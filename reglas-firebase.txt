@@ -16,9 +16,14 @@ QUÉ HACEN, EN CASTELLANO
    solo con estado "pendiente" y rol "vecino", y después no puede cambiarse
    ni el estado ni el rol. Eso solo lo hace la Administración.
 
-3. LA PRIMERA CUENTA ES LA EXCEPCIÓN. Mientras /barrio/users está vacío, la
-   primera cuenta que se crea queda como Administración. Es la única ventana
-   abierta y se cierra sola. >>> CREALA APENAS PUBLIQUES LA APP. <<<
+3. LA PRIMERA CUENTA ES LA EXCEPCIÓN. Mientras /barrio/publico/instalado no
+   existe, la primera cuenta que se crea queda como Administración y deja esa
+   marca puesta. Es la única ventana abierta del sistema y se cierra sola.
+   >>> CREALA APENAS PUBLIQUES LA APP. <<<
+   Esa marca es el ÚNICO dato público de toda la base: dice sí o no, y nada
+   más. Hace falta porque quien todavía no tiene cuenta no puede leer la lista
+   de vecinos, así que sin ella la app no sabría si ofrecer el alta de
+   Administración o un alta común.
 
 4. TRES ZONAS.
    /barrio          lo que ven todos los vecinos aprobados (pizarrón, chat,
@@ -50,11 +55,16 @@ PEGAR DESDE ACÁ
     ".write": false,
 
     "barrio": {
+      "publico": {
+        ".read": true,
+        "instalado": { ".write": "!data.exists() || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" }
+      },
+
       "users": {
         ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
         "$uid": {
           ".read": "auth.uid === $uid",
-          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/users').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val())))",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/publico/instalado').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val())))",
           "recomiendan": {
             ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
           }

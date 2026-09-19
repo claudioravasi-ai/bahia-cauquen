@@ -72,7 +72,10 @@ const Nube = {
   /* Trae todo lo que este usuario tiene permitido ver y queda escuchando. */
   async cargar(){
     const s = Store.s;
-    s.users = s.users.filter(() => false);           /* se llena desde la nube */
+    /* Se vacía todo lo que maneja la nube: si quedaron datos de la demo o de
+       otra sesión en este equipo, no tienen que subir a la base del barrio. */
+    [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff].forEach(col => { if (Array.isArray(s[col])) s[col] = []; });
+    s.notifs = []; s.motorLog = {}; this.ultimo = {};
     const yoNodo = await this.db.ref('barrio/users/' + this.uid).get().catch(() => null);
     const mio = yoNodo && yoNodo.exists() ? yoNodo.val() : null;
     Store.sesion.userId = this.uid; Store.guardarSesion();
@@ -136,6 +139,12 @@ const Nube = {
       this.ultimo.config = JSON.stringify(Store.s.config);
       if (this.arrancada) refrescar();
     });
+    /* Las marcas del motor son compartidas: así un aviso automático sale una
+       sola vez para todo el barrio y no una por equipo encendido. */
+    this.db.ref('barrio/motorLog').on('value', snap => {
+      Store.s.motorLog = snap.val() || {};
+      this.ultimo.motorLog = JSON.stringify(Store.s.motorLog);
+    });
   },
 
   recordar(col, arr){ this.ultimo[col] = {}; arr.forEach(x => { if (x && x.id) this.ultimo[col][x.id] = JSON.stringify(x); }); },
@@ -168,6 +177,8 @@ const Nube = {
     });
     const cfg = JSON.stringify(s.config);
     if (cfg !== this.ultimo.config){ poner('barrio/config', s.config); this.ultimo.config = cfg; }
+    const ml = JSON.stringify(s.motorLog || {});
+    if (ml !== this.ultimo.motorLog){ poner('barrio/motorLog', s.motorLog || {}); this.ultimo.motorLog = ml; }
     const n = Object.keys(cambios).length;
     if (n) this.db.ref().update(cambios).catch(e => toast('No se pudo guardar en la nube: ' + e.message, 'alert'));
   },
@@ -180,11 +191,17 @@ const Nube = {
   async registrar(d){
     const cred = await this.auth.createUserWithEmailAndPassword(d.email, d.clave);
     const uid = cred.user.uid;
-    const primero = !(await this.db.ref('barrio/users').limitToFirst(1).get()).exists();
+    /* ¿Es la primera cuenta del barrio? No se puede preguntar leyendo la lista
+       de vecinos (las reglas la tapan para quien todavía no está aprobado), así
+       que hay un único dato público: barrio/publico/instalado. Dice sí o no, y
+       nada más: ni quién, ni cuántos, ni ningún correo. */
+    let primero = false;
+    try { primero = !(await this.db.ref('barrio/publico/instalado').get()).exists(); } catch(e){}
     const u = { id:uid, nombre:d.nombre, casa:d.casa, dni:d.dni, email:d.email, tel:d.tel || '',
       rol: primero ? 'admin' : 'vecino', estado: primero ? 'aprobado' : 'pendiente',
       consentimiento:Date.now(), createdAt:Date.now() };
     await this.db.ref('barrio/users/' + uid).set(u);
+    if (primero) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
     return u;
   },
   async salir(){ try { await this.auth.signOut(); } catch(e){} },
