@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b3d3a">
+<title>Barrio Bahía Cauquén — App del barrio</title>
+<style>
+:root{
+  --bg:#eef3f1; --card:#ffffff; --ink:#0c1f1c; --muted:#6b807b;
+  --line:#e4ece9; --brand:#0f8a7e; --brand-2:#14b8a6;
+  --alerta:#ef4444; --warn:#f59e0b; --evento:#8b5cf6;
+  --r:20px;
+  --sh-sm:0 1px 2px rgba(12,31,28,.05), 0 2px 8px rgba(12,31,28,.04);
+  --sh-md:0 4px 12px rgba(12,31,28,.07), 0 12px 32px rgba(12,31,28,.06);
+  --portada-img: url('portada.jpg');
+  --logo-img: url('logo.jpg');
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:#c9d6d2;color:var(--ink);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow:hidden;
+}
+button{font-family:inherit}
+input,textarea,select{font-family:inherit;max-width:100%}
+
+.app{
+  width:100%;max-width:100%;margin:0 auto;
+  height:100vh;height:100dvh;
+  display:flex;flex-direction:column;background:var(--bg);
+  box-shadow:0 0 80px rgba(0,0,0,.14);position:relative;overflow:hidden;
+}
+main{
+  position:relative;z-index:1;flex:1;overflow-y:auto;overflow-x:hidden;
+  padding:0 0 110px;-webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;scrollbar-color:#c4d4d0 transparent;
+}
+main::-webkit-scrollbar{width:6px}
+main::-webkit-scrollbar-thumb{background:#c4d4d0;border-radius:3px}
+
+.portada{
+  position:relative;z-index:10;width:100%;height:190px;
+  background-image:var(--portada-img);
+  background-size:cover;background-position:center 55%;
+  background-color:#0b3d3a;border-radius:0 0 28px 28px;overflow:hidden;
+  box-shadow:0 10px 30px rgba(11,61,58,.25);
+}
+.portada::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(11,61,58,.10) 0%,rgba(11,61,58,.20) 45%,rgba(11,61,58,.85) 100%);
+}
+.portada-info{
+  position:absolute;left:16px;right:16px;bottom:14px;z-index:2;color:#fff;
+  display:flex;align-items:center;gap:12px;
+}
+.portada-logo{
+  width:56px;height:56px;flex:none;border-radius:15px;
+  background-image:var(--logo-img);
+  background-size:cover;background-position:center 40%;
+  background-color:#0f8a7e;border:2.5px solid rgba(255,255,255,.92);
+  box-shadow:0 6px 18px rgba(0,0,0,.4);
+}
+.portada-txt{min-width:0;flex:1}
+.portada-txt h1{
+  margin:0;font-size:19px;font-weight:800;letter-spacing:-.4px;line-height:1.15;
+  text-shadow:0 2px 10px rgba(0,0,0,.6);
+}
+.portada-txt small{
+  display:flex;align-items:center;gap:5px;
+  font-size:11px;color:rgba(255,255,255,.92);font-weight:500;margin-top:2px;
+  text-shadow:0 1px 6px rgba(0,0,0,.6);
+}
+.topbar{
+  position:relative;z-index:5;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 16px 8px;background:transparent;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 200px}
+.logo-mini{
+  width:36px;height:36px;flex:none;border-radius:11px;
+  background-image:var(--logo-img);
+  background-size:cover;background-position:center 40%;
+  background-color:#0f8a7e;border:2px solid #fff;
+  box-shadow:0 3px 10px rgba(11,61,58,.3);
+}
+.brand strong{
+  display:block;font-size:13.5px;font-weight:750;letter-spacing:-.2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.brand small{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);font-weight:600}
+.pulse-dot{
+  width:6px;height:6px;border-radius:50%;background:#22c55e;
+  box-shadow:0 0 0 0 rgba(34,197,94,.7);animation:pulse 2s infinite;
+}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.btn-nuevo{
+  display:flex;align-items:center;gap:6px;
+  background:linear-gradient(135deg,#0f8a7e,#14b8a6);
+  border:0;color:#fff;padding:9px 15px;border-radius:999px;
+  font-size:13px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 14px rgba(15,138,126,.32);
+  transition:transform .12s, box-shadow .2s;white-space:nowrap;
+}
+.btn-nuevo:hover{box-shadow:0 6px 20px rgba(15,138,126,.42)}
+.btn-nuevo:active{transform:scale(.94)}
+
+.content{padding:6px 14px 0;position:relative;z-index:1}
+.view-anim{animation:viewIn .38s cubic-bezier(.22,1,.36,1)}
+@keyframes viewIn{from{opacity:0;transform:translateY(10px) scale(.995)}to{opacity:1;transform:none}}
+
+.card{
+  background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:12px;
+  box-shadow:var(--sh-sm);border:1px solid rgba(228,236,233,.9);
+  transition:box-shadow .25s;animation:cardIn .4s cubic-bezier(.22,1,.36,1) backwards;
+  max-width:100%;overflow-wrap:break-word;
+}
+@keyframes cardIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.card:hover{box-shadow:var(--sh-md)}
+.post{position:relative;overflow:hidden}
+.post::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:4px;
+  background:linear-gradient(180deg,var(--brand),var(--brand-2));
+  opacity:0;transition:opacity .3s;
+}
+.post.t-alerta::before{background:linear-gradient(180deg,#f87171,#dc2626);opacity:1}
+.post.t-aviso::before{background:linear-gradient(180deg,var(--brand),var(--brand-2));opacity:1}
+.post.t-ofrezco::before{background:linear-gradient(180deg,#38bdf8,#0369a1);opacity:1}
+.post.t-busco::before{background:linear-gradient(180deg,#fbbf24,#d97706);opacity:1}
+.post.t-evento::before{background:linear-gradient(180deg,#a78bfa,#6d28d9);opacity:1}
+
+.post-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.avatar{
+  width:38px;height:38px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-size:15px;font-weight:700;color:#fff;box-shadow:0 3px 8px rgba(0,0,0,.13);letter-spacing:-.5px;
+}
+.who{min-width:0;flex:1}
+.who b{display:block;font-size:13.5px;font-weight:650;line-height:1.25}
+.who span{display:block;font-size:11.5px;color:var(--muted)}
+.post-time{font-size:11px;color:var(--muted);background:#e3ebe8;padding:4px 9px;border-radius:999px;white-space:nowrap;font-weight:500}
+.tipo-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:750;padding:4px 10px;border-radius:999px;letter-spacing:.2px;margin-bottom:9px}
+.tp-alerta{background:#fee2e2;color:#b91c1c}
+.tp-aviso{background:#ccfbf1;color:#0f766e}
+.tp-ofrezco{background:#e0f2fe;color:#075985}
+.tp-busco{background:#fef3c7;color:#92400e}
+.tp-evento{background:#ede9fe;color:#6d28d9}
+.post-title{margin:0 0 6px;font-size:16.5px;font-weight:700;letter-spacing:-.3px;line-height:1.32}
+.post-body{margin:0 0 10px;color:#3f5450;font-size:14.3px;white-space:pre-wrap}
+.precio{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#ecfdf5,#ccfbf1);color:#0f766e;font-weight:750;font-size:12.5px;padding:5px 12px;border-radius:999px;margin-bottom:4px;border:1px solid #a7f3d0}
+.post-foot{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
+
+.reactions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.rx{
+  display:inline-flex;align-items:center;gap:4px;background:#e3ebe8;border:1px solid transparent;
+  padding:5px 11px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;color:#4a5f5a;
+  transition:transform .15s, background .2s, border-color .2s;user-select:none;
+}
+.rx:hover{transform:translateY(-1px);background:#dbe6e3}
+.rx:active{transform:scale(.92)}
+.rx.on{background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-color:#6ee7b7;color:#065f46}
+.rx .n{font-size:11.5px;font-variant-numeric:tabular-nums}
+.rx.pop{animation:rxPop .35s cubic-bezier(.34,1.56,.64,1)}
+@keyframes rxPop{0%{transform:scale(1)}45%{transform:scale(1.22)}100%{transform:scale(1)}}
+
+.act{
+  display:inline-flex;align-items:center;gap:6px;background:transparent;border:0;
+  padding:7px 11px;border-radius:10px;color:var(--muted);font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:background .18s, color .18s;
+}
+.act:hover{background:#e3ebe8;color:var(--brand)}
+.act:active{transform:scale(.95)}
+.act.wa{background:#dcfce7;color:#15803d;margin-left:auto}
+.act.wa:hover{background:#bbf7d0}
+.act.privado{background:#ede9fe;color:#6d28d9;margin-left:auto}
+.act.privado:hover{background:#ddd6fe}
+
+.comments{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);animation:slideDown .3s cubic-bezier(.22,1,.36,1)}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px);max-height:0}to{opacity:1;transform:none;max-height:1200px}}
+.cmt{display:flex;gap:9px;margin-bottom:10px}
+.cmt .avatar{width:28px;height:28px;font-size:11.5px}
+.cmt-body{flex:1;min-width:0}
+.cmt-bubble{background:#e3ebe8;border-radius:12px;border-top-left-radius:4px;padding:8px 12px}
+.cmt-bubble b{font-size:12.5px;display:block;margin-bottom:1px}
+.cmt-bubble p{margin:0;font-size:13.5px;color:#3f5450;word-break:break-word}
+.cmt-time{font-size:10.5px;color:var(--muted);margin:3px 0 0 4px}
+.cmt-form{display:flex;gap:7px;margin-top:8px}
+.cmt-form input{flex:1;padding:9px 14px;border-radius:999px;font-size:13.5px}
+.cmt-form button{
+  width:38px;height:38px;flex:none;border:0;border-radius:50%;
+  background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;cursor:pointer;
+  font-size:14px;display:grid;place-items:center;
+  box-shadow:0 3px 10px rgba(15,138,126,.35);transition:transform .15s;
+}
+.cmt-form button:active{transform:scale(.88)}
+
+.scroll-x{
+  display:flex;gap:8px;padding:2px 2px 10px;margin-bottom:6px;
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  -webkit-mask-image:linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+}
+.scroll-x::-webkit-scrollbar{display:none}
+.chip{
+  flex:none;border:1px solid var(--line);background:#fff;color:#435854;
+  padding:8px 15px;border-radius:999px;font-size:13px;font-weight:600;
+  cursor:pointer;white-space:nowrap;transition:all .2s cubic-bezier(.22,1,.36,1);
+  box-shadow:0 1px 2px rgba(12,31,28,.04);
+}
+.chip:hover{border-color:#b8ccc7;transform:translateY(-1px)}
+.chip:active{transform:scale(.96)}
+.chip.active{background:linear-gradient(135deg,#0f8a7e,#14b8a6);border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(15,138,126,.32)}
+
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:750;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.7px}
+input,textarea,select{
+  width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:13px;
+  font-size:15px;background:#f9fcfb;color:var(--ink);transition:border-color .2s, box-shadow .2s, background .2s;
+}
+input::placeholder,textarea::placeholder{color:#a8b8b4}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--brand-2);background:#fff;box-shadow:0 0 0 4px rgba(20,184,166,.12)}
+textarea{resize:vertical;min-height:76px;line-height:1.5}
+select{
+  cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b807b' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;
+}
+.btn-primary{
+  background:linear-gradient(135deg,#0f8a7e,#14b8a6);color:#fff;border:0;
+  padding:12px 18px;border-radius:13px;font-size:14px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 14px rgba(15,138,126,.32);transition:transform .15s, box-shadow .25s;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+}
+.btn-primary:hover{box-shadow:0 6px 20px rgba(15,138,126,.42)}
+.btn-primary:active{transform:scale(.97)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-block{width:100%;padding:14px;font-size:15px;margin-top:4px}
+.btn-ghost{
+  background:#e3ebe8;color:var(--brand);border:0;padding:8px 13px;border-radius:10px;
+  font-size:12.5px;font-weight:650;cursor:pointer;text-decoration:none;
+  display:inline-flex;align-items:center;gap:5px;transition:background .18s;
+}
+.btn-ghost:hover{background:#d5e3df}
+.btn-danger{
+  width:100%;background:#fff;border:1.5px solid #fecaca;color:#dc2626;
+  padding:13px;border-radius:13px;font-size:13.5px;font-weight:650;cursor:pointer;transition:background .18s;
+}
+.btn-danger:hover{background:#fef2f2}
+.btn-mini{
+  padding:6px 12px;border-radius:9px;border:0;font-size:12px;font-weight:700;
+  cursor:pointer;transition:transform .15s;
+}
+.btn-mini:active{transform:scale(.94)}
+.btn-aprobar{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+.btn-rechazar{background:#fee2e2;color:#b91c1c}
+.btn-eliminar{background:#f3f4f6;color:#6b7280}
+
+.chat{display:flex;flex-direction:column;gap:10px;min-height:calc(100dvh - 420px);padding-bottom:8px}
+.msg{max-width:84%;align-self:flex-start;animation:msgIn .35s cubic-bezier(.22,1,.36,1) backwards}
+@keyframes msgIn{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:none}}
+.msg.mine{align-self:flex-end}
+.msg__meta{font-size:10.5px;color:var(--muted);margin:0 0 4px 12px;display:flex;align-items:center;gap:5px;font-weight:500}
+.msg.mine .msg__meta{justify-content:flex-end;margin:0 12px 4px 0}
+.msg__bubble{
+  background:#fff;padding:10px 14px;border-radius:18px;border-top-left-radius:6px;
+  font-size:14.3px;word-break:break-word;box-shadow:var(--sh-sm);
+  border:1px solid rgba(228,236,233,.9);line-height:1.45;
+}
+.msg.mine .msg__bubble{
+  background:linear-gradient(135deg,#0f8a7e,#14b8a6);color:#fff;border:0;
+  border-radius:18px;border-top-right-radius:6px;border-top-left-radius:18px;
+  box-shadow:0 4px 14px rgba(15,138,126,.3);
+}
+.chatbar{
+  position:sticky;bottom:-20px;display:flex;gap:9px;padding:12px 0 8px;margin-top:8px;
+  background:linear-gradient(180deg,rgba(238,243,241,0) 0%,var(--bg) 35%);
+}
+.chatbar input{border-radius:999px;padding:13px 18px}
+.chatbar button{border-radius:50%;width:48px;height:48px;padding:0;font-size:17px;flex:none}
+
+.privado-burbuja{background:linear-gradient(135deg,#f5f3ff,#ede9fe) !important;border-color:#ddd6fe !important}
+.privado-burbuja.mine{background:linear-gradient(135deg,#6d28d9,#8b5cf6) !important;color:#fff !important}
+.privado-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.privado-avatar{
+  width:42px;height:42px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:linear-gradient(135deg,#6d28d9,#8b5cf6);color:#fff;font-size:17px;font-weight:700;
+  box-shadow:0 4px 12px rgba(109,40,217,.35);
+}
+.privado-header b{display:block;font-size:14.5px}
+.privado-header span{display:block;font-size:11.5px;color:var(--muted)}
+
+.tabbar{
+  position:relative;z-index:20;display:flex;background:rgba(255,255,255,.95);
+  backdrop-filter:blur(18px) saturate(1.6);border-top:1px solid rgba(228,236,233,.9);
+  padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 24px rgba(12,31,28,.06);
+  flex:none;
+}
+.tab-indicator{
+  position:absolute;top:0;left:0;width:16.666%;height:3px;
+  display:flex;justify-content:center;pointer-events:none;
+  transition:transform .34s cubic-bezier(.34,1.3,.5,1);
+}
+.tab-indicator::after{content:"";width:30px;height:3px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,var(--brand),var(--brand-2));box-shadow:0 2px 8px rgba(15,138,126,.5)}
+.tabbar button{
+  flex:1;border:0;background:none;padding:10px 2px 11px;font-size:9.5px;font-weight:600;
+  color:#8fa5a0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:color .22s;position:relative;
+}
+.tabbar button span{font-size:20px;line-height:1;transition:transform .28s cubic-bezier(.34,1.56,.64,1);filter:grayscale(.55) opacity(.65)}
+.tabbar button.active{color:var(--brand)}
+.tabbar button.active span{transform:translateY(-2px) scale(1.14);filter:none}
+.tabbar button:active span{transform:scale(.88)}
+
+.fab{
+  position:absolute;right:18px;bottom:calc(78px + env(safe-area-inset-bottom));
+  width:58px;height:58px;border-radius:50%;border:0;
+  background:linear-gradient(135deg,#0f8a7e,#14b8a6 60%,#06b6d4);
+  color:#fff;font-size:26px;font-weight:300;line-height:1;cursor:pointer;z-index:25;
+  display:grid;place-items:center;
+  box-shadow:0 8px 24px rgba(15,138,126,.45), 0 2px 6px rgba(15,138,126,.3);
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s;
+}
+.fab:hover{transform:scale(1.07) rotate(90deg);box-shadow:0 12px 32px rgba(15,138,126,.55)}
+.fab:active{transform:scale(.92) rotate(90deg)}
+.fab::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid rgba(20,184,166,.4);animation:fabPulse 2.6s ease-out infinite}
+@keyframes fabPulse{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.35);opacity:0}}
+
+dialog{
+  border:0;padding:0;border-radius:26px;width:min(520px,calc(100vw - 24px));
+  max-height:92dvh;background:#fff;
+  box-shadow:0 12px 32px rgba(12,31,28,.12), 0 32px 64px rgba(12,31,28,.10);
+  overflow:hidden;
+}
+dialog::backdrop{background:rgba(8,28,25,.55);backdrop-filter:blur(4px)}
+dialog[open]{animation:dlgIn .34s cubic-bezier(.34,1.3,.5,1)}
+@keyframes dlgIn{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
+.dlg-head{
+  display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px;
+  background:linear-gradient(135deg,#0b3d3a,#0f8a7e);color:#fff;border-radius:26px 26px 0 0;
+}
+.dlg-head h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-.2px}
+.icon-btn{
+  border:0;background:rgba(255,255,255,.18);width:34px;height:34px;border-radius:50%;
+  font-size:15px;cursor:pointer;color:#fff;display:grid;place-items:center;
+  transition:background .18s, transform .15s;
+}
+.icon-btn:hover{background:rgba(255,255,255,.3)}
+.icon-btn:active{transform:scale(.9)}
+.dlg-body{padding:18px 20px 20px;overflow-y:auto;max-height:calc(92dvh - 76px)}
+
+.vacio{text-align:center;color:var(--muted);padding:52px 24px;font-size:14px;line-height:1.6}
+.vacio .em{display:block;font-size:44px;margin-bottom:12px;opacity:.55}
+.banner{
+  background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fed7aa;color:#9a3412;
+  padding:13px 15px;border-radius:15px;font-size:13px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;animation:cardIn .5s backwards;
+}
+.banner .em{font-size:20px;flex:none}
+.banner.verde{
+  background:linear-gradient(135deg,#ecfdf5,#d1fae5);border-color:#6ee7b7;color:#065f46;
+}
+.banner.violeta{
+  background:linear-gradient(135deg,#f5f3ff,#ede9fe);border-color:#ddd6fe;color:#5b21b6;
+}
+.banner.rojo{
+  background:linear-gradient(135deg,#fef2f2,#fee2e2);border-color:#fecaca;color:#991b1b;
+}
+.num{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px;gap:10px}
+.num:last-child{border:0}
+.num a{color:var(--brand);font-weight:700;text-decoration:none;background:#e3ebe8;padding:5px 12px;border-radius:999px;font-size:13px;transition:background .18s;white-space:nowrap}
+.num a:hover{background:#d5e3df}
+h3.sec{font-size:11.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:20px 0 10px;font-weight:750}
+h3.sec:first-child{margin-top:4px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.row{display:flex;align-items:center}
+.between{justify-content:space-between}
+.gap8{gap:8px}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:14px}
+.stat{background:#fff;border-radius:16px;padding:14px 10px;text-align:center;box-shadow:var(--sh-sm);border:1px solid rgba(228,236,233,.9)}
+.stat b{display:block;font-size:22px;font-weight:750;color:var(--brand);letter-spacing:-.5px}
+.stat span{font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+#toasts{position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:min(420px,calc(100vw - 28px))}
+.toast{background:linear-gradient(135deg,#0b3d3a,#0f8a7e);color:#fff;padding:12px 18px;border-radius:14px;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(11,61,58,.35);display:flex;align-items:center;gap:10px;animation:toastIn .4s cubic-bezier(.34,1.4,.5,1)}
+.toast.out{animation:toastOut .3s forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(-16px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-12px) scale(.95)}}
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap .ic{position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:15px;opacity:.5;pointer-events:none}
+.search-wrap input{padding-left:42px;border-radius:999px}
+.dir-item{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);gap:10px;flex-wrap:wrap}
+.dir-item:last-child{border:0}
+.dir-info{min-width:0;flex:1 1 180px}
+.dir-info b{font-size:13.5px;display:block;line-height:1.3}
+.dir-info span{font-size:12px;color:var(--muted);display:block}
+.dir-tel{flex:0 1 auto;text-align:right}
+.dir-tel a{display:inline-block;background:linear-gradient(135deg,#0f8a7e,#14b8a6);color:#fff;text-decoration:none;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;box-shadow:0 3px 10px rgba(15,138,126,.25);transition:transform .15s, box-shadow .2s;white-space:nowrap}
+.dir-tel a:active{transform:scale(.94)}
+.dir-tel .sin-tel{font-size:11px;color:#a8b8b4}
+
+.expensas-hero{
+  background:linear-gradient(135deg,#0b3d3a,#0f8a7e);
+  border-radius:var(--r);padding:24px 20px;color:#fff;margin-bottom:14px;
+  text-align:center;box-shadow:0 8px 28px rgba(11,61,58,.28);
+}
+.expensas-hero .em{font-size:44px;display:block;margin-bottom:8px}
+.expensas-hero h2{margin:0 0 4px;font-size:20px;font-weight:800;letter-spacing:-.3px}
+.expensas-hero p{margin:0 0 16px;font-size:13.5px;color:rgba(255,255,255,.85);line-height:1.5}
+.expensas-hero .btn-primary{
+  background:#fff;color:#0f766e;box-shadow:0 4px 16px rgba(0,0,0,.15);
+  padding:14px 24px;font-size:15px;border-radius:999px;
+}
+.expensas-hero .btn-primary:hover{box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.expensas-info{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.expensas-paso{
+  display:flex;align-items:flex-start;gap:12px;background:#fff;
+  border-radius:16px;padding:14px;box-shadow:var(--sh-sm);border:1px solid rgba(228,236,233,.9);
+}
+.expensas-paso .num{
+  width:28px;height:28px;border-radius:50%;flex:none;
+  background:linear-gradient(135deg,#0f8a7e,#14b8a6);color:#fff;
+  display:grid;place-items:center;font-size:13px;font-weight:800;
+}
+.expensas-paso .txt{min-width:0;flex:1}
+.expensas-paso .txt b{display:block;font-size:14px;margin-bottom:2px}
+.expensas-paso .txt span{font-size:12.5px;color:var(--muted);line-height:1.45}
+
+/* ===== REGISTRO / ADMIN ===== */
+.registro-hero{
+  background:linear-gradient(135deg,#5b21b6,#7c3aed 60%,#a78bfa);
+  border-radius:var(--r);padding:24px 20px;color:#fff;margin-bottom:14px;
+  text-align:center;box-shadow:0 8px 28px rgba(91,33,182,.35);
+}
+.registro-hero .em{font-size:44px;display:block;margin-bottom:8px}
+.registro-hero h2{margin:0 0 6px;font-size:19px;font-weight:800;letter-spacing:-.3px}
+.registro-hero p{margin:0;font-size:13px;color:rgba(255,255,255,.9);line-height:1.5}
+
+.clave-caja{
+  background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+  border:2px dashed #6ee7b7;border-radius:16px;
+  padding:16px;text-align:center;margin-bottom:12px;
+}
+.clave-caja .etiqueta{font-size:11px;color:#065f46;font-weight:750;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.clave-caja .valor{
+  font-family:'SF Mono',Menlo,monospace;font-size:22px;font-weight:800;
+  color:#065f46;letter-spacing:3px;word-break:break-all;
+}
+
+.admin-card{
+  background:linear-gradient(135deg,#1e1b4b,#4c1d95);
+  color:#fff;border-radius:var(--r);padding:18px;margin-bottom:14px;
+  box-shadow:0 8px 28px rgba(30,27,75,.35);
+}
+.admin-card .cabecera{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px}
+.admin-card h3{margin:0;font-size:16px;font-weight:800;letter-spacing:-.2px}
+.admin-card .badge{
+  font-size:10px;background:rgba(255,255,255,.18);padding:4px 10px;border-radius:999px;font-weight:700;
+}
+.solicitud-card{
+  background:#fff;border:1.5px solid #e4ece9;border-radius:16px;
+  padding:14px;margin-bottom:10px;box-shadow:var(--sh-sm);
+  animation:cardIn .4s cubic-bezier(.22,1,.36,1) backwards;
+}
+.solicitud-card.pendiente{border-color:#fbbf24;background:linear-gradient(180deg,#fff 0%,#fffbf2 100%)}
+.solicitud-card.aprobado{border-color:#6ee7b7;background:linear-gradient(180deg,#fff 0%,#f0fdf4 100%)}
+.solicitud-card.rechazado{border-color:#fecaca;background:linear-gradient(180deg,#fff 0%,#fef2f2 100%);opacity:.75}
+.sol-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.sol-info b{display:block;font-size:14.5px}
+.sol-info span{display:block;font-size:12px;color:var(--muted)}
+.sol-estado{
+  font-size:10px;font-weight:800;padding:4px 10px;border-radius:999px;
+  text-transform:uppercase;letter-spacing:.4px;white-space:nowrap;
+}
+.sol-estado.pendiente{background:#fef3c7;color:#92400e}
+.sol-estado.aprobado{background:#d1fae5;color:#065f46}
+.sol-estado.rechazado{background:#fee2e2;color:#991b1b}
+.sol-datos{
+  font-size:12.5px;color:#3f5450;background:#f9fcfb;border-radius:10px;
+  padding:10px 12px;margin-bottom:10px;line-height:1.6;
+}
+.sol-datos div{margin-bottom:2px}
+.sol-datos div:last-child{margin-bottom:0}
+.sol-datos b{color:#0c1f1c;font-weight:650}
+.sol-acciones{display:flex;gap:8px;flex-wrap:wrap}
+
+.admin-chat-lista .card{
+  cursor:pointer;transition:transform .18s, box-shadow .25s;
+}
+.admin-chat-lista .card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 8px 20px rgba(12,31,28,.1);
+}
+
+.candado{
+  text-align:center;padding:36px 20px;
+}
+.candado .em{font-size:52px;margin-bottom:14px;display:block}
+.candado h3{margin:0 0 8px;font-size:17px;font-weight:750}
+.candado p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (min-width: 640px){
+  .portada{height:220px;border-radius:0 0 32px 32px}
+  .portada-logo{width:66px;height:66px}
+  .portada-txt h1{font-size:22px}
+  .topbar{padding:14px 22px 10px}
+  .content{padding:8px 22px 0}
+  .scroll-x{flex-wrap:wrap;overflow-x:visible;mask-image:none;-webkit-mask-image:none;padding-bottom:6px}
+  .chat{min-height:calc(100dvh - 460px)}
+}
+@media (min-width: 1000px){
+  body{padding:24px;display:flex;align-items:center;justify-content:center;background:#b8c8c3}
+  .app{max-width:900px;height:min(920px, calc(100dvh - 48px));border-radius:28px;
+    box-shadow:0 24px 60px rgba(12,31,28,.18), 0 8px 24px rgba(12,31,28,.12);}
+  .portada{height:250px;border-radius:28px 28px 0 0}
+  .portada-logo{width:72px;height:72px}
+  .portada-txt h1{font-size:24px}
+  .portada-info{left:24px;right:24px;bottom:20px}
+  .topbar{padding:16px 26px 12px}
+  .content{padding:10px 26px 0}
+  .chat{min-height:calc(920px - 480px)}
+  .fab{right:32px;bottom:100px;width:62px;height:62px;font-size:28px}
+  .tabbar button{font-size:11px;padding:12px 4px 13px}
+  .tabbar button span{font-size:23px}
+  dialog{max-width:540px}
+}
+@media (min-width: 1200px){
+  .app{max-width:1100px;height:min(940px, calc(100dvh - 48px))}
+  #content.masonry{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:start}
+  #content.masonry > .card{grid-column:span 1}
+  #content.masonry > .banner,
+  #content.masonry > .scroll-x,
+  #content.masonry > h3.sec,
+  #content.masonry > .search-wrap,
+  #content.masonry > .stats,
+  #content.masonry > .vacio,
+  #content.masonry > .expensas-hero,
+  #content.masonry > .registro-hero{grid-column:1/-1}
+}
+@media (max-width: 380px){
+  .tabbar button{font-size:8.5px;padding:9px 1px 10px;gap:2px}
+  .tabbar button span{font-size:18px}
+  .portada{height:160px}
+  .portada-txt h1{font-size:17px}
+  .portada-logo{width:48px;height:48px}
+  .btn-nuevo{padding:8px 12px;font-size:12px}
+}
+@media (max-height: 480px) and (max-width: 900px){
+  .portada{height:130px}
+  .portada-logo{width:44px;height:44px}
+  .portada-txt h1{font-size:16px}
+}
+
+#filePortada, #fileLogo{display:none}
+</style>
+</head>
+<body>
+
+<div id="toasts"></div>
+
+<div class="app" id="appRoot">
+  <main id="main">
+    <div class="portada">
+      <div class="portada-info">
+        <div class="portada-logo"></div>
+        <div class="portada-txt">
+          <h1>Barrio Bahía Cauquén</h1>
+          <small><span class="pulse-dot"></span><span id="statusLine">Modo demo · local</span></small>
+        </div>
+      </div>
+    </div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo-mini"></div>
+        <div style="min-width:0;flex:1">
+          <strong id="barrioName">Barrio Bahía Cauquén</strong>
+          <small>App vecinal oficial</small>
+        </div>
+      </div>
+      <button class="btn-nuevo" data-action="nuevo">＋ Publicar</button>
+    </header>
+
+    <div class="alerta-fotos oculto" id="alertaFotos" style="margin:12px 14px 4px;background:linear-gradient(135deg,#fff7ed,#fed7aa);border:1.5px solid #fb923c;color:#9a3412;padding:14px 16px;border-radius:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 20px rgba(251,146,60,.2);">
+      <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:750;">
+        <span style="font-size:22px">📸</span><span>Faltan las fotos del barrio</span>
+      </div>
+      <p style="margin:0;font-size:12.5px;line-height:1.5;color:#7c2d12;">La portada y el logo no se cargaron. Podés subirlas desde tu celular — quedan guardadas en la app.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-primary" data-action="cargar-portada" style="flex:1 1 140px;font-size:13px;padding:11px;">🖼️ Elegir portada</button>
+        <button class="btn-ghost" data-action="cargar-logo" style="flex:1 1 140px;justify-content:center;padding:11px;">🏠 Elegir logo</button>
+      </div>
+    </div>
+
+    <div class="content" id="content"></div>
+  </main>
+
+  <button class="fab" data-action="nuevo" title="Nueva publicación">＋</button>
+
+  <nav class="tabbar" id="tabbar">
+    <div class="tab-indicator" id="tabInd"></div>
+    <button data-action="tab" data-val="muro" class="active"><span>📣</span>Muro</button>
+    <button data-action="tab" data-val="servicios"><span>🛠️</span>Servicios</button>
+    <button data-action="tab" data-val="agenda"><span>📞</span>Agenda</button>
+    <button data-action="tab" data-val="chat"><span>💬</span>Chat</button>
+    <button data-action="tab" data-val="privado"><span>🔒</span>Privado</button>
+    <button data-action="tab" data-val="expensas"><span>💰</span>Expensas</button>
+  </nav>
+</div>
+
+<input type="file" id="filePortada" accept="image/*">
+<input type="file" id="fileLogo" accept="image/*">
+
+<dialog id="dlgNuevo">
+  <form id="formNuevo">
+    <div class="dlg-head">
+      <h2>✨ Nueva publicación</h2>
+      <button type="button" class="icon-btn" data-action="cerrar">✕</button>
+    </div>
+    <div class="dlg-body">
+      <div class="field">
+        <label>Tipo</label>
+        <div class="scroll-x" id="tipoChips" style="padding-bottom:4px;margin-bottom:0">
+          <button type="button" class="chip active" data-tipo="aviso">📌 Aviso</button>
+          <button type="button" class="chip" data-tipo="alerta">🚨 Alerta</button>
+          <button type="button" class="chip" data-tipo="ofrezco">🛠️ Ofrezco</button>
+          <button type="button" class="chip" data-tipo="busco">🔎 Busco</button>
+          <button type="button" class="chip" data-tipo="evento">📅 Evento</button>
+        </div>
+        <input type="hidden" name="type" id="inputTipo" value="aviso">
+      </div>
+      <div class="field"><label>Título</label><input name="title" required maxlength="80" placeholder="Ej: Corte de agua mañana 9 a 14 hs"></div>
+      <div class="field"><label>Detalle</label><textarea name="body" maxlength="600" placeholder="Contá un poco más…"></textarea></div>
+      <div class="field" id="fieldCat" hidden><label>Categoría</label><select name="category" id="selectCat"></select></div>
+      <div class="field" id="fieldPrecio" hidden><label>Precio / tarifa (opcional)</label><input name="price" maxlength="30" placeholder="Ej: $8.000 por hora"></div>
+      <button class="btn-primary btn-block" type="submit">Publicar en el muro</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO CLAVE ADMINISTRADOR ============ -->
+<dialog id="dlgAdmin">
+  <form id="formAdmin">
+    <div class="dlg-head" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);">
+      <h2>🛡️ Acceso Administrador</h2>
+      <button type="button" class="icon-btn" data-action="cerrar-admin">✕</button>
+    </div>
+    <div class="dlg-body">
+      <p class="muted small" style="margin:0 0 14px">Ingresá la clave privada del administrador del barrio para acceder al panel.</p>
+      <div class="field">
+        <label>Clave privada</label>
+        <input type="password" id="inputClaveAdmin" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="off" required>
+      </div>
+      <button class="btn-primary btn-block" type="submit" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);">🛡️ Ingresar al panel</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+/* =========================================================
+   FOTOS DEL BARRIO
+   ========================================================= */
+const KEY_PORTADA = 'bhc_portada_img';
+const KEY_LOGO = 'bhc_logo_img';
+
+function comprimirImagen(file, maxW = 1600, maxH = 1200, quality = 0.85){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        const ratio = Math.min(maxW / w, maxH / h, 1);
+        w = Math.round(w * ratio); h = Math.round(h * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        try { resolve(canvas.toDataURL('image/jpeg', quality)); }
+        catch(err){ reject(err); }
+      };
+      img.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function aplicarFotos(){
+  const p = localStorage.getItem(KEY_PORTADA);
+  const l = localStorage.getItem(KEY_LOGO);
+  const root = document.documentElement;
+  if (p) root.style.setProperty('--portada-img', `url('${p}')`);
+  if (l) root.style.setProperty('--logo-img', `url('${l}')`);
+  return { tienePortada: !!p, tieneLogo: !!l };
+}
+
+function detectarFotosFaltantes(){
+  return new Promise(resolve => {
+    const t = { portada: false, logo: false };
+    let pendientes = 2;
+    const check = (tipo, url) => {
+      const img = new Image();
+      img.onload = () => { t[tipo] = true; if (--pendientes === 0) resolve(t); };
+      img.onerror = () => { if (--pendientes === 0) resolve(t); };
+      img.src = url + '?v=' + Date.now();
+    };
+    check('portada', 'portada.jpg');
+    check('logo', 'logo.jpg');
+  });
+}
+
+async function inicializarFotos(){
+  const g = aplicarFotos();
+  if (g.tienePortada && g.tieneLogo){
+    document.getElementById('alertaFotos').classList.add('oculto');
+    return;
+  }
+  await new Promise(r => setTimeout(r, 400));
+  const e = await detectarFotosFaltantes();
+  if (!g.tienePortada || !g.tieneLogo || !e.portada || !e.logo){
+    document.getElementById('alertaFotos').classList.remove('oculto');
+  }
+}
+
+document.getElementById('filePortada').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    toast('Procesando imagen…', '⏳');
+    const b64 = await comprimirImagen(f, 1600, 1200, 0.85);
+    localStorage.setItem(KEY_PORTADA, b64);
+    document.documentElement.style.setProperty('--portada-img', `url('${b64}')`);
+    toast('¡Portada actualizada!', '🖼️');
+    document.getElementById('alertaFotos').classList.add('oculto');
+  } catch(err){ toast('No se pudo cargar la imagen', '⚠️'); }
+  e.target.value = '';
+});
+
+document.getElementById('fileLogo').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    toast('Procesando imagen…', '⏳');
+    const b64 = await comprimirImagen(f, 600, 600, 0.9);
+    localStorage.setItem(KEY_LOGO, b64);
+    document.documentElement.style.setProperty('--logo-img', `url('${b64}')`);
+    toast('¡Logo actualizado!', '🏠');
+    if (localStorage.getItem(KEY_PORTADA)) document.getElementById('alertaFotos').classList.add('oculto');
+  } catch(err){ toast('No se pudo cargar la imagen', '⚠️'); }
+  e.target.value = '';
+});
+
+/* =========================================================
+   CONFIG Y UTILIDADES
+   ========================================================= */
+const FIREBASE_CONFIG = null;
+const CLAVE_ADMIN = '0112';
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function ago(ts){
+  const d = Date.now() - ts, m = Math.floor(d / 60000);
+  if (m < 1) return 'ahora';
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60); if (h < 24) return `hace ${h} h`;
+  const dd = Math.floor(h / 24); if (dd < 7) return `hace ${dd} d`;
+  return new Date(ts).toLocaleDateString('es-AR', { day:'2-digit', month:'short' });
+}
+const hora = ts => new Date(ts).toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
+const waLink = tel => 'https://wa.me/' + String(tel).replace(/\D/g, '');
+
+const AV_COLORS = [
+  'linear-gradient(135deg,#0f8a7e,#14b8a6)','linear-gradient(135deg,#0369a1,#38bdf8)',
+  'linear-gradient(135deg,#7c3aed,#a78bfa)','linear-gradient(135deg,#be123c,#fb7185)',
+  'linear-gradient(135deg,#b45309,#fbbf24)','linear-gradient(135deg,#047857,#34d399)',
+  'linear-gradient(135deg,#c2410c,#fb923c)','linear-gradient(135deg,#1e40af,#60a5fa)',
+];
+function avColor(name){
+  let h = 0; const s = String(name || '?');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return AV_COLORS[h % AV_COLORS.length];
+}
+const inicial = n => String(n || '?').trim().charAt(0).toUpperCase() || '?';
+
+/* Genera una clave de registro legible tipo "VEC-A3F9" */
+function generarClave(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c = '';
+  for (let i = 0; i < 4; i++) c += chars[Math.floor(Math.random() * chars.length)];
+  return 'VEC-' + c;
+}
+
+const CATEGORIAS = ['Plomería','Electricidad','Jardinería','Limpieza','Niñera','Clases particulares',
+  'Mascotas','Fletes / Mudanza','Mano de obra','Comida / Catering','Tecnología','Préstamos','Otro'];
+
+const TIPOS = {
+  alerta : { label:'Alerta',  icon:'🚨', cls:'alerta'   },
+  aviso  : { label:'Aviso',   icon:'📌', cls:'aviso'    },
+  ofrezco: { label:'Ofrezco', icon:'🛠️', cls:'ofrezco'  },
+  busco  : { label:'Busco',   icon:'🔎', cls:'busco'    },
+  evento : { label:'Evento',  icon:'📅', cls:'evento'   },
+};
+const REACCIONES = ['👍','❤️','😂','👏','😮'];
+
+function toast(msg, emoji = '✅'){
+  const box = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `<span style="font-size:17px">${emoji}</span><span>${esc(msg)}</span>`;
+  box.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, 2400);
+}
+
+/* =========================================================
+   ESTADO
+   ========================================================= */
+const LS = 'bahiacauquen.v2', LSP = 'bahiacauquen.me.v2';
+let state, me, view = 'muro';
+let filtro = 'todas', catFiltro = 'todas', canal = 'general', busqueda = '';
+const openComments = new Set();
+let privadoActual = null;
+let adminLogueado = false;
+
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('bahiacauquen') : null;
+if (bc) bc.onmessage = e => {
+  if (e.data && e.data.t === 'sync'){ state = e.data.state; render(); }
+};
+
+function seed(){
+  const n = Date.now(), M = 60000, H = 3600000, D = 86400000;
+  return {
+    config: { name: 'Barrio Bahía Cauquén' },
+    posts: [
+      { id:uid(), type:'alerta', title:'Auto sospechoso en calle 3',
+        body:'Un auto gris sin patente visible dio varias vueltas. Ya avisé a la garita.',
+        author:'Seguridad', house:'Garita', phone:'', createdAt: n - 15*M,
+        reactions:{ '👀':['Lucía','Diego'], '👍':['Carla'] },
+        comments:[{ id:uid(), author:'Diego', text:'Gracias por avisar, salgo a mirar.', createdAt: n - 12*M }] },
+      { id:uid(), type:'aviso', title:'Corte de agua programado',
+        body:'Mañana de 9 a 14 hs se corta el agua por mantenimiento del tanque principal.',
+        author:'Administración', house:'Admin', phone:'', createdAt: n - 3*H,
+        reactions:{ '👍':['Lucía','Diego','Carla'] }, comments:[] },
+      { id:uid(), type:'ofrezco', title:'Clases de apoyo escolar',
+        body:'Doy clases de matemática y física para secundaria. A domicilio dentro del barrio.',
+        author:'Lucía', house:'Casa 42', phone:'5491100000001',
+        category:'Clases particulares', price:'$8.000 / hora', createdAt: n - 5*H,
+        reactions:{ '❤️':['Diego','Carla'], '👏':['Administración'] }, comments:[] },
+      { id:uid(), type:'busco', title:'¿Alguien tiene hidrolavadora?',
+        body:'Necesito lavar el frente. La devuelvo el mismo día.',
+        author:'Diego', house:'Casa 18', phone:'', category:'Préstamos',
+        createdAt: n - 8*H, reactions:{}, comments:[] },
+      { id:uid(), type:'evento', title:'Asado de cuadra el sábado',
+        body:'Nos juntamos en el quincho común a las 13 hs. Traé algo para compartir.',
+        author:'Comisión', house:'Quincho', phone:'', createdAt: n - 1*D,
+        reactions:{ '❤️':['Lucía','Diego','Carla'] },
+        comments:[{ id:uid(), author:'Carla', text:'¡Ahí estaremos! Llevo ensalada 🥗', createdAt: n - 20*H }] },
+    ],
+    msgs: [
+      { id:uid(), channel:'general', author:'Lucía', text:'¡Buen día vecinos! 🌞', createdAt: n - 40*M },
+      { id:uid(), channel:'general', author:'Diego', text:'Alguien sabe si el camión de la basura pasó hoy?', createdAt: n - 32*M },
+      { id:uid(), channel:'general', author:'Administración', text:'Sí, pasó 8:30. El jueves se adelanta a las 7.', createdAt: n - 30*M },
+      { id:uid(), channel:'seguridad', author:'Seguridad', text:'Recordatorio: cerrar portones después de las 22 hs.', createdAt: n - 2*H },
+    ],
+    /* Solicitudes de registro de vecinos */
+    solicitudes: [
+      { id:uid(), nombre:'Lucía Fernández', casa:'Casa 42', email:'lucia@mail.com', telefono:'5491100000001',
+        skills:'Clases de matemática y física', estado:'aprobado', clave:'VEC-A7F2',
+        createdAt: n - 30*D },
+      { id:uid(), nombre:'Diego Pérez', casa:'Casa 18', email:'diego@mail.com', telefono:'5491100000002',
+        skills:'Electricista matriculado', estado:'aprobado', clave:'VEC-B4K9',
+        createdAt: n - 25*D },
+      { id:uid(), nombre:'Carla Gómez', casa:'Casa 7', email:'carla@mail.com', telefono:'5491100000003',
+        skills:'Veterinaria', estado:'pendiente', clave:'', createdAt: n - 3*H },
+    ],
+    /* Chats privados — uno por vecino aprobado */
+    privados: [
+      { id:uid(), vecino:'Lucía Fernández', house:'Casa 42',
+        msgs:[
+          { id:uid(), from:'vecino', text:'Hola, quería consultar por el pago de expensas de marzo.', createdAt: n - 26*H },
+          { id:uid(), from:'admin', text:'Hola Lucía, ya está disponible el cupón. Te lo envío por mail.', createdAt: n - 25*H },
+        ] },
+      { id:uid(), vecino:'Diego Pérez', house:'Casa 18',
+        msgs:[
+          { id:uid(), from:'vecino', text:'Buenas, necesito autorización para una obra menor en el jardín.', createdAt: n - 5*H },
+        ] },
+    ],
+    neighbors: [
+      { id:uid(), name:'Lucía', house:'Casa 42', phone:'5491100000001', skills:'Clases de matemática y física' },
+      { id:uid(), name:'Diego', house:'Casa 18', phone:'5491100000002', skills:'Electricista matriculado' },
+    ],
+  };
+}
+
+function load(){
+  try { state = JSON.parse(localStorage.getItem(LS)); } catch(e){ state = null; }
+  if (!state || !state.posts) state = seed();
+  state.posts.forEach(p => {
+    if (!p.reactions) p.reactions = {};
+    if (!p.comments)  p.comments = [];
+  });
+  if (!state.privados) state.privados = [];
+  if (!state.solicitudes) state.solicitudes = [];
+  try { me = JSON.parse(localStorage.getItem(LSP)); } catch(e){ me = null; }
+  if (!me) me = { name:'', house:'', email:'', phone:'', skills:'', claveIngresada:'', registrado:false };
+  /* Compatibilidad */
+  if (me.registrado === undefined) me.registrado = false;
+  if (!me.email) me.email = '';
+  if (!me.claveIngresada) me.claveIngresada = '';
+}
+function save(broadcast = true){
+  localStorage.setItem(LS, JSON.stringify(state));
+  localStorage.setItem(LSP, JSON.stringify(me));
+  if (broadcast && bc) bc.postMessage({ t:'sync', state });
+}
+
+/* =========================================================
+   AGENDA
+   ========================================================= */
+const AGENDA = {
+  '🚨 Emergencias': [
+    { n:'Emergencias médicas (ambulancia)', d:'Hospital Regional Ushuaia', t:'107' },
+    { n:'Policía', d:'Comisaría', t:'101' },
+    { n:'Bomberos', d:'Cuartel Central', t:'100' },
+    { n:'Emergencias generales', d:'Sistema integrado', t:'911' },
+    { n:'Protección Civil Ushuaia', d:'Defensa Civil', t:'2901-577322' },
+    { n:'Vittal Emergencias Médicas', d:'Cobertura privada', t:'2901-436222' },
+  ],
+  '🏥 Hospitales': [
+    { n:'Hospital Regional Ushuaia', d:'Av. 12 de Octubre y Maipú', t:'2901-441000' },
+    { n:'Hospital Naval Ushuaia', d:'Yaganes 299', t:'2901-422038' },
+    { n:'Sanatorio San Jorge', d:'Onachaga 184', t:'2901-422635' },
+    { n:'Clínica Cruz del Sur', d:'Consultar', t:'2901-421424' },
+  ],
+  '💊 Farmacias': [
+    { n:'Farmacia Del Solier', d:'T. Villarino 474', t:'2901-431176' },
+    { n:'Farmacia Salk Centro (24 hs)', d:'San Martín 931', t:'2901-424090' },
+    { n:'Farmacia Bahía', d:'Av. San Martín 1533', t:'2901-436262' },
+    { n:'Farmacia Mercantil ABC', d:'Gobernador Paz 679', t:'2901-432648' },
+    { n:'Farmacia Ushuaia', d:'Kuanip 540', t:'2901-431053' },
+    { n:'Farmacia Andina', d:'San Martín 683', t:'2901-423431' },
+    { n:'Farmacia Rapifarma', d:'Soldado Águila 2429', t:'2901-433752' },
+    { n:'Farmacia Jainen', d:'Jainen 152', t:'2901-432268' },
+  ],
+  '🍽️ Rotiserías': [
+    { n:'Oshovia — Casa de Comidas & Eventos', d:'Av. 12 de Octubre 974', t:'2901-537379' },
+    { n:'Parrilla y Rotisería Llampita', d:'C. Felipe Romero', t:'' },
+    { n:'Manjares Del Beagle', d:'Gral. Manuel Belgrano 43', t:'' },
+    { n:'El Parador Ushuaia', d:'Rotisería y comidas rápidas', t:'' },
+    { n:'Rotisería Rodolfo', d:'F. Romero 23 — Bº 640 Viviendas', t:'' },
+    { n:'Martinica Rotisería', d:'Av. San Martín 68', t:'2901-432134' },
+    { n:'Islas del Sur Rotisería', d:'J. D. Perón 242', t:'2901-443365' },
+    { n:'Mangiare — Pizzería y Rotisería', d:'Solo take away', t:'' },
+    { n:'Pizzería Rotisería Híper Turco', d:'J. D. Perón Sur 56', t:'' },
+    { n:'El Bambú (vegetariano)', d:'Cmte. Luis Piedrabuena 276', t:'' },
+    { n:'El Mercado Ushuaia', d:'San Martín 1488', t:'2901-5550137' },
+    { n:'La Auténtica', d:'25 de Mayo 325', t:'' },
+    { n:'El Rey del Lomito', d:'Magallanes 1097', t:'' },
+    { n:'Los Pollos Hermano\'s', d:'Delivery', t:'' },
+    { n:'Aloha Rotisería', d:'Delivery por app', t:'' },
+  ],
+  '🍕 Restaurantes': [
+    { n:'137 Pizza & Pasta', d:'San Martín 137', t:'2901-435005' },
+    { n:'Kuar 1900', d:'San Martín 471', t:'2901-436807' },
+    { n:'Kuar', d:'Av. Perito Moreno 2232', t:'2901-437396' },
+    { n:'Moustacchio', d:'San Martín 298', t:'2901-430548' },
+    { n:'La Cabaña Casa de Té', d:'L. Martial 3560', t:'2901-424779' },
+    { n:'La Cantina Fueguina de Freddi', d:'San Martín 318', t:'2901-421887' },
+    { n:'La Casa de los Mariscos', d:'San Martín 232', t:'2901-421928' },
+    { n:'Bodegón Fueguino', d:'San Martín 859', t:'2901-431972' },
+    { n:'Kaupé', d:'Roca 470', t:'2901-422704' },
+  ],
+  '🍦 Heladerías': [
+    { n:'Freddo', d:'San Martín 209 / Del Tolkeyén 709', t:'2901-430946' },
+    { n:'Grido', d:'Kuanip 129 / Magallanes 1120', t:'2901-473689' },
+    { n:'Arlequín Helados', d:'San Martín 131 / 1302', t:'2901-405574' },
+    { n:'Gadget Tu Gelateria', d:'Av. San Martín 1256', t:'2901-434864' },
+    { n:'Ana y Juana', d:'San Martín 1485 / 797', t:'2901-425235' },
+    { n:'Münch South Ice Cream', d:'San Martín 267', t:'2901-547064' },
+    { n:'Gelido', d:'San Martín 1207', t:'2901-433888' },
+    { n:'Brolas Helados', d:'Consultar', t:'' },
+    { n:'Hard Rock Café', d:'San Martín 594', t:'2901-435011' },
+    { n:'Dolcissimo', d:'San Martín 294', t:'2901-431976' },
+    { n:'Tante Sara Cosas Ricas', d:'San Martín 175', t:'2901-433710' },
+    { n:'Smechén (panadería/chocolates)', d:'San Martín 741', t:'2901-649241' },
+  ],
+  '🛒 Supermercados': [
+    { n:'La Anónima', d:'Gdor. Paz 190', t:'2901-421304' },
+    { n:'La Anónima BGP', d:'Av. San Martín 1506', t:'' },
+    { n:'Carrefour Hipermercado', d:'12 de Octubre 169', t:'' },
+    { n:'Distri TDF', d:'Magallanes 307', t:'2901-306963' },
+  ],
+  '⛽ Combustible': [
+    { n:'YPF Río Olivia', d:'Perito Moreno 4788', t:'2901-431364' },
+    { n:'YPF Centro', d:'Maipú 730', t:'' },
+    { n:'RIBERA Station', d:'De la Estancia 2195', t:'' },
+    { n:'Estación ACA', d:'Malvinas y Onachaga', t:'' },
+  ],
+  '📮 Correos y Bancos': [
+    { n:'Correo Argentino', d:'Av. San Martín 309', t:'2901-430892' },
+    { n:'Correo OCA', d:'Maipú 790', t:'' },
+    { n:'Banco de Tierra del Fuego', d:'Maipú 897', t:'' },
+    { n:'BTF Sucursal Ushuaia', d:'San Martín 396', t:'' },
+    { n:'BTF Sucursal Kuanip', d:'Kuanip 850', t:'' },
+  ],
+  '🐾 Veterinarias': [
+    { n:'Veterinaria Dra. Sonia Ortego', d:'Tekenika 263', t:'' },
+    { n:'Veterinaria Greenpet', d:'Gdor. Paz 1002', t:'' },
+    { n:'Veterinaria Orbe', d:'Av. Leandro Alem 1992', t:'' },
+    { n:'EVA — Emergencias Veterinarias', d:'Gdor. Paz 1014 (nocturno)', t:'2901-304776' },
+  ],
+  '🏋️ Gimnasios': [
+    { n:'Gimnasio Atenas', d:'Gdor. José María Gómez 552', t:'' },
+    { n:'Forza Gym', d:'Gdor. Pedro Godoy 64', t:'' },
+    { n:'Olimpo Fitness & Health', d:'Av. Leandro Alem 1743', t:'' },
+    { n:'Impacto Gym', d:'Walanika 383', t:'' },
+    { n:'Active Club Ushuaia', d:'Magallanes 2491', t:'' },
+  ],
+  '🚕 Transporte': [
+    { n:'Taxis de Ushuaia', d:'Maipú 504', t:'2901-422448' },
+    { n:'Taxi línea directa', d:'Solicitud automática', t:'2901-422007' },
+    { n:'Taxi WhatsApp', d:'Asignación por mensaje', t:'2901-465442' },
+    { n:'Municipalidad de Ushuaia', d:'Consultas', t:'2901-422089' },
+    { n:'Secretaría de Turismo', d:'Información turística', t:'2901-432001' },
+  ],
+};
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+const contentEl = document.getElementById('content');
+const mainEl = document.getElementById('main');
+
+function render(){
+  const activo = document.activeElement;
+  const focusId = activo && activo.id ? activo.id : null;
+  const selStart = activo && 'selectionStart' in activo ? activo.selectionStart : null;
+
+  document.getElementById('barrioName').textContent = state.config.name || 'Barrio Bahía Cauquén';
+  document.getElementById('statusLine').textContent = adminLogueado ? '🛡️ Modo Administrador' : 'Modo demo · local';
+
+  contentEl.classList.remove('masonry');
+
+  if (view === 'muro')      contentEl.innerHTML = viewMuro();
+  if (view === 'servicios') contentEl.innerHTML = viewServicios();
+  if (view === 'agenda')    contentEl.innerHTML = viewAgenda();
+  if (view === 'chat')      contentEl.innerHTML = viewChat();
+  if (view === 'privado')   contentEl.innerHTML = viewPrivado();
+  if (view === 'expensas')  contentEl.innerHTML = viewExpensas();
+
+  if (window.innerWidth >= 1200 && (view === 'muro' || view === 'servicios')) {
+    contentEl.classList.add('masonry');
+  }
+
+  contentEl.classList.remove('view-anim');
+  void contentEl.offsetWidth;
+  contentEl.classList.add('view-anim');
+
+  if (focusId){
+    const el = document.getElementById(focusId);
+    if (el){ el.focus(); if (selStart != null){ try{ el.setSelectionRange(selStart, selStart); }catch(e){} } }
+  }
+  if (view === 'chat'){
+    const cb = document.getElementById('chatBox');
+    if (cb) cb.scrollTop = cb.scrollHeight;
+  }
+  if (view === 'privado' && privadoActual){
+    const cb = document.getElementById('privadoBox');
+    if (cb) cb.scrollTop = cb.scrollHeight;
+  }
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => render(), 180);
+});
+
+const avatar = (name, size) =>
+  `<span class="avatar" style="background:${avColor(name)}${size ? ';width:'+size+'px;height:'+size+'px;font-size:'+(size*0.42)+'px' : ''}">${esc(inicial(name))}</span>`;
+const vacio = (t, em = '🗒️') => `<div class="vacio"><span class="em">${em}</span>${t}</div>`;
+
+/* ===== PRIVADO / REGISTRO ===== */
+function viewPrivado(){
+  /* === ADMINISTRADOR === */
+  if (adminLogueado) return viewAdminPanel();
+
+  /* === VECINO === */
+  const sol = state.solicitudes.find(s => s.email && me.email && s.email.toLowerCase() === me.email.toLowerCase());
+
+  /* Caso 1: ya registrado → chat con admin */
+  if (me.registrado && sol && sol.estado === 'aprobado'){
+    return viewChatPrivado(sol);
+  }
+
+  /* Caso 2: solicitó clave, esperando aprobación */
+  if (sol && sol.estado === 'pendiente'){
+    return `
+      <div class="registro-hero">
+        <span class="em">⏳</span>
+        <h2>Solicitud enviada</h2>
+        <p>Tu solicitud fue enviada al administrador del barrio. Cuando la apruebe te va a dar tu clave de registro.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 12px;font-size:15px">📋 Datos de tu solicitud</h3>
+        <div class="sol-datos">
+          <div><b>Nombre:</b> ${esc(sol.nombre)}</div>
+          <div><b>Casa:</b> ${esc(sol.casa)}</div>
+          <div><b>Email:</b> ${esc(sol.email)}</div>
+          <div><b>Teléfono:</b> ${esc(sol.telefono || '—')}</div>
+          <div><b>Enviada:</b> ${ago(sol.createdAt)}</div>
+        </div>
+        <button class="btn-ghost" data-action="cancelar-solicitud" data-id="${sol.id}">Cancelar solicitud</button>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 12px;font-size:15px">🔑 ¿Ya tenés tu clave?</h3>
+        <p class="muted small" style="margin:0 0 12px">Ingresá la clave que te dio el administrador para activar tu cuenta.</p>
+        <form id="formClave">
+          <div class="field">
+            <label>Clave de registro</label>
+            <input name="clave" id="inputClave" placeholder="VEC-XXXX" maxlength="12" autocomplete="off" required style="text-transform:uppercase;font-family:monospace;letter-spacing:2px;text-align:center;font-size:18px">
+          </div>
+          <button class="btn-primary btn-block" type="submit">🔓 Activar mi cuenta</button>
+        </form>
+      </div>
+      <p class="muted small" style="text-align:center;margin-top:14px;line-height:1.6">
+        ¿Sos el administrador?<br>
+        <button class="btn-ghost" data-action="login-admin" style="margin-top:8px">🛡️ Ingresar como Administrador</button>
+      </p>
+    `;
+  }
+
+  /* Caso 3: fue rechazado */
+  if (sol && sol.estado === 'rechazado'){
+    return `
+      <div class="registro-hero" style="background:linear-gradient(135deg,#991b1b,#dc2626);">
+        <span class="em">❌</span>
+        <h2>Solicitud rechazada</h2>
+        <p>Tu solicitud fue rechazada por el administrador. Podés volver a intentarlo con un email distinto o contactarlo directamente.</p>
+      </div>
+      <button class="btn-primary btn-block" data-action="nueva-solicitud">Volver a intentar</button>
+      <p class="muted small" style="text-align:center;margin-top:14px">
+        <button class="btn-ghost" data-action="login-admin">🛡️ Ingresar como Administrador</button>
+      </p>
+    `;
+  }
+
+  /* Caso 4: sin solicitud → formulario de registro */
+  return `
+    <div class="registro-hero">
+      <span class="em">🔒</span>
+      <h2>Registro de vecinos</h2>
+      <p>Completá tus datos para solicitar la clave de acceso al chat privado con la Administración del barrio.</p>
+    </div>
+
+    <form class="card" id="formRegistro">
+      <h3 style="margin:0 0 16px;font-size:15px">📝 Completar mi perfil</h3>
+      <div class="field">
+        <label>Nombre y apellido *</label>
+        <input name="nombre" required maxlength="60" placeholder="Ej: Lucía Fernández" value="${esc(me.name)}">
+      </div>
+      <div class="field">
+        <label>Casa / lote *</label>
+        <input name="casa" required maxlength="20" placeholder="Ej: Casa 42" value="${esc(me.house)}">
+      </div>
+      <div class="field">
+        <label>Email del propietario *</label>
+        <input name="email" type="email" required maxlength="80" placeholder="tucorreo@mail.com" value="${esc(me.email)}">
+      </div>
+      <div class="field">
+        <label>Teléfono / WhatsApp</label>
+        <input name="telefono" maxlength="20" inputmode="tel" placeholder="54911..." value="${esc(me.phone)}">
+      </div>
+      <div class="field">
+        <label>Oficios o servicios que ofrecés</label>
+        <input name="skills" maxlength="120" placeholder="Ej: Electricista, clases de inglés" value="${esc(me.skills)}">
+      </div>
+      <button class="btn-primary btn-block" type="submit">📨 Solicitar clave de registro</button>
+      <p class="muted small" style="margin:12px 0 0;text-align:center;line-height:1.55">
+        Al enviar la solicitud, el administrador del barrio la revisa y te entrega una clave para activar tu cuenta.
+      </p>
+    </form>
+
+    <p class="muted small" style="text-align:center;margin-top:10px;line-height:1.6">
+      ¿Ya tenés tu clave?<br>
+      <button class="btn-ghost" data-action="ingresar-clave-directo" style="margin-top:8px">🔑 Ingresar mi clave</button>
+    </p>
+
+    <p class="muted small" style="text-align:center;margin-top:20px;line-height:1.6">
+      ¿Sos el administrador del barrio?<br>
+      <button class="btn-ghost" data-action="login-admin" style="margin-top:8px;background:#ede9fe;color:#6d28d9">🛡️ Ingresar con clave secreta</button>
+    </p>
+  `;
+}
+
+/* Ingreso de clave desde el inicio (usuario ya registrado en otro dispositivo) */
+function viewIngresarClaveDirecto(){
+  return `
+    <div class="registro-hero" style="background:linear-gradient(135deg,#0f8a7e,#14b8a6);">
+      <span class="em">🔑</span>
+      <h2>Ya tengo mi clave</h2>
+      <p>Ingresá el email con el que te registraste y la clave que te dio el administrador.</p>
+    </div>
+    <form class="card" id="formClaveDirecto">
+      <div class="field">
+        <label>Email</label>
+        <input name="email" type="email" required placeholder="tucorreo@mail.com" value="${esc(me.email)}">
+      </div>
+      <div class="field">
+        <label>Clave de registro</label>
+        <input name="clave" required maxlength="12" placeholder="VEC-XXXX" style="text-transform:uppercase;font-family:monospace;letter-spacing:2px;text-align:center;font-size:18px">
+      </div>
+      <button class="btn-primary btn-block" type="submit">🔓 Activar mi cuenta</button>
+      <button type="button" class="btn-ghost" data-action="volver-registro" style="margin-top:10px;width:100%;justify-content:center">← Volver</button>
+    </form>
+  `;
+}
+
+/* Chat privado del vecino aprobado */
+function viewChatPrivado(sol){
+  /* Encontrar o crear el hilo privado de este vecino */
+  let h = state.privados.find(x => x.vecino === sol.nombre);
+  if (!h){
+    h = { id: uid(), vecino: sol.nombre, house: sol.casa, msgs: [] };
+    state.privados.push(h);
+    save();
+  }
+  privadoActual = h.id;
+
+  const msgs = (h.msgs || []).slice().sort((a,b) => a.createdAt - b.createdAt);
+
+  return `
+    <div class="banner verde">
+      <span class="em">✅</span>
+      <span>Cuenta activada. Este chat es <b>privado</b> entre vos y la Administración del barrio.</span>
+    </div>
+
+    <div class="card" style="padding:16px">
+      <div class="privado-header">
+        <div class="privado-avatar">${esc(inicial(sol.nombre))}</div>
+        <div style="min-width:0;flex:1">
+          <b>${esc(sol.nombre)}</b>
+          <span>${esc(sol.casa)} · Chat con Administración</span>
+        </div>
+      </div>
+      <div class="chat" id="privadoBox" style="min-height:auto;max-height:50dvh;overflow-y:auto">
+        ${msgs.length ? msgs.map((m, i) => {
+          const mio = m.from === 'vecino';
+          return `<div class="msg ${mio?'mine':''}" style="animation-delay:${Math.min(i*30,300)}ms">
+            <div class="msg__meta">${m.from === 'admin' ? '🛡️ Administración' : '🏠 ' + esc(sol.nombre)} · ${hora(m.createdAt)}</div>
+            <div class="msg__bubble privado-burbuja">${esc(m.text)}</div>
+          </div>`;
+        }).join('') : vacio('Sin mensajes todavía. Escribí tu primera consulta.', '🔒')}
+      </div>
+      <form class="chatbar" id="formPrivado" style="position:static;background:none;padding-top:12px">
+        <input name="text" id="privadoInput" placeholder="Escribí un mensaje a la Administración…" autocomplete="off" required maxlength="500">
+        <button class="btn-primary" type="submit">➤</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="row between" style="margin-bottom:10px">
+        <span class="muted small">Tu clave de registro</span>
+        <span class="small" style="font-family:monospace;font-weight:700;color:#065f46">${esc(sol.clave)}</span>
+      </div>
+      <button class="btn-danger" data-action="cerrar-sesion-vecino">Cerrar sesión de vecino</button>
+    </div>
+  `;
+}
+
+/* ===== PANEL ADMINISTRADOR ===== */
+function viewAdminPanel(){
+  const pendientes = state.solicitudes.filter(s => s.estado === 'pendiente');
+  const aprobadas  = state.solicitudes.filter(s => s.estado === 'aprobado');
+  const rechazadas = state.solicitudes.filter(s => s.estado === 'rechazado');
+
+  const totalMsgs = state.privados.reduce((n, h) => n + (h.msgs?.length || 0), 0);
+
+  return `
+    <div class="admin-card">
+      <div class="cabecera">
+        <div>
+          <h3>🛡️ Panel de Administración</h3>
+          <p style="margin:2px 0 0;font-size:11.5px;color:rgba(255,255,255,.75)">Barrio Bahía Cauquén</p>
+        </div>
+        <span class="badge">ADMIN</span>
+      </div>
+      <div class="stats" style="margin-bottom:0">
+        <div class="stat" style="background:rgba(255,255,255,.12);border-color:transparent">
+          <b style="color:#fff">${pendientes.length}</b>
+          <span style="color:rgba(255,255,255,.7)">Pendientes</span>
+        </div>
+        <div class="stat" style="background:rgba(255,255,255,.12);border-color:transparent">
+          <b style="color:#fff">${aprobadas.length}</b>
+          <span style="color:rgba(255,255,255,.7)">Aprobados</span>
+        </div>
+        <div class="stat" style="background:rgba(255,255,255,.12);border-color:transparent">
+          <b style="color:#fff">${totalMsgs}</b>
+          <span style="color:rgba(255,255,255,.7)">Mensajes</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOLICITUDES PENDIENTES -->
+    <h3 class="sec">📥 Solicitudes pendientes (${pendientes.length})</h3>
+    ${pendientes.length ? pendientes.map(s => `
+      <div class="solicitud-card pendiente">
+        <div class="sol-header">
+          <div class="sol-info">
+            <b>${esc(s.nombre)}</b>
+            <span>${esc(s.casa)}</span>
+          </div>
+          <span class="sol-estado pendiente">Pendiente</span>
+        </div>
+        <div class="sol-datos">
+          <div><b>Email:</b> ${esc(s.email)}</div>
+          <div><b>Teléfono:</b> ${esc(s.telefono || '—')}</div>
+          <div><b>Oficios:</b> ${esc(s.skills || '—')}</div>
+          <div><b>Recibida:</b> ${ago(s.createdAt)}</div>
+        </div>
+        <div class="sol-acciones">
+          <button class="btn-mini btn-aprobar" data-action="aprobar" data-id="${s.id}">✓ Aprobar y generar clave</button>
+          <button class="btn-mini btn-rechazar" data-action="rechazar" data-id="${s.id}">✕ Rechazar</button>
+        </div>
+      </div>`).join('') : `<div class="card"><p class="muted small" style="margin:0;text-align:center;padding:12px">No hay solicitudes pendientes.</p></div>`}
+
+    <!-- VECINOS APROBADOS -->
+    <h3 class="sec">✅ Vecinos registrados (${aprobadas.length})</h3>
+    <div class="admin-chat-lista">
+      ${aprobadas.length ? aprobadas.map(s => {
+        const h = state.privados.find(x => x.vecino === s.nombre);
+        const msgs = h?.msgs?.length || 0;
+        const ult = h?.msgs?.slice(-1)[0];
+        return `
+          <div class="solicitud-card aprobado" data-action="abrir-chat-admin" data-id="${s.id}" style="cursor:pointer">
+            <div class="sol-header">
+              <div class="sol-info">
+                <b>${esc(s.nombre)}</b>
+                <span>${esc(s.casa)} · ${msgs} mensaje${msgs === 1 ? '' : 's'}</span>
+              </div>
+              <span class="sol-estado aprobado">${esc(s.clave)}</span>
+            </div>
+            <div class="sol-datos">
+              <div><b>Email:</b> ${esc(s.email)}</div>
+              <div><b>Teléfono:</b> ${esc(s.telefono || '—')}</div>
+              ${ult ? `<div><b>Último mensaje:</b> ${esc(ult.text.substring(0, 60))}${ult.text.length > 60 ? '…' : ''}</div>` : '<div class="muted">Sin mensajes todavía.</div>'}
+            </div>
+            <div class="sol-acciones">
+              <button class="btn-mini btn-eliminar" data-action="ver-clave" data-id="${s.id}">🔑 Ver clave</button>
+              <button class="btn-mini btn-rechazar" data-action="eliminar-vecino" data-id="${s.id}">🗑️ Eliminar</button>
+            </div>
+          </div>`;
+      }).join('') : `<div class="card"><p class="muted small" style="margin:0;text-align:center;padding:12px">Todavía no hay vecinos registrados.</p></div>`}
+    </div>
+
+    ${rechazadas.length ? `
+      <h3 class="sec">❌ Rechazados (${rechazadas.length})</h3>
+      ${rechazadas.map(s => `
+        <div class="solicitud-card rechazado">
+          <div class="sol-header">
+            <div class="sol-info"><b>${esc(s.nombre)}</b><span>${esc(s.casa)} · ${esc(s.email)}</span></div>
+            <span class="sol-estado rechazado">Rechazado</span>
+          </div>
+          <div class="sol-acciones">
+            <button class="btn-mini btn-aprobar" data-action="reactivar" data-id="${s.id}">↻ Reactivar</button>
+            <button class="btn-mini btn-eliminar" data-action="borrar-solicitud" data-id="${s.id}">🗑️ Borrar</button>
+          </div>
+        </div>`).join('')}
+    ` : ''}
+
+    <button class="btn-danger" data-action="logout-admin" style="margin-top:20px">🚪 Cerrar sesión de administrador</button>
+  `;
+}
+
+/* Vista de chat cuando el admin abre un hilo de vecino */
+function viewChatAdmin(solicitudId){
+  const s = state.solicitudes.find(x => x.id === solicitudId);
+  if (!s) { return viewAdminPanel(); }
+  let h = state.privados.find(x => x.vecino === s.nombre);
+  if (!h){
+    h = { id: uid(), vecino: s.nombre, house: s.casa, msgs: [] };
+    state.privados.push(h);
+    save();
+  }
+  const msgs = (h.msgs || []).slice().sort((a,b) => a.createdAt - b.createdAt);
+
+  return `
+    <button class="btn-ghost" data-action="volver-admin" style="margin-bottom:12px">← Volver al panel</button>
+    <div class="card" style="padding:16px">
+      <div class="privado-header">
+        <div class="privado-avatar" style="background:linear-gradient(135deg,#4c1d95,#7c3aed)">${esc(inicial(s.nombre))}</div>
+        <div style="min-width:0;flex:1">
+          <b>${esc(s.nombre)}</b>
+          <span>${esc(s.casa)} · ${esc(s.email)}</span>
+        </div>
+      </div>
+      <div style="text-align:center;margin-bottom:12px">
+        <span class="muted small">Clave del vecino: </span>
+        <span style="font-family:monospace;font-weight:700;color:#5b21b6;letter-spacing:1px">${esc(s.clave)}</span>
+      </div>
+      <div class="chat" id="privadoBox" style="min-height:auto;max-height:50dvh;overflow-y:auto">
+        ${msgs.length ? msgs.map((m, i) => {
+          const mio = m.from === 'admin';
+          return `<div class="msg ${mio?'mine':''}" style="animation-delay:${Math.min(i*30,300)}ms">
+            <div class="msg__meta">${m.from === 'admin' ? '🛡️ Administración' : '🏠 ' + esc(s.nombre)} · ${hora(m.createdAt)}</div>
+            <div class="msg__bubble privado-burbuja">${esc(m.text)}</div>
+          </div>`;
+        }).join('') : vacio('Sin mensajes todavía.', '🔒')}
+      </div>
+      <form class="chatbar" id="formPrivadoAdmin" data-solicitud="${solicitudId}" style="position:static;background:none;padding-top:12px">
+        <input name="text" id="privadoInputAdmin" placeholder="Responder al vecino…" autocomplete="off" required maxlength="500">
+        <button class="btn-primary" type="submit" style="background:linear-gradient(135deg,#4c1d95,#7c3aed)">➤</button>
+      </form>
+    </div>
+  `;
+}
+
+/* Guardamos el id del chat admin actual */
+let adminChatId = null;
+
+/* ===== OTRAS VISTAS ===== */
+function viewExpensas(){
+  return `
+    <div class="expensas-hero">
+      <span class="em">💰</span>
+      <h2>Portal de Expensas</h2>
+      <p>Consultá y pagá tus expensas online a través de la plataforma <b>Octavo Piso</b>. Ingresá con tu usuario y contraseña para ver el resumen de cuenta, recibos y pagos.</p>
+      <a class="btn-primary" href="https://www.octavo-piso.com.ar/users/sign_in" target="_blank" rel="noopener">🔗 Acceder al portal de expensas</a>
+    </div>
+    <h3 class="sec">¿Cómo funciona?</h3>
+    <div class="expensas-info">
+      <div class="expensas-paso"><span class="num">1</span><div class="txt"><b>Ingresá al portal</b><span>Tocá el botón verde de arriba. Se abre la web de Octavo Piso en una nueva pestaña.</span></div></div>
+      <div class="expensas-paso"><span class="num">2</span><div class="txt"><b>Iniciá sesión</b><span>Usá el email y contraseña que te dio la Administración. Si no los tenés, pedilos por el chat privado.</span></div></div>
+      <div class="expensas-paso"><span class="num">3</span><div class="txt"><b>Consultá tu cuenta</b><span>Vas a poder ver el resumen de expensas, los recibos y el estado de tus pagos.</span></div></div>
+    </div>
+    <div class="banner"><span class="em">💡</span><span>Si tenés problemas para ingresar, escribile a la <b>Administración</b> desde la pestaña <b>🔒 Privado</b>.</span></div>
+  `;
+}
+
+function viewAgenda(){
+  const cats = Object.keys(AGENDA);
+  const chips = cats.map((c, i) =>
+    `<button class="chip ${i===0?'active':''}" data-action="agenda-cat" data-val="${esc(c)}">${c}</button>`
+  ).join('');
+  return `
+    <div class="banner"><span class="em">📍</span><span>Directorio completo de <b>Ushuaia</b>. Tocá cualquier teléfono para llamar.</span></div>
+    <div class="scroll-x" id="agendaChips">${chips}</div>
+    <div id="agendaContent">${renderAgendaCat(cats[0])}</div>
+  `;
+}
+
+function renderAgendaCat(cat){
+  const items = AGENDA[cat] || [];
+  if (!items.length) return vacio('Sin datos en esta categoría.', '📭');
+  return `
+    <div class="card" style="padding:0 16px">
+      ${items.map(it => `
+        <div class="dir-item">
+          <div class="dir-info"><b>${esc(it.n)}</b>${it.d ? `<span>${esc(it.d)}</span>` : ''}</div>
+          <div class="dir-tel">${it.t ? `<a href="tel:${it.t.replace(/[^0-9+]/g,'')}">📞 ${esc(it.t)}</a>` : `<span class="sin-tel">—</span>`}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function viewMuro(){
+  let ps = [...state.posts];
+  if (filtro === 'servicios') ps = ps.filter(p => p.type === 'ofrezco' || p.type === 'busco');
+  else if (filtro !== 'todas') ps = ps.filter(p => p.type === filtro);
+  ps.sort((a, b) => b.createdAt - a.createdAt);
+  const chipF = (v, t) => `<button class="chip ${filtro===v?'active':''}" data-action="filtro" data-val="${v}">${t}</button>`;
+  return `
+    <div class="scroll-x">
+      ${chipF('todas','Todo')}${chipF('alerta','🚨 Alertas')}${chipF('aviso','📌 Avisos')}
+      ${chipF('servicios','🛠️ Servicios')}${chipF('evento','📅 Eventos')}
+    </div>
+    ${ps.length ? ps.map((p, i) => cardPost(p, i)).join('') : vacio('No hay publicaciones todavía. ¡Sé el primero!', '📭')}
+  `;
+}
+
+function cardPost(p, idx = 0){
+  const t = TIPOS[p.type] || TIPOS.aviso;
+  const abierto = openComments.has(p.id);
+  const nComments = p.comments ? p.comments.length : 0;
+  const rxBar = REACCIONES.map(emoji => {
+    const users = (p.reactions && p.reactions[emoji]) || [];
+    const on = me.name && users.includes(me.name);
+    const n = users.length;
+    if (!n && !on && !['👍','❤️'].includes(emoji)) return '';
+    return `<button class="rx ${on?'on':''}" data-action="react" data-post="${p.id}" data-emoji="${emoji}">
+      <span>${emoji}</span>${n ? `<span class="n">${n}</span>` : ''}
+    </button>`;
+  }).join('');
+  return `
+  <article class="card post t-${t.cls}" style="animation-delay:${Math.min(idx*45,300)}ms">
+    <div class="post-head">
+      ${avatar(p.author)}
+      <div class="who"><b>${esc(p.author)}</b><span>${p.house ? esc(p.house) : 'Vecino/a'}</span></div>
+      <span class="post-time">${ago(p.createdAt)}</span>
+    </div>
+    <span class="tipo-pill tp-${t.cls}">${t.icon} ${t.label}${p.category ? ' · ' + esc(p.category) : ''}</span>
+    <h3 class="post-title">${esc(p.title)}</h3>
+    ${p.body ? `<p class="post-body">${esc(p.body)}</p>` : ''}
+    ${p.price ? `<div class="precio">💰 ${esc(p.price)}</div>` : ''}
+    <div class="reactions" data-post="${p.id}">${rxBar}</div>
+    <div class="post-foot">
+      <button class="act" data-action="toggle-comments" data-post="${p.id}">
+        💬 ${nComments ? nComments + ' comentario' + (nComments>1?'s':'') : 'Comentar'}
+      </button>
+      ${p.phone ? `<a class="act wa" href="${waLink(p.phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+    </div>
+    ${abierto ? commentsSection(p) : ''}
+  </article>`;
+}
+
+function commentsSection(p){
+  const lista = (p.comments || []).slice().sort((a,b) => a.createdAt - b.createdAt);
+  return `
+    <div class="comments">
+      ${lista.length ? lista.map(c => `
+        <div class="cmt">
+          ${avatar(c.author, 28)}
+          <div class="cmt-body">
+            <div class="cmt-bubble"><b>${esc(c.author)}</b><p>${esc(c.text)}</p></div>
+            <div class="cmt-time">${ago(c.createdAt)}</div>
+          </div>
+        </div>`).join('') : `<p class="muted small" style="margin:0 0 8px 4px">Sé el primero en comentar…</p>`}
+      <form class="cmt-form" data-action="comment-form" data-post="${p.id}">
+        <input name="text" placeholder="Escribí un comentario…" maxlength="300" autocomplete="off" required>
+        <button type="submit">➤</button>
+      </form>
+    </div>`;
+}
+
+function viewServicios(){
+  const chips = ['todas', ...CATEGORIAS].map(c =>
+    `<button class="chip ${catFiltro===c?'active':''}" data-action="cat" data-val="${esc(c)}">${c === 'todas' ? 'Todas' : esc(c)}</button>`
+  ).join('');
+  return `
+    <div class="search-wrap"><span class="ic">🔍</span><input id="buscador" placeholder="Buscar servicio, oficio o vecino…" value="${esc(busqueda)}"></div>
+    <div class="scroll-x">${chips}</div>
+    <div id="listaServicios">${listaServicios()}</div>
+  `;
+}
+
+function listaServicios(){
+  const q = busqueda.trim().toLowerCase();
+  let ps = state.posts.filter(p => p.type === 'ofrezco' || p.type === 'busco');
+  if (catFiltro !== 'todas') ps = ps.filter(p => p.category === catFiltro);
+  if (q) ps = ps.filter(p => (p.title + ' ' + (p.body||'') + ' ' + (p.category||'') + ' ' + p.author).toLowerCase().includes(q));
+  ps.sort((a, b) => b.createdAt - a.createdAt);
+  return ps.length ? ps.map((p,i) => cardPost(p, i)).join('') : vacio('No encontramos servicios con esos filtros.', '🔍');
+}
+
+function viewChat(){
+  const msgs = state.msgs.filter(m => m.channel === canal).sort((a,b) => a.createdAt - b.createdAt);
+  const canales = ['general','servicios','seguridad'];
+  return `
+    <div class="scroll-x">
+      ${canales.map(c => `<button class="chip ${canal===c?'active':''}" data-action="canal" data-val="${c}"># ${c}</button>`).join('')}
+    </div>
+    <div class="chat" id="chatBox">
+      ${msgs.length ? msgs.map((m, i) => {
+        const mio = me.name && m.author === me.name;
+        return `<div class="msg ${mio?'mine':''}" style="animation-delay:${Math.min(i*30,300)}ms">
+          <div class="msg__meta">${esc(m.author)} · ${hora(m.createdAt)}</div>
+          <div class="msg__bubble">${esc(m.text)}</div>
+        </div>`;
+      }).join('') : vacio('Todavía no hay mensajes. ¡Arrancá la conversación!', '💬')}
+    </div>
+    <form class="chatbar" id="formChat">
+      <input name="text" id="chatInput" placeholder="Escribí un mensaje…" autocomplete="off" required maxlength="500">
+      <button class="btn-primary" type="submit">➤</button>
+    </form>
+  `;
+}
+
+/* =========================================================
+   EVENTOS
+   ========================================================= */
+const TAB_ORDER = ['muro','servicios','agenda','chat','privado','expensas'];
+
+function go(v){
+  view = v;
+  if (v !== 'privado') { privadoActual = null; adminChatId = null; }
+  document.querySelectorAll('#tabbar button').forEach(b =>
+    b.classList.toggle('active', b.dataset.val === v));
+  const idx = TAB_ORDER.indexOf(v);
+  document.getElementById('tabInd').style.transform = `translateX(${idx * 100}%)`;
+  mainEl.scrollTop = 0;
+  render();
+}
+
+let vistaClaveDirecto = false;
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const a = el.dataset.action, v = el.dataset.val;
+
+  if (a === 'tab') return go(v);
+  if (a === 'nuevo'){
+    if (!me.name){ toast('Completá tu registro primero', '🙋'); go('privado'); return; }
+    document.getElementById('dlgNuevo').showModal();
+    return;
+  }
+  if (a === 'cerrar') return document.getElementById('dlgNuevo').close();
+  if (a === 'filtro'){ filtro = v; return render(); }
+  if (a === 'cat'){ catFiltro = v; return render(); }
+  if (a === 'canal'){ canal = v; return render(); }
+
+  if (a === 'cargar-portada'){ document.getElementById('filePortada').click(); return; }
+  if (a === 'cargar-logo'){ document.getElementById('fileLogo').click(); return; }
+
+  if (a === 'agenda-cat'){
+    document.querySelectorAll('#agendaChips .chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.val === v));
+    document.getElementById('agendaContent').innerHTML = renderAgendaCat(v);
+    return;
+  }
+  if (a === 'toggle-comments'){
+    const id = el.dataset.post;
+    if (openComments.has(id)) openComments.delete(id); else openComments.add(id);
+    return render();
+  }
+  if (a === 'react'){
+    const id = el.dataset.post, emoji = el.dataset.emoji;
+    if (!me.name){ toast('Registrate primero para reaccionar', '🙋'); return; }
+    const p = state.posts.find(x => x.id === id);
+    if (!p) return;
+    if (!p.reactions) p.reactions = {};
+    if (!p.reactions[emoji]) p.reactions[emoji] = [];
+    const arr = p.reactions[emoji];
+    const i = arr.indexOf(me.name);
+    if (i >= 0) arr.splice(i, 1); else arr.push(me.name);
+    if (!arr.length) delete p.reactions[emoji];
+    save(); render();
+    const nuevo = document.querySelector(`.reactions[data-post="${id}"] .rx[data-emoji="${emoji}"]`);
+    if (nuevo){ nuevo.classList.add('pop'); setTimeout(() => nuevo.classList.remove('pop'), 400); }
+    return;
+  }
+
+  /* === REGISTRO Y ADMIN === */
+  if (a === 'login-admin'){
+    document.getElementById('dlgAdmin').showModal();
+    setTimeout(() => document.getElementById('inputClaveAdmin').focus(), 100);
+    return;
+  }
+  if (a === 'cerrar-admin') return document.getElementById('dlgAdmin').close();
+  if (a === 'logout-admin'){
+    adminLogueado = false;
+    adminChatId = null;
+    toast('Sesión de administrador cerrada', '👋');
+    return render();
+  }
+  if (a === 'volver-admin'){ adminChatId = null; return render(); }
+  if (a === 'ingresar-clave-directo'){ vistaClaveDirecto = true; return render(); }
+  if (a === 'volver-registro'){ vistaClaveDirecto = false; return render(); }
+
+  if (a === 'cancelar-solicitud'){
+    if (confirm('¿Cancelar tu solicitud de registro?')){
+      const id = el.dataset.id;
+      state.solicitudes = state.solicitudes.filter(s => s.id !== id);
+      save(); render();
+      toast('Solicitud cancelada', '🗑️');
+    }
+    return;
+  }
+  if (a === 'nueva-solicitud'){
+    /* borrar la solicitud rechazada y volver al form */
+    state.solicitudes = state.solicitudes.filter(s =>
+      !(s.email && me.email && s.email.toLowerCase() === me.email.toLowerCase()));
+    save(); render();
+    return;
+  }
+  if (a === 'cerrar-sesion-vecino'){
+    if (confirm('¿Cerrar sesión? Vas a tener que volver a ingresar tu clave.')){
+      me.registrado = false;
+      me.claveIngresada = '';
+      save();
+      toast('Sesión cerrada', '👋');
+      render();
+    }
+    return;
+  }
+
+  if (a === 'aprobar'){
+    const s = state.solicitudes.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    s.estado = 'aprobado';
+    s.clave = generarClave();
+    save(); render();
+    toast(`Clave generada: ${s.clave}`, '🔑');
+    return;
+  }
+  if (a === 'rechazar'){
+    const s = state.solicitudes.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    if (confirm(`¿Rechazar la solicitud de ${s.nombre}?`)){
+      s.estado = 'rechazado';
+      s.clave = '';
+      save(); render();
+      toast('Solicitud rechazada', '❌');
+    }
+    return;
+  }
+  if (a === 'reactivar'){
+    const s = state.solicitudes.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    s.estado = 'pendiente';
+    s.clave = '';
+    save(); render();
+    toast('Solicitud reactivada', '↻');
+    return;
+  }
+  if (a === 'borrar-solicitud'){
+    if (confirm('¿Eliminar esta solicitud?')){
+      state.solicitudes = state.solicitudes.filter(s => s.id !== el.dataset.id);
+      save(); render();
+      toast('Solicitud eliminada', '🗑️');
+    }
+    return;
+  }
+  if (a === 'eliminar-vecino'){
+    const s = state.solicitudes.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    if (confirm(`¿Eliminar a ${s.nombre} de vecinos registrados? Se borrará su chat privado.`)){
+      state.solicitudes = state.solicitudes.filter(x => x.id !== s.id);
+      state.privados = state.privados.filter(x => x.vecino !== s.nombre);
+      if (adminChatId === s.id) adminChatId = null;
+      save(); render();
+      toast('Vecino eliminado', '🗑️');
+    }
+    return;
+  }
+  if (a === 'ver-clave'){
+    const s = state.solicitudes.find(x => x.id === el.dataset.id);
+    if (!s) return;
+    alert(`Clave de ${s.nombre}:\n\n${s.clave}\n\nPasásela al vecino para que active su cuenta.`);
+    return;
+  }
+  if (a === 'abrir-chat-admin'){
+    adminChatId = el.dataset.id;
+    render();
+    return;
+  }
+});
+
+/* ==== FORM: registrar solicitud ==== */
+document.addEventListener('submit', e => {
+  /* Formulario de registro de vecino */
+  if (e.target.id === 'formRegistro'){
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const email = (f.get('email') || '').trim().toLowerCase();
+    if (state.solicitudes.some(s => s.email.toLowerCase() === email)){
+      toast('Ese email ya tiene una solicitud', '⚠️');
+      return;
+    }
+    const nueva = {
+      id: uid(),
+      nombre: (f.get('nombre') || '').trim(),
+      casa: (f.get('casa') || '').trim(),
+      email,
+      telefono: (f.get('telefono') || '').trim(),
+      skills: (f.get('skills') || '').trim(),
+      estado: 'pendiente',
+      clave: '',
+      createdAt: Date.now(),
+    };
+    state.solicitudes.push(nueva);
+    me.name = nueva.nombre;
+    me.house = nueva.casa;
+    me.email = nueva.email;
+    me.phone = nueva.telefono;
+    me.skills = nueva.skills;
+    save(); render();
+    toast('¡Solicitud enviada! Esperá la clave', '📨');
+    return;
+  }
+
+  /* Ingreso de clave desde la pantalla de espera */
+  if (e.target.id === 'formClave'){
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const clave = (f.get('clave') || '').trim().toUpperCase();
+    const sol = state.solicitudes.find(s =>
+      s.email && me.email && s.email.toLowerCase() === me.email.toLowerCase() && s.estado === 'aprobado');
+    if (!sol){ toast('Todavía no hay una solicitud aprobada', '⚠️'); return; }
+    if (sol.clave.toUpperCase() === clave){
+      me.registrado = true;
+      me.claveIngresada = clave;
+      save(); render();
+      toast('¡Cuenta activada!', '🎉');
+    } else {
+      toast('Clave incorrecta', '❌');
+    }
+    return;
+  }
+
+  /* Ingreso directo (ya tengo clave) */
+  if (e.target.id === 'formClaveDirecto'){
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const email = (f.get('email') || '').trim().toLowerCase();
+    const clave = (f.get('clave') || '').trim().toUpperCase();
+    const sol = state.solicitudes.find(s => s.email.toLowerCase() === email && s.estado === 'aprobado');
+    if (!sol){ toast('No encontramos ese email aprobado', '⚠️'); return; }
+    if (sol.clave.toUpperCase() !== clave){ toast('Clave incorrecta', '❌'); return; }
+    me.name = sol.nombre;
+    me.house = sol.casa;
+    me.email = sol.email;
+    me.phone = sol.telefono;
+    me.skills = sol.skills;
+    me.registrado = true;
+    me.claveIngresada = clave;
+    save();
+    vistaClaveDirecto = false;
+    render();
+    toast('¡Bienvenido/a de nuevo!', '🎉');
+    return;
+  }
+
+  /* Clave de administrador */
+  if (e.target.id === 'formAdmin'){
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const clave = (f.get('clave') || '').trim();
+    if (clave === CLAVE_ADMIN){
+      adminLogueado = true;
+      document.getElementById('dlgAdmin').close();
+      document.getElementById('inputClaveAdmin').value = '';
+      toast('Acceso concedido', '🛡️');
+      go('privado');
+    } else {
+      toast('Clave incorrecta', '❌');
+      document.getElementById('inputClaveAdmin').value = '';
+    }
+    return;
+  }
+
+  /* Chat general */
+  if (e.target.id === 'formChat'){
+    e.preventDefault();
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+    state.msgs.push({ id: uid(), channel: canal, author: me.name || 'Anónimo', text, createdAt: Date.now() });
+    input.value = '';
+    save(); render();
+    const ni = document.getElementById('chatInput'); if (ni) ni.focus();
+    return;
+  }
+
+  /* Chat privado del vecino */
+  if (e.target.id === 'formPrivado'){
+    e.preventDefault();
+    const h = state.privados.find(x => x.id === privadoActual);
+    if (!h) return;
+    const input = document.getElementById('privadoInput');
+    const text = input.value.trim();
+    if (!text) return;
+    h.msgs.push({ id: uid(), from: 'vecino', text, createdAt: Date.now() });
+    input.value = '';
+    save(); render();
+    const ni = document.getElementById('privadoInput'); if (ni) ni.focus();
+    toast('Mensaje enviado', '📤');
+    return;
+  }
+
+  /* Chat privado del admin respondiendo a un vecino */
+  if (e.target.id === 'formPrivadoAdmin'){
+    e.preventDefault();
+    const solId = e.target.dataset.solicitud;
+    const s = state.solicitudes.find(x => x.id === solId);
+    if (!s) return;
+    const input = document.getElementById('privadoInputAdmin');
+    const text = input.value.trim();
+    if (!text) return;
+    let h = state.privados.find(x => x.vecino === s.nombre);
+    if (!h){
+      h = { id: uid(), vecino: s.nombre, house: s.casa, msgs: [] };
+      state.privados.push(h);
+    }
+    h.msgs.push({ id: uid(), from: 'admin', text, createdAt: Date.now() });
+    input.value = '';
+    save(); render();
+    const ni = document.getElementById('privadoInputAdmin'); if (ni) ni.focus();
+    toast('Respuesta enviada', '📤');
+    return;
+  }
+
+  /* Comentarios */
+  if (e.target.dataset && e.target.dataset.action === 'comment-form'){
+    e.preventDefault();
+    const postId = e.target.dataset.post;
+    const input = e.target.querySelector('input[name="text"]');
+    const text = (input.value || '').trim();
+    if (!text) return;
+    const p = state.posts.find(x => x.id === postId);
+    if (!p) return;
+    if (!p.comments) p.comments = [];
+    p.comments.push({ id: uid(), author: me.name || 'Anónimo', text, createdAt: Date.now() });
+    openComments.add(postId);
+    save(); render();
+    toast('Comentario publicado', '💬');
+    return;
+  }
+});
+
+/* Sobrescribir viewPrivado para considerar vistaClaveDirecto */
+const _viewPrivadoOriginal = viewPrivado;
+viewPrivado = function(){
+  if (adminLogueado){
+    if (adminChatId) return viewChatAdmin(adminChatId);
+    return viewAdminPanel();
+  }
+  if (vistaClaveDirecto) return viewIngresarClaveDirecto();
+  return _viewPrivadoOriginal();
+};
+
+/* Chips tipo nuevo */
+document.getElementById('tipoChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-tipo]');
+  if (!b) return;
+  document.querySelectorAll('#tipoChips .chip').forEach(c => c.classList.remove('active'));
+  b.classList.add('active');
+  const tipo = b.dataset.tipo;
+  document.getElementById('inputTipo').value = tipo;
+  const esServicio = tipo === 'ofrezco' || tipo === 'busco';
+  document.getElementById('fieldCat').hidden = !esServicio;
+  document.getElementById('fieldPrecio').hidden = tipo !== 'ofrezco';
+});
+
+document.getElementById('selectCat').innerHTML =
+  CATEGORIAS.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+
+document.addEventListener('input', e => {
+  if (e.target.id === 'buscador'){
+    busqueda = e.target.value;
+    const cont = document.getElementById('listaServicios');
+    if (cont) cont.innerHTML = listaServicios();
+  }
+});
+
+document.getElementById('formNuevo').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  state.posts.unshift({
+    id: uid(),
+    type: f.get('type') || 'aviso',
+    title: (f.get('title') || '').trim(),
+    body: (f.get('body') || '').trim(),
+    category: f.get('category') || '',
+    price: (f.get('price') || '').trim(),
+    author: me.name || 'Vecino/a',
+    house: me.house || '',
+    phone: me.phone || '',
+    createdAt: Date.now(),
+    reactions: {}, comments: [],
+  });
+  save();
+  e.target.reset();
+  document.getElementById('inputTipo').value = 'aviso';
+  document.querySelectorAll('#tipoChips .chip').forEach((c,i) => c.classList.toggle('active', i===0));
+  document.getElementById('fieldCat').hidden = true;
+  document.getElementById('fieldPrecio').hidden = true;
+  document.getElementById('dlgNuevo').close();
+  filtro = 'todas';
+  go('muro');
+  toast('¡Publicación creada!', '🎉');
+});
+
+document.getElementById('dlgNuevo').addEventListener('click', e => {
+  if (e.target.id === 'dlgNuevo') e.target.close();
+});
+document.getElementById('dlgAdmin').addEventListener('click', e => {
+  if (e.target.id === 'dlgAdmin') e.target.close();
+});
+
+/* ARRANQUE */
+load();
+go('muro');
+inicializarFotos();
+</script>
+</body>
+</html>

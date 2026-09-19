@@ -1,0 +1,139 @@
+REGLAS DE SEGURIDAD DE LA REALTIME DATABASE — BAHÍA CAUQUÉN
+===========================================================
+
+DÓNDE SE PEGAN
+  console.firebase.google.com → el proyecto → Realtime Database
+  → pestaña "Reglas" → reemplazar TODO por el bloque de abajo → Publicar
+
+QUÉ HACEN, EN CASTELLANO
+-----------------------------------------------------------
+1. TENER CUENTA NO ALCANZA. Cualquiera puede crearse una cuenta (la clave
+   del proyecto viaja en la página, es así por diseño). Por eso las reglas
+   no preguntan "¿estás logueado?" sino "¿figurás en /barrio/users con
+   estado aprobado?". Una cuenta sin aprobar no ve nada del barrio.
+
+2. NADIE SE APRUEBA SOLO. Un vecino puede crear su propio registro, pero
+   solo con estado "pendiente" y rol "vecino", y después no puede cambiarse
+   ni el estado ni el rol. Eso solo lo hace la Administración.
+
+3. LA PRIMERA CUENTA ES LA EXCEPCIÓN. Mientras /barrio/users está vacío, la
+   primera cuenta que se crea queda como Administración. Es la única ventana
+   abierta y se cierra sola. >>> CREALA APENAS PUBLIQUES LA APP. <<<
+
+4. TRES ZONAS.
+   /barrio          lo que ven todos los vecinos aprobados (pizarrón, chat,
+                    reservas, votaciones, padrón, documentos, obras…).
+                    Los datos del barrio (padrón, agenda, reglamento,
+                    espacios, proveedores, ajustes) solo los edita la
+                    Administración.
+   /privado/<uid>   lo de cada vecino: sus mensajes con la Administración y
+                    la guardia, sus mensajes con otros vecinos, sus reclamos,
+                    peticiones, pases, paquetes, llegadas y avisos.
+                    Lo lee ese vecino y el personal (la guardia necesita los
+                    pases; la Administración, reclamos y peticiones).
+   /staff           bitácora, avisos a la guardia, SOS, correos y auditoría.
+
+5. LOS MENSAJES ENTRE VECINOS no los puede leer ni la Administración: cada
+   uno guarda su copia en su propia carpeta y la regla de lectura es del
+   dueño. La Administración puede leer /privado para pases y reclamos, así
+   que si querés que ni ella vea los mensajes vecino a vecino, cambiá la
+   línea marcada con ⚠ (está explicado ahí mismo).
+
+6. LA AUDITORÍA NO SE BORRA NI SE EDITA: solo se agrega.
+
+-----------------------------------------------------------
+PEGAR DESDE ACÁ
+-----------------------------------------------------------
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "barrio": {
+      "users": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+        "$uid": {
+          ".read": "auth.uid === $uid",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/users').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val())))",
+          "recomiendan": {
+            ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
+          }
+        }
+      },
+
+      "config":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "padron":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "amenities":     { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "agenda":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "temporadas":    { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "feriados":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "contactos":     { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "documentos":    { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "proveedores":   { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "bloqueos":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "votaciones": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { "votos": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" } }
+      },
+
+      "posts":         { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "msgs":          { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "reservas":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "compras":       { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "viajes":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "obras":         { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "eventosCiudad": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "avistamientos": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "notifsTodos":   { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "motorLog":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+    },
+
+    "privado": {
+      ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+      "$uid": {
+        ".read": "auth.uid === $uid || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        ".write": "auth.uid === $uid || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+
+        "notifs": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+
+        "dms": {
+          ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+          ".read": "auth.uid === $uid || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'"
+        },
+
+        "solicitudesPase": { ".write": true }
+      }
+    },
+
+    "staff": {
+      "sos": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+        ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
+      },
+      "bitacora": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      "avisos":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "correos":  { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "auditoria": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".write": "!data.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+      }
+    }
+  }
+}
+-----------------------------------------------------------
+HASTA ACÁ
+-----------------------------------------------------------
+
+⚠ PARA QUE LA ADMINISTRACIÓN TAMPOCO LEA LOS MENSAJES ENTRE VECINOS
+En el bloque "privado" → "$uid" → "dms", cambiá la línea ".read" por:
+
+    ".read": "auth.uid === $uid"
+
+Ojo: si la cambiás, la Administración deja de ver esas conversaciones en
+cualquier caso, incluso si un vecino pide que se revisen.
+
+CÓMO PROBAR QUE ESTÁN BIEN
+  1. Entrá con la cuenta de un vecino y abrí la consola del navegador (F12).
+  2. Pegá:  firebase.database().ref('privado').get().then(s => console.log(s.val())).catch(e => console.log('BLOQUEADO', e.message))
+  3. Tiene que decir BLOQUEADO. Si muestra datos, las reglas no se publicaron.

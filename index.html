@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d6b66">
+<meta name="description" content="La app de los vecinos del barrio Bahía Cauquén, Ushuaia.">
+<title>Bahía Cauquén</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app"></div>
+<div id="toasts" aria-live="polite"></div>
+<dialog class="hoja" id="hoja">
+  <div class="hoja-cab"><h2 id="hojaTitulo"></h2><button class="cerrar" data-a="cerrar-hoja" aria-label="Cerrar">
+    <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+  <div class="hoja-cuerpo" id="hojaCuerpo"></div>
+</dialog>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/agenda.js"></script>
+<script src="js/padron.js"></script>
+<script src="js/core.js"></script>
+<script src="js/seed.js"></script>
+<script src="js/clima.js"></script>
+<script src="js/v-inicio.js"></script>
+<script src="js/v-comunidad.js"></script>
+<script src="js/v-gestion.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/v-vecinos.js"></script>
+<script src="js/nube.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
