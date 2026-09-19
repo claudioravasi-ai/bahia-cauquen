@@ -21,13 +21,24 @@
      /staff     lo de la guardia y la Administración: llegadas,
                 paquetes, bitácora, SOS, correos y auditoría.
    ========================================================= */
+/* La configuración puede venir con cualquiera de los dos nombres: el que usa
+   este proyecto (FIREBASE) o el que copia y pega la consola de Firebase
+   (firebaseConfig). Las dos formas valen. */
+function configFirebase(){
+  const a = typeof FIREBASE !== 'undefined' ? FIREBASE : null;
+  const b = typeof firebaseConfig !== 'undefined' ? firebaseConfig : null;
+  if (a && a.databaseURL) return a;
+  if (b && b.databaseURL) return b;
+  return null;
+}
+
 const Nube = {
   app: null, db: null, auth: null, uid: null,
   ultimo: {},          /* última versión escrita, para no reescribir de más */
   listos: new Set(),
   arrancada: false,
 
-  activa(){ return typeof firebase !== 'undefined' && !!(FIREBASE && FIREBASE.databaseURL); },
+  activa(){ return typeof firebase !== 'undefined' && !!configFirebase(); },
 
   /* Colecciones de cada zona. El resto (config, motorLog) va aparte. */
   ZONAS: {
@@ -55,7 +66,7 @@ const Nube = {
 
   async iniciar(){
     if (!this.activa()) return false;
-    this.app = firebase.initializeApp(FIREBASE);
+    this.app = firebase.initializeApp(configFirebase());
     this.auth = firebase.auth();
     this.db = firebase.database();
     await this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
