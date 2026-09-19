@@ -22,12 +22,12 @@
    ========================================================================= */
 'use strict';
 
-const FIREBASE = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+const firebaseConfig = {
+  apiKey: "AIzaSyBQpNhaCQN8Ydywi0sS3DVid_8ioPH7P7A",
+  authDomain: "bahia-cauquen.firebaseapp.com",
+  databaseURL: "https://bahia-cauquen-default-rtdb.firebaseio.com",
+  projectId: "bahia-cauquen",
+  storageBucket: "bahia-cauquen.firebasestorage.app",
+  messagingSenderId: "1055815111821",
+  appId: "1:1055815111821:web:8efc05ff4499c43acd7ec4"
 };
