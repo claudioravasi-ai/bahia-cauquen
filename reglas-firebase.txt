@@ -46,6 +46,12 @@ QUÉ HACEN, EN CASTELLANO
 
 6. LA AUDITORÍA NO SE BORRA NI SE EDITA: solo se agrega.
 
+7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
+   ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
+   escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
+   viven en la carpeta privada de ese lote. Lo impositivo, solo la
+   Administración.
+
 -----------------------------------------------------------
 PEGAR DESDE ACÁ
 -----------------------------------------------------------
@@ -87,12 +93,16 @@ PEGAR DESDE ACÁ
         "$id": { "votos": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" } }
       },
 
+      "gastos":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "liquidaciones": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+
       "posts":         { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "msgs":          { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "reservas":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "compras":       { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "viajes":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "obras":         { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "cruceros":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "eventosCiudad": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "avistamientos": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "notifsTodos":   { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
@@ -124,6 +134,7 @@ PEGAR DESDE ACÁ
       "bitacora": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
       "avisos":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "correos":  { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "impuestos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "auditoria": {
         ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
         "$id": { ".write": "!data.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }

@@ -131,7 +131,8 @@ const Store = {
 
 function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
-    bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[] };
+    bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
+    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
   if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
@@ -139,6 +140,7 @@ function migrar(s){
   if (!Array.isArray(s.temporadas)) s.temporadas = JSON.parse(JSON.stringify(TEMPORADAS));
   if (!Array.isArray(s.feriados)) s.feriados = JSON.parse(JSON.stringify(FERIADOS));
   if (!Array.isArray(s.eventosCiudad)) s.eventosCiudad = eventosCiudadIniciales();
+  if (!Array.isArray(s.cruceros)) s.cruceros = [];
   if (!Array.isArray(s.avistamientos)) s.avistamientos = [];
   if (!Array.isArray(s.contactos)) s.contactos = JSON.parse(JSON.stringify(CONTACTOS));
   /* Padrón con nombres de propietarios: se importa desde Administración. */
@@ -164,6 +166,20 @@ const CONFIG_BASE = {
   recoleccionHora: '08:00',
   expensasUrl: 'https://www.octavo-piso.com.ar/users/sign_in',
   expensasVence: 10,
+  /* --- expensas propias del barrio --- */
+  exp: {
+    vto1: 10,                 /* día del primer vencimiento */
+    vto2: 21,                 /* día del segundo vencimiento */
+    recargo2: 1.5,            /* % que se suma en el segundo vencimiento */
+    interesMensual: 3,        /* % mensual sobre lo que quedó impago (a confirmar con la administración) */
+    fondoFijo: 5000,          /* Fondo de Infraestructura, monto igual para cada lote */
+    mpLink: '',               /* enlace de Mercado Pago, si algún día se usa */
+    reciboNro: 0,             /* numerador de recibos */
+    contador: '',             /* correo del contador */
+    condicion: 'Exento',      /* condición frente a ARCA */
+    iibb: '',                 /* número de Ingresos Brutos, si tiene */
+    empleados: false,         /* ¿el barrio tiene personal propio? (define si va el F.931) */
+  },
   voluminosos: '',            /* próxima fecha de retiro de voluminosos (AAAA-MM-DD) */
   voluminososDetalle: 'Muebles, colchones, electrodomésticos y chatarra. Se dejan en el frente la noche anterior.',
   dea: 'Garita de acceso (a confirmar)',
@@ -330,7 +346,10 @@ function confirmar(titulo, texto, { si = 'Confirmar', peligro = false } = {}){
     const fin = v => { d.removeEventListener('click', clic); d.removeEventListener('close', cerro); ok(v); };
     const clic = e => { const b = e.target.closest('[data-r]'); if (b){ cerrarHoja(); fin(b.dataset.r === '1'); } };
     const cerro = () => fin(false);
-    d.addEventListener('click', clic); d.addEventListener('close', cerro, { once:true });
+    d.addEventListener('click', clic);
+    /* El listener de cierre se engancha en el ciclo siguiente: si la hoja
+       venía de cerrarse, ese cierre viejo cancelaba la pregunta sola. */
+    setTimeout(() => d.addEventListener('close', cerro, { once:true }), 0);
   });
 }
 async function copiar(t){

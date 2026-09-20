@@ -4,7 +4,7 @@
 const CACHE = 'bhc-v1';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css',
   './js/firebase-config.js', './js/icons.js', './js/agenda.js', './js/padron.js', './js/core.js', './js/seed.js', './js/clima.js',
-  './js/v-inicio.js', './js/v-comunidad.js', './js/v-gestion.js', './js/admin.js', './js/v-vecinos.js', './js/nube.js', './js/app.js',
+  './js/v-inicio.js', './js/v-comunidad.js', './js/v-gestion.js', './js/admin.js', './js/v-vecinos.js', './js/v-expensas.js', './js/nube.js', './js/app.js',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/icon.svg', './icons/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

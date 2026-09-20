@@ -102,6 +102,8 @@ const LISTAS = {
   temporadas: { t:'Temporadas de Ushuaia', icon:'sun', campos:[['nombre','Nombre'],['desde','Empieza (MM-DD)'],['hasta','Termina (MM-DD)'],['nota','Nota','area']], titulo:x => x.nombre, sub:x => `${x.desde} a ${x.hasta}` },
   feriados:   { t:'Feriados', icon:'calendar', campos:[['fecha','Fecha','date'],['nombre','Nombre']], titulo:x => x.nombre, sub:x => fechaLarga(x.fecha), orden:(a, b) => a.fecha.localeCompare(b.fecha) },
   eventosCiudad:{ t:'Eventos de la ciudad', icon:'calendar', campos:[['titulo','Evento'],['tipo','Tipo'],['fecha','Fecha','date'],['hora','Hora','time'],['lugar','Lugar'],['link','Enlace','url'],['nota','Nota','area']], titulo:x => x.titulo, sub:x => `${fechaCorta(x.fecha)} · ${x.lugar || ''}`, orden:(a, b) => a.fecha.localeCompare(b.fecha) },
+  cruceros:   { t:'Recaladas de cruceros', icon:'send', campos:[['fecha','Fecha','date'],['barco','Barco'],['llega','Llega','time'],['sale','Sale','time'],['pasajeros','Pasajeros','number'],['muelle','Muelle']],
+                titulo:x => x.barco, sub:x => `${fechaCorta(x.fecha)}${x.llega ? ' · ' + x.llega : ''}${x.pasajeros ? ' · ' + x.pasajeros + ' pasajeros' : ''}`, orden:(a, b) => a.fecha.localeCompare(b.fecha) },
   documentos: { t:'Documentos y normas', icon:'file', campos:[['titulo','Título'],['tipo','Tipo (Reglamento, Convivencia, Acta…)'],['texto','Texto','area-grande'],['link','Enlace al PDF (opcional)','url']], titulo:x => x.titulo, sub:x => x.tipo || '' },
   agenda:     { t:'Agenda de Ushuaia', icon:'phone', campos:[['categoria','Categoría'],['nombre','Nombre'],['detalle','Dirección o detalle'],['tel','Teléfono','tel']], titulo:x => x.nombre, sub:x => `${x.categoria} · ${x.tel || 'sin teléfono'}` },
 };
@@ -174,6 +176,7 @@ const ADMIN_TABS = {
         ${teja({ v:'privado', p:'admin', icon:'lock', color:'accent', t:'Mensajes', s:'Conversaciones privadas' })}
         ${teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones', s:'Firmadas a la garita' })}
         ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy' })}
+        ${teja({ v:'contabilidad', icon:'wallet', color:'wood', t:'Expensas', s:'Gastos, cierre y cobranzas' })}
       </div>`;
   },
   solicitudes(){
@@ -212,6 +215,18 @@ const ADMIN_TABS = {
       <div class="card"><h3>Residuos</h3><div class="grid3">${[1,2,3,4,5,6,0].map(d => `<div class="field"><label>${DIAS[d]}</label><input name="rec${d}" value="${esc(c.recoleccion[d] || '')}" placeholder="—"></div>`).join('')}</div>
         <div class="grid2">${campo('recoleccionHora', 'Hora del camión', 'time')}${campo('voluminosos', 'Próximo retiro de voluminosos', 'date')}</div>${campo('voluminososDetalle', 'Qué se retira')}</div>
       <div class="card"><h3>Expensas y normas</h3>${campo('expensasUrl', 'Portal de expensas', 'url')}<div class="grid2">${campo('expensasVence', 'Día de vencimiento', 'number')}${campo('silencio', 'Horario de silencio')}</div>${campo('obraHorario', 'Horario de obras')}</div>
+      <div class="card"><h3>Expensas</h3><div class="grid3">
+        <div class="field"><label>1º vencimiento (día)</label><input name="exp_vto1" type="number" min="1" max="28" value="${c.exp?.vto1 ?? 10}"></div>
+        <div class="field"><label>2º vencimiento (día)</label><input name="exp_vto2" type="number" min="1" max="28" value="${c.exp?.vto2 ?? 21}"></div>
+        <div class="field"><label>Recargo 2º vto (%)</label><input name="exp_recargo2" type="number" step="0.1" value="${c.exp?.recargo2 ?? 1.5}"></div></div>
+        <div class="grid2"><div class="field"><label>Interés mensual por mora (%)</label><input name="exp_interesMensual" type="number" step="0.1" value="${c.exp?.interesMensual ?? 3}"><div class="ayuda">Confirmalo con la administración antes de emitir.</div></div>
+          <div class="field"><label>Fondo de Infraestructura por lote</label><input name="exp_fondoFijo" type="number" step="100" value="${c.exp?.fondoFijo ?? 5000}"></div></div>
+        <div class="field"><label>Enlace de pago (Mercado Pago, opcional)</label><input name="exp_mpLink" type="url" value="${esc(c.exp?.mpLink || '')}"></div></div>
+      <div class="card"><h3>Impositivo (ARCA)</h3>
+        <div class="grid2"><div class="field"><label>Condición</label><input name="exp_condicion" value="${esc(c.exp?.condicion || 'Exento')}"></div>
+          <div class="field"><label>Ingresos Brutos</label><input name="exp_iibb" value="${esc(c.exp?.iibb || '')}"></div></div>
+        <div class="field"><label>Correo del contador</label><input name="exp_contador" type="email" value="${esc(c.exp?.contador || '')}"></div>
+        <label class="check"><input type="checkbox" name="exp_empleados" ${c.exp?.empleados ? 'checked' : ''}><span>El barrio tiene personal propio (corresponde F.931 todos los meses)</span></label></div>
       <div class="card"><h3>Correo</h3><p class="muted small" style="margin-top:0">Para que la app mande los mails de inscripción y claves. Instrucciones en <span class="mono">apps-script/Codigo.gs</span>.</p>
         ${campo('correoUrl', 'URL del Apps Script (termina en /exec)', 'url')}${campo('correoClave', 'Frase compartida', 'password')}</div>
       <div class="card"><h3>Vuelos en vivo (opcional)</h3>${campo('vuelosProxy', 'URL del Worker que reenvía OpenSky', 'url', 'Ver CONECTAR.md. Sin esto se muestran igual arribos y partidas.')}</div>
@@ -252,6 +267,10 @@ F['ajustes'] = d => {
     const c = s.config;
     ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminosos','voluminososDetalle','expensasUrl','silencio','obraHorario','correoUrl','correoClave','vuelosProxy'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
     ['casas','datosDias','expensasVence'].forEach(k => { if (d[k] !== '') c[k] = +d[k]; });
+    c.exp = Object.assign({}, c.exp || {});
+    ['vto1','vto2','recargo2','interesMensual','fondoFijo'].forEach(k => { if (d['exp_' + k] !== undefined && d['exp_' + k] !== '') c.exp[k] = +d['exp_' + k]; });
+    ['mpLink','condicion','iibb','contador'].forEach(k => { if (d['exp_' + k] !== undefined) c.exp[k] = String(d['exp_' + k]).trim(); });
+    c.exp.empleados = !!d.exp_empleados;
     c.recoleccion = {}; [0,1,2,3,4,5,6].forEach(i => { const v = String(d['rec' + i] || '').trim(); if (v) c.recoleccion[i] = v; });
     auditar(s, 'Cambió los ajustes del barrio', '');
   });

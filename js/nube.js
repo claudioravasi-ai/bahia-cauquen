@@ -45,9 +45,10 @@ const Nube = {
   /* Colecciones de cada zona. El resto (config, motorLog) va aparte. */
   ZONAS: {
     barrio: ['users','padron','amenities','agenda','temporadas','feriados','eventosCiudad','contactos','documentos',
-             'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos','notifsTodos'],
-    privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes'],
-    staff: ['bitacora','avisos','sos','correos','auditoria'],
+             'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
+             'gastos','liquidaciones','cruceros','notifsTodos'],
+    privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
+    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos'],
   },
 
   /* De quién es cada cosa de la zona privada (puede ser de más de uno). */
@@ -57,7 +58,8 @@ const Nube = {
       case 'dms': return [x.a, x.b];
       case 'reclamos': case 'peticiones': return [x.userId];
       case 'pases': case 'solicitudesPase': case 'llegadas': case 'paquetes': return [x.hostId];
-      case 'infracciones': return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
+      case 'infracciones': case 'pagos': case 'recibos':
+        return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
       case 'notifs': return x.para.filter(p => p && !String(p).startsWith('rol:') && p !== 'todos' && p !== 'staff');
       default: return [];
     }

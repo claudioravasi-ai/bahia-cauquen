@@ -48,21 +48,51 @@ frase van en Administración → Ajustes → Correo. Manda: confirmación de
 inscripción con enlace de seguimiento, aviso a la Administración y la clave al
 aprobar.
 
-## 5. Vuelos en vivo
+## 5. Vuelos y cruceros
 
-El listado de Aeropuertos Argentina se consulta directo; hoy responde vacío
-desde afuera de su sitio, así que la app muestra los enlaces oficiales. Para los
-**aviones en el aire sobre el barrio** (OpenSky) hace falta un Worker de
-Cloudflare como el de NiJu:
+Los servicios de vuelos (Aeropuertos Argentina, OpenSky, adsb.lol, adsb.fi) no
+dejan que una página los consulte directo: hay que pedírselos desde un
+servidor. Un Worker de Cloudflare, como el de NiJu, alcanza y es gratis.
 
-```js
-export default { async fetch() {
-  const r = await fetch('https://opensky-network.org/api/states/all?lamin=-55.1&lomin=-68.8&lamax=-54.5&lomax=-67.8');
-  return new Response(await r.text(), { headers: { 'content-type':'application/json', 'access-control-allow-origin':'*' } });
-} };
+Su URL va en **Administración → Ajustes → Vuelos**. La app le agrega `?apt=USH`
+y espera una respuesta así:
+
+```json
+{ "arr": [...], "dep": [...], "states": [...] }
 ```
 
-Su URL va en Administración → Ajustes → Vuelos en vivo.
+Worker mínimo, con los aviones en vivo sobre el barrio:
+
+```js
+export default {
+  async fetch(request) {
+    const cors = { 'content-type':'application/json', 'access-control-allow-origin':'*' };
+    const salida = { arr: [], dep: [], states: [] };
+
+    // Aviones en el aire alrededor de Ushuaia
+    try {
+      const r = await fetch('https://api.adsb.lol/v2/lat/-54.84/lon/-68.30/dist/60');
+      const j = await r.json();
+      salida.states = (j.ac || []).map(a => ({
+        callsign: (a.flight || '').trim(),
+        alt: Math.round((a.alt_baro || 0) * 0.3048),
+        vel: Math.round((a.gs || 0) * 1.852),
+        suelo: a.alt_baro === 'ground'
+      }));
+    } catch (e) {}
+
+    // Arribos y partidas: si conseguís una fuente con clave (por ejemplo
+    // AeroDataBox), la llamada va acá y se llenan arr y dep.
+
+    return new Response(JSON.stringify(salida), { headers: cors });
+  }
+};
+```
+
+**Cruceros.** El puerto no publica un servicio para consultar. El calendario de
+recaladas se carga desde **Administración → Contenido → Recaladas de cruceros**
+(fecha, barco, horario, pasajeros y muelle) y la app lo muestra en la portada,
+en "Ushuaia hoy". Si algún día hay una fuente, el mismo Worker puede traerla.
 
 ## 6. Conectividad de vanguardia (opciones, de menor a mayor obra)
 

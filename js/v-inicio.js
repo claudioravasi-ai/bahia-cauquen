@@ -167,6 +167,7 @@ R.inicio = {
     ].join('');
     const gestion = esAdmin() ? [
       teja({ v:'admin', icon:'sliders', color:'accent', t:'Administración', s:'Inscripciones, datos y motor', badge: pend }),
+      teja({ v:'contabilidad', icon:'wallet', color:'wood', t:'Contabilidad', s:'Expensas, cobranzas y ARCA', badge: s.pagos.filter(x => x.estado === 'informado').length }),
       teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy', n: pasesDelDia().length }),
       teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' }),
       teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' }),
@@ -194,7 +195,7 @@ R.inicio = {
     }).join('');
 
     return `${hero}
-      <div class="panel-sube">${urg.join('')}</div>
+      <div class="panel-sube">${urg.join('')}${ushuaiaHoy()}</div>
       <div class="inicio-cols"><div>
         ${sec('Tu casa')}<div class="mosaico">${tuCasa}</div>
         ${sec('El barrio')}<div class="mosaico">${barrio}</div>
@@ -206,6 +207,31 @@ R.inicio = {
       </div></div>`;
   },
 };
+
+/* Lo que está pasando hoy en Ushuaia: temporadas abiertas, el crucero que
+   recala, el próximo feriado y los vuelos. Va en la portada porque son las
+   cosas que cambian todos los días. */
+function ushuaiaHoy(){
+  const s = Store.s, hoy = hoyISO();
+  const chip = (icon, t, x, on) => `<button class="uh-chip ${on ? 'on' : ''}" data-a="abrir" data-v="ushuaia">${I(icon)}<span><b>${t}</b>${x ? `<small>${x}</small>` : ''}</span></button>`;
+  const partes = [];
+  s.temporadas.forEach(t => {
+    const on = enTemporada(t), d = on ? diasHasta(t.hasta) : diasHasta(t.desde);
+    partes.push(chip(t.icon || 'calendar', esc(t.nombre), on ? (d <= 15 ? `termina en ${plural(d, 'día')}` : 'abierta') : `abre en ${plural(d, 'día')}`, on));
+  });
+  const cru = s.cruceros.filter(c => c.fecha === hoy), cruMan = s.cruceros.filter(c => c.fecha === sumarDias(hoy, 1));
+  if (cru.length) partes.unshift(chip('send', `Hoy recala ${esc(cru[0].barco)}`, `${cru.length > 1 ? `y ${cru.length - 1} más · ` : ''}${cru[0].llega ? cru[0].llega + ' h' : ''}${cru[0].pasajeros ? ' · ' + cru[0].pasajeros + ' pasajeros' : ''}`, true));
+  else if (cruMan.length) partes.unshift(chip('send', `Mañana recala ${esc(cruMan[0].barco)}`, cruMan[0].llega ? cruMan[0].llega + ' h' : '', false));
+  const fer = proximoFeriado();
+  if (fer) partes.push(chip('calendar', esc(fer.nombre), relDia(fer.fecha), fer.fecha === hoy));
+  const v = Vuelos.cuantosHoy();
+  if (v) partes.push(chip('send', 'Vuelos de hoy en USH', v + ' movimientos', false));
+  const ev = s.eventosCiudad.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+  if (ev) partes.push(chip('star', esc(ev.titulo), relDia(ev.fecha), ev.fecha === hoy));
+  if (!partes.length) return '';
+  return `<div class="ushuaia-hoy"><div class="uh-cab">${I('pin')}<b>Ushuaia hoy</b><span class="muted small">tocá para ver todo</span></div>
+    <div class="uh-tira">${partes.join('')}</div></div>`;
+}
 
 function proxRecoleccion(){
   const r = Store.s.config.recoleccion, h = new Date().getDay();

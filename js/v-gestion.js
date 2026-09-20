@@ -432,29 +432,7 @@ R.documentos = {
 F['buscar-norma'] = d => abrir('documentos', d.q || '');
 A['ver-doc'] = el => { const d = Store.s.documentos.find(x => x.id === el.dataset.id); if (d) hoja(d.titulo, `<div style="white-space:pre-wrap;font-size:14.5px;line-height:1.6">${esc(d.texto)}</div>${d.link ? `<a class="btn btn-sec btn-block" style="margin-top:14px" href="${esc(d.link)}" target="_blank" rel="noopener">${I('file')}Abrir el documento completo</a>` : ''}`, { ancho:'720px' }); };
 
-/* ---------- EXPENSAS ---------- */
-R.expensas = {
-  titulo: 'Expensas', icon: 'wallet', color: 'wood', sub: 'Resumen, cupones y pagos',
-  render(){
-    const c = Store.s.config, hoy = new Date(), vence = new Date(hoy.getFullYear(), hoy.getMonth() + (hoy.getDate() > c.expensasVence ? 1 : 0), c.expensasVence);
-    const dias = Math.ceil((vence - hoy) / DIA);
-    return `<div class="card" style="background:linear-gradient(140deg,#b85f24,#7a3a12);color:#fff;border:0"><div class="small" style="opacity:.85">Próximo vencimiento</div>
-      <div style="font-size:30px;font-weight:800;letter-spacing:-1px">${vence.getDate()} de ${MESES[vence.getMonth()]}</div><div class="small" style="opacity:.9">${dias === 0 ? 'Vence hoy' : `Faltan ${plural(dias, 'día')}`}</div>
-      <a class="btn" style="background:#fff;color:#7a3a12;margin-top:14px" href="${esc(c.expensasUrl)}" target="_blank" rel="noopener">${I('wallet')}Ver y pagar en el portal</a></div>
-      ${(() => { const L = loteDe(yo()); if (!L) return '';
-        const ult = Store.s.padron.find(x => 'Lote ' + x.lote === yo().casa);
-        return `<div class="card"><b style="font-size:15px">Tu lote</b>
-          <div class="lista"><div class="it"><div class="txt"><b>${esc(nombreLote(L))} · UF ${L.uf}</b><span>Coeficiente de prorrateo</span></div><span class="pill p-brand">${L.coef.toFixed(3)} %</span></div>
-          ${ult ? `<div class="it"><div class="txt"><b>Última liquidación cargada</b><span>${esc(Store.s.padronPeriodo || '')}</span></div><span class="pill">$ ${ult.expensasAgosto.toLocaleString('es-AR', { minimumFractionDigits:2 })}</span></div>` : ''}</div>
-          <p class="muted tiny" style="margin:8px 0 0">De cada $100 de gastos del barrio, a tu lote le corresponden $${L.coef.toFixed(2)}.</p></div>`; })()}
-      <div class="card"><b style="font-size:15px">Datos para transferir</b>
-        <div class="lista"><div class="it"><div class="txt"><b>Alias</b><span>${esc(Store.s.config.alias)}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(Store.s.config.alias)}">${I('copy')}</button></div>
-        <div class="it"><div class="txt"><b>CBU</b><span class="mono">${esc(Store.s.config.cbu)}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(Store.s.config.cbu)}">${I('copy')}</button></div>
-        <div class="it"><div class="txt"><b>Titular</b><span>Barrio Bahía Cauquén · CUIT ${esc(Store.s.config.cuit)}</span></div></div></div></div>
-      ${superficie({ a:'abrir', v:'privado', icon:'lock', color:'accent', t:'Consultar a la Administración', s:'Cupones, planes de pago, dudas' })}
-      <p class="muted small">Hoy el resumen y el pago se hacen en el portal de expensas. La app te avisa sola tres días antes de cada vencimiento, y la contabilidad propia del barrio está en camino.</p>`;
-  },
-};
+/* Las expensas viven en js/v-expensas.js: el módulo contable completo. */
 
 /* ---------- RESIDUOS ---------- */
 R.recoleccion = {
@@ -510,8 +488,18 @@ R.ushuaia = {
         <div class="muted tiny" style="margin-top:8px">${esc(t.nota || '')}</div></div>`; }).join('');
     const fer = s.feriados.filter(f => f.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 6);
     const evs = s.eventosCiudad.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const cru = s.cruceros.filter(c => c.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 8);
+    const hoyCru = s.cruceros.filter(c => c.fecha === hoy);
     return `${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
+      ${hoyCru.length ? aviso('info', 'send', `Hoy recala${hoyCru.length > 1 ? 'n' : ''} ${hoyCru.map(c => esc(c.barco)).join(', ')}`, `${hoyCru.reduce((a, c) => a + (+c.pasajeros || 0), 0) || ''} pasajeros en el centro · más tránsito y más gente en los comercios`) : ''}
       ${sec('Temporadas')}${temp}
+      ${sec('Cruceros', esAdmin() ? `<button class="link" data-a="abrir" data-v="admin" data-p="contenido|cruceros">Cargar recaladas</button>` : '')}
+      ${cru.length ? `<div class="card lista">${cru.map(c => `<div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('send')}</span>
+        <div class="txt"><b>${esc(c.barco)}</b><span>${fechaCorta(c.fecha)}${c.llega ? ' · llega ' + c.llega : ''}${c.sale ? ' · sale ' + c.sale : ''}${c.pasajeros ? ' · ' + c.pasajeros + ' pasajeros' : ''}${c.muelle ? ' · ' + esc(c.muelle) : ''}</span></div>
+        <span class="pill ${c.fecha === hoy ? 'p-ok' : ''}">${relDia(c.fecha)}</span></div>`).join('')}</div>`
+        : `<div class="card"><p class="small" style="margin:0;color:var(--ink-2)">No hay recaladas cargadas. ${enTemporada(s.temporadas.find(t => /crucero/i.test(t.nombre)) || {desde:'10-15',hasta:'04-15'}) ? 'Estamos en temporada: el calendario del puerto se carga desde Administración → Contenido → Recaladas de cruceros.' : 'La temporada todavía no empezó.'}</p>
+          ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="abrir" data-v="admin" data-p="contenido|cruceros">${I('plus')}Cargar el calendario</button>` : ''}
+          <a class="btn btn-sm btn-sec" style="margin-top:10px" href="https://www.puertoushuaia.gob.ar" target="_blank" rel="noopener">${I('link')}Puerto de Ushuaia</a></div>`}
       ${sec('Próximos feriados')}<div class="card lista">${fer.length ? fer.map(f => `<div class="it"><div class="txt"><b>${esc(f.nombre)}</b><span>${fechaLarga(f.fecha)}</span></div><span class="pill ${f.fecha === hoy ? 'p-ok' : ''}">${relDia(f.fecha)}</span></div>`).join('') : vacio('calendar', 'No hay feriados cargados.')}</div>
       ${sec('Eventos en la ciudad', esStaff() || true ? `<button class="link" data-a="nuevo-evento-ciudad">Sumar uno</button>` : '')}
       ${evs.length ? evs.map(e => `<div class="card"><div class="row" style="align-items:flex-start"><div class="evento-box" style="margin:0;padding:0;background:none"><div class="fecha"><small>${MESES[fechaDe(e.fecha).getMonth()]}</small><b>${fechaDe(e.fecha).getDate()}</b></div></div>
@@ -546,46 +534,78 @@ const Vuelos = {
       aerolinea:this.campo(x, 'aerolinea', 'airline_name', 'airline', 'idaerolinea'), lugar:this.campo(x, 'destorig', 'destino', 'origen', 'city', 'ciudad'),
       hora:h ? `${pad(h[1])}:${h[2]}` : '', estado:this.campo(x, 'estes', 'estado', 'status', 'remark'), real:String(this.campo(x, 'atda', 'etda', 'actual', 'estimated')).match(/\d{1,2}:\d{2}/)?.[0] || '' };
   },
+  /* Orden de fuentes:
+     1. El Worker del barrio (Ajustes → Vuelos), que puede leer cualquier
+        servicio sin la traba que los navegadores le ponen a las páginas.
+     2. El listado de Aeropuertos Argentina, por si vuelve a responder.
+     Si no hay ninguna, la ventana lo dice y ofrece los enlaces oficiales. */
   async pedir(forzar = false){
     if (!forzar && this.d && Date.now() - this.d.t < 5 * MIN) return this.d;
     if (this.cargando) return this.cargando;
-    const base = 'https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa/all-flights';
-    const f = hoyISO().split('-').reverse().join('-');
-    const traer = mov => fetch(`${base}?c=900&idarpt=USH&movtp=${mov}&f=${f}`).then(r => r.ok ? r.text() : '[]').then(t => { try { const j = JSON.parse(t || '[]'); return Array.isArray(j) ? j : (j.data || j.vuelos || []); } catch(e){ return []; } }).catch(() => null);
-    this.cargando = Promise.all([traer('A'), traer('D')]).then(async ([a, d]) => {
-      let vivos = [];
-      const px = Store.s.config.vuelosProxy;
-      if (px){ try { const j = await fetch(px).then(r => r.json()); vivos = (j.states || []).map(s => ({ callsign:(s[1] || '').trim(), alt:Math.round(s[7] || 0), vel:Math.round((s[9] || 0) * 3.6), suelo:s[8] })); } catch(e){} }
-      if (a === null && d === null){ this.estado = 'sin-conexion'; return this.d; }
-      this.estado = (a || []).length + (d || []).length ? 'ok' : 'vacio';
-      this.d = { t:Date.now(), arr:(a || []).map(x => this.normalizar(x, 'A')), dep:(d || []).map(x => this.normalizar(x, 'D')), vivos };
+    const px = Store.s.config.vuelosProxy;
+    this.cargando = (async () => {
+      if (px){
+        try {
+          const j = await fetch(px + (px.includes('?') ? '&' : '?') + 'apt=USH').then(r => r.json());
+          const arr = (j.arr || j.arribos || []).map(x => this.normalizar(x, 'A'));
+          const dep = (j.dep || j.partidas || []).map(x => this.normalizar(x, 'D'));
+          const vivos = (j.states || j.vivos || []).map(v => Array.isArray(v)
+            ? { callsign:(v[1] || '').trim(), alt:Math.round(v[7] || 0), vel:Math.round((v[9] || 0) * 3.6), suelo:v[8] }
+            : { callsign:v.callsign || v.flight || '', alt:v.alt || 0, vel:v.vel || 0, suelo:v.suelo });
+          if (arr.length || dep.length || vivos.length){
+            this.estado = 'ok';
+            this.d = { t:Date.now(), arr, dep, vivos };
+            try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
+            return this.d;
+          }
+        } catch(e){ this.estado = 'proxy-falla'; }
+      }
+      const base = 'https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa/all-flights';
+      const f = hoyISO().split('-').reverse().join('-');
+      const traer = mov => fetch(`${base}?c=900&idarpt=USH&movtp=${mov}&f=${f}`).then(r => r.ok ? r.text() : '[]')
+        .then(t => { try { const j = JSON.parse(t || '[]'); return Array.isArray(j) ? j : (j.data || j.vuelos || []); } catch(e){ return []; } }).catch(() => null);
+      const [a, d] = await Promise.all([traer('A'), traer('D')]);
+      if (a === null && d === null){ this.estado = navigator.onLine ? 'sin-fuente' : 'sin-conexion'; return this.d; }
+      if (!(a || []).length && !(d || []).length){ this.estado = 'sin-fuente'; return this.d; }
+      this.estado = 'ok';
+      this.d = { t:Date.now(), arr:(a || []).map(x => this.normalizar(x, 'A')), dep:(d || []).map(x => this.normalizar(x, 'D')), vivos:[] };
       try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
       return this.d;
-    }).finally(() => { this.cargando = null; });
+    })().finally(() => { this.cargando = null; });
     return this.cargando;
   },
 };
 Vuelos.leer();
 R.vuelos = {
-  titulo: 'Vuelos USH', icon: 'send', color: 'accent', sub: 'Aeropuerto Malvinas Argentinas · arribos y partidas',
+  titulo: 'Vuelos de Ushuaia', icon: 'send', color: 'accent', sub: 'Aeropuerto Malvinas Argentinas · a 6 km del barrio',
   render(){
-    const d = Vuelos.d, ok = d && (d.arr.length || d.dep.length);
+    const d = Vuelos.d, hay = d && (d.arr.length || d.dep.length);
     const fila = v => `<div class="it"><div class="mono" style="font-weight:800;width:52px">${esc(v.hora)}</div><div class="txt"><b>${esc(v.lugar)}</b><span>${esc(v.nro)}${v.aerolinea ? ' · ' + esc(v.aerolinea) : ''}</span></div>
       <span class="pill ${/cancel/i.test(v.estado) ? 'p-danger' : /demor|delay/i.test(v.estado) ? 'p-warn' : /aterr|arrib|desp|landed|departed/i.test(v.estado) ? 'p-ok' : ''}">${esc(v.estado || (v.real ? 'Est. ' + v.real : 'Programado'))}</span></div>`;
-    const porHora = {}; if (ok) [...d.arr, ...d.dep].forEach(v => { const h = v.hora.slice(0, 2); if (h) porHora[h] = (porHora[h] || 0) + 1; });
+    const porHora = {}; if (hay) [...d.arr, ...d.dep].forEach(v => { const h = v.hora.slice(0, 2); if (h) porHora[h] = (porHora[h] || 0) + 1; });
     const horas = Object.keys(porHora).sort();
-    return `${!d && !Vuelos.estado ? `<div class="vacio">${I('refresh')}Buscando vuelos de hoy…</div>` : ''}
-      ${ok ? `<div class="garita-kpis"><div class="kpi"><b>${d.arr.length}</b><span>Arribos</span></div><div class="kpi"><b>${d.dep.length}</b><span>Partidas</span></div><div class="kpi"><b>${d.arr.length + d.dep.length}</b><span>Hoy</span></div></div>
-        ${horas.length ? `<div class="card"><b style="font-size:14px">Movimientos por hora</b><div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">${horas.map(h => `<div style="flex:1;text-align:center"><div style="height:${porHora[h] * 16}px;background:var(--accent);border-radius:4px 4px 0 0;opacity:.8"></div><div class="tiny muted">${h}</div></div>`).join('')}</div></div>` : ''}
+    const estados = {
+      '': `<div class="vacio">${I('refresh')}Buscando los vuelos de hoy…</div>`,
+      'sin-fuente': aviso('info', 'info', 'El listado oficial no se puede leer desde la app',
+        'Aeropuertos Argentina dejó de responder a otras páginas. Con el Worker del barrio configurado (Ajustes → Vuelos) vuelven a verse acá, con los aviones en vivo. Mientras tanto, los enlaces de abajo llevan al listado oficial.'),
+      'proxy-falla': aviso('warn', 'alert', 'El Worker del barrio no respondió', 'Revisá la dirección en Administración → Ajustes → Vuelos.'),
+      'sin-conexion': aviso('warn', 'cloud', 'Sin internet', 'Cuando vuelva la conexión, se actualiza solo.'),
+    };
+    return `${hay ? '' : (estados[Vuelos.estado] || estados[''])}
+      ${hay ? `<div class="garita-kpis"><div class="kpi"><b>${d.arr.length}</b><span>Arribos</span></div><div class="kpi"><b>${d.dep.length}</b><span>Partidas</span></div><div class="kpi"><b>${d.arr.length + d.dep.length}</b><span>Hoy</span></div></div>
+        ${horas.length ? `<div class="card"><b style="font-size:14px">Movimientos por hora</b><div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">${horas.map(h => `<div style="flex:1;text-align:center"><div style="height:${porHora[h] * 16}px;background:var(--g-accent);border-radius:4px 4px 0 0"></div><div class="tiny muted">${h}</div></div>`).join('')}</div>
+          <p class="muted tiny" style="margin:8px 0 0">El barrio está bajo la traza de aproximación: así se ve cuándo hay más movimiento.</p></div>` : ''}
         ${sec('Arribos')}<div class="card lista">${d.arr.map(fila).join('') || vacio('send', 'Sin arribos')}</div>
-        ${sec('Partidas')}<div class="card lista">${d.dep.map(fila).join('') || vacio('send', 'Sin partidas')}</div>`
-      : Vuelos.estado ? aviso('info', 'info', 'El listado oficial no respondió desde la app', 'Mientras tanto, estos son los enlaces directos de Aeropuertos Argentina:') : ''}
-      ${d?.vivos?.length ? sec('En el aire ahora, cerca del barrio') + `<div class="card lista">${d.vivos.map(v => `<div class="it"><div class="txt"><b>${esc(v.callsign || 'Sin identificar')}</b><span>${v.suelo ? 'En tierra' : `${v.alt} m · ${v.vel} km/h`}</span></div></div>`).join('')}</div>` : ''}
-      ${sec('Enlaces')}
-      ${superficie({ a:'link', v:'https://www.aeropuertosargentina.com/es/vuelos?movtp=arribos&idarpt=USH', icon:'login', color:'accent', t:'Arribos a Ushuaia', s:'Aeropuertos Argentina' })}
+        ${sec('Partidas')}<div class="card lista">${d.dep.map(fila).join('') || vacio('send', 'Sin partidas')}</div>` : ''}
+      ${d?.vivos?.length ? sec('En el aire ahora, cerca del barrio') + `<div class="card lista">${d.vivos.map(v => `<div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('send')}</span>
+        <div class="txt"><b>${esc(v.callsign || 'Sin identificar')}</b><span>${v.suelo ? 'En tierra' : `${v.alt} m de altura · ${v.vel} km/h`}</span></div></div>`).join('')}</div>` : ''}
+      ${sec('Ver en el sitio oficial')}
+      ${superficie({ a:'link', v:'https://www.aeropuertosargentina.com/es/vuelos?movtp=arribos&idarpt=USH', icon:'login', color:'accent', t:'Arribos a Ushuaia', s:'Aeropuertos Argentina · horarios y estado' })}
       ${superficie({ a:'link', v:'https://www.aeropuertosargentina.com/es/vuelos?movtp=partidas&idarpt=USH', icon:'logout', color:'accent', t:'Partidas de Ushuaia', s:'Aeropuertos Argentina' })}
-      ${superficie({ a:'link', v:'https://www.flightradar24.com/-54.84,-68.30/12', icon:'eye', color:'sky', t:'Mapa de aviones en vivo', s:'Flightradar24 sobre Ushuaia' })}
-      <button class="btn btn-sec btn-block" data-a="vuelos-actualizar">${I('refresh')}Actualizar</button>`;
+      ${superficie({ a:'link', v:'https://www.flightradar24.com/-54.84,-68.30/11', icon:'eye', color:'sky', t:'Mapa de aviones en vivo', s:'Flightradar24 sobre el barrio' })}
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'brand', t:'Configurar el Worker de vuelos', s:'Para ver arribos, partidas y aviones en vivo dentro de la app' }) : ''}
+      <button class="btn btn-sec btn-block" data-a="vuelos-actualizar">${I('refresh')}Actualizar</button>
+      ${d ? `<p class="muted tiny center">Última actualización: ${hora(d.t)}</p>` : ''}`;
   },
   alPintar(){ if (!Vuelos.d || Date.now() - Vuelos.d.t > 5 * MIN) Vuelos.pedir().then(() => { if (PILA.at(-1)?.id === 'vuelos') refrescar(); }); },
 };

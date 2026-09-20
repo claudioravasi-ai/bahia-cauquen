@@ -59,7 +59,8 @@ function pintarTop(){
     <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
       <span class="logo">${LOGO}</span>
       <span style="min-width:0"><b>${esc(Store.s.config.nombre)}</b>
-        <small><span class="en-vivo"></span>${esc(u.rol === 'vecino' ? u.nombre.split(' ')[0] : u.nombre)}<span class="casa"> · ${esc(u.casa)}</span></small></span>
+        <small><span class="en-vivo"></span>${esc(u.nombre.split(' ')[0])}${u.rol === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
+          : `<span class="rol-chip">${u.rol === 'admin' ? 'Administración' : 'Guardia'}</span><span class="casa"> · ${esc(u.casa)}</span>`}</small></span>
     </button>
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
     <button class="icon-btn" data-a="mi-cuenta" aria-label="Mi cuenta">${avatar(u, 'sm')}</button>
@@ -217,64 +218,112 @@ const modoActual = () => document.documentElement.getAttribute('data-theme') ===
 /* ---------------- bienvenida (sin sesión) ---------------- */
 function pintarBienvenida(modo = 'inicio'){
   const pend = Store.sesion.pendienteEmail && Store.s.users.find(u => u.email === Store.sesion.pendienteEmail);
-  let panel;
-  if (modo === 'entrar') panel = `
-    <form data-f="entrar">
-      <div class="field"><label style="color:#fff">Email</label><input name="email" type="email" required autocomplete="username" placeholder="tucorreo@mail.com" value="${esc(Store.sesion.pendienteEmail || '')}"></div>
-      <div class="field"><label style="color:#fff">${Nube.activa() ? 'Contraseña' : 'Clave de vecino'}</label><input name="clave" type="${Nube.activa() ? 'password' : 'text'}" required autocomplete="current-password" placeholder="${Nube.activa() ? '••••••••' : 'VEC-XXXX'}" style="${Nube.activa() ? '' : 'text-transform:uppercase;letter-spacing:2px'}"></div>
-      <button class="btn btn-pri btn-block">${I('login')}Entrar</button>
-      ${Nube.activa() ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="olvide">Olvidé mi contraseña</button>` : ''}
-    </form>
-    <div class="enlaces"><button data-a="bienvenida" data-v="inicio">Volver</button><button data-a="bienvenida" data-v="registro">No tengo clave</button></div>`;
-  else if (modo === 'registro') panel = `
-    <form data-f="registro">
-      <div class="field"><label style="color:#fff">Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="name"></div>
-      <div class="grid2"><div class="field"><label style="color:#fff">DNI</label><input name="dni" required inputmode="numeric" pattern="[0-9.]{7,11}" maxlength="11" placeholder="Sin puntos"></div>
-      <div class="field"><label style="color:#fff">Tu lote</label><select name="casa" required><option value="">Elegí tu lote…</option>${LOTES.map(l => `<option value="Lote ${l.lote}">${esc(nombreLote(l))}</option>`).join('')}</select></div></div>
-      <div class="field"><label style="color:#fff">Email</label><input name="email" type="email" required maxlength="80" autocomplete="email"></div>
-      <div class="field"><label style="color:#fff">Teléfono / WhatsApp</label><input name="tel" inputmode="tel" maxlength="20" placeholder="549 2901 …"></div>
-      ${Nube.activa() ? `<div class="field"><label style="color:#fff">Elegí tu contraseña</label><input name="clave" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></div>` : ''}
-      <label class="check" style="color:#fff;font-size:12.5px"><input type="checkbox" name="acepto" required><span>Acepto que la Administración use estos datos solo para la vida del barrio y el control de acceso (Ley 25.326). Puedo pedir verlos, corregirlos o borrarlos.</span></label>
-      <button class="btn btn-pri btn-block" style="margin-top:10px">${I('send')}Enviar mi inscripción</button>
-      <p class="tiny" style="margin:10px 0 0;opacity:.85">Te llega un mail con el enlace para seguir tu inscripción. La Administración la revisa y te manda tu clave.</p>
-    </form>
-    <div class="enlaces"><button data-a="bienvenida" data-v="inicio">Volver</button><button data-a="bienvenida" data-v="entrar">Ya tengo clave</button></div>`;
-  else if (modo === 'completar') panel = `
-    <div class="aviso a-${Nube.libre ? 'ok' : 'warn'}">${I(Nube.libre ? 'shield' : 'clock')}<div class="txt"><b>${Nube.libre ? 'Sos la primera cuenta del barrio' : 'Falta completar tus datos'}</b>${Nube.libre ? 'Completá tus datos y quedás como Administración.' : 'Tu cuenta existe pero no tiene ficha. Completala y la Administración la aprueba.'}</div></div>
-    <form data-f="completar">
-      <div class="field"><label style="color:#fff">Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="name"></div>
-      <div class="grid2"><div class="field"><label style="color:#fff">DNI</label><input name="dni" required inputmode="numeric" maxlength="11" placeholder="Sin puntos"></div>
-        <div class="field"><label style="color:#fff">Tu lote</label><select name="casa" required><option value="">Elegí…</option>${LOTES.map(l => `<option value="Lote ${l.lote}">${esc(nombreLote(l))}</option>`).join('')}</select></div></div>
-      <div class="field"><label style="color:#fff">Teléfono / WhatsApp</label><input name="tel" inputmode="tel" maxlength="20"></div>
-      <button class="btn btn-pri btn-block">${I('check')}Completar mi ficha</button>
-    </form>
-    <div class="enlaces"><button data-a="salir-espera">Salir</button></div>`;
-  else if (modo === 'espera') panel = `
-    <div class="aviso a-warn">${I('clock')}<div class="txt"><b>Tu inscripción está en revisión</b>La Administración la aprueba y te avisamos por correo. Podés cerrar la app.</div></div>
-    <button class="btn btn-sec btn-block" data-a="salir-espera">Salir</button>`;
-  else panel = `
-    ${pend && pend.estado === 'pendiente' ? `<div class="aviso a-warn" style="margin-bottom:12px">${I('clock')}<div class="txt"><b>Tu inscripción está en revisión</b>Cuando la Administración la apruebe te llega la clave por correo.
-      ${pend.token ? `<div class="acciones"><button class="btn btn-xs btn-sec" data-a="ver-inscripcion" data-v="${pend.token}">Ver mi inscripción</button></div>` : ''}</div></div>` : ''}
-    ${pend && pend.estado === 'rechazado' ? `<div class="aviso a-danger" style="margin-bottom:12px">${I('x')}<div class="txt"><b>Tu pedido no fue aprobado</b>Comunicate con la Administración del barrio.</div></div>` : ''}
-    <div class="btns"><button class="btn btn-pri" data-a="bienvenida" data-v="entrar">${I('login')}Entrar</button>
-    <button class="btn btn-sec" data-a="bienvenida" data-v="registro">Soy vecino nuevo</button></div>
-    ${Nube.activa() ? '' : `<div class="tiny" style="margin-top:14px;opacity:.85;font-weight:700">PROBAR LA DEMO COMO</div>`}
-    <div class="demo" ${Nube.activa() ? 'hidden' : ''}>
-      <button data-a="demo" data-v="u_claudio">Claudio · Lote 148</button>
-      <button data-a="demo" data-v="u_lucia">Lucía · Lote 42</button>
-      <button data-a="demo" data-v="u_diego">Diego · Lote 18</button>
-      <button data-a="demo" data-v="u_garita">Guardia</button>
-      <button data-a="demo" data-v="u_admin">Administración</button>
-    </div>`;
+  const nube = Nube.activa();
+  const c = Store.s.config;
+  const grupo = (t, campos, ayuda = '') => `<section class="grupo"><h3>${t}</h3>${campos}${ayuda ? `<p class="grupo-ayuda">${ayuda}</p>` : ''}</section>`;
+  const campo = (label, input, ancho = '') => `<div class="field ${ancho}"><label>${label}</label>${input}</div>`;
+  const selectLote = (sel = '') => `<select name="casa" required><option value="">Elegí tu lote…</option>${LOTES.map(l => `<option value="Lote ${l.lote}" ${'Lote ' + l.lote === sel ? 'selected' : ''}>${esc(nombreLote(l))}</option>`).join('')}</select>`;
+
+  let titulo, bajada, cuerpo, pie = '';
+
+  if (modo === 'entrar'){
+    titulo = 'Entrar';
+    bajada = 'Con el correo y la clave de tu cuenta.';
+    cuerpo = `<form data-f="entrar">
+      ${grupo('Tu acceso',
+        campo('Correo', `<input name="email" type="email" required autocomplete="username" inputmode="email" placeholder="tucorreo@mail.com" value="${esc(Store.sesion.pendienteEmail || '')}">`) +
+        campo(nube ? 'Contraseña' : 'Clave de vecino', `<input name="clave" type="${nube ? 'password' : 'text'}" required autocomplete="current-password" placeholder="${nube ? '••••••••' : 'VEC-XXXX'}" ${nube ? '' : 'style="text-transform:uppercase;letter-spacing:2px"'}>`))}
+      <button class="btn btn-pri btn-block btn-grande">${I('login')}Entrar</button>
+      ${nube ? `<button type="button" class="btn btn-sec btn-block" data-a="olvide">Olvidé mi contraseña</button>` : ''}
+    </form>`;
+    pie = `<button class="enlace" data-a="bienvenida" data-v="inicio">${I('left')}Volver</button>
+           <button class="enlace" data-a="bienvenida" data-v="registro">Todavía no tengo cuenta</button>`;
+  }
+
+  else if (modo === 'registro'){
+    titulo = 'Inscribite';
+    bajada = 'La Administración revisa el pedido y te habilita.';
+    cuerpo = `<form data-f="registro">
+      ${grupo('Quién sos',
+        campo('Nombre y apellido', `<input name="nombre" required maxlength="60" autocomplete="name" placeholder="Como figura en la escritura">`) +
+        `<div class="grid2">${campo('DNI', `<input name="dni" required inputmode="numeric" pattern="[0-9.]{7,11}" maxlength="11" placeholder="Sin puntos">`)}
+          ${campo('Tu lote', selectLote())}</div>`,
+        `El barrio tiene ${lotesVecinos().length} lotes de vecinos. Si no encontrás el tuyo, escribinos.`)}
+      ${grupo('Cómo te contactamos',
+        campo('Correo', `<input name="email" type="email" required maxlength="80" autocomplete="email" inputmode="email" placeholder="tucorreo@mail.com">`) +
+        campo('Teléfono o WhatsApp', `<input name="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="549 2901 …">`),
+        'Al correo te llega el estado de tu inscripción.')}
+      ${nube ? grupo('Tu contraseña', campo('Elegila', `<input name="clave" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">`), 'Es personal. Si en tu casa hay más de un vecino, cada uno tiene la suya.') : ''}
+      ${grupo('Privacidad',
+        `<label class="check"><input type="checkbox" name="acepto" required><span>Acepto que la Administración use estos datos solo para la vida del barrio y el control de acceso (Ley 25.326). Puedo pedir verlos, corregirlos o borrarlos.</span></label>`)}
+      <button class="btn btn-pri btn-block btn-grande">${I('send')}Enviar mi inscripción</button>
+    </form>`;
+    pie = `<button class="enlace" data-a="bienvenida" data-v="inicio">${I('left')}Volver</button>
+           <button class="enlace" data-a="bienvenida" data-v="entrar">Ya tengo cuenta</button>`;
+  }
+
+  else if (modo === 'completar'){
+    titulo = Nube.libre ? 'Sos la primera cuenta' : 'Completá tu ficha';
+    bajada = Nube.libre ? 'Con estos datos quedás como Administración del barrio.' : 'Tu cuenta existe pero le falta la ficha de vecino.';
+    cuerpo = `<form data-f="completar">
+      ${grupo('Quién sos',
+        campo('Nombre y apellido', `<input name="nombre" required maxlength="60" autocomplete="name">`) +
+        `<div class="grid2">${campo('DNI', `<input name="dni" required inputmode="numeric" maxlength="11" placeholder="Sin puntos">`)}
+          ${campo('Tu lote', selectLote())}</div>`)}
+      ${grupo('Contacto', campo('Teléfono o WhatsApp', `<input name="tel" inputmode="tel" maxlength="20" autocomplete="tel">`))}
+      <button class="btn btn-pri btn-block btn-grande">${I('check')}Completar mi ficha</button>
+    </form>`;
+    pie = `<button class="enlace" data-a="salir-espera">Salir</button>`;
+  }
+
+  else if (modo === 'espera'){
+    titulo = 'Inscripción enviada';
+    bajada = 'La Administración la revisa y te avisa por correo.';
+    cuerpo = `<div class="aviso a-warn">${I('clock')}<div class="txt"><b>En revisión</b>Podés cerrar la app: cuando te habiliten, entrás con tu correo y tu contraseña.</div></div>`;
+    pie = `<button class="enlace" data-a="salir-espera">Salir</button>`;
+  }
+
+  else {
+    titulo = 'Bienvenido al barrio';
+    bajada = 'Visitas con QR, reservas, avisos de la guardia, clima y vuelos de Ushuaia, votaciones y todo lo que pasa entre vecinos.';
+    cuerpo = `
+      ${pend && pend.estado === 'pendiente' ? `<div class="aviso a-warn">${I('clock')}<div class="txt"><b>Tu inscripción está en revisión</b>Cuando la aprueben te llega un correo.${pend.token ? `<div class="acciones"><button class="btn btn-xs btn-sec" data-a="ver-inscripcion" data-v="${pend.token}">Ver mi inscripción</button></div>` : ''}</div></div>` : ''}
+      ${pend && pend.estado === 'rechazado' ? `<div class="aviso a-danger">${I('x')}<div class="txt"><b>Tu pedido no fue aprobado</b>Comunicate con la Administración.</div></div>` : ''}
+      <div class="portal-acciones">
+        <button class="btn btn-pri btn-block btn-grande" data-a="bienvenida" data-v="entrar">${I('login')}Entrar</button>
+        <button class="btn btn-sec btn-block btn-grande" data-a="bienvenida" data-v="registro">${I('user')}Soy vecino nuevo</button>
+      </div>
+      ${nube ? '' : `<section class="grupo"><h3>Probar la demo</h3><div class="demo">
+        <button data-a="demo" data-v="u_claudio">Claudio · Lote 148</button>
+        <button data-a="demo" data-v="u_lucia">Lucía · Lote 42</button>
+        <button data-a="demo" data-v="u_diego">Diego · Lote 18</button>
+        <button data-a="demo" data-v="u_garita">Guardia</button>
+        <button data-a="demo" data-v="u_admin">Administración</button></div>
+        <p class="grupo-ayuda">Datos inventados, solo para mirar cómo funciona.</p></section>`}`;
+  }
+
   $('#app').innerHTML = `
-    <section class="bienvenida ${['entrar','registro','completar'].includes(modo) ? 'compacta' : ''}">
-      <div class="foto" style="background-image:url('${Clima.portada()}')"></div>
-      <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b><div class="tiny" style="opacity:.85">${esc(Store.s.config.ciudad)}</div></div></div>
-      <h1>La vida del barrio,<br>en un solo lugar.</h1>
-      <p class="lead">Visitas con QR, reservas, avisos de la guardia, clima y vuelos de Ushuaia, votaciones y todo lo que pasa entre vecinos.</p>
-      <div class="panel">${panel}</div>
-      <div class="enlaces"><a href="tel:911" style="color:#fff;font-weight:800;text-decoration:none">${I('phone')} Emergencias 911</a></div>
-    </section>`;
+    <div class="portal">
+      <div class="portal-foto" style="background-image:url('${Clima.portada()}')">
+        <div class="portal-marca"><span class="logo">${LOGO}</span>
+          <div><b>Barrio ${esc(c.nombre)}</b><small>${esc(c.ciudad)}</small></div></div>
+        <div class="portal-lema"><h1>La vida del barrio,<br>en un solo lugar.</h1>
+          ${(() => { const cl = Clima.d?.c; if (!cl) return '';
+            const [desc, ico] = Clima.cod(cl.weather_code);
+            return `<div class="portal-clima">${I(ico)}<b>${Math.round(cl.temperature_2m)}°</b><span>${esc(desc)} · ráfagas ${Math.round(cl.wind_gusts_10m)} km/h</span></div>`; })()}</div>
+      </div>
+      <div class="portal-panel">
+        <div class="portal-caja">
+          <header class="portal-cab"><h2>${esc(titulo)}</h2><p>${esc(bajada)}</p></header>
+          ${cuerpo}
+          ${pie ? `<nav class="portal-enlaces">${pie}</nav>` : ''}
+        </div>
+        <footer class="portal-pie">
+          <a href="tel:911">${I('phone')}Emergencias 911</a>
+          ${c.garitaTel ? `<a href="${telLink(c.garitaTel)}">${I('gate')}Garita</a>` : ''}
+        </footer>
+      </div>
+    </div>`;
 }
 
 /* ---------------- avisos ---------------- */
@@ -577,8 +626,8 @@ F['registro'] = async d => {
   pintarBienvenida();
 };
 A['salir'] = async () => {
+  if (!await confirmar('Cerrar sesión', 'Vas a tener que volver a entrar con tu correo y tu clave.', { si:'Cerrar sesión' })) return;
   cerrarHoja();
-  if (!await confirmar('Cerrar sesión', 'Vas a tener que volver a entrar con tu email y tu clave.', { si:'Cerrar sesión' })) return;
   if (typeof Nube !== 'undefined' && Nube.activa()) await Nube.salir();
   Store.sesion.userId = null; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
 };
