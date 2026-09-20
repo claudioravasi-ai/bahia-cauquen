@@ -311,52 +311,222 @@ F['gestionar-reclamo'] = (d, form) => {
 };
 
 /* ---------- VOTACIONES (un voto por casa, secreto) ---------- */
+/* =========================================================
+   VOTACIONES
+   -------------------------------------------------------
+   HASTA DÓNDE LLEGA EL VALOR LEGAL, DICHO SIN VUELTAS
+
+   Lo que obliga a todo el barrio es la decisión de la ASAMBLEA, con el
+   quórum y las mayorías que fija el reglamento de copropiedad, asentada
+   en el libro de actas (Código Civil y Comercial, arts. 2044 a 2072 para
+   propiedad horizontal y 2073 a 2086 para conjuntos inmobiliarios).
+   Una encuesta en una app, por sí sola, no reemplaza eso.
+
+   Lo que SÍ puede hacer esta app, y hace:
+
+   1. CONSULTA ESCRITA (art. 2060 CCyC). La ley permite obtener la
+      mayoría consultando por escrito a los propietarios ausentes. La
+      votación se emite con el texto exacto de la moción, con plazo, con
+      un voto por unidad funcional, y al cerrar la app arma el ACTA con
+      el detalle de cómo votó cada lote, lista para transcribir al libro
+      de actas y firmar. Eso es lo que le da fuerza.
+
+   2. UN VOTO POR LOTE, como manda el régimen: el voto es de la unidad
+      funcional, no de la persona. Si en una casa hay cinco cuentas,
+      el voto sigue siendo uno.
+
+   3. QUÓRUM Y MAYORÍA calculados según lo que diga el reglamento: por
+      cantidad de unidades o por coeficiente, con mayoría simple, absoluta
+      o de dos tercios. La app dice si se alcanzó o no, y no redondea a
+      favor de nadie.
+
+   4. REGISTRO QUE NO SE PUEDE TOCAR: cada voto queda en la auditoría con
+      lote, unidad funcional, quién lo emitió, fecha y hora. La auditoría
+      no se edita ni se borra desde la app.
+
+   Y las que se declaran PLEBISCITO / consulta no vinculante quedan
+   marcadas como tales, para que nadie las presente como lo que no son.
+   ========================================================= */
+const TIPOS_VOTACION = {
+  consulta:  { n:'Consulta escrita del art. 2060 CCyC', c:'accent',
+               d:'Tiene valor de decisión si se alcanza el quórum y la mayoría del reglamento. Al cerrar se emite el acta para el libro.' },
+  plebiscito:{ n:'Plebiscito · consulta no vinculante', c:'sky',
+               d:'Sirve para conocer la opinión del barrio. No obliga: para que obligue hace falta asamblea o consulta escrita.' },
+  asamblea:  { n:'Voto en asamblea', c:'brand',
+               d:'Registro del voto de una asamblea que se está celebrando. El acta de la asamblea manda.' },
+};
+const MAYORIAS = {
+  simple:   { n:'Mayoría simple de los que votan', f:(a, favor, total) => favor > (a - favor) },
+  absoluta: { n:'Mayoría absoluta del total de unidades', f:(a, favor, total) => favor > total / 2 },
+  dosTercios:{ n:'Dos tercios del total de unidades', f:(a, favor, total) => favor >= total * 2 / 3 },
+  unanimidad:{ n:'Unanimidad', f:(a, favor, total) => favor === total },
+};
+
+/* Cómo se cuenta: por unidad (un lote, un voto) o por coeficiente (el peso
+   de cada lote en las expensas). El reglamento dice cuál. */
+const pesoLote = (casa, porCoef) => {
+  if (!porCoef) return 1;
+  const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === casa) : null;
+  return L ? L.coef : 0;
+};
+function escrutinio(v){
+  const porCoef = v.conteo === 'coeficiente';
+  const total = porCoef ? 100 : (typeof LOTES !== 'undefined' ? LOTES.length : totalLotes());
+  const val = x => typeof x === 'object' && x ? x.i : x;
+  const entradas = Object.entries(v.votos || {});
+  const cuenta = (v.opciones || []).map(() => 0);
+  let emitido = 0;
+  entradas.forEach(([casa, voto]) => {
+    const i = val(voto), p = pesoLote(casa, porCoef);
+    if (i >= 0 && i < cuenta.length){ cuenta[i] += p; emitido += p; }
+  });
+  const lotes = entradas.length;
+  const quorumPedido = +v.quorum || 0;                     /* % del total */
+  const quorumLogrado = total ? (emitido / total * 100) : 0;
+  const hayQuorum = quorumLogrado + 1e-9 >= quorumPedido;
+  const ganadora = cuenta.indexOf(Math.max(...cuenta, 0));
+  const favor = cuenta[ganadora] || 0;
+  const regla = MAYORIAS[v.mayoria] || MAYORIAS.simple;
+  const hayMayoria = emitido > 0 && regla.f(emitido, favor, total);
+  return { porCoef, total, cuenta, emitido, lotes, quorumPedido, quorumLogrado, hayQuorum, ganadora, favor, regla, hayMayoria,
+    valida: hayQuorum && hayMayoria, cerrada: v.cierra <= Date.now() };
+}
+const fmtPeso = (n, porCoef) => porCoef ? n.toFixed(3) + ' %' : String(Math.round(n));
+
 R.votaciones = {
-  titulo: 'Votaciones', icon: 'vote', color: 'accent', sub: 'Un voto por casa · el voto de cada casa es secreto',
+  titulo: 'Votaciones', icon: 'vote', color: 'accent', sub: 'Un voto por lote · queda asentado en la auditoría',
   render(){
     const u = yo(), s = Store.s;
     const abiertas = s.votaciones.filter(v => v.cierra > Date.now()), cerradas = s.votaciones.filter(v => v.cierra <= Date.now());
     const card = v => {
       const abierta = v.cierra > Date.now();
-      /* Un voto por lote: si en la casa hay cinco vecinos con cuenta, el voto es uno solo. */
+      const T = TIPOS_VOTACION[v.tipo] || TIPOS_VOTACION.plebiscito;
+      const e = escrutinio(v);
       const val = x => typeof x === 'object' && x ? x.i : x;
-      const votos = Object.values(v.votos).map(val), n = votos.length;
       const miVoto = v.votos[u.casa], mio = val(miVoto);
       const quien = miVoto && typeof miVoto === 'object' && miVoto.por ? nombreDe(miVoto.por) : '';
       const ver = !abierta || mio !== undefined || esAdmin();
-      const cuenta = v.opciones.map((_, i) => votos.filter(x => x === i).length), gana = Math.max(...cuenta);
-      const totalCasas = Math.max(totalLotes(), n, 1);
+      const puedeVotar = abierta && !esStaff() && /^Lote\s/i.test(u.casa || '');
       return `<div class="card"><div class="row" style="align-items:flex-start"><div class="grow"><b style="font-size:16px">${esc(v.titulo)}</b>
-        <div class="muted small">${abierta ? `Cierra el ${new Date(v.cierra).toLocaleDateString('es-AR', { day:'numeric', month:'short' })}` : 'Cerrada'} · ${plural(n, 'lote votó', 'lotes votaron')} de ${totalCasas}</div></div>
-        <span class="pill ${abierta ? 'p-ok' : ''}">${abierta ? 'Abierta' : 'Cerrada'}</span></div>
-        ${v.detalle ? `<p class="small" style="color:var(--ink-2)">${esc(v.detalle)}</p>` : ''}
-        <div class="progreso" style="margin:8px 0 12px"><i style="width:${Math.min(100, n / totalCasas * 100)}%;background:var(--accent)"></i></div>
-        ${v.opciones.map((o, i) => { const pct = n ? Math.round(cuenta[i] / n * 100) : 0;
-          return abierta && !esStaff() ? `<button class="opcion ${mio === i ? 'elegida' : ''}" data-a="votar" data-id="${v.id}" data-v="${i}">${ver ? `<span class="barra" style="width:${pct}%"></span>` : ''}<span>${mio === i ? I('check') : ''}${esc(o)}</span>${ver ? `<span class="pct">${pct}%</span>` : ''}</button>`
-            : `<div class="opcion ${!abierta && cuenta[i] === gana && n ? 'elegida' : ''}"><span class="barra" style="width:${pct}%"></span><span>${esc(o)}</span><span class="pct">${cuenta[i]} · ${pct}%</span></div>`; }).join('')}
-        ${abierta && mio !== undefined ? `<p class="muted tiny" style="margin:4px 0 0">${quien && quien !== u.nombre ? `Votó ${esc(quien)} por ${esc(u.casa)}` : 'Tu lote ya votó'} · el voto es uno por lote y cualquiera de la casa puede cambiarlo hasta el cierre.</p>` : ''}</div>`;
+        <div class="muted small">${abierta ? `Cierra el ${fechaLarga(isoDe(new Date(v.cierra)))}` : 'Cerrada'} · votaron ${plural(e.lotes, 'lote')} de ${e.total === 100 ? (typeof LOTES !== 'undefined' ? LOTES.length : '') : e.total}</div></div>
+        <span class="pill p-${T.c === 'accent' ? 'accent' : T.c === 'brand' ? 'brand' : ''}">${abierta ? 'Abierta' : 'Cerrada'}</span></div>
+        <div class="tiny muted" style="margin:6px 0 2px">${I('shield')} ${esc(T.n)}</div>
+        ${v.detalle ? `<p class="small" style="color:var(--ink-2);white-space:pre-wrap">${esc(v.detalle)}</p>` : ''}
+        <div class="muted tiny" style="margin-bottom:8px">Se cuenta por ${e.porCoef ? 'coeficiente de expensas' : 'unidad funcional (un lote, un voto)'} · ${esc(e.regla.n.toLowerCase())}${e.quorumPedido ? ` · quórum ${e.quorumPedido} %` : ''}</div>
+        <div class="progreso" style="margin:0 0 4px"><i style="width:${Math.min(100, e.quorumLogrado)}%;background:${e.hayQuorum ? 'var(--ok)' : 'var(--accent)'}"></i></div>
+        <div class="tiny muted" style="margin-bottom:10px">Participación: ${e.quorumLogrado.toFixed(1)} %${e.quorumPedido ? (e.hayQuorum ? ' · quórum alcanzado' : ` · faltan ${(e.quorumPedido - e.quorumLogrado).toFixed(1)} puntos para el quórum`) : ''}</div>
+        ${v.opciones.map((o, i) => { const pct = e.emitido ? (e.cuenta[i] / e.emitido * 100) : 0;
+          return puedeVotar ? `<button class="opcion ${mio === i ? 'elegida' : ''}" data-a="votar" data-id="${v.id}" data-v="${i}">${ver ? `<span class="barra" style="width:${pct}%"></span>` : ''}<span>${mio === i ? I('check') : ''}${esc(o)}</span>${ver ? `<span class="pct">${pct.toFixed(0)}%</span>` : ''}</button>`
+            : `<div class="opcion ${!abierta && i === e.ganadora && e.emitido ? 'elegida' : ''}"><span class="barra" style="width:${pct}%"></span><span>${esc(o)}</span><span class="pct">${fmtPeso(e.cuenta[i], e.porCoef)} · ${pct.toFixed(0)}%</span></div>`; }).join('')}
+        ${abierta && mio !== undefined ? `<p class="muted tiny" style="margin:4px 0 0">${quien && quien !== u.nombre ? `Votó ${esc(quien)} por ${esc(u.casa)}` : 'Tu lote ya votó'} · el voto es de la unidad funcional: cualquiera de la casa puede cambiarlo hasta el cierre, y siempre cuenta uno solo.</p>` : ''}
+        ${abierta && !puedeVotar && !esStaff() ? `<p class="muted tiny">Tu cuenta no tiene un lote asignado, así que no puede emitir el voto de una unidad. Avisale a la Administración.</p>` : ''}
+        ${!abierta ? `<div class="aviso a-${e.valida ? 'ok' : 'warn'}" style="margin-top:12px">${I(e.valida ? 'check' : 'alert')}<div class="txt">
+          <b>${v.tipo === 'plebiscito' ? (e.emitido ? `Ganó "${esc(v.opciones[e.ganadora])}"` : 'Nadie votó') + ' · consulta no vinculante'
+            : e.valida ? `Aprobado: "${esc(v.opciones[e.ganadora])}"` : e.emitido ? 'No se alcanzó la mayoría necesaria' : 'Nadie votó'}</b>
+          ${e.emitido ? `${fmtPeso(e.favor, e.porCoef)} de ${fmtPeso(e.emitido, e.porCoef)} emitidos${e.porCoef ? '' : ' votos'} · ${esc(e.regla.n.toLowerCase())}${e.quorumPedido ? ` · quórum ${e.hayQuorum ? 'alcanzado' : 'NO alcanzado'}` : ''}` : ''}</div></div>
+          ${esAdmin() ? `<div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-pri" data-a="acta-votacion" data-id="${v.id}">${I('file')}Emitir el acta</button></div>` : ''}` : ''}
+        </div>`;
     };
-    return `${esAdmin() ? superficie({ a:'nueva-votacion', icon:'plus', t:'Nueva votación', s:'Asambleas, obras, reglas', cls:'acento' }) : ''}
+    return `${esAdmin() ? superficie({ a:'nueva-votacion', icon:'plus', t:'Nueva votación', s:'Consulta escrita, plebiscito o voto de asamblea', cls:'acento' }) : ''}
       ${abiertas.length ? abiertas.map(card).join('') : vacio('vote', 'No hay votaciones abiertas.')}
-      ${cerradas.length ? sec('Cerradas') + cerradas.map(card).join('') : ''}`;
+      ${cerradas.length ? sec('Cerradas') + cerradas.map(card).join('') : ''}
+      <div class="card plana small" style="color:var(--ink-2);line-height:1.6;margin-top:14px">
+        <b>Sobre el valor de estos votos.</b> El voto es de la unidad funcional: un lote, un voto, aunque en la casa haya varias cuentas.
+        Cada voto queda asentado en la auditoría con lote, UF, quién lo emitió y la hora, y esa auditoría no se edita ni se borra desde la app.
+        Las <b>consultas escritas</b> se apoyan en el art. 2060 del Código Civil y Comercial, que permite reunir la mayoría consultando por escrito:
+        al cerrarse, la app emite el <b>acta</b> con el detalle para transcribir al libro y firmar. Lo que obliga al barrio es esa acta y el
+        reglamento de copropiedad, no la pantalla.</div>`;
   },
 };
-A['votar'] = el => { const u = yo(); let antes;
-  Store.cambiar(s => { const v = s.votaciones.find(x => x.id === el.dataset.id); if (!v || v.cierra <= Date.now()) return;
-    antes = v.votos[u.casa]; v.votos[u.casa] = { i:+el.dataset.v, por:u.id, at:Date.now() }; });
-  toast(antes !== undefined ? `Cambiaste el voto de ${yo().casa}` : `Voto registrado por ${yo().casa}`, 'vote'); };
+A['votar'] = el => {
+  const u = yo();
+  if (!/^Lote\s/i.test(u.casa || '')){ toast('Tu cuenta no tiene un lote asignado', 'alert'); return; }
+  let antes;
+  Store.cambiar(s => {
+    const v = s.votaciones.find(x => x.id === el.dataset.id); if (!v || v.cierra <= Date.now()) return;
+    antes = v.votos[u.casa];
+    const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === u.casa) : null;
+    v.votos[u.casa] = { i:+el.dataset.v, por:u.id, at:Date.now(), uf:L?.uf || '', coef:L?.coef || 0 };
+    /* Queda asentado: es lo que le da respaldo al resultado. */
+    auditar(s, antes !== undefined ? 'Cambió el voto de una unidad' : 'Emitió el voto de una unidad',
+      `${u.casa}${L ? ' (UF ' + L.uf + ')' : ''} · "${v.titulo}" · opción: ${v.opciones[+el.dataset.v]}`, u.id);
+  });
+  toast(antes !== undefined ? `Cambiaste el voto de ${yo().casa}` : `Voto registrado por ${yo().casa}`, 'vote');
+};
 A['nueva-votacion'] = () => hoja('Nueva votación', `<form data-f="votacion">
-  <div class="field"><label>Pregunta</label><input name="titulo" required maxlength="120"></div>
-  <div class="field"><label>Detalle</label><textarea name="detalle" maxlength="600"></textarea></div>
-  <div class="field"><label>Opciones (una por renglón)</label><textarea name="opciones" required>Sí\nNo\nMe abstengo</textarea></div>
-  <div class="field"><label>Cierra</label><input type="date" name="cierra" required min="${sumarDias(hoyISO(), 1)}" value="${sumarDias(hoyISO(), 7)}"></div>
-  <button class="btn btn-pri btn-block">${I('vote')}Abrir votación</button></form>`);
+  <div class="field"><label>Tipo</label><select name="tipo" required>${Object.entries(TIPOS_VOTACION).map(([k, T]) => `<option value="${k}">${T.n}</option>`).join('')}</select>
+    <div class="ayuda">${Object.values(TIPOS_VOTACION).map(T => `<b>${esc(T.n.split('·')[0].trim())}:</b> ${esc(T.d)}`).join('<br>')}</div></div>
+  <div class="field"><label>Moción · el texto exacto que se vota</label><input name="titulo" required maxlength="140" placeholder="Ej: Aprobar la instalación de cámaras en el acceso de servicio"></div>
+  <div class="field"><label>Fundamentos y detalle</label><textarea name="detalle" maxlength="1200" style="min-height:120px" placeholder="Presupuestos, plazos, de dónde salen los fondos…"></textarea></div>
+  <div class="field"><label>Opciones (una por renglón)</label><textarea name="opciones" required>Sí\nNo\nMe abstengo</textarea>
+    <div class="ayuda">La primera opción es la que se considera "a favor" de la moción.</div></div>
+  <div class="grid2">
+    <div class="field"><label>Cómo se cuenta</label><select name="conteo"><option value="unidad">Un lote, un voto</option><option value="coeficiente">Por coeficiente de expensas</option></select>
+      <div class="ayuda">Lo define el reglamento de copropiedad.</div></div>
+    <div class="field"><label>Mayoría necesaria</label><select name="mayoria">${Object.entries(MAYORIAS).map(([k, M]) => `<option value="${k}">${M.n}</option>`).join('')}</select></div></div>
+  <div class="grid2">
+    <div class="field"><label>Quórum mínimo de participación (%)</label><input type="number" name="quorum" min="0" max="100" step="1" value="0"><div class="ayuda">0 = sin exigencia de quórum.</div></div>
+    <div class="field"><label>Cierra</label><input type="date" name="cierra" required min="${sumarDias(hoyISO(), 1)}" value="${sumarDias(hoyISO(), 15)}"></div></div>
+  <button class="btn btn-pri btn-block">${I('vote')}Abrir la votación</button>
+  <p class="muted tiny" style="margin:10px 0 0">Al abrirla se avisa a todo el barrio y queda asentada en la auditoría. Ni la moción ni las opciones se pueden cambiar después: si hay que corregir algo, se abre otra.</p></form>`, { ancho:'620px' });
 F['votacion'] = d => {
   const ops = d.opciones.split('\n').map(x => x.trim()).filter(Boolean);
   if (ops.length < 2){ toast('Hacen falta al menos dos opciones', 'vote'); return; }
-  Store.cambiar(s => { s.votaciones.unshift({ id:uid(), titulo:d.titulo.trim(), detalle:d.detalle.trim(), opciones:ops, cierra:fechaDe(d.cierra).getTime() + 23 * HORA, votos:{}, creadaPor:yo().id, createdAt:Date.now() });
-    notificar(s, { para:'todos', titulo:'Nueva votación', texto:d.titulo.trim(), icon:'vote', color:'accent', link:'votaciones', sonido:true }); });
+  const T = TIPOS_VOTACION[d.tipo] || TIPOS_VOTACION.plebiscito;
+  Store.cambiar(s => {
+    s.votaciones.unshift({ id:uid(), titulo:d.titulo.trim(), detalle:(d.detalle || '').trim(), opciones:ops,
+      tipo:d.tipo, conteo:d.conteo, mayoria:d.mayoria, quorum:+d.quorum || 0,
+      cierra:fechaDe(d.cierra).getTime() + 23 * HORA, votos:{}, creadaPor:yo().id, createdAt:Date.now() });
+    notificar(s, { para:'todos', titulo:'Nueva votación del barrio', texto:d.titulo.trim(), icon:'vote', color:'accent', link:'votaciones', sonido:true });
+    auditar(s, 'Abrió una votación', `${T.n} · "${d.titulo.trim()}" · cierra ${d.cierra}`);
+  });
   cerrarHoja(); toast('Votación abierta', 'vote');
+};
+
+/* El acta: lo que se transcribe al libro y se firma. Sin esto, el resultado
+   en pantalla es solo un número. */
+A['acta-votacion'] = el => {
+  const v = Store.s.votaciones.find(x => x.id === el.dataset.id); if (!v) return;
+  const e = escrutinio(v), c = Store.s.config, T = TIPOS_VOTACION[v.tipo] || TIPOS_VOTACION.plebiscito;
+  const filas = Object.entries(v.votos).sort((a, b) => a[0].localeCompare(b[0], 'es', { numeric:true })).map(([casa, voto]) => {
+    const i = typeof voto === 'object' ? voto.i : voto;
+    const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === casa) : null;
+    return `<tr><td>${esc(casa)}</td><td>${esc(voto.uf || L?.uf || '')}</td><td class="n">${(voto.coef ?? L?.coef ?? 0).toFixed(4)}</td>
+      <td>${esc(propietarioDe(casa) || '')}</td><td>${esc(v.opciones[i] || '')}</td><td>${voto.at ? fechaHora(voto.at) : ''}</td></tr>`;
+  }).join('');
+  imprimir(`Acta · ${v.titulo}`, `
+    <h1>Acta de ${T.n.toLowerCase()}</h1>
+    <p><b>Barrio ${esc(c.nombre)}</b> · ${esc(c.domicilio)} · CUIT ${esc(c.cuit)}</p>
+    <p>En ${esc(c.ciudad)}, a los ${new Date().getDate()} días del mes de ${MESES[new Date().getMonth()]} de ${new Date().getFullYear()},
+    se deja constancia del resultado de la ${T.n.toLowerCase()} convocada por la Administración el ${fechaLarga(isoDe(new Date(v.createdAt)))},
+    con cierre el ${fechaLarga(isoDe(new Date(v.cierra)))}.</p>
+    <h2>Moción sometida a votación</h2>
+    <p style="font-size:15px"><b>${esc(v.titulo)}</b></p>
+    ${v.detalle ? `<p style="white-space:pre-wrap">${esc(v.detalle)}</p>` : ''}
+    <h2>Régimen aplicado</h2>
+    <table>
+      <tr><td>Cómputo</td><td>${e.porCoef ? 'Por coeficiente de expensas' : 'Por unidad funcional (un lote, un voto)'}</td></tr>
+      <tr><td>Mayoría exigida</td><td>${esc(e.regla.n)}</td></tr>
+      <tr><td>Quórum exigido</td><td>${e.quorumPedido ? e.quorumPedido + ' %' : 'Sin exigencia'}</td></tr>
+      <tr><td>Unidades del padrón</td><td>${typeof LOTES !== 'undefined' ? LOTES.length : ''}</td></tr>
+      <tr><td>Unidades que votaron</td><td>${e.lotes}</td></tr>
+      <tr><td>Participación</td><td>${e.quorumLogrado.toFixed(2)} %${e.quorumPedido ? (e.hayQuorum ? ' — quórum alcanzado' : ' — quórum NO alcanzado') : ''}</td></tr>
+    </table>
+    <h2>Escrutinio</h2>
+    <table><tr><th>Opción</th><th class="n">Votos</th><th class="n">%</th></tr>
+      ${v.opciones.map((o, i) => `<tr><td>${esc(o)}</td><td class="n">${fmtPeso(e.cuenta[i], e.porCoef)}</td><td class="n">${e.emitido ? (e.cuenta[i] / e.emitido * 100).toFixed(2) : '0.00'} %</td></tr>`).join('')}
+      <tr class="total"><td>Total emitido</td><td class="n">${fmtPeso(e.emitido, e.porCoef)}</td><td class="n">100 %</td></tr></table>
+    <h2>Resultado</h2>
+    <p style="font-size:15px"><b>${v.tipo === 'plebiscito'
+      ? `Consulta no vinculante. Opción más votada: "${esc(v.opciones[e.ganadora] || '—')}".`
+      : e.valida ? `APROBADA la opción "${esc(v.opciones[e.ganadora])}", por haberse alcanzado ${esc(e.regla.n.toLowerCase())}${e.quorumPedido ? ' y el quórum exigido' : ''}.`
+      : `NO APROBADA: no se alcanzó ${e.hayQuorum ? esc(e.regla.n.toLowerCase()) : 'el quórum exigido'}.`}</b></p>
+    ${v.tipo === 'consulta' ? `<p style="font-size:11.5px;color:#555">La presente se emite como consulta escrita en los términos del artículo 2060 del Código Civil y Comercial de la Nación, que admite obtener la mayoría mediante consulta escrita a los propietarios. Se deja constancia de que el voto fue emitido por unidad funcional y que el detalle individual obra a continuación. Corresponde su transcripción al libro de actas del consorcio.</p>` : ''}
+    ${v.tipo === 'plebiscito' ? `<p style="font-size:11.5px;color:#555">La presente consulta tiene carácter informativo y no vinculante. No sustituye a la asamblea ni a la consulta escrita del artículo 2060 del Código Civil y Comercial.</p>` : ''}
+    <h2>Detalle por unidad</h2>
+    <table><tr><th>Lote</th><th>UF</th><th class="n">Coef. %</th><th>Titular según padrón</th><th>Voto</th><th>Fecha y hora</th></tr>${filas || '<tr><td colspan="6">No se emitieron votos.</td></tr>'}</table>
+    <p style="font-size:11.5px;color:#555">Cada voto quedó asentado en el registro de auditoría de la aplicación, con lote, unidad funcional, cuenta que lo emitió y marca de fecha y hora. Ese registro no admite edición ni borrado desde la aplicación.</p>
+    <div class="firma"><div>Administración</div><div>Consejo de administración</div></div>`);
 };
 
 /* ---------- PRIVADO con la Administración ---------- */
@@ -438,14 +608,61 @@ A['ver-doc'] = el => { const d = Store.s.documentos.find(x => x.id === el.datase
 R.recoleccion = {
   titulo: 'Residuos', icon: 'truck', color: 'ok', sub: 'Recolección y voluminosos',
   render(){
-    const c = Store.s.config, hoy = new Date().getDay();
+    const c = Store.s.config, hoy = new Date().getDay(), hoyIso = hoyISO();
+    /* Los retiros de voluminosos son una lista de fechas con su detalle:
+       la Administración anota todas las del año y la app avisa la víspera. */
+    const vols = volsProximos();
     return `<div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${c.recoleccion[d] ? I('truck') + esc(c.recoleccion[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
       <p class="muted small">El camión pasa desde las ${c.recoleccionHora} h. Si al otro día es feriado, puede cambiar: la app avisa.</p>
-      ${sec('Voluminosos')}<div class="card">${c.voluminosos ? `<b>Próximo retiro: ${fechaLarga(c.voluminosos)}</b>` : '<b>Sin fecha de retiro cargada</b>'}<p class="small" style="margin:6px 0 0;color:var(--ink-2)">${esc(c.voluminososDetalle)}</p></div>
+      ${(() => { const man = diaInfo(sumarDias(hoyIso, 1));
+        return man.feriado ? aviso('warn', 'calendar', `Mañana es feriado: ${esc(man.feriado.nombre)}`, 'La recolección puede no pasar o pasar más tarde.') : ''; })()}
+      ${sec('Voluminosos', esAdmin() ? `<button class="link" data-a="nuevo-voluminoso">Anotar un retiro</button>` : '')}
+      ${vols.length ? vols.map(v => `<div class="card"><div class="row">
+          <span class="ic ic-${v.fecha === hoyIso ? 'danger' : 'wood'}" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('truck')}</span>
+          <div class="grow"><b>${v.fecha === hoyIso ? 'Hoy' : v.fecha === sumarDias(hoyIso, 1) ? 'Mañana' : fechaLarga(v.fecha)}</b>
+            <div class="muted small">${esc(v.detalle || c.voluminososDetalle)}</div></div>
+          <span class="pill ${v.fecha === hoyIso ? 'p-danger' : ''}">${relDia(v.fecha)}</span>
+          ${esAdmin() ? `<button class="icon-btn" data-a="borrar-voluminoso" data-v="${v.fecha}" aria-label="Borrar">${I('trash')}</button>` : ''}</div></div>`).join('')
+        : `<div class="card"><b>Sin retiros anotados</b><p class="small" style="margin:6px 0 0;color:var(--ink-2)">${esc(c.voluminososDetalle)}</p>
+           ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="nuevo-voluminoso">${I('plus')}Anotar el próximo retiro</button>` : ''}</div>`}
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'accent', t:'Cambiar los días del camión', s:'Qué se retira cada día y a qué hora pasa' }) : ''}
       ${sec('Para tener en cuenta')}<div class="card small" style="color:var(--ink-2);line-height:1.6">
         • Canasto elevado y cerrado: los perros y los zorros rompen las bolsas.<br>• Con viento fuerte, sacá la bolsa a la mañana y no la noche anterior.<br>• La poda va al contenedor verde, atada.<br>• Pilas, aceite y electrónicos no van a la basura común.</div>
       ${superficie({ a:'avistamiento', icon:'eye', color:'warn', t:'¿Viste zorros o perros en la basura?', s:'Avisá y la app alerta al barrio si se repite' })}`;
   },
+};
+/* Compatibilidad: la versión vieja guardaba una sola fecha en config.voluminosos. */
+function volsProximos(){
+  const c = Store.s.config, hoy = hoyISO();
+  const lista = Array.isArray(c.volsLista) ? c.volsLista.slice() : [];
+  if (c.voluminosos && !lista.some(v => v.fecha === c.voluminosos)) lista.push({ fecha:c.voluminosos, detalle:c.voluminososDetalle });
+  return lista.filter(v => v.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+A['nuevo-voluminoso'] = () => hoja('Anotar un retiro de voluminosos', `<form data-f="voluminoso">
+  <div class="field"><label>Fecha del retiro</label><input type="date" name="fecha" required min="${hoyISO()}"></div>
+  <div class="field"><label>Qué se retira</label><textarea name="detalle" maxlength="220">${esc(Store.s.config.voluminososDetalle || '')}</textarea></div>
+  <label class="check"><input type="checkbox" name="avisar" checked><span>Avisar a todo el barrio ahora</span></label>
+  <button class="btn btn-pri btn-block" style="margin-top:12px">${I('truck')}Anotar</button>
+  <p class="muted tiny" style="margin:10px 0 0">La app vuelve a avisar sola la noche anterior.</p></form>`);
+F['voluminoso'] = d => {
+  Store.cambiar(s => {
+    const c = s.config;
+    c.volsLista = (Array.isArray(c.volsLista) ? c.volsLista : []).filter(v => v.fecha !== d.fecha);
+    c.volsLista.push({ fecha:d.fecha, detalle:(d.detalle || '').trim() });
+    c.volsLista.sort((a, b) => a.fecha.localeCompare(b.fecha));
+    c.voluminosos = volsProximos()[0]?.fecha || '';
+    if (d.avisar) notificar(s, { para:'todos', titulo:`Retiro de voluminosos el ${fechaLarga(d.fecha)}`, texto:(d.detalle || '').trim(), icon:'truck', color:'wood', link:'recoleccion', sonido:true });
+    auditar(s, 'Anotó un retiro de voluminosos', d.fecha);
+  });
+  cerrarHoja(); toast('Retiro anotado', 'truck');
+};
+A['borrar-voluminoso'] = async el => {
+  if (!await confirmar('Borrar el retiro', `¿Sacar el retiro del ${fechaLarga(el.dataset.v)}?`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => {
+    const c = s.config;
+    c.volsLista = (Array.isArray(c.volsLista) ? c.volsLista : []).filter(v => v.fecha !== el.dataset.v);
+    if (c.voluminosos === el.dataset.v) c.voluminosos = '';
+  });
 };
 
 /* ---------- EMERGENCIAS Y AGENDA ---------- */
@@ -475,7 +692,9 @@ function diasHasta(md, iso = hoyISO()){
   const y = +iso.slice(0, 4); let f = `${y}-${md}`; if (f < iso) f = `${y + 1}-${md}`;
   return Math.round((fechaDe(f) - fechaDe(iso)) / DIA);
 }
-const proximoFeriado = () => Store.s.feriados.filter(f => f.fecha >= hoyISO()).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+/* El próximo feriado de verdad (nacional, provincial o municipal): los
+   días religiosos y los no laborables no cuentan como feriado. */
+const proximoFeriado = () => proximoFeriadoReal();
 R.ushuaia = {
   titulo: 'Ushuaia', icon: 'pin', color: 'sky', sub: 'Temporadas, feriados y eventos de la ciudad',
   render(){
@@ -486,7 +705,12 @@ R.ushuaia = {
         <div class="grow"><b>${esc(t.nombre)}</b><div class="small ${on ? '' : 'muted'}">${on ? `En temporada · termina en ${plural(d, 'día')}` : `Empieza en ${plural(d, 'día')}`}</div></div>
         <span class="pill ${on ? 'p-ok' : ''}">${on ? 'Ahora' : 'Fuera'}</span></div>
         <div class="muted tiny" style="margin-top:8px">${esc(t.nota || '')}</div></div>`; }).join('');
-    const fer = s.feriados.filter(f => f.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 6);
+    const info = diaInfo(hoy);
+    const agenda = [...feriadosDe(+hoy.slice(0, 4)), ...feriadosDe(+hoy.slice(0, 4) + 1)].filter(f => f.fecha >= hoy);
+    const fer = agenda.filter(f => !f.laborable).slice(0, 8);
+    const noLab = agenda.filter(f => f.laborable && /no laborable/i.test(f.tipo)).slice(0, 6);
+    const relig = agenda.filter(f => f.ambito === 'católica' || f.ambito === 'judía').slice(0, 10);
+    const chipAmbito = f => `<span class="pill ${ {nacional:'p-brand', provincial:'p-accent', municipal:'p-wood', 'católica':'', 'judía':''}[f.ambito] || ''}">${esc(f.ambito)}</span>`;
     const evs = s.eventosCiudad.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
     const cru = s.cruceros.filter(c => c.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 8);
     const hoyCru = s.cruceros.filter(c => c.fecha === hoy);
@@ -500,13 +724,29 @@ R.ushuaia = {
         : `<div class="card"><p class="small" style="margin:0;color:var(--ink-2)">No hay recaladas cargadas. ${enTemporada(s.temporadas.find(t => /crucero/i.test(t.nombre)) || {desde:'10-15',hasta:'04-15'}) ? 'Estamos en temporada: el calendario del puerto se carga desde Administración → Contenido → Recaladas de cruceros.' : 'La temporada todavía no empezó.'}</p>
           ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="abrir" data-v="admin" data-p="contenido|cruceros">${I('plus')}Cargar el calendario</button>` : ''}
           <a class="btn btn-sm btn-sec" style="margin-top:10px" href="https://www.puertoushuaia.gob.ar" target="_blank" rel="noopener">${I('link')}Puerto de Ushuaia</a></div>`}
-      ${sec('Próximos feriados')}<div class="card lista">${fer.length ? fer.map(f => `<div class="it"><div class="txt"><b>${esc(f.nombre)}</b><span>${fechaLarga(f.fecha)}</span></div><span class="pill ${f.fecha === hoy ? 'p-ok' : ''}">${relDia(f.fecha)}</span></div>`).join('') : vacio('calendar', 'No hay feriados cargados.')}</div>
+      ${sec('Hoy')}
+      <div class="card ${info.laboral ? '' : 'plana'}" style="${info.laboral ? '' : 'background:var(--warn-soft)'}">
+        <div class="row"><span class="ic ic-${info.laboral ? 'ok' : 'warn'}" style="width:44px;height:44px;border-radius:14px;display:grid;place-items:center">${I(info.laboral ? 'check' : 'calendar')}</span>
+          <div class="grow"><b style="font-size:16px">${esc(info.resumen)}</b>
+            <div class="muted small">${fechaLarga(hoy)}${info.laboral ? ' · se trabaja y la Administración atiende' : info.feriado ? ' · no se trabaja; la recolección y los comercios pueden no funcionar' : ''}</div></div></div>
+        ${info.todos.filter(f => f.ambito === 'católica' || f.ambito === 'judía').map(f => `<div class="small" style="margin-top:8px;color:var(--ink-2)">${I(f.ambito === 'judía' ? 'star' : 'tree')} ${esc(f.nombre)} (${esc(f.ambito)})${f.noLaboralJudio ? ' · día no laborable para quienes profesan la religión judía' : ''}</div>`).join('')}
+      </div>
+      ${sec('Próximos feriados', esAdmin() ? `<button class="link" data-a="abrir" data-v="admin" data-p="contenido|feriados">Provinciales y puentes</button>` : '')}
+      <div class="card lista">${fer.length ? fer.map(f => `<div class="it"><div class="txt"><b>${esc(f.nombre)}</b>
+        <span>${fechaLarga(f.fecha)}${f.tipo === 'trasladable' ? ' · trasladado' : ''}${f.aConfirmar ? ' · a confirmar' : ''}</span></div>
+        ${chipAmbito(f)}<span class="pill ${f.fecha === hoy ? 'p-ok' : ''}">${relDia(f.fecha)}</span></div>`).join('') : vacio('calendar', 'No hay feriados próximos.')}</div>
+      ${noLab.length ? sec('Días no laborables') + `<div class="card lista">${noLab.map(f => `<div class="it"><div class="txt"><b>${esc(f.nombre)}</b><span>${fechaLarga(f.fecha)} · trabajar o no lo decide el empleador</span></div><span class="pill">${relDia(f.fecha)}</span></div>`).join('')}</div>` : ''}
+      ${sec('Calendario religioso', `<span class="muted small">católico y judío</span>`)}
+      <div class="card lista">${relig.map(f => `<div class="it"><span class="ic ic-${f.ambito === 'judía' ? 'accent' : 'brand'}" style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center">${I(f.ambito === 'judía' ? 'star' : 'tree')}</span>
+        <div class="txt"><b>${esc(f.nombre)}</b><span>${fechaLarga(f.fecha)}${f.noLaboralJudio ? ' · no laborable (Ley 24.571)' : ''}</span></div>
+        <span class="pill ${f.fecha === hoy ? 'p-ok' : ''}">${relDia(f.fecha)}</span></div>`).join('') || '<p class="muted small" style="margin:6px 0">Sin fiestas próximas.</p>'}</div>
+      <p class="muted tiny">Las fiestas judías empiezan al atardecer del día anterior. Los feriados nacionales, la Pascua y el calendario hebreo los calcula la app con las reglas de la Ley 27.399, el cómputo de la Pascua y la aritmética del calendario hebreo: no dependen de que alguien los cargue.</p>
       ${sec('Eventos en la ciudad', esStaff() || true ? `<button class="link" data-a="nuevo-evento-ciudad">Sumar uno</button>` : '')}
       ${evs.length ? evs.map(e => `<div class="card"><div class="row" style="align-items:flex-start"><div class="evento-box" style="margin:0;padding:0;background:none"><div class="fecha"><small>${MESES[fechaDe(e.fecha).getMonth()]}</small><b>${fechaDe(e.fecha).getDate()}</b></div></div>
         <div class="grow"><b>${esc(e.titulo)}</b><div class="muted small">${esc(e.tipo || '')}${e.hora ? ' · ' + e.hora + ' h' : ''}${e.lugar ? ' · ' + esc(e.lugar) : ''}</div>${e.nota ? `<div class="small" style="margin-top:4px;color:var(--ink-2)">${esc(e.nota)}</div>` : ''}
         ${e.link ? `<a class="small" href="${esc(e.link)}" target="_blank" rel="noopener">Más información</a>` : ''}</div></div></div>`).join('') : vacio('calendar', 'No hay eventos cargados.')}
       ${sec('Fauna en el barrio')}${superficie({ a:'avistamiento', icon:'eye', color:'warn', t:'Avisar un avistamiento', s:`${plural(s.avistamientos.filter(a => Date.now() - a.at < 7 * DIA).length, 'aviso')} esta semana` })}
-      <p class="muted tiny">Las fechas de temporadas y feriados cambian por decreto u ordenanza: la Administración las confirma cada año.</p>`;
+      <p class="muted tiny">Lo provincial, lo municipal y los "días no laborables con fines turísticos" (los puentes) los fija cada año un decreto o una ordenanza: esos sí los confirma la Administración desde Contenido → Feriados, y hasta entonces aparecen marcados "a confirmar".</p>`;
   },
 };
 A['nuevo-evento-ciudad'] = () => hoja('Sumar un evento de la ciudad', `<form data-f="evento-ciudad">
@@ -635,6 +875,11 @@ const Avion = {
     }).catch(() => {});
   },
 
+  /* El avión cruza la pantalla en línea recta, con una estela corta detrás, y
+     lo hace tres veces. Nada más: es un guiño al pasar, no una animación que
+     pida atención. El color lo pone el tema —oscuro de día, claro de noche—
+     para que se vea sobre cualquier fondo. El único trozo que se puede tocar
+     es el cartel con los datos del vuelo. */
   pasar(v){
     if (this.volando) return;
     this.volando = true;
@@ -644,10 +889,9 @@ const Avion = {
     el.innerHTML = `<div class="avion">${I('send')}<span class="estela"></span></div>
       <div class="avion-cartel"><b>${esc(v.titulo)}</b><span>${esc(v.detalle)}${v.vivo ? ' · en vivo' : ''}</span></div>`;
     document.body.appendChild(el);
-    const fin = () => { el.remove(); this.volando = false; };
-    el.querySelector('.avion').addEventListener('animationend', fin);
-    setTimeout(fin, quieto ? 5000 : 17000);
+    const fin = () => { if (!el.isConnected) return; el.remove(); this.volando = false; };
     el.querySelector('.avion-cartel').addEventListener('click', () => { fin(); abrir('vuelos'); });
+    setTimeout(fin, quieto ? 5000 : 25000);   /* tres pasadas de 7,5 s y el cartel */
   },
 };
 
@@ -773,3 +1017,132 @@ A['mis-datos'] = () => {
     <div class="btns"><a class="btn btn-sec" href="${blob}" download="mis-datos-bahia-cauquen.json">${I('download')}Descargar</a><button class="btn btn-danger-soft" data-a="pedir-baja">Pedir la baja</button></div>`);
 };
 A['pedir-baja'] = () => { const u = yo(); Store.cambiar(s => { notificar(s, { para:'rol:admin', titulo:'Pedido de baja de datos', texto:`${u.nombre} · ${u.casa}`, icon:'trash', color:'danger', link:'admin:vecinos' }); auditar(s, 'Pedido de baja de datos personales', u.casa, u.id); }); cerrarHoja(); toast('Pedido enviado a la Administración', 'send'); };
+
+/* =========================================================
+   DESCARGAS
+   Una ventana más de la app, con la misma lógica: superficies que se
+   tocan. Lo que hay adentro lo carga la Administración desde
+   Contenido → Descargas, así se puede sumar una app, un instructivo o
+   una planilla sin tocar el programa.
+   ========================================================= */
+const TIPOS_DESCARGA = {
+  app:      { n:'Aplicación', icon:'smartphone', c:'accent' },
+  doc:      { n:'Documento', icon:'file', c:'brand' },
+  planilla: { n:'Planilla', icon:'clipboard', c:'wood' },
+  enlace:   { n:'Enlace', icon:'link', c:'sky' },
+};
+R.descargas = {
+  titulo: 'Descargas', icon: 'download', color: 'sky', sub: 'Apps, documentos y planillas del barrio',
+  render(){
+    const s = Store.s, ds = (s.descargas || []).filter(d => d.url || d.texto);
+    const porTipo = {};
+    ds.forEach(d => { const t = TIPOS_DESCARGA[d.tipo] ? d.tipo : 'doc'; (porTipo[t] = porTipo[t] || []).push(d); });
+    const bloque = (t) => {
+      const T = TIPOS_DESCARGA[t];
+      return `${sec(T.n === 'Aplicación' ? 'Aplicaciones' : T.n + 's')}
+        ${porTipo[t].map(d => `<button class="superficie" data-a="descargar" data-id="${d.id}">
+          <span class="ic ic-${d.color || T.c}">${I(d.icon || T.icon)}</span>
+          <span class="txt"><b>${esc(d.titulo)}</b>${d.detalle ? `<small>${esc(d.detalle)}</small>` : ''}</span>${I(d.url && /^https?:/.test(d.url) ? 'right' : 'download')}</button>`).join('')}`;
+    };
+    return `${ds.length ? Object.keys(TIPOS_DESCARGA).filter(t => porTipo[t]).map(bloque).join('')
+      : vacio('download', 'Todavía no hay nada para descargar.')}
+      ${sec('Del barrio')}
+      ${superficie({ v:'documentos', icon:'file', color:'brand', t:'Reglamento y normas', s:'Convivencia, obras, actas · se pueden imprimir o guardar en PDF' })}
+      ${esAdmin() ? superficie({ a:'exportar-padron', icon:'users', color:'wood', t:'Padrón de propietarios (CSV)', s:'Para abrirlo en Excel' }) : ''}
+      ${esAdmin() ? superficie({ a:'exportar', icon:'download', color:'sky', t:'Copia de seguridad de los datos', s:'Todo el barrio en un archivo' }) : ''}
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido|descargas', icon:'plus', color:'accent', t:'Agregar algo a esta ventana', s:'Apps, instructivos, planillas o enlaces', cls:'acento' }) : ''}
+      <p class="muted tiny">Las aplicaciones se abren en el navegador y se instalan desde ahí: en el iPhone con Compartir → Agregar a la pantalla de inicio, y en Android con el menú → Instalar aplicación.</p>`;
+  },
+};
+A['descargar'] = el => {
+  const d = (Store.s.descargas || []).find(x => x.id === el.dataset.id); if (!d) return;
+  if (d.url && /^https?:/i.test(d.url)){
+    hoja(d.titulo, `${d.detalle ? `<p class="small" style="margin:0 0 14px;color:var(--ink-2)">${esc(d.detalle)}</p>` : ''}
+      ${d.texto ? `<div class="card plana small" style="white-space:pre-wrap">${esc(d.texto)}</div>` : ''}
+      <a class="btn btn-pri btn-block btn-grande" href="${esc(d.url)}" target="_blank" rel="noopener">${I(d.tipo === 'app' ? 'smartphone' : 'download')}${d.tipo === 'app' ? 'Abrir la aplicación' : 'Descargar'}</a>
+      <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="copiar" data-v="${esc(d.url)}">${I('copy')}Copiar el enlace</button>
+      ${d.tipo === 'app' ? `<p class="muted tiny" style="margin-top:12px">Para tenerla como una app en el teléfono: abrila y después, en el iPhone, tocá Compartir → Agregar a la pantalla de inicio; en Android, el menú de tres puntos → Instalar aplicación.</p>` : ''}`);
+    return;
+  }
+  if (d.texto) imprimir(d.titulo, `<h1>${esc(d.titulo)}</h1><div style="white-space:pre-wrap">${esc(d.texto)}</div>`);
+};
+
+/* =========================================================
+   PROMOCIONES DEL HOTEL Y BENEFICIOS PARA VECINOS
+   -------------------------------------------------------
+   El Hotel Los Cauquenes está dentro del predio y suele tener propuestas
+   de la semana y descuentos para los vecinos. La app las muestra en una
+   tira debajo de la foto de la portada.
+
+   DE DÓNDE SALEN
+   Un navegador no puede leer la web del hotel directamente: el sitio no
+   autoriza que otra página lo lea (es la misma limitación que con los
+   aviones en vivo). Hay dos caminos, y los dos funcionan:
+     1. La Administración las carga a mano en Contenido → Promociones.
+        Es lo que anda hoy, sin depender de nadie.
+     2. Con un programita propio (un Worker de Cloudflare o un Apps
+        Script) que lea la página del hotel y devuelva la lista en JSON.
+        Se pega su dirección en Ajustes → Promociones y la app las
+        actualiza sola cada hora. El formato esperado está en CONECTAR.md.
+   ========================================================= */
+const Promos = {
+  KEY:'bhc.promos', d:null, cargando:null,
+  leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
+  vigentes(){
+    const hoy = hoyISO();
+    const propias = (Store.s.promos || []).filter(p => (!p.desde || p.desde <= hoy) && (!p.hasta || p.hasta >= hoy));
+    const web = (this.d?.lista || []).filter(p => (!p.hasta || p.hasta >= hoy));
+    /* Si una promo está cargada a mano y también vino de la web, manda la
+       cargada a mano: la escribió alguien del barrio. */
+    const titulos = new Set(propias.map(p => (p.titulo || '').toLowerCase()));
+    return [...propias, ...web.filter(p => !titulos.has((p.titulo || '').toLowerCase()))];
+  },
+  async pedir(forzar = false){
+    const url = Store.s.config.promosUrl;
+    if (!url) return null;
+    if (!forzar && this.d && Date.now() - this.d.t < HORA) return this.d;
+    if (this.cargando) return this.cargando;
+    this.cargando = fetch(url).then(r => r.json()).then(j => {
+      const lista = (j.promociones || j.lista || (Array.isArray(j) ? j : [])).map(p => ({
+        id:'w' + (p.id || uid()), titulo:String(p.titulo || p.title || '').trim(),
+        detalle:String(p.detalle || p.descripcion || p.description || '').trim(),
+        descuento:String(p.descuento || p.discount || '').trim(),
+        desde:p.desde || '', hasta:p.hasta || '', url:p.url || p.link || '', web:true,
+      })).filter(p => p.titulo);
+      this.d = { t:Date.now(), lista };
+      try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
+      return this.d;
+    }).catch(() => this.d).finally(() => { this.cargando = null; });
+    return this.cargando;
+  },
+};
+Promos.leer();
+
+/* La tira de promociones de la portada: una debajo de la foto, se cambia
+   sola cada tanto y se puede arrastrar con el dedo. No es un cartel
+   parpadeante: avanza despacio, se frena cuando la tocás y se queda
+   quieta si el equipo pide menos movimiento. */
+function tiraPromos(){
+  const ps = Promos.vigentes();
+  if (!ps.length) return '';
+  const chips = ps.map(p => `<button class="promo-chip" data-a="ver-promo" data-id="${esc(p.id)}">
+      ${p.descuento ? `<span class="promo-desc">${esc(p.descuento)}</span>` : `<span class="ic ic-wood">${I('star')}</span>`}
+      <span class="txt"><b>${esc(p.titulo)}</b>${p.detalle ? `<small>${esc(p.detalle)}</small>` : ''}</span></button>`);
+  return `<div class="tira-promos">
+    <div class="tira-cab">${I('star')}<b>Hotel Los Cauquenes · esta semana</b>
+      ${ps.length > 1 ? `<span class="muted small">${ps.length} propuestas</span>` : ''}</div>
+    ${marquesina(chips, 'promo-tira')}
+  </div>`;
+}
+A['ver-promo'] = el => {
+  const p = Promos.vigentes().find(x => x.id === el.dataset.id); if (!p) return;
+  hoja(p.titulo, `
+    ${p.descuento ? `<div class="card plana center" style="background:var(--wood-soft);color:var(--wood)">
+      <div style="font-size:30px;font-weight:800;letter-spacing:-1px">${esc(p.descuento)}</div>
+      <div class="small">de descuento para vecinos del barrio</div></div>` : ''}
+    ${p.detalle ? `<p style="margin:0 0 14px;color:var(--ink-2)">${esc(p.detalle)}</p>` : ''}
+    ${p.desde || p.hasta ? `<div class="card plana small">${I('calendar')} ${p.desde ? 'Desde ' + fechaLarga(p.desde) : ''}${p.hasta ? (p.desde ? ' · hasta ' : 'Hasta ') + fechaLarga(p.hasta) : ''}</div>` : ''}
+    ${p.url ? `<a class="btn btn-pri btn-block" href="${esc(p.url)}" target="_blank" rel="noopener">${I('link')}Ver en el Hotel Los Cauquenes</a>` : ''}
+    <p class="muted tiny" style="margin-top:12px">${p.web ? 'Tomado del sitio del Hotel Los Cauquenes. ' : 'Cargada por la Administración del barrio. '}Confirmá las condiciones directamente con el Hotel Los Cauquenes antes de reservar.</p>`);
+};
+A['promos-actualizar'] = () => Promos.pedir(true).then(() => { refrescar(); toast('Promociones actualizadas', 'refresh'); });

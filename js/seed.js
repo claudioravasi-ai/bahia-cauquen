@@ -34,6 +34,17 @@ function seed(){
     v: 3,
     config: Object.assign({}, CONFIG_BASE),
     users,
+    /* Promociones de muestra, solo para la demo: se ven en la cinta de la
+       portada. Las de verdad las carga la Administración en
+       Contenido → Promociones. */
+    promos: [
+      { id:'pr1', titulo:'Cena de los viernes en el restaurante', detalle:'Menú de tres pasos con productos fueguinos', descuento:'20 %',
+        desde:isoDe(new Date(n - 3*DIA)), hasta:isoDe(new Date(n + 20*DIA)), url:'' },
+      { id:'pr2', titulo:'Spa · circuito de aguas', detalle:'De lunes a jueves, con reserva previa', descuento:'25 %',
+        desde:isoDe(new Date(n - 10*DIA)), hasta:isoDe(new Date(n + 40*DIA)), url:'' },
+      { id:'pr3', titulo:'Noche para vecinos del barrio', detalle:'Alojamiento para familiares que vienen de visita', descuento:'15 %',
+        desde:isoDe(new Date(n - 1*DIA)), hasta:isoDe(new Date(n + 60*DIA)), url:'' },
+    ],
     posts: [
       { id:uid(), type:'aviso', title:'Corte de agua programado', body:'Mañana de 9 a 14 h se corta el agua por mantenimiento del tanque principal. Llenen una reserva.',
         autor:'u_admin', createdAt:n - 3*HORA, fijado:true, reactions:{ '👍':['u_lucia','u_diego'] }, comments:[] },

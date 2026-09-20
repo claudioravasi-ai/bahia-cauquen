@@ -270,7 +270,8 @@ R.expensas = {
   titulo: 'Expensas', icon: 'wallet', color: 'wood', sub: 'Tu cuenta, tus cupones y tus pagos',
   render(p){
     const u = yo(), lote = miLote(), L = loteDe(u);
-    if (esAdmin() && !p) return `${superficie({ v:'contabilidad', icon:'wallet', color:'wood', t:'Administrar las expensas del barrio', s:'Gastos, cierre de mes, cobranzas e impositivo', cls:'acento' })}
+    if (esAdmin() && !p) return `${superficie({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas y cobranzas del barrio', s:'Cupones, pagos, morosos y recibos', cls:'acento' })}
+      ${superficie({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Gastos del mes, cierre e impositivo' })}
       ${sec('Tu propia cuenta')}${carpetaVecino(lote)}`;
     if (!L) return vacio('wallet', 'Tu cuenta todavía no tiene un lote asignado. Avisale a la Administración.');
     return carpetaVecino(lote);
@@ -351,7 +352,7 @@ F['informar-pago'] = d => {
   Store.cambiar(s => {
     s.pagos.unshift({ id:uid(), lote, userId:u.id, monto:+d.monto, fecha:d.fecha, medio:d.medio, nota:(d.nota || '').trim(),
       foto:leerFoto(d.foto), estado:'informado', at:Date.now() });
-    notificar(s, { para:'rol:admin', titulo:`Pago informado · ${lote}`, texto:`${plata(+d.monto)} · ${d.medio}`, icon:'wallet', color:'wood', link:'contabilidad:cobranzas' });
+    notificar(s, { para:'rol:admin', titulo:`Pago informado · ${lote}`, texto:`${plata(+d.monto)} · ${d.medio}`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas' });
     auditar(s, 'Informó un pago', `${lote} · ${plata(+d.monto)}`);
   });
   cerrarHoja(); toast('Pago informado. La Administración lo va a confirmar.', 'check');
@@ -360,39 +361,59 @@ F['informar-pago'] = d => {
 /* =========================================================
    VENTANA DE LA ADMINISTRACIÓN
    ========================================================= */
-const TABS_CONTA = [['resumen','Resumen'],['gastos','Gastos'],['cierre','Cierre de mes'],['cobranzas','Cobranzas'],['morosos','Morosos'],['impositivo','ARCA']];
+/* =========================================================
+   DOS VENTANAS DISTINTAS, A PROPÓSITO
+   -------------------------------------------------------
+   CONTABILIDAD es lo que mira el contador: los gastos del mes, el cierre
+   que los reparte entre los lotes y lo que hay que presentar ante ARCA.
+   EXPENSAS Y COBRANZAS es lo que mira la Administración todos los días:
+   los cupones emitidos, quién pagó, quién debe y los recibos.
+   Antes estaba todo mezclado en una sola pestañera y no se sabía dónde
+   terminaba una cosa y empezaba la otra.
+   ========================================================= */
+const TABS_CONTA = [['resumen','Resumen'],['gastos','Gastos del mes'],['cierre','Cierre de mes'],['impositivo','ARCA'],['parametros','Parámetros']];
 R.contabilidad = {
-  titulo: 'Contabilidad', icon: 'wallet', color: 'wood', ancha: true, sub: 'Expensas del barrio',
+  titulo: 'Contabilidad', icon: 'file', color: 'brand', ancha: true, sub: 'Gastos, cierre de mes e impositivo',
+  render(p){
+    if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
+    const [tab, sub] = String(p || 'resumen').split('|');
+    return `<div class="tabs-in">${TABS_CONTA.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="abrir" data-v="contabilidad" data-p="${k}">${t}</button>`).join('')}</div>
+      ${(CONTA[tab] || CONTA.resumen)(sub)}`;
+  },
+};
+
+const TABS_COBRO = [['resumen','Resumen'],['cupones','Cupones'],['cobranzas','Pagos'],['morosos','Morosos'],['recibos','Recibos']];
+R.cobranzas = {
+  titulo: 'Expensas y cobranzas', icon: 'wallet', color: 'wood', ancha: true, sub: 'Cupones, pagos, deuda y recibos',
   render(p){
     if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
     const [tab, sub] = String(p || 'resumen').split('|');
     const pend = Store.s.pagos.filter(x => x.estado === 'informado').length;
-    return `<div class="tabs-in">${TABS_CONTA.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="abrir" data-v="contabilidad" data-p="${k}">${t}${k === 'cobranzas' && pend ? `<span class="dot-badge">${pend}</span>` : ''}</button>`).join('')}</div>
-      ${(CONTA[tab] || CONTA.resumen)(sub)}`;
+    return `<div class="tabs-in">${TABS_COBRO.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="abrir" data-v="cobranzas" data-p="${k}">${t}${k === 'cobranzas' && pend ? `<span class="dot-badge">${pend}</span>` : ''}</button>`).join('')}</div>
+      ${(COBRO[tab] || COBRO.resumen)(sub)}`;
   },
 };
 const CONTA = {
   resumen(){
     const per = periodoHoy(), calc = calcularLiquidacion(per), ant = liquidacionDe(periodoAnterior(per));
-    const deuda = LOTES.reduce((a, L) => a + Math.max(0, saldoLote('Lote ' + L.lote)), 0);
-    const cobrado = Store.s.pagos.filter(p => p.estado === 'confirmado' && p.fecha >= per + '-01').reduce((a, p) => a + p.monto, 0);
-    const morosos = LOTES.filter(L => saldoLote('Lote ' + L.lote) > 0.5).length;
     const emitida = liquidacionDe(per)?.estado === 'emitida';
-    return `<div class="admin-hero" style="background:var(--g-wood)">
+    return `<div class="admin-hero" style="background:var(--g-brand)">
         <b style="font-size:18px">${nombrePeriodo(per)}</b>
-        <div class="small" style="opacity:.85">${emitida ? 'Liquidación emitida' : `Borrador · ${plural(calc.gastos, 'gasto cargado', 'gastos cargados')}`}</div>
+        <div class="small" style="opacity:.85">${emitida ? 'Mes cerrado y liquidado' : `Borrador · ${plural(calc.gastos, 'gasto cargado', 'gastos cargados')}`}</div>
         <div class="garita-kpis"><div class="kpi"><b>${plataCorta(calc.totalGastos)}</b><span>Gastos del mes</span></div>
-          <div class="kpi"><b>${plataCorta(cobrado)}</b><span>Cobrado</span></div>
-          <div class="kpi"><b>${morosos}</b><span>Con deuda</span></div></div></div>
+          <div class="kpi"><b>${calc.gastos}</b><span>Comprobantes</span></div>
+          <div class="kpi"><b>${LOTES.length}</b><span>Lotes a prorratear</span></div></div></div>
       ${ant ? `<div class="card plana small">Mes anterior (${nombrePeriodo(ant.periodo)}): ${plata(ant.totalGastos)} · variación ${(((calc.totalGastos - ant.totalGastos) / (ant.totalGastos || 1)) * 100).toFixed(1)} %</div>` : ''}
+      ${sec('El mes, paso a paso')}
       <div class="mosaico">
-        ${teja({ v:'contabilidad', p:'gastos', icon:'file', color:'wood', t:'Cargar gastos', s:'Facturas del mes', n:calc.gastos || '' })}
-        ${teja({ v:'contabilidad', p:'cierre', icon:'zap', color:'brand', t:'Cerrar el mes', s: emitida ? 'Ya emitida' : 'Prorratear y emitir cupones' })}
-        ${teja({ v:'contabilidad', p:'cobranzas', icon:'wallet', color:'ok', t:'Cobranzas', s:'Pagos informados', badge: Store.s.pagos.filter(x => x.estado === 'informado').length })}
-        ${teja({ v:'contabilidad', p:'morosos', icon:'alert', color:'danger', t:'Morosos', s:plataCorta(deuda), n:morosos || '' })}
-        ${teja({ v:'contabilidad', p:'impositivo', icon:'clipboard', color:'accent', t:'ARCA', s:'Libro de gastos y presentaciones' })}
-        ${teja({ a:'exportar-contable', icon:'download', color:'sky', t:'Enviar al contador', s:'Planilla del mes' })}
+        ${teja({ v:'contabilidad', p:'gastos', icon:'file', color:'wood', t:'1 · Cargar gastos', s:'Facturas y pagos del mes', n:calc.gastos || '' })}
+        ${teja({ v:'contabilidad', p:'cierre', icon:'zap', color:'brand', t:'2 · Cerrar el mes', s: emitida ? 'Ya emitida' : 'Prorratear y emitir cupones' })}
+        ${teja({ v:'cobranzas', p:'cobranzas', icon:'wallet', color:'ok', t:'3 · Cobrar', s:'Pagos, morosos y recibos', badge: Store.s.pagos.filter(x => x.estado === 'informado').length })}
+        ${teja({ v:'contabilidad', p:'impositivo', icon:'clipboard', color:'accent', t:'4 · ARCA', s:'Libro de gastos y presentaciones' })}
       </div>
+      ${sec('Para el contador')}
+      ${superficie({ a:'exportar-contable', icon:'download', color:'sky', t:'Planilla del mes (CSV)', s:'Comprobantes, rubros, IVA y retenciones' })}
+      ${superficie({ a:'mandar-contador', icon:'mail', color:'accent', t:'Avisarle al contador', s: cfgExp().contador || 'Todavía no hay correo cargado' })}
       ${sec('Últimas liquidaciones')}
       ${liquidacionesEmitidas().slice().reverse().slice(0, 6).map(l => `<button class="superficie" data-a="ver-liquidacion" data-v="${l.periodo}">
         <span class="ic ic-wood">${I('file')}</span><span class="txt"><b>${nombrePeriodo(l.periodo)}</b>
@@ -449,6 +470,125 @@ const CONTA = {
       <p class="muted tiny" style="margin-top:8px">Al emitir, cada vecino recibe su cupón en la app y un aviso. Si tenés el correo configurado, también le llega por mail.</p>`;
   },
 
+  impositivo(per){
+    const periodo = /^\d{4}-\d{2}$/.test(per || '') ? per : periodoAnterior(periodoHoy());
+    const c = cfgExp(), gs = gastosDe(periodo);
+    const retGan = gs.reduce((a, g) => a + (+g.retGan || 0), 0), retSuss = gs.reduce((a, g) => a + (+g.retSuss || 0), 0);
+    const conIVA = gs.filter(g => +g.iva > 0);
+    const presentaciones = presentacionesDe(periodo);
+    return `<div class="card"><b style="font-size:16px">Situación fiscal del barrio</b>
+        <div class="lista"><div class="it"><div class="txt"><b>CUIT</b><span>${esc(Store.s.config.cuit || '—')}</span></div></div>
+          <div class="it"><div class="txt"><b>Condición</b><span>${esc(c.condicion)}</span></div></div>
+          <div class="it"><div class="txt"><b>Ingresos Brutos</b><span>${esc(c.iibb || 'sin número cargado')}</span></div></div>
+          <div class="it"><div class="txt"><b>Personal propio</b><span>${c.empleados ? 'Sí: corresponde F.931 mensual' : 'No: los servicios son tercerizados'}</span></div></div>
+          <div class="it"><div class="txt"><b>Contador</b><span>${esc(c.contador || 'sin correo cargado')}</span></div>
+            <button class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="parametros">${I('edit')}</button></div></div></div>
+      <div class="chips">${[periodoAnterior(periodoHoy()), periodoHoy(), periodoAnterior(periodoAnterior(periodoHoy()))].sort().reverse().map(m => `<button class="chip ${m === periodo ? 'on' : ''}" data-a="abrir" data-v="contabilidad" data-p="impositivo|${m}">${nombrePeriodo(m)}</button>`).join('')}</div>
+      ${sec('Lo que hay que presentar')}
+      ${presentaciones.map(p => `<div class="card" style="padding:13px 14px"><div class="row">
+        <span class="ic ic-${p.estado === 'presentado' ? 'ok' : p.vencido ? 'danger' : 'accent'}" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center">${I(p.estado === 'presentado' ? 'check' : 'clipboard')}</span>
+        <div class="grow"><b>${esc(p.nombre)}</b><div class="muted small">${esc(p.detalle)}</div>
+          <div class="muted small">Vence ${fechaCorta(p.vence)}${p.estado === 'presentado' ? ` · presentado ${fechaCorta(p.presentadoEl)}` : p.vencido ? ' · vencido' : ''}</div></div>
+        ${p.estado === 'presentado' ? `<span class="pill p-ok">Listo</span>` : `<button class="btn btn-xs btn-ok" data-a="marcar-presentado" data-v="${p.id}" data-p="${periodo}">Marcar</button>`}</div></div>`).join('')}
+      ${sec('Libro de gastos del período')}
+      <div class="card"><div class="lista">
+        <div class="it"><div class="txt"><b>Comprobantes</b><span>${plural(gs.length, 'gasto')}</span></div><b class="num">${plata(gs.reduce((a, g) => a + (+g.total || 0), 0))}</b></div>
+        <div class="it"><div class="txt"><b>Con IVA discriminado</b><span>${plural(conIVA.length, 'comprobante')}</span></div><b class="num">${plata(conIVA.reduce((a, g) => a + (+g.iva || 0), 0))}</b></div>
+        <div class="it"><div class="txt"><b>Retenciones de Ganancias</b><span>RG 830 · para el SIRE</span></div><b class="num">${plata(retGan)}</b></div>
+        <div class="it"><div class="txt"><b>Retenciones de Seguridad Social</b><span>Contratistas de obra</span></div><b class="num">${plata(retSuss)}</b></div></div>
+        <div class="btns" style="margin-top:12px">
+          <button class="btn btn-sm btn-pri" data-a="exportar-contable" data-v="${periodo}">${I('download')}Planilla para el contador (CSV)</button>
+          <button class="btn btn-sm btn-sec" data-a="mandar-contador" data-v="${periodo}">${I('mail')}Avisarle al contador</button></div></div>
+      ${aviso('info', 'info', 'Esto no reemplaza al contador', 'La app junta y ordena los comprobantes, calcula las retenciones y avisa los vencimientos. Qué corresponde presentar cada mes lo define tu contador: confirmá con él la lista de arriba.')}`;
+  },
+
+  /* Los números con los que se arma cada cupón. Vivían en Ajustes, entre el
+     teléfono de la garita y los días de recolección: no es su lugar. */
+  parametros(){
+    const c = Store.s.config, e = cfgExp();
+    return `<p class="muted small" style="margin-top:0">Con esto la app arma cada cupón. Cambiarlo afecta a las liquidaciones que se emitan de acá en adelante, no a las ya emitidas.</p>
+      <form data-f="parametros-exp">
+      <div class="card"><h3>Vencimientos y recargos</h3><div class="grid3">
+        <div class="field"><label>1º vencimiento (día)</label><input name="vto1" type="number" min="1" max="28" value="${e.vto1 ?? 10}"></div>
+        <div class="field"><label>2º vencimiento (día)</label><input name="vto2" type="number" min="1" max="28" value="${e.vto2 ?? 21}"></div>
+        <div class="field"><label>Recargo 2º vto (%)</label><input name="recargo2" type="number" step="0.1" value="${e.recargo2 ?? 1.5}"></div></div>
+        <div class="grid2"><div class="field"><label>Interés mensual por mora (%)</label><input name="interesMensual" type="number" step="0.1" value="${e.interesMensual ?? 3}"><div class="ayuda">Confirmalo con la administración antes de emitir.</div></div>
+          <div class="field"><label>Fondo de Infraestructura por lote</label><input name="fondoFijo" type="number" step="100" value="${e.fondoFijo ?? 5000}"></div></div></div>
+      <div class="card"><h3>Dónde pagan los vecinos</h3>
+        <div class="grid2"><div class="field"><label>Alias</label><input name="alias" value="${esc(c.alias || '')}"></div>
+          <div class="field"><label>CBU</label><input name="cbu" value="${esc(c.cbu || '')}"></div></div>
+        <div class="field"><label>Cuenta</label><input name="cuenta" value="${esc(c.cuenta || '')}"></div>
+        <div class="field"><label>Enlace de Mercado Pago (opcional)</label><input name="mpLink" type="url" value="${esc(e.mpLink || '')}"></div></div>
+      <div class="card"><h3>Impositivo (ARCA)</h3>
+        <div class="grid2"><div class="field"><label>CUIT del barrio</label><input name="cuit" value="${esc(c.cuit || '')}"></div>
+          <div class="field"><label>Condición</label><input name="condicion" value="${esc(e.condicion || 'Exento')}"></div></div>
+        <div class="grid2"><div class="field"><label>Ingresos Brutos</label><input name="iibb" value="${esc(e.iibb || '')}"></div>
+          <div class="field"><label>Correo del contador</label><input name="contador" type="email" value="${esc(e.contador || '')}"></div></div>
+        <label class="check"><input type="checkbox" name="empleados" ${e.empleados ? 'checked' : ''}><span>El barrio tiene personal propio (corresponde F.931 todos los meses)</span></label></div>
+      <button class="btn btn-pri btn-block">${I('check')}Guardar los parámetros</button></form>`;
+  },
+};
+F['parametros-exp'] = d => {
+  Store.cambiar(s => {
+    const c = s.config;
+    ['alias','cbu','cuenta','cuit'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
+    c.exp = Object.assign({}, c.exp || {});
+    ['vto1','vto2','recargo2','interesMensual','fondoFijo'].forEach(k => { if (d[k] !== undefined && d[k] !== '') c.exp[k] = +d[k]; });
+    ['mpLink','condicion','iibb','contador'].forEach(k => { if (d[k] !== undefined) c.exp[k] = String(d[k]).trim(); });
+    c.exp.empleados = !!d.empleados;
+    c.expensasVence = +d.vto1 || c.expensasVence;
+    auditar(s, 'Cambió los parámetros de expensas', '');
+  });
+  toast('Parámetros guardados', 'check');
+};
+
+/* ---------- EXPENSAS Y COBRANZAS ---------- */
+const COBRO = {
+  resumen(){
+    const per = periodoHoy();
+    const deuda = LOTES.reduce((a, L) => a + Math.max(0, saldoLote('Lote ' + L.lote)), 0);
+    const cobrado = Store.s.pagos.filter(p => p.estado === 'confirmado' && p.fecha >= per + '-01').reduce((a, p) => a + p.monto, 0);
+    const morosos = LOTES.filter(L => saldoLote('Lote ' + L.lote) > 0.5).length;
+    const emitida = liquidacionDe(per)?.estado === 'emitida';
+    const pend = Store.s.pagos.filter(x => x.estado === 'informado').length;
+    return `<div class="admin-hero" style="background:var(--g-wood)">
+        <b style="font-size:18px">${nombrePeriodo(per)}</b>
+        <div class="small" style="opacity:.85">${emitida ? 'Cupones emitidos' : 'El mes todavía no está cerrado'}</div>
+        <div class="garita-kpis"><div class="kpi"><b>${plataCorta(cobrado)}</b><span>Cobrado</span></div>
+          <div class="kpi"><b>${plataCorta(deuda)}</b><span>Deuda total</span></div>
+          <div class="kpi"><b>${morosos}</b><span>Lotes con deuda</span></div></div></div>
+      ${pend ? aviso('warn', 'clock', `${plural(pend, 'pago informado', 'pagos informados')} esperando confirmación`, 'Confirmalos y se emite el recibo solo.',
+        `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="cobranzas" data-p="cobranzas">Ver los pagos</button>`) : ''}
+      ${!emitida ? aviso('info', 'file', 'Para cobrar, primero hay que cerrar el mes', 'El cierre reparte los gastos entre los lotes y emite los cupones.',
+        `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="cierre">Ir al cierre</button>`) : ''}
+      <div class="mosaico">
+        ${teja({ v:'cobranzas', p:'cupones', icon:'file', color:'wood', t:'Cupones', s:'Emitidos, reenviar por correo' })}
+        ${teja({ v:'cobranzas', p:'cobranzas', icon:'wallet', color:'ok', t:'Pagos', s:'Informados y confirmados', badge: pend })}
+        ${teja({ v:'cobranzas', p:'morosos', icon:'alert', color:'danger', t:'Morosos', s:plataCorta(deuda), n:morosos || '' })}
+        ${teja({ v:'cobranzas', p:'recibos', icon:'check', color:'brand', t:'Recibos', s:'Los que ya se emitieron', n:Store.s.recibos.length || '' })}
+      </div>`;
+  },
+
+  cupones(){
+    const emitidas = liquidacionesEmitidas().slice().reverse();
+    if (!emitidas.length) return `${vacio('file', 'Todavía no hay cupones emitidos.')}
+      ${superficie({ a:'abrir', v:'contabilidad', p:'cierre', icon:'zap', color:'brand', t:'Cerrar el mes y emitir', s:'Reparte los gastos y arma un cupón por lote', cls:'acento' })}`;
+    return emitidas.map(l => `<div class="card"><div class="row"><span class="ic ic-wood" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center">${I('file')}</span>
+        <div class="grow"><b>${nombrePeriodo(l.periodo)}</b><div class="muted small">${plural(l.cuotas.length, 'cupón', 'cupones')} · ${plata(l.totalCuotas || l.totalGastos)} · emitida ${hace(l.emitidaAt)}</div></div></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn btn-sm btn-sec" data-a="ver-liquidacion" data-v="${l.periodo}">${I('file')}Ver liquidación</button>
+        <button class="btn btn-sm btn-pri" data-a="mandar-cupones" data-v="${l.periodo}">${I('mail')}Reenviar cupones</button></div></div>`).join('');
+  },
+
+  recibos(){
+    const rs = Store.s.recibos.slice().sort((a, b) => b.at - a.at);
+    return `<div class="card"><div class="row" style="justify-content:space-between"><b>Recibos emitidos</b><b class="num" style="font-size:18px">${rs.length}</b></div></div>
+      <div class="card lista">${rs.slice(0, 120).map(r => `<div class="it"><span class="ic ic-ok" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('check')}</span>
+        <div class="txt"><b>Nº ${esc(r.numero)} · ${esc(r.lote)}</b><span>${fechaCorta(r.fecha)}${propietarioDe(r.lote) ? ' · ' + esc(propietarioDe(r.lote)) : ''}</span></div>
+        <b class="num">${plata(r.monto)}</b>
+        <button class="icon-btn" data-a="ver-recibo" data-id="${r.id}" aria-label="Ver">${I('eye')}</button></div>`).join('') || '<p class="muted small" style="margin:6px 0">Todavía no se emitió ningún recibo.</p>'}</div>`;
+  },
+
   cobranzas(){
     const informados = Store.s.pagos.filter(p => p.estado === 'informado').sort((a, b) => b.at - a.at);
     const confirmados = Store.s.pagos.filter(p => p.estado === 'confirmado').sort((a, b) => b.at - a.at).slice(0, 20);
@@ -485,37 +625,6 @@ const CONTA = {
             <button class="btn btn-sm btn-pri" data-a="reclamar-deuda" data-v="${esc(x.lote)}">${I('send')}Reclamar</button></div></div>`; }).join('') || vacio('check', '¡Nadie debe nada!')}`;
   },
 
-  impositivo(per){
-    const periodo = /^\d{4}-\d{2}$/.test(per || '') ? per : periodoAnterior(periodoHoy());
-    const c = cfgExp(), gs = gastosDe(periodo);
-    const retGan = gs.reduce((a, g) => a + (+g.retGan || 0), 0), retSuss = gs.reduce((a, g) => a + (+g.retSuss || 0), 0);
-    const conIVA = gs.filter(g => +g.iva > 0);
-    const presentaciones = presentacionesDe(periodo);
-    return `<div class="card"><b style="font-size:16px">Situación fiscal del barrio</b>
-        <div class="lista"><div class="it"><div class="txt"><b>CUIT</b><span>${esc(Store.s.config.cuit || '—')}</span></div></div>
-          <div class="it"><div class="txt"><b>Condición</b><span>${esc(c.condicion)}</span></div></div>
-          <div class="it"><div class="txt"><b>Ingresos Brutos</b><span>${esc(c.iibb || 'sin número cargado')}</span></div></div>
-          <div class="it"><div class="txt"><b>Personal propio</b><span>${c.empleados ? 'Sí: corresponde F.931 mensual' : 'No: los servicios son tercerizados'}</span></div></div>
-          <div class="it"><div class="txt"><b>Contador</b><span>${esc(c.contador || 'sin correo cargado')}</span></div>
-            <button class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="impositivo">${I('edit')}</button></div></div></div>
-      <div class="chips">${[periodoAnterior(periodoHoy()), periodoHoy(), periodoAnterior(periodoAnterior(periodoHoy()))].sort().reverse().map(m => `<button class="chip ${m === periodo ? 'on' : ''}" data-a="abrir" data-v="contabilidad" data-p="impositivo|${m}">${nombrePeriodo(m)}</button>`).join('')}</div>
-      ${sec('Lo que hay que presentar')}
-      ${presentaciones.map(p => `<div class="card" style="padding:13px 14px"><div class="row">
-        <span class="ic ic-${p.estado === 'presentado' ? 'ok' : p.vencido ? 'danger' : 'accent'}" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center">${I(p.estado === 'presentado' ? 'check' : 'clipboard')}</span>
-        <div class="grow"><b>${esc(p.nombre)}</b><div class="muted small">${esc(p.detalle)}</div>
-          <div class="muted small">Vence ${fechaCorta(p.vence)}${p.estado === 'presentado' ? ` · presentado ${fechaCorta(p.presentadoEl)}` : p.vencido ? ' · vencido' : ''}</div></div>
-        ${p.estado === 'presentado' ? `<span class="pill p-ok">Listo</span>` : `<button class="btn btn-xs btn-ok" data-a="marcar-presentado" data-v="${p.id}" data-p="${periodo}">Marcar</button>`}</div></div>`).join('')}
-      ${sec('Libro de gastos del período')}
-      <div class="card"><div class="lista">
-        <div class="it"><div class="txt"><b>Comprobantes</b><span>${plural(gs.length, 'gasto')}</span></div><b class="num">${plata(gs.reduce((a, g) => a + (+g.total || 0), 0))}</b></div>
-        <div class="it"><div class="txt"><b>Con IVA discriminado</b><span>${plural(conIVA.length, 'comprobante')}</span></div><b class="num">${plata(conIVA.reduce((a, g) => a + (+g.iva || 0), 0))}</b></div>
-        <div class="it"><div class="txt"><b>Retenciones de Ganancias</b><span>RG 830 · para el SIRE</span></div><b class="num">${plata(retGan)}</b></div>
-        <div class="it"><div class="txt"><b>Retenciones de Seguridad Social</b><span>Contratistas de obra</span></div><b class="num">${plata(retSuss)}</b></div></div>
-        <div class="btns" style="margin-top:12px">
-          <button class="btn btn-sm btn-pri" data-a="exportar-contable" data-v="${periodo}">${I('download')}Planilla para el contador (CSV)</button>
-          <button class="btn btn-sm btn-sec" data-a="mandar-contador" data-v="${periodo}">${I('mail')}Avisarle al contador</button></div></div>
-      ${aviso('info', 'info', 'Esto no reemplaza al contador', 'La app junta y ordena los comprobantes, calcula las retenciones y avisa los vencimientos. Qué corresponde presentar cada mes lo define tu contador: confirmá con él la lista de arriba.')}`;
-  },
 };
 
 /* Presentaciones mensuales. Las fechas exactas las fija ARCA según la
@@ -614,68 +723,60 @@ A['reabrir-liquidacion'] = async el => {
 };
 A['ver-liquidacion'] = el => imprimir(`Liquidación ${nombrePeriodo(el.dataset.v)}`, liquidacionHTML(el.dataset.v));
 A['mandar-cupones'] = el => mandarCupones(el.dataset.v);
-async function mandarCupones(periodo){
-  const l = liquidacionDe(periodo); if (!l) return;
-  const con = Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && u.email);
-  if (!con.length || !Correo.configurado()){ toast('Los cupones quedan en la app. Configurá el correo para enviarlos.', 'info'); return; }
-  let n = 0;
-  for (const u of con){
-    const c = cuotaDe(l, u.casa); if (!c) continue;
-    const ok = await Correo.enviar({ para:u.email, asunto:`Expensas de ${nombrePeriodo(periodo)} · ${u.casa}`, tipo:'cupon',
-      html:Correo.plantilla(`Expensas de ${nombrePeriodo(periodo)}`,
-        `<p>Hola ${esc(u.nombre.split(' ')[0])}:</p>
-         <p>Tu cupón de <b>${esc(u.casa)}</b> ya está disponible.</p>
-         <p style="font-size:22px;font-weight:800;color:#0d6b66">${plata(c.total + (c.interes || 0))}</p>
-         <p>Primer vencimiento: <b>${fechaCorta(vtoDe(periodo, 1))}</b> · Segundo: ${fechaCorta(vtoDe(periodo, 2))} (+${cfgExp().recargo2} %).</p>
-         <p>Podés pagar por transferencia al alias <b>${esc(Store.s.config.alias || '')}</b> e informar el pago desde la app.</p>`,
-        { texto:'Ver mi cupón', url:urlApp() }) });
-    if (ok) n++;
-  }
-  toast(n ? `${n} cupones enviados por correo` : 'Los cupones quedaron en la bandeja de salida', 'mail');
-}
-A['confirmar-pago'] = el => {
-  const p = Store.s.pagos.find(x => x.id === el.dataset.id); if (!p) return;
-  Store.cambiar(s => {
-    const pago = s.pagos.find(x => x.id === p.id);
-    const c = cfgExp();
-    const numero = 'R-' + String((c.reciboNro || 0) + 1).padStart(5, '0');
-    s.config.exp = Object.assign({}, c, { reciboNro: (c.reciboNro || 0) + 1 });
-    pago.estado = 'confirmado'; pago.recibo = numero; pago.confirmadoPor = yo().id; pago.confirmadoAt = Date.now();
-    s.recibos.unshift({ id:uid(), numero, lote:pago.lote, monto:pago.monto, fecha:pago.fecha, medio:pago.medio,
-      concepto:`Expensas${pago.nota ? ' · ' + pago.nota : ''}`, pagoId:pago.id, at:Date.now(), por:yo().id });
-    notificar(s, { para:s.users.filter(u => u.casa === pago.lote).map(u => u.id), titulo:'Recibimos tu pago', texto:`${plata(pago.monto)} · recibo ${numero}`, icon:'check', color:'ok', link:'expensas' });
-    auditar(s, 'Confirmó un pago', `${pago.lote} · ${plata(pago.monto)} · recibo ${numero}`);
+/* El cupón le llega a CADA lote: al vecino con cuenta y, si no la tiene, al
+   propietario del padrón. Si el envío automático no está configurado, los
+   correos quedan igual en la bandeja de salida (Administración → Correos) y
+   se mandan a mano: nunca se pierde un cupón. */
+function destinatariosDeCupon(){
+  const out = new Map();
+  Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && u.email && /^Lote\s/i.test(u.casa || ''))
+    .forEach(u => out.set(u.email.toLowerCase(), { email:u.email, nombre:u.nombre, casa:u.casa }));
+  Store.s.padron.filter(p => p.email).forEach(p => {
+    const casa = 'Lote ' + p.lote;
+    /* Si en ese lote ya hay alguien con cuenta, no se duplica el correo salvo
+       que el propietario sea otra dirección distinta. */
+    if (!out.has(p.email.toLowerCase())) out.set(p.email.toLowerCase(), { email:p.email, nombre:p.propietario || 'Propietario/a', casa });
   });
-  toast('Pago confirmado y recibo emitido', 'check');
-};
-A['rechazar-pago'] = async el => {
-  if (!await confirmar('Rechazar el pago', 'El vecino recibe el aviso para que lo revise.', { si:'Rechazar', peligro:true })) return;
-  Store.cambiar(s => { const p = s.pagos.find(x => x.id === el.dataset.id); if (!p) return; p.estado = 'rechazado';
-    notificar(s, { para:s.users.filter(u => u.casa === p.lote).map(u => u.id), titulo:'No pudimos confirmar tu pago', texto:`${plata(p.monto)} · revisá el comprobante o escribinos`, icon:'alert', color:'danger', link:'expensas' });
-    auditar(s, 'Rechazó un pago informado', `${p.lote} · ${plata(p.monto)}`); });
-};
-A['pago-manual'] = () => hoja('Registrar un pago', `<form data-f="pago-manual">
-  <div class="field"><label>Lote</label><select name="lote" required>${LOTES.map(L => `<option value="Lote ${L.lote}">${esc(nombreLote(L))}${propietarioDe('Lote ' + L.lote) ? ' · ' + esc(propietarioDe('Lote ' + L.lote)) : ''}</option>`).join('')}</select></div>
-  <div class="grid2"><div class="field"><label>Importe</label><input type="number" step="0.01" name="monto" required></div>
-    <div class="field"><label>Fecha</label><input type="date" name="fecha" required value="${hoyISO()}"></div></div>
-  <div class="field"><label>Medio</label><select name="medio"><option>Transferencia</option><option>Depósito</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select></div>
-  <div class="field"><label>Nota</label><input name="nota" maxlength="120"></div>
-  <button class="btn btn-pri btn-block">${I('check')}Registrar y emitir recibo</button></form>`);
-F['pago-manual'] = d => {
-  const id = uid();
-  Store.cambiar(s => { s.pagos.unshift({ id, lote:d.lote, userId:yo().id, monto:+d.monto, fecha:d.fecha, medio:d.medio, nota:(d.nota || '').trim(), estado:'informado', at:Date.now() }); });
-  cerrarHoja();
-  A['confirmar-pago']({ dataset:{ id } });
-};
-A['ver-cuenta'] = el => {
-  const lote = el.dataset.v, cuenta = cuentaLote(lote);
-  hoja(`Cuenta de ${lote}`, `<div class="card plana"><b>${esc(propietarioDe(lote) || lote)}</b><div class="muted small">Saldo: <b>${plata(cuenta.saldo)}</b></div></div>
-    <div class="card lista">${cuenta.movs.slice().reverse().map(m => `<div class="it"><div class="txt"><b>${esc(m.detalle)}</b><span>${fechaCorta(isoDe(new Date(m.fecha)))}</span></div>
-      <b class="num">${m.debe ? plata(m.debe) : '− ' + plata(m.haber)}</b></div>`).join('') || '<p class="muted small">Sin movimientos.</p>'}</div>
-    <div class="btns"><button class="btn btn-sec" data-a="certificado-deuda" data-v="${esc(lote)}">${I('file')}Certificado de deuda</button>
-      <button class="btn btn-pri" data-a="pago-manual">${I('plus')}Registrar pago</button></div>`, { ancho:'620px' });
-};
-A['certificado-deuda'] = el => imprimir(`Certificado de deuda · ${el.dataset.v}`, certificadoHTML(el.dataset.v));
+  return [...out.values()];
+}
+async function mandarCupones(periodo, { silencioso = false } = {}){
+  const l = liquidacionDe(periodo); if (!l) return 0;
+  const gente = destinatariosDeCupon();
+  if (!gente.length){ if (!silencioso) toast('No hay correos cargados. Cargá el padrón para poder enviarlos.', 'info'); return 0; }
+  const c = cfgExp();
+  let n = 0;
+  for (let i = 0; i < gente.length; i += 10){
+    const tanda = gente.slice(i, i + 10);
+    const r = await Promise.all(tanda.map(x => {
+      const cu = cuotaDe(l, x.casa); if (!cu) return false;
+      return Correo.enviar({ para:x.email, asunto:`Expensas de ${nombrePeriodo(periodo)} · ${x.casa}`, tipo:'cupon',
+        html:Correo.plantilla(`Expensas de ${nombrePeriodo(periodo)}`,
+          `<p>Hola ${esc(String(x.nombre || '').split(/[ ,]/)[0] || 'vecino/a')}:</p>
+           <p>Este es el cupón de <b>${esc(x.casa)}</b>.</p>
+           <p style="font-size:26px;font-weight:800;color:#0d6b66;margin:14px 0">${plata(cu.total + (cu.interes || 0))}</p>
+           <table style="width:100%;border-collapse:collapse;font-size:14px">
+             <tr><td style="padding:4px 0;color:#555">Expensas por coeficiente (${cu.coef.toFixed(4)} %)</td><td style="text-align:right">${plata(cu.expensas || 0)}</td></tr>
+             ${cu.fondo ? `<tr><td style="padding:4px 0;color:#555">Fondo de Infraestructura</td><td style="text-align:right">${plata(cu.fondo)}</td></tr>` : ''}
+             ${cu.particulares ? `<tr><td style="padding:4px 0;color:#555">Gastos particulares</td><td style="text-align:right">${plata(cu.particulares)}</td></tr>` : ''}
+             ${cu.multas ? `<tr><td style="padding:4px 0;color:#555">Multas</td><td style="text-align:right">${plata(cu.multas)}</td></tr>` : ''}
+             ${cu.interes ? `<tr><td style="padding:4px 0;color:#555">Intereses por saldo impago</td><td style="text-align:right">${plata(cu.interes)}</td></tr>` : ''}
+           </table>
+           <p style="margin-top:16px">Primer vencimiento: <b>${fechaCorta(vtoDe(periodo, 1))}</b><br>
+             Segundo vencimiento: ${fechaCorta(vtoDe(periodo, 2))} — ${plata((cu.total + (cu.interes || 0)) * (1 + (c.recargo2 || 0) / 100))} con el recargo del ${c.recargo2} %.</p>
+           <p>Podés pagar por transferencia:<br>
+             Alias <b>${esc(Store.s.config.alias || '—')}</b><br>
+             CBU <span style="font-family:monospace">${esc(Store.s.config.cbu || '—')}</span><br>
+             ${esc(Store.s.config.cuenta || '')}</p>
+           <p>Después de pagar, informá el pago desde la app y te llega el recibo.</p>`,
+          { texto:'Ver mi cupón en la app', url:urlApp('expensas') }) });
+    }));
+    n += r.filter(Boolean).length;
+    if (i + 10 < gente.length) await new Promise(res => setTimeout(res, 800));
+  }
+  if (!silencioso) toast(n ? `${plural(n, 'cupón enviado', 'cupones enviados')} por correo` : `Los ${gente.length} cupones quedaron en la bandeja de salida`, n ? 'mail' : 'clock');
+  return n;
+}
+
 A['reclamar-deuda'] = el => {
   const lote = el.dataset.v, saldo = saldoLote(lote);
   const dest = Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado');

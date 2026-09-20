@@ -85,12 +85,9 @@ const P = {
 };
 window.I = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n] || P.info}</svg>`;
 
-/* Marca del barrio: la bahía, el cerro y un cauquén en vuelo. */
-window.LOGO = `<svg viewBox="0 0 64 64" aria-hidden="true">
-  <path d="M4 44 20 22l8 10 10-16 22 28z" fill="#e9f3f1"/>
-  <path d="M20 22l4 5-3 2-4-2zM38 16l5 8-4 1-3-4z" fill="#fff" opacity=".9"/>
-  <path d="M0 46c8-3 16-3 24 0s16 3 24 0 12-3 16-1v19H0z" fill="#59d4c6" opacity=".55"/>
-  <path d="M0 52c8-3 16-3 24 0s16 3 24 0 12-3 16-1v13H0z" fill="#3cbfb2" opacity=".6"/>
-  <path d="M40 10c3 0 5 2 7 4 2-2 4-3 7-3-3 1-5 3-6 5-1-1-4-4-8-6z" fill="#f7d27a"/>
-</svg>`;
+/* Marca del barrio: la foto de noche del barrio, la misma que el isotipo de
+   la app (el ícono que queda en la pantalla del celular). Se carga como
+   imagen para que el logo del encabezado, el del portal y el del teléfono
+   sean exactamente lo mismo. */
+window.LOGO = `<img src="icons/logo.png" alt="" width="64" height="64">`;
 })();

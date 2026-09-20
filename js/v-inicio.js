@@ -95,14 +95,216 @@ function urgentesVecino(){
 }
 function recoleccionAviso(){
   const c = Store.s.config, h = new Date(), hoy = h.getDay(), man = (hoy + 1) % 7;
-  const vol = c.voluminosos;
-  if (vol && (vol === hoyISO() || vol === sumarDias(hoyISO(), 1))) return aviso('warn', 'truck', `${vol === hoyISO() ? 'Hoy' : 'Mañana'} pasan por los voluminosos`, esc(c.voluminososDetalle));
+  const vol = volsProximos().find(v => v.fecha === hoyISO() || v.fecha === sumarDias(hoyISO(), 1));
+  if (vol) return aviso('warn', 'truck', `${vol.fecha === hoyISO() ? 'Hoy' : 'Mañana'} pasan por los voluminosos`, esc(vol.detalle || c.voluminososDetalle));
   if (c.recoleccion[hoy] && ahoraMin() < minutosDe(c.recoleccionHora)) return aviso('info', 'truck', `Hoy pasa el camión: ${esc(c.recoleccion[hoy])}`, `Alrededor de las ${c.recoleccionHora} h.`);
   if (c.recoleccion[man] && h.getHours() >= 17) return aviso('info', 'truck', `Mañana pasa el camión: ${esc(c.recoleccion[man])}`, 'Sacá la bolsa esta noche, en el canasto cerrado.');
   return null;
 }
 
-/* ---------- INICIO del vecino y la Administración ---------- */
+/* =========================================================
+   INICIO
+   La portada no es un tablero con treinta botones: es una puerta.
+   Tiene cuatro capas, de arriba abajo:
+     1. quién sos y qué tiempo hace (el hero),
+     2. QUÉ PASA AHORA: solo lo que pide una decisión tuya,
+     3. QUÉ QUERÉS HACER: las cuatro cosas que todos hacen siempre,
+     4. POR DÓNDE SEGUIR: cuatro secciones, cada una con su propia
+        ventana. Adentro de cada una está el detalle.
+   Así cada objetivo queda marcado y la portada invita a recorrerla
+   en lugar de abrumar.
+   ========================================================= */
+
+/* Las secciones de la app. Cada una es una ventana con su mosaico.
+   `tejas(u, s, hoy)` devuelve el contenido y `linea(u, s, hoy)` la frase
+   viva que se lee en la portada. */
+const SECCIONES = {
+  casa: {
+    titulo:'Tu casa', icon:'home', color:'ok', ancha:true,
+    sub:'Visitas, reservas, mensajes y los datos de tu lote',
+    linea(u, s, hoy){
+      const v = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy)).length;
+      const m = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(x => x.from !== 'vecino' && !x.leido).length, 0) + dmNoLeidos();
+      const r = s.reservas.filter(x => x.userId === u.id && x.fecha >= hoy && !x.cancelada).length;
+      return [v && `${plural(v, 'visita esperada', 'visitas esperadas')} hoy`, m && `${plural(m, 'mensaje sin leer', 'mensajes sin leer')}`,
+        r && `${plural(r, 'reserva')}`].filter(Boolean).join(' · ') || 'Todo en orden en tu lote';
+    },
+    tejas(u, s, hoy){
+      const misHoy = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy));
+      const proxRes = s.reservas.filter(r => r.userId === u.id && r.fecha >= hoy && !r.cancelada).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+      const privNoLeidos = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(m => m.from !== 'vecino' && !m.leido).length, 0);
+      return [
+        teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Código y QR para la garita', destaca:true }),
+        teja({ v:'visitas', icon:'users', color:'sky', t:'Mis visitas', s: misHoy.length ? `${plural(misHoy.length, 'esperada')} hoy` : 'Nadie anunciado hoy', n: misHoy.length || '' }),
+        teja({ v:'reservas', icon:'calendar', color:'wood', t:'Reservas', s: proxRes ? `${amenity(proxRes.amenity)?.nombre} · ${relDia(proxRes.fecha)}` : 'Quincho, SUM y cancha' }),
+        teja({ v:'mensajes', icon:'chat', color:'accent', t:'Mensajes', s:'Privados con vecinos y la Administración', badge: privNoLeidos + dmNoLeidos() }),
+        teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas por vos y la guardia', n: s.peticiones.filter(p => p.userId === u.id && p.estado !== 'cerrada').length || '' }),
+        teja({ v:'expensas', icon:'wallet', color:'wood', t:'Mis expensas', s:`Tu cuenta, cupones y pagos` }),
+        teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Mis reclamos', s:'Privados con la Administración', n: s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length || '' }),
+        teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Familia, autos, mascotas' }),
+        ...(s.infracciones.some(i => i.casa === u.casa && i.estado === 'notificada')
+          ? [teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificación', s:'Podés presentar tu descargo', badge: s.infracciones.filter(i => i.casa === u.casa && i.estado === 'notificada').length })] : []),
+      ].join('');
+    },
+  },
+  comunidad: {
+    titulo:'El barrio', icon:'muro', color:'brand', ancha:true,
+    sub:'Lo que pasa entre vecinos',
+    linea(u, s, hoy){
+      const piz = s.posts.filter(p => p.createdAt > (Store.sesion.pizarronVisto || 0) && p.autor !== u.id).length;
+      const vot = s.votaciones.filter(v => v.cierra > Date.now()).length;
+      const cha = s.msgs.filter(m => m.createdAt > (Store.sesion.chatVisto || 0) && m.autor !== u.id).length;
+      return [piz && `${plural(piz, 'novedad', 'novedades')} en el pizarrón`, vot && `${plural(vot, 'votación abierta', 'votaciones abiertas')}`,
+        cha && `${plural(cha, 'mensaje', 'mensajes')} en el chat`].filter(Boolean).join(' · ') || 'Pizarrón, chat, vecinos y votaciones';
+    },
+    tejas(u, s, hoy){
+      const pizNuevas = s.posts.filter(p => p.createdAt > (Store.sesion.pizarronVisto || 0) && p.autor !== u.id).length;
+      const chatNuevos = s.msgs.filter(m => m.createdAt > (Store.sesion.chatVisto || 0) && m.autor !== u.id).length;
+      const votAbiertas = s.votaciones.filter(v => v.cierra > Date.now()).length;
+      const compras = s.compras.filter(x => x.cierra > Date.now()).length;
+      return [
+        teja({ v:'pizarron', icon:'muro', t:'Pizarrón', s:'Guardia, Administración y vecinos', badge: pizNuevas, destaca:true }),
+        teja({ v:'vecinos', icon:'users', color:'sky', t:'Vecinos', s:'Buscá por nombre, oficio o dirección' }),
+        teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#general · #seguridad · #mascotas', badge: chatNuevos }),
+        teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votAbiertas ? `${plural(votAbiertas, 'abierta')}` : 'Sin votaciones abiertas', n: votAbiertas || '' }),
+        teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:(() => { const h = s.obras.filter(o => o.avisoHoy?.fecha === hoy).length; return h ? `${plural(h, 'aviso')} para hoy` : `${plural(s.obras.filter(o => o.estado === 'activa').length, 'en curso', 'en curso')}`; })(), n: s.obras.filter(o => o.estado === 'activa').length || '' }),
+        teja({ v:'viajes', icon:'car', color:'sky', t:'Viajes compartidos', s:'Centro, escuela, aeropuerto', n: s.viajes.filter(v => v.fecha >= hoy).length || '' }),
+        teja({ v:'servicios', icon:'star', color:'wood', t:'Oficios de vecinos', s:'Recomendados por el barrio' }),
+        teja({ v:'mascotas', icon:'paw', color:'ok', t:'Mascotas', s:'Perdidas, encontradas y del barrio' }),
+        teja({ v:'compras', icon:'cart', color:'brand', t:'Compras conjuntas', s: compras ? `${plural(compras, 'abierta')}` : 'Leña, gas, lo que sea', n: compras || '' }),
+        teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamento', s:'Convivencia, obras, actas' }),
+        teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:(s.descargas || []).filter(d => d.url || d.texto).length || '' }),
+      ].join('');
+    },
+  },
+  ciudad: {
+    titulo:'Ushuaia y servicios', icon:'pin', color:'sky', ancha:true,
+    sub:'Lo de afuera del barrio que igual te toca',
+    linea(u, s, hoy){
+      const cru = s.cruceros.filter(c => c.fecha === hoy).length;
+      const v = Vuelos.cuantosHoy();
+      const f = proximoFeriado();
+      return [cru && `${plural(cru, 'crucero recala', 'cruceros recalan')} hoy`, v && `${v} vuelos hoy`,
+        f && `feriado ${relDia(f.fecha)}`].filter(Boolean).join(' · ') || 'Vuelos, residuos, feriados y emergencias';
+    },
+    tejas(u, s, hoy){
+      const prox = proximoFeriado();
+      return [
+        teja({ v:'agenda', icon:'phone', color:'danger', t:'Emergencias y agenda', s:'Bomberos, policía, hospital', destaca:true }),
+        teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
+        teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: Vuelos.cuantosHoy() || '' }),
+        teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
+      ].join('');
+    },
+  },
+  gestion: {
+    titulo:'Gestión del barrio', icon:'sliders', color:'accent', ancha:true,
+    sub:'Administración, contabilidad, expensas y garita',
+    solo:'admin',
+    linea(u, s){
+      const pend = s.users.filter(x => x.estado === 'pendiente').length;
+      const pagos = s.pagos.filter(x => x.estado === 'informado').length;
+      const recl = s.reclamos.filter(r => r.estado !== 'resuelto').length;
+      return [pend && `${plural(pend, 'inscripción', 'inscripciones')}`, pagos && `${plural(pagos, 'pago informado', 'pagos informados')}`,
+        recl && `${plural(recl, 'reclamo abierto', 'reclamos abiertos')}`].filter(Boolean).join(' · ') || 'Todo al día';
+    },
+    tejas(u, s){
+      const pend = s.users.filter(x => x.estado === 'pendiente').length;
+      return `<p class="muted small" style="margin:0 0 14px">Las tres áreas están separadas a propósito: lo que es del barrio y sus vecinos, lo que es contable y lo que es de cobranza de expensas no se mezclan.</p>
+        <div class="mosaico">
+        ${teja({ v:'admin', icon:'sliders', color:'accent', t:'Administración', s:'Inscripciones, vecinos, contenido y ajustes', badge: pend, destaca:true })}
+        ${teja({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Gastos del mes, cierre y ARCA' })}
+        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas y cobranzas', s:'Cupones, pagos, morosos y recibos', badge: s.pagos.filter(x => x.estado === 'informado').length })}
+        </div>
+        ${sec('Día a día')}<div class="mosaico">
+        ${teja({ v:'padron', icon:'users', color:'brand', t:'Padrón', s: s.padron.length ? `${plural(s.padron.length, 'unidad', 'unidades')} · buscá por apellido o lote` : 'Sin cargar' })}
+        ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy', n: pasesDelDia().length })}
+        ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
+        ${teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Reclamos', s:'Responder y publicar', n: s.reclamos.filter(r => r.estado !== 'resuelto').length || '' })}
+        ${teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones', s:'Firmadas a la garita', n: s.peticiones.filter(p => p.estado === 'pendiente').length || '' })}
+        ${teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' })}
+        ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día', n: s.proveedores.filter(p => artEstado(p)[1] !== 'ok').length || '' })}
+        ${teja({ v:'obras', p:'pendientes', icon:'wrench', color:'wood', t:'Obras por aprobar', s:'Registro de obras', n: s.obras.filter(o => o.estado === 'pendiente').length || '' })}
+        ${teja({ a:'nuevo-post', v:'aviso', icon:'tack', color:'sky', t:'Comunicado oficial', s:'Suena y llega a todos' })}
+        </div>`;
+    },
+  },
+};
+/* Cada sección es una ventana de verdad, con su lomo y su vuelta atrás. */
+for (const k in SECCIONES){
+  const S = SECCIONES[k];
+  R[k] = { titulo:S.titulo, icon:S.icon, color:S.color, sub:S.sub, ancha:S.ancha,
+    render(){
+      if (S.solo === 'admin' && !esAdmin()) return vacio('lock', 'Solo para la Administración.');
+      const u = yo(), s = Store.s, hoy = hoyISO();
+      const c = S.tejas(u, s, hoy);
+      return c.trim().startsWith('<p') ? c : `<div class="mosaico">${c}</div>`;
+    } };
+}
+
+/* =========================================================
+   LUZ DEL DÍA
+   Una barra que es el día entero, de 0 a 24 h: la franja clara es el
+   tiempo con sol y el punto rojo es AHORA. El punto camina solo,
+   segundo a segundo, y arriba lleva la hora con segundos. En Ushuaia
+   esto no es un adorno: en junio hay siete horas de luz y en diciembre
+   diecisiete, y se ve de un vistazo cuánto queda.
+   ========================================================= */
+function barraLuz(sol){
+  const mSale = minutosDe(sol.sale), mPone = minutosDe(sol.pone), luzMin = Math.max(1, mPone - mSale);
+  const pc = m => (m / 1440 * 100).toFixed(3);
+  const ahora = new Date();
+  const seg = ahora.getHours() * 3600 + ahora.getMinutes() * 60 + ahora.getSeconds();
+  const esDeDia = Clima.esDeDia();
+  const faltan = esDeDia ? mPone - Math.floor(seg / 60) : (mSale > seg / 60 ? mSale - seg / 60 : 1440 - seg / 60 + mSale);
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:14px">
+      <b style="font-size:14px">Luz del día</b>
+      <span class="muted small">${Math.floor(luzMin / 60)} h ${luzMin % 60} min · ${esDeDia ? `anochece en ${Math.floor(faltan / 60)} h ${Math.round(faltan % 60)} min` : `amanece en ${Math.floor(faltan / 60)} h ${Math.round(faltan % 60)} min`}</span></div>
+    <div class="luz24" data-reloj="luz" data-sale="${mSale}" data-pone="${mPone}">
+      <div class="luz24-barra">
+        <span class="luz24-dia" style="left:${pc(mSale)}%;width:${pc(mPone - mSale)}%"></span>
+        ${[6,12,18].map(h => `<span class="luz24-marca" style="left:${pc(h * 60)}%"></span>`).join('')}
+        <i class="luz24-punto" style="left:${pc(seg / 60)}%"></i>
+        <b class="luz24-hora" style="left:${pc(seg / 60)}%">${String(ahora.getHours()).padStart(2,'0')}:${String(ahora.getMinutes()).padStart(2,'0')}:${String(ahora.getSeconds()).padStart(2,'0')}</b>
+      </div>
+      <div class="luz24-pie"><span>0 h</span><span>${I('sunrise')}${sol.sale}</span><span>${I('sunset')}${sol.pone}</span><span>24 h</span></div>
+    </div></div>`;
+}
+/* El punto camina sin redibujar la pantalla: se mueve solo el punto y su
+   etiqueta. Redibujar toda la portada cada segundo sería un despropósito. */
+const Reloj = {
+  timer:null,
+  arrancar(){
+    if (this.timer) return;
+    this.timer = setInterval(() => this.paso(), 1000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.paso(); });
+  },
+  paso(){
+    if (document.hidden) return;
+    const cajas = $$('[data-reloj="luz"]');
+    if (!cajas.length) return;
+    const d = new Date();
+    const seg = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+    const izq = (seg / 60 / 1440 * 100).toFixed(3) + '%';
+    const txt = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+    cajas.forEach(c => {
+      const punto = c.querySelector('.luz24-punto'), hora = c.querySelector('.luz24-hora');
+      if (punto) punto.style.left = izq;
+      if (hora){ hora.style.left = izq; hora.textContent = txt; }
+    });
+  },
+};
+
+/* La puerta de una sección tal como se ve en la portada. */
+const puerta = (k, u, s, hoy) => {
+  const S = SECCIONES[k];
+  return `<button class="puerta" data-a="abrir" data-v="${k}">
+    <span class="ic ic-${S.color}">${I(S.icon)}</span>
+    <span class="txt"><b>${esc(S.titulo)}</b><small>${esc(S.linea(u, s, hoy))}</small></span>
+    <span class="puerta-flecha">${I('right')}</span></button>`;
+};
+
 R.inicio = {
   titulo: 'Inicio', icon: 'home', ancha: true,
   render(){
@@ -124,56 +326,20 @@ R.inicio = {
     </div>`;
 
     const urg = urgentesVecino();
-    const misHoy = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy));
-    const proxRes = s.reservas.filter(r => r.userId === u.id && r.fecha >= hoy && !r.cancelada).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
-    const pizNuevas = s.posts.filter(p => p.createdAt > (Store.sesion.pizarronVisto || 0) && p.autor !== u.id).length;
-    const chatNuevos = s.msgs.filter(m => m.createdAt > (Store.sesion.chatVisto || 0) && m.autor !== u.id).length;
-    const privNoLeidos = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(m => m.from !== 'vecino' && !m.leido).length, 0);
-    const votAbiertas = s.votaciones.filter(v => v.cierra > Date.now()).length;
-    const misRecl = s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length;
-    const compras = s.compras.filter(x => x.cierra > Date.now()).length;
-    const prox = proximoFeriado();
-    const pend = s.users.filter(x => x.estado === 'pendiente').length;
-    const vuelosHoy = Vuelos.cuantosHoy();
+    /* Lo urgente primero, y si no hay nada urgente se dice, que también es
+       información: el vecino sabe que no se está perdiendo nada. */
+    const ahora = urg.length
+      ? `${sec('Ahora', `<span class="muted small">${plural(urg.length, 'aviso')}</span>`)}<div class="panel-sube">${urg.join('')}</div>`
+      : `${sec('Ahora')}<div class="todo-tranquilo">${I('check')}<div><b>Todo tranquilo</b><span>No hay nada pendiente de tu parte.</span></div></div>`;
 
-    const tuCasa = [
-      teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Código y QR para la garita', destaca:true }),
-      teja({ v:'visitas', icon:'users', color:'sky', t:'Mis visitas', s: misHoy.length ? `${plural(misHoy.length, 'esperada')} hoy` : 'Nadie anunciado hoy', n: misHoy.length || '' }),
-      teja({ v:'reservas', icon:'calendar', color:'wood', t:'Reservas', s: proxRes ? `${amenity(proxRes.amenity)?.nombre} · ${relDia(proxRes.fecha)}` : 'Quincho, SUM y cancha' }),
-      teja({ v:'mensajes', icon:'chat', color:'accent', t:'Mensajes', s:'Privados con vecinos y la Administración', badge: privNoLeidos + dmNoLeidos() }),
-      teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas por vos y la guardia', n: s.peticiones.filter(p => p.userId === u.id && p.estado !== 'cerrada').length || '' }),
-      teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Familia, autos, mascotas' }),
-      ...(s.infracciones.some(i => i.casa === u.casa && i.estado === 'notificada') ? [teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificación', s:'Podés presentar tu descargo', badge: s.infracciones.filter(i => i.casa === u.casa && i.estado === 'notificada').length })] : []),
-    ].join('');
-    const barrio = [
-      teja({ v:'pizarron', icon:'muro', t:'Pizarrón', s:'Guardia, Administración y vecinos', badge: pizNuevas }),
-      teja({ v:'vecinos', icon:'users', color:'sky', t:'Vecinos', s:'Buscá por nombre, oficio o dirección' }),
-      teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s: (() => { const a = s.obras.filter(o => o.estado === 'activa'); const h = s.obras.filter(o => o.avisoHoy?.fecha === hoy).length; return h ? `${plural(h, 'aviso')} para hoy` : `${plural(a.length, 'en curso', 'en curso')}`; })(), n: s.obras.filter(o => o.estado === 'activa').length || '' }),
-      teja({ v:'viajes', icon:'car', color:'sky', t:'Viajes compartidos', s:'Centro, escuela, aeropuerto', n: s.viajes.filter(v => v.fecha >= hoy).length || '' }),
-      teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#general · #seguridad · #mascotas', badge: chatNuevos }),
-      teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votAbiertas ? `${plural(votAbiertas, 'abierta')}` : 'Sin votaciones abiertas', n: votAbiertas || '' }),
-      teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Reclamos', s: misRecl ? `${plural(misRecl, 'abierto')}` : 'Privados con la Administración', n: misRecl || '' }),
-      teja({ v:'servicios', icon:'star', color:'wood', t:'Oficios de vecinos', s:'Recomendados por el barrio' }),
-      teja({ v:'mascotas', icon:'paw', color:'ok', t:'Mascotas', s:'Perdidas, encontradas y del barrio' }),
-      teja({ v:'compras', icon:'cart', color:'brand', t:'Compras conjuntas', s: compras ? `${plural(compras, 'abierta')}` : 'Leña, gas, lo que sea', n: compras || '' }),
-    ].join('');
-    const ciudad = [
-      teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
-      teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: vuelosHoy || '' }),
-      teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
-      teja({ v:'agenda', icon:'phone', color:'danger', t:'Emergencias', s:'Y agenda de Ushuaia' }),
-      teja({ v:'expensas', icon:'wallet', color:'wood', t:'Expensas', s:`Vencen el ${Store.s.config.expensasVence} de cada mes` }),
-      teja({ v:'documentos', icon:'file', color:'brand', t:'Normas', s:'Reglamento y convivencia' }),
-    ].join('');
-    const gestion = esAdmin() ? [
-      teja({ v:'admin', icon:'sliders', color:'accent', t:'Administración', s:'Inscripciones, datos y motor', badge: pend }),
-      teja({ v:'contabilidad', icon:'wallet', color:'wood', t:'Contabilidad', s:'Expensas, cobranzas y ARCA', badge: s.pagos.filter(x => x.estado === 'informado').length }),
-      teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy', n: pasesDelDia().length }),
-      teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' }),
-      teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' }),
-      teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día', n: s.proveedores.filter(p => artEstado(p)[1] !== 'ok').length || '' }),
-      teja({ v:'obras', p:'pendientes', icon:'wrench', color:'wood', t:'Obras por aprobar', s:'Registro de obras', n: s.obras.filter(o => o.estado === 'pendiente').length || '' }),
-    ].join('') : '';
+    const acciones = `<div class="acciones-rapidas">
+      <button class="rapido r-brand" data-a="nuevo-pase"><span class="ic">${I('qr')}</span><b>Autorizar una visita</b></button>
+      <button class="rapido r-wood" data-a="abrir" data-v="reservas"><span class="ic">${I('calendar')}</span><b>Reservar un espacio</b></button>
+      <button class="rapido r-sky" data-a="nuevo-post" data-v="aviso"><span class="ic">${I('muro')}</span><b>Publicar en el pizarrón</b></button>
+      <button class="rapido r-accent" data-a="abrir" data-v="expensas"><span class="ic">${I('wallet')}</span><b>Ver mis expensas</b></button></div>`;
+
+    const puertas = ['casa', 'comunidad', 'ciudad', ...(esAdmin() ? ['gestion'] : [])]
+      .map(k => puerta(k, u, s, hoy)).join('');
 
     const pron = Clima.d?.dd ? `<div class="pronostico">${[1,2,3].map(i => {
       const dd = Clima.d.dd; if (!dd.time[i]) return '';
@@ -181,10 +347,7 @@ R.inicio = {
       return `<div><b>${i === 1 ? 'Mañana' : DIAS[fechaDe(dd.time[i]).getDay()]}</b>${I(ic)}
         <div class="t">${Math.round(dd.temperature_2m_max[i])}° <span>${Math.round(dd.temperature_2m_min[i])}°</span></div>
         <div class="v">${dd.snowfall_sum[i] >= 1 ? `❄ ${Math.round(dd.snowfall_sum[i])} cm` : `ráf. ${Math.round(dd.wind_gusts_10m_max[i])}`}</div></div>`; }).join('')}</div>` : '';
-    const mSale = minutosDe(sol.sale), mPone = minutosDe(sol.pone), luzMin = mPone - mSale;
-    const pos = Math.max(0, Math.min(100, (ahoraMin() - mSale) / luzMin * 100));
-    const luz = `<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:10px"><b style="font-size:14px">Luz del día</b><span class="muted small">${Math.floor(luzMin / 60)} h ${luzMin % 60} min</span></div>
-      <div class="luz"><span class="small">${sol.sale}</span><div class="barra"><i style="left:${pos}%"></i></div><span class="small">${sol.pone}</span></div></div>`;
+    const luz = barraLuz(sol);
     const ant = Store.sesion.visitaAnterior || 0;
     const nPost = s.posts.filter(p => p.createdAt > ant && p.autor !== u.id).length, nMsg = s.msgs.filter(m => m.createdAt > ant && m.autor !== u.id).length;
     const desde = ant && (nPost || nMsg) ? `<div class="card" style="display:flex;gap:12px;align-items:center"><span class="ic ic-accent" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I('sparkle')}</span>
@@ -195,12 +358,12 @@ R.inicio = {
     }).join('');
 
     return `${hero}
-      <div class="panel-sube">${ushuaiaHoy()}${urg.join('')}</div>
+      ${tiraPromos()}
       <div class="inicio-cols"><div>
-        ${sec('Tu casa')}<div class="mosaico">${tuCasa}</div>
-        ${sec('El barrio')}<div class="mosaico">${barrio}</div>
-        ${sec('Ushuaia y servicios')}<div class="mosaico">${ciudad}</div>
-        ${gestion ? sec('Gestión') + `<div class="mosaico">${gestion}</div>` : ''}
+        ${ahora}
+        ${sec('¿Qué querés hacer?')}${acciones}
+        ${sec('Por dónde seguir')}<div class="puertas">${puertas}</div>
+        ${ushuaiaHoy()}
       </div><div>
         ${sec('Próximos días')}${pron}<div style="height:10px"></div>${luz}${desde}
         ${sec('Último en el pizarrón', `<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button>`)}${ultimas}
@@ -222,15 +385,43 @@ function ushuaiaHoy(){
   const cru = s.cruceros.filter(c => c.fecha === hoy), cruMan = s.cruceros.filter(c => c.fecha === sumarDias(hoy, 1));
   if (cru.length) partes.unshift(chip('send', `Hoy recala ${esc(cru[0].barco)}`, `${cru.length > 1 ? `y ${cru.length - 1} más · ` : ''}${cru[0].llega ? cru[0].llega + ' h' : ''}${cru[0].pasajeros ? ' · ' + cru[0].pasajeros + ' pasajeros' : ''}`, true));
   else if (cruMan.length) partes.unshift(chip('send', `Mañana recala ${esc(cruMan[0].barco)}`, cruMan[0].llega ? cruMan[0].llega + ' h' : '', false));
+  /* Qué pasa hoy: si es feriado o no laborable, va primero, porque cambia el día. */
+  const info = diaInfo(hoy);
+  if (info.feriado) partes.unshift(chip('calendar', `Hoy es feriado`, esc(info.feriado.nombre), true));
+  else if (info.noLaborable) partes.unshift(chip('calendar', 'Día no laborable', esc(info.noLaborable.nombre), true));
   const fer = proximoFeriado();
-  if (fer) partes.push(chip('calendar', esc(fer.nombre), relDia(fer.fecha), fer.fecha === hoy));
+  if (fer && fer.fecha !== hoy) partes.push(chip('calendar', esc(fer.nombre), relDia(fer.fecha), false));
+  const relig = feriadosDe(+hoy.slice(0, 4)).filter(f => f.fecha === hoy && (f.ambito === 'católica' || f.ambito === 'judía'));
+  relig.forEach(f => partes.push(chip(f.ambito === 'judía' ? 'star' : 'tree', esc(f.nombre), f.ambito === 'judía' ? 'fiesta judía' : 'calendario católico', false)));
   const v = Vuelos.cuantosHoy();
   if (v) partes.push(chip('send', 'Vuelos de hoy en USH', v + ' movimientos', false));
   const ev = s.eventosCiudad.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
   if (ev) partes.push(chip('star', esc(ev.titulo), relDia(ev.fecha), ev.fecha === hoy));
   if (!partes.length) return '';
   return `<div class="ushuaia-hoy"><div class="uh-cab">${I('pin')}<b>Ushuaia hoy</b><span class="muted small">tocá para ver todo</span></div>
-    <div class="uh-tira">${partes.join('')}</div></div>`;
+    ${marquesina(partes, 'uh-tira')}</div>`;
+}
+
+/* =========================================================
+   MARQUESINA
+   Una cinta que va pasando sola de derecha a izquierda, para que se vea
+   todo sin tener que entrar a la ventana. No parpadea ni salta: se
+   desliza despacio y en bucle. Se frena al pasar el dedo o el mouse por
+   encima, para poder leer y tocar tranquilo, y queda quieta (y se puede
+   arrastrar a mano) si el equipo pide menos movimiento.
+
+   El truco del bucle sin cortes: el contenido va DOS VECES. Cuando la
+   cinta se corrió la mitad de su ancho, la segunda copia está justo
+   donde arrancó la primera y la animación vuelve a empezar sin que se
+   note. La copia lleva aria-hidden para que un lector de pantalla no
+   lea todo dos veces.
+   ========================================================= */
+function marquesina(items, cls = ''){
+  const seg = Math.max(18, Math.round(items.length * 4.5));   /* más cosas, más lento */
+  const grupo = `<div class="marq-grupo">${items.join('')}</div>`;
+  return `<div class="marquesina ${cls}" data-marq>
+    <div class="marq-pista" style="--marq-dur:${seg}s">${grupo}${grupo.replace('<div class="marq-grupo">', '<div class="marq-grupo" aria-hidden="true">')}</div>
+  </div>`;
 }
 
 function proxRecoleccion(){

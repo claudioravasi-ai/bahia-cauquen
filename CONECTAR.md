@@ -1,16 +1,57 @@
-# Bahía Cauquén — cómo pasar de la demo al barrio real
+# Barrio Bahía Cauquén — conectar la app con el barrio
 
 ## Dónde está hoy
 
-La app funciona completa, pero **los datos viven en el equipo donde se abre**
-(localStorage + IndexedDB). Entre pestañas del mismo equipo se sincroniza en vivo
-(así se prueba la garita en una pestaña y un vecino en otra). Para que la usen
-las 80 casas a la vez hace falta un servidor. Mientras tanto:
+**Firebase ya está conectado.** Las claves del proyecto `bahia-cauquen` están
+en `js/firebase-config.js` y la sincronización vive en `js/nube.js`, con las
+tres zonas de privacidad (`/barrio`, `/privado/<uid>`, `/staff`).
 
-- Las claves de demo están en `js/seed.js` (ADM-2026, GAR-2026, VEC-…).
-- Lo privado (mensajes, reclamos, peticiones) se respeta **en pantalla**, no
-  todavía en los datos: cualquiera que abra las herramientas del navegador de
-  ese equipo lo vería. Eso lo resuelve el paso 1.
+Lo que falta confirmar antes de que entre todo el barrio está en
+**`CAPACIDAD.md`**, y hay un punto que no se puede postergar: **el plan Spark
+(gratis) solo acepta 100 conexiones simultáneas** y el barrio tiene 152 lotes.
+Hay que pasar a Blaze.
+
+Con **`?local`** en la dirección, la app trabaja solo en ese equipo con datos de
+prueba y no toca la base del barrio. Sirve para probar cambios sin ensuciar
+nada; para probar de verdad la identidad y los permisos, hay que entrar **sin**
+`?local`.
+
+## Guías aparte
+
+- **`PADRON.md`** — cargar los lotes y propietarios para las expensas.
+- **`CORREO.md`** — que la app mande mails y circulares.
+- **`CAPACIDAD.md`** — que la usen los 152 lotes a la vez.
+
+## Servicios de afuera que la app usa
+
+| Qué | De dónde sale | ¿Hace falta configurar algo? |
+|---|---|---|
+| Clima de Ushuaia | Open-Meteo | No. Es gratis y sin clave. |
+| Arribos y partidas | Tablero de London Supply | No. Se lee directo. |
+| Aviones en vivo sobre el barrio | ADS-B | Sí, un Worker propio (Ajustes → Vuelos). Opcional. |
+| Recaladas de cruceros | Las carga la Administración | Contenido → Recaladas |
+| Promociones del Hotel Los Cauquenes | Las carga la Administración | Contenido → Promociones. Con un Worker propio se leen solas (Ajustes → Promociones). |
+| Feriados y calendario religioso | **Se calculan** en `js/calendario.js` | Solo lo provincial, lo municipal y los puentes |
+| Correo | Google Apps Script | Sí, ver `CORREO.md` |
+
+### El formato que tiene que devolver el lector de promociones
+
+Si algún día se hace el Worker que lee la web del hotel, tiene que devolver
+esto (la app entiende también `title`, `description`, `discount` y `link`):
+
+```json
+{ "promociones": [
+  { "titulo": "Cena de los viernes",
+    "detalle": "Menú de tres pasos con productos fueguinos",
+    "descuento": "20 %",
+    "desde": "2026-09-01", "hasta": "2026-10-15",
+    "url": "https://…" }
+] }
+```
+
+---
+
+## Notas de la migración original (referencia)
 
 ## 1. Servidor: Firebase (el mismo camino que HRU, AFAAR y ASHA)
 

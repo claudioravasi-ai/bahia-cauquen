@@ -18,6 +18,7 @@
   --sh-3:0 18px 50px rgba(15,31,30,.18);
   --r-lg:22px; --r:16px; --r-sm:12px;
   --tab-h:0px;
+  --pad-cuerpo:18px;
   --font:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   color-scheme:light;
 }
@@ -74,47 +75,87 @@ body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 #app{flex:1;display:flex;flex-direction:column;min-height:0}
 .top{display:flex;align-items:center;gap:10px;padding:calc(8px + env(safe-area-inset-top)) 14px 8px;background:var(--surface);border-bottom:1px solid var(--line);flex:none;z-index:30}
 .top .marca{display:flex;align-items:center;gap:10px;flex:1;min-width:0;border:0;background:none;padding:0;text-align:left;color:inherit}
-.top .marca b{display:block;font-size:15.5px;font-weight:800;letter-spacing:-.3px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .marca b{display:block;font-size:14.5px;font-weight:800;letter-spacing:-.3px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .top .marca small{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-weight:700}
-.en-vivo{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:enVivo 2s infinite}
+.en-vivo{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:enVivo 2s infinite;flex:none}
+.en-vivo.conectando{background:#eab308;animation:latir 1s ease-in-out infinite alternate}
+.en-vivo.caido{background:#ef4444;animation:none}
+.en-vivo.local{background:var(--muted);animation:none}
+@keyframes latir{to{opacity:.25}}
 @keyframes enVivo{70%{box-shadow:0 0 0 7px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-.logo{width:36px;height:36px;border-radius:11px;flex:none;display:grid;place-items:center;background:linear-gradient(150deg,#0d6b66,#0b3c47);box-shadow:0 3px 10px rgba(13,107,102,.35);overflow:hidden}
+.logo{width:36px;height:36px;border-radius:11px;flex:none;display:grid;place-items:center;background:#0b3c47;box-shadow:0 3px 10px rgba(11,60,71,.35);overflow:hidden}
+.logo img{width:100%;height:100%;object-fit:cover;display:block}
 .logo svg{width:28px;height:28px}
 .icon-btn{width:40px;height:40px;border-radius:50%;border:0;background:var(--surface-3);color:inherit;display:grid;place-items:center;position:relative;transition:transform .15s,background .2s;flex:none}
 .icon-btn:hover{background:var(--line-2)}
 .icon-btn:active{transform:scale(.92)}
 .dot-badge{position:absolute;top:1px;right:1px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--danger);color:#fff;font-size:10.5px;font-weight:800;display:grid;place-items:center;border:2px solid var(--surface)}
+/* El interruptor entre los dos brazos de la app. Solo lo ve quien administra. */
+.modo-btn{display:flex;align-items:center;gap:6px;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:999px;
+  background:var(--surface-3);color:var(--ink-2);font-size:12.5px;font-weight:800;flex:none;transition:transform .12s,background .2s}
+.modo-btn svg.i{width:17px;height:17px}
+.modo-btn:active{transform:scale(.94)}
+.modo-btn.admin{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.modo-btn.vecino{background:var(--ok-soft);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent)}
+@media (max-width:520px){ .modo-btn span{display:none} .modo-btn{padding:0 11px} }
+
 .sos-btn{
   position:relative;border:0;height:40px;padding:0 14px 0 11px;border-radius:999px;display:flex;align-items:center;gap:6px;
   background:linear-gradient(135deg,#e24848,#b91c1c);color:#fff;font-weight:800;font-size:13px;letter-spacing:.6px;
-  box-shadow:0 4px 14px rgba(185,28,28,.35);overflow:hidden;flex:none;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  box-shadow:0 4px 14px rgba(185,28,28,.35);overflow:hidden;flex:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .12s,box-shadow .2s;
 }
-.sos-btn svg{width:18px;height:18px;position:relative}
-.sos-btn::before{content:"";position:absolute;inset:0;background:rgba(255,255,255,.3);transform:scaleX(0);transform-origin:left}
-.sos-btn.cargando::before{animation:sosFill 1.2s linear forwards}
-@keyframes sosFill{to{transform:scaleX(1)}}
-.sos-btn span{position:relative}
+.sos-btn svg{width:18px;height:18px;position:relative;z-index:1}
+.sos-btn:active{transform:scale(.96)}
+.sos-btn:hover{box-shadow:0 6px 20px rgba(185,28,28,.5)}
+/* Mientras se mantiene apretado, el rojo se va llenando y se pone más fuerte. */
+.sos-btn::before{content:"";position:absolute;inset:0;width:var(--sos-carga,0%);
+  background:linear-gradient(135deg,#ff5a5a,#7f0d0d);transition:width .06s linear}
+.sos-btn.cargando{animation:sosLatido .5s ease-in-out infinite alternate}
+.sos-btn.cargando span{font-size:17px;letter-spacing:0;min-width:14px;text-align:center}
+@keyframes sosLatido{from{box-shadow:0 4px 14px rgba(185,28,28,.4)}to{box-shadow:0 0 0 7px rgba(226,59,59,.28),0 6px 22px rgba(185,28,28,.7)}}
+.sos-btn span{position:relative;z-index:1}
 
-.lienzo{flex:1;min-height:0;display:flex;align-items:stretch;gap:10px;padding:12px;background:var(--surface-3);overflow:hidden;justify-content:safe center}
-.lomo{flex:0 0 46px;background:var(--surface);border:1px solid var(--line);border-radius:18px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px 0;transition:flex-basis .18s,background .18s;box-shadow:var(--sh-1);color:var(--ink-2)}
-.lomo:hover{background:var(--brand-soft);flex-basis:54px;color:var(--brand)}
+.lienzo{flex:1;min-height:0;display:flex;align-items:stretch;gap:10px;padding:12px;background:var(--surface-3);overflow:hidden}
+.lienzo.apilado{justify-content:flex-start}
+.lienzo:not(.apilado){justify-content:center}
+
+/* LOMOS: las ventanas de atrás, como libros de canto en un estante.
+   Siempre visibles a la izquierda, siempre tocables: son el camino de vuelta. */
+.lomos{display:flex;gap:10px;flex:none;min-width:0;max-width:40%}
+.lomos:empty{display:none}
+.lomo{flex:0 0 52px;background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--line);border-radius:18px;cursor:pointer;
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px 0;
+  transition:flex-basis .18s,background .18s,color .18s;box-shadow:var(--sh-1);color:var(--ink-2);min-width:0}
+.lomo:hover,.lomo:focus-visible{background:var(--brand-soft);flex-basis:60px;color:var(--brand)}
+.lomo:active{transform:scale(.98)}
 .lomo svg.i{width:18px;height:18px;flex:none}
-.lomo b{writing-mode:vertical-rl;transform:rotate(180deg);font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:75%;letter-spacing:.2px}
-.ventana{flex:1 1 0;min-width:0;max-width:900px;background:var(--bg);border:1px solid var(--line);border-radius:22px;box-shadow:var(--sh-2);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.lomo .lomo-flecha{position:absolute;top:8px;left:50%;transform:translateX(-50%);display:grid;place-items:center;
+  width:22px;height:22px;border-radius:50%;background:var(--surface-3);color:var(--brand)}
+.lomo .lomo-flecha svg.i{width:14px;height:14px}
+.lomo b{writing-mode:vertical-rl;transform:rotate(180deg);font-size:12.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:70%;letter-spacing:.2px}
+.lomo.ultimo{border-color:color-mix(in srgb,var(--brand) 45%,transparent);color:var(--brand)}
+
+.ventana{flex:1 1 0;min-width:0;min-height:0;max-width:900px;background:var(--bg);border:1px solid var(--line);border-radius:22px;
+  box-shadow:0 2px 6px rgba(12,31,28,.06),0 18px 44px rgba(12,31,28,.12);display:flex;flex-direction:column;overflow:hidden;position:relative}
 .ventana.entra{animation:entra .26s cubic-bezier(.2,.8,.3,1)}
 .ventana.sale{animation:sale .2s ease-in forwards}
-@keyframes entra{from{opacity:0;transform:translateX(26px) scale(.99)}to{opacity:1;transform:none}}
-@keyframes sale{to{opacity:0;transform:translateX(30px)}}
+@keyframes entra{from{opacity:0;transform:translateX(26px)}}
+@keyframes sale{to{opacity:0;transform:translateX(26px)}}
 .ventana.ancha{max-width:1180px}
-.ventana > header{display:flex;align-items:center;gap:12px;padding:13px 14px 12px 20px;border-bottom:1px solid var(--line);background:var(--surface);flex:none}
+.ventana > header{display:flex;align-items:center;gap:10px;padding:11px 12px 10px 12px;border-bottom:1px solid var(--line);background:var(--surface);flex:none}
 .ventana > header .ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none}
 .ventana > header h2{margin:0;font-size:17.5px;font-weight:800;letter-spacing:-.3px;line-height:1.2}
 .ventana > header .sub{font-size:12.5px;color:var(--muted);font-weight:600;margin-top:1px}
 .ventana > header .tit{flex:1;min-width:0}
-.cerrar{width:38px;height:38px;border-radius:50%;border:0;background:var(--surface-3);color:var(--ink-2);display:grid;place-items:center;flex:none;transition:background .15s,transform .15s}
-.cerrar:hover{background:var(--line-2);color:var(--ink)}
-.cerrar:active{transform:scale(.9)}
-.cuerpo{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 18px calc(28px + env(safe-area-inset-bottom));overscroll-behavior:contain;scroll-behavior:smooth}
+/* La flecha de volver: la salida más obvia, siempre en el mismo lugar. */
+.volver-btn{width:40px;height:40px;flex:none;border:0;border-radius:13px;background:var(--surface-3);color:var(--ink);display:grid;place-items:center;transition:background .18s,transform .12s}
+.volver-btn:hover{background:var(--brand-soft);color:var(--brand)}
+.volver-btn:active{transform:scale(.92)}
+.volver-btn svg.i{width:22px;height:22px;stroke-width:2.4}
+.ventana > header .cerrar{width:36px;height:36px;flex:none;border:0;border-radius:50%;background:transparent;color:var(--muted);display:grid;place-items:center}
+.ventana > header .cerrar:hover{background:var(--surface-3);color:var(--ink)}
+.cuerpo{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  padding:16px var(--pad-cuerpo) calc(28px + env(safe-area-inset-bottom));overscroll-behavior:contain;scroll-behavior:smooth}
 .ventana.inicio > header{display:none}
 .ventana.inicio .cuerpo{padding-top:0}
 .ventana.inicio{background:var(--bg)}
@@ -185,11 +226,11 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
 .btn-accent{background:var(--accent);color:#fff}
 .btn-wa{background:#1fa855;color:#fff}
 .btn-block{width:100%}
-.btn-sm{padding:8px 12px;font-size:13px;border-radius:11px}
-.btn-xs{padding:6px 10px;font-size:12px;border-radius:9px;gap:5px}
+.btn-sm{padding:8px 12px;font-size:13px;border-radius:11px;min-height:38px}
+.btn-xs{padding:6px 10px;font-size:12px;border-radius:9px;gap:5px;min-height:34px}
 .btn-xs svg.i,.btn-sm svg.i{width:16px;height:16px}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
-.btns > .btn{flex:1 1 auto}
+.btns > .btn{flex:1 1 auto;min-width:0}
 
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--surface-3);color:var(--ink-2);white-space:nowrap;letter-spacing:.1px}
 .pill svg.i{width:13px;height:13px}
@@ -201,9 +242,9 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
 .p-warn{background:var(--warn-soft);color:var(--warn)}
 .p-sky{background:var(--sky-soft);color:var(--sky)}
 
-.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;margin:0 -16px 4px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px var(--pad-cuerpo) 10px;margin:0 calc(var(--pad-cuerpo) * -1) 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);padding:8px 14px;border-radius:999px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;transition:all .18s}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);padding:8px 14px;min-height:38px;border-radius:999px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;transition:all .18s}
 .chip svg.i{width:15px;height:15px}
 .chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 .chip .n{font-size:11px;background:var(--surface-3);color:var(--ink-2);padding:1px 7px;border-radius:9px}
@@ -266,8 +307,8 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .vacio svg.i{width:38px;height:38px;stroke-width:1.5;margin:0 auto 10px;display:block;opacity:.6}
 
 /* ================= INICIO ================= */
-.hero{position:relative;margin:0 -18px 0;min-height:min(330px,42dvh);color:#fff;display:flex;flex-direction:column;justify-content:flex-end;
-  padding:26px 20px 54px;overflow:hidden;isolation:isolate;border-radius:0 0 30px 30px}
+.hero{position:relative;margin:0 calc(var(--pad-cuerpo) * -1) 0;min-height:min(280px,36dvh);color:#fff;display:flex;flex-direction:column;justify-content:flex-end;
+  padding:24px 20px 34px;overflow:hidden;isolation:isolate;border-radius:0 0 30px 30px}
 .hero .foto{position:absolute;inset:0;z-index:-2;background:#0b3c47 center 55%/cover;transform:scale(1.04);transition:opacity .6s}
 .hero::after{content:"";position:absolute;inset:0;z-index:-1;
   background:linear-gradient(180deg,rgba(5,18,22,.55) 0%,rgba(5,18,22,.22) 26%,rgba(5,18,22,.5) 58%,rgba(5,18,22,.88) 100%)}
@@ -285,7 +326,47 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .clima-datos{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 .clima-datos span{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:rgba(10,25,30,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18)}
 .clima-datos svg.i{width:14px;height:14px}
-.panel-sube{position:relative;margin-top:-34px;z-index:2}
+.panel-sube{position:relative;z-index:2}
+
+/* ---- PORTADA ----
+   Tres piezas y nada más: lo que pasa ahora, lo que se hace siempre y las
+   cuatro puertas. Cada una con su propio peso visual, para que el ojo sepa
+   en qué orden mirar. */
+
+/* "Todo tranquilo": cuando no hay nada pendiente, decirlo también informa. */
+.todo-tranquilo{display:flex;align-items:center;gap:12px;background:var(--ok-soft);border:1px solid color-mix(in srgb,var(--ok) 28%,transparent);
+  border-radius:18px;padding:14px 16px;color:var(--ok)}
+.todo-tranquilo svg.i{width:24px;height:24px;flex:none}
+.todo-tranquilo b{display:block;font-size:14.5px;line-height:1.25}
+.todo-tranquilo span{display:block;font-size:12.5px;opacity:.85}
+
+/* Las cuatro cosas que todos hacen siempre. Grandes, de color, sin adornos. */
+.acciones-rapidas{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.acciones-rapidas .rapido{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:14px;
+  padding:16px 14px;border-radius:20px;border:0;min-height:124px;text-align:left;font-size:14px;font-weight:800;line-height:1.2;
+  color:#fff;box-shadow:var(--sh-1);transition:transform .15s,box-shadow .2s}
+.acciones-rapidas .rapido:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+.acciones-rapidas .rapido:active{transform:scale(.97)}
+.acciones-rapidas .rapido .ic{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.2);color:#fff}
+.acciones-rapidas .rapido .ic svg.i{width:22px;height:22px}
+.acciones-rapidas .r-brand{background:linear-gradient(145deg,#12857e,#0b4b52)}
+.acciones-rapidas .r-wood{background:linear-gradient(145deg,#c46a2a,#8d4415)}
+.acciones-rapidas .r-sky{background:linear-gradient(145deg,#3a80c4,#22527f)}
+.acciones-rapidas .r-accent{background:linear-gradient(145deg,#8155cc,#503083)}
+
+/* Las puertas a cada sección: una línea viva que cambia con el barrio. */
+.puertas{display:grid;gap:10px}
+.puerta{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);
+  border-radius:20px;padding:16px;color:var(--ink);box-shadow:var(--sh-1);transition:transform .15s,box-shadow .2s,border-color .2s}
+.puerta:hover{transform:translateY(-2px);box-shadow:var(--sh-2);border-color:var(--brand-2)}
+.puerta:active{transform:scale(.99)}
+.puerta .ic{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;flex:none}
+.puerta .ic svg.i{width:24px;height:24px}
+.puerta .txt{flex:1;min-width:0}
+.puerta b{display:block;font-size:16.5px;font-weight:800;letter-spacing:-.3px;line-height:1.2}
+.puerta small{display:block;font-size:13px;color:var(--muted);margin-top:3px;line-height:1.35}
+.puerta-flecha{color:var(--muted);display:grid;place-items:center;flex:none}
+.puerta-flecha svg.i{width:20px;height:20px}
 
 .rapidos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .rapido{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px 10px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1);text-decoration:none;color:var(--ink);font-size:11.5px;font-weight:750;text-align:center;line-height:1.2;transition:transform .15s}
@@ -306,13 +387,30 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .hoy b{display:block;font-size:14.5px;line-height:1.3}
 .hoy .txt{min-width:0;flex:1}
 .hoy .txt span{font-size:12.5px;color:var(--muted);display:block}
-.pronostico{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pronostico{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;min-width:0}
 .pronostico > div{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 10px;text-align:center}
 .pronostico b{display:block;font-size:13px}
 .pronostico .t{font-size:13px;font-weight:750;margin-top:4px}
 .pronostico .t span{color:var(--muted);font-weight:600}
 .pronostico svg.i{width:26px;height:26px;margin:6px auto 0;display:block;color:var(--sky)}
 .pronostico .v{font-size:11px;color:var(--muted);margin-top:2px}
+/* La barra de 24 horas: la noche oscura, el día claro y el punto rojo que
+   camina en tiempo real con la hora encima. */
+.luz24{padding-top:26px}
+.luz24-barra{position:relative;height:12px;border-radius:6px;background:linear-gradient(180deg,#152a3d,#0d1b28)}
+.luz24-dia{position:absolute;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,#f0a93c,#ffd98a 45%,#f0a93c)}
+.luz24-marca{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--line-2);opacity:.6}
+.luz24-punto{position:absolute;top:50%;width:15px;height:15px;border-radius:50%;background:#e23b3b;border:2.5px solid #fff;
+  transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(226,59,59,.25),0 2px 6px rgba(0,0,0,.3);transition:left .6s linear;z-index:2}
+.luz24-hora{position:absolute;bottom:calc(100% + 10px);transform:translateX(-50%);font-size:12.5px;font-weight:800;
+  font-variant-numeric:tabular-nums;letter-spacing:.3px;background:var(--ink);color:var(--bg);padding:3px 8px;border-radius:8px;
+  white-space:nowrap;transition:left .6s linear;z-index:2}
+.luz24-hora::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:var(--ink)}
+.luz24-pie{display:flex;justify-content:space-between;margin-top:9px;font-size:11.5px;color:var(--muted);font-weight:700}
+.luz24-pie span{display:inline-flex;align-items:center;gap:4px}
+.luz24-pie svg.i{width:13px;height:13px}
+@media (prefers-reduced-motion:reduce){ .luz24-punto,.luz24-hora{transition:none} }
+
 .luz{display:flex;align-items:center;gap:12px}
 .luz .barra{flex:1;height:8px;border-radius:4px;background:linear-gradient(90deg,#1c3a55,#f3b24d 30%,#f7d27a 50%,#f3b24d 70%,#1c3a55);position:relative}
 .luz .barra i{position:absolute;top:-4px;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--wood);transform:translateX(-50%);box-shadow:var(--sh-1)}
@@ -371,9 +469,9 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .ticket .bottom{padding:16px;text-align:center}
 .validador{display:flex;gap:8px}
 .validador input{font-size:22px!important;font-weight:800;letter-spacing:4px;text-align:center;font-family:ui-monospace,"SF Mono",Menlo,monospace;text-transform:uppercase}
-.garita-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center}
-.kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+.garita-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 8px;text-align:center;min-width:0;overflow-wrap:anywhere}
+.kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.1;overflow-wrap:anywhere}
 .kpi span{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .estado{font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
 .e-esperado{background:var(--sky-soft);color:var(--sky)}
@@ -456,7 +554,8 @@ button.opcion:hover{border-color:var(--brand)}
 .timeline .ev{position:relative;font-size:13px}
 .timeline .ev::before{content:"";position:absolute;left:-24px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2.5px solid var(--brand)}
 .timeline .ev small{display:block;color:var(--muted);font-size:11.5px}
-.recoleccion{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.recoleccion{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.recoleccion > div{overflow-wrap:anywhere}
 .recoleccion > div{border-radius:14px;padding:10px 4px;text-align:center;background:var(--surface);border:1px solid var(--line);font-size:11px;line-height:1.25;min-height:84px}
 .recoleccion b{display:block;font-size:12px;margin-bottom:6px}
 .recoleccion .hoy-r{border-color:var(--brand);background:var(--brand-soft)}
@@ -468,7 +567,8 @@ button.opcion:hover{border-color:var(--brand)}
 .admin-hero .kpi{background:rgba(255,255,255,.12);border-color:transparent;color:#fff}
 .admin-hero .kpi span{color:rgba(255,255,255,.75)}
 .tabs-in{display:flex;gap:4px;background:var(--surface-3);padding:4px;border-radius:14px;margin-bottom:14px;overflow-x:auto;scrollbar-width:none}
-.tabs-in button{flex:1 0 auto;border:0;background:transparent;padding:9px 12px;border-radius:11px;font-size:13px;font-weight:800;color:var(--muted);position:relative}
+.tabs-in button{flex:1 0 auto;border:0;background:transparent;padding:9px 12px;min-height:40px;border-radius:11px;font-size:13px;font-weight:800;color:var(--muted);position:relative}
+.tabs-in::-webkit-scrollbar{display:none}
 .tabs-in button.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1)}
 .tabs-in .dot-badge{position:static;display:inline-grid;margin-left:4px;border:0;vertical-align:1px}
 
@@ -581,28 +681,64 @@ dialog.hoja[open]{animation:hojaIn .32s cubic-bezier(.2,.9,.3,1)}
 
 /* ================= PANTALLAS ================= */
 @media (max-width:760px){
+  .acciones-rapidas{grid-template-columns:1fr 1fr;gap:9px}
+  .acciones-rapidas .rapido{min-height:108px;padding:14px 13px;font-size:14px}
   .lienzo{padding:8px;gap:6px}
-  .lomo{flex-basis:36px;border-radius:14px}
-  .lomo:hover{flex-basis:36px}
-  .lomo svg.i{display:none}
+  .lomos{gap:6px;max-width:132px}
+  .lomo{flex-basis:44px;border-radius:14px;padding:10px 0}
+  .lomo:hover{flex-basis:44px}
+  .lomo b{font-size:12px}
   .ventana{border-radius:18px}
-  .cuerpo{padding:14px 14px calc(26px + env(safe-area-inset-bottom))}
-  .ventana > header{padding:10px 10px 10px 16px}
+  :root{--pad-cuerpo:14px}
+  .cuerpo{padding:14px var(--pad-cuerpo) calc(26px + env(safe-area-inset-bottom))}
+  .ventana > header{padding:9px 8px 9px 8px;gap:8px}
+  .ventana > header h2{font-size:16.5px}
   .top .marca small .casa{display:none}
 }
-@media (max-width:420px){
+/* Teléfono: la ventana ocupa todo y el lomo queda como una cinta al costado,
+   angosta pero tocable, con la flecha bien visible arriba. Es la forma de
+   volver sin depender del botón Atrás del sistema. */
+@media (max-width:480px){
   .lienzo{padding:0;gap:0}
-  .lomo{border-radius:0;border-width:0 1px 0 0;box-shadow:none}
+  .lomos{gap:0;max-width:96px}
+  .lomo{flex-basis:38px;border-radius:0;border-width:0 1px 0 0;box-shadow:none;background:var(--surface-2);padding:34px 0 12px}
+  .lomo:hover{flex-basis:38px}
+  .lomo svg.i{width:16px;height:16px}
+  .lomo .lomo-flecha{top:9px;width:24px;height:24px;background:var(--brand);color:#fff}
+  .lomo b{font-size:11.5px;max-height:62%}
   .ventana{border-radius:0;border:0}
   .mosaico{grid-template-columns:1fr 1fr}
+  .garita-kpis{gap:6px}
+  .kpi{padding:10px 6px}
+  .kpi b{font-size:19px}
+  .recoleccion{grid-template-columns:1fr;gap:4px}
+  .recoleccion > div{display:flex;align-items:center;gap:10px;text-align:left;min-height:0;padding:11px 14px;font-size:13px}
+  .recoleccion b{margin:0;min-width:34px;font-size:13px}
+  .recoleccion svg.i{margin:0}
+  .acciones-rapidas{grid-template-columns:1fr 1fr}
+  .acciones-rapidas .rapido{min-height:106px;padding:14px 12px;font-size:13.5px}
+  .puerta{padding:14px;gap:12px}
+  .puerta .ic{width:44px;height:44px;border-radius:14px}
+  .puerta b{font-size:15.5px}
 }
 @media (min-width:1000px){
   .hero{min-height:380px;border-radius:0 0 34px 34px}
   .hero h1{font-size:38px}
-  .inicio-cols{display:grid;grid-template-columns:1.55fr 1fr;gap:20px;align-items:start}
+  .inicio-cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:20px;align-items:start}
+  .inicio-cols > *{min-width:0}
   .muro-cols{columns:2;column-gap:14px}
   .muro-cols > .card{break-inside:avoid;display:inline-block;width:100%}
   .chips{margin:0 0 4px;padding-left:2px;padding-right:2px;flex-wrap:wrap}
+}
+/* Teléfonos chicos de verdad (iPhone SE y Android de 320-360 px): los
+   botones dejan de exigir una sola línea y los títulos largos se parten,
+   así nada queda cortado ni empuja la pantalla al costado. */
+@media (max-width:400px){
+  .btn{white-space:normal;text-align:center}
+  .btns > .btn{flex:1 1 44%}
+  .lista .txt b,.superficie b,.puerta b,.teja b{overflow-wrap:anywhere}
+  .card{padding:14px}
+  .sec h2{font-size:12px;letter-spacing:.6px}
 }
 @media (max-width:370px){
   .rapidos{grid-template-columns:repeat(3,1fr)}
@@ -658,7 +794,12 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .casa-foto.grande{width:120px;height:90px;border-radius:14px}
 .sos-botones{display:flex;flex-direction:column;gap:8px}
 .sos-botones .btn{justify-content:center}
-@media (max-width:420px){ .sos-cab b{font-size:22px} .casa-foto.grande{width:88px;height:68px} }
+.sos-texto{background:rgba(0,0,0,.25);border-radius:20px;padding:16px;margin-bottom:14px;font-size:15.5px;line-height:1.5}
+.sos-b-claro{background:#fff;color:#a11}
+.sos-b-tenue{background:rgba(255,255,255,.2);color:#fff}
+.sos-b-oscuro{background:rgba(0,0,0,.28);color:#fff}
+.sos-botones .btn-sec{background:rgba(255,255,255,.16);color:#fff}
+@media (max-width:420px){ .sos-cab b{font-size:22px} .casa-foto.grande{width:88px;height:68px} .sos-caja{max-height:88dvh} }
 
 /* Pantallas bajas (celular apaisado o ventana chica): todo más compacto. */
 
@@ -718,9 +859,6 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .sec h2{display:flex;align-items:center;gap:8px}
 .sec h2::before{content:"";width:16px;height:3px;border-radius:2px;background:var(--g-brand)}
 
-/* la ventana activa se despega del lienzo */
-.ventana{box-shadow:0 2px 6px rgba(12,31,28,.06),0 18px 44px rgba(12,31,28,.12)}
-.lomo{background:linear-gradient(180deg,var(--surface),var(--surface-2))}
 
 /* la campanita late cuando hay algo sin leer */
 .dot-badge{box-shadow:0 0 0 0 color-mix(in srgb,var(--danger) 60%,transparent);animation:campanita 2.4s ease-out infinite}
@@ -746,11 +884,46 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 @media (prefers-reduced-motion:reduce){ .mosaico .teja,.dot-badge{animation:none} }
 
 /* Ushuaia hoy: la tira de temporadas, cruceros y feriados en la portada */
+/* Tira de promociones del hotel: una línea debajo de la foto de portada.
+   Avanza sola, despacio, y se frena cuando la tocás. */
+.tira-promos{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:12px 0 8px;margin:12px 0 4px;box-shadow:var(--sh-1);overflow:hidden}
+.tira-cab{display:flex;align-items:center;gap:8px;padding:0 14px 10px;font-size:14px;font-weight:800}
+.tira-cab svg.i{width:17px;height:17px;color:var(--wood)}
+.tira-cab .muted{margin-left:auto;font-weight:600}
+/* La cinta en sí: se desliza de derecha a izquierda, en bucle. */
+.marquesina{overflow:hidden;position:relative;padding:0 0 6px}
+.marquesina::before,.marquesina::after{content:"";position:absolute;top:0;bottom:0;width:26px;z-index:2;pointer-events:none}
+.marquesina::before{left:0;background:linear-gradient(90deg,var(--surface),transparent)}
+.marquesina::after{right:0;background:linear-gradient(270deg,var(--surface),transparent)}
+.marq-pista{display:flex;width:max-content;animation:desfile var(--marq-dur,30s) linear infinite}
+.marq-grupo{display:flex;gap:8px;padding-left:8px}
+.marquesina.quieta .marq-pista{animation-play-state:paused}
+@keyframes desfile{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+/* Si el equipo pide menos movimiento, la cinta queda quieta y se arrastra a mano. */
+@media (prefers-reduced-motion:reduce){
+  .marquesina{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .marquesina::-webkit-scrollbar{display:none}
+  .marq-pista{animation:none!important;width:auto}
+  .marq-grupo[aria-hidden]{display:none}
+}
+.promo-chip{flex:none;scroll-snap-align:start;display:flex;align-items:center;gap:10px;border:1px solid var(--line);
+  background:linear-gradient(140deg,var(--wood-soft),var(--surface-2));border-radius:16px;padding:10px 14px 10px 10px;
+  text-align:left;min-width:235px;max-width:300px;transition:transform .15s,border-color .2s;color:var(--ink)}
+.promo-chip:hover{transform:translateY(-2px);border-color:var(--wood)}
+.promo-chip:active{transform:scale(.98)}
+.promo-chip .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
+.promo-desc{flex:none;min-width:48px;height:38px;padding:0 8px;border-radius:12px;background:var(--wood);color:#fff;
+  display:grid;place-items:center;font-size:13.5px;font-weight:800;letter-spacing:-.3px}
+.promo-chip .txt{min-width:0}
+.promo-chip b{display:block;font-size:13.5px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.promo-chip small{display:block;font-size:11.5px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 .ushuaia-hoy{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:12px 0 6px;margin-bottom:10px;box-shadow:var(--sh-1)}
 .uh-cab{display:flex;align-items:center;gap:8px;padding:0 14px 10px;font-size:14px}
 .uh-cab svg.i{width:17px;height:17px;color:var(--sky)}
 .uh-cab .muted{margin-left:auto}
-.uh-tira{display:flex;gap:8px;overflow-x:auto;padding:0 14px 8px;scrollbar-width:none}
+.uh-tira .marq-grupo{padding-left:8px}
+.ushuaia-hoy .marquesina::before,.ushuaia-hoy .marquesina::after{width:20px}
 .uh-tira::-webkit-scrollbar{display:none}
 .uh-chip{flex:none;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface-2);border-radius:14px;padding:9px 12px;text-align:left;min-width:150px;transition:transform .15s,border-color .2s}
 .uh-chip:hover{transform:translateY(-2px);border-color:var(--sky)}
@@ -767,27 +940,39 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
    el toque, para ir a la ventana de Vuelos. Con "menos movimiento" puesto
    en el teléfono, el avión no vuela: queda solo el cartel.
    ==================================================== */
+/* EL AVIÓN QUE CRUZA LA APP
+   El barrio está bajo la traza de aproximación de Ushuaia, a 6 km de la
+   cabecera. Cuando pasa un vuelo, cruza uno por la pantalla: tres pasadas,
+   con su cartel de datos, y la estela va dibujando un corazón que después
+   se esfuma. No tapa nada: el único trozo que se puede tocar es el cartel.
+   El color lo pone el tema: oscuro cuando la app está en modo día y claro
+   cuando está en modo noche, para que se vea siempre. */
+:root{ --avion:#0f1f1e; --avion-estela:rgba(15,31,30,.62); --avion-cartel:rgba(255,255,255,.72); --avion-cartel-ink:#0f1f1e; --avion-borde:rgba(15,31,30,.12); }
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --avion:#ffffff; --avion-estela:rgba(255,255,255,.55); --avion-cartel:rgba(9,22,27,.6); --avion-cartel-ink:#eaf3f1; --avion-borde:rgba(255,255,255,.18); } }
+:root[data-theme="dark"]{ --avion:#ffffff; --avion-estela:rgba(255,255,255,.55); --avion-cartel:rgba(9,22,27,.6); --avion-cartel-ink:#eaf3f1; --avion-borde:rgba(255,255,255,.18); }
+
 .sobrevuelo{position:fixed;inset:0;z-index:60;pointer-events:none;overflow:hidden}
-.sobrevuelo .avion{position:absolute;top:18%;left:0;color:#fff;will-change:transform;
-  filter:drop-shadow(0 8px 20px rgba(0,0,0,.5));animation:surcar 7.5s linear 2 both}
+.sobrevuelo .avion{position:absolute;top:18%;left:0;color:var(--avion);will-change:transform;
+  filter:drop-shadow(0 6px 16px rgba(0,0,0,.28));animation:surcar 7.5s linear 3 both}
 .sobrevuelo .avion svg.i{width:32px;height:32px;transform:rotate(45deg);stroke-width:1.6}
 .sobrevuelo .estela{position:absolute;right:26px;top:50%;width:86px;height:2px;border-radius:2px;
-  background:linear-gradient(270deg,rgba(255,255,255,.55),rgba(255,255,255,0))}
+  background:linear-gradient(270deg,var(--avion-estela),transparent)}
 .sobrevuelo.vuelve .avion{animation-name:surcar-vuelve}
 .sobrevuelo.vuelve .avion svg.i{transform:scaleX(-1) rotate(45deg)}
-.sobrevuelo.vuelve .estela{right:auto;left:26px;background:linear-gradient(90deg,rgba(255,255,255,.55),rgba(255,255,255,0))}
+.sobrevuelo.vuelve .estela{right:auto;left:26px;background:linear-gradient(90deg,var(--avion-estela),transparent)}
 @keyframes surcar{from{transform:translate3d(-26vw,3vh,0)}to{transform:translate3d(122vw,-4vh,0)}}
 @keyframes surcar-vuelve{from{transform:translate3d(122vw,3vh,0)}to{transform:translate3d(-26vw,-6vh,0)}}
 
 .sobrevuelo .avion-cartel{position:absolute;left:50%;top:calc(18% + 60px);transform:translateX(-50%);
   pointer-events:auto;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;text-align:center;
-  max-width:min(340px,calc(100vw - 32px));padding:10px 16px;border-radius:18px;color:#fff;
-  background:rgba(9,22,27,.74);border:1px solid rgba(255,255,255,.18);box-shadow:0 14px 34px rgba(0,0,0,.4);
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-  animation:cartel-entra .5s cubic-bezier(.2,.9,.3,1.2) both,cartel-sale .7s ease 9s both}
-.sobrevuelo .avion-cartel b{font-size:14.5px;font-weight:800}
-.sobrevuelo .avion-cartel span{font-size:12.5px;opacity:.82}
-@keyframes cartel-entra{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+  max-width:min(250px,calc(100vw - 40px));padding:7px 13px;border-radius:14px;color:var(--avion-cartel-ink);
+  background:var(--avion-cartel);border:1px solid var(--avion-borde);box-shadow:0 8px 22px rgba(0,0,0,.16);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);opacity:.88;
+  animation:cartel-entra .5s cubic-bezier(.2,.9,.3,1.2) both,cartel-sale .9s ease 21s both}
+.sobrevuelo .avion-cartel b{font-size:12.5px;font-weight:800;line-height:1.25}
+.sobrevuelo .avion-cartel span{font-size:11px;opacity:.72;line-height:1.3}
+@keyframes cartel-entra{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:.88;transform:translate(-50%,0)}}
 @keyframes cartel-sale{to{opacity:0;transform:translate(-50%,-8px)}}
 
 .sobrevuelo.quieto .avion{display:none}

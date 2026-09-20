@@ -111,6 +111,13 @@ const Nube = {
       mio.email = this.auth.currentUser.email;
       this.db.ref('barrio/users/' + this.uid + '/email').set(mio.email).catch(() => {});
     }
+    /* La ficha propia entra al estado antes de escuchar nada: así la app se
+       dibuja ya logueada y no aparece un parpadeo del portal mientras bajan
+       las colecciones. */
+    Store.s.users = [mio];
+    Store.sesion.visitaAnterior = Store.sesion.ultimaVisita || 0;
+    Store.sesion.ultimaVisita = Date.now();
+    Store.guardarSesion();
     const staff = mio.rol === 'admin' || mio.rol === 'guardia';
     this.escucharColeccion('barrio', this.ZONAS.barrio);
     this.escucharConfig();
@@ -122,6 +129,11 @@ const Nube = {
       this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
     }
     this.arrancada = true;
+    /* Si administra el barrio, elige desde qué brazo entra. */
+    if (mio.rol === 'admin' && /^Lote\s/i.test(mio.casa || '') && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
+    /* Las alertas que ya estaban abiertas antes de entrar no vuelven a sonar:
+       se ven en pantalla, pero el sonido queda para las nuevas. */
+    if (typeof sosVistos !== 'undefined') sosVistos = new Set((Store.s.sos || []).map(x => x.id));
     if (mio.rol === 'admin') this.sembrarContenido();
   },
 
@@ -157,6 +169,22 @@ const Nube = {
 
   escuchar(ruta, fn){ this.db.ref(ruta).on('value', snap => fn(snap.val())); },
 
+  /* Al conectar llegan veinte colecciones casi juntas. Si cada una redibujara
+     la ventana, la app se arrastraría y los botones no responderían durante
+     varios segundos: por eso se junta todo en un dibujo por cuadro. Y lo que
+     llega de otro equipo pasa por el mismo camino que un cambio local, así
+     los avisos de la guardia y el SOS suenan también acá. */
+  llegoAlgo(){
+    if (typeof Conexion !== 'undefined') Conexion.poner('vivo');
+    if (this.tanda) return;
+    this.tanda = setTimeout(() => {
+      this.tanda = null;
+      if (typeof refrescarPronto === 'function') refrescarPronto(); else refrescar();
+      if (typeof avisosDelSistema === 'function' && yo()) avisosDelSistema();
+    }, 60);
+  },
+  tanda: null,
+
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
       this.db.ref(`${base}/${col}`).on('value', snap => {
@@ -168,7 +196,7 @@ const Nube = {
         Store.s.notifs.sort((a, b) => b.at - a.at);
         this.recordar(col, arr);
         this.listos.add(base + col);
-        if (this.arrancada) refrescar();
+        if (this.arrancada) this.llegoAlgo();
       }, err => { if (!opcional) console.warn('No se pudo leer', base, col, err.message); });
     });
   },
@@ -187,14 +215,14 @@ const Nube = {
         else Store.s[col] = juntado[col];
         this.recordar(col, juntado[col]);
       });
-      if (this.arrancada) refrescar();
+      if (this.arrancada) this.llegoAlgo();
     });
   },
   escucharConfig(){
     this.db.ref('barrio/config').on('value', snap => {
       const c = snap.val(); if (c) Store.s.config = Object.assign({}, CONFIG_BASE, c);
       this.ultimo.config = JSON.stringify(Store.s.config);
-      if (this.arrancada) refrescar();
+      if (this.arrancada) this.llegoAlgo();
     });
     /* Las marcas del motor son compartidas: así un aviso automático sale una
        sola vez para todo el barrio y no una por equipo encendido. */

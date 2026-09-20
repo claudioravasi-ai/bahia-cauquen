@@ -97,6 +97,7 @@ const Store = {
     /* Cada pestaña recuerda quién entró en ella: así se puede tener la
        garita en una y un vecino en otra, en el mismo equipo. */
     try { const t = sessionStorage.getItem('bhc.pestana'); if (t !== null) this.sesion.userId = t || null; } catch(e){}
+    try { const m = sessionStorage.getItem('bhc.modo'); if (m !== null) this.sesion.modo = m || ''; } catch(e){}
     if (this.bc) this.bc.onmessage = e => {
       if (e.data === 'cambio'){
         try { this.s = JSON.parse(localStorage.getItem(this.KEY)); migrar(this.s); } catch(err){}
@@ -121,6 +122,9 @@ const Store = {
   },
   guardarSesion(){
     try { sessionStorage.setItem('bhc.pestana', this.sesion.userId || ''); } catch(e){}
+    /* El modo también es de la pestaña: así se puede tener abierta la
+       Administración en una y el mismo usuario como vecino en otra. */
+    try { sessionStorage.setItem('bhc.modo', this.sesion.modo || ''); } catch(e){}
     try { localStorage.setItem(this.SKEY, JSON.stringify(this.sesion)); } catch(e){}
   },
   /* Toda escritura pasa por acá: cambia, guarda y redibuja. */
@@ -132,17 +136,36 @@ const Store = {
 function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
     bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
-    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[] };
+    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
   if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
   if (!Array.isArray(s.agenda)) s.agenda = agendaInicial();
   if (!Array.isArray(s.temporadas)) s.temporadas = JSON.parse(JSON.stringify(TEMPORADAS));
   if (!Array.isArray(s.feriados)) s.feriados = JSON.parse(JSON.stringify(FERIADOS));
+  /* Antes los feriados nacionales estaban escritos a mano, año por año, y se
+     desactualizaban solos. Ahora los calcula js/calendario.js: los que
+     quedaron guardados de esa época se descartan, y solo se conserva lo que
+     no se puede calcular (lo provincial, lo municipal y los puentes). */
+  if (s.feriadosV !== 2){
+    const esPuente = f => /tur[ií]stic|puente/i.test(f.nombre || '');
+    const esProvincial = f => ['provincial','municipal'].includes(f.ambito) || /provincia|fueguin|ushuaia/i.test(f.nombre || '');
+    s.feriados = s.feriados.filter(f => f && f.fecha && (esPuente(f) || esProvincial(f))).map(f => ({
+      ...f,
+      ambito: f.ambito || (esPuente(f) ? 'nacional' : /ushuaia/i.test(f.nombre) ? 'municipal' : 'provincial'),
+      tipo: f.tipo || (esPuente(f) ? 'puente turístico' : 'inamovible'),
+      laborable: esPuente(f) ? true : f.laborable === true,
+      aConfirmar: f.aConfirmar !== false,
+      nombre: String(f.nombre || '').replace(/\s*\(provincial, a confirmar\)/i, '').replace(/^.*·\s*/, m => /ushuaia/i.test(f.nombre) ? '' : m),
+    }));
+    FERIADOS.forEach(d => { if (!s.feriados.some(f => f.fecha === d.fecha && f.ambito === d.ambito)) s.feriados.push(JSON.parse(JSON.stringify(d))); });
+    s.feriadosV = 2;
+  }
   if (!Array.isArray(s.eventosCiudad)) s.eventosCiudad = eventosCiudadIniciales();
   if (!Array.isArray(s.cruceros)) s.cruceros = [];
   if (!Array.isArray(s.avistamientos)) s.avistamientos = [];
   if (!Array.isArray(s.contactos)) s.contactos = JSON.parse(JSON.stringify(CONTACTOS));
+  if (!Array.isArray(s.descargas)) s.descargas = JSON.parse(JSON.stringify(DESCARGAS));
   /* Padrón con nombres de propietarios: se importa desde Administración. */
   if (!Array.isArray(s.padron)) s.padron = [];
   if (!s.motorLog || typeof s.motorLog !== 'object') s.motorLog = {};
@@ -185,6 +208,8 @@ const CONFIG_BASE = {
   dea: 'Garita de acceso (a confirmar)',
   vuelosProxy: '',            /* opcional: un Worker que reenvía ADS-B para ver los aviones en vivo.
                                  El tablero de arribos y partidas ya no lo necesita. */
+  promosUrl: '',              /* opcional: un Worker que lee las promociones del hotel y las
+                                 devuelve en JSON. Sin esto, se cargan a mano en Contenido. */
   datosDias: 90,              /* los datos de visitas se borran solos a los N días (Ley 25.326) */
   obraHorario: 'Lunes a viernes de 8 a 18 h · sábados de 9 a 13 h',
   silencio: '22 a 8 h',
@@ -209,6 +234,15 @@ const CONTACTOS = [
   { id:'c3', nombre:'Electricista del barrio', detalle:'Urgencias eléctricas en espacios comunes', tel:'' },
 ];
 
+/* Lo que se puede bajar desde la ventana Descargas. La Administración lo
+   edita en Contenido → Descargas: para sumar una app alcanza con pegar su
+   dirección. Las que vienen de fábrica están sin dirección hasta que
+   alguien la pegue: la app no inventa enlaces. */
+const DESCARGAS = [
+  { id:'d1', tipo:'app', titulo:'VITALIA by Mónica Ponzio', detalle:'Seguimiento nutricional. Pegá su dirección en Contenido → Descargas.', url:'', icon:'heart', color:'ok' },
+  { id:'d2', tipo:'planilla', titulo:'Modelo de planilla del padrón', detalle:'CSV con los 152 lotes y sus coeficientes, para completar los propietarios', url:'', icon:'clipboard', color:'wood' },
+];
+
 /* Temporadas de Ushuaia. Las fechas cambian por disposición provincial
    u ordenanza municipal: la Administración las confirma y edita cada año.
    desde/hasta son MM-DD; si hasta < desde, la temporada cruza el año. */
@@ -219,22 +253,30 @@ const TEMPORADAS = [
   { id:'t4', nombre:'Temporada de cruceros', icon:'sun', desde:'10-15', hasta:'04-15', nota:'Más movimiento en el centro y el puerto los días de recalada.' },
 ];
 
-/* Feriados nacionales 2026 y los que se conocen de la provincia.
-   Editables: los días puente y los trasladables los fija cada año un decreto. */
+/* FERIADOS QUE NO SE PUEDEN CALCULAR.
+   Los nacionales, el calendario católico y el judío los calcula
+   js/calendario.js con las reglas de la Ley 27.399, la Pascua y la
+   aritmética hebrea: no hace falta cargarlos ni actualizarlos.
+   Acá va SOLO lo que depende de una decisión que se toma cada año:
+     · lo provincial de Tierra del Fuego,
+     · lo municipal de Ushuaia,
+     · los "días no laborables con fines turísticos" (los puentes), que
+       fija un decreto del Poder Ejecutivo para cada año.
+   Vienen marcados "a confirmar": la Administración los verifica contra
+   el Boletín Oficial y la ordenanza vigente, y recién ahí la app deja de
+   mostrar la advertencia. Se editan en Administración → Contenido → Feriados. */
 const FERIADOS = [
-  ['2026-01-01','Año Nuevo'],['2026-02-16','Carnaval'],['2026-02-17','Carnaval'],
-  ['2026-03-23','Día no laborable con fines turísticos'],['2026-03-24','Día de la Memoria'],
-  ['2026-04-02','Día del Veterano y de los Caídos en Malvinas'],['2026-04-03','Viernes Santo'],
-  ['2026-05-01','Día del Trabajador'],['2026-05-25','Revolución de Mayo'],
-  ['2026-06-01','Día de la Provincia de Tierra del Fuego (provincial, a confirmar)'],
-  ['2026-06-15','Paso a la Inmortalidad de Güemes'],['2026-06-20','Día de la Bandera'],
-  ['2026-07-09','Día de la Independencia'],['2026-07-10','Día no laborable con fines turísticos'],
-  ['2026-08-17','Paso a la Inmortalidad de San Martín'],
-  ['2026-10-12','Día de la Diversidad Cultural · Aniversario de Ushuaia'],
-  ['2026-11-23','Día de la Soberanía Nacional'],['2026-12-07','Día no laborable con fines turísticos'],
-  ['2026-12-08','Inmaculada Concepción'],['2026-12-25','Navidad'],
-  ['2027-01-01','Año Nuevo'],
-].map(([fecha, nombre], i) => ({ id:'fer' + i, fecha, nombre }));
+  { fecha:'2026-06-01', nombre:'Día de la Provincia de Tierra del Fuego', ambito:'provincial', tipo:'inamovible', laborable:false, aConfirmar:true,
+    nota:'Aniversario de la provincialización (Ley 23.775). Confirmar el alcance con la ley provincial vigente.' },
+  { fecha:'2026-10-12', nombre:'Aniversario de la fundación de Ushuaia', ambito:'municipal', tipo:'inamovible', laborable:false, aConfirmar:true,
+    nota:'Ushuaia se fundó el 12 de octubre de 1884. Confirmar con la ordenanza municipal del año.' },
+  { fecha:'2026-03-23', nombre:'Día no laborable con fines turísticos', ambito:'nacional', tipo:'puente turístico', laborable:true, aConfirmar:true,
+    nota:'Los puentes los fija un decreto para cada año. Verificar en el Boletín Oficial.' },
+  { fecha:'2026-07-10', nombre:'Día no laborable con fines turísticos', ambito:'nacional', tipo:'puente turístico', laborable:true, aConfirmar:true, nota:'Verificar en el Boletín Oficial.' },
+  { fecha:'2026-12-07', nombre:'Día no laborable con fines turísticos', ambito:'nacional', tipo:'puente turístico', laborable:true, aConfirmar:true, nota:'Verificar en el Boletín Oficial.' },
+  { fecha:'2027-06-01', nombre:'Día de la Provincia de Tierra del Fuego', ambito:'provincial', tipo:'inamovible', laborable:false, aConfirmar:true, nota:'' },
+  { fecha:'2027-10-12', nombre:'Aniversario de la fundación de Ushuaia', ambito:'municipal', tipo:'inamovible', laborable:false, aConfirmar:true, nota:'' },
+].map((f, i) => ({ id:'fer' + i, ...f }));
 
 /* Eventos típicos de la ciudad. Las fechas exactas se confirman cada año. */
 function eventosCiudadIniciales(){
@@ -258,7 +300,27 @@ function agendaInicial(){
 const yo = () => Store.s && Store.sesion.userId ? Store.s.users.find(u => u.id === Store.sesion.userId && u.estado === 'aprobado') : null;
 const usuario = id => Store.s.users.find(u => u.id === id);
 const nombreDe = id => { const u = usuario(id); return u ? u.nombre : 'Vecino/a'; };
-const esAdmin = () => yo()?.rol === 'admin';
+/* =========================================================
+   LOS DOS BRAZOS DE LA APP
+   -------------------------------------------------------
+   Quien administra el barrio también es vecino de su lote. Si las dos
+   cosas se mezclan en la misma pantalla, no se entiende nunca desde qué
+   lugar está mirando: por eso al entrar elige, y puede cambiar cuando
+   quiera desde su cuenta.
+
+   En MODO VECINO la app se comporta como para cualquier otro: no ve
+   inscripciones, ni gastos, ni la bitácora, y las alertas le llegan como
+   a un vecino. En MODO ADMINISTRACIÓN tiene todo el panel.
+
+   Esto existe SOLO para el rol admin. La guardia y los vecinos tienen un
+   solo modo y ni siquiera ven la opción.
+   ========================================================= */
+/* Tiene los dos sombreros solo quien administra Y además es dueño de un
+   lote. Una cuenta de administración pura (la del estudio, por ejemplo) no
+   tiene vista de vecino que mostrar, así que ni siquiera ve la opción. */
+const puedeAdministrar = () => { const u = yo(); return u?.rol === 'admin' && /^Lote\s/i.test(u.casa || ''); };
+const modoActivo = () => { const u = yo(); if (!u) return ''; return puedeAdministrar() ? (Store.sesion.modo || 'admin') : u.rol; };
+const esAdmin = () => yo()?.rol === 'admin' && modoActivo() !== 'vecino';
 const esGuardia = () => yo()?.rol === 'guardia';
 const esStaff = () => esAdmin() || esGuardia();
 const vecinosAprobados = () => Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino');
@@ -509,19 +571,10 @@ const Correo = {
 };
 const urlApp = (hash = '') => location.origin + location.pathname + (hash ? '#/' + hash : '');
 
-/* Dos notas suaves: "ding-dong" para avisos; tres agudas si es urgente. */
+/* Dos notas suaves: "ding-dong" para avisos; tres agudas si es urgente.
+   Suena por el mismo canal que el SOS, que se despierta con el primer toque
+   de la persona: si no, el navegador deja los avisos mudos. */
 function campanita(urgente = false){
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notas = urgente ? [[988, 0], [988, .18], [988, .36]] : [[880, 0], [660, .22]];
-    notas.forEach(([f, t]) => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0, ctx.currentTime + t);
-      g.gain.linearRampToValueAtTime(.18, ctx.currentTime + t + .02);
-      g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + t + .5);
-      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + .55);
-    });
-    if (navigator.vibrate) navigator.vibrate(urgente ? [200, 100, 200] : 120);
-  } catch(e){}
+  const notas = urgente ? [[988, 0, .5], [988, .18, .5], [988, .36, .5]] : [[880, 0, .5], [660, .22, .5]];
+  if (typeof Sonido !== 'undefined') { Sonido.tocar(notas, 'sine', .18); Sonido.vibrar(urgente ? [200, 100, 200] : 120); }
 }

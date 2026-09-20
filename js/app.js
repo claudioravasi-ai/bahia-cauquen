@@ -7,18 +7,35 @@
      volverA(i)             vuelve a la ventana i (cierra las de la derecha)
      cerrarVentana()        cierra la última (también el Atrás del celular)
    Cada ventana se declara en R: { titulo, sub, icon, color, ancha, render(param) }.
+
+   Las ventanas de atrás quedan como LOMOS en el lateral izquierdo: se ve de
+   qué son y se vuelve tocándolos. Además, toda ventana apilada tiene una
+   flecha "Volver" en su cabecera, y en el celular se puede volver con un
+   deslizamiento desde el borde izquierdo.
    ========================================================= */
 const PILA = [];
 let ventanaNueva = false;
 
+/* La profundidad de la pila se refleja en el historial del navegador para que
+   el botón Atrás del celular cierre la última ventana en vez de salir de la
+   app. Se sincroniza siempre contra PILA.length: nunca se confía en que el
+   estado del historial exista (en la PWA puede venir vacío). */
+function sincronizarHistorial(){
+  const n = PILA.length;
+  const actual = (history.state && history.state.n) || 0;
+  if (actual === n) return;
+  if (actual === 0) history.replaceState({ n }, '');
+  else if (n > actual) for (let i = actual; i < n; i++) history.pushState({ n:i + 1 }, '');
+}
+
 function abrir(id, param = ''){
-  if (!R[id]) return;
+  if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
   const ya = PILA.findIndex(v => v.id === id);
   if (ya >= 0){
     PILA[ya].param = param;
     const cerrar = PILA.length - 1 - ya;
-    if (cerrar > 0){ saltando = true; history.go(-cerrar); }
     PILA.length = ya + 1;
+    if (cerrar > 0){ saltando = true; history.go(-cerrar); }
     pintar();
     return;
   }
@@ -30,23 +47,35 @@ function abrir(id, param = ''){
 let saltando = false;
 function volverA(i){
   const cerrar = PILA.length - 1 - i;
-  if (cerrar <= 0) return;
+  if (cerrar <= 0){ $('#cuerpo')?.scrollTo({ top:0, behavior:'smooth' }); return; }
+  PILA.length = i + 1;
   saltando = true;
   history.go(-cerrar);
-  PILA.length = i + 1;
   pintar();
 }
-function cerrarVentana(){ if (PILA.length > 1) history.back(); }
+function cerrarVentana(){ if (PILA.length > 1) volverA(PILA.length - 2); }
 window.addEventListener('popstate', e => {
   if (saltando){ saltando = false; return; }
   const d = $('#hoja');
   if (d && d.open){ d.close(); history.pushState({ n: PILA.length }, ''); return; }
   const n = (e.state && e.state.n) || 1;
-  if (PILA.length > n){
-    PILA.length = Math.max(1, n);
-    pintar();
-  }
+  if (PILA.length > n){ PILA.length = Math.max(1, n); pintar(); }
+  else sincronizarHistorial();
 });
+
+/* Deslizar desde el borde izquierdo vuelve atrás, como en el sistema. */
+let gesto = null;
+document.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  gesto = (PILA.length > 1 && t.clientX < 28) ? { x:t.clientX, y:t.clientY, t:Date.now() } : null;
+}, { passive:true });
+document.addEventListener('touchend', e => {
+  if (!gesto) return;
+  const t = e.changedTouches[0], dx = t.clientX - gesto.x, dy = Math.abs(t.clientY - gesto.y);
+  gesto = null;
+  if (dx > 70 && dy < 60) cerrarVentana();
+}, { passive:true });
+
 const inicioId = () => esGuardia() ? 'garita' : 'inicio';
 const titulo = (def, p) => typeof def.titulo === 'function' ? def.titulo(p) : def.titulo;
 
@@ -54,17 +83,19 @@ const titulo = (def, p) => typeof def.titulo === 'function' ? def.titulo(p) : de
 function pintarTop(){
   const u = yo(); if (!u) return;
   const nl = noLeidas().length;
-  const sos = !esGuardia();
+  const modo = modoActivo();
+  const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[modo] || '';
   $('#top').innerHTML = `
     <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
       <span class="logo">${LOGO}</span>
-      <span style="min-width:0"><b>${esc(Store.s.config.nombre)}</b>
-        <small><span class="en-vivo"></span>${esc(u.nombre.split(' ')[0])}${u.rol === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
-          : `<span class="rol-chip">${u.rol === 'admin' ? 'Administración' : 'Guardia'}</span><span class="casa"> · ${esc(u.casa)}</span>`}</small></span>
+      <span style="min-width:0"><b>Barrio ${esc(Store.s.config.nombre)}</b>
+        <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
+          : `<span class="rol-chip">${rol}</span><span class="casa"> · ${esc(u.casa)}</span>`}</small></span>
     </button>
+    ${puedeAdministrar() ? `<button class="modo-btn ${modo}" data-a="cambiar-modo" aria-label="Cambiar de modo">${I(modo === 'admin' ? 'sliders' : 'home')}<span>${modo === 'admin' ? 'Admin' : 'Vecino'}</span></button>` : ''}
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
     <button class="icon-btn" data-a="mi-cuenta" aria-label="Mi cuenta">${avatar(u, 'sm')}</button>
-    ${sos ? `<button class="sos-btn" id="sosBtn" aria-label="SOS: mantené apretado para pedir ayuda">${I('siren')}<span>SOS</span></button>` : ''}`;
+    <button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`;
 }
 
 function pintar(){
@@ -75,26 +106,36 @@ function pintar(){
     $('#app').innerHTML = `<header class="top" id="top"></header><div class="lienzo" id="lienzo"></div><div id="alarmas"></div>`;
   }
   if (!PILA.length || PILA[0].id !== inicioId()){ PILA.length = 0; PILA.push({ id: inicioId(), param:'' }); }
+  /* Una ventana que ya no existe (por un enlace viejo o un cambio de rol) no
+     puede dejar la app en blanco: se descarta y se vuelve al inicio. */
+  while (PILA.length > 1 && !R[PILA[PILA.length - 1].id]) PILA.pop();
+  sincronizarHistorial();
   pintarTop();
   const lienzo = $('#lienzo');
   const activa = PILA[PILA.length - 1];
-  const def = R[activa.id];
+  const def = R[activa.id] || R[inicioId()];
   const lomos = PILA.slice(0, -1).map((v, i) => {
-    const d = R[v.id];
-    return `<button class="lomo" data-a="volver" data-i="${i}" title="Volver a ${esc(titulo(d, v.param))}">${I(d.icon || 'home')}<b>${esc(titulo(d, v.param))}</b></button>`;
+    const d = R[v.id] || {};
+    const t = titulo(d, v.param) || 'Atrás';
+    return `<button class="lomo ${i === PILA.length - 2 ? 'ultimo' : ''}" data-a="volver" data-i="${i}" aria-label="Volver a ${esc(t)}" title="Volver a ${esc(t)}">
+      <span class="lomo-flecha">${I('left')}</span>${I(d.icon || 'home')}<b>${esc(t)}</b></button>`;
   }).join('');
   const cab = PILA.length > 1 ? `<header>
+      <button class="volver-btn" data-a="cerrar-ventana" aria-label="Volver a ${esc(titulo(R[PILA[PILA.length - 2].id] || {}, PILA[PILA.length - 2].param) || 'atrás')}">${I('left')}</button>
       <span class="ic ic-${def.color || 'brand'}">${I(def.icon || 'grid')}</span>
       <div class="tit"><h2>${esc(titulo(def, activa.param))}</h2>${def.sub ? `<div class="sub">${esc(typeof def.sub === 'function' ? def.sub(activa.param) : def.sub)}</div>` : ''}</div>
-      <button class="cerrar" data-a="cerrar-ventana" aria-label="Cerrar">${I('x')}</button></header>` : '';
+      <button class="cerrar" data-a="volver" data-i="0" aria-label="Cerrar e ir al inicio">${I('x')}</button></header>` : '';
   let html;
   try { html = def.render(activa.param); }
-  catch(err){ console.error(err); html = `<div class="aviso a-danger">${I('alert')}<div class="txt"><b>Esta ventana tuvo un problema</b>${esc(err.message)}</div></div>`; }
-  lienzo.innerHTML = lomos + `<section class="ventana ${PILA.length === 1 ? 'inicio' : ''} ${def.ancha ? 'ancha' : ''} ${ventanaNueva ? 'entra' : ''}" data-id="${activa.id}">${cab}<div class="cuerpo" id="cuerpo">${html}</div></section>`;
+  catch(err){ console.error(err); html = panelDeError(err); }
+  lienzo.innerHTML = `<div class="lomos">${lomos}</div>` + `<section class="ventana ${PILA.length === 1 ? 'inicio' : ''} ${def.ancha ? 'ancha' : ''} ${ventanaNueva ? 'entra' : ''}" data-id="${activa.id}">${cab}<div class="cuerpo" id="cuerpo">${html}</div></section>`;
+  lienzo.classList.toggle('apilado', PILA.length > 1);
   ventanaNueva = false;
   despuesDePintar();
   pintarAlarmas();
 }
+const panelDeError = err => `<div class="aviso a-danger">${I('alert')}<div class="txt"><b>Esta ventana tuvo un problema</b>${esc(err.message)}
+  <div class="acciones"><button class="btn btn-xs btn-sec" data-a="volver" data-i="0">Volver al inicio</button></div></div></div>`;
 
 /* Redibuja solo el cuerpo de la ventana activa sin perder lo que se
    estaba escribiendo ni la posición del scroll. Se usa cuando llega un
@@ -105,6 +146,7 @@ function refrescar(){
   if (!PILA.length) return pintar();
   const activa = PILA[PILA.length - 1];
   const def = R[activa.id];
+  if (!def) return pintar();
   if (def.noRefrescar) { pintarTop(); pintarAlarmas(); return; }
   const cuerpo = $('#cuerpo');
   const y = cuerpo.scrollTop;
@@ -117,7 +159,7 @@ function refrescar(){
      nodo, el navegador vuelve a pintar la imagen y se ve un parpadeo cada
      vez que llega un dato (el clima, un aviso, el motor). */
   const fotoVieja = cuerpo.querySelector('.hero .foto');
-  try { cuerpo.innerHTML = def.render(activa.param); } catch(err){ console.error(err); }
+  try { cuerpo.innerHTML = def.render(activa.param); } catch(err){ console.error(err); cuerpo.innerHTML = panelDeError(err); }
   const fotoNueva = cuerpo.querySelector('.hero .foto');
   if (fotoVieja && fotoNueva && fotoVieja.style.backgroundImage === fotoNueva.style.backgroundImage)
     fotoNueva.replaceWith(fotoVieja);
@@ -129,86 +171,181 @@ function refrescar(){
   pintarAlarmas();
 }
 
+/* Al conectar con la base del barrio llegan veinte colecciones casi juntas.
+   Si cada una redibujara la ventana, la app se arrastraría y los botones no
+   responderían. Se juntan todas en un solo dibujo por cuadro de pantalla. */
+let refrescoPedido = false;
+function refrescarPronto(){
+  if (refrescoPedido) return;
+  refrescoPedido = true;
+  requestAnimationFrame(() => { refrescoPedido = false; if (yo()) refrescar(); });
+}
+
+/* =========================================================
+   TIRAS QUE AVANZAN SOLAS
+   Las tiras de "Ushuaia hoy", las promociones del hotel y las secciones
+   van pasando solas para que se vea todo sin tener que entrar. Se frenan
+   cuando la persona las toca, cuando la app está en segundo plano y
+   cuando el equipo pide menos movimiento. No es un cartel que parpadea:
+   avanza despacio y con desplazamiento suave.
+   ========================================================= */
+const Tiras = {
+  arrancar(){
+    $$('[data-marq]').forEach(m => {
+      if (m.dataset.enganchada) return;
+      m.dataset.enganchada = '1';
+      const pausa = v => m.classList.toggle('quieta', v);
+      ['pointerenter','focusin','touchstart','pointerdown'].forEach(ev => m.addEventListener(ev, () => pausa(true), { passive:true }));
+      ['pointerleave','focusout','touchend','touchcancel'].forEach(ev => m.addEventListener(ev, () => setTimeout(() => pausa(false), 2500), { passive:true }));
+    });
+  },
+};
+
+/* Estado de la conexión con la base del barrio: el puntito verde del
+   encabezado deja de ser decorativo y dice la verdad. */
+const Conexion = {
+  estado: 'local',   /* local | conectando | vivo | caido */
+  poner(e){ if (this.estado === e) return; this.estado = e; if (yo() && $('#top')) pintarTop(); },
+  texto(){ return { local:'Modo local: los datos quedan en este equipo', conectando:'Conectando con la base del barrio…',
+    vivo:'Conectado con el barrio', caido:'Sin conexión con el barrio: se reintenta solo' }[this.estado] || ''; },
+};
+
 function despuesDePintar(){
   Fotos.hidratar($('#cuerpo') || document);
   $$('[data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
+  Tiras.arrancar();
+  if (typeof Reloj !== 'undefined') Reloj.arrancar();
   const def = R[PILA[PILA.length - 1]?.id];
   if (def && def.alPintar) def.alPintar(PILA[PILA.length - 1].param);
 }
 
-/* Alarma SOS para la guardia y la Administración: ventana grande, luz roja
-   latente, sirena y el lugar exacto del vecino en el mapa. */
-let sosVistos = new Set(), sirenaOn = false, sirenaTimer = null, sosSilenciada = new Set();
+/* =========================================================
+   SONIDO
+   Los navegadores no dejan sonar si el audio no se "despertó" antes con un
+   toque de la persona. Por eso hay un solo AudioContext, que se despierta
+   con el primer toque de la sesión y queda listo: así, cuando llega una
+   alerta de otro equipo (que no es un toque), suena de verdad. Sin esto el
+   SOS llegaba mudo a las demás terminales.
+   ========================================================= */
+const Sonido = {
+  ctx: null,
+  despertar(){
+    try {
+      if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    } catch(e){}
+    return this.ctx;
+  },
+  /* notas: [frecuencia, cuándo empieza, cuánto dura] */
+  tocar(notas, tipo = 'sine', vol = .18){
+    if (Store.sesion?.sinSonido) return;
+    const ctx = this.despertar(); if (!ctx || ctx.state !== 'running') return;
+    notas.forEach(([f, t, d = .5]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = tipo; o.frequency.value = f;
+      g.gain.setValueAtTime(0, ctx.currentTime + t);
+      g.gain.linearRampToValueAtTime(vol, ctx.currentTime + t + .02);
+      g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + t + d);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d + .05);
+    });
+  },
+  vibrar(patron){ try { if (navigator.vibrate) navigator.vibrate(patron); } catch(e){} },
+};
+['pointerdown','keydown','touchstart'].forEach(ev =>
+  document.addEventListener(ev, () => Sonido.despertar(), { once:false, passive:true }));
+
+/* =========================================================
+   ALARMA SOS
+   Una alerta se ve en TODAS las terminales del barrio que estén abiertas y
+   suena UNA VEZ en cada una. Lo que se muestra depende de quién mira:
+     · Guardia y Administración: la ficha completa, con el lugar exacto,
+       el teléfono del vecino y los botones para atenderla.
+     · El resto de los vecinos: el aviso de que hay una emergencia y en qué
+       lote, sin datos personales. Si es médica y el vecino marcó que sabe
+       primeros auxilios, además le aparece el botón para acercarse.
+     · Quien la mandó: su propio panel, con el botón para cancelarla.
+   ========================================================= */
+let sosVistos = new Set(), sosSilenciada = new Set(), sosOcultas = new Set();
+const sosQueVeo = () => {
+  const u = yo(); if (!u) return [];
+  return Store.s.sos.filter(x => x.estado !== 'resuelta' && !sosOcultas.has(x.id)).filter(x =>
+    esStaff() || x.userId === u.id || x.tipo === 'seguridad' || x.tipo === 'incendio' || (x.tipo === 'medica' && u.respondedor));
+};
 function pintarAlarmas(){
   const box = $('#alarmas'); if (!box) return;
-  if (!esStaff()){ box.innerHTML = ''; pararSirena(); return; }
-  const act = Store.s.sos.filter(s => s.estado !== 'resuelta');
-  const nuevas = act.filter(s => !sosVistos.has(s.id));
-  act.forEach(s => sosVistos.add(s.id));
-  if (!act.length){ box.innerHTML = ''; pararSirena(); return; }
-  const s = act[0], u = usuario(s.userId) || {}, t = TIPOS_SOS[s.tipo] || TIPOS_SOS.otra;
-  const punto = s.coords || u.ubicacion;
+  const u = yo();
+  const act = sosQueVeo();
+  if (!u || !act.length){ box.innerHTML = ''; return; }
+  /* Suena una sola vez por alerta, en cada terminal. */
+  const nuevas = act.filter(x => !sosVistos.has(x.id));
+  act.forEach(x => sosVistos.add(x.id));
+  if (nuevas.length && !sosSilenciada.has(nuevas[0].id)){
+    Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .56, .5]], 'square', .16);
+    Sonido.vibrar([400, 160, 400, 160, 400]);
+  }
+  const s0 = act[0], t = TIPOS_SOS[s0.tipo] || TIPOS_SOS.otra;
+  box.innerHTML = `<div class="sos-pantalla" role="alertdialog" aria-label="Alerta SOS"><div class="sos-caja">
+    ${s0.userId === u.id ? sosPanelMio(s0, t) : esStaff() ? sosPanelStaff(s0, t, act.length) : sosPanelVecino(s0, t)}
+  </div></div>`;
+  Fotos.hidratar(box);
+}
+function sosPanelStaff(s0, t, cuantas){
+  const u = usuario(s0.userId) || {};
+  const punto = s0.coords || u.ubicacion;
   const mapa = punto ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(punto)}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((Store.s.config.domicilio || '') + ' ' + (u.casa || ''))}`;
   const L = u.casa && typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === u.casa) : null;
-  box.innerHTML = `<div class="sos-pantalla" role="alertdialog" aria-label="Alerta SOS">
-    <div class="sos-caja">
-      <div class="sos-cab">${I('siren')}<div><b>SOS · ${esc(t.nombre)}</b><span>${hace(s.at)}${act.length > 1 ? ` · y ${act.length - 1} más` : ''}</span></div></div>
-      <div class="sos-vecino">
-        ${u.fotoCasa ? fotoHTML(u.fotoCasa, 'casa-foto grande') : `<span class="casa-foto grande vacia">${I('home')}</span>`}
-        <div class="grow"><b>${esc(u.nombre || 'Vecino/a')}</b>
-          <div class="sos-lote">${esc(u.casa || '')}${L ? ' · UF ' + L.uf : ''}</div>
-          ${u.direccion ? `<div class="sos-dato">${esc(u.direccion)}</div>` : ''}
-          ${u.integrantes ? `<div class="sos-dato">${I('users')} ${esc(u.integrantes)}</div>` : ''}
-          ${s.estado === 'en_camino' ? `<div class="sos-dato">${I('check')} Va en camino ${esc(nombreDe(s.atiende))}</div>` : ''}</div></div>
-      <div class="sos-botones">
-        <a class="btn btn-block" style="background:#fff;color:#a11" href="${mapa}" target="_blank" rel="noopener">${I('pin')}Cómo llegar${s.coords ? ' (GPS de la alerta)' : u.ubicacion ? ' (ubicación del lote)' : ''}</a>
-        ${u.tel ? `<a class="btn btn-block" style="background:rgba(255,255,255,.2);color:#fff" href="${telLink(u.tel)}">${I('phone')}Llamar a ${esc((u.nombre || '').split(' ')[0])}</a>` : ''}
-        <div class="btns">
-          ${s.estado === 'activa' ? `<button class="btn btn-ok" data-a="sos-voy" data-id="${s.id}">${I('check')}Voy en camino</button>` : ''}
-          <button class="btn btn-sec" data-a="sos-resuelta" data-id="${s.id}">Resuelta</button>
-          <button class="btn btn-sec" data-a="sos-silencio" data-id="${s.id}">${sosSilenciada.has(s.id) ? I('volume') + 'Sonido' : I('volume') + 'Silenciar'}</button>
-        </div>
-        <a class="btn btn-block" style="background:rgba(0,0,0,.25);color:#fff" href="tel:${t.llamar}">${I('siren')}Llamar al ${t.llamar}</a>
-      </div></div></div>`;
-  Fotos.hidratar(box);
-  if (sosSilenciada.has(s.id)) pararSirena(); else arrancarSirena();
-  if (nuevas.length && navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]);
+  return `<div class="sos-cab">${I('siren')}<div><b>SOS · ${esc(t.nombre)}</b><span>${hace(s0.at)}${cuantas > 1 ? ` · y ${cuantas - 1} más` : ''}</span></div></div>
+    <div class="sos-vecino">
+      ${u.fotoCasa ? fotoHTML(u.fotoCasa, 'casa-foto grande') : `<span class="casa-foto grande vacia">${I('home')}</span>`}
+      <div class="grow"><b>${esc(u.nombre || 'Vecino/a')}</b>
+        <div class="sos-lote">${esc(u.casa || '')}${L ? ' · UF ' + L.uf : ''}</div>
+        ${u.direccion ? `<div class="sos-dato">${esc(u.direccion)}</div>` : ''}
+        ${u.integrantes ? `<div class="sos-dato">${I('users')} ${esc(u.integrantes)}</div>` : ''}
+        ${s0.estado === 'en_camino' ? `<div class="sos-dato">${I('check')} Va en camino ${esc(nombreDe(s0.atiende))}</div>` : ''}</div></div>
+    <div class="sos-botones">
+      <a class="btn btn-block sos-b-claro" href="${mapa}" target="_blank" rel="noopener">${I('pin')}Cómo llegar${s0.coords ? ' (GPS de la alerta)' : u.ubicacion ? ' (ubicación del lote)' : ''}</a>
+      ${u.tel ? `<a class="btn btn-block sos-b-tenue" href="${telLink(u.tel)}">${I('phone')}Llamar a ${esc((u.nombre || '').split(' ')[0])}</a>` : ''}
+      <div class="btns">
+        ${s0.estado === 'activa' ? `<button class="btn btn-ok" data-a="sos-voy" data-id="${s0.id}">${I('check')}Voy en camino</button>` : ''}
+        <button class="btn btn-sec" data-a="sos-resuelta" data-id="${s0.id}">Resuelta</button>
+        <button class="btn btn-sec" data-a="sos-repetir" data-id="${s0.id}">${I('volume')}Repetir sonido</button>
+      </div>
+      <a class="btn btn-block sos-b-oscuro" href="tel:${t.llamar}">${I('siren')}Llamar al ${t.llamar}</a>
+    </div>`;
 }
-/* Sirena de dos tonos hasta que alguien atienda o silencie. */
-function arrancarSirena(){
-  if (sirenaOn || Store.sesion.sinSonido) return;
-  sirenaOn = true;
-  const sonar = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'sawtooth'; g.gain.value = .07;
-      o.frequency.setValueAtTime(620, ctx.currentTime);
-      o.frequency.linearRampToValueAtTime(1020, ctx.currentTime + .5);
-      o.frequency.linearRampToValueAtTime(620, ctx.currentTime + 1);
-      o.connect(g); g.connect(ctx.destination);
-      o.start(); o.stop(ctx.currentTime + 1.05);
-      setTimeout(() => ctx.close().catch(() => {}), 1300);
-    } catch(e){}
-  };
-  sonar();
-  sirenaTimer = setInterval(sonar, 1200);
+function sosPanelVecino(s0, t){
+  const u = usuario(s0.userId) || {};
+  const medicaRespondedor = s0.tipo === 'medica' && yo()?.respondedor;
+  return `<div class="sos-cab">${I('siren')}<div><b>${esc(t.nombre)} en el barrio</b><span>${esc(u.casa || 'Un vecino')} · ${hace(s0.at)}</span></div></div>
+    <div class="sos-texto">${medicaRespondedor
+      ? 'Marcaste que sabés primeros auxilios. Si podés, acercate. La guardia ya fue avisada.'
+      : s0.tipo === 'incendio' ? 'Alejate de la zona, no bloquees las calles y dejá paso a los bomberos. La guardia y la Administración ya fueron avisadas.'
+      : s0.tipo === 'seguridad' ? 'Quedate adentro, cerrá con llave y no salgas a mirar. La guardia y la Administración ya fueron avisadas.'
+      : 'La guardia y la Administración ya fueron avisadas.'}</div>
+    <div class="sos-botones">
+      ${medicaRespondedor ? `<a class="btn btn-block sos-b-claro" href="tel:107">${I('heart')}Llamar al 107</a>` : ''}
+      <div class="btns"><button class="btn btn-sec grow" data-a="sos-entendido" data-id="${s0.id}">${I('check')}Entendido</button></div>
+      <a class="btn btn-block sos-b-oscuro" href="tel:${t.llamar}">${I('phone')}Emergencias ${t.llamar}</a>
+    </div>`;
 }
-function pararSirena(){ sirenaOn = false; if (sirenaTimer){ clearInterval(sirenaTimer); sirenaTimer = null; } }
-A['sos-silencio'] = el => { const id = el.dataset.id; sosSilenciada.has(id) ? sosSilenciada.delete(id) : sosSilenciada.add(id); pararSirena(); pintarAlarmas(); };
+function sosPanelMio(s0, t){
+  return `<div class="sos-cab">${I('siren')}<div><b>Tu alerta está activa</b><span>${esc(t.nombre)} · ${hace(s0.at)}</span></div></div>
+    <div class="sos-texto">${s0.estado === 'en_camino' ? `La guardia va en camino (${esc(nombreDe(s0.atiende))}). Quedate en un lugar seguro.`
+      : 'La guardia y la Administración ya la recibieron. Quedate en un lugar seguro.'}</div>
+    <div class="sos-botones">
+      <a class="btn btn-block sos-b-claro" href="tel:${t.llamar}">${I('phone')}Llamar al ${t.llamar}</a>
+      ${Store.s.config.garitaTel ? `<a class="btn btn-block sos-b-tenue" href="${telLink(Store.s.config.garitaTel)}">${I('gate')}Llamar a la garita</a>` : ''}
+      <div class="btns"><button class="btn btn-sec grow" data-a="sos-cancelar" data-id="${s0.id}">Ya estoy bien, cancelar</button></div>
+    </div>`;
+}
+A['sos-repetir'] = () => { Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .56, .5]], 'square', .16); Sonido.vibrar([400, 160, 400]); };
+/* "Entendido" saca el cartel de la pantalla de este vecino; la alerta sigue
+   activa para la guardia hasta que la den por resuelta. */
+A['sos-entendido'] = el => { sosSilenciada.add(el.dataset.id); sosOcultas.add(el.dataset.id); pintarAlarmas(); };
 
-function pitido(){
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [0, .35, .7].forEach(t => {
-      const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'square'; o.frequency.value = 880; g.gain.value = .08;
-      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + .22);
-    });
-    if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-  } catch(e){}
-}
+function pitido(){ Sonido.tocar([[880, 0, .22], [880, .35, .22], [880, .7, .22]], 'square', .1); Sonido.vibrar([300, 150, 300, 150, 300]); }
 
 /* ---------------- modo día y modo noche ----------------
    En automático manda el sol de Ushuaia, no el reloj del equipo ni el
@@ -218,7 +355,7 @@ function aplicarTema(){
   const t = Store.sesion?.tema || 'auto';
   const modo = t === 'auto' ? (Clima.esDeDia() ? 'light' : 'dark') : t;
   document.documentElement.setAttribute('data-theme', modo);
-  document.querySelector('meta[name=theme-color]')?.setAttribute('content', modo === 'dark' ? '#0a1315' : '#0d6b66');
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', modo === 'dark' ? '#0a1315' : '#0b3c47');
 }
 const modoActual = () => document.documentElement.getAttribute('data-theme') === 'dark' ? 'noche' : 'día';
 
@@ -353,34 +490,79 @@ A['notif'] = el => {
 };
 
 /* ---------------- SOS ----------------
-   Se mantiene apretado 1,2 s para que no salga por un toque sin querer. */
+   Un solo toque. Antes había que mantenerlo apretado 1,2 segundos: nadie lo
+   adivinaba y parecía roto. Ahora abre al instante la lista de emergencias, y
+   la alerta recién sale cuando se elige una: ese segundo toque es la
+   confirmación, así no se dispara sola en el bolsillo. */
 const TIPOS_SOS = {
   medica:    { nombre:'Emergencia médica', icon:'heart', llamar:'107' },
   seguridad: { nombre:'Seguridad / intrusión', icon:'shield', llamar:'101' },
   incendio:  { nombre:'Incendio', icon:'flame', llamar:'100' },
   otra:      { nombre:'Otra emergencia', icon:'alert', llamar:'911' },
 };
-let sosTimer = null;
-document.addEventListener('pointerdown', e => {
+/* Se mantiene apretado TRES SEGUNDOS. Mientras se aprieta, el botón se va
+   llenando de rojo cada vez más fuerte y cuenta 3, 2, 1: así se ve que algo
+   está pasando y no queda la duda de si anda o no. Soltar antes lo cancela,
+   con un aviso que explica qué hacer. Los tres segundos son a propósito:
+   evitan que la alerta salga sola desde el bolsillo, y a la vez el gesto es
+   inequívoco cuando de verdad hace falta.
+   Se usan eventos de puntero, que en iPhone, Android y computadora son los
+   mismos; si el navegador fuese muy viejo, quedan los de toque y de mouse. */
+const SOS_ESPERA = 3000;
+let sosTimer = null, sosCuenta = null;
+function sosSoltar(cancelado = true){
+  const b = $('#sosBtn');
+  if (sosTimer){ clearTimeout(sosTimer); sosTimer = null; }
+  if (sosCuenta){ clearInterval(sosCuenta); sosCuenta = null; }
+  if (!b) return;
+  const estaba = b.classList.contains('cargando');
+  b.classList.remove('cargando');
+  b.style.removeProperty('--sos-carga');
+  const txt = b.querySelector('span'); if (txt) txt.textContent = 'SOS';
+  if (cancelado && estaba) toast('Mantené apretado el SOS 3 segundos para pedir ayuda', 'siren');
+}
+function sosApretar(e){
   const b = e.target.closest('#sosBtn'); if (!b) return;
   e.preventDefault();
+  if (sosTimer) return;
+  Sonido.despertar();
   b.classList.add('cargando');
-  sosTimer = setTimeout(() => { b.classList.remove('cargando'); if (navigator.vibrate) navigator.vibrate(80); elegirSOS(); }, 1200);
-});
-['pointerup','pointerleave','pointercancel'].forEach(t => document.addEventListener(t, e => {
+  const txt = b.querySelector('span');
+  const desde = Date.now();
+  Sonido.vibrar(40);
+  sosCuenta = setInterval(() => {
+    const p = Math.min(1, (Date.now() - desde) / SOS_ESPERA);
+    b.style.setProperty('--sos-carga', (p * 100).toFixed(1) + '%');
+    const quedan = Math.ceil((SOS_ESPERA - (Date.now() - desde)) / 1000);
+    if (txt) txt.textContent = quedan > 0 ? String(quedan) : 'SOS';
+    if (p >= .34 && p < .36) Sonido.vibrar(30);
+    if (p >= .67 && p < .69) Sonido.vibrar(30);
+  }, 50);
+  sosTimer = setTimeout(() => {
+    sosSoltar(false);
+    Sonido.vibrar([90, 60, 90]);
+    elegirSOS();
+  }, SOS_ESPERA);
+}
+document.addEventListener('pointerdown', sosApretar);
+['pointerup','pointercancel'].forEach(t => document.addEventListener(t, () => sosSoltar(true)));
+/* Si el dedo se va del botón, también se cancela. */
+document.addEventListener('pointermove', e => {
   if (!sosTimer) return;
-  const b = $('#sosBtn');
-  if (t !== 'pointerleave' || e.target === b){
-    clearTimeout(sosTimer); sosTimer = null;
-    if (b && b.classList.contains('cargando')){ b.classList.remove('cargando'); toast('Mantené apretado SOS un segundo para pedir ayuda', 'siren'); }
-  }
-}, true));
+  const b = $('#sosBtn'); if (!b) return;
+  const r = b.getBoundingClientRect();
+  if (e.clientX < r.left - 24 || e.clientX > r.right + 24 || e.clientY < r.top - 24 || e.clientY > r.bottom + 24) sosSoltar(true);
+});
+window.addEventListener('blur', () => sosSoltar(false));
+/* Un clic suelto (sin mantener) no dispara nada, pero sí explica qué hacer. */
+document.addEventListener('click', e => { if (e.target.closest('#sosBtn')) e.preventDefault(); });
 function elegirSOS(){
   hoja('¿Qué está pasando?', `
-    <p class="muted small" style="margin:0 0 12px">Al tocar una opción se avisa al instante a la guardia y a la Administración.</p>
+    <p class="muted small" style="margin:0 0 12px">Elegí una y la alerta sale al instante a la guardia, a la Administración y a las terminales del barrio.</p>
     ${Object.entries(TIPOS_SOS).map(([k, t]) => `<button class="superficie ${k === 'medica' || k === 'incendio' ? 'peligro' : ''}" data-a="sos-enviar" data-v="${k}">
       <span class="ic ic-danger">${I(t.icon)}</span><span class="txt"><b>${t.nombre}</b>
-      <small>${k === 'medica' ? 'También avisa a los vecinos con formación en primeros auxilios' : k === 'seguridad' || k === 'incendio' ? 'También avisa a todos los vecinos' : 'Guardia y Administración'}</small></span>${I('right')}</button>`).join('')}`);
+      <small>${k === 'medica' ? 'También avisa a los vecinos con formación en primeros auxilios' : k === 'seguridad' || k === 'incendio' ? 'También avisa a todos los vecinos' : 'Guardia y Administración'}</small></span>${I('right')}</button>`).join('')}
+    <p class="muted tiny" style="margin:14px 0 0">Si te equivocaste, cerrá esta ventana: todavía no se mandó nada.</p>`);
 }
 A['sos-enviar'] = el => {
   const u = yo(), tipo = el.dataset.v, t = TIPOS_SOS[tipo];
@@ -439,8 +621,11 @@ A['bienvenida'] = el => { pintarBienvenida(el.dataset.v); window.scrollTo({ top:
 A['mi-cuenta'] = () => { const u = yo();
   hoja('Tu cuenta', `<div class="row" style="margin-bottom:14px">${avatar(u, 'lg')}<div class="grow"><b style="font-size:16px">${esc(u.nombre)}</b>
       <div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
-      <div class="muted tiny">${{ vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[u.rol]}${u.rol === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
-    ${u.rol === 'vecino' ? superficie({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Datos, foto del frente, mascotas' }) : ''}
+      <div class="muted tiny">${{ vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
+    ${puedeAdministrar() ? superficie({ a:'cambiar-modo', icon: modoActivo() === 'admin' ? 'sliders' : 'home', color: modoActivo() === 'admin' ? 'accent' : 'ok',
+      t: modoActivo() === 'admin' ? 'Estás como Administración' : 'Estás como vecino/a',
+      s: modoActivo() === 'admin' ? 'Tocá para pasar a tu vista de vecino/a' : 'Tocá para volver al panel de administración', cls:'acento' }) : ''}
+    ${modoActivo() === 'vecino' ? superficie({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Datos, foto del frente, mascotas' }) : ''}
     <div class="card" style="margin-bottom:8px"><div class="lbl">Modo de pantalla · ahora está en ${modoActual()}</div>
       <div class="seg">${[['auto', 'Automático', 'sunrise'], ['light', 'Día', 'sun'], ['dark', 'Noche', 'moon']].map(([k, t, ic]) =>
         `<label><input type="radio" name="temaRapido" ${(Store.sesion.tema || 'auto') === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
@@ -514,6 +699,30 @@ A['olvide-adentro'] = async () => {
   try { await Nube.recuperar(u.email); cerrarHoja(); toast('Te mandamos un correo para cambiarla', 'mail'); }
   catch(e){ toast('No se pudo mandar: ' + e.message, 'alert'); }
 };
+/* ---------------- los dos brazos: vecino o Administración ---------------- */
+function elegirModo({ alEntrar = false } = {}){
+  const u = yo(); if (!puedeAdministrar()) return;
+  hoja(alEntrar ? `Hola, ${esc(u.nombre.split(' ')[0])}` : 'Cambiar de modo', `
+    <p class="muted small" style="margin:0 0 14px">${alEntrar ? 'Administrás el barrio y además sos vecino/a de ' + esc(u.casa) + '. ¿Desde dónde querés entrar?' : 'Podés cambiar cuando quieras: la app se reacomoda entera.'}</p>
+    <button class="superficie ${modoActivo() === 'vecino' ? 'acento' : ''}" data-a="modo" data-v="vecino">
+      <span class="ic ic-ok">${I('home')}</span><span class="txt"><b>Como vecino/a de ${esc(u.casa)}</b>
+      <small>Tus visitas, tus reservas, tus expensas y el pizarrón. Sin panel de administración.</small></span>${I('right')}</button>
+    <button class="superficie ${modoActivo() === 'admin' ? 'acento' : ''}" data-a="modo" data-v="admin">
+      <span class="ic ic-accent">${I('sliders')}</span><span class="txt"><b>Como Administración</b>
+      <small>Inscripciones, padrón, contabilidad, expensas, garita, reclamos y auditoría.</small></span>${I('right')}</button>
+    <p class="muted tiny" style="margin:14px 0 0">Esta elección es solo tuya, porque administrás el barrio. Los vecinos y la guardia no la ven.</p>`);
+}
+A['cambiar-modo'] = () => elegirModo();
+A['modo'] = el => {
+  const nuevo = el.dataset.v;
+  Store.sesion.modo = nuevo; Store.guardarSesion();
+  cerrarHoja();
+  PILA.length = 0;
+  history.replaceState({ n:1 }, '');
+  pintar();
+  toast(nuevo === 'admin' ? 'Estás en la Administración' : 'Estás como vecino/a', nuevo === 'admin' ? 'sliders' : 'home');
+};
+
 A['demo'] = el => { entrarComo(el.dataset.v); toast(`Entraste como ${nombreDe(el.dataset.v)}`, 'login'); };
 A['ver-foto'] = async el => {
   const id = el.dataset.foto; const v = await Fotos.sacar(id);
@@ -571,6 +780,7 @@ function entrarComo(id){
   sosVistos = new Set(Store.s.sos.map(s => s.id));
   pintar();
   Motor.correr();
+  if (puedeAdministrar()) setTimeout(() => elegirModo({ alEntrar:true }), 250);
 }
 F['entrar'] = async d => {
   const email = (d.email || '').trim().toLowerCase();
@@ -643,7 +853,7 @@ A['salir'] = async () => {
     Store.s.notifs = []; Store.s.motorLog = {}; Nube.ultimo = {}; Nube.arrancada = false;
     Store.guardar();
   }
-  Store.sesion.userId = null; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
+  Store.sesion.userId = null; Store.sesion.modo = ''; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
 };
 
 /* ---------------- delegación de eventos ---------------- */
@@ -686,43 +896,67 @@ const campoFoto = (id, etiqueta = 'Foto (opcional)') => `
     <div class="muted small">La foto se guarda en este equipo. A los demás les llega una miniatura.</div>
     <input type="hidden" name="foto" id="${id}"></div></div>`;
 
-/* Un cambio de otra pestaña (o de otro vecino, cuando haya servidor). */
+/* Un cambio de otra pestaña, o de otro vecino a través de la base del barrio. */
 Store.alCambiar(remoto => {
   if (!yo()){ if (remoto && !$('#lienzo')) return; return; }
-  refrescar();
+  refrescarPronto();
   if (remoto) avisosDelSistema();
 });
 
-/* ---------------- arranque ---------------- */
+/* ---------------- arranque ----------------
+   La app se dibuja PRIMERO y se conecta después. Antes esperaba a que
+   Firebase respondiera para mostrar algo, y con una conexión lenta se veía
+   un "Conectando con el barrio…" durante varios segundos con todo trabado.
+   Ahora entra directo: el puntito del encabezado dice si ya está conectada, y
+   lo que llega de la base se va sumando solo.
+   ========================================================= */
+function rutaPublica(){
+  const h = location.hash;
+  if (h.startsWith('#/pedir/')){ pintarPedirPase(decodeURIComponent(h.slice(8))); return true; }
+  if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return true; }
+  return false;
+}
+
+/* Lo que viene de internet (clima, vuelos) se pide en paralelo y se dibuja
+   cuando llega: nunca frena la apertura de la app. */
+function datosDeAfuera(){
+  Clima.pedir().then(() => { aplicarTema(); refrescarPronto(); });
+  Vuelos.pedir().then(() => refrescarPronto()).catch(() => {});
+  if (typeof Promos !== 'undefined') Promos.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});
+}
+
 async function arrancar(){
   Store.cargar();
   aplicarTema();
-  if (Nube.activa()){
-    $('#app').innerHTML = `<div class="vacio" style="padding-top:34vh">${I('refresh')}Conectando con el barrio…</div>`;
-    await Nube.iniciar();
-    if (!yo()) { if (!$('.bienvenida')) pintarBienvenida(); }
-    else pintar();
-    Motor.correr();
-    setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescar(); }, 60000);
-    Avion.arrancar();
-    Clima.pedir().then(() => { if (yo()) refrescar(); });
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
-    return;
-  }
   history.replaceState({ n:1 }, '');
-  const h = location.hash;
-  if (h.startsWith('#/pedir/')){ pintarPedirPase(decodeURIComponent(h.slice(8))); return; }
-  if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return; }
-  if (yo()){
-    Store.sesion.visitaAnterior = Store.sesion.ultimaVisita || 0;
-    Store.sesion.ultimaVisita = Date.now();
-    Store.guardarSesion();
-    sosVistos = new Set(Store.s.sos.map(s => s.id));
+
+  if (Nube.activa()){
+    Conexion.poner('conectando');
+    /* Mientras Firebase resuelve quién es, se muestra el portal o la app con
+       lo último que había guardado en este equipo. Nada de pantallas vacías. */
+    if (!rutaPublica()) pintarBienvenida();
+    Nube.iniciar()
+      .then(() => { Conexion.poner('vivo'); if (!rutaPublica()){ if (yo()) pintar(); else if (!$('.portal')) pintarBienvenida(); } Motor.correr(); })
+      .catch(err => { console.error(err); Conexion.poner('caido'); toast('No se pudo conectar con la base del barrio. Reintentando…', 'alert'); });
+    window.addEventListener('online', () => { Conexion.poner('vivo'); datosDeAfuera(); });
+    window.addEventListener('offline', () => Conexion.poner('caido'));
+  } else {
+    Conexion.poner('local');
+    if (rutaPublica()) { datosDeAfuera(); return; }
+    if (yo()){
+      Store.sesion.visitaAnterior = Store.sesion.ultimaVisita || 0;
+      Store.sesion.ultimaVisita = Date.now();
+      Store.guardarSesion();
+      sosVistos = new Set(Store.s.sos.map(x => x.id));
+    }
+    pintar();
   }
-  pintar();
-  Clima.pedir().then(() => { if (yo() && PILA.length === 1) refrescar(); else if (!yo()) refrescar(); Motor.correr(); });
+
+  datosDeAfuera();
   Motor.correr();
-  setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescar(); }, 60000);
+  setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescarPronto(); }, 60000);
+  /* El clima y los vuelos se refrescan solos, sin que haya que entrar. */
+  setInterval(datosDeAfuera, 10 * MIN);
   Avion.arrancar();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
