@@ -8,13 +8,13 @@ compilar.
 
 ```bash
 cd "Barrio Bahia Cauquen"
-python3 -m http.server 8820
+python3 -m http.server 8830
 ```
 
-Y abrir http://localhost:8820.
+Y abrir http://localhost:8830.
 
 Con la base conectada, agregando **`?local`** a la dirección
-(`http://localhost:8820/?local`, o la de GitHub con `/?local`) la app trabaja
+(`http://localhost:8830/?local`, o la de GitHub con `/?local`) la app trabaja
 solo en ese equipo, con datos de prueba, sin tocar la base del barrio.
 
 ## Antes de subir a GitHub — SIEMPRE
@@ -91,3 +91,16 @@ La persona también puede forzarlo desde **Tu cuenta → Actualizar la app**.
   feriados, el calendario completo de las expensas y la privacidad de los datos.
 - Modo día y modo noche: en automático siguen la salida y la puesta del sol en
   Ushuaia, no el reloj ni el ajuste del sistema.
+
+## Si un equipo quedó a medio actualizar
+
+Abrir **`/limpiar.html`** (por ejemplo `http://localhost:8830/limpiar.html`, o
+la dirección de GitHub con `/limpiar.html`). Esa página da de baja el service
+worker y borra el programa guardado; los datos del barrio no se tocan, viven en
+la nube. Es la misma reparación que hace *Tu cuenta → Actualizar la app*, pero
+funciona aunque la app esté tan rota que no se pueda ni entrar.
+
+**El puerto de pruebas es el 8830, no el 8820.** El 8820 quedó con un service
+worker viejo registrado de versiones anteriores: `localhost` es un mismo sitio
+para el navegador, así que lo que se guardó ahí una vez se sigue usando aunque
+cambies los archivos de la carpeta. Cambiar de puerto es empezar limpio.

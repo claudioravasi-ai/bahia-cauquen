@@ -505,6 +505,7 @@ function pintarBienvenida(modo = 'inicio'){
         <footer class="portal-pie">
           <a href="tel:911">${I('phone')}Emergencias 911</a>
           ${c.garitaTel ? `<a href="${telLink(c.garitaTel)}">${I('gate')}Garita</a>` : ''}
+          <span class="version">v${esc(window.VERSION || 'sin sellar')}</span>
         </footer>
       </div>
     </div>`;
@@ -960,23 +961,60 @@ A['salir'] = async () => {
   Store.sesion.userId = null; Store.sesion.modo = ''; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
 };
 
+/* =========================================================
+   NINGÚN BOTÓN SE QUEDA MUDO
+   -------------------------------------------------------
+   Un botón que no hace nada es lo peor que le puede pasar a esta app: la
+   persona toca, toca otra vez, y no tiene forma de saber si se rompió algo o
+   si tocó donde no era. Pasó, y costó días entender por qué.
+
+   Desde acá, cualquier error de una acción sale en pantalla con el nombre de
+   la acción y el motivo. No arregla el error, pero lo saca de la oscuridad:
+   con ese texto se sabe en un minuto qué archivo falta o qué se rompió.
+   ========================================================= */
+let fallasContadas = 0;
+function avisarFalla(err, donde){
+  console.error('Falló ' + donde, err);
+  if (fallasContadas++ > 6) return;                 /* no tapar la pantalla de avisos */
+  const motivo = (err && err.message) ? err.message : String(err);
+  toast(`No se pudo hacer "${donde}": ${motivo}`, 'alert');
+}
+/* Si el que se rompe es el programa entero (por ejemplo, falta un archivo),
+   se avisa igual y se ofrece la reparación, en vez de quedar en silencio. */
+window.addEventListener('error', e => {
+  if (!e.message) return;
+  if (fallasContadas++ > 6) return;
+  const falta = typeof piezasQueFaltan === 'function' ? piezasQueFaltan() : [];
+  if (falta.length){ toast('Falta parte del programa. Abrí Tu cuenta → Actualizar la app.', 'alert'); return; }
+  toast('Algo se rompió: ' + e.message, 'alert');
+});
+window.addEventListener('unhandledrejection', e => {
+  if (fallasContadas++ > 6) return;
+  const r = e.reason;
+  toast('Algo quedó a medias: ' + ((r && r.message) ? r.message : r), 'alert');
+});
+
 /* ---------------- delegación de eventos ---------------- */
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]');
   if (!el) return;
   const f = A[el.dataset.a];
+  if (!f){ console.warn('Acción sin código:', el.dataset.a); toast(`Esa acción no está en esta versión ("${el.dataset.a}")`, 'alert'); return; }
   /* Los tildes y opciones tienen que poder marcarse: a ellos no se les frena el clic. */
-  if (f){ if (el.tagName !== 'INPUT') e.preventDefault(); f(el, e); }
+  if (el.tagName !== 'INPUT') e.preventDefault();
+  try { const r = f(el, e); if (r && r.catch) r.catch(err => avisarFalla(err, el.dataset.a)); }
+  catch(err){ avisarFalla(err, el.dataset.a); }
 });
 document.addEventListener('submit', e => {
   const form = e.target.closest('form[data-f]');
   if (!form) return;
   e.preventDefault();
   const f = F[form.dataset.f];
-  if (!f) return;
+  if (!f){ toast(`Ese formulario no está en esta versión ("${form.dataset.f}")`, 'alert'); return; }
   const fd = new FormData(form), d = {};
   for (const [k, v] of fd.entries()){ if (v instanceof File) continue; if (k in d){ d[k] = [].concat(d[k], v); } else d[k] = v; }
-  f(d, form, e);
+  try { const r = f(d, form, e); if (r && r.catch) r.catch(err => avisarFalla(err, form.dataset.f)); }
+  catch(err){ avisarFalla(err, form.dataset.f); }
 });
 /* Las entradas de archivo con data-foto-in guardan la foto en el
    equipo y dejan { fotoId, mini } en un campo oculto. */
@@ -1106,6 +1144,21 @@ async function reinstalar(){
 /* Pantalla de espera mientras la base del barrio dice quién está entrando.
    Sin esto, se veía el portal un segundo, la persona empezaba a escribir su
    correo y la app entraba sola por la sesión que ya estaba abierta. */
+/* Saca de la pantalla de espera y deja algo usable. Se llama por tiempo, y
+   también desde el botón "Entrar igual" de la propia espera.
+
+   Acá estaba la falla: antes esto preguntaba `if (!yo())` antes de dibujar el
+   portal. Pero `yo()` es verdadero para cualquiera que ya hubiera entrado
+   alguna vez en ese equipo, porque la sesión queda guardada. O sea: justo a
+   quien ya usaba la app, la pantalla de espera se le quedaba fija, y esa
+   pantalla no tiene un solo botón. La app parecía muerta al tocarla. */
+function salirDeLaEspera(){
+  if (rutaPublica()) return;
+  if (!$('.portal-caja.esperando')) return;   /* ya hay otra cosa dibujada */
+  if (yo()) pintar(); else pintarBienvenida();
+}
+A['salir-espera-ya'] = () => salirDeLaEspera();
+
 function pintarEspera(){
   $('#app').innerHTML = `<div class="portal">
     <div class="portal-foto" style="background-image:url('${Clima.portada()}')"></div>
@@ -1116,6 +1169,8 @@ function pintarEspera(){
         <div class="cargando"><span></span><span></span><span></span></div>
         <b>Conectando con el barrio…</b>
         <small>Un segundo: estamos viendo si tu sesión sigue abierta.</small>
+        <button class="btn btn-sec" data-a="salir-espera-ya">Entrar igual</button>
+        <small class="version">Versión ${esc(window.VERSION || 'sin sellar')}</small>
       </div></div></div>`;
 }
 
@@ -1130,18 +1185,20 @@ async function arrancar(){
     /* Primero la espera, no el portal: si la sesión estaba abierta, mostrar
        el portal sería mentirle a la persona y hacerla escribir de gusto. */
     if (!rutaPublica()) pintarEspera();
-    /* Si la base tarda demasiado (o no hay señal), igual se llega al portal:
-       nunca se queda colgada una pantalla de espera. */
-    const aPortal = setTimeout(() => { if (!rutaPublica() && !yo()) pintarBienvenida(); }, 7000);
+    /* La espera NO puede quedarse colgada: a los 3 segundos se muestra algo
+       que se pueda tocar, pase lo que pase con la base. Si en este equipo ya
+       había una sesión, se dibuja la app con lo último que se bajó y la nube
+       va completando sola; si no había ninguna, el portal. */
+    const aSalvo = setTimeout(salirDeLaEspera, 3000);
     Nube.iniciar()
-      .then(() => { clearTimeout(aPortal); Conexion.poner('vivo');
+      .then(() => { clearTimeout(aSalvo); Conexion.poner('vivo');
         if (!rutaPublica()){
           if (yo()){ if (portalEnUso()) avisarSesionAbierta(); else pintar(); }
           else if (!$('.portal')) pintarBienvenida();
         }
         Motor.correr(); })
-      .catch(err => { clearTimeout(aPortal); console.error(err); Conexion.poner('caido');
-        if (!rutaPublica() && !yo() && !$('.portal')) pintarBienvenida();
+      .catch(err => { clearTimeout(aSalvo); console.error(err); Conexion.poner('caido');
+        salirDeLaEspera();
         toast('No se pudo conectar con la base del barrio. Reintentando…', 'alert'); });
     window.addEventListener('online', () => { Conexion.poner('vivo'); datosDeAfuera(); });
     window.addEventListener('offline', () => Conexion.poner('caido'));

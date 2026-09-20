@@ -1124,7 +1124,13 @@ Promos.leer();
    quieta si el equipo pide menos movimiento. */
 function tiraPromos(){
   const ps = Promos.vigentes();
-  if (!ps.length) return '';
+  /* Sin promociones no hay tira: es lo correcto, pero desde afuera se lee
+     como "falta algo / está rota". A quien administra se le dice por qué y
+     dónde se cargan; al vecino no se le muestra un hueco. */
+  if (!ps.length) return esAdmin()
+    ? `<div class="card plana small" style="margin-bottom:12px">${I('star')} Todavía no hay promociones del Hotel Los Cauquenes.
+        Se cargan en <b>Administración → Contenido → Promociones</b>, o poniendo la dirección del lector en <b>Ajustes</b>.</div>`
+    : '';
   const chips = ps.map(p => `<button class="promo-chip" data-a="ver-promo" data-id="${esc(p.id)}">
       ${p.descuento ? `<span class="promo-desc">${esc(p.descuento)}</span>` : `<span class="ic ic-wood">${I('star')}</span>`}
       <span class="txt"><b>${esc(p.titulo)}</b>${p.detalle ? `<small>${esc(p.detalle)}</small>` : ''}</span></button>`);
