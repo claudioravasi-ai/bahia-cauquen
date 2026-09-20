@@ -1062,3 +1062,34 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .medio-pago small{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
 .qr-pago{background:#fff;border-radius:18px;padding:16px;display:grid;place-items:center;margin:0 auto 12px;max-width:230px}
 .qr-pago svg{width:100%;height:auto;display:block}
+
+/* =========================================================
+   ESPERA, REPARACIÓN Y AVISO DE SESIÓN ABIERTA
+   -------------------------------------------------------
+   Tres pantallas que casi nunca se ven, y que existen para que la app nunca
+   quede muda: la espera mientras la base dice quién entra, el cartel de
+   "quedó a medio actualizar" y la barra que aparece si la sesión estaba
+   abierta justo cuando la persona empezaba a escribir su correo.
+   ========================================================= */
+.portal-caja.esperando{display:grid;justify-items:center;text-align:center;gap:8px;padding:34px 26px}
+.portal-caja.esperando b{font-size:17px;font-weight:800}
+.portal-caja.esperando small{color:var(--muted);font-size:13.5px;line-height:1.45;max-width:30ch}
+.cargando{display:flex;gap:7px;margin-bottom:6px}
+.cargando span{width:9px;height:9px;border-radius:50%;background:var(--brand);animation:latido 1s infinite ease-in-out}
+.cargando span:nth-child(2){animation-delay:.16s}
+.cargando span:nth-child(3){animation-delay:.32s}
+@keyframes latido{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){ .cargando span{animation:none;opacity:.6} }
+
+.reparar{max-width:560px;margin:0 auto;padding:max(28px,env(safe-area-inset-top)) 20px 40px;display:grid;gap:14px;align-content:center;min-height:100dvh;text-align:left}
+.reparar h1{margin:0;font-size:clamp(22px,5vw,28px);font-weight:800;letter-spacing:-.6px}
+.reparar p{margin:0;color:var(--muted);font-size:15px;line-height:1.55}
+.reparar .btn{justify-self:start;margin-top:4px}
+.reparar .mini{font-size:12px;color:var(--muted);opacity:.75;word-break:break-word}
+
+.barra-sesion{position:fixed;left:50%;transform:translateX(-50%);bottom:max(14px,env(safe-area-inset-bottom));z-index:80;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:min(560px,calc(100vw - 24px));
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:12px 14px;box-shadow:var(--sombra-alta,0 18px 40px rgba(0,0,0,.22))}
+.barra-sesion .txt{flex:1;min-width:150px}
+.barra-sesion b{display:block;font-size:14px;font-weight:800}
+.barra-sesion span{display:block;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

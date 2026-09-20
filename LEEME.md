@@ -34,6 +34,14 @@ ve, pero media pantalla no responde. Es exactamente lo que se siente como
 navegador y el service worker siguen usando los archivos viejos y queda una app
 mitad nueva y mitad vieja durante días.
 
+`revisar.py` comprueba además que la lista **`PIEZAS`** de `js/app.js` nombre
+exactamente los `.js` que carga `index.html`. Esa lista es la que, al arrancar,
+detecta que el equipo quedó con un `index.html` viejo —al que le falta algún
+archivo— y repara la app sola: tira lo guardado, da de baja el service worker y
+recarga una vez. Si agregás un `.js` nuevo, agregalo también a `PIEZAS`.
+
+La persona también puede forzarlo desde **Tu cuenta → Actualizar la app**.
+
 ## Guías
 
 | Archivo | Para qué |

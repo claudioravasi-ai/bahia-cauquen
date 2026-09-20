@@ -568,6 +568,8 @@ GitHub Pages se actualiza solo en un par de minutos.
 | Al pegar las reglas no aparece "Publicar" | No hay nada que publicar: ya estaban. Comprobalo con el 2.4 |
 | Anda para unos y para otros no | Paso 2.5: el tope de 100 conexiones del plan Spark |
 | Media pantalla no responde | Corré `python3 revisar.py`: hay un nombre repetido |
+| Se entra, se elige Administración y después no responde nada: no abren las ventanas, no están los lomos del costado, no aparece la tira del hotel | El equipo quedó con una **versión a medias** (un `index.html` viejo que carga una lista de archivos vieja). Desde la 20/09/2026 la app se da cuenta sola y se repara al abrirla. Si querés forzarlo: *Tu cuenta → Actualizar la app* |
+| Se ve "La app quedó a medio actualizar" | En el celular: cerrá la app del todo y volvé a abrirla; si sigue, borrala de la pantalla de inicio y reinstalala. En la computadora: recargá con Mayúsculas apretada |
 | Los cambios no llegan a los celulares | Faltó `python3 version.py`, o no subiste `index.html` y `sw.js` |
 | Los correos no salen | `CORREO.md`, sección "Dónde mirar si algo falla" |
 | Se ven datos de demo | Estás entrando con `?local` en la dirección |

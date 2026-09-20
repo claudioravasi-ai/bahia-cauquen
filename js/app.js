@@ -510,6 +510,27 @@ function pintarBienvenida(modo = 'inicio'){
     </div>`;
 }
 
+/* ¿La persona está escribiendo en el portal? Si Firebase tarda y contesta
+   tarde que la sesión seguía abierta, no se le borra de un plumazo lo que
+   estaba tecleando: se le avisa y decide ella. */
+function portalEnUso(){
+  const portal = $('.portal'); if (!portal) return false;
+  return $$('input', portal).some(i => i.type !== 'checkbox' && String(i.value || '').trim().length > 1);
+}
+function avisarSesionAbierta(){
+  const u = yo(); if (!u) return;
+  if ($('#sesionAbierta')) return;
+  const bar = document.createElement('div');
+  bar.id = 'sesionAbierta';
+  bar.className = 'barra-sesion';
+  bar.innerHTML = `<div class="txt"><b>Tu sesión ya estaba abierta</b><span>Entraste antes como ${esc(u.email || u.nombre)}.</span></div>
+    <button class="btn btn-xs btn-pri" data-a="seguir-sesion">Seguir</button>
+    <button class="btn btn-xs btn-sec" data-a="salir-y-entrar">Otra cuenta</button>`;
+  document.body.appendChild(bar);
+}
+A['seguir-sesion'] = () => { $('#sesionAbierta')?.remove(); pintar(); };
+A['salir-y-entrar'] = async () => { $('#sesionAbierta')?.remove(); await Nube.salir(); Store.sesion.userId = null; Store.guardarSesion(); pintarBienvenida('entrar'); };
+
 /* ---------------- avisos ---------------- */
 function abrirNotifs(){
   const u = yo();
@@ -676,11 +697,18 @@ A['mi-cuenta'] = () => { const u = yo();
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
     ${superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Por si algo no anda y hay que contarlo' })}
+    ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
 
 /* Una pantalla chica con todo lo que hace falta para entender un problema sin
    tener que adivinar: quién sos para la app, en qué modo estás, qué versión
    corre y si está hablando con la base del barrio. Se copia de un toque. */
+A['actualizar-app'] = async () => {
+  if (!await confirmar('Actualizar la app', 'Se baja el programa de nuevo y la app se reinicia. Los datos del barrio están en la nube: no se pierde nada.', { si:'Actualizar' })) return;
+  toast('Bajando la versión nueva…', 'refresh');
+  reinstalar();
+};
+
 A['diagnostico'] = () => {
   const u = yo(), c = Store.s.config;
   const datos = {
@@ -1001,19 +1029,120 @@ function datosDeAfuera(){
   if (typeof Promos !== 'undefined') Promos.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});
 }
 
+/* =========================================================
+   QUE NUNCA QUEDE UNA APP MITAD VIEJA Y MITAD NUEVA
+   -------------------------------------------------------
+   El navegador y el service worker guardan el programa para que la app abra
+   sin internet. Si por lo que sea queda guardado un index.html viejo, ese
+   index carga una LISTA DE ARCHIVOS vieja: falta alguno de los .js y media
+   app deja de responder sin decir por qué. Es exactamente el cuadro que se
+   ve desde afuera: se entra, se elige Administración, y después no se puede
+   volver a vecino, no abre ninguna ventana, no están los lomos del costado
+   y no aparece la tira de promociones del hotel.
+
+   Por eso, antes de dibujar nada, se comprueba que TODAS las piezas estén.
+   Si falta una, se tira lo guardado, se da de baja el service worker y se
+   recarga una sola vez: la app vuelve entera y la persona no tiene que
+   saber nada de cachés. Si después de esa recarga sigue faltando algo, no
+   se recarga en bucle: se explica en pantalla qué hacer.
+   ========================================================= */
+const PIEZAS = [
+  ['js/icons.js',      () => typeof I],
+  ['js/agenda.js',     () => typeof AGENDA],
+  ['js/padron.js',     () => typeof LOTES],
+  ['js/core.js',       () => typeof Store],
+  ['js/seed.js',       () => typeof seed],
+  ['js/clima.js',      () => typeof Clima],
+  ['js/calendario.js', () => typeof diaInfo],
+  ['js/v-inicio.js',   () => typeof teja],
+  ['js/v-comunidad.js',() => typeof TIPOS_POST],
+  ['js/v-gestion.js',  () => typeof Promos],
+  ['js/admin.js',      () => typeof REGLAS],
+  ['js/v-vecinos.js',  () => typeof normTxt],
+  ['js/v-expensas.js', () => typeof RUBROS],
+  ['js/nube.js',       () => typeof Nube],
+];
+function piezasQueFaltan(){
+  const falta = [];
+  PIEZAS.forEach(([archivo, hay]) => { let t; try { t = hay(); } catch(e){ t = 'undefined'; } if (t === 'undefined') falta.push(archivo); });
+  return falta;
+}
+/* Borra todo lo guardado del programa (no los datos del barrio) y recarga. */
+async function tirarLoGuardado(){
+  try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch(e){}
+  try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); } catch(e){}
+}
+async function programaCompleto(){
+  const falta = piezasQueFaltan();
+  if (!falta.length){ try { sessionStorage.removeItem('bhc.reparando'); } catch(e){} return true; }
+  console.error('Faltan piezas del programa:', falta.join(', '));
+  let yaIntenté = false;
+  try { yaIntenté = !!sessionStorage.getItem('bhc.reparando'); } catch(e){}
+  if (yaIntenté){
+    document.getElementById('app').innerHTML = `<div class="reparar">
+      <h1>La app quedó a medio actualizar</h1>
+      <p>Este equipo tiene guardada una versión vieja y no la suelta. No se perdió nada: los datos del barrio están en la nube.</p>
+      <p><b>En el celular:</b> cerrá la app del todo y volvé a abrirla. Si sigue igual, borrala de la pantalla de inicio y volvé a instalarla desde el navegador.<br>
+         <b>En la computadora:</b> recargá con la tecla Mayúsculas apretada.</p>
+      <button class="btn btn-pri btn-grande" onclick="reinstalar()">Intentar de nuevo</button>
+      <p class="mini">Faltan: ${falta.join(', ')} · versión ${window.VERSION || 'sin sellar'}</p></div>`;
+    return false;
+  }
+  try { sessionStorage.setItem('bhc.reparando', '1'); } catch(e){}
+  document.getElementById('app').innerHTML = `<div class="reparar"><h1>Actualizando la app…</h1><p>Un momento: se está bajando la versión nueva.</p></div>`;
+  await tirarLoGuardado();
+  const sep = location.search ? '&' : '?';
+  location.replace(location.pathname + location.search + sep + 'nuevo=' + Date.now() + location.hash);
+  return false;
+}
+/* Botón de emergencia, siempre a mano desde Tu cuenta. */
+async function reinstalar(){
+  try { sessionStorage.removeItem('bhc.reparando'); } catch(e){}
+  await tirarLoGuardado();
+  const sep = location.search ? '&' : '?';
+  location.replace(location.pathname + location.search + sep + 'nuevo=' + Date.now());
+}
+
+/* Pantalla de espera mientras la base del barrio dice quién está entrando.
+   Sin esto, se veía el portal un segundo, la persona empezaba a escribir su
+   correo y la app entraba sola por la sesión que ya estaba abierta. */
+function pintarEspera(){
+  $('#app').innerHTML = `<div class="portal">
+    <div class="portal-foto" style="background-image:url('${Clima.portada()}')"></div>
+    <div class="portal-contenido">
+      <header class="portal-marca"><span class="logo">${LOGO}</span>
+        <div><b>Barrio ${esc(Store.s.config.nombre)}</b><small>${esc(Store.s.config.ciudad)}</small></div></header>
+      <div class="portal-caja esperando">
+        <div class="cargando"><span></span><span></span><span></span></div>
+        <b>Conectando con el barrio…</b>
+        <small>Un segundo: estamos viendo si tu sesión sigue abierta.</small>
+      </div></div></div>`;
+}
+
 async function arrancar(){
   Store.cargar();
   aplicarTema();
   history.replaceState({ n:1 }, '');
+  if (!await programaCompleto()) return;
 
   if (Nube.activa()){
     Conexion.poner('conectando');
-    /* Mientras Firebase resuelve quién es, se muestra el portal o la app con
-       lo último que había guardado en este equipo. Nada de pantallas vacías. */
-    if (!rutaPublica()) pintarBienvenida();
+    /* Primero la espera, no el portal: si la sesión estaba abierta, mostrar
+       el portal sería mentirle a la persona y hacerla escribir de gusto. */
+    if (!rutaPublica()) pintarEspera();
+    /* Si la base tarda demasiado (o no hay señal), igual se llega al portal:
+       nunca se queda colgada una pantalla de espera. */
+    const aPortal = setTimeout(() => { if (!rutaPublica() && !yo()) pintarBienvenida(); }, 7000);
     Nube.iniciar()
-      .then(() => { Conexion.poner('vivo'); if (!rutaPublica()){ if (yo()) pintar(); else if (!$('.portal')) pintarBienvenida(); } Motor.correr(); })
-      .catch(err => { console.error(err); Conexion.poner('caido'); toast('No se pudo conectar con la base del barrio. Reintentando…', 'alert'); });
+      .then(() => { clearTimeout(aPortal); Conexion.poner('vivo');
+        if (!rutaPublica()){
+          if (yo()){ if (portalEnUso()) avisarSesionAbierta(); else pintar(); }
+          else if (!$('.portal')) pintarBienvenida();
+        }
+        Motor.correr(); })
+      .catch(err => { clearTimeout(aPortal); console.error(err); Conexion.poner('caido');
+        if (!rutaPublica() && !yo() && !$('.portal')) pintarBienvenida();
+        toast('No se pudo conectar con la base del barrio. Reintentando…', 'alert'); });
     window.addEventListener('online', () => { Conexion.poner('vivo'); datosDeAfuera(); });
     window.addEventListener('offline', () => Conexion.poner('caido'));
   } else {
@@ -1034,7 +1163,27 @@ async function arrancar(){
   /* El clima y los vuelos se refrescan solos, sin que haya que entrar. */
   setInterval(datosDeAfuera, 10 * MIN);
   Avion.arrancar();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  registrarServiceWorker();
+}
+
+/* El service worker guarda el programa para que abra sin internet. Dos
+   cuidados: se pide la versión nueva sin pasar por el caché del navegador, y
+   cuando entra una versión nueva se recarga UNA vez, para que el index.html y
+   los .js sean siempre del mismo juego. */
+function registrarServiceWorker(){
+  if (!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
+  const habia = !!navigator.serviceWorker.controller;
+  let recargando = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!habia || recargando) return;            /* la primera instalación no recarga */
+    recargando = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).then(reg => {
+    reg.update().catch(() => {});
+    setInterval(() => reg.update().catch(() => {}), 30 * MIN);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+  }).catch(() => {});
 }
 document.addEventListener('DOMContentLoaded', arrancar);
 

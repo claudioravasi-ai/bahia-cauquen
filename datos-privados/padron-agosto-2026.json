@@ -1,0 +1,1374 @@
+{
+ "periodo": "2026-08",
+ "fuente": "Liquidación de agosto 2026 (Octavo Piso)",
+ "unidades": [
+  {
+   "uf": "000",
+   "lote": "0",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Hotel)",
+   "coef": 1.797603,
+   "expensasAgosto": 894877.32,
+   "totalCupon": 911016.0,
+   "deuda": 0.0
+  },
+  {
+   "uf": "001",
+   "lote": "1",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Hotel)",
+   "coef": 0.688735,
+   "expensasAgosto": 342863.96,
+   "totalCupon": 352702.01,
+   "deuda": 0.0
+  },
+  {
+   "uf": "002",
+   "lote": "2",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Hotel)",
+   "coef": 0.671942,
+   "expensasAgosto": 334504.27,
+   "totalCupon": 344226.02,
+   "deuda": 0.0
+  },
+  {
+   "uf": "003",
+   "lote": "3",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Hotel)",
+   "coef": 0.655204,
+   "expensasAgosto": 326171.54,
+   "totalCupon": 335778.03,
+   "deuda": 0.0
+  },
+  {
+   "uf": "004",
+   "lote": "4",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Hotel)",
+   "coef": 0.6411,
+   "expensasAgosto": 319150.48,
+   "totalCupon": 328659.04,
+   "deuda": 0.0
+  },
+  {
+   "uf": "005",
+   "lote": "5",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Hotel)",
+   "coef": 0.710274,
+   "expensasAgosto": 353586.46,
+   "totalCupon": 363574.05,
+   "deuda": 0.0
+  },
+  {
+   "uf": "006",
+   "lote": "6",
+   "propietario": "Luis Maria Capellano",
+   "coef": 0.959439,
+   "expensasAgosto": 477625.17,
+   "totalCupon": 482626.06,
+   "deuda": 0.0
+  },
+  {
+   "uf": "007",
+   "lote": "7",
+   "propietario": "Morand, Alejandro / Sanchez Manu Maria",
+   "coef": 0.805859,
+   "expensasAgosto": 401170.64,
+   "totalCupon": 435081.07,
+   "deuda": 0.0
+  },
+  {
+   "uf": "008",
+   "lote": "8",
+   "propietario": "Jerez Alejandra",
+   "coef": 0.791296,
+   "expensasAgosto": 393920.49,
+   "totalCupon": 398921.08,
+   "deuda": 0.0
+  },
+  {
+   "uf": "009",
+   "lote": "9",
+   "propietario": "Suárez Grandi, Fernanda",
+   "coef": 0.796475,
+   "expensasAgosto": 396498.92,
+   "totalCupon": 826556.09,
+   "deuda": 405550.09
+  },
+  {
+   "uf": "010",
+   "lote": "10",
+   "propietario": "Abregu Esteba / Giri Maria Gabriela",
+   "coef": 0.787,
+   "expensasAgosto": 391782.28,
+   "totalCupon": 396783.1,
+   "deuda": 0.0
+  },
+  {
+   "uf": "011",
+   "lote": "11",
+   "propietario": "Giavarini Alberto / Lara Andrea",
+   "coef": 0.874898,
+   "expensasAgosto": 435539.24,
+   "totalCupon": 346981.11,
+   "deuda": 0.0
+  },
+  {
+   "uf": "012",
+   "lote": "12",
+   "propietario": "Day, Darrel / Hew, Catherine",
+   "coef": 1.509663,
+   "expensasAgosto": 751536.31,
+   "totalCupon": 36079227.12,
+   "deuda": 19476129.34
+  },
+  {
+   "uf": "013",
+   "lote": "13",
+   "propietario": "Vivian Victoria / Ignacio Cano",
+   "coef": 0.560746,
+   "expensasAgosto": 279148.86,
+   "totalCupon": 284149.13,
+   "deuda": 0.0
+  },
+  {
+   "uf": "014",
+   "lote": "14",
+   "propietario": "Vivian Cecilia",
+   "coef": 0.588917,
+   "expensasAgosto": 293173.01,
+   "totalCupon": 298173.14,
+   "deuda": 0.0
+  },
+  {
+   "uf": "015",
+   "lote": "15",
+   "propietario": "Viaña, Silvina",
+   "coef": 0.6374,
+   "expensasAgosto": 317308.74,
+   "totalCupon": 322309.15,
+   "deuda": 0.0
+  },
+  {
+   "uf": "016",
+   "lote": "16",
+   "propietario": "Euskal SA",
+   "coef": 1.105267,
+   "expensasAgosto": 550221.03,
+   "totalCupon": 555221.16,
+   "deuda": 0.0
+  },
+  {
+   "uf": "017",
+   "lote": "17",
+   "propietario": "Cecilia Stratico",
+   "coef": 0.721003,
+   "expensasAgosto": 358927.5,
+   "totalCupon": 363928.17,
+   "deuda": 0.0
+  },
+  {
+   "uf": "018",
+   "lote": "18",
+   "propietario": "Regalado, Arturo Rubén",
+   "coef": 0.830494,
+   "expensasAgosto": 413433.91,
+   "totalCupon": 418434.18,
+   "deuda": 0.0
+  },
+  {
+   "uf": "019",
+   "lote": "19",
+   "propietario": "BOSSIO Pedro / CAUCICH Paola",
+   "coef": 0.780973,
+   "expensasAgosto": 388781.6,
+   "totalCupon": 393782.19,
+   "deuda": 0.0
+  },
+  {
+   "uf": "020",
+   "lote": "20",
+   "propietario": "Savino, Alicia Beatríz / Rubinos, Oscar",
+   "coef": 0.718395,
+   "expensasAgosto": 357629.3,
+   "totalCupon": 362630.2,
+   "deuda": 0.0
+  },
+  {
+   "uf": "021",
+   "lote": "21",
+   "propietario": "Fossat, Guillermo",
+   "coef": 0.655808,
+   "expensasAgosto": 326472.5,
+   "totalCupon": 331473.21,
+   "deuda": 0.0
+  },
+  {
+   "uf": "022",
+   "lote": "22",
+   "propietario": "Marina Iglesias",
+   "coef": 0.681137,
+   "expensasAgosto": 339081.66,
+   "totalCupon": 716669.22,
+   "deuda": 355488.0
+  },
+  {
+   "uf": "023",
+   "lote": "23",
+   "propietario": "Juan Pablo Ciarroca / Arbini Maria Eugenia",
+   "coef": 0.580661,
+   "expensasAgosto": 289062.79,
+   "totalCupon": 294063.23,
+   "deuda": 0.0
+  },
+  {
+   "uf": "024",
+   "lote": "24",
+   "propietario": "Chiesa Fernando Juan / Guarido Maria Daniela",
+   "coef": 0.549674,
+   "expensasAgosto": 273637.13,
+   "totalCupon": 278637.24,
+   "deuda": 0.0
+  },
+  {
+   "uf": "025",
+   "lote": "25",
+   "propietario": "Elicabe, Martín / Gussoni Romina Valeria",
+   "coef": 0.550224,
+   "expensasAgosto": 273911.14,
+   "totalCupon": 278911.25,
+   "deuda": 0.0
+  },
+  {
+   "uf": "026",
+   "lote": "26",
+   "propietario": "Zoratto Marisol",
+   "coef": 0.55073,
+   "expensasAgosto": 274162.7,
+   "totalCupon": 279163.26,
+   "deuda": 0.0
+  },
+  {
+   "uf": "027",
+   "lote": "27",
+   "propietario": "Moreno Salvatore",
+   "coef": 0.551271,
+   "expensasAgosto": 274432.22,
+   "totalCupon": 279432.27,
+   "deuda": 0.0
+  },
+  {
+   "uf": "028",
+   "lote": "28",
+   "propietario": "Emiliano F Fank / Emilia Chialvo",
+   "coef": 0.551885,
+   "expensasAgosto": 274737.68,
+   "totalCupon": 279738.28,
+   "deuda": 0.0
+  },
+  {
+   "uf": "029",
+   "lote": "29",
+   "propietario": "Zeitler, Gustavo Alejandro/ Manganiello Paula",
+   "coef": 0.552471,
+   "expensasAgosto": 275029.66,
+   "totalCupon": 280030.29,
+   "deuda": 0.29
+  },
+  {
+   "uf": "030",
+   "lote": "30",
+   "propietario": "Bosio Oscar/ Cárdenas Gladis",
+   "coef": 0.552895,
+   "expensasAgosto": 275240.79,
+   "totalCupon": 280241.3,
+   "deuda": 0.0
+  },
+  {
+   "uf": "031",
+   "lote": "31",
+   "propietario": "Acosta Mabel",
+   "coef": 0.553518,
+   "expensasAgosto": 275550.74,
+   "totalCupon": 280551.31,
+   "deuda": 0.0
+  },
+  {
+   "uf": "032",
+   "lote": "32",
+   "propietario": "Arrua Carina/Manrique Jonatan",
+   "coef": 0.554005,
+   "expensasAgosto": 275793.31,
+   "totalCupon": 280793.32,
+   "deuda": 0.0
+  },
+  {
+   "uf": "033",
+   "lote": "33",
+   "propietario": "Car, Valeria / Gómez Adillón, Lino",
+   "coef": 0.540533,
+   "expensasAgosto": 269086.69,
+   "totalCupon": 284826.33,
+   "deuda": 0.0
+  },
+  {
+   "uf": "034",
+   "lote": "34",
+   "propietario": "Rocca, Jorge Rubén / Vecchi, Norma",
+   "coef": 0.552534,
+   "expensasAgosto": 275061.1,
+   "totalCupon": 280061.34,
+   "deuda": 0.0
+  },
+  {
+   "uf": "035",
+   "lote": "35",
+   "propietario": "La Falce, Daniel",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274523.35,
+   "deuda": 0.0
+  },
+  {
+   "uf": "036",
+   "lote": "36",
+   "propietario": "Norma Beatriz Muñoz",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 931036.36,
+   "deuda": 613149.78
+  },
+  {
+   "uf": "037",
+   "lote": "37",
+   "propietario": "Alvarez, Jorge Omar / Villarruel, Graciela Beatriz",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274523.37,
+   "deuda": 0.0
+  },
+  {
+   "uf": "038",
+   "lote": "38",
+   "propietario": "Gonzalez Daniel",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274523.38,
+   "deuda": 0.0
+  },
+  {
+   "uf": "039",
+   "lote": "39",
+   "propietario": "German Baez , Ana Navarro",
+   "coef": 0.514338,
+   "expensasAgosto": 256046.3,
+   "totalCupon": 1292102.39,
+   "deuda": 983737.39
+  },
+  {
+   "uf": "040",
+   "lote": "40",
+   "propietario": "Rodriguez, Marcelo Gustavo",
+   "coef": 0.514338,
+   "expensasAgosto": 256046.3,
+   "totalCupon": 261046.4,
+   "deuda": 0.0
+  },
+  {
+   "uf": "041",
+   "lote": "41",
+   "propietario": "Tapella, Federico / Romero, Carolina",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274523.41,
+   "deuda": 0.0
+  },
+  {
+   "uf": "042",
+   "lote": "42",
+   "propietario": "Chinquini, Martín Sebastián",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274522.42,
+   "deuda": 0.0
+  },
+  {
+   "uf": "043",
+   "lote": "43",
+   "propietario": "D'Angelo Juan José/ Rodriguez Maria Sol",
+   "coef": 0.554402,
+   "expensasAgosto": 275990.96,
+   "totalCupon": 280991.43,
+   "deuda": 0.0
+  },
+  {
+   "uf": "044",
+   "lote": "44",
+   "propietario": "Scarello Luciano",
+   "coef": 0.63167,
+   "expensasAgosto": 314456.3,
+   "totalCupon": 319456.44,
+   "deuda": 0.0
+  },
+  {
+   "uf": "045",
+   "lote": "45",
+   "propietario": "Begué, Mariana",
+   "coef": 0.756862,
+   "expensasAgosto": 376778.86,
+   "totalCupon": 381779.45,
+   "deuda": 0.0
+  },
+  {
+   "uf": "046",
+   "lote": "46",
+   "propietario": "Begué, Mariana",
+   "coef": 0.881088,
+   "expensasAgosto": 438620.78,
+   "totalCupon": 443621.46,
+   "deuda": 0.0
+  },
+  {
+   "uf": "047",
+   "lote": "47",
+   "propietario": "Yorio, Marta Liliana / Monachelli, Alberto",
+   "coef": 0.907924,
+   "expensasAgosto": 451980.11,
+   "totalCupon": 456980.47,
+   "deuda": 0.0
+  },
+  {
+   "uf": "048",
+   "lote": "48",
+   "propietario": "Galizzi Alejandra",
+   "coef": 0.862067,
+   "expensasAgosto": 429151.56,
+   "totalCupon": 434152.48,
+   "deuda": 0.0
+  },
+  {
+   "uf": "049",
+   "lote": "49",
+   "propietario": "Muriel, María Verónica / Vanecek Marcelo",
+   "coef": 1.593753,
+   "expensasAgosto": 793397.63,
+   "totalCupon": 798398.49,
+   "deuda": 0.0
+  },
+  {
+   "uf": "050",
+   "lote": "50",
+   "propietario": "Olivero, Eduardo Bernardo / Lopez Cabrera Maria",
+   "coef": 0.535164,
+   "expensasAgosto": 266413.93,
+   "totalCupon": 271414.5,
+   "deuda": 0.0
+  },
+  {
+   "uf": "051",
+   "lote": "51",
+   "propietario": "Reyes, Eduardo Antonio / Ubertazzi, Laura",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 2466250.51,
+   "deuda": 1997424.82
+  },
+  {
+   "uf": "052",
+   "lote": "52",
+   "propietario": "Petrolito Fernando / Cots Claudia",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274522.52,
+   "deuda": 0.0
+  },
+  {
+   "uf": "053",
+   "lote": "53",
+   "propietario": "Lioy, Josefina",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274522.53,
+   "deuda": 0.0
+  },
+  {
+   "uf": "054",
+   "lote": "54",
+   "propietario": "Aracena, Alicia Inés",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274522.54,
+   "deuda": 0.0
+  },
+  {
+   "uf": "055",
+   "lote": "55",
+   "propietario": "Rota, Fernando",
+   "coef": 0.62262,
+   "expensasAgosto": 309950.78,
+   "totalCupon": 314951.55,
+   "deuda": 0.0
+  },
+  {
+   "uf": "056",
+   "lote": "56",
+   "propietario": "Caballero, Ramiro / Romano, María",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 274522.56,
+   "deuda": 0.0
+  },
+  {
+   "uf": "057",
+   "lote": "57",
+   "propietario": "Federico Vidal",
+   "coef": 0.64969,
+   "expensasAgosto": 323426.9,
+   "totalCupon": 328427.57,
+   "deuda": 0.0
+  },
+  {
+   "uf": "058",
+   "lote": "58",
+   "propietario": "Cardone Marcelo",
+   "coef": 0.755021,
+   "expensasAgosto": 375862.49,
+   "totalCupon": 380862.58,
+   "deuda": 0.0
+  },
+  {
+   "uf": "059",
+   "lote": "59",
+   "propietario": "Deieso Claudio",
+   "coef": 0.582447,
+   "expensasAgosto": 289952.22,
+   "totalCupon": 294952.59,
+   "deuda": 0.0
+  },
+  {
+   "uf": "060",
+   "lote": "60",
+   "propietario": "Lucas Gabriel Diaz Zeberio, Candela Diaz Zeberio",
+   "coef": 0.690296,
+   "expensasAgosto": 343641.08,
+   "totalCupon": 348641.6,
+   "deuda": 0.0
+  },
+  {
+   "uf": "061",
+   "lote": "61",
+   "propietario": "Rocca, Jorge Rubén / Vecchi, Norma",
+   "coef": 0.625778,
+   "expensasAgosto": 311522.99,
+   "totalCupon": 316523.61,
+   "deuda": 0.0
+  },
+  {
+   "uf": "062",
+   "lote": "62",
+   "propietario": "Martínez de Sucre, Virgilio / Cincunegui, Sandra",
+   "coef": 0.770713,
+   "expensasAgosto": 383674.15,
+   "totalCupon": 388674.62,
+   "deuda": 0.0
+  },
+  {
+   "uf": "063",
+   "lote": "63",
+   "propietario": "Bilota Ivandic Federico, Trinchitella Andrea",
+   "coef": 0.881801,
+   "expensasAgosto": 438975.65,
+   "totalCupon": 443976.63,
+   "deuda": 0.0
+  },
+  {
+   "uf": "064",
+   "lote": "64",
+   "propietario": "Ponce, Ligia Adriana",
+   "coef": 0.87848,
+   "expensasAgosto": 437322.58,
+   "totalCupon": 442322.64,
+   "deuda": 0.0
+  },
+  {
+   "uf": "065",
+   "lote": "65",
+   "propietario": "Viaña Mariano / Gomez Guadalupe",
+   "coef": 0.769684,
+   "expensasAgosto": 383162.05,
+   "totalCupon": 388162.65,
+   "deuda": 0.0
+  },
+  {
+   "uf": "066",
+   "lote": "66",
+   "propietario": "Dominguez Pose, Fernando",
+   "coef": 0.738256,
+   "expensasAgosto": 367516.28,
+   "totalCupon": 372516.66,
+   "deuda": 0.0
+  },
+  {
+   "uf": "067",
+   "lote": "67",
+   "propietario": "Pivetta Fabiana / Arias",
+   "coef": 0.796349,
+   "expensasAgosto": 396436.03,
+   "totalCupon": 401436.67,
+   "deuda": 0.0
+  },
+  {
+   "uf": "068",
+   "lote": "68",
+   "propietario": "Gonzalez Martin, Pamela Andres",
+   "coef": 0.875006,
+   "expensasAgosto": 435593.15,
+   "totalCupon": 440593.68,
+   "deuda": 0.0
+  },
+  {
+   "uf": "069",
+   "lote": "69",
+   "propietario": "San Pietro, Pablo Daniel / Viaña, Romina",
+   "coef": 0.845373,
+   "expensasAgosto": 420841.29,
+   "totalCupon": 425841.69,
+   "deuda": 0.0
+  },
+  {
+   "uf": "070",
+   "lote": "70",
+   "propietario": "Mariano Gaudio",
+   "coef": 0.921189,
+   "expensasAgosto": 458583.41,
+   "totalCupon": 905296.7,
+   "deuda": 421441.83
+  },
+  {
+   "uf": "071",
+   "lote": "71",
+   "propietario": "PETEREIT / HERNANDEZ",
+   "coef": 0.844336,
+   "expensasAgosto": 420324.7,
+   "totalCupon": 425324.71,
+   "deuda": 0.0
+  },
+  {
+   "uf": "072",
+   "lote": "72",
+   "propietario": "Lechman Marcelo",
+   "coef": 0.851897,
+   "expensasAgosto": 424089.03,
+   "totalCupon": 429089.72,
+   "deuda": 0.0
+  },
+  {
+   "uf": "073",
+   "lote": "73",
+   "propietario": "Vairo, Carlos Pedro",
+   "coef": 0.79005,
+   "expensasAgosto": 393300.59,
+   "totalCupon": 393300.73,
+   "deuda": 0.0
+  },
+  {
+   "uf": "074",
+   "lote": "74",
+   "propietario": "Ballester Bidau, Fernando",
+   "coef": 0.822255,
+   "expensasAgosto": 409332.68,
+   "totalCupon": 414332.74,
+   "deuda": 0.0
+  },
+  {
+   "uf": "075",
+   "lote": "75",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Cabañas)",
+   "coef": 0.7031,
+   "expensasAgosto": 350015.29,
+   "totalCupon": 359952.75,
+   "deuda": 0.0
+  },
+  {
+   "uf": "076",
+   "lote": "76",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Cabañas)",
+   "coef": 0.552634,
+   "expensasAgosto": 275110.52,
+   "totalCupon": 284005.76,
+   "deuda": 0.0
+  },
+  {
+   "uf": "077",
+   "lote": "77",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Cabañas)",
+   "coef": 0.552643,
+   "expensasAgosto": 275115.01,
+   "totalCupon": 284010.77,
+   "deuda": 0.0
+  },
+  {
+   "uf": "078",
+   "lote": "78",
+   "propietario": "Los Cauquenes Ushuaia S.A. (Cabañas)",
+   "coef": 0.552634,
+   "expensasAgosto": 275110.52,
+   "totalCupon": 284005.78,
+   "deuda": 0.0
+  },
+  {
+   "uf": "079",
+   "lote": "79",
+   "propietario": "Bruno Adrian",
+   "coef": 0.552634,
+   "expensasAgosto": 275110.52,
+   "totalCupon": 280110.79,
+   "deuda": 0.0
+  },
+  {
+   "uf": "080",
+   "lote": "80",
+   "propietario": "Piñol, Enrique, Alicia Cuervo",
+   "coef": 0.615257,
+   "expensasAgosto": 306285.28,
+   "totalCupon": 311285.8,
+   "deuda": 0.0
+  },
+  {
+   "uf": "081",
+   "lote": "81",
+   "propietario": "Federico Noia",
+   "coef": 0.578017,
+   "expensasAgosto": 287746.63,
+   "totalCupon": 292746.81,
+   "deuda": 0.0
+  },
+  {
+   "uf": "082",
+   "lote": "82",
+   "propietario": "Quadrini, Guillermo / Rubinos, Silvia",
+   "coef": 0.666943,
+   "expensasAgosto": 332015.68,
+   "totalCupon": 337015.82,
+   "deuda": 0.0
+  },
+  {
+   "uf": "083",
+   "lote": "83",
+   "propietario": "Sourrouille, Horacio Guillermo",
+   "coef": 0.5437,
+   "expensasAgosto": 270663.4,
+   "totalCupon": 275663.83,
+   "deuda": 0.0
+  },
+  {
+   "uf": "084",
+   "lote": "84",
+   "propietario": "Arturo Capellano, Romina Villafaña",
+   "coef": 0.542491,
+   "expensasAgosto": 270061.46,
+   "totalCupon": 275061.84,
+   "deuda": 0.0
+  },
+  {
+   "uf": "085",
+   "lote": "85",
+   "propietario": "Montilla, María Teresa",
+   "coef": 0.542491,
+   "expensasAgosto": 270061.46,
+   "totalCupon": 275061.85,
+   "deuda": 0.0
+  },
+  {
+   "uf": "086",
+   "lote": "86",
+   "propietario": "Clausen, Pablo",
+   "coef": 0.584947,
+   "expensasAgosto": 291196.51,
+   "totalCupon": 296196.86,
+   "deuda": 0.0
+  },
+  {
+   "uf": "087",
+   "lote": "87",
+   "propietario": "Tapella, Federico / Romero, Carolina",
+   "coef": 0.556812,
+   "expensasAgosto": 277190.33,
+   "totalCupon": 282190.87,
+   "deuda": 0.0
+  },
+  {
+   "uf": "088",
+   "lote": "88",
+   "propietario": "Cambio DANILO/Penayo Valeria",
+   "coef": 0.542491,
+   "expensasAgosto": 270061.46,
+   "totalCupon": 275061.88,
+   "deuda": 0.0
+  },
+  {
+   "uf": "089",
+   "lote": "89",
+   "propietario": "Echagüe, Maria",
+   "coef": 0.542491,
+   "expensasAgosto": 270061.46,
+   "totalCupon": 275061.89,
+   "deuda": 0.0
+  },
+  {
+   "uf": "090",
+   "lote": "90",
+   "propietario": "Echagüe, Guillermo",
+   "coef": 0.542491,
+   "expensasAgosto": 270061.46,
+   "totalCupon": 275061.9,
+   "deuda": 0.0
+  },
+  {
+   "uf": "091",
+   "lote": "91",
+   "propietario": "Echague, Guillermo Raúl / Guete, Nadine",
+   "coef": 0.542491,
+   "expensasAgosto": 270061.46,
+   "totalCupon": -39735.63,
+   "deuda": 0.0
+  },
+  {
+   "uf": "092",
+   "lote": "92",
+   "propietario": "Bettiana Cobas / Marcos Streitenberger",
+   "coef": 0.543195,
+   "expensasAgosto": 270411.84,
+   "totalCupon": 566967.92,
+   "deuda": 278174.92
+  },
+  {
+   "uf": "093",
+   "lote": "93",
+   "propietario": "Florencia A. Nuñez La Torre / Alfredo J. Maidana",
+   "coef": 0.546498,
+   "expensasAgosto": 272055.93,
+   "totalCupon": 277055.93,
+   "deuda": 0.0
+  },
+  {
+   "uf": "094",
+   "lote": "94",
+   "propietario": "Merino, Gabriel / Alq Francisco Garzón",
+   "coef": 0.549187,
+   "expensasAgosto": 273394.56,
+   "totalCupon": 278394.94,
+   "deuda": 0.0
+  },
+  {
+   "uf": "095",
+   "lote": "95",
+   "propietario": "Bruno Adrian",
+   "coef": 0.549187,
+   "expensasAgosto": 273394.56,
+   "totalCupon": 278394.95,
+   "deuda": 0.0
+  },
+  {
+   "uf": "096",
+   "lote": "96",
+   "propietario": "Mollica Daniel",
+   "coef": 0.549187,
+   "expensasAgosto": 273394.56,
+   "totalCupon": 293450.96,
+   "deuda": 0.0
+  },
+  {
+   "uf": "097",
+   "lote": "97",
+   "propietario": "Prost Konrad / Ibarra Bárbara Eugenia",
+   "coef": 0.549214,
+   "expensasAgosto": 273408.03,
+   "totalCupon": 278408.97,
+   "deuda": 0.0
+  },
+  {
+   "uf": "098",
+   "lote": "98",
+   "propietario": "Pasqualini, Anabella,",
+   "coef": 0.549187,
+   "expensasAgosto": 273394.56,
+   "totalCupon": 278394.98,
+   "deuda": 0.0
+  },
+  {
+   "uf": "099",
+   "lote": "99",
+   "propietario": "Osmar Luis Aguilar",
+   "coef": 0.679016,
+   "expensasAgosto": 338026.03,
+   "totalCupon": 2059033.99,
+   "deuda": 1624360.32
+  },
+  {
+   "uf": "100",
+   "lote": "100",
+   "propietario": "Tomás Viaña",
+   "coef": 0.82591,
+   "expensasAgosto": 411151.96,
+   "totalCupon": 877893.0,
+   "deuda": 420352.71
+  },
+  {
+   "uf": "101",
+   "lote": "101",
+   "propietario": "Gliubich / Diliberto, Carolina",
+   "coef": 0.85788,
+   "expensasAgosto": 427067.26,
+   "totalCupon": 662287.01,
+   "deuda": 219654.0
+  },
+  {
+   "uf": "102",
+   "lote": "102",
+   "propietario": "Mackinlay, Matías / Navarro, Carolina",
+   "coef": 0.550432,
+   "expensasAgosto": 274014.46,
+   "totalCupon": 279015.02,
+   "deuda": 0.0
+  },
+  {
+   "uf": "103",
+   "lote": "103",
+   "propietario": "Gaglione, Paola",
+   "coef": 0.550432,
+   "expensasAgosto": 274014.46,
+   "totalCupon": 279014.03,
+   "deuda": 0.0
+  },
+  {
+   "uf": "104",
+   "lote": "104",
+   "propietario": "Eva Sanchez Sciani / Mosca Atilio",
+   "coef": 0.550432,
+   "expensasAgosto": 274014.46,
+   "totalCupon": 279015.04,
+   "deuda": 0.0
+  },
+  {
+   "uf": "105",
+   "lote": "105",
+   "propietario": "Francisco Martello, Florencia Sarru",
+   "coef": 0.550432,
+   "expensasAgosto": 274014.46,
+   "totalCupon": 279015.05,
+   "deuda": 0.0
+  },
+  {
+   "uf": "106",
+   "lote": "106",
+   "propietario": "Campos, Fabián",
+   "coef": 0.550432,
+   "expensasAgosto": 274014.46,
+   "totalCupon": 279015.06,
+   "deuda": 0.0
+  },
+  {
+   "uf": "107",
+   "lote": "107",
+   "propietario": "Zacarías Vera, Johny David / Bugueyro, Flavia G.",
+   "coef": 0.52291,
+   "expensasAgosto": 260313.74,
+   "totalCupon": 265314.07,
+   "deuda": 0.0
+  },
+  {
+   "uf": "108",
+   "lote": "108",
+   "propietario": "Molinolo, Agustina María / Ortíz, Darío",
+   "coef": 0.52291,
+   "expensasAgosto": 260313.74,
+   "totalCupon": 265314.08,
+   "deuda": 0.0
+  },
+  {
+   "uf": "109",
+   "lote": "109",
+   "propietario": "Bretti, Gastón / Hojvat, Inés",
+   "coef": 0.52291,
+   "expensasAgosto": 260313.74,
+   "totalCupon": 265314.09,
+   "deuda": 0.0
+  },
+  {
+   "uf": "110",
+   "lote": "110",
+   "propietario": "Avaca, Jorge / García, Claudia",
+   "coef": 0.52291,
+   "expensasAgosto": 260313.74,
+   "totalCupon": 265314.1,
+   "deuda": 0.0
+  },
+  {
+   "uf": "111",
+   "lote": "111",
+   "propietario": "Ruckauf, Guillermo / Yuba, Gabriela",
+   "coef": 0.550432,
+   "expensasAgosto": 274014.46,
+   "totalCupon": 279015.11,
+   "deuda": 0.0
+  },
+  {
+   "uf": "112",
+   "lote": "112",
+   "propietario": "Marcos, Silvia",
+   "coef": 0.545379,
+   "expensasAgosto": 271498.92,
+   "totalCupon": 276499.12,
+   "deuda": 0.0
+  },
+  {
+   "uf": "113",
+   "lote": "113",
+   "propietario": "Patroni Bertomeu Nicolas/Ivanec Marina",
+   "coef": 0.780756,
+   "expensasAgosto": 388673.79,
+   "totalCupon": 393674.13,
+   "deuda": 0.0
+  },
+  {
+   "uf": "114",
+   "lote": "114",
+   "propietario": "Barría, Néstor Fabián / Moretto, Alicia Susana",
+   "coef": 0.731326,
+   "expensasAgosto": 364066.39,
+   "totalCupon": 369067.14,
+   "deuda": 0.0
+  },
+  {
+   "uf": "115",
+   "lote": "115",
+   "propietario": "Patchman, David / Pereyra, Romina",
+   "coef": 0.542248,
+   "expensasAgosto": 269940.18,
+   "totalCupon": 1928696.15,
+   "deuda": 1442011.19
+  },
+  {
+   "uf": "116",
+   "lote": "116",
+   "propietario": "Patroni Bertomeu Nicolas / Ivanec Marina",
+   "coef": 0.54232,
+   "expensasAgosto": 269976.11,
+   "totalCupon": 274976.16,
+   "deuda": 0.0
+  },
+  {
+   "uf": "117",
+   "lote": "117",
+   "propietario": "Lovrich, Gustavo / Elizarraga, Mirta",
+   "coef": 0.543033,
+   "expensasAgosto": 270330.99,
+   "totalCupon": 275331.17,
+   "deuda": 0.0
+  },
+  {
+   "uf": "118",
+   "lote": "118",
+   "propietario": "Gaita, Graciela Fernanda / Guida Eduardo",
+   "coef": 0.594214,
+   "expensasAgosto": 295809.84,
+   "totalCupon": 300810.18,
+   "deuda": 0.0
+  },
+  {
+   "uf": "119",
+   "lote": "119",
+   "propietario": "Arata, Viviana Lorena / Leon Jimenez Ivan",
+   "coef": 0.560791,
+   "expensasAgosto": 279171.32,
+   "totalCupon": 284172.19,
+   "deuda": 0.0
+  },
+  {
+   "uf": "120",
+   "lote": "120",
+   "propietario": "Brigando Franco",
+   "coef": 0.571177,
+   "expensasAgosto": 284341.66,
+   "totalCupon": 289342.2,
+   "deuda": 0.0
+  },
+  {
+   "uf": "121",
+   "lote": "121",
+   "propietario": "Heredia, Pablo",
+   "coef": 0.579776,
+   "expensasAgosto": 288622.57,
+   "totalCupon": 293623.21,
+   "deuda": 0.0
+  },
+  {
+   "uf": "122",
+   "lote": "122",
+   "propietario": "Martín Ricardo / Coroas Graciela",
+   "coef": 1.058733,
+   "expensasAgosto": 527055.58,
+   "totalCupon": 1344283.22,
+   "deuda": 812227.22
+  },
+  {
+   "uf": "123",
+   "lote": "123",
+   "propietario": "García Arpón, Maximiliano / Flores Maria Jose",
+   "coef": 0.552553,
+   "expensasAgosto": 275070.09,
+   "totalCupon": 280070.23,
+   "deuda": 0.0
+  },
+  {
+   "uf": "124",
+   "lote": "124",
+   "propietario": "Carzo Sergio Andrés",
+   "coef": 0.551957,
+   "expensasAgosto": 274773.61,
+   "totalCupon": 279774.24,
+   "deuda": 0.0
+  },
+  {
+   "uf": "125",
+   "lote": "125",
+   "propietario": "Pablo Tbaudín, Mariana Tbaudin Ratto",
+   "coef": 0.523858,
+   "expensasAgosto": 260785.4,
+   "totalCupon": 265786.25,
+   "deuda": 0.0
+  },
+  {
+   "uf": "126",
+   "lote": "126",
+   "propietario": "Díaz, Roxana Veda",
+   "coef": 0.523344,
+   "expensasAgosto": 260529.35,
+   "totalCupon": 546621.26,
+   "deuda": 268191.26
+  },
+  {
+   "uf": "127",
+   "lote": "127",
+   "propietario": "Laplace, Juan / Zumarraga, María de los Ángeles",
+   "coef": 0.522829,
+   "expensasAgosto": 260273.31,
+   "totalCupon": 265274.27,
+   "deuda": 0.0
+  },
+  {
+   "uf": "128",
+   "lote": "128",
+   "propietario": "Weinert, Cristián/Otero Andrea Isabel",
+   "coef": 0.522315,
+   "expensasAgosto": 260017.26,
+   "totalCupon": 265017.28,
+   "deuda": 0.0
+  },
+  {
+   "uf": "129",
+   "lote": "129",
+   "propietario": "Hugo Alberto Del Valle / Josefina Quiroga",
+   "coef": 0.549448,
+   "expensasAgosto": 273524.83,
+   "totalCupon": 278485.29,
+   "deuda": 0.0
+  },
+  {
+   "uf": "130",
+   "lote": "130",
+   "propietario": "Vanella, Fabián / Ducculi, Daniela",
+   "coef": 0.548916,
+   "expensasAgosto": 273259.8,
+   "totalCupon": 278260.3,
+   "deuda": 0.0
+  },
+  {
+   "uf": "131",
+   "lote": "131",
+   "propietario": "Moyano, Ezequiel",
+   "coef": 0.541354,
+   "expensasAgosto": 269495.47,
+   "totalCupon": 285946.31,
+   "deuda": 0.0
+  },
+  {
+   "uf": "132",
+   "lote": "132",
+   "propietario": "Pastoriza Eduardo",
+   "coef": 0.667882,
+   "expensasAgosto": 332482.85,
+   "totalCupon": 337482.32,
+   "deuda": 0.0
+  },
+  {
+   "uf": "133",
+   "lote": "133",
+   "propietario": "Peralta Norberto & Angera Maria Ines",
+   "coef": 0.3883,
+   "expensasAgosto": 193302.42,
+   "totalCupon": 198303.33,
+   "deuda": 0.0
+  },
+  {
+   "uf": "133A",
+   "lote": "133A",
+   "propietario": "Marcelo Magnano",
+   "coef": 0.3889,
+   "expensasAgosto": 193601.11,
+   "totalCupon": 198601.33,
+   "deuda": 0.0
+  },
+  {
+   "uf": "134",
+   "lote": "134",
+   "propietario": "Martín, Marcelo",
+   "coef": 0.613596,
+   "expensasAgosto": 305458.74,
+   "totalCupon": 639122.34,
+   "deuda": 313580.0
+  },
+  {
+   "uf": "135",
+   "lote": "135",
+   "propietario": "Bechis, Luis Simón",
+   "coef": 0.613596,
+   "expensasAgosto": 305458.74,
+   "totalCupon": 310459.35,
+   "deuda": 0.0
+  },
+  {
+   "uf": "136",
+   "lote": "136",
+   "propietario": "Vallejos, Enrique / Acosta, Elizabeth",
+   "coef": 0.613596,
+   "expensasAgosto": 305458.74,
+   "totalCupon": 310459.36,
+   "deuda": 0.0
+  },
+  {
+   "uf": "137",
+   "lote": "137",
+   "propietario": "PETEREIT / HERNANDEZ",
+   "coef": 0.794066,
+   "expensasAgosto": 395299.55,
+   "totalCupon": 400300.37,
+   "deuda": 0.0
+  },
+  {
+   "uf": "138",
+   "lote": "138",
+   "propietario": "Garcia Federico / Luna Veronica",
+   "coef": 0.794066,
+   "expensasAgosto": 395299.55,
+   "totalCupon": 400300.38,
+   "deuda": 0.0
+  },
+  {
+   "uf": "139",
+   "lote": "139",
+   "propietario": "Funes Agustín",
+   "coef": 0.721878,
+   "expensasAgosto": 359363.22,
+   "totalCupon": 364363.39,
+   "deuda": 0.0
+  },
+  {
+   "uf": "140",
+   "lote": "140",
+   "propietario": "Guidalevich, Alejandro / Ceballos Acasuso, Susana",
+   "coef": 0.685784,
+   "expensasAgosto": 341395.06,
+   "totalCupon": 315395.4,
+   "deuda": 0.0
+  },
+  {
+   "uf": "141",
+   "lote": "141",
+   "propietario": "Unzué, Ignacio",
+   "coef": 0.685784,
+   "expensasAgosto": 341395.06,
+   "totalCupon": 346395.41,
+   "deuda": 0.0
+  },
+  {
+   "uf": "142",
+   "lote": "142",
+   "propietario": "Saucedo, Mario / Borelli, Valeria R.",
+   "coef": 0.685784,
+   "expensasAgosto": 341395.06,
+   "totalCupon": 346394.42,
+   "deuda": 0.0
+  },
+  {
+   "uf": "143",
+   "lote": "143",
+   "propietario": "Saucedo, Mario / Borelli, Valeria R.",
+   "coef": 0.685784,
+   "expensasAgosto": 341395.06,
+   "totalCupon": 346395.43,
+   "deuda": 0.0
+  },
+  {
+   "uf": "144",
+   "lote": "144",
+   "propietario": "Kuipers Alejandro / Juncos Paula",
+   "coef": 0.685784,
+   "expensasAgosto": 341395.06,
+   "totalCupon": -8305.38,
+   "deuda": 0.0
+  },
+  {
+   "uf": "145",
+   "lote": "145",
+   "propietario": "Gómez Río, Lucas / Goyogana, Marina",
+   "coef": 0.669379,
+   "expensasAgosto": 333228.53,
+   "totalCupon": 338229.45,
+   "deuda": 0.0
+  },
+  {
+   "uf": "146",
+   "lote": "146",
+   "propietario": "Barchetta, Ricardo / Pévere, Marcela",
+   "coef": 0.636913,
+   "expensasAgosto": 317066.17,
+   "totalCupon": 317107.46,
+   "deuda": 0.0
+  },
+  {
+   "uf": "147",
+   "lote": "147",
+   "propietario": "Cieri, Christian / Radío, Silvina",
+   "coef": 0.60441,
+   "expensasAgosto": 300885.84,
+   "totalCupon": 305886.47,
+   "deuda": 0.0
+  },
+  {
+   "uf": "148",
+   "lote": "148",
+   "propietario": "Ravassi, Claudio / Ponzio Monica",
+   "coef": 0.571772,
+   "expensasAgosto": 284638.13,
+   "totalCupon": 289638.48,
+   "deuda": 0.0
+  },
+  {
+   "uf": "149",
+   "lote": "149",
+   "propietario": "Calvete, Federico H./ Alonso Massey, María",
+   "coef": 0.729656,
+   "expensasAgosto": 363235.36,
+   "totalCupon": 368235.49,
+   "deuda": 0.0
+  },
+  {
+   "uf": "150",
+   "lote": "150",
+   "propietario": "Nuñez, Juan Carlos / La Torre, Silvana G.",
+   "coef": 0.541409,
+   "expensasAgosto": 269522.42,
+   "totalCupon": 96071901.22,
+   "deuda": 0.0
+  }
+ ]
+}
