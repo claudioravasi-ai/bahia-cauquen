@@ -635,6 +635,8 @@ R.perfil = {
         <div class="lbl" style="margin-top:14px">Avisos en este equipo</div>
         ${notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
         <label class="check" style="margin-top:10px"><input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span>Sonido cuando escribe la guardia o la Administración</span></label></div>
+      ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras' })}
+      ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
       ${superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Descargarlos o pedir que se borren (Ley 25.326)' })}
       ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', cls:'peligro' })}`;
   },

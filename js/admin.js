@@ -190,6 +190,7 @@ const ADMIN_TABS = {
     const ls = s.users.filter(u => u.estado === 'aprobado' && (!qq || (u.nombre + u.casa + u.email + (u.dni || '')).toLowerCase().includes(qq))).sort((a, b) => a.casa.localeCompare(b.casa, 'es', { numeric:true }));
     return `<form data-f="buscar-vecino-admin" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecAdm" value="${esc(q || '')}" placeholder="Nombre, casa, email o DNI"><button class="btn btn-pri">${I('search')}</button></form>
       ${superficie({ a:'alta-staff', icon:'plus', color:'accent', t:'Dar de alta guardia o administrador', s:'Cuentas del personal' })}
+      ${superficie({ a:'pasar-admin', icon:'key', color:'wood', t:'Pasar la Administración a otro vecino', s:'Por ejemplo, a Paula cuando la app esté andando' })}
       <label class="superficie"><span class="ic ic-brand">${I('upload')}</span><span class="txt"><b>Importar el padrón de propietarios</b>
         <small>${Store.s.padron.length ? `Cargado: ${plural(Store.s.padron.length, 'unidad', 'unidades')}${Store.s.padronPeriodo ? ' · ' + Store.s.padronPeriodo : ''}` : 'Archivo JSON de datos-privados/. Los nombres quedan solo en la base del barrio.'}</small></span>
         <input type="file" accept="application/json" id="importarPadron" hidden></label>
@@ -294,6 +295,37 @@ A['baja-vecino'] = async el => {
   Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); auditar(s, 'Dio de baja a un vecino', `${x.nombre} · ${x.casa}`, x.id);
     s.privados = s.privados.filter(h => h.userId !== x.id); s.pases = s.pases.filter(p => p.hostId !== x.id); s.users = s.users.filter(z => z.id !== x.id); });
   cerrarHoja(); toast('Vecino dado de baja', 'trash');
+};
+/* Traspaso de la Administración. Se puede quedar más de un administrador; lo
+   que no se puede es dejar el barrio sin ninguno. */
+A['pasar-admin'] = () => {
+  const yoId = yo().id;
+  const gente = Store.s.users.filter(u => u.estado === 'aprobado' && u.id !== yoId).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  if (!gente.length){ toast('Todavía no hay otra cuenta aprobada en el barrio', 'users'); return; }
+  hoja('Pasar la Administración', `<form data-f="pasar-admin">
+    <p class="muted small" style="margin:0 0 12px">La persona que elijas pasa a tener el panel completo: inscripciones, datos del barrio, reclamos, expensas y auditoría.</p>
+    <div class="field"><label>¿A quién?</label><select name="id" required>${gente.map(u => `<option value="${u.id}">${esc(u.nombre)} · ${esc(u.casa)}${u.rol !== 'vecino' ? ' (' + u.rol + ')' : ''}</option>`).join('')}</select></div>
+    <label class="check"><input type="checkbox" name="dejar"><span>Además, dejo de ser Administración y paso a ser vecino/a de mi lote</span></label>
+    <button class="btn btn-pri btn-block" style="margin-top:12px">${I('key')}Pasar la Administración</button>
+    <p class="muted tiny" style="margin:10px 0 0">Queda asentado en la auditoría, con fecha y hora.</p></form>`);
+};
+F['pasar-admin'] = async d => {
+  const yoId = yo().id, nuevo = usuario(d.id);
+  if (!nuevo) return;
+  if (!await confirmar('Pasar la Administración', `${esc(nuevo.nombre)} va a poder administrar todo el barrio${d.dejar ? ', y vos pasás a ser vecino/a' : ''}.`, { si:'Sí, pasarla' })) return;
+  Store.cambiar(s => {
+    const n = s.users.find(x => x.id === d.id);
+    n.rol = 'admin'; n.estado = 'aprobado';
+    if (d.dejar){
+      const quedan = s.users.filter(x => x.rol === 'admin' && x.id !== yoId).length;
+      if (quedan >= 1) s.users.find(x => x.id === yoId).rol = 'vecino';
+    }
+    notificar(s, { para:d.id, titulo:'Ahora sos Administración del barrio', texto:'Ya tenés el panel completo en la app.', icon:'shield', color:'accent', link:'admin', sonido:true });
+    auditar(s, 'Pasó la Administración', `${nuevo.nombre} (${nuevo.casa})${d.dejar ? ' · quien la pasó quedó como vecino' : ''}`, d.id);
+  });
+  cerrarHoja();
+  toast(`${nuevo.nombre.split(' ')[0]} ya es Administración`, 'shield');
+  if (d.dejar) pintar();
 };
 A['alta-staff'] = () => hoja('Alta de personal', `<form data-f="alta-staff"><div class="field"><label>Nombre</label><input name="nombre" required></div>
   <div class="grid2"><div class="field"><label>Rol</label><select name="rol"><option value="guardia">Guardia</option><option value="admin">Administración</option></select></div><div class="field"><label>DNI</label><input name="dni" inputmode="numeric"></div></div>

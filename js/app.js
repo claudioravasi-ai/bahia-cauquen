@@ -239,6 +239,16 @@ function pintarBienvenida(modo = 'inicio'){
       <p class="tiny" style="margin:10px 0 0;opacity:.85">Te llega un mail con el enlace para seguir tu inscripción. La Administración la revisa y te manda tu clave.</p>
     </form>
     <div class="enlaces"><button data-a="bienvenida" data-v="inicio">Volver</button><button data-a="bienvenida" data-v="entrar">Ya tengo clave</button></div>`;
+  else if (modo === 'completar') panel = `
+    <div class="aviso a-${Nube.libre ? 'ok' : 'warn'}">${I(Nube.libre ? 'shield' : 'clock')}<div class="txt"><b>${Nube.libre ? 'Sos la primera cuenta del barrio' : 'Falta completar tus datos'}</b>${Nube.libre ? 'Completá tus datos y quedás como Administración.' : 'Tu cuenta existe pero no tiene ficha. Completala y la Administración la aprueba.'}</div></div>
+    <form data-f="completar">
+      <div class="field"><label style="color:#fff">Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="name"></div>
+      <div class="grid2"><div class="field"><label style="color:#fff">DNI</label><input name="dni" required inputmode="numeric" maxlength="11" placeholder="Sin puntos"></div>
+        <div class="field"><label style="color:#fff">Tu lote</label><select name="casa" required><option value="">Elegí…</option>${LOTES.map(l => `<option value="Lote ${l.lote}">${esc(nombreLote(l))}</option>`).join('')}</select></div></div>
+      <div class="field"><label style="color:#fff">Teléfono / WhatsApp</label><input name="tel" inputmode="tel" maxlength="20"></div>
+      <button class="btn btn-pri btn-block">${I('check')}Completar mi ficha</button>
+    </form>
+    <div class="enlaces"><button data-a="salir-espera">Salir</button></div>`;
   else if (modo === 'espera') panel = `
     <div class="aviso a-warn">${I('clock')}<div class="txt"><b>Tu inscripción está en revisión</b>La Administración la aprueba y te avisamos por correo. Podés cerrar la app.</div></div>
     <button class="btn btn-sec btn-block" data-a="salir-espera">Salir</button>`;
@@ -257,7 +267,7 @@ function pintarBienvenida(modo = 'inicio'){
       <button data-a="demo" data-v="u_admin">Administración</button>
     </div>`;
   $('#app').innerHTML = `
-    <section class="bienvenida ${modo === 'entrar' || modo === 'registro' ? 'compacta' : ''}">
+    <section class="bienvenida ${['entrar','registro','completar'].includes(modo) ? 'compacta' : ''}">
       <div class="foto" style="background-image:url('${Clima.portada()}')"></div>
       <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b><div class="tiny" style="opacity:.85">${esc(Store.s.config.ciudad)}</div></div></div>
       <h1>La vida del barrio,<br>en un solo lugar.</h1>
@@ -382,7 +392,73 @@ A['mi-cuenta'] = () => { const u = yo();
       <div class="ayuda">En automático sigue la salida y la puesta del sol en Ushuaia (hoy: ${Clima.sol().sale} a ${Clima.sol().pone}).</div></div>
     ${(() => { const otros = Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
+    ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
+    ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
+
+/* ---------------- cambiar la clave ---------------- */
+A['cambiar-clave'] = () => {
+  const nube = Nube.activa();
+  hoja(nube ? 'Cambiar mi contraseña' : 'Cambiar mi clave', `<form data-f="cambiar-clave">
+    <div class="field"><label>${nube ? 'Contraseña actual' : 'Clave actual'}</label><input name="vieja" type="password" required autocomplete="current-password"></div>
+    <div class="field"><label>${nube ? 'Contraseña nueva' : 'Clave nueva'}</label><input name="nueva" type="password" required minlength="${nube ? 6 : 4}" autocomplete="new-password" placeholder="${nube ? 'Mínimo 6 caracteres' : 'Mínimo 4 caracteres'}"></div>
+    <div class="field"><label>Repetila</label><input name="nueva2" type="password" required autocomplete="new-password"></div>
+    <button class="btn btn-pri btn-block">${I('key')}Guardar</button>
+    ${nube ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="olvide-adentro">No me acuerdo la actual</button>` : ''}
+    <p class="muted tiny" style="margin:10px 0 0">Es personal: no la compartas. Si alguien más de tu casa usa la app, que tenga su propia cuenta.</p></form>`);
+};
+F['cambiar-clave'] = async d => {
+  const u = yo();
+  if (d.nueva !== d.nueva2){ toast('Las dos no coinciden', 'alert'); return; }
+  if (Nube.activa()){
+    try {
+      await Nube.entrar(u.email, d.vieja);          /* confirma que es quien dice ser */
+      await Nube.cambiarClave(d.nueva);
+      cerrarHoja(); toast('Contraseña cambiada', 'check');
+    } catch(e){
+      toast({ 'auth/invalid-credential':'La contraseña actual no coincide', 'auth/wrong-password':'La contraseña actual no coincide',
+        'auth/weak-password':'La nueva es muy corta' }[e.code] || e.message, 'alert');
+    }
+    return;
+  }
+  if ((u.clave || '').toUpperCase() !== String(d.vieja).trim().toUpperCase()){ toast('La clave actual no coincide', 'alert'); return; }
+  Store.cambiar(s => { s.users.find(x => x.id === u.id).clave = String(d.nueva).trim().toUpperCase(); });
+  cerrarHoja(); toast('Clave cambiada', 'check');
+};
+A['cambiar-email'] = () => {
+  const u = yo(), nube = Nube.activa();
+  hoja('Cambiar mi correo', `<form data-f="cambiar-email">
+    <p class="muted small" style="margin:0 0 12px">Ahora entrás con <b>${esc(u.email)}</b>.</p>
+    <div class="field"><label>Correo nuevo</label><input name="email" type="email" required autocomplete="email"></div>
+    ${nube ? `<div class="field"><label>Tu contraseña</label><input name="clave" type="password" required autocomplete="current-password"></div>` : ''}
+    <button class="btn btn-pri btn-block">${I('mail')}Cambiar</button>
+    ${nube ? `<p class="muted tiny" style="margin:10px 0 0">Te llega un aviso a la dirección nueva: hay que confirmarlo desde ahí. Hasta entonces seguís entrando con la vieja.</p>` : ''}</form>`);
+};
+F['cambiar-email'] = async d => {
+  const u = yo(), email = (d.email || '').trim().toLowerCase();
+  if (email === u.email){ toast('Es el mismo correo', 'info'); return; }
+  if (Store.s.users.some(x => x.id !== u.id && (x.email || '').toLowerCase() === email)){ toast('Ese correo ya está en uso en el barrio', 'alert'); return; }
+  if (Nube.activa()){
+    try {
+      await Nube.entrar(u.email, d.clave);
+      const r = await Nube.cambiarEmail(email);
+      cerrarHoja();
+      toast(r === 'confirmar' ? 'Revisá el correo nuevo y confirmá desde ahí' : 'Correo cambiado', 'mail');
+    } catch(e){
+      toast({ 'auth/invalid-credential':'La contraseña no coincide', 'auth/wrong-password':'La contraseña no coincide',
+        'auth/email-already-in-use':'Ese correo ya tiene cuenta', 'auth/invalid-email':'Ese correo no es válido',
+        'auth/operation-not-allowed':'Firebase pide confirmar el correo actual primero' }[e.code] || e.message, 'alert');
+    }
+    return;
+  }
+  Store.cambiar(s => { s.users.find(x => x.id === u.id).email = email; });
+  cerrarHoja(); toast('Correo cambiado', 'mail');
+};
+A['olvide-adentro'] = async () => {
+  const u = yo();
+  try { await Nube.recuperar(u.email); cerrarHoja(); toast('Te mandamos un correo para cambiarla', 'mail'); }
+  catch(e){ toast('No se pudo mandar: ' + e.message, 'alert'); }
+};
 A['demo'] = el => { entrarComo(el.dataset.v); toast(`Entraste como ${nombreDe(el.dataset.v)}`, 'login'); };
 A['ver-foto'] = async el => {
   const id = el.dataset.foto; const v = await Fotos.sacar(id);
@@ -408,6 +484,15 @@ function pintarInscripcion(token){
       <button class="btn btn-pri btn-block" data-a="ir-app">${I('login')}Ir a la app</button>
     </div></section>`;
 }
+F['completar'] = async d => {
+  const dni = soloDigitos(d.dni);
+  if (dni.length < 7 || dni.length > 9){ toast('Revisá el DNI', 'alert'); return; }
+  try {
+    const u = await Nube.completar({ nombre:d.nombre.trim(), casa:d.casa, dni, tel:(d.tel || '').trim() });
+    if (u.estado === 'aprobado'){ toast('Listo: quedás como Administración del barrio', 'shield'); location.reload(); }
+    else { toast('Ficha enviada. La Administración la revisa.', 'send'); pintarBienvenida('espera'); }
+  } catch(e){ toast('No se pudo guardar: ' + e.message, 'alert'); }
+};
 A['olvide'] = async () => {
   const email = prompt('¿Cuál es tu email?');
   if (!email) return;

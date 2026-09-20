@@ -92,11 +92,22 @@ const Nube = {
     const yoNodo = await this.db.ref('barrio/users/' + this.uid).get().catch(() => null);
     const mio = yoNodo && yoNodo.exists() ? yoNodo.val() : null;
     Store.sesion.userId = this.uid; Store.guardarSesion();
-    if (!mio){ /* todavía sin aprobar: solo puede ver su propio registro */
+    if (!mio){
+      /* Hay cuenta pero no hay ficha de vecino. Pasa cuando el alta quedó a
+         medias. Si el barrio todavía no tiene ninguna ficha, esta es la
+         primera y queda como Administración; si no, se completa y espera
+         aprobación. En los dos casos se le pide que complete sus datos. */
       s.users = [];
-      pintarBienvenida('espera');
-      this.escuchar('barrio/users/' + this.uid, v => { if (v && v.estado === 'aprobado') location.reload(); });
+      this.libre = false;
+      try { this.libre = !(await this.db.ref('barrio/publico/instalado').get()).exists(); } catch(e){}
+      pintarBienvenida('completar');
+      this.escuchar('barrio/users/' + this.uid, v => { if (v && v.estado === 'aprobado' && !this.arrancada) location.reload(); });
       return;
+    }
+    /* Si cambió el correo de la cuenta, la ficha lo toma al entrar. */
+    if (this.auth.currentUser.email && mio.email !== this.auth.currentUser.email){
+      mio.email = this.auth.currentUser.email;
+      this.db.ref('barrio/users/' + this.uid + '/email').set(mio.email).catch(() => {});
     }
     const staff = mio.rol === 'admin' || mio.rol === 'guardia';
     this.escucharColeccion('barrio', this.ZONAS.barrio);
@@ -217,7 +228,24 @@ const Nube = {
     if (primero) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
     return u;
   },
+  /* Completar la ficha de una cuenta que ya existe en Firebase. */
+  async completar(d){
+    const uid = this.uid;
+    const u = { id:uid, nombre:d.nombre, casa:d.casa, dni:d.dni, email:this.auth.currentUser.email, tel:d.tel || '',
+      rol: this.libre ? 'admin' : 'vecino', estado: this.libre ? 'aprobado' : 'pendiente',
+      consentimiento:Date.now(), createdAt:Date.now() };
+    await this.db.ref('barrio/users/' + uid).set(u);
+    if (this.libre) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
+    return u;
+  },
   async salir(){ try { await this.auth.signOut(); } catch(e){} },
   async cambiarClave(nueva){ return this.auth.currentUser.updatePassword(nueva); },
+  /* Cambio de correo: Firebase manda un aviso a la dirección nueva y el
+     cambio se hace efectivo cuando la persona lo confirma desde ahí. */
+  async cambiarEmail(nuevo){
+    const u = this.auth.currentUser;
+    if (u.verifyBeforeUpdateEmail) return u.verifyBeforeUpdateEmail(nuevo).then(() => 'confirmar');
+    return u.updateEmail(nuevo).then(() => 'listo');
+  },
   async recuperar(email){ return this.auth.sendPasswordResetEmail(email); },
 };
