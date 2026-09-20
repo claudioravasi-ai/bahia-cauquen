@@ -72,8 +72,8 @@ F['dm'] = (d, form) => {
   const i = $('#dmIn'); if (i){ i.value = ''; i.focus(); }
 };
 function marcarVistoLink(link){
-  const u = yo(); const pend = Store.s.notifs.filter(n => n.link === link && meToca(n, u) && !n.leidas.includes(u.id));
-  if (pend.length){ pend.forEach(n => n.leidas.push(u.id)); Store.guardar(); setTimeout(pintarTop, 0); }
+  const u = yo(); const pend = aLista(Store.s.notifs).filter(n => n.link === link && meToca(n, u) && !aLista(n.leidas).includes(u.id));
+  if (pend.length){ pend.forEach(n => listaDe(n, 'leidas').push(u.id)); Store.guardar(); setTimeout(pintarTop, 0); }
 }
 
 /* ---------- OBRAS EN EL BARRIO ---------- */

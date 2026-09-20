@@ -354,19 +354,41 @@ function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand'
   s.notifs.unshift({ id: uid(), para: [].concat(para), titulo, texto, icon, color, link, urgente, sonido: sonido || urgente, de: Store.sesion.userId, at: Date.now(), leidas: [] });
   if (s.notifs.length > 400) s.notifs.length = 400;
 }
+/* =========================================================
+   LO QUE LA BASE SE COME: LAS LISTAS VACÍAS
+   -------------------------------------------------------
+   Firebase no guarda listas ni objetos vacíos. Un aviso creado con
+   `leidas: []` llega a la base SIN ese campo, y al volver a leerlo
+   `n.leidas` es `undefined`. Entonces `n.leidas.includes(...)` revienta; y
+   como eso pasa dentro de `pintarTop()`, se rompe el dibujo entero: no
+   abren las ventanas, no se puede cambiar de modo, la app parece muerta.
+   Con `?local` no pasa nunca, porque los datos no dan esa vuelta por la
+   base: por eso la demo andaba y el barrio de verdad no.
+
+   Además, una lista con huecos vuelve como objeto `{0:…, 2:…}`.
+
+   `aLista()` devuelve siempre una lista, venga como venga. Se usa en todos
+   los lugares donde lo que se lee pudo haber pasado por la base. */
+const aLista = v => Array.isArray(v) ? v
+  : (v && typeof v === 'object') ? Object.keys(v).sort((a, b) => a - b).map(k => v[k])
+  : [];
+/* Igual que aLista, pero además deja el campo arreglado en el objeto, para
+   poder hacerle push sin que explote. */
+const listaDe = (obj, campo) => { const l = aLista(obj[campo]); obj[campo] = l; return l; };
+
 function meToca(n, u = yo()){
-  if (!u || n.de === u.id) return false;
-  return n.para.some(p => p === 'todos' || p === u.id || p === 'rol:' + u.rol || (p === 'staff' && (u.rol === 'admin' || u.rol === 'guardia')));
+  if (!u || !n || n.de === u.id) return false;
+  return aLista(n.para).some(p => p === 'todos' || p === u.id || p === 'rol:' + u.rol || (p === 'staff' && (u.rol === 'admin' || u.rol === 'guardia')));
 }
-const misNotifs = () => { const u = yo(); return u ? Store.s.notifs.filter(n => meToca(n, u)) : []; };
-const noLeidas = () => { const u = yo(); return misNotifs().filter(n => !n.leidas.includes(u.id)); };
+const misNotifs = () => { const u = yo(); return u ? aLista(Store.s.notifs).filter(n => meToca(n, u)) : []; };
+const noLeidas = () => { const u = yo(); return misNotifs().filter(n => !aLista(n.leidas).includes(u.id)); };
 
 /* Aviso del sistema operativo cuando la app está en segundo plano
    (en esta versión, mientras esté abierta en alguna pestaña). */
 let ultimoAvisoSO = Date.now();
 function avisosDelSistema(){
   const u = yo(); if (!u) return;
-  const nuevas = misNotifs().filter(n => n.at > ultimoAvisoSO && !n.leidas.includes(u.id));
+  const nuevas = misNotifs().filter(n => n.at > ultimoAvisoSO && !aLista(n.leidas).includes(u.id));
   ultimoAvisoSO = Date.now();
   /* Lo que escribe la guardia o la Administración suena y se anuncia arriba. */
   const conSonido = nuevas.filter(n => n.sonido);

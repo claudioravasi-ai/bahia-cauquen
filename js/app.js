@@ -110,7 +110,11 @@ function pintar(){
      puede dejar la app en blanco: se descarta y se vuelve al inicio. */
   while (PILA.length > 1 && !R[PILA[PILA.length - 1].id]) PILA.pop();
   sincronizarHistorial();
-  pintarTop();
+  /* La barra de arriba se dibuja aparte y con red: si algo de ahí falla (un
+     aviso mal formado, por ejemplo), antes se caía `pintar()` entero y la
+     app dejaba de responder a todo. Un encabezado incompleto se aguanta;
+     una app muda, no. */
+  try { pintarTop(); } catch(err){ console.error('Falló el encabezado', err); avisarFalla(err, 'encabezado'); }
   const lienzo = $('#lienzo');
   const activa = PILA[PILA.length - 1];
   const def = R[activa.id] || R[inicioId()];
@@ -131,10 +135,12 @@ function pintar(){
   lienzo.innerHTML = `<div class="lomos">${lomos}</div>` + `<section class="ventana ${PILA.length === 1 ? 'inicio' : ''} ${def.ancha ? 'ancha' : ''} ${ventanaNueva ? 'entra' : ''}" data-id="${activa.id}">${cab}<div class="cuerpo" id="cuerpo">${html}</div></section>`;
   lienzo.classList.toggle('apilado', PILA.length > 1);
   ventanaNueva = false;
-  despuesDePintar();
-  pintarAlarmas();
-  mostrarComunicado();
+  conRed('después de pintar', despuesDePintar);
+  conRed('alarmas', pintarAlarmas);
+  conRed('comunicados', mostrarComunicado);
 }
+/* Corre algo que adorna la pantalla sin dejar que se lleve puesto el resto. */
+function conRed(qué, fn){ try { fn(); } catch(err){ console.error('Falló ' + qué, err); avisarFalla(err, qué); } }
 const panelDeError = err => `<div class="aviso a-danger">${I('alert')}<div class="txt"><b>Esta ventana tuvo un problema</b>${esc(err.message)}
   <div class="acciones"><button class="btn btn-xs btn-sec" data-a="volver" data-i="0">Volver al inicio</button></div></div></div>`;
 
@@ -167,10 +173,10 @@ function refrescar(){
   for (const id in valores){ const el = document.getElementById(id); if (el){ if (el.type === 'checkbox') el.checked = valores[id]; else el.value = valores[id]; } }
   if (foco){ const el = document.getElementById(foco); if (el){ el.focus({ preventScroll:true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch(e){} } }
   cuerpo.scrollTop = y;
-  pintarTop();
-  despuesDePintar();
-  pintarAlarmas();
-  mostrarComunicado();
+  conRed('encabezado', pintarTop);
+  conRed('después de pintar', despuesDePintar);
+  conRed('alarmas', pintarAlarmas);
+  conRed('comunicados', mostrarComunicado);
 }
 
 /* =========================================================
@@ -538,16 +544,16 @@ function abrirNotifs(){
   const ns = misNotifs().slice(0, 60);
   hoja('Avisos', ns.length ? `
     <div class="row" style="justify-content:flex-end;margin:-4px 0 6px"><button class="btn btn-xs btn-sec" data-a="notifs-leidas">${I('check')}Marcar todo como leído</button></div>
-    ${ns.map(n => `<div class="notif ${n.leidas.includes(u.id) ? '' : 'nueva'}" data-a="notif" data-id="${n.id}">
+    ${ns.map(n => `<div class="notif ${aLista(n.leidas).includes(u.id) ? '' : 'nueva'}" data-a="notif" data-id="${n.id}">
       <span class="ic ic-${n.color}">${I(n.icon)}</span>
       <div class="txt"><b>${esc(n.titulo)}</b>${n.texto ? `<span>${esc(n.texto)}</span>` : ''}<time>${hace(n.at)}</time></div></div>`).join('')}`
     : `<div class="vacio">${I('bell')}No tenés avisos todavía.</div>`);
 }
 A['notifs'] = abrirNotifs;
-A['notifs-leidas'] = () => { const u = yo(); Store.cambiar(s => s.notifs.forEach(n => { if (meToca(n, u) && !n.leidas.includes(u.id)) n.leidas.push(u.id); })); abrirNotifs(); };
+A['notifs-leidas'] = () => { const u = yo(); Store.cambiar(s => aLista(s.notifs).forEach(n => { const l = listaDe(n, 'leidas'); if (meToca(n, u) && !l.includes(u.id)) l.push(u.id); })); abrirNotifs(); };
 A['notif'] = el => {
   const u = yo(); const n = Store.s.notifs.find(x => x.id === el.dataset.id); if (!n) return;
-  Store.cambiar(() => { if (!n.leidas.includes(u.id)) n.leidas.push(u.id); });
+  Store.cambiar(() => { const l = listaDe(n, 'leidas'); if (!l.includes(u.id)) l.push(u.id); });
   cerrarHoja();
   if (n.link){ const [id, p] = n.link.split(':'); abrir(id, p || ''); }
 };

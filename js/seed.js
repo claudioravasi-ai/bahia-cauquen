@@ -44,6 +44,8 @@ function seed(){
         desde:isoDe(new Date(n - 10*DIA)), hasta:isoDe(new Date(n + 40*DIA)), url:'' },
       { id:'pr3', titulo:'Noche para vecinos del barrio', detalle:'Alojamiento para familiares que vienen de visita', descuento:'15 %',
         desde:isoDe(new Date(n - 1*DIA)), hasta:isoDe(new Date(n + 60*DIA)), url:'' },
+      { id:'pr4', titulo:'Té de la tarde con vista al canal', detalle:'Todos los días de 16 a 18 h, sin reserva', descuento:'10 %',
+        desde:isoDe(new Date(n - 5*DIA)), hasta:isoDe(new Date(n + 90*DIA)), url:'' },
     ],
     posts: [
       { id:uid(), type:'aviso', title:'Corte de agua programado', body:'Mañana de 9 a 14 h se corta el agua por mantenimiento del tanque principal. Llenen una reserva.',

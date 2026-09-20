@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20260920-151735';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260920-151735',
-  './js/firebase-config.js?v=20260920-151735', './js/icons.js?v=20260920-151735', './js/agenda.js?v=20260920-151735', './js/padron.js?v=20260920-151735', './js/core.js?v=20260920-151735', './js/seed.js?v=20260920-151735', './js/clima.js?v=20260920-151735', './js/calendario.js?v=20260920-151735',
-  './js/v-inicio.js?v=20260920-151735', './js/v-comunidad.js?v=20260920-151735', './js/v-gestion.js?v=20260920-151735', './js/admin.js?v=20260920-151735', './js/v-vecinos.js?v=20260920-151735', './js/v-expensas.js?v=20260920-151735', './js/nube.js?v=20260920-151735', './js/app.js?v=20260920-151735',
+const CACHE = 'bhc-20260920-153316';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260920-153316',
+  './js/firebase-config.js?v=20260920-153316', './js/icons.js?v=20260920-153316', './js/agenda.js?v=20260920-153316', './js/padron.js?v=20260920-153316', './js/core.js?v=20260920-153316', './js/seed.js?v=20260920-153316', './js/clima.js?v=20260920-153316', './js/calendario.js?v=20260920-153316',
+  './js/v-inicio.js?v=20260920-153316', './js/v-comunidad.js?v=20260920-153316', './js/v-gestion.js?v=20260920-153316', './js/admin.js?v=20260920-153316', './js/v-vecinos.js?v=20260920-153316', './js/v-expensas.js?v=20260920-153316', './js/nube.js?v=20260920-153316', './js/app.js?v=20260920-153316',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

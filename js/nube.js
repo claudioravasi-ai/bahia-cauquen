@@ -51,6 +51,52 @@ const Nube = {
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos'],
   },
 
+  /* =========================================================
+     LO QUE LA BASE SE COME
+     -------------------------------------------------------
+     Firebase no guarda listas ni objetos vacíos: `comments: []` o
+     `reactions: {}` desaparecen, y al leerlos vuelven como `undefined`.
+     Después, `x.comments.map(...)` revienta y se lleva puesta la ventana
+     entera. Con `?local` no se nota, porque los datos no pasan por la base:
+     por eso la demo anda y el barrio de verdad no.
+
+     Acá está, por colección, qué campos son lista y cuáles objeto. Todo lo
+     que baja pasa por `comoLaGuardamos()` antes de entrar al estado, así el
+     resto de la app puede confiar en que están. Poner un campo de más no
+     molesta; que falte uno rompe la app. */
+  FORMAS: {
+    users:           { listas:['mascotas','vehiculos'] },
+    posts:           { listas:['comments','voy'], objetos:['reactions'] },
+    notifs:          { listas:['para','leidas'] },
+    notifsTodos:     { listas:['para','leidas'] },
+    privados:        { listas:['msgs'] },
+    dms:             { listas:['msgs'] },
+    msgs:            { listas:[] },
+    pases:           { listas:['dias','listaInvitados'], objetos:['log'] },
+    solicitudesPase: { listas:['dias'], objetos:['log'] },
+    reservas:        { listas:['listaInvitados'] },
+    reclamos:        { listas:['apoyos','historial'] },
+    peticiones:      { listas:['apoyos','historial','firmas'] },
+    votaciones:      { listas:['opciones'], objetos:['votos'] },
+    comunicados:     { listas:['vistos'], objetos:['respuestas'] },
+    compras:         { listas:['anotados'] },
+    viajes:          { listas:['anotados'] },
+    obras:           { listas:['historial'], objetos:['avisoHoy'] },
+    infracciones:    { listas:['historial'] },
+    liquidaciones:   { listas:['filas'] },
+    documentos:      { listas:['versiones'] },
+    padron:          { listas:['titulares'] },
+    amenities:       { listas:['franjas'] },
+    cruceros:        { listas:['escalas'] },
+  },
+  comoLaGuardamos(col, x){
+    const f = this.FORMAS[col];
+    if (!f || !x || typeof x !== 'object') return x;
+    (f.listas || []).forEach(k => { x[k] = aLista(x[k]); });
+    (f.objetos || []).forEach(k => { if (!x[k] || typeof x[k] !== 'object' || Array.isArray(x[k])) x[k] = {}; });
+    return x;
+  },
+
   /* De quién es cada cosa de la zona privada (puede ser de más de uno). */
   duenos(col, x){
     switch (col){
@@ -60,13 +106,13 @@ const Nube = {
       case 'pases': case 'solicitudesPase': case 'llegadas': case 'paquetes': return [x.hostId];
       case 'infracciones': case 'pagos': case 'recibos':
         return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
-      case 'notifs': return x.para.filter(p => p && !String(p).startsWith('rol:') && p !== 'todos' && p !== 'staff');
+      case 'notifs': return aLista(x.para).filter(p => p && !String(p).startsWith('rol:') && p !== 'todos' && p !== 'staff');
       default: return [];
     }
   },
   /* Un aviso para todos o para un rol no puede ir a la carpeta de nadie:
      va al pizarrón de avisos del barrio, y cada uno filtra lo suyo. */
-  esNotifGeneral: n => n.para.some(p => p === 'todos' || p === 'staff' || String(p).startsWith('rol:')),
+  esNotifGeneral: n => aLista(n.para).some(p => p === 'todos' || p === 'staff' || String(p).startsWith('rol:')),
 
   async iniciar(){
     if (!this.activa()) return false;
@@ -114,7 +160,7 @@ const Nube = {
     /* La ficha propia entra al estado antes de escuchar nada: así la app se
        dibuja ya logueada y no aparece un parpadeo del portal mientras bajan
        las colecciones. */
-    Store.s.users = [mio];
+    Store.s.users = [this.comoLaGuardamos('users', mio)];
     Store.sesion.visitaAnterior = Store.sesion.ultimaVisita || 0;
     Store.sesion.ultimaVisita = Date.now();
     Store.guardarSesion();
@@ -151,6 +197,12 @@ const Nube = {
       eventosCiudad: eventosCiudadIniciales(),
       contactos: JSON.parse(JSON.stringify(CONTACTOS)),
       documentos: base.documentos,
+      /* Promociones de ejemplo, para que la tira del hotel se vea desde el
+         primer día y se entienda para qué sirve. Son de muestra: la
+         Administración las edita o las borra en Contenido → Promociones, y
+         si pone la dirección del lector en Ajustes, las reemplazan las que
+         publica el hotel. */
+      promos: base.promos,
     };
     let puestos = 0;
     for (const col in arranque){
@@ -189,7 +241,7 @@ const Nube = {
     cols.forEach(col => {
       this.db.ref(`${base}/${col}`).on('value', snap => {
         const v = snap.val() || {};
-        const arr = Object.keys(v).map(k => v[k]);
+        const arr = Object.keys(v).map(k => this.comoLaGuardamos(col, v[k]));
         if (col === 'notifsTodos') Store.s.notifs = [...arr, ...Store.s.notifs.filter(n => !this.esNotifGeneral(n))];
         else if (col === 'notifs') Store.s.notifs = [...Store.s.notifs.filter(n => this.esNotifGeneral(n)), ...arr];
         else Store.s[col] = arr;
@@ -208,7 +260,7 @@ const Nube = {
       this.ZONAS.privado.forEach(c => juntado[c] = []);
       Object.keys(v).forEach(uid => this.ZONAS.privado.forEach(col => {
         const nodo = v[uid] && v[uid][col];
-        if (nodo) Object.keys(nodo).forEach(id => { if (!juntado[col].some(x => x.id === id)) juntado[col].push(nodo[id]); });
+        if (nodo) Object.keys(nodo).forEach(id => { if (!juntado[col].some(x => x.id === id)) juntado[col].push(this.comoLaGuardamos(col, nodo[id])); });
       }));
       this.ZONAS.privado.forEach(col => {
         if (col === 'notifs') Store.s.notifs = [...Store.s.notifs.filter(n => this.esNotifGeneral(n)), ...juntado.notifs].sort((a, b) => b.at - a.at);

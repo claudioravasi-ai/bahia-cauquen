@@ -163,8 +163,8 @@ function marcarVisto(link){
   const u = yo(); if (!u) return;
   const clave = link === 'pizarron' ? 'pizarronVisto' : link === 'chat' ? 'chatVisto' : null;
   if (clave){ Store.sesion[clave] = Date.now(); Store.guardarSesion(); }
-  const pend = Store.s.notifs.filter(n => n.link && n.link.split(':')[0] === link && meToca(n, u) && !n.leidas.includes(u.id));
-  if (pend.length){ pend.forEach(n => n.leidas.push(u.id)); Store.guardar(); setTimeout(pintarTop, 0); }
+  const pend = aLista(Store.s.notifs).filter(n => n.link && n.link.split(':')[0] === link && meToca(n, u) && !aLista(n.leidas).includes(u.id));
+  if (pend.length){ pend.forEach(n => listaDe(n, 'leidas').push(u.id)); Store.guardar(); setTimeout(pintarTop, 0); }
 }
 
 /* ---------- CHAT ---------- */
