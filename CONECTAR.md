@@ -50,26 +50,40 @@ aprobar.
 
 ## 5. Vuelos y cruceros
 
-Los servicios de vuelos (Aeropuertos Argentina, OpenSky, adsb.lol, adsb.fi) no
-dejan que una página los consulte directo: hay que pedírselos desde un
-servidor. Un Worker de Cloudflare, como el de NiJu, alcanza y es gratis.
+**Arribos y partidas: ya funcionan, sin configurar nada.** El aeropuerto de
+Ushuaia no es de Aeropuertos Argentina (esa API nunca va a devolver vuelos de
+USH: el aeropuerto lo opera London Supply). El tablero bueno es este, y deja
+que la app lo lea directo porque responde con `access-control-allow-origin: *`:
 
-Su URL va en **Administración → Ajustes → Vuelos**. La app le agrega `?apt=USH`
-y espera una respuesta así:
+- `https://flightstats.londonsupplygroup.com/arribos-USH`
+- `https://flightstats.londonsupplygroup.com/partidas-USH`
+
+La app lee esas dos páginas, las decodifica en iso-8859-1 y saca de cada fila
+la aerolínea, el vuelo, el origen o destino, el horario, la estima, el estado y
+la puerta. Si alguna vez cambian el diseño de esa página hay que tocar
+`Vuelos.fila()` en `js/v-gestion.js`.
+
+**Aviones en vivo (opcional).** Para ver los aviones que están en el aire sobre
+el barrio sí hace falta un servidor propio: los servicios de ADS-B (OpenSky,
+adsb.lol, adsb.fi) no dejan que una página los consulte directo. Ojo que hoy
+casi no hay antenas que cubran Tierra del Fuego, así que lo más probable es que
+la lista venga vacía aunque el Worker ande. Un Worker de Cloudflare, como el de
+NiJu, alcanza y es gratis.
+
+Su URL va en **Administración → Ajustes → Aviones en vivo**. La app le agrega
+`?apt=USH` y espera una respuesta así:
 
 ```json
-{ "arr": [...], "dep": [...], "states": [...] }
+{ "states": [...] }
 ```
 
-Worker mínimo, con los aviones en vivo sobre el barrio:
+Worker mínimo:
 
 ```js
 export default {
   async fetch(request) {
     const cors = { 'content-type':'application/json', 'access-control-allow-origin':'*' };
-    const salida = { arr: [], dep: [], states: [] };
-
-    // Aviones en el aire alrededor de Ushuaia
+    const salida = { states: [] };
     try {
       const r = await fetch('https://api.adsb.lol/v2/lat/-54.84/lon/-68.30/dist/60');
       const j = await r.json();
@@ -80,14 +94,17 @@ export default {
         suelo: a.alt_baro === 'ground'
       }));
     } catch (e) {}
-
-    // Arribos y partidas: si conseguís una fuente con clave (por ejemplo
-    // AeroDataBox), la llamada va acá y se llenan arr y dep.
-
     return new Response(JSON.stringify(salida), { headers: cors });
   }
 };
 ```
+
+**El avión que cruza la pantalla.** Cuando un vuelo pasa por arriba del barrio,
+la app cruza un avión por la pantalla con el número de vuelo. Sin Worker se
+calcula con el tablero (los que llegan pasan entre 5 y 1 minuto antes de
+aterrizar; los que salen, entre 1 y 5 minutos después de despegar). Con Worker
+manda el avión de verdad. Cada vecino lo puede apagar desde la ventana de
+Vuelos.
 
 **Cruceros.** El puerto no publica un servicio para consultar. El calendario de
 recaladas se carga desde **Administración → Contenido → Recaladas de cruceros**

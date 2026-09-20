@@ -519,97 +519,176 @@ A['nuevo-evento-ciudad'] = () => hoja('Sumar un evento de la ciudad', `<form dat
 F['evento-ciudad'] = d => { Store.cambiar(s => s.eventosCiudad.push({ id:uid(), titulo:d.titulo.trim(), tipo:d.tipo, fecha:d.fecha, hora:d.hora, lugar:d.lugar, link:d.link, nota:'', por:yo().id })); cerrarHoja(); toast('Evento sumado', 'calendar'); };
 
 /* ---------- VUELOS USH ----------
-   Aeropuertos Argentina publica arribos y partidas. Su servicio acepta
-   pedidos desde otras páginas, pero a veces responde vacío: en ese caso
-   se muestran los enlaces oficiales. Con un Worker propio (vuelosProxy)
-   se suman además los aviones en vivo de OpenSky sobre el barrio. */
+   El aeropuerto de Ushuaia no es de Aeropuertos Argentina: su tablero lo
+   publica London Supply en flightstats.londonsupplygroup.com, y ese sí deja
+   que la app lo lea directo (manda access-control-allow-origin: *). De ahí
+   salen arribos y partidas del día, con estado, estima y puerta.
+   El Worker del barrio (Ajustes → Vuelos) ya no hace falta para el tablero:
+   queda solo para ver los aviones en vivo sobre el barrio. */
 const Vuelos = {
-  KEY:'bhc.vuelos', d:null, estado:'', cargando:null,
+  KEY:'bhc.vuelos', TABLERO:'https://flightstats.londonsupplygroup.com/', d:null, estado:'', cargando:null,
   leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
   cuantosHoy(){ return this.d && Date.now() - this.d.t < 6 * HORA ? (this.d.arr.length + this.d.dep.length) || '' : ''; },
   campo(o, ...ks){ for (const k of ks) if (o && o[k] != null && o[k] !== '') return o[k]; return ''; },
-  normalizar(x, tipo){
-    const h = String(this.campo(x, 'stda', 'sched', 'std', 'sta', 'scheduled', 'hora', 'fecha')).match(/(\d{1,2}):(\d{2})/);
-    return { tipo, nro:this.campo(x, 'nro', 'flight', 'vuelo') || `${this.campo(x, 'idaerolinea', 'id_airline', 'airline')} ${this.campo(x, 'flight_number', 'numero')}`.trim(),
-      aerolinea:this.campo(x, 'aerolinea', 'airline_name', 'airline', 'idaerolinea'), lugar:this.campo(x, 'destorig', 'destino', 'origen', 'city', 'ciudad'),
-      hora:h ? `${pad(h[1])}:${h[2]}` : '', estado:this.campo(x, 'estes', 'estado', 'status', 'remark'), real:String(this.campo(x, 'atda', 'etda', 'actual', 'estimated')).match(/\d{1,2}:\d{2}/)?.[0] || '' };
+  hhmm(x){ const m = String(x || '').match(/(\d{1,2}):(\d{2})/); return m ? `${pad(m[1])}:${m[2]}` : ''; },
+
+  /* Una fila del tablero de London Supply. Las columnas son siempre las
+     mismas: aerolínea, vuelo, procedencia o destino, horario, estima,
+     estado y puerta. */
+  fila(li, tipo){
+    const txt = c => (li.querySelector('.' + c)?.textContent || '').replace(/\s+/g, ' ').trim();
+    const lugar = txt('c3');
+    return { tipo, nro:txt('c2'), aerolinea:li.querySelector('.c1 img')?.getAttribute('alt') || '',
+      lugar:lugar.replace(/^\(([A-Z]{3})\)\s*/, '').trim() || lugar, iata:(lugar.match(/^\(([A-Z]{3})\)/) || [])[1] || '',
+      hora:this.hhmm(txt('c4')), real:this.hhmm(txt('c5')), estado:txt('c6'), puerta:txt('c7') };
   },
-  /* Orden de fuentes:
-     1. El Worker del barrio (Ajustes → Vuelos), que puede leer cualquier
-        servicio sin la traba que los navegadores le ponen a las páginas.
-     2. El listado de Aeropuertos Argentina, por si vuelve a responder.
-     Si no hay ninguna, la ventana lo dice y ofrece los enlaces oficiales. */
+  /* La página viene en iso-8859-1: si se lee como UTF-8 los acentos salen rotos. */
+  async tablero(mov, tipo){
+    const r = await fetch(this.TABLERO + mov + '-USH', { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const doc = new DOMParser().parseFromString(new TextDecoder('iso-8859-1').decode(await r.arrayBuffer()), 'text/html');
+    const act = (doc.querySelector('.inf-act')?.textContent || '').match(/(\d{1,2}:\d{2})hs\s*$/);
+    return { filas:[...doc.querySelectorAll('li.dl')].map(li => this.fila(li, tipo)).filter(v => v.nro), act:act ? act[1] : '' };
+  },
+
+  /* Aviones en el aire sobre el barrio. Los servicios de ADS-B no se dejan
+     leer desde una página, así que esto sale solo si hay Worker propio. */
+  normalizarVivo(v){
+    return Array.isArray(v)
+      ? { callsign:(v[1] || '').trim(), alt:Math.round(v[7] || 0), vel:Math.round((v[9] || 0) * 3.6), suelo:v[8] }
+      : { callsign:v.callsign || v.flight || '', alt:v.alt || 0, vel:v.vel || 0, suelo:v.suelo };
+  },
+  async vivos(){
+    const px = Store.s.config.vuelosProxy;
+    if (!px) return null;
+    try {
+      const j = await fetch(px + (px.includes('?') ? '&' : '?') + 'apt=USH').then(r => r.json());
+      return (j.states || j.vivos || []).map(v => this.normalizarVivo(v));
+    } catch(e){ return null; }
+  },
+
   async pedir(forzar = false){
     if (!forzar && this.d && Date.now() - this.d.t < 5 * MIN) return this.d;
     if (this.cargando) return this.cargando;
-    const px = Store.s.config.vuelosProxy;
     this.cargando = (async () => {
-      if (px){
-        try {
-          const j = await fetch(px + (px.includes('?') ? '&' : '?') + 'apt=USH').then(r => r.json());
-          const arr = (j.arr || j.arribos || []).map(x => this.normalizar(x, 'A'));
-          const dep = (j.dep || j.partidas || []).map(x => this.normalizar(x, 'D'));
-          const vivos = (j.states || j.vivos || []).map(v => Array.isArray(v)
-            ? { callsign:(v[1] || '').trim(), alt:Math.round(v[7] || 0), vel:Math.round((v[9] || 0) * 3.6), suelo:v[8] }
-            : { callsign:v.callsign || v.flight || '', alt:v.alt || 0, vel:v.vel || 0, suelo:v.suelo });
-          if (arr.length || dep.length || vivos.length){
-            this.estado = 'ok';
-            this.d = { t:Date.now(), arr, dep, vivos };
-            try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
-            return this.d;
-          }
-        } catch(e){ this.estado = 'proxy-falla'; }
-      }
-      const base = 'https://webaa-api-h4d5amdfcze7hthn.a02.azurefd.net/web-prod/v1/api-aa/all-flights';
-      const f = hoyISO().split('-').reverse().join('-');
-      const traer = mov => fetch(`${base}?c=900&idarpt=USH&movtp=${mov}&f=${f}`).then(r => r.ok ? r.text() : '[]')
-        .then(t => { try { const j = JSON.parse(t || '[]'); return Array.isArray(j) ? j : (j.data || j.vuelos || []); } catch(e){ return []; } }).catch(() => null);
-      const [a, d] = await Promise.all([traer('A'), traer('D')]);
-      if (a === null && d === null){ this.estado = navigator.onLine ? 'sin-fuente' : 'sin-conexion'; return this.d; }
-      if (!(a || []).length && !(d || []).length){ this.estado = 'sin-fuente'; return this.d; }
+      const [a, d, vivos] = await Promise.all([
+        this.tablero('arribos', 'A').catch(() => null),
+        this.tablero('partidas', 'D').catch(() => null),
+        this.vivos(),
+      ]);
+      if (!a && !d){ this.estado = navigator.onLine ? 'sin-fuente' : 'sin-conexion'; return this.d; }
       this.estado = 'ok';
-      this.d = { t:Date.now(), arr:(a || []).map(x => this.normalizar(x, 'A')), dep:(d || []).map(x => this.normalizar(x, 'D')), vivos:[] };
+      this.d = { t:Date.now(), arr:a?.filas || [], dep:d?.filas || [], act:a?.act || d?.act || '', vivos:vivos || [] };
       try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
       return this.d;
     })().finally(() => { this.cargando = null; });
     return this.cargando;
   },
+
+  /* ¿Hay un avión pasando por arriba del barrio ahora mismo?
+     El barrio está a 6 km de la cabecera, bajo la traza: los que llegan
+     pasan unos minutos antes de tocar tierra y los que salen, poco después
+     de despegar. Si hay Worker, lo que manda es el avión de verdad. */
+  minutos(h){ const m = String(h || '').match(/(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; },
+  sobrevuelos(){
+    const d = this.d; if (!d) return [];
+    const ahora = new Date(), min = ahora.getHours() * 60 + ahora.getMinutes(), lista = [];
+    (d.vivos || []).filter(v => !v.suelo && v.alt && v.alt < 4500).forEach(v => lista.push({
+      clave:'vivo-' + (v.callsign || v.alt), titulo:v.callsign || 'Un avión sobre el barrio',
+      detalle:`${v.alt} m de altura · ${v.vel} km/h`, sentido:'A', vivo:true }));
+    const cerca = (t, desde, hasta) => t !== null && min - t >= desde && min - t <= hasta;
+    (d.arr || []).forEach(v => { if (/cancel/i.test(v.estado)) return;
+      if (cerca(this.minutos(v.real || v.hora), -5, -1)) lista.push({ clave:'a-' + v.nro + (v.real || v.hora),
+        titulo:`${v.nro} está llegando`, detalle:`Viene de ${v.lugar} · aterriza ${v.real || v.hora}`, sentido:'A', vivo:false }); });
+    (d.dep || []).forEach(v => { if (/cancel/i.test(v.estado)) return;
+      if (cerca(this.minutos(v.real || v.hora), 1, 5)) lista.push({ clave:'d-' + v.nro + (v.real || v.hora),
+        titulo:`${v.nro} acaba de despegar`, detalle:`Va a ${v.lugar} · salió ${v.real || v.hora}`, sentido:'D', vivo:false }); });
+    return lista;
+  },
 };
 Vuelos.leer();
+
+/* ---------- EL AVIÓN QUE CRUZA LA APP ----------
+   Cuando pasa un avión por arriba del barrio, cruza uno por la pantalla.
+   Es un aviso, no una ventana: no tapa nada ni se puede tocar. Cada vuelo
+   se muestra una sola vez y se puede apagar desde la ventana de Vuelos. */
+const Avion = {
+  KEY:'bhc.avion.vistos', PREF:'bhc.avion', timer:null, volando:false,
+  encendido(){ return localStorage.getItem(this.PREF) !== 'no'; },
+  prender(v){ try { localStorage.setItem(this.PREF, v ? 'si' : 'no'); } catch(e){} },
+  vistos(){ try { return JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch(e){ return {}; } },
+  marcar(clave){ const v = this.vistos(); const lim = Date.now() - 6 * HORA;
+    Object.keys(v).forEach(k => { if (v[k] < lim) delete v[k]; });
+    v[clave] = Date.now(); try { localStorage.setItem(this.KEY, JSON.stringify(v)); } catch(e){} },
+
+  arrancar(){
+    if (this.timer) return;
+    this.timer = setInterval(() => this.mirar(), 45000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.mirar(); });
+    this.mirar();
+  },
+  mirar(){
+    if (document.hidden || this.volando || !this.encendido() || !yo()) return;
+    Vuelos.pedir().then(() => {
+      const v = Vuelos.sobrevuelos().find(x => !(x.clave in this.vistos()));
+      if (v){ this.marcar(v.clave); this.pasar(v); }
+    }).catch(() => {});
+  },
+
+  pasar(v){
+    if (this.volando) return;
+    this.volando = true;
+    const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const el = document.createElement('div');
+    el.className = 'sobrevuelo' + (v.sentido === 'D' ? ' vuelve' : '') + (quieto ? ' quieto' : '');
+    el.innerHTML = `<div class="avion">${I('send')}<span class="estela"></span></div>
+      <div class="avion-cartel"><b>${esc(v.titulo)}</b><span>${esc(v.detalle)}${v.vivo ? ' · en vivo' : ''}</span></div>`;
+    document.body.appendChild(el);
+    const fin = () => { el.remove(); this.volando = false; };
+    el.querySelector('.avion').addEventListener('animationend', fin);
+    setTimeout(fin, quieto ? 5000 : 17000);
+    el.querySelector('.avion-cartel').addEventListener('click', () => { fin(); abrir('vuelos'); });
+  },
+};
+
 R.vuelos = {
   titulo: 'Vuelos de Ushuaia', icon: 'send', color: 'accent', sub: 'Aeropuerto Malvinas Argentinas · a 6 km del barrio',
   render(){
     const d = Vuelos.d, hay = d && (d.arr.length || d.dep.length);
-    const fila = v => `<div class="it"><div class="mono" style="font-weight:800;width:52px">${esc(v.hora)}</div><div class="txt"><b>${esc(v.lugar)}</b><span>${esc(v.nro)}${v.aerolinea ? ' · ' + esc(v.aerolinea) : ''}</span></div>
-      <span class="pill ${/cancel/i.test(v.estado) ? 'p-danger' : /demor|delay/i.test(v.estado) ? 'p-warn' : /aterr|arrib|desp|landed|departed/i.test(v.estado) ? 'p-ok' : ''}">${esc(v.estado || (v.real ? 'Est. ' + v.real : 'Programado'))}</span></div>`;
+    const fila = v => `<div class="it"><div class="mono" style="font-weight:800;width:52px">${esc(v.hora)}</div><div class="txt"><b>${esc(v.lugar)}</b><span>${esc(v.nro)}${v.aerolinea ? ' · ' + esc(v.aerolinea) : ''}${v.puerta ? ' · puerta ' + esc(v.puerta) : ''}</span></div>
+      <span class="pill ${/cancel/i.test(v.estado) ? 'p-danger' : /demor|delay/i.test(v.estado) ? 'p-warn' : /aterr|arrib|despeg|landed|departed/i.test(v.estado) ? 'p-ok' : ''}">${esc(v.estado || (v.real ? 'Est. ' + v.real : 'Programado'))}</span></div>`;
     const porHora = {}; if (hay) [...d.arr, ...d.dep].forEach(v => { const h = v.hora.slice(0, 2); if (h) porHora[h] = (porHora[h] || 0) + 1; });
-    const horas = Object.keys(porHora).sort();
+    const horas = Object.keys(porHora).sort(), pico = Math.max(1, ...Object.values(porHora));
     const estados = {
       '': `<div class="vacio">${I('refresh')}Buscando los vuelos de hoy…</div>`,
-      'sin-fuente': aviso('info', 'info', 'El listado oficial no se puede leer desde la app',
-        'Aeropuertos Argentina dejó de responder a otras páginas. Con el Worker del barrio configurado (Ajustes → Vuelos) vuelven a verse acá, con los aviones en vivo. Mientras tanto, los enlaces de abajo llevan al listado oficial.'),
-      'proxy-falla': aviso('warn', 'alert', 'El Worker del barrio no respondió', 'Revisá la dirección en Administración → Ajustes → Vuelos.'),
+      'sin-fuente': aviso('info', 'info', 'No se pudo leer el tablero del aeropuerto',
+        'El tablero lo publica London Supply y a veces no responde. Probá de nuevo en un rato o mirá el sitio oficial acá abajo.'),
       'sin-conexion': aviso('warn', 'cloud', 'Sin internet', 'Cuando vuelva la conexión, se actualiza solo.'),
     };
     return `${hay ? '' : (estados[Vuelos.estado] || estados[''])}
       ${hay ? `<div class="garita-kpis"><div class="kpi"><b>${d.arr.length}</b><span>Arribos</span></div><div class="kpi"><b>${d.dep.length}</b><span>Partidas</span></div><div class="kpi"><b>${d.arr.length + d.dep.length}</b><span>Hoy</span></div></div>
-        ${horas.length ? `<div class="card"><b style="font-size:14px">Movimientos por hora</b><div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">${horas.map(h => `<div style="flex:1;text-align:center"><div style="height:${porHora[h] * 16}px;background:var(--g-accent);border-radius:4px 4px 0 0"></div><div class="tiny muted">${h}</div></div>`).join('')}</div>
+        ${horas.length ? `<div class="card"><b style="font-size:14px">Movimientos por hora</b><div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">${horas.map(h => `<div style="flex:1;text-align:center"><div style="height:${Math.round(porHora[h] / pico * 56) + 4}px;background:var(--g-accent);border-radius:4px 4px 0 0"></div><div class="tiny muted">${h}</div></div>`).join('')}</div>
           <p class="muted tiny" style="margin:8px 0 0">El barrio está bajo la traza de aproximación: así se ve cuándo hay más movimiento.</p></div>` : ''}
         ${sec('Arribos')}<div class="card lista">${d.arr.map(fila).join('') || vacio('send', 'Sin arribos')}</div>
         ${sec('Partidas')}<div class="card lista">${d.dep.map(fila).join('') || vacio('send', 'Sin partidas')}</div>` : ''}
       ${d?.vivos?.length ? sec('En el aire ahora, cerca del barrio') + `<div class="card lista">${d.vivos.map(v => `<div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('send')}</span>
         <div class="txt"><b>${esc(v.callsign || 'Sin identificar')}</b><span>${v.suelo ? 'En tierra' : `${v.alt} m de altura · ${v.vel} km/h`}</span></div></div>`).join('')}</div>` : ''}
+      ${sec('Cuando pasa un avión')}
+      ${superficie({ a:'avion-aviso', icon:'send', color:Avion.encendido() ? 'ok' : 'accent', t:Avion.encendido() ? 'Avisarme: está activado' : 'Avisarme: está apagado',
+        s:'Cruza un avión por la pantalla cuando uno sobrevuela el barrio' })}
+      <p class="muted tiny">Los que llegan pasan por el barrio unos minutos antes de aterrizar y los que salen, al ratito de despegar. ${Store.s.config.vuelosProxy ? 'Con el Worker configurado se avisa con el avión real.' : 'Se calcula con el horario del tablero.'}</p>
       ${sec('Ver en el sitio oficial')}
-      ${superficie({ a:'link', v:'https://www.aeropuertosargentina.com/es/vuelos?movtp=arribos&idarpt=USH', icon:'login', color:'accent', t:'Arribos a Ushuaia', s:'Aeropuertos Argentina · horarios y estado' })}
-      ${superficie({ a:'link', v:'https://www.aeropuertosargentina.com/es/vuelos?movtp=partidas&idarpt=USH', icon:'logout', color:'accent', t:'Partidas de Ushuaia', s:'Aeropuertos Argentina' })}
+      ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/arribos-USH', icon:'login', color:'accent', t:'Arribos a Ushuaia', s:'Tablero del aeropuerto · horarios y estado' })}
+      ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/partidas-USH', icon:'logout', color:'accent', t:'Partidas de Ushuaia', s:'Tablero del aeropuerto' })}
       ${superficie({ a:'link', v:'https://www.flightradar24.com/-54.84,-68.30/11', icon:'eye', color:'sky', t:'Mapa de aviones en vivo', s:'Flightradar24 sobre el barrio' })}
-      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'brand', t:'Configurar el Worker de vuelos', s:'Para ver arribos, partidas y aviones en vivo dentro de la app' }) : ''}
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'brand', t:'Configurar el Worker de vuelos', s:'Opcional: para ver los aviones en vivo dentro de la app' }) : ''}
       <button class="btn btn-sec btn-block" data-a="vuelos-actualizar">${I('refresh')}Actualizar</button>
-      ${d ? `<p class="muted tiny center">Última actualización: ${hora(d.t)}</p>` : ''}`;
+      ${d ? `<p class="muted tiny center">Última actualización: ${hora(d.t)}${d.act ? ` · el aeropuerto actualizó ${d.act}` : ''}</p>` : ''}`;
   },
   alPintar(){ if (!Vuelos.d || Date.now() - Vuelos.d.t > 5 * MIN) Vuelos.pedir().then(() => { if (PILA.at(-1)?.id === 'vuelos') refrescar(); }); },
 };
 A['vuelos-actualizar'] = () => Vuelos.pedir(true).then(() => { refrescar(); toast('Vuelos actualizados', 'refresh'); });
+A['avion-aviso'] = () => { Avion.prender(!Avion.encendido()); refrescar(); toast(Avion.encendido() ? 'Te avisamos cuando pase un avión' : 'Aviso de aviones apagado', 'send'); };
 A['link'] = el => window.open(el.dataset.v, '_blank', 'noopener');
 
 /* ---------- MI CASA ---------- */

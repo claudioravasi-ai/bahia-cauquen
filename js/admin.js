@@ -229,7 +229,7 @@ const ADMIN_TABS = {
         <label class="check"><input type="checkbox" name="exp_empleados" ${c.exp?.empleados ? 'checked' : ''}><span>El barrio tiene personal propio (corresponde F.931 todos los meses)</span></label></div>
       <div class="card"><h3>Correo</h3><p class="muted small" style="margin-top:0">Para que la app mande los mails de inscripción y claves. Instrucciones en <span class="mono">apps-script/Codigo.gs</span>.</p>
         ${campo('correoUrl', 'URL del Apps Script (termina en /exec)', 'url')}${campo('correoClave', 'Frase compartida', 'password')}</div>
-      <div class="card"><h3>Vuelos en vivo (opcional)</h3>${campo('vuelosProxy', 'URL del Worker que reenvía OpenSky', 'url', 'Ver CONECTAR.md. Sin esto se muestran igual arribos y partidas.')}</div>
+      <div class="card"><h3>Aviones en vivo (opcional)</h3>${campo('vuelosProxy', 'URL del Worker que reenvía ADS-B', 'url', 'Ver CONECTAR.md. Arribos y partidas se leen solos del tablero del aeropuerto: esto es solo para ver los aviones que están en el aire.')}</div>
       <button class="btn btn-pri btn-block">${I('check')}Guardar ajustes</button></form>`;
   },
   motor(){

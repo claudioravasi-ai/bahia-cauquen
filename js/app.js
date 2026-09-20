@@ -311,15 +311,14 @@ function pintarBienvenida(modo = 'inicio'){
 
   $('#app').innerHTML = `
     <div class="portal">
-      <div class="portal-foto" style="background-image:url('${Clima.portada()}')">
-        <div class="portal-marca"><span class="logo">${LOGO}</span>
-          <div><b>Barrio ${esc(c.nombre)}</b><small>${esc(c.ciudad)}</small></div></div>
+      <div class="portal-foto" style="background-image:url('${Clima.portada()}')"></div>
+      <div class="portal-contenido">
+        <header class="portal-marca"><span class="logo">${LOGO}</span>
+          <div><b>Barrio ${esc(c.nombre)}</b><small>${esc(c.ciudad)}</small></div></header>
         <div class="portal-lema"><h1>La vida del barrio,<br>en un solo lugar.</h1>
           ${(() => { const cl = Clima.d?.c; if (!cl) return '';
             const [desc, ico] = Clima.cod(cl.weather_code);
             return `<div class="portal-clima">${I(ico)}<b>${Math.round(cl.temperature_2m)}°</b><span>${esc(desc)} · ráfagas ${Math.round(cl.wind_gusts_10m)} km/h</span></div>`; })()}</div>
-      </div>
-      <div class="portal-panel">
         <div class="portal-caja">
           <header class="portal-cab"><h2>${esc(titulo)}</h2><p>${esc(bajada)}</p></header>
           ${cuerpo}
@@ -705,6 +704,7 @@ async function arrancar(){
     else pintar();
     Motor.correr();
     setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescar(); }, 60000);
+    Avion.arrancar();
     Clima.pedir().then(() => { if (yo()) refrescar(); });
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
     return;
@@ -720,9 +720,10 @@ async function arrancar(){
     sosVistos = new Set(Store.s.sos.map(s => s.id));
   }
   pintar();
-  Clima.pedir().then(() => { if (yo() && PILA.length === 1) refrescar(); else if (!yo()) { const f = $('.bienvenida .foto'); if (f) f.style.backgroundImage = `url('${Clima.portada()}')`; } Motor.correr(); });
+  Clima.pedir().then(() => { if (yo() && PILA.length === 1) refrescar(); else if (!yo()) refrescar(); Motor.correr(); });
   Motor.correr();
   setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescar(); }, 60000);
+  Avion.arrancar();
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 document.addEventListener('DOMContentLoaded', arrancar);

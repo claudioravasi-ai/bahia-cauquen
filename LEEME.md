@@ -29,7 +29,7 @@ Sirve para probar cambios sin ensuciar nada.
 | `js/clima.js` | Clima de Ushuaia y luz del día. |
 | `js/v-inicio.js` | Inicio, garita, visitas, pases y bitácora. |
 | `js/v-comunidad.js` | Pizarrón, chat, oficios, mascotas, compras. |
-| `js/v-gestion.js` | Peticiones firmadas, reservas, reclamos, votaciones, expensas, normas, Ushuaia, vuelos, Mi casa. |
+| `js/v-gestion.js` | Peticiones firmadas, reservas, reclamos, votaciones, expensas, normas, Ushuaia, vuelos (tablero del aeropuerto y el avión que cruza la pantalla), Mi casa. |
 | `js/v-vecinos.js` | Directorio, mensajes entre vecinos, obras, viajes, infracciones, proveedores. |
 | `js/admin.js` | Administración y el motor de automatizaciones. |
 | `js/nube.js` | Sincronización con Firebase (las tres zonas de privacidad). |

@@ -183,8 +183,8 @@ const CONFIG_BASE = {
   voluminosos: '',            /* próxima fecha de retiro de voluminosos (AAAA-MM-DD) */
   voluminososDetalle: 'Muebles, colchones, electrodomésticos y chatarra. Se dejan en el frente la noche anterior.',
   dea: 'Garita de acceso (a confirmar)',
-  vuelosFuente: 'aa2000',     /* de dónde salen los vuelos */
-  vuelosProxy: '',            /* opcional: un Worker que reenvía OpenSky para ver aviones en vivo */
+  vuelosProxy: '',            /* opcional: un Worker que reenvía ADS-B para ver los aviones en vivo.
+                                 El tablero de arribos y partidas ya no lo necesita. */
   datosDias: 90,              /* los datos de visitas se borran solos a los N días (Ley 25.326) */
   obraHorario: 'Lunes a viernes de 8 a 18 h · sábados de 9 a 13 h',
   silencio: '22 a 8 h',

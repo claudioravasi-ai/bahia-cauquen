@@ -613,7 +613,7 @@ function pintarPaseQR(id){
   const p = Store.s.pases.find(x => x.id === id), u = p && usuario(p.hostId);
   $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
-    <div class="panel" style="color:var(--ink)">${p && !p.cancelado ? `<div class="ticket"><div class="tk-top"><small>Pase de ingreso</small><h3>${esc(p.nombre)}</h3>
+    <div class="panel">${p && !p.cancelado ? `<div class="ticket"><div class="tk-top"><small>Pase de ingreso</small><h3>${esc(p.nombre)}</h3>
       <div style="opacity:.85;font-size:13px">${esc(u?.casa || '')} · ${p.dias?.length ? p.dias.map(d => DIAS[d]).join(' ') : relDia(p.fecha)} · ${p.desde}–${p.hasta}</div></div>
       <div class="bottom"><div class="qr-box" data-qr="BHC:${p.codigo}"></div><div class="codigo-grande">${p.codigo}</div></div></div>
       <a class="btn btn-sec btn-block" style="margin-top:10px" href="${esc(Store.s.config.mapa)}" target="_blank" rel="noopener">${I('pin')}Cómo llegar</a>`

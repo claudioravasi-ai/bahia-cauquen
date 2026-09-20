@@ -1,7 +1,7 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-v1';
+const CACHE = 'bhc-v2';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css',
   './js/firebase-config.js', './js/icons.js', './js/agenda.js', './js/padron.js', './js/core.js', './js/seed.js', './js/clima.js',
   './js/v-inicio.js', './js/v-comunidad.js', './js/v-gestion.js', './js/admin.js', './js/v-vecinos.js', './js/v-expensas.js', './js/nube.js', './js/app.js',
