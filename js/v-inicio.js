@@ -195,7 +195,7 @@ R.inicio = {
     }).join('');
 
     return `${hero}
-      <div class="panel-sube">${urg.join('')}${ushuaiaHoy()}</div>
+      <div class="panel-sube">${ushuaiaHoy()}${urg.join('')}</div>
       <div class="inicio-cols"><div>
         ${sec('Tu casa')}<div class="mosaico">${tuCasa}</div>
         ${sec('El barrio')}<div class="mosaico">${barrio}</div>

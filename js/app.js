@@ -113,7 +113,14 @@ function refrescar(){
   const sel = foco && 'selectionStart' in act ? [act.selectionStart, act.selectionEnd] : null;
   const valores = {};
   $$('input[id],textarea[id],select[id]', cuerpo).forEach(el => { if (el.type !== 'file') valores[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
+  /* La foto grande del inicio se conserva entre redibujos. Si se rehace el
+     nodo, el navegador vuelve a pintar la imagen y se ve un parpadeo cada
+     vez que llega un dato (el clima, un aviso, el motor). */
+  const fotoVieja = cuerpo.querySelector('.hero .foto');
   try { cuerpo.innerHTML = def.render(activa.param); } catch(err){ console.error(err); }
+  const fotoNueva = cuerpo.querySelector('.hero .foto');
+  if (fotoVieja && fotoNueva && fotoVieja.style.backgroundImage === fotoNueva.style.backgroundImage)
+    fotoNueva.replaceWith(fotoVieja);
   for (const id in valores){ const el = document.getElementById(id); if (el){ if (el.type === 'checkbox') el.checked = valores[id]; else el.value = valores[id]; } }
   if (foco){ const el = document.getElementById(foco); if (el){ el.focus({ preventScroll:true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch(e){} } }
   cuerpo.scrollTop = y;
@@ -628,7 +635,15 @@ F['registro'] = async d => {
 A['salir'] = async () => {
   if (!await confirmar('Cerrar sesión', 'Vas a tener que volver a entrar con tu correo y tu clave.', { si:'Cerrar sesión' })) return;
   cerrarHoja();
-  if (typeof Nube !== 'undefined' && Nube.activa()) await Nube.salir();
+  if (typeof Nube !== 'undefined' && Nube.activa()){
+    await Nube.salir();
+    /* En un equipo compartido no puede quedar nada del barrio después de
+       salir: se borra lo que vino de la nube y queda solo la preferencia de
+       pantalla. Al volver a entrar se baja todo de nuevo. */
+    [...Nube.ZONAS.barrio, ...Nube.ZONAS.privado, ...Nube.ZONAS.staff].forEach(col => { if (Array.isArray(Store.s[col])) Store.s[col] = []; });
+    Store.s.notifs = []; Store.s.motorLog = {}; Nube.ultimo = {}; Nube.arrancada = false;
+    Store.guardar();
+  }
   Store.sesion.userId = null; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
 };
 

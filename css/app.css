@@ -117,6 +117,7 @@ body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 .cuerpo{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 18px calc(28px + env(safe-area-inset-bottom));overscroll-behavior:contain;scroll-behavior:smooth}
 .ventana.inicio > header{display:none}
 .ventana.inicio .cuerpo{padding-top:0}
+.ventana.inicio{background:var(--bg)}
 
 /* superficies: bloques que se tocan (en lugar de botones sueltos) */
 .superficie{display:flex;align-items:center;gap:12px;width:100%;text-align:left;cursor:pointer;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:13px 14px;margin-bottom:8px;color:var(--ink);text-decoration:none;transition:transform .13s,box-shadow .13s,border-color .13s}
@@ -265,10 +266,14 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .vacio svg.i{width:38px;height:38px;stroke-width:1.5;margin:0 auto 10px;display:block;opacity:.6}
 
 /* ================= INICIO ================= */
-.hero{position:relative;margin:0 -16px 0;min-height:340px;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(76px + env(safe-area-inset-top)) 20px 64px;overflow:hidden;isolation:isolate}
+.hero{position:relative;margin:0 -18px 0;min-height:min(330px,42dvh);color:#fff;display:flex;flex-direction:column;justify-content:flex-end;
+  padding:26px 20px 54px;overflow:hidden;isolation:isolate;border-radius:0 0 30px 30px}
 .hero .foto{position:absolute;inset:0;z-index:-2;background:#0b3c47 center 55%/cover;transform:scale(1.04);transition:opacity .6s}
 .hero::after{content:"";position:absolute;inset:0;z-index:-1;
-  background:linear-gradient(180deg,rgba(5,18,22,.6) 0%,rgba(5,18,22,.25) 28%,rgba(5,18,22,.55) 62%,rgba(5,18,22,.9) 100%)}
+  background:linear-gradient(180deg,rgba(5,18,22,.55) 0%,rgba(5,18,22,.22) 26%,rgba(5,18,22,.5) 58%,rgba(5,18,22,.88) 100%)}
+/* la costura entre la foto y el resto: un degradé hacia el fondo de la app */
+.hero::before{content:"";position:absolute;left:0;right:0;bottom:0;height:120px;z-index:-1;pointer-events:none;
+  background:linear-gradient(180deg,transparent,var(--bg))}
 .hero .saludo{font-size:14px;font-weight:700;opacity:.95;text-shadow:0 1px 8px rgba(0,0,0,.6)}
 .hero h1{margin:2px 0 0;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.8px;text-shadow:0 2px 18px rgba(0,0,0,.6),0 1px 3px rgba(0,0,0,.45)}
 .hero .sub{font-size:13.5px;opacity:.92;margin-top:4px;text-shadow:0 1px 8px rgba(0,0,0,.6)}
@@ -280,7 +285,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .clima-datos{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 .clima-datos span{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:rgba(10,25,30,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18)}
 .clima-datos svg.i{width:14px;height:14px}
-.panel-sube{position:relative;margin-top:-40px;z-index:2}
+.panel-sube{position:relative;margin-top:-34px;z-index:2}
 
 .rapidos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .rapido{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px 10px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1);text-decoration:none;color:var(--ink);font-size:11.5px;font-weight:750;text-align:center;line-height:1.2;transition:transform .15s}
@@ -580,7 +585,7 @@ dialog.hoja[open]{animation:hojaIn .32s cubic-bezier(.2,.9,.3,1)}
   .mosaico{grid-template-columns:1fr 1fr}
 }
 @media (min-width:1000px){
-  .hero{min-height:380px}
+  .hero{min-height:380px;border-radius:0 0 34px 34px}
   .hero h1{font-size:38px}
   .inicio-cols{display:grid;grid-template-columns:1.55fr 1fr;gap:20px;align-items:start}
   .muro-cols{columns:2;column-gap:14px}

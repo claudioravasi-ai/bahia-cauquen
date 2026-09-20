@@ -122,6 +122,37 @@ const Nube = {
       this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
     }
     this.arrancada = true;
+    if (mio.rol === 'admin') this.sembrarContenido();
+  },
+
+  /* La primera vez, la base está vacía: no tiene los espacios comunes, la
+     agenda de Ushuaia, las temporadas, los feriados ni el reglamento. Eso
+     vive en el código como punto de partida, así que la Administración lo
+     sube una vez y a partir de ahí lo edita desde Contenido. */
+  async sembrarContenido(){
+    const base = seed();
+    const arranque = {
+      amenities: JSON.parse(JSON.stringify(AMENITIES)),
+      agenda: agendaInicial(),
+      temporadas: JSON.parse(JSON.stringify(TEMPORADAS)),
+      feriados: JSON.parse(JSON.stringify(FERIADOS)),
+      eventosCiudad: eventosCiudadIniciales(),
+      contactos: JSON.parse(JSON.stringify(CONTACTOS)),
+      documentos: base.documentos,
+    };
+    let puestos = 0;
+    for (const col in arranque){
+      try {
+        const snap = await this.db.ref('barrio/' + col).get();
+        if (snap.exists() && Object.keys(snap.val() || {}).length) continue;
+        const obj = {};
+        (arranque[col] || []).forEach(x => { if (x && x.id) obj[x.id] = x; });
+        if (!Object.keys(obj).length) continue;
+        await this.db.ref('barrio/' + col).set(obj);
+        puestos++;
+      } catch(e){ console.warn('No se pudo sembrar', col, e.message); }
+    }
+    if (puestos) toast('Se cargó el contenido inicial del barrio', 'check');
   },
 
   escuchar(ruta, fn){ this.db.ref(ruta).on('value', snap => fn(snap.val())); },
