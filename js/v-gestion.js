@@ -629,7 +629,9 @@ R.perfil = {
       ${superficie({ a:'abrir', v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas y con historial' })}
       ${superficie({ a:'modo-viaje', icon:'lock', color:'wood', t:'Me voy de viaje', s: u.viaje ? `Casa sola hasta el ${fechaCorta(u.viaje.hasta)}` : 'Rondas extra mientras no estás' })}
       ${sec('Este equipo')}
-      <div class="card"><div class="lbl">Apariencia</div><div class="seg">${[['auto','Automática'],['light','Clara'],['dark','Oscura']].map(([k, t]) => `<label><input type="radio" name="tema" ${tema === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${t}</span></label>`).join('')}</div>
+      <div class="card"><div class="lbl">Modo de pantalla · ahora está en ${modoActual()}</div>
+        <div class="seg">${[['auto','Automático','sunrise'],['light','Día','sun'],['dark','Noche','moon']].map(([k, t, ic]) => `<label><input type="radio" name="tema" ${tema === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
+        <div class="ayuda">En automático sigue el sol de Ushuaia: hoy amanece ${Clima.sol().sale} y anochece ${Clima.sol().pone}.</div>
         <div class="lbl" style="margin-top:14px">Avisos en este equipo</div>
         ${notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
         <label class="check" style="margin-top:10px"><input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span>Sonido cuando escribe la guardia o la Administración</span></label></div>

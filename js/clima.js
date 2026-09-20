@@ -39,7 +39,10 @@ const Clima = {
     return { sale, pone };
   },
   esDeDia(){ const { sale, pone } = this.sol(); const m = ahoraMin(); return m >= minutosDe(sale) && m < minutosDe(pone); },
-  portada(){ return this.esDeDia() ? 'img/portada-dia.jpg' : 'img/portada-noche.jpg'; },
+  /* La portada va siempre con la foto de día: es la del barrio.
+     (Para que vuelva a cambiar sola de día y de noche, poner:
+      return this.esDeDia() ? 'img/portada-dia.jpg' : 'img/portada-noche.jpg';) */
+  portada(){ return 'img/portada-dia.jpg'; },
 
   cod(c){
     if (c === 0) return ['Despejado', 'sun'];

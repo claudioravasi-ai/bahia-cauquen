@@ -12,6 +12,11 @@ python3 -m http.server 8820
 
 Y abrir http://localhost:8820. Para conectarla al barrio de verdad, seguí **PUBLICAR.md**.
 
+Con la base ya conectada, agregando **`?local`** a la dirección
+(`http://localhost:8820/?local` o la de GitHub con `/?local`) la app trabaja
+solo en ese equipo, con los datos de prueba, sin tocar la base del barrio.
+Sirve para probar cambios sin ensuciar nada.
+
 ## Qué hay en cada carpeta
 
 | Archivo / carpeta | Qué es |
@@ -41,3 +46,5 @@ Y abrir http://localhost:8820. Para conectarla al barrio de verdad, seguí **PUB
 - Las fotos viven en el equipo de cada uno (IndexedDB); a la base solo va una miniatura.
 - Un motor de automatizaciones (17 reglas) que corre solo: clima, recolección,
   temporadas, recordatorios, privacidad de datos.
+- Modo día y modo noche: en automático siguen la salida y la puesta del sol en
+  Ushuaia, no el reloj ni el ajuste del sistema.

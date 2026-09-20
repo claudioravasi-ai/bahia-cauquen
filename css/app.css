@@ -267,17 +267,18 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 /* ================= INICIO ================= */
 .hero{position:relative;margin:0 -16px 0;min-height:340px;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(76px + env(safe-area-inset-top)) 20px 64px;overflow:hidden;isolation:isolate}
 .hero .foto{position:absolute;inset:0;z-index:-2;background:#0b3c47 center 55%/cover;transform:scale(1.04);transition:opacity .6s}
-.hero::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,22,26,.55) 0%,rgba(6,22,26,.05) 30%,rgba(6,22,26,.2) 55%,rgba(6,22,26,.82) 100%)}
-.hero .saludo{font-size:14px;font-weight:700;opacity:.9}
-.hero h1{margin:2px 0 0;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.8px;text-shadow:0 2px 16px rgba(0,0,0,.35)}
-.hero .sub{font-size:13.5px;opacity:.85;margin-top:4px}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,rgba(5,18,22,.6) 0%,rgba(5,18,22,.25) 28%,rgba(5,18,22,.55) 62%,rgba(5,18,22,.9) 100%)}
+.hero .saludo{font-size:14px;font-weight:700;opacity:.95;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+.hero h1{margin:2px 0 0;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.8px;text-shadow:0 2px 18px rgba(0,0,0,.6),0 1px 3px rgba(0,0,0,.45)}
+.hero .sub{font-size:13.5px;opacity:.92;margin-top:4px;text-shadow:0 1px 8px rgba(0,0,0,.6)}
 .clima{display:flex;align-items:center;gap:14px;margin-top:16px;flex-wrap:wrap}
-.clima .temp{font-size:44px;font-weight:300;letter-spacing:-2px;line-height:1}
+.clima .temp{font-size:44px;font-weight:300;letter-spacing:-2px;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,.5)}
 .clima .temp small{font-size:18px;letter-spacing:0;vertical-align:top;margin-left:2px}
-.clima .desc{font-size:13px;line-height:1.35;min-width:0}
+.clima .desc{font-size:13px;line-height:1.35;min-width:0;text-shadow:0 1px 8px rgba(0,0,0,.6)}
 .clima .desc b{font-size:14.5px;display:block}
 .clima-datos{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-.clima-datos span{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.16);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18)}
+.clima-datos span{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:rgba(10,25,30,.45);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18)}
 .clima-datos svg.i{width:14px;height:14px}
 .panel-sube{position:relative;margin-top:-40px;z-index:2}
 
@@ -467,19 +468,28 @@ button.opcion:hover{border-color:var(--brand)}
 .tabs-in .dot-badge{position:static;display:inline-grid;margin-left:4px;border:0;vertical-align:1px}
 
 /* bienvenida (sin sesión) */
-.bienvenida{min-height:100dvh;position:relative;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));isolation:isolate;overflow:hidden}
+.bienvenida{min-height:100dvh;position:relative;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));isolation:isolate}
+/* La bienvenida se desplaza por dentro: con el formulario de alta abierto no
+   entra en una pantalla chica, y si no se puede bajar no hay forma de llegar
+   al botón. El fondo acompaña, porque cubre todo el alto del contenido. */
+.bienvenida{overflow-y:auto;overscroll-behavior:contain}
+/* Con un formulario abierto, el título grande deja lugar a los campos. */
+.bienvenida.compacta h1{font-size:26px;margin-bottom:6px}
+.bienvenida.compacta p.lead{display:none}
+.bienvenida.compacta .marca{margin-bottom:18px}
 .bienvenida .foto{position:absolute;inset:0;z-index:-2;background:#0b3c47 center/cover;animation:kenburns 30s ease-in-out infinite alternate}
 @keyframes kenburns{from{transform:scale(1.02)}to{transform:scale(1.12) translate(-1.5%,1%)}}
-.bienvenida::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,22,26,.35),rgba(6,22,26,.15) 35%,rgba(6,22,26,.92) 78%)}
-.bienvenida .marca{display:flex;align-items:center;gap:12px;margin-bottom:auto}
+.bienvenida::after{content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,rgba(5,18,22,.62) 0%,rgba(5,18,22,.42) 28%,rgba(5,18,22,.78) 62%,rgba(5,18,22,.95) 88%)}
+.bienvenida .marca{display:flex;align-items:center;gap:12px;margin-bottom:auto;text-shadow:0 1px 10px rgba(0,0,0,.6)}
 .bienvenida .marca .logo{width:44px;height:44px;border-radius:14px}
-.bienvenida h1{font-size:40px;line-height:1.02;letter-spacing:-1.4px;margin:0 0 10px;font-weight:800}
-.bienvenida p.lead{font-size:16px;opacity:.9;margin:0 0 22px;max-width:440px}
-.bienvenida .panel{background:rgba(255,255,255,.1);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);border:1px solid rgba(255,255,255,.16);border-radius:24px;padding:16px;max-width:460px;width:100%}
+.bienvenida h1{font-size:40px;line-height:1.02;letter-spacing:-1.4px;margin:0 0 10px;font-weight:800;text-shadow:0 2px 18px rgba(0,0,0,.55),0 1px 3px rgba(0,0,0,.4)}
+.bienvenida p.lead{font-size:16px;opacity:.95;margin:0 0 22px;max-width:440px;text-shadow:0 1px 10px rgba(0,0,0,.6)}
+.bienvenida .panel{max-height:none;background:rgba(255,255,255,.1);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);border:1px solid rgba(255,255,255,.16);border-radius:24px;padding:16px;max-width:460px;width:100%}
 .bienvenida .btn-sec{background:rgba(255,255,255,.16);color:#fff}
 .bienvenida .demo{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 .bienvenida .demo button{border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.18);color:#fff;border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:750}
-.bienvenida .enlaces{display:flex;gap:16px;justify-content:center;margin-top:14px;font-size:13px}
+.bienvenida .enlaces{display:flex;gap:16px;justify-content:center;margin-top:14px;font-size:13px;text-shadow:0 1px 8px rgba(0,0,0,.7)}
 .bienvenida .enlaces button{background:none;border:0;color:rgba(255,255,255,.85);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 
 /* ================= HOJAS (dialog) ================= */
@@ -548,6 +558,7 @@ dialog.hoja[open]{animation:hojaIn .32s cubic-bezier(.2,.9,.3,1)}
   .chips{margin:0 0 4px;padding-left:2px;padding-right:2px;flex-wrap:wrap}
   .bienvenida{padding:48px 64px}
   .bienvenida h1{font-size:64px}
+  .bienvenida.compacta h1{font-size:40px}
 }
 @media (max-width:370px){
   .rapidos{grid-template-columns:repeat(3,1fr)}
@@ -604,3 +615,15 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .sos-botones{display:flex;flex-direction:column;gap:8px}
 .sos-botones .btn{justify-content:center}
 @media (max-width:420px){ .sos-cab b{font-size:22px} .casa-foto.grande{width:88px;height:68px} }
+
+/* Pantallas bajas (celular apaisado o ventana chica): todo más compacto. */
+@media (max-height:700px){
+  .bienvenida{justify-content:flex-start;padding-top:16px}
+  .bienvenida h1{font-size:28px}
+  .bienvenida p.lead{font-size:14px;margin-bottom:14px}
+  .bienvenida .marca{margin-bottom:14px}
+}
+@media (max-height:560px){
+  .bienvenida h1{font-size:23px;line-height:1.1}
+  .bienvenida p.lead{display:none}
+}

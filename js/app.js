@@ -202,12 +202,17 @@ function pitido(){
   } catch(e){}
 }
 
-/* ---------------- tema ---------------- */
+/* ---------------- modo día y modo noche ----------------
+   En automático manda el sol de Ushuaia, no el reloj del equipo ni el
+   ajuste del sistema: de día la app va clara y de noche, oscura. En
+   invierno eso significa que a las 17:30 ya cambia sola. */
 function aplicarTema(){
   const t = Store.sesion?.tema || 'auto';
-  if (t === 'auto') document.documentElement.removeAttribute('data-theme');
-  else document.documentElement.setAttribute('data-theme', t);
+  const modo = t === 'auto' ? (Clima.esDeDia() ? 'light' : 'dark') : t;
+  document.documentElement.setAttribute('data-theme', modo);
+  document.querySelector('meta[name=theme-color]')?.setAttribute('content', modo === 'dark' ? '#0a1315' : '#0d6b66');
 }
+const modoActual = () => document.documentElement.getAttribute('data-theme') === 'dark' ? 'noche' : 'día';
 
 /* ---------------- bienvenida (sin sesión) ---------------- */
 function pintarBienvenida(modo = 'inicio'){
@@ -252,7 +257,7 @@ function pintarBienvenida(modo = 'inicio'){
       <button data-a="demo" data-v="u_admin">Administración</button>
     </div>`;
   $('#app').innerHTML = `
-    <section class="bienvenida">
+    <section class="bienvenida ${modo === 'entrar' || modo === 'registro' ? 'compacta' : ''}">
       <div class="foto" style="background-image:url('${Clima.portada()}')"></div>
       <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b><div class="tiny" style="opacity:.85">${esc(Store.s.config.ciudad)}</div></div></div>
       <h1>La vida del barrio,<br>en un solo lugar.</h1>
@@ -365,12 +370,16 @@ A['abrir'] = el => abrir(el.dataset.v, el.dataset.p || '');
 A['volver'] = el => { const i = +el.dataset.i; if (i === 0 && PILA.length === 1) { $('#cuerpo')?.scrollTo({ top:0 }); return; } volverA(i); };
 A['cerrar-ventana'] = () => cerrarVentana();
 A['cerrar-hoja'] = () => cerrarHoja();
-A['bienvenida'] = el => pintarBienvenida(el.dataset.v);
+A['bienvenida'] = el => { pintarBienvenida(el.dataset.v); window.scrollTo({ top:0 }); };
 A['mi-cuenta'] = () => { const u = yo();
   hoja('Tu cuenta', `<div class="row" style="margin-bottom:14px">${avatar(u, 'lg')}<div class="grow"><b style="font-size:16px">${esc(u.nombre)}</b>
       <div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
       <div class="muted tiny">${{ vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[u.rol]}${u.rol === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
     ${u.rol === 'vecino' ? superficie({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Datos, foto del frente, mascotas' }) : ''}
+    <div class="card" style="margin-bottom:8px"><div class="lbl">Modo de pantalla · ahora está en ${modoActual()}</div>
+      <div class="seg">${[['auto', 'Automático', 'sunrise'], ['light', 'Día', 'sun'], ['dark', 'Noche', 'moon']].map(([k, t, ic]) =>
+        `<label><input type="radio" name="temaRapido" ${(Store.sesion.tema || 'auto') === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
+      <div class="ayuda">En automático sigue la salida y la puesta del sol en Ushuaia (hoy: ${Clima.sol().sale} a ${Clima.sol().pone}).</div></div>
     ${(() => { const otros = Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
@@ -408,7 +417,9 @@ A['olvide'] = async () => {
 A['salir-espera'] = async () => { await Nube.salir(); pintarBienvenida(); };
 A['ir-app'] = () => { history.replaceState({ n:1 }, '', location.pathname); pintarBienvenida(estadoInscripcionModo()); };
 const estadoInscripcionModo = () => 'entrar';
-A['tema'] = el => { Store.sesion.tema = el.dataset.v; Store.guardarSesion(); aplicarTema(); refrescar(); };
+A['tema'] = el => { Store.sesion.tema = el.dataset.v; Store.guardarSesion(); aplicarTema();
+  const d = $('#hoja'); if (d && d.open) A['mi-cuenta'](); else refrescar();
+  toast(el.dataset.v === 'auto' ? `Automático: ahora está en modo ${modoActual()}` : `Modo ${el.dataset.v === 'dark' ? 'noche' : 'día'}`, el.dataset.v === 'dark' ? 'moon' : 'sun'); };
 
 function entrarComo(id){
   Store.sesion.userId = id;
@@ -544,7 +555,7 @@ async function arrancar(){
     if (!yo()) { if (!$('.bienvenida')) pintarBienvenida(); }
     else pintar();
     Motor.correr();
-    setInterval(() => { Motor.correr(); if (yo()) refrescar(); }, 60000);
+    setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescar(); }, 60000);
     Clima.pedir().then(() => { if (yo()) refrescar(); });
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
     return;
@@ -562,7 +573,7 @@ async function arrancar(){
   pintar();
   Clima.pedir().then(() => { if (yo() && PILA.length === 1) refrescar(); else if (!yo()) { const f = $('.bienvenida .foto'); if (f) f.style.backgroundImage = `url('${Clima.portada()}')`; } Motor.correr(); });
   Motor.correr();
-  setInterval(() => { Motor.correr(); if (yo()) refrescar(); }, 60000);
+  setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescar(); }, 60000);
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 document.addEventListener('DOMContentLoaded', arrancar);

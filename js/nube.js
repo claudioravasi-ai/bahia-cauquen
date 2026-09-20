@@ -38,7 +38,9 @@ const Nube = {
   listos: new Set(),
   arrancada: false,
 
-  activa(){ return typeof firebase !== 'undefined' && !!configFirebase(); },
+  /* Con ?local en la dirección, la app trabaja solo en este equipo, sin tocar
+     la base del barrio. Sirve para probar cambios sin ensuciar los datos. */
+  activa(){ return !/[?&]local\b/.test(location.search) && typeof firebase !== 'undefined' && !!configFirebase(); },
 
   /* Colecciones de cada zona. El resto (config, motorLog) va aparte. */
   ZONAS: {
