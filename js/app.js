@@ -239,6 +239,7 @@ document.addEventListener('close', e => { if (e.target && e.target.id === 'hoja'
 const Tiras = {
   arrancar(){
     $$('[data-marq]').forEach(m => {
+      this.acomodar(m);
       if (m.dataset.enganchada) return;
       m.dataset.enganchada = '1';
       const pausa = v => m.classList.toggle('quieta', v);
@@ -246,7 +247,37 @@ const Tiras = {
       ['pointerleave','focusout','touchend','touchcancel'].forEach(ev => m.addEventListener(ev, () => setTimeout(() => pausa(false), 2500), { passive:true }));
     });
   },
+
+  /* EL BUCLE SIN SALTO
+     -------------------------------------------------------
+     La cinta es el contenido repetido, y la animación lo corre exactamente
+     el ancho de UNA copia: cuando termina, la copia siguiente está justo
+     donde arrancó la primera y no se nota el corte.
+
+     Eso sólo funciona si la cinta es MÁS ANCHA que su ventana. Con pocas
+     propuestas y una pantalla grande, dos copias no alcanzan: al final queda
+     un hueco vacío a la derecha y la vuelta al principio se ve como un
+     salto. Acá se mide después de dibujar y se agregan copias hasta que
+     sobre, y el paso se fija en píxeles exactos (no en 50 %, que depende de
+     cuántas copias haya). La velocidad se mantiene pareja, unos 55 px por
+     segundo, así una cinta larga no sale disparada. */
+  acomodar(m){
+    const pista = m.querySelector('.marq-pista'); if (!pista) return;
+    const grupo = pista.querySelector('.marq-grupo'); if (!grupo) return;
+    const ancho = grupo.getBoundingClientRect().width;
+    if (!ancho) return;                       /* todavía no se dibujó */
+    const copias = Math.max(2, Math.ceil((m.clientWidth + ancho) / ancho) + 1);
+    for (let i = pista.children.length; i < copias; i++){
+      const c = grupo.cloneNode(true);
+      c.setAttribute('aria-hidden', 'true');
+      pista.appendChild(c);
+    }
+    pista.style.setProperty('--marq-paso', ancho + 'px');
+    pista.style.setProperty('--marq-dur', Math.max(14, Math.round(ancho / 55)) + 's');
+  },
 };
+/* Si cambia el ancho de la ventana, las cintas se vuelven a medir. */
+addEventListener('resize', () => { clearTimeout(Tiras._t); Tiras._t = setTimeout(() => $$('[data-marq]').forEach(m => Tiras.acomodar(m)), 200); });
 
 /* Estado de la conexión con la base del barrio: el puntito verde del
    encabezado deja de ser decorativo y dice la verdad. */

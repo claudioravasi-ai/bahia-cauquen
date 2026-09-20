@@ -1088,10 +1088,22 @@ A['descargar'] = el => {
 const Promos = {
   KEY:'bhc.promos', d:null, cargando:null,
   leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
+  /* Ejemplos que viajan en el código. Están para que la tira del hotel se vea
+     desde el primer día, aunque la base del barrio todavía no tenga nada
+     cargado: si no, la portada queda con un hueco y parece rota. En cuanto la
+     Administración carga una promoción de verdad (Contenido → Promociones) o
+     pega la dirección del lector en Ajustes, estos ejemplos desaparecen. */
+  MUESTRA: [
+    { id:'demo1', titulo:'Cena de los viernes en el restaurante', detalle:'Menú de tres pasos con productos fueguinos', descuento:'20 %', muestra:true },
+    { id:'demo2', titulo:'Spa · circuito de aguas', detalle:'De lunes a jueves, con reserva previa', descuento:'25 %', muestra:true },
+    { id:'demo3', titulo:'Noche para vecinos del barrio', detalle:'Alojamiento para familiares que vienen de visita', descuento:'15 %', muestra:true },
+    { id:'demo4', titulo:'Té de la tarde con vista al canal', detalle:'Todos los días de 16 a 18 h, sin reserva', descuento:'10 %', muestra:true },
+  ],
   vigentes(){
     const hoy = hoyISO();
-    const propias = (Store.s.promos || []).filter(p => (!p.desde || p.desde <= hoy) && (!p.hasta || p.hasta >= hoy));
-    const web = (this.d?.lista || []).filter(p => (!p.hasta || p.hasta >= hoy));
+    const propias = aLista(Store.s.promos).filter(p => (!p.desde || p.desde <= hoy) && (!p.hasta || p.hasta >= hoy));
+    const web = aLista(this.d?.lista).filter(p => (!p.hasta || p.hasta >= hoy));
+    if (!propias.length && !web.length) return this.MUESTRA;
     /* Si una promo está cargada a mano y también vino de la web, manda la
        cargada a mano: la escribió alguien del barrio. */
     const titulos = new Set(propias.map(p => (p.titulo || '').toLowerCase()));
@@ -1124,20 +1136,22 @@ Promos.leer();
    quieta si el equipo pide menos movimiento. */
 function tiraPromos(){
   const ps = Promos.vigentes();
-  /* Sin promociones no hay tira: es lo correcto, pero desde afuera se lee
-     como "falta algo / está rota". A quien administra se le dice por qué y
-     dónde se cargan; al vecino no se le muestra un hueco. */
-  if (!ps.length) return esAdmin()
-    ? `<div class="card plana small" style="margin-bottom:12px">${I('star')} Todavía no hay promociones del Hotel Los Cauquenes.
-        Se cargan en <b>Administración → Contenido → Promociones</b>, o poniendo la dirección del lector en <b>Ajustes</b>.</div>`
+  if (!ps.length) return '';
+  /* Si lo que se está mostrando son los ejemplos que viajan en el código,
+     a quien administra se le dice dónde se cargan las de verdad. Al vecino
+     no se le cuenta: para él son propuestas del hotel y punto. */
+  const aviso = (ps[0] && ps[0].muestra && esAdmin())
+    ? `<div class="card plana small" style="margin:8px 0 0">${I('info')} Estas son promociones <b>de ejemplo</b>.
+        Las reales se cargan en <b>Administración → Contenido → Promociones</b>, o pegando la dirección del lector del hotel en <b>Ajustes</b>.</div>`
     : '';
   const chips = ps.map(p => `<button class="promo-chip" data-a="ver-promo" data-id="${esc(p.id)}">
       ${p.descuento ? `<span class="promo-desc">${esc(p.descuento)}</span>` : `<span class="ic ic-wood">${I('star')}</span>`}
       <span class="txt"><b>${esc(p.titulo)}</b>${p.detalle ? `<small>${esc(p.detalle)}</small>` : ''}</span></button>`);
   return `<div class="tira-promos">
     <div class="tira-cab">${I('star')}<b>Hotel Los Cauquenes · esta semana</b>
-      ${ps.length > 1 ? `<span class="muted small">${ps.length} propuestas</span>` : ''}</div>
+      ${ps[0] && ps[0].muestra ? `<span class="muted small">ejemplos</span>` : ps.length > 1 ? `<span class="muted small">${ps.length} propuestas</span>` : ''}</div>
     ${marquesina(chips, 'promo-tira')}
+    ${aviso}
   </div>`;
 }
 A['ver-promo'] = el => {
@@ -1149,6 +1163,6 @@ A['ver-promo'] = el => {
     ${p.detalle ? `<p style="margin:0 0 14px;color:var(--ink-2)">${esc(p.detalle)}</p>` : ''}
     ${p.desde || p.hasta ? `<div class="card plana small">${I('calendar')} ${p.desde ? 'Desde ' + fechaLarga(p.desde) : ''}${p.hasta ? (p.desde ? ' · hasta ' : 'Hasta ') + fechaLarga(p.hasta) : ''}</div>` : ''}
     ${p.url ? `<a class="btn btn-pri btn-block" href="${esc(p.url)}" target="_blank" rel="noopener">${I('link')}Ver en el Hotel Los Cauquenes</a>` : ''}
-    <p class="muted tiny" style="margin-top:12px">${p.web ? 'Tomado del sitio del Hotel Los Cauquenes. ' : 'Cargada por la Administración del barrio. '}Confirmá las condiciones directamente con el Hotel Los Cauquenes antes de reservar.</p>`);
+    <p class="muted tiny" style="margin-top:12px">${p.muestra ? 'Promoción de MUESTRA, para ver cómo se ve la sección: no es una oferta real. La Administración las reemplaza desde Contenido → Promociones. ' : p.web ? 'Tomado del sitio del Hotel Los Cauquenes. ' : 'Cargada por la Administración del barrio. '}Confirmá las condiciones directamente con el Hotel Los Cauquenes antes de reservar.</p>`);
 };
 A['promos-actualizar'] = () => Promos.pedir(true).then(() => { refrescar(); toast('Promociones actualizadas', 'refresh'); });

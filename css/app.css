@@ -137,7 +137,11 @@ body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 
 /* LOMOS: las ventanas de atrás, como libros de canto en un estante.
    Siempre visibles a la izquierda, siempre tocables: son el camino de vuelta. */
-.lomos{display:flex;gap:10px;flex:none;min-width:0;max-width:40%}
+/* Los lomos van POR ENCIMA de la ventana: la ventana tiene una sombra ancha
+   y, al entrar, se desliza desde la derecha. Sin esto, la sombra le comía el
+   borde al lomo y durante la animación la ventana le pasaba por arriba: se
+   veía el camino de vuelta tapado a medias. */
+.lomos{display:flex;gap:10px;flex:none;min-width:0;max-width:40%;position:relative;z-index:2}
 .lomos:empty{display:none}
 .lomo{flex:0 0 52px;background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--line);border-radius:18px;cursor:pointer;
   position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px 0;
@@ -152,7 +156,7 @@ body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 .lomo.ultimo{border-color:color-mix(in srgb,var(--brand) 45%,transparent);color:var(--brand)}
 
 .ventana{flex:1 1 0;min-width:0;min-height:0;max-width:900px;background:var(--bg);border:1px solid var(--line);border-radius:22px;
-  box-shadow:0 2px 6px rgba(12,31,28,.06),0 18px 44px rgba(12,31,28,.12);display:flex;flex-direction:column;overflow:hidden;position:relative}
+  box-shadow:0 2px 6px rgba(12,31,28,.06),0 18px 44px rgba(12,31,28,.12);display:flex;flex-direction:column;overflow:hidden;position:relative;z-index:1}
 .ventana.entra{animation:entra .26s cubic-bezier(.2,.8,.3,1)}
 .ventana.sale{animation:sale .2s ease-in forwards}
 @keyframes entra{from{opacity:0;transform:translateX(26px)}}
@@ -749,6 +753,14 @@ dialog.hoja[open]{animation:hojaIn .32s cubic-bezier(.2,.9,.3,1)}
   .hero h1{font-size:38px}
   .inicio-cols{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:20px;align-items:start}
   .inicio-cols > *{min-width:0}
+  /* En pantalla grande cada bloque reparte SU contenido a lo ancho: las
+     puertas y lo último del pizarrón en varias columnas, y los próximos días
+     al lado de la luz del día. Así no queda ningún costado vacío. */
+  .puertas{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+  .ultimas{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;align-items:start}
+  .ultimas .superficie{margin-bottom:0;height:100%}
+  .panel-sube{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:10px;align-items:start}
+  .dia-y-luz{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
   .muro-cols{columns:2;column-gap:14px}
   .muro-cols > .card{break-inside:avoid;display:inline-block;width:100%}
   .chips{margin:0 0 4px;padding-left:2px;padding-right:2px;flex-wrap:wrap}
@@ -921,7 +933,11 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .marq-pista{display:flex;width:max-content;animation:desfile var(--marq-dur,30s) linear infinite}
 .marq-grupo{display:flex;gap:8px;padding-left:8px}
 .marquesina.quieta .marq-pista{animation-play-state:paused}
-@keyframes desfile{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+/* El paso es el ancho de UNA copia, en píxeles, y lo pone el JS al medir.
+   Antes era -50 %, que sólo da el resultado correcto si hay exactamente dos
+   copias: al agregar más para llenar pantallas anchas, el -50 % caía en
+   cualquier lado y la cinta pegaba un salto al volver a empezar. */
+@keyframes desfile{from{transform:translate3d(0,0,0)}to{transform:translate3d(calc(var(--marq-paso,50%) * -1),0,0)}}
 /* Si el equipo pide menos movimiento, la cinta queda quieta y se arrastra a mano. */
 @media (prefers-reduced-motion:reduce){
   .marquesina{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -1096,3 +1112,25 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .portal-pie .version,.portal-caja.esperando .version{font-size:11.5px;opacity:.65;letter-spacing:.3px}
 .portal-caja.esperando .version{margin-top:2px}
 .portal-caja.esperando .btn{margin-top:4px}
+
+/* =========================================================
+   PORTADA EN BLOQUES
+   Cada sección de la portada es un bloque de ancho completo que ordena su
+   propio contenido. En el teléfono se apila; en pantallas grandes cada
+   bloque se abre en columnas (ver la regla de min-width:1000px). El aire
+   entre bloques es el mismo siempre, así la página se lee pareja.
+   ========================================================= */
+.inicio-lienzo{display:flex;flex-direction:column;gap:6px}
+.inicio-lienzo > .bloque{min-width:0}
+.inicio-lienzo > .bloque:empty{display:none}
+.ultimas .superficie:last-child{margin-bottom:0}
+
+/* Tablet (720-999 px): ni fila india como en el teléfono ni cuatro columnas
+   como en la computadora. Dos columnas, que es lo que entra bien. */
+@media (min-width:720px) and (max-width:999px){
+  .puertas{grid-template-columns:1fr 1fr}
+  .ultimas{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+  .ultimas .superficie{margin-bottom:0;height:100%}
+  .panel-sube{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+  .dia-y-luz{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
+}

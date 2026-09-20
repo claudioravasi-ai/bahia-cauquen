@@ -569,6 +569,7 @@ GitHub Pages se actualiza solo en un par de minutos.
 | Anda para unos y para otros no | Paso 2.5: el tope de 100 conexiones del plan Spark |
 | Media pantalla no responde | Corré `python3 revisar.py`: hay un nombre repetido |
 | Se entra, se elige Administración y después no responde nada: no abren las ventanas, no están los lomos del costado, no aparece la tira del hotel | El equipo quedó con una **versión a medias** (un `index.html` viejo que carga una lista de archivos vieja). Desde la 20/09/2026 la app se da cuenta sola y se repara al abrirla. Si querés forzarlo: *Tu cuenta → Actualizar la app* |
+| No aparecen las promociones del hotel, o los comunicados importantes | Faltan reglas en Firebase. Volvé a publicar `reglas-firebase.txt` completo (Paso 2.3): hasta la versión del 20/09/2026 no tenía `promos` ni `comunicados`, y Firebase **niega en silencio** todo lo que no esté nombrado |
 | Se ve "La app quedó a medio actualizar" | En el celular: cerrá la app del todo y volvé a abrirla; si sigue, borrala de la pantalla de inicio y reinstalala. En la computadora: recargá con Mayúsculas apretada |
 | Los cambios no llegan a los celulares | Faltó `python3 version.py`, o no subiste `index.html` y `sw.js` |
 | Los correos no salen | `CORREO.md`, sección "Dónde mirar si algo falla" |

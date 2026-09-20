@@ -106,6 +106,22 @@ PEGAR DESDE ACÁ
       "eventosCiudad": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "avistamientos": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "notifsTodos":   { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+
+      /* Las promociones del hotel las publica la Administración; las ven todos
+         los vecinos aprobados. Sin esta regla, Firebase NIEGA la rama entera y
+         la tira de ofertas de la portada no aparece nunca (falla muda). */
+      "promos":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+
+      /* Los comunicados importantes: los escribe la Administración, los ve
+         todo el barrio, y cada lote deja su respuesta y su acuse de recibo. */
+      "comunicados": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": {
+          "vistos":     { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+          "respuestas": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+        }
+      },
       "motorLog":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
     },
 

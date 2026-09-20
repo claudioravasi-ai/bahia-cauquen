@@ -358,17 +358,34 @@ R.inicio = {
       return superficie({ v:'pizarron', icon:t.icon, color:t.c, t:esc(p.title), s:`${t.n} · ${esc(autorVisible(p.autor).nombre)} · ${hace(p.createdAt)}` });
     }).join('');
 
+    /* =========================================================
+       LA PORTADA, EN BLOQUES DE ANCHO COMPLETO
+       -------------------------------------------------------
+       Antes esto eran dos columnas: una larga a la izquierda y otra corta a
+       la derecha. En una pantalla de computadora la columna corta se
+       terminaba enseguida y quedaba un hueco blanco enorme al costado, y las
+       puertas ("Tu casa", "El barrio"…) se apilaban en fila india
+       desaprovechando todo el ancho.
+
+       Ahora cada sección ocupa el ancho entero y ordena SU contenido en una
+       grilla propia. Así no hay columna que sobre ni hueco que llenar: en el
+       teléfono se apila solo, y en la computadora cada bloque se abre en dos,
+       tres o cuatro celdas según entre. */
+    const ultimasHTML = ultimas || vacio('muro', 'Todavía no hay nada en el pizarrón. Publicá el primer aviso.');
     return `${hero}
       ${tiraPromos()}
-      <div class="inicio-cols"><div>
-        ${ahora}
-        ${sec('¿Qué querés hacer?')}${acciones}
-        ${sec('Por dónde seguir')}<div class="puertas">${puertas}</div>
-        ${ushuaiaHoy()}
-      </div><div>
-        ${sec('Próximos días')}${pron}<div style="height:10px"></div>${luz}${desde}
-        ${sec('Último en el pizarrón', `<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button>`)}${ultimas}
-      </div></div>`;
+      <div class="inicio-lienzo">
+        <section class="bloque">${ahora}${desde}</section>
+        <section class="bloque">${sec('¿Qué querés hacer?')}${acciones}</section>
+        <section class="bloque">${sec('Por dónde seguir')}<div class="puertas">${puertas}</div></section>
+        <section class="bloque dia-y-luz">
+          <div>${sec('Próximos días')}${pron}</div>
+          <div>${sec('Luz del día')}${luz}</div>
+        </section>
+        <section class="bloque">${sec('Último en el pizarrón', `<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button>`)}
+          <div class="ultimas">${ultimasHTML}</div></section>
+        <section class="bloque">${ushuaiaHoy()}</section>
+      </div>`;
   },
 };
 
