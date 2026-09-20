@@ -22,11 +22,12 @@ Si lo hacés al revés, tenés que volver sobre tus pasos.
 |---|------|--------|--------------------|
 | 0 | Revisar, sellar y probarla | 10 min | **No** |
 | 1 | GitHub: publicarla en internet | 20 min | No |
-| 2 | Firebase: lo que falta | 20 min | **No** |
+| 2 | Firebase: dominio, acceso y reglas | 20 min | **No** |
 | 3 | Tu cuenta, la garita y Paula | 15 min | No |
 | 4 | Cargar el padrón | 10 min | No |
 | 5 | Apps Script: los correos | 20 min | Sí, pero quedan para mandar a mano |
 | 6 | Ajustes del barrio y feriados | 15 min | Conviene que no |
+| 6.5 | Firebase: pasar a plan Blaze | 10 min | No, antes del 7 |
 | 7 | Prueba chica y recién ahí, invitar a todos | — | **No** |
 
 Total la primera vez: unas dos horas, tranquilo.
@@ -142,38 +143,77 @@ Cuando termines, cerrá la ventana negra (Ctrl + C, o cerrarla directamente).
 > los datos: los datos viven en Firebase, detrás de las reglas del paso 2.
 > Por eso **nunca** se sube `datos-privados/`.
 
-### 1.2 Subir los archivos
+### 1.2 Preparar lo que se sube
 
-En la página del repositorio vacío tocá **uploading an existing file** y
-arrastrá esto, **respetando las carpetas**:
+**No subas la carpeta del Escritorio tal cual**: adentro hay cosas que no
+pueden salir de tu computadora (los nombres de los propietarios, sobre todo).
+
+Doble clic en:
 
 ```
-index.html          manifest.webmanifest     sw.js
-revisar.py          version.py               .gitignore
-reglas-firebase.txt
+3 - Preparar carpeta para GitHub.command
+```
 
-css/app.css
+Revisa, sella la versión y arma en el Escritorio una carpeta nueva llamada
+**`SUBIR A GITHUB`** con exactamente lo que va y nada más. Se abre sola al
+terminar. Podés volver a correrlo cada vez que haya cambios.
 
-js/  → agenda.js  admin.js  app.js  calendario.js  clima.js  core.js
-       firebase-config.js  icons.js  nube.js  padron.js  seed.js
-       v-comunidad.js  v-expensas.js  v-gestion.js  v-inicio.js  v-vecinos.js
+### 1.3 Subir los archivos
 
-img/  → portada-dia.jpg   portada-noche.jpg
+1. Abrí la carpeta **`SUBIR A GITHUB`**.
+2. Seleccioná **todo lo que hay adentro** con **Cmd + A**.
+3. Arrastralo a la página del repositorio vacío, donde dice
+   *"uploading an existing file"*.
+
+> **Importante:** se arrastra **el contenido** de la carpeta, no la carpeta
+> entera. Si arrastrás la carpeta, GitHub la deja como subcarpeta y la app no
+> abre.
+
+4. Esperá a que termine de subir (son 38 archivos, 1,2 MB).
+5. Abajo escribí "Primera versión" y tocá **Commit changes**.
+
+### Qué hay adentro (38 archivos)
+
+```
+index.html                 ← la página; carga todo lo demás
+manifest.webmanifest       ← el nombre y el ícono cuando se instala
+sw.js                      ← lo que hace que abra sin internet
+reglas-firebase.txt        ← las reglas; las usás en el Paso 2
+revisar.py  version.py     ← las dos revisiones
+.gitignore                 ← la lista de lo que nunca se sube
+
+css/  → app.css
+
+js/   → app.js  core.js  nube.js  admin.js  calendario.js  clima.js
+        icons.js  agenda.js  padron.js  seed.js  firebase-config.js
+        v-inicio.js  v-comunidad.js  v-gestion.js  v-vecinos.js  v-expensas.js
+
+img/   → portada-dia.jpg   portada-noche.jpg
 icons/ → logo.png  icon-192.png  icon-512.png  icon.svg
-apps-script/ → Codigo.gs
+apps-script/ → Codigo.gs   ← lo usás en el Paso 5
 
-LEEME.md  PUBLICAR.md  PADRON.md  CORREO.md  CAPACIDAD.md  CONECTAR.md  EXPENSAS.md
+LEEME.md  PUBLICAR.md  PADRON.md  CORREO.md
+CAPACIDAD.md  CONECTAR.md  EXPENSAS.md
 ```
 
-**NO subir nunca:**
+### Lo que NUNCA se sube, y por qué
 
-- `datos-privados/` — el padrón con nombres de propietarios.
-- Los PDF de expensas.
-- La carpeta `Incial DeepSeek/` — es tu respaldo local, no hace falta arriba.
-- Los dos archivos `.command` — son herramientas tuyas para esta computadora;
-  arriba no hacen nada. (Si los subís igual tampoco pasa nada malo.)
+| Qué | Por qué |
+|---|---|
+| `datos-privados/` | Tiene los **nombres, DNI y correos de los propietarios**. Es lo único que no puede salir de tu computadora. |
+| Los PDF de expensas | Datos de los vecinos. |
+| `Incial DeepSeek/` | Es tu respaldo local. |
+| Los archivos `.command` | Son herramientas para tu Mac; arriba no hacen nada. |
+| `.DS_Store` | Basura que deja macOS. |
 
-Escribí abajo "Primera versión" y tocá **Commit changes**.
+El archivo `3 - Preparar carpeta para GitHub.command` ya los deja afuera a
+todos. Igual, antes de tocar **Commit changes**, pegale una mirada a la lista
+que muestra GitHub y confirmá que **no aparece `datos-privados`**.
+
+> **¿Y las claves de Firebase que están en `js/firebase-config.js`?**
+> Esas sí van, y está bien que vayan: son públicas por diseño, viajan dentro de
+> cualquier página que use Firebase. Lo que protege los datos del barrio **no
+> es esconderlas, son las reglas** del Paso 2.3.
 
 ## Camino B — por Terminal (si preferís git)
 
@@ -193,7 +233,7 @@ usar un *token*. Se saca en github.com → tu foto → **Settings** →
 **Generate new token**, con el permiso `repo`. Lo pegás donde pide la
 contraseña. Guardalo: no se vuelve a mostrar.
 
-## 1.3 Encender GitHub Pages
+## 1.4 Encender GitHub Pages
 
 1. En el repositorio: **Settings** → **Pages**.
 2. *Source*: **Deploy from a branch**. Rama `main`, carpeta `/ (root)`.
@@ -218,53 +258,102 @@ El proyecto **`bahia-cauquen`** existe y sus claves están en
 `js/firebase-config.js` (`databaseURL` apunta a
 `bahia-cauquen-default-rtdb.firebaseio.com`). No hay que crear nada de cero.
 
-## 2.1 Pasar a plan Blaze — esto no se puede saltear
+## Y si todavía no pasaste a plan Blaze, seguí igual
 
-El plan gratuito (**Spark**) acepta **100 conexiones simultáneas**. El barrio
-tiene **152 lotes**, y muchos van a tener la app abierta en el teléfono y en la
-computadora. A partir de la conexión 101, esa persona ve la app pero no le
-llegan los datos, **sin mensaje de error claro**.
+**Blaze no hace falta para configurar ni para probar.** El plan gratuito
+(**Spark**) alcanza de sobra para vos, la garita, Paula y los primeros quince
+vecinos de la prueba.
 
-1. console.firebase.google.com → proyecto `bahia-cauquen`.
-2. Abajo a la izquierda: **Actualizar** / **Upgrade** → plan **Blaze**.
-3. Cargá una tarjeta y **poné una alerta de presupuesto** (por ejemplo, avisar
-   a los 5 dólares).
+El tope del plan gratuito son **100 conexiones al mismo tiempo**. Recién
+molesta cuando hay más de cien personas con la app abierta a la vez, y eso pasa
+el día que invitás a los 152 lotes.
 
-Con el tamaño de este barrio el costo real es de centavos por mes, y buena
-parte cae en el tramo gratuito que Blaze mantiene. Lo que cambia es que
-**desaparece el tope de 100 conexiones**.
+**Dónde entra Blaze entonces:** es el **Paso 2.5**, y hay que hacerlo **antes
+del Paso 7** (invitar a todo el barrio). No antes.
 
-## 2.2 Autorizar la dirección de la app
+Así que ahora hacés **2.1, 2.2, 2.3 y 2.4**, que son los cuatro que sí hacen
+falta para que la app funcione.
 
-**Authentication → Settings → Dominios autorizados** → **Agregar dominio**:
+---
+
+## 2.1 Autorizar la dirección de la app
+
+1. Entrá a **console.firebase.google.com** → proyecto **`bahia-cauquen`**.
+2. Menú de la izquierda: **Compilación → Authentication**.
+3. Pestaña **Settings** (Configuración) → **Dominios autorizados**.
+4. **Agregar dominio** y escribí, sin `https://` ni nada más:
 
 ```
 TUUSUARIO.github.io
 ```
 
-Sin esto nadie puede entrar desde el celular, aunque la app cargue.
+(Poné tu usuario real de GitHub. Si tu dirección es
+`https://claudioravasi.github.io/bahia-cauquen/`, acá va `claudioravasi.github.io`.)
 
-## 2.3 Confirmar que el acceso por correo está encendido
+> Sin esto la app carga en el celular, pero al intentar entrar dice que el
+> dominio no está autorizado. Es el error más común.
 
-**Authentication → Sign-in method**: **Correo electrónico/contraseña** tiene
-que estar **Habilitado**.
+## 2.2 Confirmar el acceso por correo y contraseña
 
-## 2.4 Publicar las reglas — esto tampoco se saltea
+En **Authentication → Sign-in method** (Método de acceso), la fila
+**Correo electrónico/contraseña** tiene que decir **Habilitado**.
 
-Sin reglas, cualquiera que conozca la dirección de la base lee todo el barrio.
+Si dice *Inhabilitado*, tocala → activá el primer interruptor → **Guardar**.
+(El segundo, "vínculo de correo sin contraseña", se deja apagado.)
 
-1. Abrí `reglas-firebase.txt`.
-2. Copiá el bloque entre **PEGAR DESDE ACÁ** y **HASTA ACÁ** (líneas 56 a 146).
-3. Firebase → **Realtime Database** → pestaña **Reglas** → borrá todo lo que
-   haya → pegá → **Publicar**.
+## 2.3 Publicar las reglas — esto no se saltea nunca
 
-## 2.5 Probar que las reglas andan
+Sin reglas, cualquiera que conozca la dirección de la base lee todo el barrio:
+mensajes privados, reclamos, DNI de las visitas.
+
+1. Abrí el archivo **`reglas-firebase.txt`** de la carpeta.
+2. Copiá el bloque que está entre **PEGAR DESDE ACÁ** y **HASTA ACÁ**
+   (empieza con `{` y termina con `}`).
+3. En Firebase: **Compilación → Realtime Database** → pestaña **Reglas**.
+4. Borrá **todo** lo que haya en el recuadro y pegá lo que copiaste.
+5. Tocá **Publicar**.
+
+Tiene que quedar sin errores en rojo. Si Firebase se queja, avisame y lo
+miramos: es un problema de copiado, no del contenido.
+
+## 2.4 Probar que las reglas andan
 
 Esto es lo que separa "creo que está protegido" de "está protegido".
 
-1. Entrá a la app publicada con una cuenta de **vecino** (no la de
-   Administración).
-2. Abrí la consola del navegador (F12 → Console) y pegá:
+### La forma fácil: dos direcciones en el navegador
+
+No hace falta entrar a ninguna cuenta. Pegá cada una en el navegador:
+
+**1)** Esta tiene que **responder con datos** (es el único dato público del
+barrio: dice sí o no, y nada más):
+
+```
+https://bahia-cauquen-default-rtdb.firebaseio.com/barrio/publico.json
+```
+
+Tiene que decir `{"instalado":true}` o `null`.
+
+**2)** Estas tienen que decir **Permission denied**, todas:
+
+```
+https://bahia-cauquen-default-rtdb.firebaseio.com/privado.json
+https://bahia-cauquen-default-rtdb.firebaseio.com/barrio/users.json
+https://bahia-cauquen-default-rtdb.firebaseio.com/barrio/posts.json
+https://bahia-cauquen-default-rtdb.firebaseio.com/staff/bitacora.json
+```
+
+**Cómo se lee el resultado:**
+
+| Lo que ves | Qué significa |
+|---|---|
+| La 1 responde y las demás dicen *Permission denied* | **Perfecto.** Las reglas están publicadas y andando. |
+| **Todas** dicen *Permission denied*, incluso la 1 | Las reglas **no** se publicaron: sigue el modo bloqueado de fábrica. Volvé al 2.3. |
+| Alguna de las de abajo **muestra datos** | Las reglas están mal o quedó el modo de prueba. **Urgente**: volvé al 2.3. |
+
+### La forma larga (si querés probar como un vecino de verdad)
+
+Con una cuenta de vecino, en la app publicada **sin `?local`**, F12 →
+pestaña **Console**, pegás esto:
 
 ```js
 firebase.database().ref('privado').get()
@@ -272,13 +361,49 @@ firebase.database().ref('privado').get()
   .catch(e => console.log('BLOQUEADO', e.message))
 ```
 
-3. **Tiene que decir BLOQUEADO.** Si muestra datos, las reglas no se
-   publicaron: volvé al 2.4.
+Tiene que responder **`BLOQUEADO`**.
 
-> Probá siempre **sin** `?local` en la dirección. Con `?local` la app ni toca
-> Firebase, así que no estarías probando nada.
+### Si al pegar las reglas desaparece el botón "Publicar"
 
----
+**No es un error: es que no hay nada que publicar.** Firebase solo muestra
+"Publicar" cuando detecta que el texto cambió. Si pegaste exactamente lo mismo
+que ya estaba publicado, no hay diferencia y el botón no aparece.
+
+Para confirmarlo, hacé la prueba de las dos direcciones de arriba. Si la
+primera responde `{"instalado":true}`, **ya está**, seguí con el Paso 3.
+
+Las otras dos causas posibles, por si acaso:
+
+- **La ventana del navegador está angosta** y el botón quedó cortado. Agrandá
+  la ventana o alejá con **Cmd + −**.
+- **Hay un error de sintaxis** más abajo en el texto. Firebase lo marca en rojo
+  al costado del renglón y no deja publicar. Bajá por el editor buscando la
+  marca roja.
+
+## 2.5 Pasar a plan Blaze — antes del Paso 7
+
+**Cuándo:** antes de mandarle la dirección a los 152 lotes. No hace falta antes.
+
+**Por qué:** el plan gratuito corta en 100 conexiones simultáneas. La persona
+número 101 ve la app pero **no le llegan los datos, y sin mensaje de error
+claro**. Con 152 lotes, y muchos con el teléfono y la computadora a la vez, se
+llega enseguida.
+
+**Cómo:**
+
+1. console.firebase.google.com → proyecto `bahia-cauquen`.
+2. Abajo a la izquierda, donde dice **Spark**: **Actualizar** / **Upgrade**.
+3. Elegí **Blaze (pago por uso)** y cargá una tarjeta.
+4. **Poné una alerta de presupuesto** —por ejemplo, avisar a los 5 dólares—
+   para dormir tranquilo.
+
+**Cuánto sale:** para un barrio de este tamaño, centavos por mes. Blaze
+mantiene un tramo gratuito parecido al de Spark; lo que cambia es que
+**desaparece el tope de 100 conexiones**.
+
+> Si la tarjeta la tiene que poner el consorcio y eso lleva tiempo, **no te
+> frena**: hacé toda la configuración y la prueba chica ahora, y resolvé Blaze
+> antes de la invitación general.
 
 # PASO 3 — Tu cuenta, la garita y Paula
 
@@ -394,6 +519,10 @@ una ordenanza:
 
 # PASO 7 — Prueba chica, y recién ahí, todo el barrio
 
+> **Antes de este paso, el plan Blaze** (punto 2.5). Es el momento: con más de
+> cien vecinos conectados a la vez, el plan gratuito empieza a dejar gente
+> afuera sin avisar.
+
 **No invites a los 152 lotes el primer día.**
 
 1. Invitá a **diez o quince vecinos** de confianza.
@@ -415,10 +544,16 @@ una ordenanza:
 
 # Cada vez que cambies algo, después
 
-Doble clic en **`1 - Revisar y sellar.command`** y esperá a que diga "LISTO".
+Doble clic en **`3 - Preparar carpeta para GitHub.command`**: revisa, sella la
+versión y vuelve a armar la carpeta **`SUBIR A GITHUB`** del Escritorio.
 
-Y recién ahí subís los archivos que cambiaron **más `index.html` y `sw.js`**
-(esos dos llevan la marca de versión: si no los subís, nadie recibe lo nuevo).
+Después, en el repositorio: **Add file → Upload files**, abrís esa carpeta,
+**Cmd + A**, y arrastrás todo de nuevo. GitHub reemplaza lo que cambió y deja
+igual lo demás.
+
+> Se sube **todo** otra vez a propósito. Subir solo "los archivos que cambiaron"
+> es la forma más fácil de olvidarse de `index.html` y `sw.js`, que son los que
+> llevan la marca de versión: sin ellos, los celulares siguen con la app vieja.
 
 GitHub Pages se actualiza solo en un par de minutos.
 
@@ -428,9 +563,10 @@ GitHub Pages se actualiza solo en un par de minutos.
 
 | Lo que pasa | Qué mirar |
 |---|---|
-| La app carga pero no se puede entrar | Paso 2.2: falta autorizar `TUUSUARIO.github.io` |
-| Entra, pero no aparece nada del barrio | Paso 2.4: las reglas no están publicadas |
-| Anda para unos y para otros no | Paso 2.1: el tope de 100 conexiones del plan Spark |
+| La app carga pero no se puede entrar | Paso 2.1: falta autorizar `TUUSUARIO.github.io` |
+| Entra, pero no aparece nada del barrio | Paso 2.3: las reglas no están publicadas |
+| Al pegar las reglas no aparece "Publicar" | No hay nada que publicar: ya estaban. Comprobalo con el 2.4 |
+| Anda para unos y para otros no | Paso 2.5: el tope de 100 conexiones del plan Spark |
 | Media pantalla no responde | Corré `python3 revisar.py`: hay un nombre repetido |
 | Los cambios no llegan a los celulares | Faltó `python3 version.py`, o no subiste `index.html` y `sw.js` |
 | Los correos no salen | `CORREO.md`, sección "Dónde mirar si algo falla" |

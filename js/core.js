@@ -136,7 +136,7 @@ const Store = {
 function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
     bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
-    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[] };
+    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
   if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
@@ -196,7 +196,8 @@ const CONFIG_BASE = {
     recargo2: 1.5,            /* % que se suma en el segundo vencimiento */
     interesMensual: 3,        /* % mensual sobre lo que quedó impago (a confirmar con la administración) */
     fondoFijo: 5000,          /* Fondo de Infraestructura, monto igual para cada lote */
-    mpLink: '',               /* enlace de Mercado Pago, si algún día se usa */
+    mpLink: '',               /* enlace de cobro de Mercado Pago */
+    modoLink: '',             /* enlace de cobro de MODO */
     reciboNro: 0,             /* numerador de recibos */
     contador: '',             /* correo del contador */
     condicion: 'Exento',      /* condición frente a ARCA */
@@ -315,11 +316,15 @@ const nombreDe = id => { const u = usuario(id); return u ? u.nombre : 'Vecino/a'
    Esto existe SOLO para el rol admin. La guardia y los vecinos tienen un
    solo modo y ni siquiera ven la opción.
    ========================================================= */
-/* Tiene los dos sombreros solo quien administra Y además es dueño de un
-   lote. Una cuenta de administración pura (la del estudio, por ejemplo) no
-   tiene vista de vecino que mostrar, así que ni siquiera ve la opción. */
-const puedeAdministrar = () => { const u = yo(); return u?.rol === 'admin' && /^Lote\s/i.test(u.casa || ''); };
-const modoActivo = () => { const u = yo(); if (!u) return ''; return puedeAdministrar() ? (Store.sesion.modo || 'admin') : u.rol; };
+/* Quien administra el barrio tiene los dos sombreros SIEMPRE que su rol sea
+   admin. Antes se le exigía además tener un lote asignado, y si la ficha
+   tenía la casa escrita de otra forma (o vacía) el botón para cambiar de
+   modo simplemente no aparecía: la app parecía no distinguir vecino de
+   administrador. Ahora aparece siempre, y si no hay lote, la propia pantalla
+   lo dice en vez de esconderse. */
+const puedeAdministrar = () => yo()?.rol === 'admin';
+const tengoLote = () => /^Lote\s/i.test(yo()?.casa || '');
+const modoActivo = () => { const u = yo(); if (!u) return ''; return u.rol === 'admin' ? (Store.sesion.modo || 'admin') : u.rol; };
 const esAdmin = () => yo()?.rol === 'admin' && modoActivo() !== 'vecino';
 const esGuardia = () => yo()?.rol === 'guardia';
 const esStaff = () => esAdmin() || esGuardia();

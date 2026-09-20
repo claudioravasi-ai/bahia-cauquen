@@ -46,7 +46,7 @@ const Nube = {
   ZONAS: {
     barrio: ['users','padron','amenities','agenda','temporadas','feriados','eventosCiudad','contactos','documentos',
              'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
-             'gastos','liquidaciones','cruceros','notifsTodos'],
+             'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos'],
   },
@@ -130,7 +130,7 @@ const Nube = {
     }
     this.arrancada = true;
     /* Si administra el barrio, elige desde qué brazo entra. */
-    if (mio.rol === 'admin' && /^Lote\s/i.test(mio.casa || '') && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
+    if (mio.rol === 'admin' && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
     /* Las alertas que ya estaban abiertas antes de entrar no vuelven a sonar:
        se ven en pantalla, pero el sonido queda para las nuevas. */
     if (typeof sosVistos !== 'undefined') sosVistos = new Set((Store.s.sos || []).map(x => x.id));

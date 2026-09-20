@@ -133,6 +133,7 @@ function pintar(){
   ventanaNueva = false;
   despuesDePintar();
   pintarAlarmas();
+  mostrarComunicado();
 }
 const panelDeError = err => `<div class="aviso a-danger">${I('alert')}<div class="txt"><b>Esta ventana tuvo un problema</b>${esc(err.message)}
   <div class="acciones"><button class="btn btn-xs btn-sec" data-a="volver" data-i="0">Volver al inicio</button></div></div></div>`;
@@ -169,17 +170,57 @@ function refrescar(){
   pintarTop();
   despuesDePintar();
   pintarAlarmas();
+  mostrarComunicado();
 }
 
-/* Al conectar con la base del barrio llegan veinte colecciones casi juntas.
-   Si cada una redibujara la ventana, la app se arrastraría y los botones no
-   responderían. Se juntan todas en un solo dibujo por cuadro de pantalla. */
-let refrescoPedido = false;
+/* =========================================================
+   CUÁNDO SE PUEDE REDIBUJAR, Y CUÁNDO NO
+   -------------------------------------------------------
+   Acá estaba la causa de que la app "no respondiera al tocar".
+
+   Al conectar con la base del barrio llegan más de veinte colecciones, una
+   por una, durante varios segundos. Antes, cada una redibujaba la ventana
+   entera. Y un toque en el celular son DOS cosas separadas en el tiempo: el
+   dedo que baja (pointerdown) y el toque que se confirma (click), con 100 a
+   300 ms en el medio. Si justo en ese ratito llega un dato y se rehace el
+   HTML, el botón que tocaste **deja de existir** antes de que el toque se
+   confirme: el navegador no dispara el click y no pasa nada. Tocás de nuevo,
+   y de nuevo nada. Con buena conexión no se nota; con la conexión de un
+   celular, pasa todo el tiempo.
+
+   Tres reglas, entonces:
+     1. mientras el dedo está apoyado, NO se redibuja;
+     2. lo que llega se junta y se dibuja UNA vez, cuando dejó de llegar;
+     3. con una hoja abierta tampoco: redibujar lo de atrás no sirve y puede
+        cerrarla.
+   Lo que queda pendiente se dibuja apenas se suelta el dedo.
+   ========================================================= */
+let refrescoPedido = false, refrescoTimer = null, tocando = false, tocandoDesde = 0;
+
+document.addEventListener('pointerdown', () => { tocando = true; tocandoDesde = Date.now(); }, true);
+['pointerup','pointercancel','click'].forEach(ev =>
+  document.addEventListener(ev, () => {
+    /* Un respiro después de soltar, para que el click llegue a destino. */
+    setTimeout(() => { tocando = false; if (refrescoPedido) refrescarPronto(); }, 140);
+  }, true));
+/* Red de seguridad: si nunca llega el pointerup (el dedo se fue de la
+   pantalla, la app pasó a segundo plano), no puede quedar trabado. */
+setInterval(() => { if (tocando && Date.now() - tocandoDesde > 3000){ tocando = false; if (refrescoPedido) refrescarPronto(); } }, 1000);
+
+const hojaAbierta = () => { const d = $('#hoja'); return !!(d && d.open); };
+
 function refrescarPronto(){
-  if (refrescoPedido) return;
   refrescoPedido = true;
-  requestAnimationFrame(() => { refrescoPedido = false; if (yo()) refrescar(); });
+  if (refrescoTimer) clearTimeout(refrescoTimer);
+  refrescoTimer = setTimeout(() => {
+    refrescoTimer = null;
+    if (tocando || hojaAbierta()) return;     /* se reintenta al soltar o al cerrar */
+    refrescoPedido = false;
+    if (yo()) refrescar();
+  }, 220);
 }
+/* Al cerrar una hoja se pone al día lo que quedó esperando. */
+document.addEventListener('close', e => { if (e.target && e.target.id === 'hoja' && refrescoPedido) refrescarPronto(); }, true);
 
 /* =========================================================
    TIRAS QUE AVANZAN SOLAS
@@ -634,7 +675,40 @@ A['mi-cuenta'] = () => { const u = yo();
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
+    ${superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Por si algo no anda y hay que contarlo' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
+
+/* Una pantalla chica con todo lo que hace falta para entender un problema sin
+   tener que adivinar: quién sos para la app, en qué modo estás, qué versión
+   corre y si está hablando con la base del barrio. Se copia de un toque. */
+A['diagnostico'] = () => {
+  const u = yo(), c = Store.s.config;
+  const datos = {
+    version: window.VERSION || 'sin sellar',
+    cuenta: u?.email || '—',
+    nombre: u?.nombre || '—',
+    rol: u?.rol || '—',
+    estado: u?.estado || '—',
+    casa: u?.casa || '(vacía)',
+    modo: modoActivo(),
+    puedeAdministrar: puedeAdministrar(),
+    esAdmin: esAdmin(),
+    tieneLote: tengoLote(),
+    conexion: Conexion.estado,
+    nube: typeof Nube !== 'undefined' && Nube.activa(),
+    vecinosCargados: Store.s.users.length,
+    padron: Store.s.padron.length,
+    ventana: PILA.map(v => v.id).join(' → '),
+    pantalla: `${innerWidth}×${innerHeight}`,
+    correo: Correo.configurado() ? 'configurado' : 'sin configurar',
+  };
+  const txt = Object.entries(datos).map(([k, v]) => `${k}: ${v}`).join('\n');
+  hoja('Datos técnicos', `
+    <div class="card lista">${Object.entries(datos).map(([k, v]) =>
+      `<div class="it"><div class="txt"><b>${esc(k)}</b><span class="mono small">${esc(String(v))}</span></div></div>`).join('')}</div>
+    <button class="btn btn-pri btn-block" data-a="copiar" data-v="${esc(txt)}">${I('copy')}Copiar todo</button>
+    <p class="muted tiny" style="margin-top:10px">Si algo no funciona, copiá esto y pasalo: dice exactamente qué versión estás usando y cómo te ve la app.</p>`);
+};
 
 /* ---------------- cambiar la clave ---------------- */
 A['cambiar-clave'] = () => {
@@ -702,10 +776,12 @@ A['olvide-adentro'] = async () => {
 /* ---------------- los dos brazos: vecino o Administración ---------------- */
 function elegirModo({ alEntrar = false } = {}){
   const u = yo(); if (!puedeAdministrar()) return;
+  const conLote = tengoLote();
   hoja(alEntrar ? `Hola, ${esc(u.nombre.split(' ')[0])}` : 'Cambiar de modo', `
-    <p class="muted small" style="margin:0 0 14px">${alEntrar ? 'Administrás el barrio y además sos vecino/a de ' + esc(u.casa) + '. ¿Desde dónde querés entrar?' : 'Podés cambiar cuando quieras: la app se reacomoda entera.'}</p>
+    <p class="muted small" style="margin:0 0 14px">${alEntrar ? (conLote ? 'Administrás el barrio y además sos vecino/a de ' + esc(u.casa) + '. ¿Desde dónde querés entrar?' : 'Administrás el barrio. ¿Desde dónde querés entrar?') : 'Podés cambiar cuando quieras: la app se reacomoda entera.'}</p>
+    ${!conLote ? aviso('warn', 'info', 'Tu cuenta no tiene lote asignado', `Figura como <b>${esc(u.casa || 'sin casa')}</b>. En modo vecino no vas a ver expensas ni visitas propias. Podés corregirlo en Administración → Vecinos.`) : ''}
     <button class="superficie ${modoActivo() === 'vecino' ? 'acento' : ''}" data-a="modo" data-v="vecino">
-      <span class="ic ic-ok">${I('home')}</span><span class="txt"><b>Como vecino/a de ${esc(u.casa)}</b>
+      <span class="ic ic-ok">${I('home')}</span><span class="txt"><b>${conLote ? 'Como vecino/a de ' + esc(u.casa) : 'Como vecino/a'}</b>
       <small>Tus visitas, tus reservas, tus expensas y el pizarrón. Sin panel de administración.</small></span>${I('right')}</button>
     <button class="superficie ${modoActivo() === 'admin' ? 'acento' : ''}" data-a="modo" data-v="admin">
       <span class="ic ic-accent">${I('sliders')}</span><span class="txt"><b>Como Administración</b>
@@ -961,3 +1037,96 @@ async function arrancar(){
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 document.addEventListener('DOMContentLoaded', arrancar);
+
+/* =========================================================
+   COMUNICADOS IMPORTANTES
+   -------------------------------------------------------
+   Lo que la Administración necesita que NO se pase por alto. A diferencia
+   del pizarrón, que espera a que el vecino entre, un comunicado importante
+   se planta en la pantalla apenas la app está abierta, suena una vez y no
+   se va hasta que la persona lo acusa.
+
+   Puede ir a TODO el barrio o a UN LOTE. Cuando va a un lote lo ven todas
+   las cuentas de ese lote y nadie más: sirve para el aviso puntual
+   ("saquen la basura en horario") sin exponer a nadie delante del resto.
+
+   Si es una invitación a una reunión, trae los botones Voy / No puedo. La
+   respuesta es POR LOTE, como el voto: si en la casa hay cinco cuentas, la
+   respuesta es una sola y cualquiera puede cambiarla. La Administración ve
+   el conteo en vivo, y cada comunicado lleva el suyo: abre, cierra y cuenta
+   lo propio.
+   ========================================================= */
+const comunicadosParaMi = () => {
+  const u = yo(); if (!u) return [];
+  const hoy = hoyISO();
+  return (Store.s.comunicados || []).filter(c =>
+    !c.archivado &&
+    (!c.vence || c.vence >= hoy) &&
+    (c.para === 'todos' || c.para === u.casa) &&
+    c.creadoPor !== u.id);
+};
+const comunicadoPendiente = () => {
+  const u = yo(); if (!u) return null;
+  return comunicadosParaMi().find(c => !(c.vistos || []).includes(u.id)) || null;
+};
+let comunicadoEnPantalla = null;
+function mostrarComunicado(){
+  const u = yo(); if (!u) return;
+  const c = comunicadoPendiente();
+  const box = $('#comunicado');
+  if (!c){ if (box) box.remove(); comunicadoEnPantalla = null; return; }
+  if (comunicadoEnPantalla === c.id) return;      /* ya está en pantalla */
+  comunicadoEnPantalla = c.id;
+  /* Suena una vez, por el mismo canal que el SOS (se despierta con el primer
+     toque de la persona; si no, el navegador lo dejaría mudo). */
+  Sonido.tocar([[740, 0, .45], [988, .22, .55]], 'sine', .2);
+  Sonido.vibrar([180, 90, 180]);
+
+  const esMio = c.para !== 'todos';
+  const r = (c.respuestas || {})[u.casa];
+  const div = box || document.createElement('div');
+  div.id = 'comunicado';
+  div.className = 'comunicado-pantalla';
+  div.innerHTML = `<div class="comunicado-caja">
+    <div class="comunicado-cab">
+      <span class="ic ic-${c.tipo === 'reunion' ? 'accent' : 'danger'}">${I(c.tipo === 'reunion' ? 'calendar' : 'tack')}</span>
+      <div><b>${c.tipo === 'reunion' ? 'Invitación' : 'Comunicado de la Administración'}</b>
+        <span>${esMio ? 'Para ' + esc(c.para) : 'Para todo el barrio'} · ${hace(c.at)}</span></div></div>
+    <h2>${esc(c.titulo)}</h2>
+    <div class="comunicado-texto">${esc(c.texto).replace(/\n/g, '<br>')}</div>
+    ${c.tipo === 'reunion' && c.fecha ? `<div class="comunicado-cuando">${I('calendar')}
+      <div><b>${fechaLarga(c.fecha)}${c.hora ? ' · ' + esc(c.hora) + ' h' : ''}</b>${c.lugar ? `<span>${esc(c.lugar)}</span>` : ''}</div></div>` : ''}
+    ${c.tipo === 'reunion' ? `
+      <p class="comunicado-pregunta">¿Va alguien de ${esc(u.casa)}?</p>
+      <div class="btns">
+        <button class="btn ${r?.va === true ? 'btn-ok' : 'btn-sec'}" data-a="comunicado-voy" data-id="${c.id}" data-v="1">${I('check')}Sí, vamos</button>
+        <button class="btn ${r?.va === false ? 'btn-danger-soft' : 'btn-sec'}" data-a="comunicado-voy" data-id="${c.id}" data-v="0">No podemos</button>
+      </div>
+      <p class="muted tiny" style="margin:10px 0 0">La respuesta es del lote: cualquiera de la casa puede cambiarla hasta la reunión.</p>`
+    : ''}
+    <button class="btn btn-pri btn-block btn-grande" style="margin-top:14px" data-a="comunicado-visto" data-id="${c.id}">
+      ${I('check')}${c.tipo === 'reunion' && !r ? 'Después respondo' : 'Entendido'}</button>
+  </div>`;
+  if (!box) document.body.appendChild(div);
+}
+A['comunicado-voy'] = el => {
+  const u = yo(), va = el.dataset.v === '1';
+  Store.cambiar(s => {
+    const c = s.comunicados.find(x => x.id === el.dataset.id); if (!c) return;
+    c.respuestas = c.respuestas || {};
+    c.respuestas[u.casa] = { va, por:u.id, at:Date.now() };
+    notificar(s, { para:c.creadoPor, titulo:`${u.casa}: ${va ? 'asiste' : 'no asiste'}`, texto:c.titulo, icon:'calendar', color: va ? 'ok' : 'warn', link:'comunicados' });
+  });
+  toast(va ? `Anotado: ${u.casa} asiste` : `Anotado: ${u.casa} no asiste`, va ? 'check' : 'info');
+  comunicadoEnPantalla = null; mostrarComunicado();
+};
+A['comunicado-visto'] = el => {
+  const u = yo();
+  Store.cambiar(s => {
+    const c = s.comunicados.find(x => x.id === el.dataset.id); if (!c) return;
+    c.vistos = c.vistos || []; if (!c.vistos.includes(u.id)) c.vistos.push(u.id);
+  });
+  comunicadoEnPantalla = null;
+  $('#comunicado')?.remove();
+  setTimeout(mostrarComunicado, 400);            /* si hay otro esperando, sigue */
+};

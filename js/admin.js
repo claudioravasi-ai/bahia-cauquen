@@ -785,3 +785,115 @@ F['circular'] = async d => {
   toast(salieron ? `Salieron ${plural(salieron, 'correo')}` : 'Quedaron en la bandeja de salida', salieron ? 'mail' : 'clock');
   refrescar();
 };
+
+/* =========================================================
+   COMUNICADOS — el lado de la Administración
+   Crear, y sobre todo VER quién respondió. Cada comunicado lleva su propio
+   conteo: abre, cierra y cuenta lo suyo, sin mezclarse con los demás.
+   ========================================================= */
+R.comunicados = {
+  titulo: 'Comunicados importantes', icon: 'tack', color: 'danger', ancha: true,
+  sub: 'Salen como ventana, suenan y piden acuse de recibo',
+  render(){
+    if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
+    const s = Store.s, hoy = hoyISO();
+    const cs = (s.comunicados || []).slice().sort((a, b) => b.at - a.at);
+    const vivos = cs.filter(c => !c.archivado && (!c.vence || c.vence >= hoy));
+    const viejos = cs.filter(c => c.archivado || (c.vence && c.vence < hoy));
+    const card = c => {
+      const alcance = c.para === 'todos'
+        ? Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino').length
+        : Store.s.users.filter(u => u.estado === 'aprobado' && u.casa === c.para).length;
+      const vistos = (c.vistos || []).length;
+      const resp = Object.entries(c.respuestas || {});
+      const van = resp.filter(([, r]) => r.va), noVan = resp.filter(([, r]) => !r.va);
+      const lotesTotal = c.para === 'todos' ? (typeof LOTES !== 'undefined' ? LOTES.length : totalLotes()) : 1;
+      return `<div class="card">
+        <div class="row" style="align-items:flex-start">
+          <span class="ic ic-${c.tipo === 'reunion' ? 'accent' : 'danger'}" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I(c.tipo === 'reunion' ? 'calendar' : 'tack')}</span>
+          <div class="grow"><b style="font-size:16px">${esc(c.titulo)}</b>
+            <div class="muted small">${c.para === 'todos' ? 'Todo el barrio' : esc(c.para)} · ${hace(c.at)}${c.vence ? ' · vence ' + fechaCorta(c.vence) : ''}</div></div>
+          <span class="pill ${c.tipo === 'reunion' ? 'p-accent' : 'p-danger'}">${c.tipo === 'reunion' ? 'Invitación' : 'Aviso'}</span></div>
+        <p class="small" style="color:var(--ink-2);white-space:pre-wrap;margin:10px 0 0">${esc(c.texto)}</p>
+        ${c.tipo === 'reunion' && c.fecha ? `<div class="card plana small" style="margin:10px 0 0">${I('calendar')} ${fechaLarga(c.fecha)}${c.hora ? ' · ' + esc(c.hora) + ' h' : ''}${c.lugar ? ' · ' + esc(c.lugar) : ''}</div>` : ''}
+        ${c.tipo === 'reunion' ? `
+          <div class="garita-kpis" style="margin-top:12px">
+            <div class="kpi"><b style="color:var(--ok)">${van.length}</b><span>Lotes que van</span></div>
+            <div class="kpi"><b style="color:var(--danger)">${noVan.length}</b><span>No pueden</span></div>
+            <div class="kpi"><b>${Math.max(0, lotesTotal - resp.length)}</b><span>Sin responder</span></div></div>
+          ${resp.length ? `<div class="chips">${van.map(([lote]) => `<span class="chip" style="background:var(--ok-soft);color:var(--ok);border-color:transparent">${I('check')}${esc(lote)}</span>`).join('')}
+            ${noVan.map(([lote]) => `<span class="chip" style="background:var(--danger-soft);color:var(--danger);border-color:transparent">${esc(lote)}</span>`).join('')}</div>` : ''}`
+        : `<div class="muted small" style="margin-top:10px">${I('eye')} Lo acusaron ${vistos} de ${alcance} cuentas</div>`}
+        <div class="btns" style="margin-top:10px">
+          ${c.tipo === 'reunion' ? `<button class="btn btn-sm btn-sec" data-a="comunicado-lista" data-id="${c.id}">${I('users')}Ver lote por lote</button>` : ''}
+          <button class="btn btn-sm btn-sec" data-a="comunicado-repetir" data-id="${c.id}">${I('refresh')}Volver a mostrarlo</button>
+          <button class="btn btn-sm btn-danger-soft" data-a="comunicado-cerrar" data-id="${c.id}">${c.archivado ? 'Cerrado' : 'Cerrar'}</button></div></div>`;
+    };
+    return `${superficie({ a:'nuevo-comunicado', icon:'plus', color:'danger', t:'Nuevo comunicado importante', s:'Sale como ventana, suena y pide acuse', cls:'acento' })}
+      ${aviso('info', 'info', 'Usalo poco', 'Un comunicado importante interrumpe lo que el vecino esté haciendo. Si se usa para todo, deja de significar algo. Lo común va al pizarrón.')}
+      ${vivos.length ? sec('Activos') + vivos.map(card).join('') : vacio('tack', 'No hay comunicados activos.')}
+      ${viejos.length ? sec('Cerrados') + viejos.slice(0, 10).map(card).join('') : ''}`;
+  },
+};
+A['nuevo-comunicado'] = () => {
+  const lotes = (typeof LOTES !== 'undefined' ? LOTES : []).map(l => 'Lote ' + l.lote);
+  hoja('Nuevo comunicado importante', `<form data-f="comunicado">
+    <div class="field"><label>¿A quién?</label>
+      <select name="para" required><option value="todos">A todo el barrio</option>${lotes.map(l => `<option value="${esc(l)}">Solo a ${esc(l)}</option>`).join('')}</select>
+      <div class="ayuda">Si elegís un lote, lo ven todas las cuentas de ese lote y nadie más.</div></div>
+    <div class="field"><label>¿Qué tipo?</label>
+      <select name="tipo" required><option value="aviso">Aviso · solo acusar recibo</option><option value="reunion">Invitación · con "voy / no puedo"</option></select></div>
+    <div class="field"><label>Título</label><input name="titulo" required maxlength="110" placeholder="Ej: Reunión extraordinaria del barrio"></div>
+    <div class="field"><label>Mensaje</label><textarea name="texto" required maxlength="900" style="min-height:130px" placeholder="Ej: El lunes próximo hay reunión extraordinaria. Tema: pavimento y asfalto."></textarea></div>
+    <div class="grid3">
+      <div class="field"><label>Fecha (si es reunión)</label><input type="date" name="fecha" min="${hoyISO()}"></div>
+      <div class="field"><label>Hora</label><input type="time" name="hora"></div>
+      <div class="field"><label>Deja de mostrarse</label><input type="date" name="vence" min="${hoyISO()}" value="${sumarDias(hoyISO(), 30)}"></div></div>
+    <div class="field"><label>Lugar</label><input name="lugar" maxlength="80" placeholder="Ej: SUM del barrio"></div>
+    <label class="check"><input type="checkbox" name="mail"><span>Mandarlo también por correo</span></label>
+    <button class="btn btn-pri btn-block btn-grande" style="margin-top:14px">${I('send')}Publicar el comunicado</button>
+    <p class="muted tiny" style="margin:10px 0 0">Aparece como ventana en la app de cada vecino, suena una vez y no se va hasta que lo acusan. Queda asentado en la auditoría.</p></form>`, { ancho:'620px' });
+};
+F['comunicado'] = async d => {
+  const id = uid(), esReunion = d.tipo === 'reunion';
+  Store.cambiar(s => {
+    s.comunicados.unshift({ id, titulo:d.titulo.trim(), texto:d.texto.trim(), para:d.para, tipo:d.tipo,
+      fecha:d.fecha || '', hora:d.hora || '', lugar:(d.lugar || '').trim(), vence:d.vence || '',
+      creadoPor:yo().id, at:Date.now(), respuestas:{}, vistos:[] });
+    notificar(s, { para: d.para === 'todos' ? 'todos' : s.users.filter(u => u.casa === d.para && u.estado === 'aprobado').map(u => u.id),
+      titulo: (esReunion ? 'Invitación: ' : 'Comunicado: ') + d.titulo.trim(), texto:d.texto.trim().slice(0, 120),
+      icon: esReunion ? 'calendar' : 'tack', color:'danger', link:'pizarron', urgente:true });
+    auditar(s, 'Publicó un comunicado importante', `${d.para} · ${d.titulo.trim()}`);
+  });
+  cerrarHoja();
+  toast('Comunicado publicado', 'tack');
+  if (d.mail){
+    const gente = d.para === 'todos'
+      ? Store.s.users.filter(u => u.estado === 'aprobado' && u.email)
+      : Store.s.users.filter(u => u.casa === d.para && u.estado === 'aprobado' && u.email);
+    for (const u of gente){
+      await Correo.enviar({ para:u.email, asunto:d.titulo.trim(), tipo:'comunicado',
+        html:Correo.plantilla(d.titulo.trim(),
+          `<p>${esc(d.texto.trim()).replace(/\n/g, '<br>')}</p>` +
+          (esReunion && d.fecha ? `<p><b>${fechaLarga(d.fecha)}${d.hora ? ' · ' + esc(d.hora) + ' h' : ''}</b>${d.lugar ? '<br>' + esc(d.lugar) : ''}</p>` : ''),
+          { texto: esReunion ? 'Confirmar si voy' : 'Abrir la app', url:urlApp() }) });
+    }
+  }
+};
+A['comunicado-repetir'] = el => {
+  Store.cambiar(s => { const c = s.comunicados.find(x => x.id === el.dataset.id); if (c){ c.vistos = []; c.at = Date.now(); c.archivado = false; } });
+  toast('Va a volver a aparecer en todas las pantallas', 'refresh');
+};
+A['comunicado-cerrar'] = async el => {
+  if (!await confirmar('Cerrar el comunicado', 'Deja de mostrarse. El conteo de respuestas se conserva.', { si:'Cerrar' })) return;
+  Store.cambiar(s => { const c = s.comunicados.find(x => x.id === el.dataset.id); if (c) c.archivado = true; });
+};
+A['comunicado-lista'] = el => {
+  const c = Store.s.comunicados.find(x => x.id === el.dataset.id); if (!c) return;
+  const lotes = (typeof LOTES !== 'undefined' ? LOTES : []).map(l => 'Lote ' + l.lote);
+  const fila = lote => { const r = (c.respuestas || {})[lote];
+    return `<div class="it"><div class="txt"><b>${esc(lote)}</b><span>${esc(propietarioDe(lote) || '')}</span></div>
+      <span class="pill ${r ? (r.va ? 'p-ok' : 'p-danger') : ''}">${r ? (r.va ? 'Va' : 'No puede') : 'Sin responder'}</span></div>`; };
+  hoja(c.titulo, `<div class="card lista">${(c.para === 'todos' ? lotes : [c.para]).map(fila).join('')}</div>
+    <button class="btn btn-sec btn-block" data-a="copiar" data-v="${esc(Object.entries(c.respuestas || {}).map(([l, r]) => `${l}: ${r.va ? 'va' : 'no'}`).join('\n'))}">${I('copy')}Copiar la lista</button>`);
+};

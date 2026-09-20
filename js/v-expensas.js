@@ -285,14 +285,16 @@ function carpetaVecino(lote){
   const misRecibos = Store.s.recibos.filter(r => r.lote === lote).sort((a, b) => b.at - a.at);
   const alDia = cuenta.saldo <= 0.5;
   return `
-    <div class="card" style="background:${alDia ? 'var(--g-ok)' : pagar.vencido ? 'var(--g-danger)' : 'var(--g-wood)'};color:#fff;border:0">
-      <div class="small" style="opacity:.85">${alDia ? 'Tu cuenta está al día' : pagar.vencido ? 'Tenés un saldo vencido' : 'Saldo a pagar'}</div>
-      <div style="font-size:32px;font-weight:800;letter-spacing:-1px;margin:2px 0">${plata(Math.max(0, cuenta.saldo))}</div>
-      ${pagar.periodo ? `<div class="small" style="opacity:.92">${nombrePeriodo(pagar.periodo)} · 1º vto ${fechaCorta(pagar.vto1)} · 2º vto ${fechaCorta(pagar.vto2)}${pagar.recargo ? ` · con recargo: ${plata(pagar.total)}` : ''}</div>` : ''}
-      ${cuenta.informado ? `<div class="small" style="opacity:.92;margin-top:6px">${I('clock')} ${plata(cuenta.informado)} informados, esperando confirmación</div>` : ''}
-      ${!alDia ? `<div class="btns" style="margin-top:14px"><button class="btn btn-sm" style="background:#fff;color:#7a3a12" data-a="pagar-expensas">${I('wallet')}Pagar</button>
-        <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff" data-a="informar-pago">${I('camera')}Ya pagué</button></div>` : ''}
-    </div>
+    <button class="tarjeta-pago ${alDia ? 'al-dia' : pagar.vencido ? 'vencida' : ''}" ${alDia ? 'disabled' : 'data-a="pagar-expensas"'}>
+      <span class="tp-arriba">
+        <span class="tp-rotulo">${alDia ? 'Tu cuenta está al día' : pagar.vencido ? 'Tenés un saldo vencido' : 'Tu expensa de este mes'}</span>
+        ${!alDia ? `<span class="tp-chip">${I('wallet')}Pagar ahora</span>` : `<span class="tp-chip">${I('check')}Sin deuda</span>`}
+      </span>
+      <span class="tp-monto">${plata(Math.max(0, cuenta.saldo))}</span>
+      ${pagar.periodo ? `<span class="tp-detalle">${nombrePeriodo(pagar.periodo)} · vence el ${fechaCorta(pagar.vto1)}${pagar.recargo ? ` · con recargo ${plata(pagar.total)}` : ''}</span>` : ''}
+      ${cuenta.informado ? `<span class="tp-detalle">${I('clock')} ${plata(cuenta.informado)} informados, esperando confirmación</span>` : ''}
+      ${!alDia ? `<span class="tp-pie">${I('right')}Tocá para pagar: transferencia, Mercado Pago, MODO o tarjeta</span>` : ''}
+    </button>
     ${L ? `<div class="card plana small" style="color:var(--ink-2)">${I('info')} ${esc(lote)} · UF ${L.uf} · coeficiente <b>${L.coef.toFixed(4)} %</b>. De cada $100 de gastos del barrio, a tu lote le corresponden $${L.coef.toFixed(2)}.</div>` : ''}
     ${sec('Tus cupones')}
     ${emitidas.length ? emitidas.slice(0, 12).map(l => { const cu = cuotaDe(l, lote); if (!cu) return '';
@@ -320,23 +322,103 @@ function carpetaVecino(lote){
 }
 A['ver-cupon'] = el => { const lote = esAdmin() && el.dataset.p ? el.dataset.p : miLote(); imprimir(`Cupón ${nombrePeriodo(el.dataset.v)} · ${lote}`, cuponHTML(lote, el.dataset.v)); };
 A['ver-recibo'] = el => { const r = Store.s.recibos.find(x => x.id === el.dataset.id); if (r) imprimir(`Recibo ${r.numero}`, reciboHTML(r)); };
+/* =========================================================
+   PAGAR LAS EXPENSAS
+   -------------------------------------------------------
+   Un solo lugar, con todos los caminos que existen de verdad. Qué se puede
+   y qué no, dicho sin vueltas:
+
+   · TRANSFERENCIA: alias, CBU, importe y referencia, cada uno con su botón
+     de copiar. Es el que usa casi todo el mundo y no cuesta comisión.
+   · MERCADO PAGO / MODO: se abre el enlace de cobro del barrio. Desde ahí
+     el vecino paga con saldo, débito, crédito o la billetera que tenga.
+     El enlace lo genera la Administración una vez (Contabilidad → Parámetros).
+   · QR: el mismo enlace en código, para pagar desde otro equipo o para que
+     lo escanee quien esté al lado.
+   · EFECTIVO en la Administración, que sigue existiendo.
+
+   Lo que NO se puede, y conviene saberlo: una página web no puede cobrar
+   con la tarjeta apoyada en el teléfono (NFC). Eso lo hace la app del banco
+   o de la billetera, no el navegador: para aceptar una tarjeta hace falta
+   ser comercio adherido y cumplir la normativa de tarjetas. Lo que sí pasa
+   es lo de arriba: el vecino toca "Mercado Pago" y paga con la tarjeta,
+   la billetera o el NFC DENTRO de esa app, que es donde está permitido.
+   ========================================================= */
 A['pagar-expensas'] = () => {
-  const c = cfgExp(), pagar = aPagar(miLote()), cfg = Store.s.config;
-  const texto = `Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} · ${miLote()} · ${plata(pagar.total)}`;
+  const c = cfgExp(), lote = miLote(), pagar = aPagar(lote), cfg = Store.s.config;
+  const total = pagar.total || Math.max(0, saldoLote(lote));
+  const ref = `Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} · ${lote}`;
+  const medio = (icon, color, t, sub, attrs) => `<button class="medio-pago" ${attrs}>
+    <span class="ic ic-${color}">${I(icon)}</span><span class="txt"><b>${t}</b><small>${sub}</small></span>${I('right')}</button>`;
+
   hoja('Pagar las expensas', `
-    <div class="card plana center"><div class="muted small">Total a pagar${pagar.recargo ? ' (con recargo)' : ''}</div>
-      <div style="font-size:30px;font-weight:800;color:var(--brand)">${plata(pagar.total)}</div>
-      ${pagar.periodo ? `<div class="muted small">${nombrePeriodo(pagar.periodo)}</div>` : ''}</div>
-    ${sec('Transferencia')}
-    <div class="card lista">
-      <div class="it"><div class="txt"><b>Alias</b><span>${esc(cfg.alias || '—')}</span></div><button class="btn btn-xs btn-pri" data-a="copiar" data-v="${esc(cfg.alias || '')}">${I('copy')}Copiar</button></div>
-      <div class="it"><div class="txt"><b>CBU</b><span class="mono small">${esc(cfg.cbu || '—')}</span></div><button class="btn btn-xs btn-pri" data-a="copiar" data-v="${esc(cfg.cbu || '')}">${I('copy')}Copiar</button></div>
-      <div class="it"><div class="txt"><b>Importe</b><span>${plata(pagar.total)}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${(pagar.total || 0).toFixed(2)}">${I('copy')}</button></div>
-      <div class="it"><div class="txt"><b>Referencia</b><span>${esc(texto)}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(texto)}">${I('copy')}</button></div></div>
-    ${c.mpLink ? `<a class="btn btn-pri btn-block" href="${esc(c.mpLink)}" target="_blank" rel="noopener">${I('wallet')}Pagar con Mercado Pago</a>` : ''}
-    <button class="btn btn-ok btn-block" style="margin-top:10px" data-a="informar-pago">${I('camera')}Ya transferí: informar el pago</button>
-    <p class="muted tiny" style="margin-top:10px">Cuando informás el pago con el comprobante, la Administración lo confirma y te llega el recibo a la app.</p>`);
+    <div class="card plana center" style="margin-bottom:16px">
+      <div class="muted small">Total a pagar${pagar.recargo ? ' (con recargo)' : ''}</div>
+      <div style="font-size:34px;font-weight:800;letter-spacing:-1.4px;color:var(--wood)">${plata(total)}</div>
+      ${pagar.periodo ? `<div class="muted small">${nombrePeriodo(pagar.periodo)} · ${lote}</div>` : ''}</div>
+
+    ${sec('Elegí cómo')}
+    ${c.mpLink ? medio('wallet', 'sky', 'Mercado Pago', 'Saldo, débito, crédito o la billetera que uses', `data-a="pago-link" data-v="${esc(c.mpLink)}" data-t="Mercado Pago"`) : ''}
+    ${c.modoLink ? medio('smartphone', 'accent', 'MODO', 'Pagás desde la app de tu banco', `data-a="pago-link" data-v="${esc(c.modoLink)}" data-t="MODO"`) : ''}
+    ${medio('copy', 'brand', 'Transferencia', 'Alias, CBU e importe listos para copiar', `data-a="pago-transferencia"`)}
+    ${medio('home', 'wood', 'Efectivo en la Administración', 'De lunes a viernes, en el horario de atención', `data-a="pago-efectivo"`)}
+    ${(c.mpLink || c.modoLink) ? medio('qr', 'ok', 'Mostrar el QR', 'Para pagar desde otro equipo o que lo escanee alguien', `data-a="pago-qr" data-v="${esc(c.mpLink || c.modoLink)}"`) : ''}
+
+    ${!c.mpLink && !c.modoLink && esAdmin() ? aviso('info', 'info', 'Todavía no hay enlace de cobro', 'Cargá el de Mercado Pago o MODO en Contabilidad → Parámetros y a los vecinos les aparece acá.',
+      `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="parametros">Cargarlo</button>`) : ''}
+
+    ${sec('Cuando ya pagaste')}
+    ${medio('camera', 'ok', 'Informar el pago', 'Subís el comprobante y te llega el recibo a la app', `data-a="informar-pago"`)}
+    <p class="muted tiny" style="margin-top:12px">Los pagos con Mercado Pago o MODO igual conviene informarlos: así la Administración los concilia y te emite el recibo enseguida.</p>`,
+    { ancho:'520px' });
 };
+A['pago-link'] = el => {
+  window.open(el.dataset.v, '_blank', 'noopener');
+  /* Al volver, lo natural es informar el pago: se lo dejamos a mano. */
+  setTimeout(() => hoja(`Pagaste con ${esc(el.dataset.t)}`, `
+    ${aviso('info', 'clock', 'Se abrió la página de pago', 'Cuando termines, informá el pago acá y la Administración te emite el recibo.')}
+    <button class="btn btn-pri btn-block btn-grande" data-a="informar-pago">${I('camera')}Ya pagué, informarlo</button>
+    <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="cerrar-hoja">Más tarde</button>`), 900);
+};
+A['pago-transferencia'] = () => {
+  const cfg = Store.s.config, lote = miLote(), pagar = aPagar(lote);
+  const total = pagar.total || Math.max(0, saldoLote(lote));
+  const ref = `Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} ${lote}`;
+  const fila = (t, v, copiar) => `<div class="it"><div class="txt"><b>${t}</b><span class="${t === 'CBU' ? 'mono' : ''}">${esc(v || '—')}</span></div>
+    ${v ? `<button class="btn btn-xs btn-pri" data-a="copiar" data-v="${esc(v)}">${I('copy')}Copiar</button>` : ''}</div>`;
+  hoja('Transferencia', `
+    <p class="muted small" style="margin:0 0 12px">Copiá el alias en tu app del banco, pegá el importe y listo. No tiene comisión.</p>
+    <div class="card lista">
+      ${fila('Alias', cfg.alias)}
+      ${fila('CBU', cfg.cbu)}
+      ${fila('Importe', total.toFixed(2))}
+      ${fila('Referencia', ref)}
+      <div class="it"><div class="txt"><b>Titular</b><span>Barrio ${esc(cfg.nombre)} · CUIT ${esc(cfg.cuit || '')}</span></div></div>
+    </div>
+    <button class="btn btn-pri btn-block btn-grande" data-a="informar-pago">${I('camera')}Ya transferí, informarlo</button>
+    <p class="muted tiny" style="margin-top:10px">Poné la referencia: es lo que permite identificar tu lote sin tener que preguntarte.</p>`);
+};
+A['pago-qr'] = el => {
+  hoja('Pagá escaneando', `<div class="qr-pago" data-qr="${esc(el.dataset.v)}"></div>
+    <p class="muted small center">Escanealo con la cámara o con tu billetera virtual.</p>
+    <button class="btn btn-sec btn-block" style="margin-top:10px" data-a="copiar" data-v="${esc(el.dataset.v)}">${I('copy')}Copiar el enlace</button>`);
+  setTimeout(() => { const el2 = $('[data-qr]'); if (el2) pintarQR(el2, el2.dataset.qr); }, 60);
+};
+A['pago-efectivo'] = () => {
+  const cfg = Store.s.config, lote = miLote(), pagar = aPagar(lote);
+  hoja('Efectivo en la Administración', `
+    <div class="card plana center"><div class="muted small">Llevá</div>
+      <div style="font-size:28px;font-weight:800;color:var(--wood)">${plata(pagar.total || Math.max(0, saldoLote(lote)))}</div>
+      <div class="muted small">${esc(lote)}</div></div>
+    <div class="card lista">
+      <div class="it"><div class="txt"><b>Dónde</b><span>${esc(cfg.domicilio || '')}</span></div></div>
+      <div class="it"><div class="txt"><b>Cuándo</b><span>Lunes a viernes, horario de atención</span></div></div>
+      ${cfg.adminTel ? `<div class="it"><div class="txt"><b>Teléfono</b><span>${esc(cfg.adminTel)}</span></div>
+        <a class="btn btn-xs btn-wa" href="${waLink(cfg.adminTel)}" target="_blank" rel="noopener">${I('phone')}</a></div>` : ''}
+    </div>
+    <p class="muted tiny">Pedí el recibo en el momento. También te va a quedar cargado en la app.</p>`);
+};
+
 A['informar-pago'] = () => {
   const pagar = aPagar(miLote());
   hoja('Informar un pago', `<form data-f="informar-pago">
@@ -518,7 +600,9 @@ const CONTA = {
         <div class="grid2"><div class="field"><label>Alias</label><input name="alias" value="${esc(c.alias || '')}"></div>
           <div class="field"><label>CBU</label><input name="cbu" value="${esc(c.cbu || '')}"></div></div>
         <div class="field"><label>Cuenta</label><input name="cuenta" value="${esc(c.cuenta || '')}"></div>
-        <div class="field"><label>Enlace de Mercado Pago (opcional)</label><input name="mpLink" type="url" value="${esc(e.mpLink || '')}"></div></div>
+        <div class="grid2"><div class="field"><label>Enlace de cobro de Mercado Pago</label><input name="mpLink" type="url" value="${esc(e.mpLink || '')}" placeholder="https://mpago.la/...">
+          <div class="ayuda">Se crea una vez en Mercado Pago → Cobrar → Link de pago. Los vecinos pagan con saldo, débito o crédito.</div></div>
+          <div class="field"><label>Enlace de cobro de MODO</label><input name="modoLink" type="url" value="${esc(e.modoLink || '')}" placeholder="https://..."></div></div></div>
       <div class="card"><h3>Impositivo (ARCA)</h3>
         <div class="grid2"><div class="field"><label>CUIT del barrio</label><input name="cuit" value="${esc(c.cuit || '')}"></div>
           <div class="field"><label>Condición</label><input name="condicion" value="${esc(e.condicion || 'Exento')}"></div></div>
@@ -534,7 +618,7 @@ F['parametros-exp'] = d => {
     ['alias','cbu','cuenta','cuit'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
     c.exp = Object.assign({}, c.exp || {});
     ['vto1','vto2','recargo2','interesMensual','fondoFijo'].forEach(k => { if (d[k] !== undefined && d[k] !== '') c.exp[k] = +d[k]; });
-    ['mpLink','condicion','iibb','contador'].forEach(k => { if (d[k] !== undefined) c.exp[k] = String(d[k]).trim(); });
+    ['mpLink','modoLink','condicion','iibb','contador'].forEach(k => { if (d[k] !== undefined) c.exp[k] = String(d[k]).trim(); });
     c.exp.empleados = !!d.empleados;
     c.expensasVence = +d.vto1 || c.expensasVence;
     auditar(s, 'Cambió los parámetros de expensas', '');

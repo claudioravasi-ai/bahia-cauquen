@@ -73,7 +73,23 @@ svg.i{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-widt
 html,body{height:100%}
 body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
 #app{flex:1;display:flex;flex-direction:column;min-height:0}
-.top{display:flex;align-items:center;gap:10px;padding:calc(8px + env(safe-area-inset-top)) 14px 8px;background:var(--surface);border-bottom:1px solid var(--line);flex:none;z-index:30}
+/* En un teléfono angosto entran: marca, modo, avisos, cuenta y SOS. Si no se
+   achica nada, se amontonan y quedan botones de 20 px imposibles de tocar. */
+.top{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:var(--surface);border-bottom:1px solid var(--line);flex:none;z-index:30}
+@media (max-width:430px){
+  .top{gap:6px;padding-left:10px;padding-right:10px}
+  .top .marca small{font-size:11px}
+  .top .marca .rol-chip{display:none}
+  .icon-btn{width:38px;height:38px}
+  .sos-btn{height:38px;padding:0 12px 0 10px;font-size:12.5px}
+  .modo-btn{height:38px}
+}
+@media (max-width:360px){
+  .top .logo{width:32px;height:32px;border-radius:9px}
+  .top .marca b{font-size:13.5px}
+  .sos-btn span{display:none}
+  .sos-btn{padding:0 11px}
+}
 .top .marca{display:flex;align-items:center;gap:10px;flex:1;min-width:0;border:0;background:none;padding:0;text-align:left;color:inherit}
 .top .marca b{display:block;font-size:14.5px;font-weight:800;letter-spacing:-.3px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .top .marca small{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-weight:700}
@@ -578,14 +594,21 @@ button.opcion:hover{border-color:var(--brand)}
    fija aparte y se agranda con transform (no con background-size): así
    no parpadea ni se repite cuando la pantalla es más alta que la foto.
    ==================================================== */
-.portal{position:relative;min-height:100dvh;display:flex;isolation:isolate;color:#fff;
-  padding:calc(26px + env(safe-area-inset-top)) 18px calc(20px + env(safe-area-inset-bottom))}
+/* El portal SCROLLEA. El cuerpo de la página está fijo (la app ocupa la
+   pantalla y son las ventanas las que se desplazan por dentro), así que si el
+   portal no scrollea por su cuenta, en una pantalla baja el formulario de
+   inscripción queda cortado y el botón de enviar es inalcanzable. Pasaba
+   justamente eso. */
+.portal{position:relative;min-height:100dvh;max-height:100dvh;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  display:flex;isolation:isolate;color:#fff;
+  padding:calc(26px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom))}
 .portal-foto,.bienvenida .foto{position:fixed;inset:0;z-index:-2;max-width:none;margin:0;
   background:#0b3c47 center 55%/cover no-repeat;animation:respira 34s ease-in-out infinite alternate;will-change:transform}
 .portal::after{content:"";position:fixed;inset:0;z-index:-1;
   background:linear-gradient(180deg,rgba(5,18,22,.74) 0%,rgba(5,18,22,.42) 40%,rgba(5,18,22,.9) 100%)}
 
-.portal-contenido{margin:auto;width:100%;max-width:470px;display:flex;flex-direction:column;gap:16px}
+.portal-contenido{margin:auto;width:100%;max-width:470px;display:flex;flex-direction:column;gap:16px;flex:0 0 auto}
 .portal-marca{display:flex;align-items:center;gap:11px;text-shadow:0 1px 10px rgba(0,0,0,.6)}
 .portal-marca .logo{width:44px;height:44px;border-radius:14px;flex:none}
 .portal-marca b{display:block;font-size:16px;font-weight:800;line-height:1.2}
@@ -978,3 +1001,64 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .sobrevuelo.quieto .avion{display:none}
 .sobrevuelo.quieto .avion-cartel{animation:cartel-entra .4s ease both,cartel-sale .6s ease 4s both}
 @media (prefers-reduced-motion:reduce){ .sobrevuelo .avion{display:none} }
+
+/* ================= COMUNICADOS IMPORTANTES =================
+   Se planta delante de todo, como el SOS pero sin urgencia: fondo oscuro,
+   la tarjeta clara y un solo camino de salida. No se puede tocar nada de
+   atrás hasta acusarlo, que es justamente el punto. */
+.comunicado-pantalla{position:fixed;inset:0;z-index:180;display:grid;place-items:center;padding:16px;
+  background:rgba(6,18,22,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  animation:comuEntra .3s ease both}
+@keyframes comuEntra{from{opacity:0}}
+.comunicado-caja{width:min(480px,100%);max-height:92dvh;overflow-y:auto;background:var(--surface);color:var(--ink);
+  border-radius:26px;padding:22px;box-shadow:var(--sh-3);animation:comuSube .4s cubic-bezier(.2,.9,.3,1.1) both}
+@keyframes comuSube{from{transform:translateY(22px) scale(.97)}}
+.comunicado-cab{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.comunicado-cab .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.comunicado-cab b{display:block;font-size:13px;font-weight:800;letter-spacing:.2px}
+.comunicado-cab span{display:block;font-size:12px;color:var(--muted)}
+.comunicado-caja h2{margin:0 0 10px;font-size:21px;font-weight:800;letter-spacing:-.4px;line-height:1.2}
+.comunicado-texto{font-size:15px;line-height:1.55;color:var(--ink-2)}
+.comunicado-cuando{display:flex;align-items:center;gap:12px;background:var(--accent-soft);color:var(--accent);
+  border-radius:16px;padding:13px 15px;margin-top:14px}
+.comunicado-cuando svg.i{width:22px;height:22px;flex:none}
+.comunicado-cuando b{display:block;font-size:14.5px}
+.comunicado-cuando span{display:block;font-size:12.5px;opacity:.85}
+.comunicado-pregunta{margin:18px 0 10px;font-size:14.5px;font-weight:800}
+@media (max-width:420px){ .comunicado-caja{padding:18px;border-radius:22px} .comunicado-caja h2{font-size:19px} }
+
+/* ================= TARJETA DE PAGO =================
+   La ventana del importe ES el botón de pagar. La idea: que el vecino vea
+   cuánto debe y que el gesto natural —tocar ese número— sea justamente
+   pagar, sin tener que buscar nada. */
+.tarjeta-pago{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left;border:0;border-radius:24px;
+  padding:20px;margin-bottom:12px;color:#fff;background:linear-gradient(145deg,#c46a2a,#8d4415);
+  box-shadow:0 10px 30px rgba(141,68,21,.3);transition:transform .15s,box-shadow .2s;cursor:pointer}
+.tarjeta-pago:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(141,68,21,.42)}
+.tarjeta-pago:active{transform:scale(.985)}
+.tarjeta-pago.vencida{background:linear-gradient(145deg,#d84545,#8f1414);box-shadow:0 10px 30px rgba(143,20,20,.34)}
+.tarjeta-pago.al-dia{background:linear-gradient(145deg,#1b9e64,#0f6a43);box-shadow:none;cursor:default}
+.tarjeta-pago:disabled{opacity:1}
+.tp-arriba{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tp-rotulo{font-size:13px;font-weight:700;opacity:.9}
+.tp-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.22);border-radius:999px;
+  padding:6px 12px;font-size:12.5px;font-weight:800}
+.tp-chip svg.i{width:15px;height:15px}
+.tp-monto{font-size:clamp(34px,9vw,46px);font-weight:800;letter-spacing:-1.5px;line-height:1.05;margin:2px 0}
+.tp-detalle{display:flex;align-items:center;gap:6px;font-size:12.5px;opacity:.92}
+.tp-detalle svg.i{width:14px;height:14px}
+.tp-pie{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;margin-top:10px;
+  padding-top:10px;border-top:1px solid rgba(255,255,255,.22)}
+.tp-pie svg.i{width:16px;height:16px}
+
+/* los medios de pago, en la hoja */
+.medio-pago{display:flex;align-items:center;gap:13px;width:100%;text-align:left;background:var(--surface);
+  border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:9px;color:var(--ink);
+  transition:transform .13s,border-color .2s,box-shadow .2s}
+.medio-pago:hover{transform:translateY(-1px);border-color:var(--brand-2);box-shadow:var(--sh-2)}
+.medio-pago .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none;font-size:18px;font-weight:800}
+.medio-pago .txt{flex:1;min-width:0}
+.medio-pago b{display:block;font-size:15px;font-weight:800;line-height:1.25}
+.medio-pago small{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.qr-pago{background:#fff;border-radius:18px;padding:16px;display:grid;place-items:center;margin:0 auto 12px;max-width:230px}
+.qr-pago svg{width:100%;height:auto;display:block}

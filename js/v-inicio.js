@@ -225,7 +225,8 @@ const SECCIONES = {
         ${teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' })}
         ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día', n: s.proveedores.filter(p => artEstado(p)[1] !== 'ok').length || '' })}
         ${teja({ v:'obras', p:'pendientes', icon:'wrench', color:'wood', t:'Obras por aprobar', s:'Registro de obras', n: s.obras.filter(o => o.estado === 'pendiente').length || '' })}
-        ${teja({ a:'nuevo-post', v:'aviso', icon:'tack', color:'sky', t:'Comunicado oficial', s:'Suena y llega a todos' })}
+        ${teja({ v:'comunicados', icon:'tack', color:'danger', t:'Comunicados importantes', s:'Ventana, sonido y acuse de recibo', n:(s.comunicados || []).filter(c => !c.archivado).length || '' })}
+        ${teja({ a:'nuevo-post', v:'aviso', icon:'muro', color:'sky', t:'Publicar en el pizarrón', s:'Para lo que no es urgente' })}
         </div>`;
     },
   },
