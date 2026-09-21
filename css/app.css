@@ -1134,3 +1134,158 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
   .panel-sube{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
   .dia-y-luz{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px;align-items:start}
 }
+
+/* =========================================================
+   TANDA DEL 21-09-2026
+   ========================================================= */
+
+/* ---------- La X de cerrar: una sola, simple y en todos lados ----------
+   Antes la de las hojas no tenía estilo (salía el botón gris del
+   navegador) y la de las ventanas era un trazo fino casi invisible.
+   Ahora es un círculo gris claro con una X clara, igual en todas partes. */
+.cerrar{width:34px;height:34px;flex:none;padding:0;border:0;border-radius:50%;background:var(--surface-3);color:var(--ink-2);
+  display:grid;place-items:center;cursor:pointer;transition:background .15s,color .15s,transform .1s;-webkit-appearance:none;appearance:none}
+.cerrar svg.i{width:17px;height:17px;stroke-width:2.4}
+.cerrar:hover{background:var(--line-2);color:var(--ink)}
+.cerrar:active{transform:scale(.92)}
+.cerrar:focus-visible{outline:2px solid var(--brand-2);outline-offset:2px}
+.ventana > header .cerrar{width:34px;height:34px;background:var(--surface-3);color:var(--ink-2)}
+.ventana > header .cerrar:hover{background:var(--line-2);color:var(--ink)}
+.hoja-cab .cerrar{margin-left:auto}
+
+/* ---------- Lomos: parejos con la ventana y a su misma altura ----------
+   Mismo radio, mismo borde y la misma separación de los dos lados: el
+   camino de vuelta se ve entero y no queda "tapado" por la ventana. */
+.lomo{border-radius:22px}
+.ventana{border-radius:22px}
+@media (max-width:760px){ .lomo{border-radius:18px} .ventana{border-radius:18px} }
+/* En el teléfono no entra una fila de lomos: todos van apilados en UNA
+   sola cinta a la izquierda, del mismo ancho siempre, tenga una ventana
+   atrás o cinco. Cada tramo lleva al lugar que nombra. */
+@media (max-width:600px){
+  .lienzo{padding:6px;gap:6px}
+  .lomos{flex-direction:column;flex:0 0 40px;width:40px;max-width:40px;gap:6px}
+  .lomo{flex:1 1 0;min-height:0;width:40px;border-radius:14px;border:1px solid var(--line);box-shadow:var(--sh-1);
+    background:var(--surface);padding:30px 0 8px;gap:6px}
+  .lomo:hover{flex-basis:0}
+  .lomo .lomo-flecha{top:6px;width:22px;height:22px;background:var(--surface-3);color:var(--brand)}
+  .lomo.ultimo{background:var(--brand-soft)}
+  .lomo.ultimo .lomo-flecha{background:var(--brand);color:#fff}
+  .lomo svg.i{width:15px;height:15px}
+  .lomo b{font-size:11px;max-height:calc(100% - 26px)}
+  .ventana{border-radius:16px;border:1px solid var(--line)}
+  .ventana > header{padding:8px 8px 8px 8px;gap:8px}
+  .ventana > header .ic{display:none}
+  .volver-btn{width:36px;height:36px;border-radius:12px}
+  .ventana > header .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
+@media (max-width:360px){ .lomos{flex-basis:34px;width:34px;max-width:34px} .lomo{width:34px} .lomo b{font-size:10.5px} }
+
+/* ---------- Por dónde seguir: ventanas ilustradas ---------- */
+.puertas-arte{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:14px}
+.puerta-arte{position:relative;display:flex;flex-direction:column;text-align:left;padding:0;border:0;border-radius:24px;overflow:hidden;cursor:pointer;
+  background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(12,31,28,.06),0 12px 30px rgba(12,31,28,.12);
+  transition:transform .25s cubic-bezier(.2,.9,.3,1.2),box-shadow .25s;animation:puertaEntra .55s cubic-bezier(.2,.9,.3,1) backwards;isolation:isolate}
+.puerta-arte:nth-child(2){animation-delay:.07s} .puerta-arte:nth-child(3){animation-delay:.14s} .puerta-arte:nth-child(4){animation-delay:.21s}
+@keyframes puertaEntra{from{opacity:0;transform:translateY(18px) scale(.97)}}
+.puerta-arte:hover{transform:translateY(-5px);box-shadow:0 2px 4px rgba(12,31,28,.08),0 22px 46px rgba(12,31,28,.2)}
+.puerta-arte:active{transform:scale(.98)}
+.puerta-arte:focus-visible{outline:3px solid var(--brand-2);outline-offset:3px}
+.pa-arte{position:relative;display:block;height:170px;overflow:hidden;background:#0b3c47}
+.pa-arte::after{content:"";position:absolute;inset:auto 0 0;height:60%;background:linear-gradient(180deg,transparent,rgba(0,0,0,.28))}
+.arte-svg{position:absolute;inset:0;width:100%;height:100%;display:block;transition:transform .6s cubic-bezier(.2,.8,.3,1)}
+.arte-foto{position:absolute;inset:0;display:block;background:#0b3c47 center 60%/cover no-repeat;transition:transform .6s cubic-bezier(.2,.8,.3,1)}
+.puerta-arte:hover .arte-svg,.puerta-arte:hover .arte-foto{transform:scale(1.07)}
+.pa-pie{position:relative;display:flex;align-items:center;gap:12px;padding:14px 14px 15px;background:var(--surface)}
+.pa-ic{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;flex:none;margin-top:-38px;border:3px solid var(--surface)}
+.pa-ic svg.i{width:22px;height:22px}
+.pa-txt{flex:1;min-width:0}
+.pa-txt b{display:block;font-size:17px;font-weight:800;letter-spacing:-.3px;line-height:1.2}
+.pa-txt small{display:block;font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+.pa-entrar{display:inline-flex;align-items:center;gap:4px;flex:none;font-size:12.5px;font-weight:800;color:var(--brand);
+  background:var(--brand-soft);padding:7px 10px 7px 12px;border-radius:999px;transition:gap .2s,background .2s}
+.pa-entrar svg.i{width:15px;height:15px}
+.puerta-arte:hover .pa-entrar{gap:8px;background:var(--brand);color:#fff}
+@media (max-width:600px){ .pa-arte{height:150px} .pa-entrar{padding:7px 8px;font-size:0;gap:0} .pa-entrar svg.i{width:17px;height:17px} .puerta-arte:hover .pa-entrar{gap:0} }
+@media (min-width:1000px){ .pa-arte{height:200px} }
+
+/* ---------- La ventana de cada sección, con su portada ---------- */
+.seccion-vista .sec-banner{position:relative;margin:-16px calc(var(--pad-cuerpo) * -1) 18px;min-height:200px;display:flex;align-items:flex-end;overflow:hidden;color:#fff;isolation:isolate}
+.sec-banner-arte{position:absolute;inset:0;z-index:-2;animation:bannerZoom 1.2s cubic-bezier(.2,.8,.3,1) backwards}
+@keyframes bannerZoom{from{transform:scale(1.12);opacity:.4}}
+.sec-banner::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(0,0,0,0) 10%,rgba(4,20,24,.35) 45%,rgba(4,20,24,.85))}
+.sec-banner-txt{display:flex;align-items:flex-end;gap:14px;padding:18px var(--pad-cuerpo) 18px;width:100%;animation:bannerTxt .6s .15s cubic-bezier(.2,.9,.3,1) backwards}
+@keyframes bannerTxt{from{opacity:0;transform:translateY(12px)}}
+.sec-banner-ic{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;flex:none;border:2px solid rgba(255,255,255,.55)}
+.sec-banner-ic svg.i{width:26px;height:26px}
+.sec-banner small{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:1px;opacity:.9;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.sec-banner h2{margin:2px 0 0;font-size:28px;font-weight:800;letter-spacing:-.7px;line-height:1.1;text-shadow:0 2px 14px rgba(0,0,0,.5)}
+.sec-banner p{margin:5px 0 0;font-size:13.5px;font-weight:600;opacity:.95;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+@media (min-width:1000px){ .seccion-vista .sec-banner{min-height:250px} .sec-banner h2{font-size:34px} }
+@media (max-width:480px){ .seccion-vista .sec-banner{min-height:170px} .sec-banner h2{font-size:24px} .sec-banner-ic{width:46px;height:46px;border-radius:15px} }
+/* Las tejas de adentro: más aire, color y la primera como protagonista. */
+.seccion-vista .mosaico{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.seccion-vista .teja{min-height:132px;padding:16px;border-radius:22px}
+.seccion-vista .teja .ic{width:44px;height:44px;border-radius:14px}
+.seccion-vista .teja .ic svg.i{width:22px;height:22px}
+.seccion-vista .teja b{font-size:15px}
+.seccion-vista .teja.destaca{grid-column:span 2;min-height:132px;justify-content:space-between}
+.seccion-vista .teja.destaca b{font-size:19px;letter-spacing:-.3px}
+.seccion-vista .teja.destaca small{font-size:13px}
+.seccion-vista > p{margin-top:0}
+@media (max-width:480px){ .seccion-vista .mosaico{grid-template-columns:1fr 1fr;gap:10px} .seccion-vista .teja{min-height:122px;padding:14px} }
+
+/* ---------- Pizarra del día ---------- */
+.sec-extra{display:inline-flex;align-items:center;gap:10px}
+.pizarra{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr));gap:10px}
+.novedad{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;width:100%;cursor:pointer;background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:18px;padding:13px 14px 12px 16px;box-shadow:var(--sh-1);overflow:hidden;transition:transform .15s,box-shadow .15s}
+.novedad::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line-2)}
+.novedad.n-guardia::before{background:var(--brand)} .novedad.n-aviso::before{background:var(--sky)}
+.novedad.n-alerta::before{background:var(--danger)} .novedad.n-evento::before{background:var(--accent)}
+.novedad.n-perdido::before{background:var(--warn)} .novedad.n-com::before{background:var(--danger)}
+.novedad:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+.novedad:active{transform:scale(.99)}
+.nov-cab{display:flex;align-items:center;gap:8px}
+.nov-cab time{margin-left:auto;font-size:11.5px;color:var(--muted);font-weight:700;white-space:nowrap}
+.nov-fijo svg.i{width:14px;height:14px;color:var(--brand)}
+.novedad b{font-size:15px;font-weight:800;line-height:1.3;letter-spacing:-.2px}
+.nov-texto{font-size:13px;color:var(--ink-2);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nov-de{font-size:11.5px;color:var(--muted);font-weight:600}
+.novedad.nueva{border-color:color-mix(in srgb,var(--brand) 40%,var(--line))}
+.novedad.nueva .nov-cab::after{content:"Nueva";order:2;font-size:10.5px;font-weight:800;color:#fff;background:var(--brand);padding:2px 7px;border-radius:999px}
+.novedad-leer time{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin-top:8px}
+.novedad-leer h3{margin:10px 0 0;font-size:20px;font-weight:800;letter-spacing:-.4px;line-height:1.25}
+.novedad-leer p{margin:10px 0 0;font-size:15px;line-height:1.6;color:var(--ink-2);white-space:pre-wrap}
+.novedad-leer .card{margin:12px 0 0}
+.para-vos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:8px;margin-bottom:10px}
+.para-vos .aviso{margin:0}
+
+/* ---------- La campanita ---------- */
+.notifs-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 4px;font-size:12.5px;color:var(--muted);font-weight:700}
+button.notif{width:100%;background:none;border:0;border-bottom:1px solid var(--line);text-align:left;color:var(--ink);font:inherit;align-items:center;border-radius:0}
+button.notif:hover{background:var(--surface-2)}
+button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:none}
+.notif .txt span{overflow-wrap:anywhere}
+.notif .txt time{display:block;margin-top:2px}
+.notif-sos{display:flex;gap:12px;padding:14px;margin:0 0 10px;border-radius:18px;color:#fff;
+  background:linear-gradient(135deg,#d33a3a,#8f1414);box-shadow:0 10px 26px rgba(160,20,20,.35);animation:sosLate 1.1s ease-in-out infinite alternate}
+.notif-sos .ic{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none;background:rgba(255,255,255,.2)}
+.notif-sos .txt{flex:1;min-width:0}
+.notif-sos b{display:block;font-size:15.5px;font-weight:800}
+.notif-sos span{display:block;font-size:13px;opacity:.95;margin-top:2px}
+.notif-sos small{display:block;font-size:12px;opacity:.85;margin-top:3px}
+.notif-sos .btns{margin-top:10px;gap:6px}
+.notif-sos .btn-sec{background:rgba(255,255,255,.18);color:#fff;border-color:transparent}
+.aviso-leido{display:flex;gap:12px;align-items:center}
+.aviso-leido .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.aviso-leido b{display:block;font-size:17px;font-weight:800;line-height:1.25}
+.aviso-leido time{font-size:12px;color:var(--muted)}
+.aviso-leido-texto{margin:14px 0 0;font-size:15px;line-height:1.55;color:var(--ink-2);white-space:pre-wrap}
+.vacio b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+.sos-nota{margin:4px 0 0;font-size:12.5px;opacity:.8;text-align:center}
+
+@media (prefers-reduced-motion:reduce){
+  .puerta-arte,.sec-banner-arte,.sec-banner-txt,.notif-sos{animation:none}
+  .arte-svg,.arte-foto{transition:none}
+}

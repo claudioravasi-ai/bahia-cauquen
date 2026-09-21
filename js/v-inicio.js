@@ -71,8 +71,9 @@ function tarjetaPase(p, { garita = false } = {}){
 function urgentesVecino(){
   const u = yo(), s = Store.s, out = [], hoy = hoyISO();
   s.sos.filter(x => x.userId === u.id && x.estado !== 'resuelta').forEach(x => out.push(aviso('danger latido', 'siren',
-    x.estado === 'en_camino' ? `La guardia va en camino (${nombreDe(x.atiende)})` : 'Tu alerta SOS está activa',
-    'La guardia y la Administración ya fueron avisadas.', `<button class="btn btn-xs btn-sec" data-a="sos-cancelar" data-id="${x.id}">Ya estoy bien, cancelar</button>`)));
+    x.estado === 'en_camino' ? `La guardia va en camino (${nombreDe(x.atiende)})` : x.estado === 'atendida' ? 'La guardia dio por atendida tu alerta' : 'Tu alerta SOS está activa',
+    x.estado === 'atendida' ? 'Si ya está todo bien, confirmalo para que se cierre en todo el barrio.' : 'La guardia, la Administración y los vecinos ya fueron avisados.',
+    `<button class="btn btn-xs btn-ok" data-a="sos-cancelar" data-id="${x.id}">${I('check')}Ya está solucionado</button>`)));
   s.llegadas.filter(l => l.hostId === u.id && l.estado === 'consultando').forEach(l => out.push(aviso('warn latido', 'gate',
     `En la garita: ${esc(l.nombre)} pregunta por vos`, `${esc(l.motivo || 'Sin aviso previo')}${l.patente ? ' · ' + esc(l.patente) : ''} · ${hace(l.at)}`,
     `<button class="btn btn-xs btn-ok" data-a="llegada-si" data-id="${l.id}">${I('check')}Que pase</button><button class="btn btn-xs btn-danger-soft" data-a="llegada-no" data-id="${l.id}">No lo conozco</button>`)));
@@ -82,8 +83,6 @@ function urgentesVecino(){
   const paq = s.paquetes.filter(p => p.hostId === u.id && !p.retirado);
   if (paq.length) out.push(aviso('brand', 'box', `Tenés ${plural(paq.length, 'paquete')} en la garita`, paq.map(p => esc(p.empresa)).join(', ')));
   Clima.alertas().forEach(a => out.push(aviso(a.nivel, a.icon, a.t, a.x)));
-  s.posts.filter(p => p.type === 'alerta' && Date.now() - p.createdAt < DIA && p.autor !== u.id && !p.resuelto).slice(0, 2)
-    .forEach(p => out.push(aviso('danger', 'alert', `Alerta vecinal: ${esc(p.title)}`, `${esc(autorVisible(p.autor).casa)} · ${hace(p.createdAt)}`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="pizarron">Ver en el pizarrón</button>`)));
   const rec = recoleccionAviso(); if (rec) out.push(rec);
   s.reservas.filter(r => r.userId === u.id && (r.fecha === hoy || r.fecha === sumarDias(hoy, 1)) && !r.cancelada).forEach(r => {
     const a = amenity(r.amenity); if (!a) return;
@@ -115,12 +114,33 @@ function recoleccionAviso(){
    en lugar de abrumar.
    ========================================================= */
 
+/* =========================================================
+   LAS ILUSTRACIONES DE LAS SECCIONES
+   Cada puerta de la portada es una ventana con un dibujo: una casa para
+   "Tu casa", la foto del barrio para "El barrio" y la bahía de Ushuaia
+   (el faro, el crucero, el avión) para "Ushuaia y servicios". Van como
+   SVG dentro del código: no pesan, no dependen de internet y se ven
+   nítidos en cualquier pantalla.
+   Si algún día hay una foto propia para una sección, alcanza con
+   ponerla en `foto` (por ejemplo 'img/servicios.jpg').
+   ========================================================= */
+const ARTE = {
+  casa: { svg:`<svg class="arte-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="acC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fbad6"/><stop offset=".8" stop-color="#d9eff0"/></linearGradient><linearGradient id="acT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d98a45"/><stop offset="1" stop-color="#a55a26"/></linearGradient></defs><rect width="400" height="240" fill="url(#acC)"/><circle cx="330" cy="52" r="32" fill="#fff6d1" opacity=".35"/><circle cx="330" cy="52" r="19" fill="#fff6d1"/><path d="M-10 150 L60 78 L100 112 L170 48 L235 118 L285 84 L410 160 V240 H-10Z" fill="#5f8fa3"/><path d="M170 48 L150 68 L162 66 L171 76 L181 64 L192 70Z M60 78 L46 92 L57 90 L63 97 L72 89Z M285 84 L272 96 L282 95 L289 101 L297 94Z" fill="#fff"/><path d="M-10 172 Q90 146 200 164 T410 160 V240 H-10Z" fill="#4c8f6e"/><path d="M-10 202 Q140 180 410 198 V240 H-10Z" fill="#2f6e55"/><g fill="#24574a"><path d="M52 202 L70 146 L88 202Z"/><path d="M28 206 L46 164 L64 206Z" opacity=".85"/><path d="M322 200 L342 136 L362 200Z"/><path d="M352 206 L368 160 L384 206Z" opacity=".85"/></g><rect x="236" y="96" width="14" height="36" rx="2" fill="#6b4636"/><g fill="#fff" opacity=".75"><circle cx="243" cy="85" r="6"/><circle cx="252" cy="72" r="8"/><circle cx="264" cy="57" r="10"/></g><rect x="146" y="138" width="112" height="70" fill="url(#acT)"/><path d="M146 152H258M146 166H258M146 180H258M146 194H258" stroke="#7d421b" stroke-opacity=".35" stroke-width="2"/><path d="M132 144 L202 88 L272 144Z" fill="#b23a2e"/><path d="M132 144 L202 88 L272 144" fill="none" stroke="#fff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="202" cy="120" r="9" fill="#ffd97a" stroke="#8a4b22" stroke-width="2"/><rect x="158" y="154" width="26" height="22" rx="2" fill="#ffd97a"/><rect x="220" y="154" width="26" height="22" rx="2" fill="#ffd97a"/><path d="M171 154v22M158 165h26M233 154v22M220 165h26" stroke="#8a4b22" stroke-width="2"/><rect x="190" y="166" width="24" height="42" rx="3" fill="#5a331c"/><circle cx="208" cy="188" r="2.2" fill="#f2c14e"/><rect x="140" y="206" width="124" height="5" rx="2" fill="#5b3b2a"/><path d="M194 211 L180 240 H224 L210 211Z" fill="#d9c9a8" opacity=".85"/></svg>` },
+  comunidad: { foto:'img/portada-dia.jpg' },
+  ciudad: { svg:`<svg class="arte-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="auC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3f7e"/><stop offset=".55" stop-color="#d9775f"/><stop offset="1" stop-color="#f3c77e"/></linearGradient><linearGradient id="auA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d5f80"/><stop offset="1" stop-color="#15344c"/></linearGradient></defs><rect width="400" height="240" fill="url(#auC)"/><circle cx="300" cy="120" r="26" fill="#ffdca0" opacity=".8"/><path d="M40 58 L150 40" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="6 5"/><g transform="translate(150 38) rotate(-9)"><path d="M0 0 L26 -1 C31 -1 33 1 33 2 C33 3 31 4 26 4 L0 4Z" fill="#fff"/><path d="M12 1 L4 -9 L9 -9 L19 1Z M12 3 L5 12 L10 12 L19 3Z M1 1 L-3 -5 L1 -5 L5 1Z" fill="#fff"/></g><path d="M-10 156 L30 112 L55 128 L92 66 L116 102 L140 82 L170 120 L206 60 L236 100 L262 86 L300 128 L340 90 L410 140 V175 H-10Z" fill="#4b3f6d"/><path d="M92 66 L80 84 L90 80 L96 88 L104 79Z M206 60 L193 79 L203 76 L210 84 L218 74Z M340 90 L329 104 L338 102 L344 108 L351 101Z M140 82 L133 92 L141 90 L146 95Z" fill="#fff"/><path d="M-10 168 L50 140 L110 156 L170 138 L240 158 L300 142 L410 162 V178 H-10Z" fill="#372f57"/><rect x="6" y="161" width="11" height="9" fill="#e63946"/><path d="M5 161 L11.5 156 L18 161Z" fill="#3b2f4f"/><rect x="18" y="158" width="15" height="12" fill="#f4a261"/><path d="M17 158 L25.5 153 L34 158Z" fill="#3b2f4f"/><rect x="21" y="162" width="3" height="3" fill="#ffe7a3"/><rect x="34" y="161" width="13" height="9" fill="#e76f51"/><path d="M33 161 L40.5 156 L48 161Z" fill="#3b2f4f"/><rect x="37" y="165" width="3" height="3" fill="#ffe7a3"/><rect x="51" y="161" width="9" height="9" fill="#f4a261"/><path d="M50 161 L55.5 156 L61 161Z" fill="#3b2f4f"/><rect x="61" y="158" width="15" height="12" fill="#f4a261"/><path d="M60 158 L68.5 153 L77 158Z" fill="#3b2f4f"/><rect x="82" y="158" width="14" height="12" fill="#e76f51"/><path d="M81 158 L89.0 153 L97 158Z" fill="#3b2f4f"/><rect x="100" y="161" width="9" height="9" fill="#e76f51"/><path d="M99 161 L104.5 156 L110 161Z" fill="#3b2f4f"/><rect x="111" y="159" width="11" height="11" fill="#e9c46a"/><path d="M110 159 L116.5 154 L123 159Z" fill="#3b2f4f"/><rect x="127" y="158" width="11" height="12" fill="#e9c46a"/><path d="M126 158 L132.5 153 L139 158Z" fill="#3b2f4f"/><rect x="130" y="162" width="3" height="3" fill="#ffe7a3"/><rect x="143" y="161" width="14" height="9" fill="#f1faee"/><path d="M142 161 L150.0 156 L158 161Z" fill="#3b2f4f"/><rect x="146" y="165" width="3" height="3" fill="#ffe7a3"/><rect x="163" y="158" width="9" height="12" fill="#e76f51"/><path d="M162 158 L167.5 153 L173 158Z" fill="#3b2f4f"/><rect x="176" y="158" width="14" height="12" fill="#e63946"/><path d="M175 158 L183.0 153 L191 158Z" fill="#3b2f4f"/><rect x="194" y="159" width="13" height="11" fill="#f1faee"/><path d="M193 159 L200.5 154 L208 159Z" fill="#3b2f4f"/><rect x="197" y="163" width="3" height="3" fill="#ffe7a3"/><rect x="209" y="156" width="14" height="14" fill="#2a9d8f"/><path d="M208 156 L216.0 151 L224 156Z" fill="#3b2f4f"/><rect x="212" y="160" width="3" height="3" fill="#ffe7a3"/><rect x="226" y="159" width="13" height="11" fill="#f1faee"/><path d="M225 159 L232.5 154 L240 159Z" fill="#3b2f4f"/><rect x="242" y="162" width="13" height="8" fill="#f4a261"/><path d="M241 162 L248.5 157 L256 162Z" fill="#3b2f4f"/><rect x="257" y="160" width="15" height="10" fill="#e9c46a"/><path d="M256 160 L264.5 155 L273 160Z" fill="#3b2f4f"/><rect x="276" y="157" width="9" height="13" fill="#f4a261"/><path d="M275 157 L280.5 152 L286 157Z" fill="#3b2f4f"/><rect x="290" y="156" width="15" height="14" fill="#f1faee"/><path d="M289 156 L297.5 151 L306 156Z" fill="#3b2f4f"/><rect x="293" y="160" width="3" height="3" fill="#ffe7a3"/><rect x="308" y="159" width="13" height="11" fill="#a8dadc"/><path d="M307 159 L314.5 154 L322 159Z" fill="#3b2f4f"/><rect x="311" y="163" width="3" height="3" fill="#ffe7a3"/><rect x="322" y="159" width="11" height="11" fill="#f4a261"/><path d="M321 159 L327.5 154 L334 159Z" fill="#3b2f4f"/><rect x="325" y="163" width="3" height="3" fill="#ffe7a3"/><rect x="339" y="157" width="11" height="13" fill="#a8dadc"/><path d="M338 157 L344.5 152 L351 157Z" fill="#3b2f4f"/><rect x="342" y="161" width="3" height="3" fill="#ffe7a3"/><rect x="354" y="160" width="14" height="10" fill="#e76f51"/><path d="M353 160 L361.0 155 L369 160Z" fill="#3b2f4f"/><rect x="371" y="158" width="10" height="12" fill="#f4a261"/><path d="M370 158 L376.0 153 L382 158Z" fill="#3b2f4f"/><rect x="374" y="162" width="3" height="3" fill="#ffe7a3"/><rect x="383" y="160" width="15" height="10" fill="#e9c46a"/><path d="M382 160 L390.5 155 L399 160Z" fill="#3b2f4f"/><rect x="0" y="170" width="400" height="70" fill="url(#auA)"/><g stroke="#f3c77e" stroke-opacity=".45" stroke-width="2"><path d="M270 182h60M282 190h36M290 198h22"/></g><path d="M226 200 H330 L318 214 H238Z" fill="#fff"/><rect x="246" y="190" width="62" height="10" rx="2" fill="#f1f1f1"/><rect x="258" y="182" width="36" height="8" rx="2" fill="#e8e8e8"/><rect x="286" y="172" width="9" height="12" fill="#d64545"/><path d="M250 195h54" stroke="#2d5f80" stroke-width="2" stroke-dasharray="3 3"/><ellipse cx="86" cy="222" rx="30" ry="8" fill="#2b2445"/><path d="M78 222 L81 180 H91 L94 222Z" fill="#fff"/><path d="M79.6 206 H92.4 L93 214 H79Z M80.6 190 H91.4 L91.9 198 H80.1Z" fill="#d64545"/><rect x="79" y="174" width="14" height="7" rx="2" fill="#2b2445"/><circle cx="86" cy="177" r="10" fill="#ffe9a8" opacity=".55"/></svg>` },
+  gestion: { svg:`<svg class="arte-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="agC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b3fa0"/><stop offset="1" stop-color="#1c6f73"/></linearGradient></defs><rect width="400" height="240" fill="url(#agC)"/><circle cx="340" cy="30" r="80" fill="#fff" opacity=".06"/><circle cx="40" cy="220" r="70" fill="#fff" opacity=".06"/><rect x="110" y="42" width="130" height="164" rx="12" fill="#fff"/><rect x="128" y="62" width="70" height="9" rx="4" fill="#5b3fa0"/><g fill="#d6d9e4"><rect x="128" y="82" width="94" height="6" rx="3"/><rect x="128" y="96" width="80" height="6" rx="3"/><rect x="128" y="110" width="88" height="6" rx="3"/></g><g fill="#1c9e8f"><rect x="132" y="170" width="14" height="20" rx="2"/><rect x="152" y="156" width="14" height="34" rx="2"/><rect x="172" y="144" width="14" height="46" rx="2"/><rect x="192" y="160" width="14" height="30" rx="2" fill="#f2a541"/></g><circle cx="286" cy="98" r="40" fill="#fff" opacity=".95"/><path d="M286 98 L286 58 A40 40 0 0 1 322 116Z" fill="#f2a541"/><path d="M286 98 L322 116 A40 40 0 0 1 262 130Z" fill="#1c9e8f"/><g><ellipse cx="290" cy="196" rx="26" ry="8" fill="#e0a82e"/><rect x="264" y="178" width="52" height="18" fill="#f2c14e"/><ellipse cx="290" cy="178" rx="26" ry="8" fill="#f7d774"/><ellipse cx="290" cy="170" rx="26" ry="8" fill="#e0a82e"/><rect x="264" y="160" width="52" height="10" fill="#f2c14e"/><ellipse cx="290" cy="160" rx="26" ry="8" fill="#f7d774"/></g></svg>` },
+};
+const arteDe = k => {
+  const a = ARTE[k] || {};
+  return a.foto ? `<span class="arte-foto" style="background-image:url('${a.foto}')"></span>` : (a.svg || '');
+};
+
 /* Las secciones de la app. Cada una es una ventana con su mosaico.
    `tejas(u, s, hoy)` devuelve el contenido y `linea(u, s, hoy)` la frase
    viva que se lee en la portada. */
 const SECCIONES = {
   casa: {
-    titulo:'Tu casa', icon:'home', color:'ok', ancha:true,
+    titulo:'Tu casa', icon:'home', color:'ok', ancha:true, lema:'Tu lote, tus visitas y tus cosas',
     sub:'Visitas, reservas, mensajes y los datos de tu lote',
     linea(u, s, hoy){
       const v = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy)).length;
@@ -148,7 +168,7 @@ const SECCIONES = {
     },
   },
   comunidad: {
-    titulo:'El barrio', icon:'muro', color:'brand', ancha:true,
+    titulo:'El barrio', icon:'muro', color:'brand', ancha:true, lema:'La vida entre vecinos',
     sub:'Lo que pasa entre vecinos',
     linea(u, s, hoy){
       const piz = s.posts.filter(p => p.createdAt > (Store.sesion.pizarronVisto || 0) && p.autor !== u.id).length;
@@ -178,7 +198,7 @@ const SECCIONES = {
     },
   },
   ciudad: {
-    titulo:'Ushuaia y servicios', icon:'pin', color:'sky', ancha:true,
+    titulo:'Ushuaia y servicios', icon:'pin', color:'sky', ancha:true, lema:'Lo de afuera que igual te toca',
     sub:'Lo de afuera del barrio que igual te toca',
     linea(u, s, hoy){
       const cru = s.cruceros.filter(c => c.fecha === hoy).length;
@@ -198,7 +218,7 @@ const SECCIONES = {
     },
   },
   gestion: {
-    titulo:'Gestión del barrio', icon:'sliders', color:'accent', ancha:true,
+    titulo:'Gestión del barrio', icon:'sliders', color:'accent', ancha:true, lema:'La trastienda del barrio',
     sub:'Administración, contabilidad, expensas y garita',
     solo:'admin',
     linea(u, s){
@@ -231,7 +251,19 @@ const SECCIONES = {
     },
   },
 };
-/* Cada sección es una ventana de verdad, con su lomo y su vuelta atrás. */
+/* Cada sección es una ventana de verdad, con su lomo y su vuelta atrás.
+   Arriba lleva su ilustración a lo ancho, con el título grande y la frase
+   viva de lo que está pasando; abajo, las tejas. La idea es que abrir una
+   sección se sienta como entrar a un lugar, no como abrir un menú. */
+const bannerSeccion = (k, u, s, hoy) => {
+  const S = SECCIONES[k];
+  return `<div class="sec-banner s-${k}">
+    <div class="sec-banner-arte">${arteDe(k)}</div>
+    <div class="sec-banner-txt">
+      <span class="sec-banner-ic ic-${S.color}">${I(S.icon)}</span>
+      <div><small>${esc(S.lema || '')}</small><h2>${esc(S.titulo)}</h2><p>${esc(S.linea(u, s, hoy))}</p></div>
+    </div></div>`;
+};
 for (const k in SECCIONES){
   const S = SECCIONES[k];
   R[k] = { titulo:S.titulo, icon:S.icon, color:S.color, sub:S.sub, ancha:S.ancha,
@@ -239,7 +271,8 @@ for (const k in SECCIONES){
       if (S.solo === 'admin' && !esAdmin()) return vacio('lock', 'Solo para la Administración.');
       const u = yo(), s = Store.s, hoy = hoyISO();
       const c = S.tejas(u, s, hoy);
-      return c.trim().startsWith('<p') ? c : `<div class="mosaico">${c}</div>`;
+      return `<div class="seccion-vista">${bannerSeccion(k, u, s, hoy)}
+        ${c.trim().startsWith('<p') ? c : `<div class="mosaico">${c}</div>`}</div>`;
     } };
 }
 
@@ -297,14 +330,75 @@ const Reloj = {
   },
 };
 
-/* La puerta de una sección tal como se ve en la portada. */
+/* La puerta de una sección tal como se ve en la portada: una ventana con
+   su dibujo, que se agranda un poco al pasar por encima e invita a entrar. */
 const puerta = (k, u, s, hoy) => {
   const S = SECCIONES[k];
-  return `<button class="puerta" data-a="abrir" data-v="${k}">
-    <span class="ic ic-${S.color}">${I(S.icon)}</span>
-    <span class="txt"><b>${esc(S.titulo)}</b><small>${esc(S.linea(u, s, hoy))}</small></span>
-    <span class="puerta-flecha">${I('right')}</span></button>`;
+  return `<button class="puerta-arte s-${k}" data-a="abrir" data-v="${k}" aria-label="Abrir ${esc(S.titulo)}">
+    <span class="pa-arte">${arteDe(k)}</span>
+    <span class="pa-pie">
+      <span class="pa-ic ic-${S.color}">${I(S.icon)}</span>
+      <span class="pa-txt"><b>${esc(S.titulo)}</b><small>${esc(S.linea(u, s, hoy))}</small></span>
+      <span class="pa-entrar">Entrar${I('right')}</span>
+    </span></button>`;
 };
+
+/* =========================================================
+   PIZARRA DEL DÍA
+   Todo lo que se anotó para el barrio, lo último primero: los avisos de
+   la guardia y de la Administración, los comunicados, las alertas y las
+   novedades de los vecinos. Se ven los primeros renglones; al tocar uno se
+   lee completo. Lo de compra y venta queda en el pizarrón, para no tapar
+   lo importante.
+   ========================================================= */
+const TIPOS_PIZARRA = ['guardia', 'aviso', 'alerta', 'evento', 'perdido'];
+function novedadesDelBarrio(){
+  const s = Store.s, hoy = hoyISO();
+  const posts = aLista(s.posts).filter(p => p && (TIPOS_PIZARRA.includes(p.type) || usuario(p.autor)?.rol === 'admin'))
+    .map(p => ({ tipo:'post', id:p.id, at:p.createdAt, p }));
+  const coms = aLista(s.comunicados).filter(c => c && c.para === 'todos' && !c.archivado && (!c.vence || c.vence >= hoy))
+    .map(c => ({ tipo:'com', id:c.id, at:c.at, c }));
+  return [...posts, ...coms].sort((a, b) => b.at - a.at);
+}
+const cuandoFue = at => {
+  const d = new Date(at), iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const h = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return iso === hoyISO() ? `Hoy ${h}` : iso === sumarDias(hoyISO(), -1) ? `Ayer ${h}` : `${fechaCorta(iso)} ${h}`;
+};
+function tarjetaNovedad(n, ant){
+  const nueva = ant && n.at > ant;
+  if (n.tipo === 'com'){
+    const c = n.c;
+    return `<button class="novedad n-com ${nueva ? 'nueva' : ''}" data-a="ver-novedad" data-v="com" data-id="${esc(c.id)}">
+      <span class="nov-cab"><span class="pill p-danger">${I(c.tipo === 'reunion' ? 'calendar' : 'tack')}${c.tipo === 'reunion' ? 'Invitación' : 'Comunicado'}</span><time>${cuandoFue(c.at)}</time></span>
+      <b>${esc(c.titulo)}</b><span class="nov-texto">${esc(c.texto || '')}</span>
+      <span class="nov-de">Administración</span></button>`;
+  }
+  const p = n.p, t = TIPOS_POST[p.type] || TIPOS_POST.aviso, a = autorVisible(p.autor);
+  return `<button class="novedad n-${esc(p.type)} ${nueva ? 'nueva' : ''}" data-a="ver-novedad" data-v="post" data-id="${esc(p.id)}">
+    <span class="nov-cab"><span class="pill p-${t.c}">${I(t.icon)}${t.n}</span>${p.fijado ? `<span class="nov-fijo">${I('tack')}</span>` : ''}<time>${cuandoFue(p.createdAt)}</time></span>
+    <b>${esc(p.title)}</b>${p.body ? `<span class="nov-texto">${esc(p.body)}</span>` : ''}
+    <span class="nov-de">${esc(a.nombre)}${a.casa && a.casa !== a.nombre ? ' · ' + esc(a.casa) : ''}</span></button>`;
+}
+A['ver-novedad'] = el => {
+  const s = Store.s, id = el.dataset.id;
+  if (el.dataset.v === 'com'){
+    const c = aLista(s.comunicados).find(x => x.id === id); if (!c) return;
+    return hoja(c.tipo === 'reunion' ? 'Invitación' : 'Comunicado', `
+      <div class="novedad-leer"><span class="pill p-danger">${I('tack')}De la Administración</span><time>${cuandoFue(c.at)}</time>
+      <h3>${esc(c.titulo)}</h3><p>${esc(c.texto || '')}</p>
+      ${c.tipo === 'reunion' && c.fecha ? `<div class="card plana small">${I('calendar')} ${fechaLarga(c.fecha)}${c.hora ? ' · ' + esc(c.hora) + ' h' : ''}${c.lugar ? ' · ' + esc(c.lugar) : ''}</div>` : ''}</div>
+      <button class="btn btn-pri btn-block" data-a="cerrar-hoja" style="margin-top:14px">Listo</button>`);
+  }
+  const p = aLista(s.posts).find(x => x.id === id); if (!p) return;
+  const t = TIPOS_POST[p.type] || TIPOS_POST.aviso, a = autorVisible(p.autor);
+  hoja(t.n, `<div class="novedad-leer"><span class="pill p-${t.c}">${I(t.icon)}${t.n}</span><time>${cuandoFue(p.createdAt)} · ${esc(a.nombre)}${a.casa && a.casa !== a.nombre ? ' · ' + esc(a.casa) : ''}</time>
+    <h3>${esc(p.title)}</h3>${p.body ? `<p>${esc(p.body)}</p>` : ''}
+    ${p.type === 'evento' && p.fecha ? `<div class="card plana small">${I('calendar')} ${fechaLarga(p.fecha)}${p.horaEv ? ' · ' + esc(p.horaEv) + ' h' : ''}${p.lugar ? ' · ' + esc(p.lugar) : ''}</div>` : ''}</div>
+    <div class="btns" style="margin-top:14px"><button class="btn btn-sec" data-a="novedad-al-pizarron">${I('muro')}Ver en el pizarrón</button>
+      <button class="btn btn-pri grow" data-a="cerrar-hoja">Listo</button></div>`);
+};
+A['novedad-al-pizarron'] = () => { cerrarHoja(); abrir('pizarron'); };
 
 R.inicio = {
   titulo: 'Inicio', icon: 'home', ancha: true,
@@ -312,7 +406,7 @@ R.inicio = {
     const u = yo(), s = Store.s, hoy = hoyISO(), c = Clima.d?.c;
     const hr = new Date().getHours();
     const saludo = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
-    const [desc, icoClima] = c ? Clima.cod(c.weather_code) : ['', 'cloud'];
+    const [desc] = c ? Clima.cod(c.weather_code) : [''];
     const sol = Clima.sol();
     const hero = `<div class="hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
       <div class="saludo">${saludo},</div>
@@ -326,65 +420,51 @@ R.inicio = {
         : `<div class="clima-datos" style="margin-top:14px"><span>${I('cloud')}Cargando el clima de Ushuaia…</span></div>`}
     </div>`;
 
-    const urg = urgentesVecino();
-    /* Lo urgente primero, y si no hay nada urgente se dice, que también es
-       información: el vecino sabe que no se está perdiendo nada. */
-    const ahora = urg.length
-      ? `${sec('Ahora', `<span class="muted small">${plural(urg.length, 'aviso')}</span>`)}<div class="panel-sube">${urg.join('')}</div>`
-      : `${sec('Ahora')}<div class="todo-tranquilo">${I('check')}<div><b>Todo tranquilo</b><span>No hay nada pendiente de tu parte.</span></div></div>`;
+    const pron = Clima.d?.dd ? `<div class="pronostico">${[1,2,3].map(i => {
+      const dd = Clima.d.dd; if (!dd.time[i]) return '';
+      const [, ic] = Clima.cod(dd.weather_code[i]);
+      return `<div><b>${i === 1 ? 'Mañana' : DIAS[fechaDe(dd.time[i]).getDay()]}</b>${I(ic)}
+        <div class="t">${Math.round(dd.temperature_2m_max[i])}° <span>${Math.round(dd.temperature_2m_min[i])}°</span></div>
+        <div class="v">${dd.snowfall_sum[i] >= 1 ? `❄ ${Math.round(dd.snowfall_sum[i])} cm` : `ráf. ${Math.round(dd.wind_gusts_10m_max[i])}`}</div></div>`; }).join('')}</div>`
+      : `<div class="card muted small">${I('cloud')} Cargando el pronóstico…</div>`;
 
-    const acciones = `<div class="acciones-rapidas">
-      <button class="rapido r-brand" data-a="nuevo-pase"><span class="ic">${I('qr')}</span><b>Autorizar una visita</b></button>
-      <button class="rapido r-wood" data-a="abrir" data-v="reservas"><span class="ic">${I('calendar')}</span><b>Reservar un espacio</b></button>
-      <button class="rapido r-sky" data-a="nuevo-post" data-v="aviso"><span class="ic">${I('muro')}</span><b>Publicar en el pizarrón</b></button>
-      <button class="rapido r-accent" data-a="abrir" data-v="expensas"><span class="ic">${I('wallet')}</span><b>Ver mis expensas</b></button></div>`;
+    /* Lo que te pide algo a vos (alguien en la garita, un paquete, tu
+       propia alerta) va arriba de la pizarra, y sólo si hay algo. */
+    const urg = urgentesVecino();
+    const paraVos = urg.length ? `<div class="para-vos">${urg.join('')}</div>` : '';
+
+    const ant = Store.sesion.visitaAnterior || 0;
+    const nov = novedadesDelBarrio();
+    const nuevas = ant ? nov.filter(n => n.at > ant).length : 0;
+    const pizarra = nov.length
+      ? `<div class="pizarra">${nov.slice(0, 6).map(n => tarjetaNovedad(n, ant)).join('')}</div>`
+      : vacio('muro', 'Todavía no hay novedades para el barrio.');
 
     const puertas = ['casa', 'comunidad', 'ciudad', ...(esAdmin() ? ['gestion'] : [])]
       .map(k => puerta(k, u, s, hoy)).join('');
 
-    const pron = Clima.d?.dd ? `<div class="pronostico">${[1,2,3].map(i => {
-      const dd = Clima.d.dd; if (!dd.time[i]) return '';
-      const [dsc, ic] = Clima.cod(dd.weather_code[i]);
-      return `<div><b>${i === 1 ? 'Mañana' : DIAS[fechaDe(dd.time[i]).getDay()]}</b>${I(ic)}
-        <div class="t">${Math.round(dd.temperature_2m_max[i])}° <span>${Math.round(dd.temperature_2m_min[i])}°</span></div>
-        <div class="v">${dd.snowfall_sum[i] >= 1 ? `❄ ${Math.round(dd.snowfall_sum[i])} cm` : `ráf. ${Math.round(dd.wind_gusts_10m_max[i])}`}</div></div>`; }).join('')}</div>` : '';
-    const luz = barraLuz(sol);
-    const ant = Store.sesion.visitaAnterior || 0;
-    const nPost = s.posts.filter(p => p.createdAt > ant && p.autor !== u.id).length, nMsg = s.msgs.filter(m => m.createdAt > ant && m.autor !== u.id).length;
-    const desde = ant && (nPost || nMsg) ? `<div class="card" style="display:flex;gap:12px;align-items:center"><span class="ic ic-accent" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I('sparkle')}</span>
-      <div class="grow"><b style="font-size:14px">Desde tu última visita</b><div class="muted small">${[nPost && plural(nPost, 'publicación nueva', 'publicaciones nuevas'), nMsg && plural(nMsg, 'mensaje nuevo', 'mensajes nuevos') + ' en el chat'].filter(Boolean).join(' · ')}</div></div></div>` : '';
-    const ultimas = s.posts.slice().sort((a, b) => (b.fijado - a.fijado) || b.createdAt - a.createdAt).slice(0, 3).map(p => {
-      const t = TIPOS_POST[p.type] || TIPOS_POST.aviso;
-      return superficie({ v:'pizarron', icon:t.icon, color:t.c, t:esc(p.title), s:`${t.n} · ${esc(autorVisible(p.autor).nombre)} · ${hace(p.createdAt)}` });
-    }).join('');
-
     /* =========================================================
-       LA PORTADA, EN BLOQUES DE ANCHO COMPLETO
-       -------------------------------------------------------
-       Antes esto eran dos columnas: una larga a la izquierda y otra corta a
-       la derecha. En una pantalla de computadora la columna corta se
-       terminaba enseguida y quedaba un hueco blanco enorme al costado, y las
-       puertas ("Tu casa", "El barrio"…) se apilaban en fila india
-       desaprovechando todo el ancho.
-
-       Ahora cada sección ocupa el ancho entero y ordena SU contenido en una
-       grilla propia. Así no hay columna que sobre ni hueco que llenar: en el
-       teléfono se apila solo, y en la computadora cada bloque se abre en dos,
-       tres o cuatro celdas según entre. */
-    const ultimasHTML = ultimas || vacio('muro', 'Todavía no hay nada en el pizarrón. Publicá el primer aviso.');
+       LA PORTADA, DE ARRIBA ABAJO
+         1. el saludo y el tiempo de ahora (hero),
+         2. los próximos días y la luz del día,
+         3. las propuestas del Hotel Los Cauquenes,
+         4. la pizarra del día: lo último del barrio primero,
+         5. Ushuaia hoy,
+         6. por dónde seguir: tres ventanas ilustradas.
+       Cada bloque ocupa el ancho entero y reparte su contenido en su
+       propia grilla: en el teléfono se apila y en la computadora se abre.
+       ========================================================= */
     return `${hero}
-      ${tiraPromos()}
       <div class="inicio-lienzo">
-        <section class="bloque">${ahora}${desde}</section>
-        <section class="bloque">${sec('¿Qué querés hacer?')}${acciones}</section>
-        <section class="bloque">${sec('Por dónde seguir')}<div class="puertas">${puertas}</div></section>
         <section class="bloque dia-y-luz">
           <div>${sec('Próximos días')}${pron}</div>
-          <div>${sec('Luz del día')}${luz}</div>
+          <div>${sec('Luz del día')}${barraLuz(sol)}</div>
         </section>
-        <section class="bloque">${sec('Último en el pizarrón', `<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button>`)}
-          <div class="ultimas">${ultimasHTML}</div></section>
+        <section class="bloque">${tiraPromos()}</section>
+        <section class="bloque">${sec('Pizarra del día', `<span class="sec-extra">${nuevas ? `<span class="pill p-brand">${plural(nuevas, 'nueva', 'nuevas')}</span>` : ''}<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button></span>`)}
+          ${paraVos}${pizarra}</section>
         <section class="bloque">${ushuaiaHoy()}</section>
+        <section class="bloque">${sec('Por dónde seguir')}<div class="puertas-arte">${puertas}</div></section>
       </div>`;
   },
 };

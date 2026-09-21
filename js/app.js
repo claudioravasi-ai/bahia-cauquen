@@ -82,7 +82,7 @@ const titulo = (def, p) => typeof def.titulo === 'function' ? def.titulo(p) : de
 /* ---------------- dibujo ---------------- */
 function pintarTop(){
   const u = yo(); if (!u) return;
-  const nl = noLeidas().length;
+  const nl = noLeidas().length + sosEnCampanita().length;
   const modo = modoActivo();
   const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[modo] || '';
   $('#top').innerHTML = `
@@ -335,38 +335,80 @@ const Sonido = {
 
 /* =========================================================
    ALARMA SOS
-   Una alerta se ve en TODAS las terminales del barrio que estén abiertas y
-   suena UNA VEZ en cada una. Lo que se muestra depende de quién mira:
-     · Guardia y Administración: la ficha completa, con el lugar exacto,
-       el teléfono del vecino y los botones para atenderla.
-     · El resto de los vecinos: el aviso de que hay una emergencia y en qué
-       lote, sin datos personales. Si es médica y el vecino marcó que sabe
-       primeros auxilios, además le aparece el botón para acercarse.
-     · Quien la mandó: su propio panel, con el botón para cancelarla.
+   Cuando un vecino aprieta el SOS, en TODAS las terminales del barrio que
+   estén abiertas en ese momento salta la pantalla roja titilante, suena UNA
+   vez y dice qué pasa, en qué lote y quién la pidió.
+
+   Lo que NO tiene que pasar (y pasaba): que alguien abra la app doce horas
+   después y le salte una alerta vieja como si fuera nueva. Por eso:
+     · a un vecino la pantalla roja le salta sólo si la alerta llega EN VIVO
+       (creada hace menos de SOS_EN_VIVO) y este equipo todavía no la mostró;
+     · una alerta vieja no salta ni suena: queda en la campanita;
+     · en la campanita de cada app queda hasta que el vecino que la pidió
+       marca "Ya está solucionado" (o, si no puede, la guardia la cierra).
+   La guardia y la Administración siguen viendo la ficha completa mientras
+   la alerta esté abierta: atenderla es su trabajo.
    ========================================================= */
-let sosVistos = new Set(), sosSilenciada = new Set(), sosOcultas = new Set();
+const SOS_EN_VIVO = 3 * 60e3;          /* cuánto dura "recién llegada" */
+const SOS_EN_CAMPANITA = 24 * 3600e3;  /* los vecinos dejan de verla pasado un día */
+const SOS_ESTADO = { activa:'Activa', en_camino:'La guardia va en camino', atendida:'Atendida por la guardia · falta que el vecino confirme' };
+/* Lo que ya saltó en este equipo se recuerda aunque se recargue la app. */
+const sosMemoria = (clave) => {
+  let ids = [];
+  try { ids = JSON.parse(localStorage.getItem(clave) || '[]'); } catch(e){}
+  const set = new Set(Array.isArray(ids) ? ids : []);
+  const guardar = () => { try { localStorage.setItem(clave, JSON.stringify([...set].slice(-60))); } catch(e){} };
+  return { has: id => set.has(id), add(id){ if (!set.has(id)){ set.add(id); guardar(); } }, delete(id){ if (set.delete(id)) guardar(); } };
+};
+const sosAvisadas = sosMemoria('bhc.sosAvisadas');   /* ya sonó y saltó acá */
+const sosOcultas = sosMemoria('bhc.sosOcultas');     /* la sacaron de la pantalla con "Entendido" */
+const sosEnPantalla = new Set();                      /* vecinos: las que saltaron en esta sesión */
+
+const sosAbiertas = () => aLista(Store.s.sos).filter(x => x && x.estado !== 'resuelta');
+/* Las que van en la campanita de quien mira. */
+const sosEnCampanita = () => {
+  const u = yo(); if (!u) return [];
+  return sosAbiertas().filter(x => esStaff() || x.userId === u.id || Date.now() - x.at < SOS_EN_CAMPANITA)
+    .sort((a, b) => b.at - a.at);
+};
 const sosQueVeo = () => {
   const u = yo(); if (!u) return [];
-  return Store.s.sos.filter(x => x.estado !== 'resuelta' && !sosOcultas.has(x.id)).filter(x =>
-    esStaff() || x.userId === u.id || x.tipo === 'seguridad' || x.tipo === 'incendio' || (x.tipo === 'medica' && u.respondedor));
+  return sosAbiertas().filter(x => !sosOcultas.has(x.id)).filter(x => {
+    if (x.userId === u.id) return true;
+    if (esStaff()) return x.estado !== 'atendida';
+    return sosEnPantalla.has(x.id);
+  });
 };
 function pintarAlarmas(){
   const box = $('#alarmas'); if (!box) return;
   const u = yo();
-  const act = sosQueVeo();
-  if (!u || !act.length){ box.innerHTML = ''; return; }
-  /* Suena una sola vez por alerta, en cada terminal. */
-  const nuevas = act.filter(x => !sosVistos.has(x.id));
-  act.forEach(x => sosVistos.add(x.id));
-  if (nuevas.length && !sosSilenciada.has(nuevas[0].id)){
+  if (!u){ box.innerHTML = ''; return; }
+  /* Las que llegan en vivo y este equipo todavía no mostró: saltan y suenan una vez. */
+  const recien = sosAbiertas().filter(x => x.userId !== u.id && x.estado !== 'atendida' && !sosAvisadas.has(x.id) && Date.now() - x.at < SOS_EN_VIVO);
+  recien.forEach(x => { sosAvisadas.add(x.id); sosEnPantalla.add(x.id); sosOcultas.delete(x.id); });
+  if (recien.length){
     Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .56, .5]], 'square', .16);
     Sonido.vibrar([400, 160, 400, 160, 400]);
+    sosAvisoDelSistema(recien[0]);
   }
+  /* A la guardia, una alerta vieja se le muestra (tiene que atenderla) pero
+     no le suena de nuevo cada vez que abre la app. */
+  sosAbiertas().forEach(x => sosAvisadas.add(x.id));
+  const act = sosQueVeo();
+  if (!act.length){ box.innerHTML = ''; return; }
   const s0 = act[0], t = TIPOS_SOS[s0.tipo] || TIPOS_SOS.otra;
   box.innerHTML = `<div class="sos-pantalla" role="alertdialog" aria-label="Alerta SOS"><div class="sos-caja">
     ${s0.userId === u.id ? sosPanelMio(s0, t) : esStaff() ? sosPanelStaff(s0, t, act.length) : sosPanelVecino(s0, t)}
   </div></div>`;
   Fotos.hidratar(box);
+}
+/* Si la app está abierta pero en segundo plano, el aviso del sistema. */
+function sosAvisoDelSistema(x){
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
+    const v = usuario(x.userId) || {}, t = TIPOS_SOS[x.tipo] || TIPOS_SOS.otra;
+    new Notification(`SOS · ${t.nombre}`, { body:`${v.casa || ''} · ${v.nombre || ''}`, icon:'icons/icon-192.png', tag:'sos-' + x.id, requireInteraction:true });
+  } catch(e){}
 }
 function sosPanelStaff(s0, t, cuantas){
   const u = usuario(s0.userId) || {};
@@ -387,41 +429,66 @@ function sosPanelStaff(s0, t, cuantas){
       ${u.tel ? `<a class="btn btn-block sos-b-tenue" href="${telLink(u.tel)}">${I('phone')}Llamar a ${esc((u.nombre || '').split(' ')[0])}</a>` : ''}
       <div class="btns">
         ${s0.estado === 'activa' ? `<button class="btn btn-ok" data-a="sos-voy" data-id="${s0.id}">${I('check')}Voy en camino</button>` : ''}
-        <button class="btn btn-sec" data-a="sos-resuelta" data-id="${s0.id}">Resuelta</button>
+        <button class="btn btn-sec" data-a="sos-atendida" data-id="${s0.id}">Ya la atendimos</button>
         <button class="btn btn-sec" data-a="sos-repetir" data-id="${s0.id}">${I('volume')}Repetir sonido</button>
       </div>
       <a class="btn btn-block sos-b-oscuro" href="tel:${t.llamar}">${I('siren')}Llamar al ${t.llamar}</a>
     </div>`;
 }
+/* Lo que ve el resto del barrio: qué pasa, en qué lote y quién la pidió. */
 function sosPanelVecino(s0, t){
   const u = usuario(s0.userId) || {};
   const medicaRespondedor = s0.tipo === 'medica' && yo()?.respondedor;
-  return `<div class="sos-cab">${I('siren')}<div><b>${esc(t.nombre)} en el barrio</b><span>${esc(u.casa || 'Un vecino')} · ${hace(s0.at)}</span></div></div>
+  return `<div class="sos-cab">${I('siren')}<div><b>SOS · ${esc(t.nombre)}</b><span>${hace(s0.at)}</span></div></div>
+    <div class="sos-vecino">
+      <div class="grow"><b>${esc(u.nombre || 'Un vecino')}</b>
+        <div class="sos-lote">${esc(u.casa || 'Lote sin dato')}</div>
+        ${s0.estado === 'en_camino' ? `<div class="sos-dato">${I('check')} La guardia va en camino</div>` : ''}</div></div>
     <div class="sos-texto">${medicaRespondedor
       ? 'Marcaste que sabés primeros auxilios. Si podés, acercate. La guardia ya fue avisada.'
       : s0.tipo === 'incendio' ? 'Alejate de la zona, no bloquees las calles y dejá paso a los bomberos. La guardia y la Administración ya fueron avisadas.'
       : s0.tipo === 'seguridad' ? 'Quedate adentro, cerrá con llave y no salgas a mirar. La guardia y la Administración ya fueron avisadas.'
+      : s0.tipo === 'medica' ? 'La guardia ya fue avisada y está yendo. No bloquees la calle: puede venir una ambulancia.'
       : 'La guardia y la Administración ya fueron avisadas.'}</div>
     <div class="sos-botones">
       ${medicaRespondedor ? `<a class="btn btn-block sos-b-claro" href="tel:107">${I('heart')}Llamar al 107</a>` : ''}
       <div class="btns"><button class="btn btn-sec grow" data-a="sos-entendido" data-id="${s0.id}">${I('check')}Entendido</button></div>
       <a class="btn btn-block sos-b-oscuro" href="tel:${t.llamar}">${I('phone')}Emergencias ${t.llamar}</a>
+      <p class="sos-nota">Queda en tu campanita hasta que ${esc((u.nombre || 'el vecino').split(' ')[0])} avise que ya está solucionado.</p>
     </div>`;
 }
 function sosPanelMio(s0, t){
   return `<div class="sos-cab">${I('siren')}<div><b>Tu alerta está activa</b><span>${esc(t.nombre)} · ${hace(s0.at)}</span></div></div>
     <div class="sos-texto">${s0.estado === 'en_camino' ? `La guardia va en camino (${esc(nombreDe(s0.atiende))}). Quedate en un lugar seguro.`
-      : 'La guardia y la Administración ya la recibieron. Quedate en un lugar seguro.'}</div>
+      : s0.estado === 'atendida' ? 'La guardia la dio por atendida. Si ya está todo bien, confirmalo: así deja de figurar como emergencia en las apps del barrio.'
+      : 'La guardia, la Administración y los vecinos ya la recibieron. Quedate en un lugar seguro.'}</div>
     <div class="sos-botones">
       <a class="btn btn-block sos-b-claro" href="tel:${t.llamar}">${I('phone')}Llamar al ${t.llamar}</a>
       ${Store.s.config.garitaTel ? `<a class="btn btn-block sos-b-tenue" href="${telLink(Store.s.config.garitaTel)}">${I('gate')}Llamar a la garita</a>` : ''}
-      <div class="btns"><button class="btn btn-sec grow" data-a="sos-cancelar" data-id="${s0.id}">Ya estoy bien, cancelar</button></div>
+      <div class="btns"><button class="btn btn-ok grow" data-a="sos-cancelar" data-id="${s0.id}">${I('check')}Ya está solucionado</button>
+        <button class="btn btn-sec" data-a="sos-entendido" data-id="${s0.id}">Ocultar</button></div>
+      <p class="sos-nota">"Ocultar" la saca de tu pantalla pero la alerta sigue abierta: la encontrás en la campanita.</p>
     </div>`;
+}
+/* Cómo se ve una alerta abierta dentro de la campanita. */
+function sosEnLista(x){
+  const u = yo(), v = usuario(x.userId) || {}, t = TIPOS_SOS[x.tipo] || TIPOS_SOS.otra, mia = x.userId === u.id;
+  return `<div class="notif-sos">
+    <span class="ic">${I('siren')}</span>
+    <div class="txt"><b>SOS · ${esc(t.nombre)}</b>
+      <span>${mia ? 'Tu alerta' : `${esc(v.casa || '')} · ${esc(v.nombre || 'Vecino/a')}`} · ${hace(x.at)}</span>
+      <small>${SOS_ESTADO[x.estado] || ''}</small>
+      <div class="btns">
+        ${mia ? `<button class="btn btn-xs btn-ok" data-a="sos-cancelar" data-id="${x.id}">${I('check')}Ya está solucionado</button>` : ''}
+        <button class="btn btn-xs btn-sec" data-a="sos-ver" data-id="${x.id}">Ver la alerta</button>
+        ${!mia && esStaff() && x.estado === 'atendida' ? `<button class="btn btn-xs btn-danger-soft" data-a="sos-cerrar" data-id="${x.id}">Cerrarla</button>` : ''}
+      </div></div></div>`;
 }
 A['sos-repetir'] = () => { Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .56, .5]], 'square', .16); Sonido.vibrar([400, 160, 400]); };
 /* "Entendido" saca el cartel de la pantalla de este vecino; la alerta sigue
-   activa para la guardia hasta que la den por resuelta. */
-A['sos-entendido'] = el => { sosSilenciada.add(el.dataset.id); sosOcultas.add(el.dataset.id); pintarAlarmas(); };
+   en su campanita hasta que quien la pidió avise que está solucionada. */
+A['sos-entendido'] = el => { sosOcultas.add(el.dataset.id); sosEnPantalla.delete(el.dataset.id); pintarAlarmas(); pintarTop(); };
+A['sos-ver'] = el => { cerrarHoja(); sosOcultas.delete(el.dataset.id); sosEnPantalla.add(el.dataset.id); pintarAlarmas(); };
 
 function pitido(){ Sonido.tocar([[880, 0, .22], [880, .35, .22], [880, .7, .22]], 'square', .1); Sonido.vibrar([300, 150, 300, 150, 300]); }
 
@@ -569,24 +636,41 @@ function avisarSesionAbierta(){
 A['seguir-sesion'] = () => { $('#sesionAbierta')?.remove(); pintar(); };
 A['salir-y-entrar'] = async () => { $('#sesionAbierta')?.remove(); await Nube.salir(); Store.sesion.userId = null; Store.guardarSesion(); pintarBienvenida('entrar'); };
 
-/* ---------------- avisos ---------------- */
+/* ---------------- avisos ----------------
+   La campanita muestra SOLO lo que todavía no viste. Cada aviso que abrís
+   desaparece de la lista y resta del número; "Marcar todos como vistos"
+   la deja vacía. Lo único que no se va con un toque es un SOS abierto:
+   queda arriba de todo hasta que el vecino que lo pidió avisa que ya está
+   solucionado. */
 function abrirNotifs(){
-  const u = yo();
-  const ns = misNotifs().slice(0, 60);
-  hoja('Avisos', ns.length ? `
-    <div class="row" style="justify-content:flex-end;margin:-4px 0 6px"><button class="btn btn-xs btn-sec" data-a="notifs-leidas">${I('check')}Marcar todo como leído</button></div>
-    ${ns.map(n => `<div class="notif ${aLista(n.leidas).includes(u.id) ? '' : 'nueva'}" data-a="notif" data-id="${n.id}">
-      <span class="ic ic-${n.color}">${I(n.icon)}</span>
-      <div class="txt"><b>${esc(n.titulo)}</b>${n.texto ? `<span>${esc(n.texto)}</span>` : ''}<time>${hace(n.at)}</time></div></div>`).join('')}`
-    : `<div class="vacio">${I('bell')}No tenés avisos todavía.</div>`);
+  const sos = sosEnCampanita();
+  const ns = noLeidas().slice(0, 80);
+  if (!sos.length && !ns.length)
+    return hoja('Avisos', `<div class="vacio">${I('bell')}<b>No tenés avisos nuevos</b><span class="muted small">Cuando llegue uno, lo vas a ver con un número en la campanita.</span></div>`);
+  hoja('Avisos', `
+    ${sos.map(sosEnLista).join('')}
+    ${ns.length ? `<div class="notifs-cab"><span>${plural(ns.length, 'aviso sin ver', 'avisos sin ver')}</span>
+      <button class="btn btn-xs btn-sec" data-a="notifs-leidas">${I('check')}Marcar todos como vistos</button></div>
+    ${ns.map(n => `<button class="notif nueva" data-a="notif" data-id="${n.id}">
+      <span class="ic ic-${n.color || 'brand'}">${I(n.icon || 'bell')}</span>
+      <span class="txt"><b>${esc(n.titulo)}</b>${n.texto ? `<span>${esc(n.texto)}</span>` : ''}<time>${hace(n.at)}</time></span>${I('right')}</button>`).join('')}` : ''}`);
 }
+const marcarVistoAviso = (n, u) => { const l = listaDe(n, 'leidas'); if (!l.includes(u.id)) l.push(u.id); };
 A['notifs'] = abrirNotifs;
-A['notifs-leidas'] = () => { const u = yo(); Store.cambiar(s => aLista(s.notifs).forEach(n => { const l = listaDe(n, 'leidas'); if (meToca(n, u) && !l.includes(u.id)) l.push(u.id); })); abrirNotifs(); };
+A['notifs-leidas'] = () => { const u = yo(); Store.cambiar(() => noLeidas().forEach(n => marcarVistoAviso(n, u))); pintarTop(); abrirNotifs(); };
+/* Abrir un aviso lo da por visto: si lleva a una ventana, va ahí; si no,
+   se lee entero en la hoja y al cerrarla ya no está en la lista. */
 A['notif'] = el => {
-  const u = yo(); const n = Store.s.notifs.find(x => x.id === el.dataset.id); if (!n) return;
-  Store.cambiar(() => { const l = listaDe(n, 'leidas'); if (!l.includes(u.id)) l.push(u.id); });
-  cerrarHoja();
-  if (n.link){ const [id, p] = n.link.split(':'); abrir(id, p || ''); }
+  const u = yo(); const n = aLista(Store.s.notifs).find(x => x.id === el.dataset.id); if (!n) return;
+  Store.cambiar(() => marcarVistoAviso(n, u));
+  pintarTop();
+  if (n.link && R[n.link.split(':')[0]]){ cerrarHoja(); const [id, p] = n.link.split(':'); abrir(id, p || ''); return; }
+  const quedan = noLeidas().length + sosEnCampanita().length;
+  hoja('Aviso', `<div class="aviso-leido"><span class="ic ic-${n.color || 'brand'}">${I(n.icon || 'bell')}</span>
+      <div><b>${esc(n.titulo)}</b><time>${hace(n.at)}</time></div></div>
+    ${n.texto ? `<p class="aviso-leido-texto">${esc(n.texto)}</p>` : ''}
+    <div class="btns" style="margin-top:16px">${quedan ? `<button class="btn btn-sec" data-a="notifs">${I('left')}Ver ${plural(quedan, 'aviso más', 'avisos más')}</button>` : ''}
+      <button class="btn btn-pri grow" data-a="cerrar-hoja">Listo</button></div>`);
 };
 
 /* ---------------- SOS ----------------
@@ -661,7 +745,7 @@ function elegirSOS(){
     <p class="muted small" style="margin:0 0 12px">Elegí una y la alerta sale al instante a la guardia, a la Administración y a las terminales del barrio.</p>
     ${Object.entries(TIPOS_SOS).map(([k, t]) => `<button class="superficie ${k === 'medica' || k === 'incendio' ? 'peligro' : ''}" data-a="sos-enviar" data-v="${k}">
       <span class="ic ic-danger">${I(t.icon)}</span><span class="txt"><b>${t.nombre}</b>
-      <small>${k === 'medica' ? 'También avisa a los vecinos con formación en primeros auxilios' : k === 'seguridad' || k === 'incendio' ? 'También avisa a todos los vecinos' : 'Guardia y Administración'}</small></span>${I('right')}</button>`).join('')}
+      <small>${k === 'medica' ? 'Guardia, Administración y vecinos (con aviso a quienes saben primeros auxilios)' : 'Guardia, Administración y todos los vecinos'}</small></span>${I('right')}</button>`).join('')}
     <p class="muted tiny" style="margin:14px 0 0">Si te equivocaste, cerrá esta ventana: todavía no se mandó nada.</p>`);
 }
 A['sos-enviar'] = el => {
@@ -677,13 +761,9 @@ A['sos-enviar'] = el => {
   Store.cambiar(s => {
     const id = idSos;
     s.sos.unshift({ id, userId: u.id, tipo, at: Date.now(), estado:'activa' });
-    notificar(s, { para:'staff', titulo:`SOS · ${t.nombre}`, texto:`${u.nombre} · ${u.casa}`, icon:'siren', color:'danger', urgente:true, link:'garita' });
-    if (tipo === 'medica' && motorActivo('sos-respondedores')){
-      const resp = s.users.filter(x => x.respondedor && x.id !== u.id && x.estado === 'aprobado').map(x => x.id);
-      if (resp.length) notificar(s, { para:resp, titulo:'Emergencia médica cerca', texto:`${u.casa} pidió ayuda médica. Si podés, acercate.`, icon:'heart', color:'danger', urgente:true });
-    }
-    if (tipo === 'seguridad' || tipo === 'incendio')
-      notificar(s, { para:'todos', titulo:`Alerta: ${t.nombre.toLowerCase()}`, texto:`Reportado desde ${u.casa}. La guardia ya está avisada.`, icon:t.icon, color:'danger', urgente:true });
+    /* No se manda además un aviso a la campanita: la alerta misma salta en
+       todas las apps abiertas y queda en la campanita de cada una. Antes se
+       mandaban las dos cosas y sonaba dos veces. */
     s.bitacora.unshift({ id:uid(), autor:'sistema', tipo:'incidente', texto:`SOS ${t.nombre} desde ${u.casa} (${u.nombre}).`, at:Date.now() });
   });
   const g = Store.s.config.garitaTel || contactoTel('Garita');
@@ -693,23 +773,43 @@ A['sos-enviar'] = el => {
       <a class="btn btn-danger" href="tel:${t.llamar}">${I('phone')}Llamar al ${t.llamar}</a>
       ${g ? `<a class="btn btn-sec" href="${telLink(g)}">${I('gate')}Llamar a la garita</a>` : ''}
     </div>
-    <p class="muted small" style="margin:14px 0 0">Tu alerta queda activa hasta que la guardia la marque como resuelta.</p>`);
+    <p class="muted small" style="margin:14px 0 0">Tu alerta queda abierta en todas las apps del barrio hasta que vos marques que ya está solucionado.</p>`);
 };
 A['sos-voy'] = el => Store.cambiar(s => {
   const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
   x.estado = 'en_camino'; x.atiende = yo().id;
   notificar(s, { para:x.userId, titulo:'La guardia va en camino', texto:'Recibimos tu alerta. Ya salimos.', icon:'shield', color:'ok', urgente:true });
 });
-A['sos-resuelta'] = el => Store.cambiar(s => {
+/* La guardia la da por atendida: sale de su pantalla, pero en el barrio
+   sigue figurando hasta que el vecino confirme que está todo bien. */
+A['sos-atendida'] = el => Store.cambiar(s => {
   const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
-  x.estado = 'resuelta'; x.resueltaAt = Date.now(); x.resuelve = yo().id;
-  s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`SOS de ${usuario(x.userId)?.casa || ''} resuelta.`, at:Date.now() });
+  x.estado = 'atendida'; x.atendidaAt = Date.now(); x.atiende = x.atiende || yo().id;
+  s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`SOS de ${usuario(x.userId)?.casa || ''} atendida por la guardia.`, at:Date.now() });
+  notificar(s, { para:x.userId, titulo:'La guardia dio por atendida tu alerta', texto:'Cuando esté todo bien, tocá "Ya está solucionado".', icon:'shield', color:'ok', urgente:true });
 });
-A['sos-cancelar'] = el => Store.cambiar(s => {
-  const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
-  x.estado = 'resuelta'; x.resueltaAt = Date.now(); x.resuelve = yo().id;
-  notificar(s, { para:'staff', titulo:'SOS cancelada por el vecino', texto:usuario(x.userId)?.casa || '', icon:'check', color:'ok' });
-});
+/* Quien la pidió avisa que ya está: se cierra en todas las apps. */
+A['sos-cancelar'] = el => {
+  Store.cambiar(s => {
+    const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
+    x.estado = 'resuelta'; x.resueltaAt = Date.now(); x.resuelve = yo().id;
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`SOS de ${usuario(x.userId)?.casa || ''}: el vecino avisó que ya está solucionado.`, at:Date.now() });
+    notificar(s, { para:'staff', titulo:'SOS solucionada', texto:`${usuario(x.userId)?.casa || ''} avisó que ya está todo bien`, icon:'check', color:'ok' });
+  });
+  if ($('#hoja')?.open && $('#hojaTitulo')?.textContent === 'Avisos') abrirNotifs();
+  toast('Listo: la alerta se cerró en todo el barrio', 'check');
+};
+/* Si el vecino no puede confirmarlo, la guardia la cierra a mano. */
+A['sos-cerrar'] = async el => {
+  const x = aLista(Store.s.sos).find(o => o.id === el.dataset.id); if (!x) return;
+  if (!await confirmar('Cerrar la alerta', `El vecino de ${esc(usuario(x.userId)?.casa || '')} todavía no confirmó que está todo bien. ¿La cerrás igual? Queda en la bitácora.`, { si:'Cerrarla' })) return;
+  Store.cambiar(s => {
+    const y = s.sos.find(o => o.id === x.id); if (!y) return;
+    y.estado = 'resuelta'; y.resueltaAt = Date.now(); y.resuelve = yo().id;
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`SOS de ${usuario(y.userId)?.casa || ''} cerrada por la guardia sin confirmación del vecino.`, at:Date.now() });
+  });
+  abrirNotifs();
+};
 const contactoTel = nombre => (Store.s.contactos.find(c => c.nombre.toLowerCase().includes(nombre.toLowerCase())) || {}).tel || '';
 
 /* ---------------- acciones comunes ---------------- */
@@ -919,7 +1019,6 @@ function entrarComo(id){
   Store.guardarSesion();
   PILA.length = 0;
   history.replaceState({ n:1 }, '');
-  sosVistos = new Set(Store.s.sos.map(s => s.id));
   pintar();
   Motor.correr();
   if (puedeAdministrar()) setTimeout(() => elegirModo({ alEntrar:true }), 250);
@@ -1246,7 +1345,6 @@ async function arrancar(){
       Store.sesion.visitaAnterior = Store.sesion.ultimaVisita || 0;
       Store.sesion.ultimaVisita = Date.now();
       Store.guardarSesion();
-      sosVistos = new Set(Store.s.sos.map(x => x.id));
     }
     pintar();
   }

@@ -177,9 +177,8 @@ const Nube = {
     this.arrancada = true;
     /* Si administra el barrio, elige desde qué brazo entra. */
     if (mio.rol === 'admin' && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
-    /* Las alertas que ya estaban abiertas antes de entrar no vuelven a sonar:
-       se ven en pantalla, pero el sonido queda para las nuevas. */
-    if (typeof sosVistos !== 'undefined') sosVistos = new Set((Store.s.sos || []).map(x => x.id));
+    /* Las alertas que ya estaban abiertas antes de entrar no saltan ni
+       suenan: eso lo decide pintarAlarmas() por la hora de cada alerta. */
     if (mio.rol === 'admin') this.sembrarContenido();
   },
 
