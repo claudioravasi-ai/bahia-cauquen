@@ -8,27 +8,79 @@
    Nombre y casa los ve todo el barrio (son vecinos). Profesión,
    teléfono y dirección exacta, solo si cada uno lo comparte. */
 const normTxt = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+/* =========================================================
+   BUSCAR UN VECINO
+   Salen los 152 lotes del padrón, con el nombre del propietario tal como
+   figura en la liquidación de expensas y el número de lote, estén o no en
+   la app. Si alguien de ese lote ya tiene cuenta y subió la foto del frente
+   de su casa, se ve la foto: es lo que la garita necesita para ubicar un
+   domicilio y lo que un vecino usa para saber quién es quién.
+   Se busca por nombre, apellido o número de lote, sin importar acentos ni
+   mayúsculas. Si el padrón todavía no se cargó, salen las cuentas de la app.
+   ========================================================= */
+function fichasDeVecinos(){
+  const s = Store.s;
+  const cuentas = s.users.filter(x => x.estado === 'aprobado' && x.rol === 'vecino' && x.casa);
+  const padron = aLista(s.padron).filter(p => p && p.lote !== undefined && p.lote !== '');
+  const fichas = [];
+  if (padron.length){
+    padron.forEach(p => { const casa = 'Lote ' + p.lote; fichas.push({ casa, lote:String(p.lote), nombre:p.propietario || '', cuentas:cuentas.filter(x => x.casa === casa) }); });
+    cuentas.filter(x => !padron.some(p => 'Lote ' + p.lote === x.casa))
+      .forEach(x => fichas.push({ casa:x.casa, lote:x.casa.replace(/^Lote\s*/i, ''), nombre:x.nombre, cuentas:[x] }));
+  } else {
+    const porCasa = new Map();
+    cuentas.forEach(x => { if (!porCasa.has(x.casa)) porCasa.set(x.casa, []); porCasa.get(x.casa).push(x); });
+    porCasa.forEach((cs, casa) => fichas.push({ casa, lote:casa.replace(/^Lote\s*/i, ''), nombre:cs.map(x => x.nombre).join(' · '), cuentas:cs }));
+  }
+  return fichas.sort((a, b) => String(a.lote).localeCompare(String(b.lote), 'es', { numeric:true }));
+}
+const textoFicha = f => normTxt([f.nombre, f.casa, 'lote ' + f.lote, ...f.cuentas.map(x => [x.nombre,
+  x.enDirectorio ? x.profesion : '', x.skills && x.mostrarTel ? x.skills : '', x.enDirectorio ? x.direccion : ''].join(' '))].join(' '));
+function coincideFicha(f, qq){
+  if (!qq) return true;
+  const palabras = qq.split(/\s+/).filter(Boolean), t = textoFicha(f);
+  /* Un número solo busca el lote exacto: "14" es el lote 14, no el 140. */
+  if (palabras.length === 1 && /^\d+[a-z]?$/.test(palabras[0])) return normTxt(f.lote) === palabras[0];
+  return palabras.every(w => t.includes(w));
+}
 R.vecinos = {
-  titulo: 'Vecinos', icon: 'users', color: 'sky', sub: 'Buscá por nombre, apellido, profesión, oficio o dirección',
+  titulo: 'Vecinos', icon: 'users', color: 'sky', sub: 'Por nombre, apellido o número de lote',
   render(q){
-    const u = yo(), qq = normTxt(q);
-    const todos = Store.s.users.filter(x => x.estado === 'aprobado' && x.rol === 'vecino' && x.id !== u.id);
-    const campos = x => normTxt([x.nombre, x.casa, x.enDirectorio ? x.profesion : '', x.skills && x.mostrarTel ? x.skills : '', x.enDirectorio ? x.direccion : ''].join(' '));
-    const ls = (qq ? todos.filter(x => qq.split(/\s+/).every(w => campos(x).includes(w))) : todos)
-      .sort((a, b) => a.nombre.split(' ').slice(-1)[0].localeCompare(b.nombre.split(' ').slice(-1)[0], 'es'));
-    return `<form data-f="buscar-vecino" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecino" value="${esc(q || '')}" placeholder="Ej: Pérez, médica, electricista, calle 3"><button class="btn btn-pri">${I('search')}</button></form>
-      ${!u.enDirectorio ? aviso('info', 'info', 'Vos todavía no compartís tu profesión ni tu dirección', 'Activalo en Mi casa para que te encuentren.', `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">Ir a Mi casa</button>`) : ''}
-      <div class="muted small" style="margin:0 2px 8px">${plural(ls.length, 'vecino')}${qq ? ' encontrados' : ''}</div>
-      ${ls.length ? ls.map(x => {
-        const prof = x.enDirectorio && x.profesion ? x.profesion : '', of = x.skills && x.mostrarTel ? x.skills : '';
-        const dir = x.enDirectorio && x.direccion ? x.direccion : '';
-        return `<div class="card"><div class="row">${x.fotoCasa ? fotoHTML(x.fotoCasa, 'casa-foto chica') : avatar(x)}<div class="grow"><b>${esc(x.nombre)}</b><div class="muted small">${esc(x.casa)}${dir ? ' · ' + esc(dir) : ''}</div></div></div>
-          ${prof || of ? `<div class="row wrap" style="margin-top:10px;gap:6px">${prof ? `<span class="pill p-accent">${I('user')}${esc(prof)}</span>` : ''}${of ? `<span class="pill p-wood">${I('wrench')}${esc(of)}</span>` : ''}</div>` : ''}
-          <div class="btns" style="margin-top:12px"><button class="btn btn-sm btn-pri" data-a="abrir" data-v="dm" data-p="${x.id}">${I('chat')}Mensaje privado</button>
-            ${x.enDirectorio && x.ubicacion ? `<a class="btn btn-sm btn-sec" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(x.ubicacion)}" target="_blank" rel="noopener">${I('pin')}Cómo llegar</a>` : ''}
-            ${x.enDirectorio && x.tel ? `<a class="btn btn-sm btn-wa" href="${waLink(x.tel)}" target="_blank" rel="noopener">${I('phone')}</a>` : ''}</div></div>`; }).join('') : vacio('search', 'Nadie coincide con esa búsqueda.')}`;
+    const u = yo(), qq = normTxt(q || '').trim(), staff = esStaff();
+    const todas = fichasDeVecinos(), ls = todas.filter(f => coincideFicha(f, qq));
+    const mostrar = ls.slice(0, 160);
+    return `<form data-f="buscar-vecino" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecino" value="${esc(q || '')}" placeholder="Ej: Pérez, Lucía, 148" autocomplete="off"><button class="btn btn-pri">${I('search')}</button></form>
+      ${!staff && u.rol === 'vecino' && !u.fotoCasa ? aviso('info', 'camera', 'Subí la foto del frente de tu casa', 'Así te reconocen en el buscador y la garita ubica tu domicilio en una emergencia.', `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">Subirla</button>`) : ''}
+      <div class="muted small" style="margin:0 2px 8px">${qq ? `${plural(ls.length, 'lote encontrado', 'lotes encontrados')}` : `${plural(todas.length, 'lote')} del barrio`}</div>
+      <div class="fichas-vecinos">${mostrar.length ? mostrar.map(f => fichaVecino(f, u, staff)).join('') : vacio('search', 'Nadie coincide con esa búsqueda.')}</div>`;
   },
 };
+function fichaVecino(f, u, staff){
+  const conFoto = f.cuentas.find(x => x.fotoCasa);
+  /* "Fernández, Lucía" y "Lucía Fernández" son la misma persona: no se repite. */
+  const mismas = (a, b) => normTxt(a).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ') === normTxt(b).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
+  const enApp = f.cuentas.filter(x => !mismas(x.nombre, f.nombre));
+  const esMio = f.casa === u.casa && !staff;
+  const botones = f.cuentas.filter(x => x.id !== u.id).map(x => {
+    const primero = esc(x.nombre.split(' ')[0]);
+    const quien = f.cuentas.length > 1 ? ' a ' + primero : '';
+    if (staff) return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esGuardia() ? 'guardia' : 'admin'}|${x.id}">${I('chat')}Escribirle${quien}</button>
+      ${x.tel ? `<a class="btn btn-xs btn-sec" href="${telLink(x.tel)}">${I('phone')}Llamar${quien}</a>` : ''}`;
+    return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="dm" data-p="${x.id}">${I('chat')}Mensaje${quien}</button>
+      ${x.enDirectorio && x.tel ? `<a class="btn btn-xs btn-wa" href="${waLink(x.tel)}" target="_blank" rel="noopener">${I('phone')}</a>` : ''}`;
+  }).join('');
+  const prof = f.cuentas.map(x => x.enDirectorio && x.profesion ? x.profesion : '').filter(Boolean);
+  return `<div class="ficha-vecino ${esMio ? 'mia' : ''}">
+    ${conFoto ? fotoHTML(conFoto.fotoCasa, 'ficha-foto') : `<span class="ficha-foto vacia">${I('home')}</span>`}
+    <div class="ficha-txt">
+      <span class="ficha-lote">Lote ${esc(f.lote)}</span>
+      <b>${esc(f.nombre || 'Sin propietario cargado')}</b>
+      ${enApp.length ? `<small>En la app: ${enApp.map(x => esc(x.nombre)).join(', ')}</small>` : ''}
+      ${prof.length ? `<small>${I('user')} ${esc(prof.join(' · '))}</small>` : ''}
+      ${esMio ? `<small>Es tu lote</small>` : !f.cuentas.length ? `<small class="muted">Todavía no usa la app</small>` : ''}
+      ${botones ? `<div class="btns">${botones}</div>` : ''}
+    </div></div>`;
+}
 F['buscar-vecino'] = d => abrir('vecinos', d.q || '');
 
 /* ---------- MENSAJES PRIVADOS ENTRE VECINOS ---------- */

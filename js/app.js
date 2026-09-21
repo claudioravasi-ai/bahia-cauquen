@@ -28,8 +28,21 @@ function sincronizarHistorial(){
   else if (n > actual) for (let i = actual; i < n; i++) history.pushState({ n:i + 1 }, '');
 }
 
+/* =========================================================
+   LA GARITA VE SOLO LO SUYO
+   La cuenta de la garita no es un vecino ni la Administración: tiene su
+   propia lista de ventanas. Lo que no está acá (expensas, contabilidad,
+   votaciones, reservas, mensajes entre vecinos, los datos de un lote…)
+   no se abre desde la garita, ni por un enlace ni por un aviso.
+   Y antes de trabajar, cada turno se anota: hasta que no dice quiénes
+   están de guardia, la única ventana es la de abrir el turno.
+   ========================================================= */
+const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron', 'chat',
+  'obras', 'proveedores', 'agenda', 'vuelos', 'recoleccion', 'ushuaia', 'documentos']);
+const ventanaPermitida = id => !esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo()));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
+  if (!ventanaPermitida(id)){ toast(VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
   const ya = PILA.findIndex(v => v.id === id);
   if (ya >= 0){
     PILA[ya].param = param;
@@ -108,7 +121,7 @@ function pintar(){
   if (!PILA.length || PILA[0].id !== inicioId()){ PILA.length = 0; PILA.push({ id: inicioId(), param:'' }); }
   /* Una ventana que ya no existe (por un enlace viejo o un cambio de rol) no
      puede dejar la app en blanco: se descarta y se vuelve al inicio. */
-  while (PILA.length > 1 && !R[PILA[PILA.length - 1].id]) PILA.pop();
+  while (PILA.length > 1 && (!R[PILA[PILA.length - 1].id] || !ventanaPermitida(PILA[PILA.length - 1].id))) PILA.pop();
   sincronizarHistorial();
   /* La barra de arriba se dibuja aparte y con red: si algo de ahí falla (un
      aviso mal formado, por ejemplo), antes se caía `pintar()` entero y la
@@ -636,6 +649,18 @@ function avisarSesionAbierta(){
 A['seguir-sesion'] = () => { $('#sesionAbierta')?.remove(); pintar(); };
 A['salir-y-entrar'] = async () => { $('#sesionAbierta')?.remove(); await Nube.salir(); Store.sesion.userId = null; Store.guardarSesion(); pintarBienvenida('entrar'); };
 
+/* En la inscripción: si el correo es el de la garita, no se piden lote ni DNI. */
+document.addEventListener('input', e => {
+  const i = e.target; if (i.name !== 'email' || !i.closest('form[data-f="registro"]')) return;
+  const f = i.form, g = esCorreoGarita(i.value);
+  ['nombre', 'dni', 'casa'].forEach(n => { const el = f.elements[n]; if (!el) return; el.required = !g; const c = el.closest('.field'); if (c) c.hidden = g; });
+  let nota = f.querySelector('.nota-garita');
+  if (g && !nota){ nota = document.createElement('div'); nota.className = 'aviso a-info nota-garita';
+    nota.innerHTML = `${I('shield')}<div class="txt"><b>Cuenta de la garita</b>Es una sola para todos los turnos. Cuando la Administración la apruebe, entra con este correo y ve solamente lo de la garita.</div>`;
+    i.closest('.grupo')?.after(nota); }
+  if (!g && nota) nota.remove();
+});
+
 /* ---------------- avisos ----------------
    La campanita muestra SOLO lo que todavía no viste. Cada aviso que abrís
    desaparece de la lista y resta del número; "Marcar todos como vistos"
@@ -821,16 +846,16 @@ A['bienvenida'] = el => { pintarBienvenida(el.dataset.v); window.scrollTo({ top:
 A['mi-cuenta'] = () => { const u = yo();
   hoja('Tu cuenta', `<div class="row" style="margin-bottom:14px">${avatar(u, 'lg')}<div class="grow"><b style="font-size:16px">${esc(u.nombre)}</b>
       <div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
-      <div class="muted tiny">${{ vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
+      <div class="muted tiny">${{ vecino:'Vecino/a', admin:'Administración', guardia:'Garita' + (turnoAbierto() ? ' · turno ' + esc(turnoAbierto().turno) + ': ' + esc(aLista(turnoAbierto().guardias).join(', ')) : '') }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
     ${puedeAdministrar() ? superficie({ a:'cambiar-modo', icon: modoActivo() === 'admin' ? 'sliders' : 'home', color: modoActivo() === 'admin' ? 'accent' : 'ok',
       t: modoActivo() === 'admin' ? 'Estás como Administración' : 'Estás como vecino/a',
       s: modoActivo() === 'admin' ? 'Tocá para pasar a tu vista de vecino/a' : 'Tocá para volver al panel de administración', cls:'acento' }) : ''}
-    ${modoActivo() === 'vecino' ? superficie({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Datos, foto del frente, mascotas' }) : ''}
     <div class="card" style="margin-bottom:8px"><div class="lbl">Modo de pantalla · ahora está en ${modoActual()}</div>
       <div class="seg">${[['auto', 'Automático', 'sunrise'], ['light', 'Día', 'sun'], ['dark', 'Noche', 'moon']].map(([k, t, ic]) =>
         `<label><input type="radio" name="temaRapido" ${(Store.sesion.tema || 'auto') === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
       <div class="ayuda">En automático sigue la salida y la puesta del sol en Ushuaia (hoy: ${Clima.sol().sale} a ${Clima.sol().pone}).</div></div>
-    ${(() => { const otros = Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
+    ${esGuardia() ? superficie({ a:'cerrar-turno', icon:'logout', color:'warn', t:'Cerrar el turno', s:'Deja anotado quién trabajó y sale de la app' }) : ''}
+    ${(() => { const otros = esGuardia() ? [] : Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
@@ -1041,6 +1066,10 @@ F['entrar'] = async d => {
 };
 F['registro'] = async d => {
   const email = (d.email || '').trim().toLowerCase();
+  /* La garita se inscribe una sola vez con su correo; no tiene lote ni DNI.
+     Queda pendiente igual que cualquiera y la Administración la aprueba:
+     al aprobarla, la app le da los permisos de garita. */
+  if (esCorreoGarita(email)){ d.nombre = 'Garita'; d.casa = 'Garita'; d.dni = d.dni || '00000000'; }
   const dni = soloDigitos(d.dni);
   if (dni.length < 7 || dni.length > 9){ toast('Revisá el DNI', 'alert'); return; }
   if (Nube.activa()){
@@ -1084,7 +1113,11 @@ F['registro'] = async d => {
 };
 A['salir'] = async () => {
   if (!await confirmar('Cerrar sesión', 'Vas a tener que volver a entrar con tu correo y tu clave.', { si:'Cerrar sesión' })) return;
+  await cerrarSesion();
+};
+async function cerrarSesion(){
   cerrarHoja();
+  Store.sesion.turnoId = '';
   if (typeof Nube !== 'undefined' && Nube.activa()){
     await Nube.salir();
     /* En un equipo compartido no puede quedar nada del barrio después de
@@ -1095,7 +1128,7 @@ A['salir'] = async () => {
     Store.guardar();
   }
   Store.sesion.userId = null; Store.sesion.modo = ''; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
-};
+}
 
 /* =========================================================
    NINGÚN BOTÓN SE QUEDA MUDO

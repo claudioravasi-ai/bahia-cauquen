@@ -77,6 +77,11 @@ PEGAR DESDE ACÁ
         }
       },
 
+      "fotosCasa": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+        "$id": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (!newData.exists() || (newData.isString() && newData.val().length < 150000))" }
+      },
+
       "config":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "padron":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "amenities":     { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },

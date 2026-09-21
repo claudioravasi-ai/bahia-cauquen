@@ -240,6 +240,8 @@ const SECCIONES = {
         ${teja({ v:'padron', icon:'users', color:'brand', t:'Padrón', s: s.padron.length ? `${plural(s.padron.length, 'unidad', 'unidades')} · buscá por apellido o lote` : 'Sin cargar' })}
         ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy', n: pasesDelDia().length })}
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
+        ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos de la garita', s: turnoAbierto() ? `Ahora: ${esc(turnoAbierto().turno)} · ${esc(aLista(turnoAbierto().guardias).join(', '))}` : 'Horarios y guardias' })}
+        ${teja({ v:'privado', p:'interno', icon:'shield', color:'brand', t:'Mensajes con la garita', s:'Entre la Administración y la guardia' })}
         ${teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Reclamos', s:'Responder y publicar', n: s.reclamos.filter(r => r.estado !== 'resuelto').length || '' })}
         ${teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones', s:'Firmadas a la garita', n: s.peticiones.filter(p => p.estado === 'pendiente').length || '' })}
         ${teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' })}
@@ -675,10 +677,154 @@ F['aviso-guardia'] = d => {
 };
 
 /* ---------- GARITA (guardia y Administración) ---------- */
+/* =========================================================
+   TURNOS DE LA GARITA
+   La garita entra con una sola cuenta. Lo que cambia es quién está de
+   guardia: cada turno, al entrar, anota los nombres de los que trabajan.
+   La Administración define los turnos (de 2 a 4, con su horario); la app
+   propone el que corresponde a la hora y la guardia confirma.
+   Los nombres se reconocen sin importar mayúsculas, acentos ni espacios:
+   "jose  perez", "José Pérez" y "JOSE PEREZ" son la misma persona, y se
+   guarda como se escribió la primera vez.
+   Cada turno queda en la bitácora (abre y cierra), así todo lo que se
+   anota ahí se puede atribuir a los guardias que estaban.
+   ========================================================= */
+const TURNOS_BASE = [{ nombre:'Mañana', desde:'06:00', hasta:'14:00' }, { nombre:'Tarde', desde:'14:00', hasta:'22:00' }, { nombre:'Noche', desde:'22:00', hasta:'06:00' }];
+const turnosConfig = () => { const t = aLista(Store.s.config.turnosGarita).filter(x => x && x.nombre && x.desde && x.hasta); return t.length ? t : TURNOS_BASE; };
+const enFranja = (t, min) => { const d = minutosDe(t.desde), h = minutosDe(t.hasta); return d < h ? min >= d && min < h : (min >= d || min < h); };
+const turnoDeAhora = () => turnosConfig().find(t => enFranja(t, ahoraMin())) || turnosConfig()[0];
+const registrosTurno = () => aLista(Store.s.bitacora).filter(b => b && b.tipo === 'turno' && b.abre).sort((a, b) => b.at - a.at);
+const turnoAbierto = () => registrosTurno().find(b => !b.cerradoAt) || null;
+/* ¿Esta sesión ya anotó (o retomó) su turno? Mientras la bitácora todavía
+   está bajando de la nube se le cree a la sesión, para que no parpadee. */
+function turnoListo(){
+  if (!esGuardia()) return true;
+  const t = turnoAbierto();
+  if (t) return Store.sesion.turnoId === t.id;
+  return !!Store.sesion.turnoId && !registrosTurno().length && !(Store.s.bitacora || []).length;
+}
+/* Quiénes estaban de guardia en un momento dado. */
+const guardiasEn = at => { const t = registrosTurno().find(b => b.at <= at && (!b.cerradoAt || at <= b.cerradoAt)); return t ? aLista(t.guardias) : []; };
+const claveNombre = t => normTxt(t).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const conMayusculas = t => String(t).trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+/* Los guardias que ya trabajaron alguna vez, con su nombre como quedó escrito. */
+function guardiasConocidos(){
+  const m = new Map();
+  registrosTurno().slice().reverse().forEach(r => aLista(r.guardias).forEach(n => { const k = claveNombre(n); if (k && !m.has(k)) m.set(k, n); }));
+  return m;
+}
+function formularioTurno(){
+  const u = yo(), t = turnoDeAhora(), abierto = turnoAbierto(), conocidos = [...guardiasConocidos().values()];
+  const fila = i => `<div class="turno-fila"><span class="turno-n">${i + 1}</span><input name="g" list="guardiasLista" autocomplete="off" maxlength="50" ${i === 0 ? 'required' : ''} placeholder="${i === 0 ? 'Nombre y apellido' : 'Otro guardia (opcional)'}"></div>`;
+  return `<div class="turno-portada">
+    <span class="turno-ic">${I('shield')}</span>
+    <h1>Nuevo turno en la garita</h1>
+    <p>${fechaLarga(hoyISO())} · ${hora(Date.now())} h</p></div>
+    ${abierto ? `<div class="card turno-previo"><b>${I('clock')} El turno ${esc(abierto.turno)} sigue abierto</b>
+      <span>${esc(aLista(abierto.guardias).join(', '))} · desde las ${hora(abierto.at)} h${isoDe(new Date(abierto.at)) !== hoyISO() ? ' del ' + fechaCorta(isoDe(new Date(abierto.at))) : ''}</span>
+      <div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-sec" data-a="seguir-turno">Soy de ese turno: seguir</button></div>
+      <p class="muted tiny" style="margin:8px 0 0">Si abrís uno nuevo, ese se cierra solo y queda anotado en la bitácora.</p></div>` : ''}
+    <form data-f="abrir-turno" class="card">
+      <div class="field"><label>¿Qué turno es?</label><select name="turno">${turnosConfig().map(x => `<option value="${esc(x.nombre)}" ${x.nombre === t.nombre ? 'selected' : ''}>${esc(x.nombre)} · ${x.desde} a ${x.hasta} h</option>`).join('')}</select></div>
+      <div class="field"><label>¿Quiénes trabajan hoy?</label>${[0, 1, 2].map(fila).join('')}<div id="turnoMas"></div>
+        <button type="button" class="btn btn-xs btn-sec" data-a="turno-otro" style="margin-top:4px">${I('plus')}Agregar otro guardia</button>
+        <div class="ayuda">No importan mayúsculas ni acentos: si ya trabajó antes, se reconoce solo.</div></div>
+      <datalist id="guardiasLista">${conocidos.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+      <button class="btn btn-pri btn-block btn-grande">${I('check')}Empezar el turno</button>
+    </form>
+    <p class="muted tiny center">Cuenta de la garita · ${esc(u.email || '')}</p>`;
+}
+A['turno-otro'] = () => {
+  const box = $('#turnoMas'); if (!box) return;
+  const n = $$('input[name="g"]').length;
+  if (n >= 8){ toast('Hasta ocho guardias por turno', 'users'); return; }
+  box.insertAdjacentHTML('beforeend', `<div class="turno-fila"><span class="turno-n">${n + 1}</span><input name="g" list="guardiasLista" autocomplete="off" maxlength="50" placeholder="Otro guardia"></div>`);
+  box.lastElementChild.querySelector('input').focus();
+};
+A['seguir-turno'] = () => { const t = turnoAbierto(); if (!t) return; Store.sesion.turnoId = t.id; Store.guardarSesion(); toast(`Seguís en el turno ${t.turno}`, 'shield'); pintar(); };
+F['abrir-turno'] = d => {
+  const u = yo(), conocidos = guardiasConocidos(), vistos = new Set(), guardias = [];
+  [].concat(d.g || []).forEach(n => {
+    const k = claveNombre(n); if (!k || vistos.has(k)) return;
+    vistos.add(k); guardias.push(conocidos.get(k) || conMayusculas(n));
+  });
+  if (!guardias.length){ toast('Anotá al menos un guardia', 'users'); return; }
+  const turno = turnosConfig().find(x => x.nombre === d.turno)?.nombre || turnoDeAhora().nombre;
+  const id = uid(), ahora = Date.now();
+  Store.cambiar(s => {
+    const previo = aLista(s.bitacora).find(b => b.tipo === 'turno' && b.abre && !b.cerradoAt);
+    if (previo){
+      previo.cerradoAt = ahora; previo.cierreAuto = true;
+      s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'turno', texto:`Se cerró el turno ${previo.turno} (${aLista(previo.guardias).join(', ')}) al empezar el siguiente.`, at:ahora - 1 });
+    }
+    s.bitacora.unshift({ id, autor:u.id, tipo:'turno', abre:true, turno, guardias, texto:`Empieza el turno ${turno}: ${guardias.join(', ')}.`, at:ahora });
+  });
+  Store.sesion.turnoId = id; Store.guardarSesion();
+  toast(`Turno ${turno} en marcha`, 'shield');
+  pintar();
+};
+A['cerrar-turno'] = () => {
+  const t = turnoAbierto();
+  hoja('Cerrar el turno', `<form data-f="cerrar-turno">
+    ${t ? `<p class="small" style="margin:0 0 12px">Turno <b>${esc(t.turno)}</b> · ${esc(aLista(t.guardias).join(', '))} · desde las ${hora(t.at)} h.</p>` : ''}
+    <div class="field"><label>Novedades para el turno que entra (opcional)</label><textarea name="nota" maxlength="500" placeholder="Ej: quedó un paquete para el lote 40; el portón del fondo cierra mal."></textarea></div>
+    <button class="btn btn-pri btn-block">${I('logout')}Cerrar el turno y salir</button>
+    <p class="muted tiny" style="margin:10px 0 0">El turno siguiente entra con el mismo correo y la misma clave de la garita, y anota a sus guardias.</p></form>`);
+};
+F['cerrar-turno'] = async d => {
+  const u = yo(), t = turnoAbierto(), nota = (d.nota || '').trim();
+  Store.cambiar(s => {
+    const x = t && aLista(s.bitacora).find(b => b.id === t.id);
+    if (x) x.cerradoAt = Date.now();
+    s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'turno', texto:`Termina el turno ${t ? t.turno + ' (' + aLista(t.guardias).join(', ') + ')' : ''}.${nota ? ' Novedades: ' + nota : ''}`, at:Date.now() });
+  });
+  if (typeof Nube !== 'undefined' && Nube.activa()) await new Promise(r => setTimeout(r, 700));   /* que llegue a la base antes de salir */
+  toast('Turno cerrado', 'check');
+  await cerrarSesion();
+};
+const bandaTurno = () => {
+  const t = turnoAbierto(); if (!t) return '';
+  return `<div class="turno-banda">${I('shield')}<div class="grow"><b>Turno ${esc(t.turno)}</b><span>${esc(aLista(t.guardias).join(' · '))} · desde las ${hora(t.at)} h</span></div>
+    ${esGuardia() ? `<button class="btn btn-xs btn-sec" data-a="cerrar-turno">${I('logout')}Cerrar turno</button>` : ''}</div>`;
+};
+
+/* La Administración arma los turnos y ve quién trabajó en cada uno. */
+R.turnos = {
+  titulo: 'Turnos de la garita', icon: 'clock', color: 'sky', sub: 'Horarios y quién trabajó en cada turno',
+  render(){
+    if (!esStaff()) return vacio('lock', 'Solo para la garita y la Administración.');
+    const ts = turnosConfig(), hist = registrosTurno().slice(0, 40);
+    const fila = i => { const t = ts[i] || {}; return `<div class="grid3 turno-edit"><div class="field"><label>Turno ${i + 1}${i >= 2 ? ' (opcional)' : ''}</label><input name="n${i}" value="${esc(t.nombre || '')}" maxlength="20" placeholder="${['Mañana', 'Tarde', 'Noche', 'Madrugada'][i]}" ${i < 2 ? 'required' : ''}></div>
+      <div class="field"><label>Desde</label><input type="time" name="d${i}" value="${esc(t.desde || '')}" ${i < 2 ? 'required' : ''}></div>
+      <div class="field"><label>Hasta</label><input type="time" name="h${i}" value="${esc(t.hasta || '')}" ${i < 2 ? 'required' : ''}></div></div>`; };
+    return `${bandaTurno()}
+      ${esAdmin() ? `<form data-f="turnos" class="card"><div class="lbl" style="margin-bottom:8px">Horarios de los turnos</div>
+        ${[0, 1, 2, 3].map(fila).join('')}
+        <p class="muted tiny" style="margin:0 0 10px">De 2 a 4 turnos. Un turno puede pasar la medianoche (por ejemplo, de 22:00 a 06:00). Dejá vacíos los que no uses.</p>
+        <button class="btn btn-pri btn-block">${I('check')}Guardar los turnos</button></form>`
+      : `<div class="card">${ts.map(t => `<div class="row" style="justify-content:space-between;padding:6px 0"><b>${esc(t.nombre)}</b><span class="muted">${t.desde} a ${t.hasta} h</span></div>`).join('')}
+        <p class="muted tiny" style="margin:6px 0 0">Los horarios los define la Administración.</p></div>`}
+      ${sec('Últimos turnos')}
+      ${hist.length ? `<div class="card">${hist.map(r => `<div class="lista"><div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('shield')}</span>
+        <div class="txt"><b>${esc(r.turno)} · ${esc(aLista(r.guardias).join(', '))}</b>
+        <span>${relDia(isoDe(new Date(r.at)))} de ${hora(r.at)} a ${r.cerradoAt ? hora(r.cerradoAt) + ' h' + (r.cierreAuto ? ' (se cerró al abrir el siguiente)' : '') : 'ahora · en curso'}</span></div></div></div>`).join('')}</div>`
+        : vacio('clock', 'Todavía no se abrió ningún turno.')}`;
+  },
+};
+F['turnos'] = d => {
+  const ts = [0, 1, 2, 3].map(i => ({ nombre:String(d['n' + i] || '').trim(), desde:d['d' + i] || '', hasta:d['h' + i] || '' })).filter(t => t.nombre && t.desde && t.hasta);
+  if (ts.length < 2){ toast('Tienen que ser al menos dos turnos', 'clock'); return; }
+  if (new Set(ts.map(t => claveNombre(t.nombre))).size !== ts.length){ toast('Dos turnos no pueden llamarse igual', 'clock'); return; }
+  if (ts.some(t => t.desde === t.hasta)){ toast('Un turno no puede empezar y terminar a la misma hora', 'clock'); return; }
+  Store.cambiar(s => { s.config.turnosGarita = ts; auditar(s, 'Cambió los turnos de la garita', ts.map(t => `${t.nombre} ${t.desde}-${t.hasta}`).join(' · ')); });
+  toast('Turnos guardados', 'check');
+};
+
 R.garita = {
   titulo: 'Garita', icon: 'gate', color: 'brand', ancha: true, sub: () => fechaLarga(hoyISO()),
   render(){
     if (!esStaff()) return vacio('lock', 'La garita es solo para la guardia y la Administración.');
+    if (esGuardia() && !turnoListo()) return formularioTurno();
     const s = Store.s, hoy = hoyISO();
     const lista = pasesDelDia(hoy).sort((a, b) => a.desde.localeCompare(b.desde));
     const adentro = lista.filter(p => estadoPase(p) === 'adentro').length;
@@ -690,7 +836,8 @@ R.garita = {
     const vol = s.avistamientos.filter(a => Date.now() - a.at < DIA);
     const u = yo();
     return `
-      ${PILA.length === 1 ? `<div class="titulo-vista" style="margin-top:16px"><h1>Garita</h1><p>${esc(u.nombre)} · ${fechaLarga(hoy)}</p></div>` : ''}
+      ${PILA.length === 1 ? `<div class="titulo-vista" style="margin-top:16px"><h1>Garita</h1><p>${fechaLarga(hoy)}</p></div>` : ''}
+      ${bandaTurno()}
       ${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
       <div class="garita-kpis"><div class="kpi"><b>${esperados}</b><span>Esperados</span></div><div class="kpi"><b>${adentro}</b><span>Adentro</span></div><div class="kpi"><b>${paq.length}</b><span>Paquetes</span></div></div>
       <form data-f="validar" class="card">
@@ -724,13 +871,17 @@ R.garita = {
         ${teja({ v:'peticiones', icon:'edit', color:'warn', t:'Peticiones', s:'Recibir y firmar', badge: s.peticiones.filter(p => p.estado === 'pendiente').length })}
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
         ${teja({ a:'nuevo-post', v:'guardia', icon:'muro', t:'Escribir en el pizarrón', s:'Les suena a todos los vecinos' })}
-        ${teja({ v:'privado', icon:'lock', color:'accent', t:'Mensajes con vecinos', s:'Avisar algo a un lote', badge: s.privados.filter(h => (h.con || 'admin') === 'guardia').reduce((n, h) => n + h.msgs.filter(m => m.from === 'vecino' && !m.leido).length, 0) })}
+        ${teja({ v:'vecinos', icon:'search', color:'brand', t:'Buscar un vecino', s:'Por nombre, apellido o lote, con la foto de la casa' })}
+        ${teja({ v:'privado', icon:'lock', color:'accent', t:'Mensajes con vecinos', s:'Avisar algo a un lote', badge: s.privados.filter(h => (h.con || 'admin') === 'guardia').reduce((n, h) => n + aLista(h.msgs).filter(m => m.from === 'vecino' && !m.leido).length, 0) })}
+        ${esGuardia() ? teja({ v:'privado', p:'interno', icon:'sliders', color:'accent', t:'Administración', s:'Mensajes entre la garita y la Administración', badge: s.privados.filter(h => h.con === 'interno' && h.userId === u.id).reduce((n, h) => n + aLista(h.msgs).filter(m => m.from === 'admin' && !m.leido).length, 0) }) : ''}
+        ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos', s:'Horarios y quién trabajó' })}
         ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'Controlar ART', n: s.proveedores.filter(p => artEstado(p)[1] === 'danger').length || '' })}
         ${teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:'Avisos del día' })}
         ${teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#seguridad y más' })}
         ${teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas' })}
         ${teja({ v:'agenda', icon:'phone', color:'danger', t:'Emergencias', s:'Teléfonos útiles' })}
-        ${teja({ a:'salir', icon:'logout', color:'warn', t:'Cerrar sesión', s:'Cambio de turno' })}</div>` : ''}`;
+        ${teja({ v:'documentos', icon:'file', color:'brand', t:'Reglamento', s:'Normas y protocolos' })}
+        ${esGuardia() ? teja({ a:'cerrar-turno', icon:'logout', color:'warn', t:'Cerrar el turno', s:'Cambio de guardia' }) : ''}</div>` : ''}`;
   },
 };
 F['validar'] = d => validar(d.q);
@@ -855,7 +1006,7 @@ R.bitacora = {
         const d = isoDe(new Date(b.at)); const sep = d !== dia ? (dia = d, `<div class="sec" style="margin:14px 0 4px"><h2>${relDia(d)}</h2></div>`) : '';
         const t = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad;
         return `${sep}<div class="lista"><div class="it"><span class="ic ic-${t[2]}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(t[1])}</span>
-          <div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(autorVisible(b.autor).nombre)}</span></div></div></div>`; }).join('') : vacio('book', 'Sin registros.')}</div>`;
+          <div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(autorVisible(b.autor).nombre)}${usuario(b.autor)?.rol === 'guardia' && b.tipo !== 'turno' && guardiasEn(b.at).length ? ' (' + esc(guardiasEn(b.at).join(', ')) + ')' : ''}</span></div></div></div>`; }).join('') : vacio('book', 'Sin registros.')}</div>`;
   },
 };
 F['bitacora'] = (d, form) => { Store.cambiar(s => s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:d.tipo, texto:d.texto.trim(), at:Date.now() })); form.reset(); const i = $('#bitTxt'); if (i) i.value = ''; toast('Anotado', 'book'); };

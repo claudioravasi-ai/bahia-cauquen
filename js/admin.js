@@ -248,7 +248,7 @@ const ADMIN_TABS = {
   },
   solicitudes(){
     const s = Store.s, pend = s.users.filter(u => u.estado === 'pendiente'), rech = s.users.filter(u => u.estado === 'rechazado');
-    const card = u => `<div class="card"><div class="row">${avatar(u)}<div class="grow"><b>${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${hace(u.createdAt)}</div></div><span class="pill ${u.estado === 'pendiente' ? 'p-warn' : 'p-danger'}">${u.estado}</span></div>
+    const card = u => `<div class="card">${esCorreoGarita(u.email) ? `<div class="pill p-brand" style="margin-bottom:8px">${I('shield')}Cuenta de la GARITA · al aprobarla ve solo lo de la garita</div>` : ''}<div class="row">${avatar(u)}<div class="grow"><b>${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${hace(u.createdAt)}</div></div><span class="pill ${u.estado === 'pendiente' ? 'p-warn' : 'p-danger'}">${u.estado}</span></div>
       <div class="small" style="margin:10px 0;color:var(--ink-2)">DNI ${esc(u.dni || '—')} · ${esc(u.email)} · ${esc(u.tel || 'sin teléfono')}${u.consentimiento ? ' · aceptó el uso de datos' : ''}</div>
       ${(() => { const misma = s.users.filter(x => x.id !== u.id && x.casa === u.casa && x.estado === 'aprobado'); return misma.length ? `<div class="small" style="margin-bottom:10px">${I('info')} En ${esc(u.casa)} ya están: ${misma.map(x => esc(x.nombre)).join(', ')}</div>` : ''; })()}
       <div class="btns">${u.estado === 'pendiente' ? `<button class="btn btn-sm btn-ok" data-a="aprobar" data-id="${u.id}">${I('check')}Aprobar y mandar clave</button><button class="btn btn-sm btn-danger-soft" data-a="rechazar" data-id="${u.id}">Rechazar</button>`
@@ -341,7 +341,11 @@ A['aprobar'] = async el => {
   const u = Store.s.users.find(x => x.id === el.dataset.id); if (!u) return;
   const nube = typeof Nube !== 'undefined' && Nube.activa();
   const clave = nube ? '' : generarClave(u.rol === 'guardia' ? 'GAR' : u.rol === 'admin' ? 'ADM' : 'VEC');
-  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.estado = 'aprobado'; x.clave = clave; x.aprobadoAt = Date.now(); auditar(s, 'Aprobó una inscripción', `${x.nombre} · ${x.casa}`, x.id); });
+  const garita = esCorreoGarita(u.email);
+  if (garita && !await confirmar('Aprobar la cuenta de la garita', `Esta cuenta (${esc(u.email)}) va a ver todo lo de la garita: ingresos, paquetes, peticiones y datos de contacto de los vecinos. Aprobala solo si la inscribiste vos o la guardia te lo confirmó.`, { si:'Aprobar como garita' })) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.estado = 'aprobado'; x.clave = clave; x.aprobadoAt = Date.now();
+    if (garita){ x.rol = 'guardia'; x.casa = 'Garita'; x.nombre = 'Garita'; }
+    auditar(s, garita ? 'Aprobó la cuenta de la garita' : 'Aprobó una inscripción', `${x.nombre} · ${x.casa}`, x.id); });
   const salio = await Correo.enviar({ para:u.email, asunto:'Tu acceso al barrio está aprobado', tipo:'clave',
     html:Correo.plantilla('¡Bienvenido/a al barrio!', `<p>Hola ${esc(u.nombre.split(' ')[0])}: la Administración aprobó tu inscripción para <b>${esc(u.casa)}</b>.</p>` +
       (nube ? `<p>Ya podés entrar con tu email y la contraseña que elegiste al inscribirte.</p>`

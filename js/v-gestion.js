@@ -530,20 +530,46 @@ A['acta-votacion'] = el => {
 };
 
 /* ---------- PRIVADO con la Administración ---------- */
+/* La cuenta de la garita (hay una sola). */
+const cuentaGarita = () => Store.s.users.find(x => x.rol === 'guardia' && x.estado === 'aprobado' && esCorreoGarita(x.email))
+  || Store.s.users.find(x => x.rol === 'guardia' && x.estado === 'aprobado');
+/* Garita ↔ Administración: una conversación interna que no ve ningún vecino.
+   Vive en la carpeta privada de la cuenta de la garita, con `con: 'interno'`. */
+function chatInterno(idP){
+  const u = yo(), s = Store.s;
+  if (!esStaff()) return vacio('lock', 'Solo para la garita y la Administración.');
+  const garitaId = esGuardia() ? u.id : (idP || cuentaGarita()?.id);
+  if (!garitaId) return vacio('shield', 'Todavía no hay una cuenta de la garita aprobada.');
+  const yoSoy = esGuardia() ? 'guardia' : 'admin';
+  const h = s.privados.find(x => x.userId === garitaId && x.con === 'interno');
+  const msgs = h ? aLista(h.msgs) : [];
+  if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
+  return `<div class="chat-wrap"><div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
+      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
+      : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
+    <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno"><input name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
+}
 R.privado = {
-  titulo: p => { const [con, id] = String(p || '').split('|'); return esStaff() && id ? (usuario(id)?.nombre || 'Conversación') : con === 'guardia' ? 'Guardia' : 'Administración'; },
+  titulo: p => { const [con, id] = String(p || '').split('|'); if (con === 'interno') return esGuardia() ? 'Administración' : 'Garita';
+    return esStaff() && id ? (usuario(id)?.nombre || 'Conversación') : con === 'guardia' ? 'Guardia' : 'Administración'; },
   icon: 'lock', color: 'accent',
   sub: p => { const [con, id] = String(p || '').split('|');
+    if (con === 'interno') return 'Entre la garita y la Administración · no lo ve ningún vecino';
     return esStaff() && id ? (usuario(id)?.casa || '') : con === 'guardia' ? 'Privado: solo lo ven vos y la guardia' : 'Privado: solo lo ven vos y la Administración'; },
   render(p){
     const u = yo(), s = Store.s;
     const [conP, idP] = String(p || '').split('|');
+    if (conP === 'interno') return chatInterno(idP);
     const con = conP === 'guardia' ? 'guardia' : 'admin';
     /* La guardia ve solo sus conversaciones; la Administración, las suyas. */
     const miCanal = esGuardia() ? 'guardia' : esAdmin() ? 'admin' : con;
     if (esStaff() && !idP){
       const hilos = s.privados.filter(h => (h.con || 'admin') === miCanal).sort((a, b) => (b.msgs.at(-1)?.createdAt || 0) - (a.msgs.at(-1)?.createdAt || 0));
-      return `${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote', s:'Elegí el lote en "¿Para quién?"' })}
+      const interno = s.privados.find(h => h.con === 'interno' && (esGuardia() ? h.userId === u.id : true));
+      const sinLeerInt = interno ? aLista(interno.msgs).filter(m => m.from !== (esGuardia() ? 'guardia' : 'admin') && !m.leido).length : 0;
+      return `${superficie({ v:'privado', p:'interno', icon: esGuardia() ? 'sliders' : 'shield', color:'accent', t: esGuardia() ? 'Administración' : 'Garita',
+          s: (sinLeerInt ? plural(sinLeerInt, 'mensaje sin leer', 'mensajes sin leer') + ' · ' : '') + 'Conversación interna, no la ve ningún vecino' })}
+        ${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote', s:'Elegí el lote en "¿Para quién?"' })}
         ${hilos.length ? hilos.map(h => { const v = usuario(h.userId) || {}, ult = h.msgs.at(-1), nl = h.msgs.filter(m => m.from === 'vecino' && !m.leido).length;
           return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${miCanal}|${h.userId}">${v.fotoCasa ? fotoHTML(v.fotoCasa, 'casa-foto chica') : avatar(v)}<span class="txt"><b>${esc(v.nombre || '')} · ${esc(v.casa || '')}</b><small>${ult ? esc(ult.text.slice(0, 70)) + ' · ' + hace(ult.createdAt) : 'Sin mensajes'}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')
           : vacio('lock', 'No hay conversaciones.')}`;
@@ -565,7 +591,22 @@ R.privado = {
   alPintar(){ const c = $('#cuerpo'); if (c) c.scrollTop = c.scrollHeight; },
 };
 F['privado'] = (d, form) => {
-  const u = yo(), para = form.dataset.u, con = form.dataset.con === 'guardia' ? 'guardia' : 'admin';
+  const u = yo(), para = form.dataset.u;
+  if (form.dataset.con === 'interno'){
+    if (!esStaff()) return;
+    const from = esGuardia() ? 'guardia' : 'admin';
+    Store.cambiar(s => {
+      let h = s.privados.find(x => x.userId === para && x.con === 'interno');
+      if (!h){ h = { id:uid(), userId:para, con:'interno', msgs:[] }; s.privados.push(h); }
+      listaDe(h, 'msgs').push({ id:uid(), from, text:d.text.trim(), createdAt:Date.now() });
+      notificar(s, from === 'guardia'
+        ? { para:'rol:admin', titulo:'Mensaje de la garita', texto:d.text.trim().slice(0, 90), icon:'shield', color:'brand', link:'privado:interno|' + para, sonido:true }
+        : { para, titulo:'Mensaje de la Administración', texto:d.text.trim().slice(0, 90), icon:'sliders', color:'accent', link:'privado:interno', sonido:true });
+    });
+    const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
+    return;
+  }
+  const con = form.dataset.con === 'guardia' ? 'guardia' : 'admin';
   const from = esStaff() ? con : 'vecino';
   Store.cambiar(s => {
     let h = s.privados.find(x => x.userId === para && (x.con || 'admin') === con);
@@ -994,7 +1035,8 @@ document.addEventListener('change', e => {
     const v = document.getElementById('fotoCasaIn');
     if (v && v.value){ clearInterval(esperar); const f = leerFoto(v.value);
       Store.cambiar(s => { const x = s.users.find(z => z.id === yo().id); if (x.fotoCasa?.fotoId) Fotos.borrar(x.fotoCasa.fotoId); x.fotoCasa = f; });
-      toast('Foto de tu casa guardada', 'home'); }
+      toast('Foto de tu casa guardada', 'home');
+      if (typeof Nube !== 'undefined' && Nube.activa()) setTimeout(() => Nube.fotoCasaAlDia(), 400); }
   }, 300);
   setTimeout(() => clearInterval(esperar), 15000);
 });

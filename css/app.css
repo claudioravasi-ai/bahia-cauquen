@@ -1289,3 +1289,39 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
   .puerta-arte,.sec-banner-arte,.sec-banner-txt,.notif-sos{animation:none}
   .arte-svg,.arte-foto{transition:none}
 }
+
+/* ---------- Buscar un vecino: fichas con la foto de la casa ---------- */
+.fichas-vecinos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:10px}
+.ficha-vecino{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px;box-shadow:var(--sh-1);min-width:0}
+.ficha-vecino.mia{border-color:color-mix(in srgb,var(--brand) 45%,var(--line));background:color-mix(in srgb,var(--brand-soft) 45%,var(--surface))}
+.ficha-foto{width:104px;height:78px;flex:none;border-radius:13px;background:var(--surface-3) center/cover no-repeat;border:1px solid var(--line);cursor:zoom-in}
+.ficha-foto.vacia{display:grid;place-items:center;color:var(--muted);border:1.5px dashed var(--line-2);cursor:default}
+.ficha-foto.vacia svg.i{width:26px;height:26px;opacity:.6}
+.ficha-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.ficha-lote{align-self:flex-start;font-size:11.5px;font-weight:800;color:var(--brand);background:var(--brand-soft);padding:2px 9px;border-radius:999px}
+.ficha-txt b{font-size:15px;font-weight:800;line-height:1.25;overflow-wrap:anywhere}
+.ficha-txt small{font-size:12px;color:var(--ink-2);line-height:1.35;display:flex;align-items:center;gap:4px}
+.ficha-txt small svg.i{width:13px;height:13px}
+.ficha-txt small.muted{color:var(--muted)}
+.ficha-txt .btns{margin-top:6px;gap:6px;flex-wrap:wrap}
+@media (max-width:400px){ .ficha-foto{width:84px;height:64px} }
+
+/* ---------- Turnos de la garita ---------- */
+.turno-portada{text-align:center;padding:26px 10px 14px}
+.turno-ic{width:64px;height:64px;border-radius:22px;display:grid;place-items:center;margin:0 auto 12px;background:var(--g-brand);color:#fff;box-shadow:0 10px 26px color-mix(in srgb,var(--brand) 40%,transparent)}
+.turno-ic svg.i{width:30px;height:30px}
+.turno-portada h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.5px}
+.turno-portada p{margin:4px 0 0;color:var(--muted);font-size:13.5px;font-weight:600}
+.turno-portada ~ .card{max-width:560px;margin-left:auto;margin-right:auto}
+.turno-previo b{display:flex;align-items:center;gap:6px;font-size:14.5px}
+.turno-previo b svg.i{width:16px;height:16px}
+.turno-previo span{display:block;font-size:13px;color:var(--ink-2);margin-top:3px}
+.turno-fila{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.turno-fila input{flex:1;min-width:0}
+.turno-n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--surface-3);font-size:12px;font-weight:800;color:var(--ink-2)}
+.turno-banda{display:flex;align-items:center;gap:12px;background:var(--brand-soft);border:1px solid color-mix(in srgb,var(--brand) 25%,transparent);border-radius:16px;padding:11px 12px;margin:10px 0 12px;color:var(--ink)}
+.turno-banda > svg.i{width:22px;height:22px;color:var(--brand);flex:none}
+.turno-banda b{display:block;font-size:14px}
+.turno-banda span{display:block;font-size:12.5px;color:var(--ink-2)}
+.turno-edit{align-items:end}
+.msg .b .msg-de{display:block;font-size:11px;font-weight:800;opacity:.75;margin-bottom:2px}

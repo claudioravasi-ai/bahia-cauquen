@@ -70,6 +70,7 @@ const Nube = {
     notifs:          { listas:['para','leidas'] },
     notifsTodos:     { listas:['para','leidas'] },
     privados:        { listas:['msgs'] },
+    bitacora:        { listas:['guardias'] },
     dms:             { listas:['msgs'] },
     msgs:            { listas:[] },
     pases:           { listas:['dias','listaInvitados'], objetos:['log'] },
@@ -180,6 +181,11 @@ const Nube = {
     /* Las alertas que ya estaban abiertas antes de entrar no saltan ni
        suenan: eso lo decide pintarAlarmas() por la hora de cada alerta. */
     if (mio.rol === 'admin') this.sembrarContenido();
+    Fotos.relevo = { bajar: id => this.bajarFotoCasa(id), subir: async () => {} };
+    setTimeout(() => this.fotoCasaAlDia(), 4000);
+    /* La cuenta de la garita se reconoce por el correo: si quedó como vecino
+       (se inscribió por el portal común), la Administración la corrige sola. */
+    if (mio.rol === 'admin') setTimeout(() => this.corregirGarita(), 5000);
   },
 
   /* La primera vez, la base está vacía: no tiene los espacios comunes, la
@@ -323,6 +329,37 @@ const Nube = {
   async entrar(email, clave){
     const cred = await this.auth.signInWithEmailAndPassword(email, clave);
     return cred.user.uid;
+  },
+  /* =========================================================
+     LA FOTO DEL FRENTE DE LA CASA
+     Las fotos viven en el equipo de cada uno y a la base va solo una
+     miniatura de 48 px. Con la del frente de la casa no alcanza: la garita
+     y los vecinos tienen que reconocerla en el buscador. Por eso de esa
+     foto (y solo de esa) se sube una versión mediana, de 480 px, a
+     barrio/fotosCasa. No baja con todo lo demás: se pide recién cuando
+     aparece en pantalla, así no pesa en el arranque de nadie.
+     ========================================================= */
+  corregirGarita(){
+    const g = Store.s.users.find(x => esCorreoGarita(x.email) && x.estado === 'aprobado' && (x.rol !== 'guardia' || x.casa !== 'Garita'));
+    if (!g) return;
+    Store.cambiar(s => { const x = s.users.find(z => z.id === g.id); x.rol = 'guardia'; x.casa = 'Garita'; x.nombre = 'Garita';
+      auditar(s, 'La cuenta de la garita quedó con permisos de garita', x.email, x.id); });
+  },
+  async bajarFotoCasa(id){
+    if (!this.db || !this.uid) return null;
+    const v = (await this.db.ref('barrio/fotosCasa/' + id).get()).val();
+    return typeof v === 'string' ? v : null;
+  },
+  /* Si mi foto todavía no está en la nube (la subí antes de esta versión,
+     o recién la cambié), se sube desde este equipo. */
+  async fotoCasaAlDia(){
+    try {
+      const u = yo(); if (!this.arrancada || !u || !u.fotoCasa || !u.fotoCasa.fotoId || u.fotoCasa.nube) return;
+      const dato = await Fotos.sacar(u.fotoCasa.fotoId); if (!dato) return;
+      const med = await achicarDato(dato, 480, .7);
+      await this.db.ref('barrio/fotosCasa/' + u.fotoCasa.fotoId).set(med);
+      Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x && x.fotoCasa && x.fotoCasa.fotoId === u.fotoCasa.fotoId) x.fotoCasa.nube = true; });
+    } catch(e){ console.warn('No se pudo subir la foto de la casa', e.message); }
   },
   async registrar(d){
     const cred = await this.auth.createUserWithEmailAndPassword(d.email, d.clave);

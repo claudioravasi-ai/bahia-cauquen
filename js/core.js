@@ -179,6 +179,15 @@ const CONFIG_BASE = {
   cuit: '30-71010005-1',
   garitaTel: '',
   adminEmail: 'barriobahiacauquen@gmail.com',
+  /* La garita entra con UNA sola cuenta: este correo. La app la reconoce por
+     el correo y le muestra solamente lo de la garita. */
+  garitaEmail: 'garitabarriobahiacauquen@gmail.com',
+  /* Turnos de la garita: los edita la Administración (de 2 a 4). */
+  turnosGarita: [
+    { nombre:'Mañana', desde:'06:00', hasta:'14:00' },
+    { nombre:'Tarde',  desde:'14:00', hasta:'22:00' },
+    { nombre:'Noche',  desde:'22:00', hasta:'06:00' },
+  ],
   adminTel: '2901446911',
   cbu: '0070346620000001759042',
   alias: 'bahia.cauquen',
@@ -327,6 +336,9 @@ const tengoLote = () => /^Lote\s/i.test(yo()?.casa || '');
 const modoActivo = () => { const u = yo(); if (!u) return ''; return u.rol === 'admin' ? (Store.sesion.modo || 'admin') : u.rol; };
 const esAdmin = () => yo()?.rol === 'admin' && modoActivo() !== 'vecino';
 const esGuardia = () => yo()?.rol === 'guardia';
+/* ¿Este correo es el de la garita? Sin mayúsculas ni espacios que molesten. */
+const correoGarita = () => String(Store.s.config.garitaEmail || CONFIG_BASE.garitaEmail).trim().toLowerCase();
+const esCorreoGarita = e => !!e && String(e).trim().toLowerCase() === correoGarita();
 const esStaff = () => esAdmin() || esGuardia();
 const vecinosAprobados = () => Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino');
 const casasRegistradas = () => new Set(Store.s.users.filter(u => u.estado === 'aprobado' && u.casa && u.rol === 'vecino').map(u => u.casa)).size;
@@ -483,7 +495,7 @@ async function pintarQR(el, texto){
    IndexedDB y el servidor la borra), sin ocupar la base.
    ========================================================= */
 const Fotos = {
-  db: null, cache: new Map(), relevo: null,
+  db: null, cache: new Map(), relevo: null, faltan: new Set(),
   abrir(){
     if (this.db) return this.db;
     this.db = new Promise(ok => {
@@ -505,7 +517,9 @@ const Fotos = {
     if (this.cache.has(id)) return this.cache.get(id);
     const db = await this.abrir(); if (!db) return null;
     const v = await new Promise(ok => { const r = db.transaction('fotos').objectStore('fotos').get(id); r.onsuccess = () => ok(r.result || null); r.onerror = () => ok(null); });
-    if (!v && this.relevo){ try { const b = await this.relevo.bajar(id); if (b){ await this.poner(id, b); return b; } } catch(e){} }
+    /* Lo que no está en el equipo se pide una sola vez a la nube (hoy, solo
+       las fotos del frente de las casas); si no está, no se vuelve a pedir. */
+    if (!v && this.relevo && !this.faltan.has(id)){ try { const b = await this.relevo.bajar(id); if (b){ await this.poner(id, b); return b; } } catch(e){} this.faltan.add(id); }
     if (v) this.cache.set(id, v);
     return v;
   },
