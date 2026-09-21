@@ -1325,3 +1325,34 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 .turno-banda span{display:block;font-size:12.5px;color:var(--ink-2)}
 .turno-edit{align-items:end}
 .msg .b .msg-de{display:block;font-size:11px;font-weight:800;opacity:.75;margin-bottom:2px}
+
+/* ---------- Los lomos nunca pisan la ventana ----------
+   Antes la tira de lomos tenía un ancho máximo pero cada lomo tenía ancho
+   fijo: con varias ventanas abiertas (Inicio › Gestión › Garita › …) los
+   lomos se salían de su tira y quedaban ENCIMA de la ventana, tapando el
+   comienzo de cada renglón. Ahora la tira recorta lo que no entra y cada
+   lomo se angosta para caber; si queda muy angosto, esconde el texto y
+   deja solo el ícono y la flecha. La ventana arranca siempre después del
+   último lomo, con la misma separación en todas las medidas. */
+.lomos{flex:0 1 auto;min-width:0;overflow:hidden;padding:0;margin:0}
+.lomo{flex:0 1 52px;min-width:30px;container-type:inline-size;overflow:hidden}
+.lomo:hover,.lomo:focus-visible{flex-basis:52px}
+.ventana{flex:1 1 0;min-width:0}
+@container (max-width:31px){
+  .lomo b{display:none}
+}
+@media (min-width:1000px){ .lomos{max-width:34%} }
+@media (min-width:601px) and (max-width:999px){ .lomos{max-width:30%} .lomo{flex-basis:46px} .lomo:hover{flex-basis:46px} }
+/* Teléfono: una sola cinta vertical; cada tramo se reparte el alto. */
+@media (max-width:600px){
+  .lomos{flex:0 0 40px;max-width:40px;overflow:hidden}
+  .lomo{flex:1 1 0;min-height:44px;min-width:0;width:100%}
+  .lomo:hover{flex-basis:0}
+}
+@media (max-width:360px){ .lomos{flex-basis:34px;max-width:34px} }
+/* El último lomo (la ventana de la que venís) nunca se angosta: siempre se lee. */
+@media (min-width:601px){ .lomo.ultimo{flex-shrink:0} }
+/* Con container-type el lomo no aporta ancho propio a su tira: se le da un
+   ancho explícito para que la tira mida lo justo y solo se angoste si falta lugar. */
+@media (min-width:1000px){ .lomo{width:52px} }
+@media (min-width:601px) and (max-width:999px){ .lomo{width:46px} }
