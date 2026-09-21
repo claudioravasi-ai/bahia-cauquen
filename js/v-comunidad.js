@@ -196,24 +196,40 @@ F['chat'] = (d, form) => {
   const c = $('#cuerpo'); if (c) c.scrollTop = c.scrollHeight;
 };
 
-/* ---------- OFICIOS DE VECINOS ---------- */
+/* =========================================================
+   PROFESIONALES Y OFICIOS DE VECINOS
+   Aparece todo vecino que lo haya permitido, de dos maneras:
+     · su PROFESIÓN, si marcó "mostrar a los vecinos" (enDirectorio),
+     · su OFICIO, si marcó "aparecer con mi WhatsApp" (mostrarTel).
+   Cualquier cuenta con lote cuenta: antes se pedía rol "vecino" y por eso
+   quien además administra (o una profesión sin oficio) no salía nunca.
+   Se ve desde "Ushuaia y servicios" y desde "El barrio".
+   ========================================================= */
+const publicaProfesion = x => !!(x && x.profesion && x.enDirectorio);
+const publicaOficio = x => !!(x && x.skills && x.mostrarTel);
+const enDirectorioProfesional = x => x && x.estado === 'aprobado' && x.rol !== 'guardia' && x.casa !== 'Garita' && (publicaProfesion(x) || publicaOficio(x));
 R.servicios = {
-  titulo: 'Oficios de vecinos', icon: 'wrench', color: 'wood', sub: 'Recomendados por el barrio',
+  titulo: 'Profesionales y oficios', icon: 'wrench', color: 'wood', sub: 'Vecinos del barrio que se pueden contactar',
   render(q){
     const u = yo(), s = Store.s;
-    const qq = (q || '').toLowerCase();
-    const gente = s.users.filter(x => x.estado === 'aprobado' && x.rol === 'vecino' && x.skills && x.mostrarTel)
-      .filter(x => !qq || (x.skills + ' ' + x.nombre + ' ' + x.casa).toLowerCase().includes(qq))
-      .sort((a, b) => (b.recomiendan || []).length - (a.recomiendan || []).length);
-    const ofertas = s.posts.filter(p => p.type === 'ofrezco' && (!qq || (p.title + ' ' + p.body + ' ' + (p.category || '')).toLowerCase().includes(qq)));
-    return `<form data-f="buscar-oficio" class="linea-form" style="margin-bottom:12px"><input name="q" id="qOficio" value="${esc(q || '')}" placeholder="Buscar: electricista, clases, leña…"><button class="btn btn-pri">${I('search')}</button></form>
-      ${u.skills && u.mostrarTel ? '' : aviso('info', 'info', '¿Tenés un oficio?', 'Sumalo desde Mi casa y aparecés acá con tu WhatsApp.', `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">Ir a Mi casa</button>`)}
-      ${gente.length ? gente.map(x => { const rec = x.recomiendan || [], mia = rec.includes(u.id);
-        return `<div class="card"><div class="row">${avatar(x)}<div class="grow"><b>${esc(x.nombre)}</b><div class="muted small">${esc(x.casa)}</div></div>
-          <span class="pill p-warn">${I('star')}${rec.length}</span></div>
-          <p style="margin:10px 0 0;font-size:14.5px">${esc(x.skills)}</p>
-          <div class="btns" style="margin-top:12px">${x.id !== u.id ? `<a class="btn btn-sm btn-wa" href="${waLink(x.tel, 'Hola ' + x.nombre.split(' ')[0] + ', te escribo por la app del barrio.')}" target="_blank" rel="noopener">${I('phone')}WhatsApp</a>
-            <button class="btn btn-sm ${mia ? 'btn-accent' : 'btn-sec'}" data-a="recomendar" data-id="${x.id}">${I('star')}${mia ? 'Lo recomiendo' : 'Recomendar'}</button>` : '<span class="muted small">Así te ven los vecinos</span>'}</div></div>`; }).join('') : vacio('wrench', 'No encontramos oficios con esa búsqueda.')}
+    const qq = normTxt(q || '');
+    const gente = s.users.filter(enDirectorioProfesional)
+      .filter(x => !qq || normTxt([x.nombre, x.casa, publicaProfesion(x) ? x.profesion : '', publicaOficio(x) ? x.skills : ''].join(' ')).includes(qq))
+      .sort((a, b) => (aLista(b.recomiendan).length - aLista(a.recomiendan).length) || (a.profesion || a.skills || '').localeCompare(b.profesion || b.skills || '', 'es'));
+    const ofertas = s.posts.filter(p => p.type === 'ofrezco' && (!qq || normTxt(p.title + ' ' + p.body + ' ' + (p.category || '')).includes(qq)));
+    const estoy = enDirectorioProfesional(u);
+    return `<form data-f="buscar-oficio" class="linea-form" style="margin-bottom:12px"><input name="q" id="qOficio" value="${esc(q || '')}" placeholder="Buscar: médico, electricista, clases, leña…"><button class="btn btn-pri">${I('search')}</button></form>
+      ${estoy ? '' : aviso('info', 'info', '¿Sos profesional o tenés un oficio?', u.profesion && !u.enDirectorio ? `Cargaste "${esc(u.profesion)}" pero no marcaste que se muestre. Activalo en Mi casa y aparecés acá.` : 'Sumalo desde Mi casa, marcá que se publique y aparecés acá para que te contacten.', `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">Ir a Mi casa</button>`)}
+      ${gente.length ? `<div class="fichas-prof">${gente.map(x => { const rec = aLista(x.recomiendan), mia = rec.includes(u.id), tel = x.tel && (x.mostrarTel || x.enDirectorio);
+        return `<div class="card prof ${x.id === u.id ? 'mia' : ''}"><div class="row">${avatar(x)}<div class="grow"><b>${esc(x.nombre)}</b><div class="muted small">${esc(x.casa)}${x.enDirectorio && x.direccion ? ' · ' + esc(x.direccion) : ''}</div></div>
+          ${rec.length ? `<span class="pill p-warn">${I('star')}${rec.length}</span>` : ''}</div>
+          ${publicaProfesion(x) ? `<div class="prof-que"><span class="pill p-brand">${I('user')}Profesión</span><b>${esc(x.profesion)}</b></div>` : ''}
+          ${publicaOficio(x) ? `<div class="prof-que"><span class="pill p-wood">${I('wrench')}Oficio</span><b>${esc(x.skills)}</b></div>` : ''}
+          <div class="btns" style="margin-top:12px">${x.id !== u.id ? `${tel ? `<a class="btn btn-sm btn-wa" href="${waLink(x.tel, 'Hola ' + x.nombre.split(' ')[0] + ', te escribo por la app del barrio.')}" target="_blank" rel="noopener">${I('phone')}WhatsApp</a>
+              <a class="btn btn-sm btn-sec" href="${telLink(x.tel)}">${I('phone')}Llamar</a>` : ''}
+            <button class="btn btn-sm btn-sec" data-a="abrir" data-v="dm" data-p="${x.id}">${I('chat')}Mensaje</button>
+            <button class="btn btn-sm ${mia ? 'btn-accent' : 'btn-sec'}" data-a="recomendar" data-id="${x.id}">${I('star')}${mia ? 'Lo recomiendo' : 'Recomendar'}</button>` : `<span class="muted small">Así te ven los vecinos</span><button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">${I('edit')}Cambiar</button>`}</div></div>`; }).join('')}</div>`
+        : vacio('wrench', qq ? 'No encontramos a nadie con esa búsqueda.' : 'Todavía nadie publicó su profesión u oficio.')}
       ${ofertas.length ? sec('Ofrecimientos en el pizarrón') + ofertas.map(cardPost).join('') : ''}`;
   },
 };
@@ -229,9 +245,9 @@ R.mascotas = {
     const todas = s.users.filter(x => x.estado === 'aprobado').flatMap(x => (x.mascotas || []).map(m => ({ ...m, dueno:x })));
     return `${perdidas.length ? sec('Se buscan') + perdidas.map(cardPost).join('') : ''}
       ${sec('Las mascotas del barrio', `<button class="link" data-a="abrir" data-v="perfil">Sumar la mía</button>`)}
-      <p class="muted small" style="margin:-4px 2px 12px">Si ves una suelta, la reconocés acá y le avisás al dueño con un toque.</p>
+      <p class="muted small" style="margin:-4px 2px 12px">Si ves una suelta, la reconocés acá y le avisás al dueño con un toque. Tocá la foto para verla más grande: se baja recién ahí, así no te ocupa datos.</p>
       ${todas.length ? `<div class="hoy">${todas.map(m => `<div class="card">
-        ${m.foto ? fotoHTML(m.foto, 'mini-foto') : `<span class="ic ic-ok" style="width:56px;height:56px;border-radius:12px;display:grid;place-items:center;flex:none">${I('paw')}</span>`}
+        ${m.foto ? `<span class="masc-foto">${fotoHTML(m.foto, 'mini-foto', { aPedido: m.dueno.id !== u.id })}${m.dueno.id !== u.id ? `<i>${I('eye')}</i>` : ''}</span>` : `<span class="ic ic-ok" style="width:56px;height:56px;border-radius:12px;display:grid;place-items:center;flex:none">${I('paw')}</span>`}
         <div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.dueno.casa)}</span><span style="margin-top:4px;color:var(--ink-2)">${esc(m.desc || '')}</span>
         <div class="btns" style="margin-top:8px">${m.dueno.id === u.id
           ? `<button class="btn btn-xs btn-danger-soft" data-a="se-perdio" data-v="${m.id}">${I('alert')}Se perdió</button>`

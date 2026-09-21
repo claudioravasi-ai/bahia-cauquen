@@ -105,6 +105,7 @@ function pintarTop(){
         <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
           : `<span class="rol-chip">${rol}</span><span class="casa"> · ${esc(u.casa)}</span>`}</small></span>
     </button>
+    ${Presencia.chip()}
     ${puedeAdministrar() ? `<button class="modo-btn ${modo}" data-a="cambiar-modo" aria-label="Cambiar de modo">${I(modo === 'admin' ? 'sliders' : 'home')}<span>${modo === 'admin' ? 'Admin' : 'Vecino'}</span></button>` : ''}
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
     <button class="icon-btn" data-a="mi-cuenta" aria-label="Mi cuenta">${avatar(u, 'sm')}</button>
@@ -291,6 +292,41 @@ const Tiras = {
 };
 /* Si cambia el ancho de la ventana, las cintas se vuelven a medir. */
 addEventListener('resize', () => { clearTimeout(Tiras._t); Tiras._t = setTimeout(() => $$('[data-marq]').forEach(m => Tiras.acomodar(m)), 200); });
+
+/* =========================================================
+   CUÁNTOS HAY EN LA APP AHORA
+   Al lado del nombre va, en tiempo real: vecinos con la app abierta
+   ahora / vecinos con cuenta aprobada / lotes del barrio (152). Cada app
+   abierta se anota en barrio/presencia/<uid>/<equipo> y Firebase la borra
+   sola cuando esa app se cierra o pierde la conexión (onDisconnect). Una
+   persona con la app en el celular y en la computadora cuenta una vez;
+   "en pantalla" quiere decir que no la tiene en segundo plano.
+   ========================================================= */
+const Presencia = {
+  d: null,
+  poner(v){ this.d = v || {}; if (yo() && $('#top')) conRed('encabezado', pintarTop); },
+  /* Sin nube (modo local) la única app abierta es esta. */
+  personas(){ return this.d ? Object.keys(this.d).filter(k => this.d[k] && typeof this.d[k] === 'object').length : 1; },
+  enPantalla(){ return this.d ? Object.values(this.d).filter(eqs => eqs && typeof eqs === 'object' && Object.values(eqs).some(e => e && e.activa)).length : 1; },
+  equipos(){ return this.d ? Object.values(this.d).reduce((n, eqs) => n + (eqs && typeof eqs === 'object' ? Object.keys(eqs).length : 0), 0) : 1; },
+  inscriptos(){ return aLista(Store.s.users).filter(x => x && x.estado === 'aprobado' && x.casa !== 'Garita' && !esCorreoGarita(x.email)).length; },
+  lotes(){ return +Store.s.config.casas || 152; },
+  chip(){
+    const n = this.personas(), ins = this.inscriptos(), lot = this.lotes();
+    return `<button class="presencia" data-a="ver-presencia" aria-label="${n} con la app abierta, ${ins} vecinos con cuenta, ${lot} lotes" title="Con la app abierta ahora / vecinos con cuenta / lotes">
+      <span class="pr-arriba"><i></i><b>${n}</b><span>/${ins}</span></span><span class="pr-lotes"><span class="pr-bar">/</span>${lot}<span class="pr-lt"> lotes</span></span></button>`;
+  },
+};
+A['ver-presencia'] = () => {
+  const P = Presencia, lotesCon = casasRegistradas();
+  const fila = (n, t, x) => `<div class="it"><b class="pr-n">${n}</b><div class="txt"><b>${t}</b><span>${x}</span></div></div>`;
+  hoja('Quiénes están en la app', `<div class="card lista">
+    ${fila(P.personas(), 'Con la app abierta ahora', `${plural(P.enPantalla(), 'la tiene', 'la tienen')} en pantalla${P.equipos() > P.personas() ? ` · ${P.equipos()} equipos en total` : ''}`)}
+    ${fila(P.inscriptos(), 'Vecinos con cuenta aprobada', `de ${plural(lotesCon, 'lote distinto', 'lotes distintos')}`)}
+    ${fila(P.lotes(), 'Lotes del barrio', `${Math.max(0, P.lotes() - lotesCon)} todavía sin nadie en la app`)}</div>
+    <p class="muted small" style="margin:10px 2px 0">Se actualiza solo. Una app cuenta como abierta mientras está conectada con el barrio; al cerrarla sale de la cuenta en unos segundos.</p>
+    ${typeof Nube !== 'undefined' && Nube.activa() ? '' : `<p class="muted tiny" style="margin:6px 2px 0">Estás en modo local: la única app que se cuenta es esta.</p>`}`);
+};
 
 /* Estado de la conexión con la base del barrio: el puntito verde del
    encabezado deja de ser decorativo y dice la verdad. */
@@ -555,6 +591,10 @@ function pintarBienvenida(modo = 'inicio'){
         campo('Correo', `<input name="email" type="email" required maxlength="80" autocomplete="email" inputmode="email" placeholder="tucorreo@mail.com">`) +
         campo('Teléfono o WhatsApp', `<input name="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="549 2901 …">`),
         'Al correo te llega el estado de tu inscripción.')}
+      ${grupo('Tu profesión u oficio (opcional)',
+        campo('A qué te dedicás', `<input name="profesion" maxlength="60" placeholder="Médico, electricista, abogada, clases de inglés…">`) +
+        `<label class="check"><input type="checkbox" name="publicar"><span>Publicarlo en <b>Ushuaia y servicios → Profesionales y oficios</b>, con mi teléfono, para que los vecinos me puedan contactar.</span></label>`,
+        'Lo podés cambiar cuando quieras desde Mi casa.')}
       ${nube ? grupo('Tu contraseña', campo('Elegila', `<input name="clave" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">`), 'Es personal. Si en tu casa hay más de un vecino, cada uno tiene la suya.') : ''}
       ${grupo('Privacidad',
         `<label class="check"><input type="checkbox" name="acepto" required><span>Acepto que la Administración use estos datos solo para la vida del barrio y el control de acceso (Ley 25.326). Puedo pedir verlos, corregirlos o borrarlos.</span></label>`)}
@@ -1075,11 +1115,17 @@ F['registro'] = async d => {
   if (Nube.activa()){
     if (!d.clave || d.clave.length < 6){ toast('La contraseña tiene que tener al menos 6 caracteres', 'lock'); return; }
     try {
-      const u = await Nube.registrar({ nombre:d.nombre.trim(), casa:d.casa, dni, email, tel:(d.tel || '').trim(), clave:d.clave });
+      const u = await Nube.registrar({ nombre:d.nombre.trim(), casa:d.casa, dni, email, tel:(d.tel || '').trim(), clave:d.clave,
+        profesion:(d.profesion || '').trim(), publicar:!!d.publicar });
       if (u.estado === 'aprobado'){ toast('Primera cuenta del barrio: quedás como Administración', 'shield'); return; }
+      /* Quien se inscribe todavía no puede leer los ajustes del barrio: la
+         dirección del correo y el mail de la Administración salen de la
+         copia pública que deja la Administración. */
+      await Correo.traerPublico();
+      const mailAdmin = Correo.datos()?.adminEmail || Store.s.config.adminEmail;
       await Correo.enviar({ para:email, asunto:'Recibimos tu inscripción', tipo:'inscripcion',
         html:Correo.plantilla('Recibimos tu inscripción', `<p>Hola ${esc(u.nombre.split(' ')[0])}: tu pedido de acceso para <b>${esc(u.casa)}</b> quedó registrado. Cuando la Administración lo apruebe vas a poder entrar con tu email y la contraseña que elegiste.</p>`, { texto:'Abrir la app', url:urlApp() }) });
-      if (Store.s.config.adminEmail) Correo.enviar({ para:Store.s.config.adminEmail, asunto:`Nueva inscripción: ${u.nombre} (${u.casa})`, tipo:'aviso-admin',
+      if (mailAdmin) Correo.enviar({ para:mailAdmin, asunto:`Nueva inscripción: ${u.nombre} (${u.casa})`, tipo:'aviso-admin',
         html:Correo.plantilla('Nueva inscripción', `<p><b>${esc(u.nombre)}</b><br>${esc(u.casa)} · DNI ${esc(dni)}<br>${esc(email)}</p><p>Aprobala desde Administración → Inscripciones.</p>`, { texto:'Abrir la app', url:urlApp() }) });
       pintarBienvenida('espera');
     } catch(e){ toast({ 'auth/email-already-in-use':'Ese email ya tiene cuenta. Probá "Entrar".', 'auth/weak-password':'La contraseña es muy corta' }[e.code] || e.message, 'alert'); }
@@ -1096,6 +1142,7 @@ F['registro'] = async d => {
   }
   const token = uid() + uid();
   const nuevo = { id:'u' + uid(), nombre:d.nombre.trim(), casa:d.casa.trim(), dni, email, tel:(d.tel || '').trim(), rol:'vecino', estado:'pendiente', clave:'',
+    profesion:(d.profesion || '').trim(), enDirectorio:!!d.publicar, mostrarTel:!!d.publicar,
     token, skills:'', consentimiento:Date.now(), createdAt:Date.now(), vehiculos:[], mascotas:[] };
   Store.cambiar(s => {
     s.users.push(nuevo);

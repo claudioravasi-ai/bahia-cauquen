@@ -286,7 +286,10 @@ const ADMIN_TABS = {
       <div class="card plana small">${I('info')} Los vencimientos, el recargo, el interés, el CBU y lo impositivo se configuran en <b>Contabilidad → Parámetros</b>, junto a las expensas.
         <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="parametros">${I('right')}Ir a Parámetros</button></div></div>
       <div class="card"><h3>Correo</h3><p class="muted small" style="margin-top:0">Para que la app mande los mails de inscripción y claves. Instrucciones en <span class="mono">apps-script/Codigo.gs</span>.</p>
-        ${campo('correoUrl', 'URL del Apps Script (termina en /exec)', 'url')}${campo('correoClave', 'Frase compartida', 'password')}</div>
+        ${campo('correoUrl', 'URL del Apps Script (termina en /exec)', 'url')}${campo('correoClave', 'Frase compartida', 'password')}
+        <div class="card plana small" style="margin:0 0 10px">${I('info')} Los correos salen de la cuenta de Google con la que se <b>creó el proyecto</b> de Apps Script (si lo hiciste con ${esc(Store.s.config.garitaEmail || 'la casilla de la garita')}, salen de ahí). El correo de la Administración de arriba es el que <b>recibe</b> los avisos.</div>
+        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-correo">${I('send')}Probar el envío</button></div>
+        <div id="probarCorreo"></div></div>
       <div class="card"><h3>Promociones del Hotel Los Cauquenes (opcional)</h3>
         <p class="muted small" style="margin-top:0">Las promociones se cargan a mano en <b>Contenido → Promociones</b> y eso ya funciona. Esto es solo si querés que se lean solas del sitio del Hotel Los Cauquenes: hace falta un programita propio que las devuelva en JSON (está explicado en CONECTAR.md), porque el navegador no puede leer otra web directamente.</p>
         ${campo('promosUrl', 'Dirección del lector de promociones', 'url')}</div>
@@ -307,9 +310,11 @@ const ADMIN_TABS = {
     const salidosHoy = cs.filter(c => c.estado === 'enviado' && isoDe(new Date(c.at)) === hoy).length;
     return `${Correo.configurado() ? aviso('ok', 'mail', 'El envío automático está configurado', `Salieron ${plural(salidosHoy, 'correo')} hoy.`) : aviso('warn', 'mail', 'El envío automático no está configurado', 'Los correos quedan acá para mandarlos a mano. Configuralo en Ajustes → Correo, siguiendo CORREO.md.')}
       ${superficie({ a:'circular', icon:'send', color:'accent', t:'Escribirles a los vecinos', s:'Una circular del barrio, a todos o a quien elijas', cls:'acento' })}
+      ${Correo.configurado() && cs.some(c => c.estado !== 'enviado') ? superficie({ a:'correos-reintentar', icon:'refresh', color:'warn', t:'Mandar ahora los que no salieron', s:`${plural(cs.filter(c => c.estado !== 'enviado').length, 'correo pendiente', 'correos pendientes')} · también se reintentan solos al abrir la app` }) : ''}
+      ${superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'brand', t:'Probar el envío', s:'Ajustes → Correo → Probar el envío: dice exactamente qué falla' })}
       ${sec('Historial')}
       ${cs.length ? cs.slice(0, 60).map(c => `<div class="card" style="padding:12px 14px"><div class="row"><span class="ic ic-${c.estado === 'enviado' ? 'ok' : c.estado === 'error' ? 'danger' : 'warn'}" style="width:36px;height:36px;border-radius:11px;display:grid;place-items:center">${I('mail')}</span>
-        <div class="grow"><b style="font-size:14px">${esc(c.asunto)}</b><div class="muted small">${esc(c.para)} · ${hace(c.at)} · ${c.estado}</div></div>
+        <div class="grow"><b style="font-size:14px">${esc(c.asunto)}</b><div class="muted small">${esc(c.para)} · ${hace(c.at)} · ${c.estado}</div>${c.error ? `<div class="small" style="color:var(--danger);margin-top:2px">${esc(c.error)}</div>` : ''}</div>
         ${c.estado !== 'enviado' ? `<button class="btn btn-xs btn-sec" data-a="correo-manual" data-id="${c.id}">${I('send')}Mandar</button>` : ''}</div></div>`).join('') : vacio('mail', 'No hay correos.')}`;
   },
   auditoria(){
@@ -336,6 +341,28 @@ F['ajustes'] = d => {
     auditar(s, 'Cambió los ajustes del barrio', '');
   });
   toast('Ajustes guardados', 'check');
+  if (typeof Nube !== 'undefined' && Nube.activa()) Nube.publicarCorreo();
+};
+A['correos-reintentar'] = async () => {
+  Store.s.correos.forEach(c => { if (c.estado !== 'enviado') c.intentos = 0; });
+  const n = await Correo.reintentar();
+  toast(n ? `Salieron ${plural(n, 'correo')}` : 'No salió ninguno: mirá el motivo en cada correo', n ? 'mail' : 'alert');
+  refrescar();
+};
+/* Prueba el correo con lo que está escrito en el formulario, aunque todavía
+   no se haya guardado: así se sabe si anda antes de tocar Guardar. */
+A['probar-correo'] = async el => {
+  const f = el.closest('form'), caja = $('#probarCorreo');
+  const url = f?.correoUrl?.value.trim(), clave = f?.correoClave?.value.trim();
+  const c = Store.s.config, antes = [c.correoUrl, c.correoClave];
+  if (url) c.correoUrl = url; if (clave) c.correoClave = clave;
+  const para = (f?.adminEmail?.value || '').trim() || c.adminEmail || yo().email;
+  if (caja) caja.innerHTML = `<div class="card plana small" style="margin:10px 0 0">${I('refresh')} Probando…</div>`;
+  el.disabled = true;
+  const r = await Correo.probar(para);
+  el.disabled = false;
+  [c.correoUrl, c.correoClave] = antes;
+  if (caja) caja.innerHTML = `<div style="margin-top:10px">${aviso(r.ok ? 'ok' : 'danger', r.ok ? 'check' : 'alert', r.ok ? 'El correo funciona' : 'El correo no está saliendo', esc(r.txt))}</div>`;
 };
 A['aprobar'] = async el => {
   const u = Store.s.users.find(x => x.id === el.dataset.id); if (!u) return;

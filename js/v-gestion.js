@@ -716,6 +716,7 @@ R.agenda = {
     const lista = qq ? s.agenda.filter(a => (a.nombre + ' ' + a.detalle + ' ' + a.categoria).toLowerCase().includes(qq)) : null;
     return `<div class="btns" style="margin-bottom:12px"><a class="btn btn-danger" href="tel:911">${I('phone')}911</a><a class="btn btn-danger-soft" href="tel:107">107 Ambulancia</a><a class="btn btn-danger-soft" href="tel:100">100 Bomberos</a><a class="btn btn-danger-soft" href="tel:101">101 Policía</a></div>
       <div class="card"><b>${I('heart')} Desfibrilador (DEA) del barrio</b><div class="small" style="color:var(--ink-2);margin-top:4px">${esc(s.config.dea)}</div></div>
+      ${sosDelDia()}
       ${sec('Del barrio')}<div class="card lista">${s.contactos.map(c => it({ nombre:c.nombre, detalle:c.detalle, tel:c.tel })).join('')}</div>
       <form data-f="buscar-agenda" class="linea-form" style="margin:16px 0 4px"><input name="q" id="qAgenda" value="${esc(q || '')}" placeholder="Buscar farmacia, taxi, veterinaria…"><button class="btn btn-pri">${I('search')}</button></form>
       ${lista ? `<div class="card lista">${lista.length ? lista.map(it).join('') : vacio('search', 'Sin resultados')}</div>`
@@ -723,6 +724,37 @@ R.agenda = {
   },
 };
 F['buscar-agenda'] = d => abrir('agenda', d.q || '');
+
+/* =========================================================
+   LOS SOS DEL DÍA
+   Debajo del DEA, una ventanita por cada SOS de las últimas 24 horas: qué
+   fue, a qué hora y si ya se resolvió. Al pasar el mouse (o tocarla en el
+   celular) se despliega con el vecino, el lote y cómo terminó. Pasadas las
+   24 h desaparecen solas de acá; el registro completo sigue en la bitácora
+   y la auditoría, que no se borran.
+   ========================================================= */
+function sosDelDia(){
+  const lista = aLista(Store.s.sos).filter(x => x && Date.now() - x.at < DIA).sort((a, b) => b.at - a.at);
+  const est = x => x.estado === 'resuelta' ? ['ok', 'Resuelta'] : x.estado === 'atendida' ? ['warn', 'Atendida, falta confirmar'] : x.estado === 'en_camino' ? ['warn', 'La guardia va en camino'] : ['danger', 'Activa'];
+  const tarjeta = x => {
+    const t = TIPOS_SOS[x.tipo] || TIPOS_SOS.otra, v = usuario(x.userId) || {}, [c, e] = est(x);
+    const quien = x.estado === 'resuelta' && x.resuelve ? (x.resuelve === x.userId ? 'la dio por solucionada el vecino' : `la cerró ${esc(nombreDe(x.resuelve))}`) : '';
+    return `<details class="sos-dia s-${c}" tabindex="0">
+      <summary><span class="ic ic-${c === 'ok' ? 'ok' : 'danger'}">${I(t.icon)}</span><span class="sd-txt"><b>${esc(t.nombre)}</b><small>${hora(x.at)} h · ${esc(v.casa || '')}</small></span><span class="pill p-${c}">${e}</span></summary>
+      <div class="sd-mas">
+        <div><span class="muted">Pidió ayuda</span><b>${esc(v.nombre || 'Un vecino')}${v.casa ? ' · ' + esc(v.casa) : ''}</b></div>
+        <div><span class="muted">Cuándo</span><b>${cuandoFue(x.at)} · ${hace(x.at)}</b></div>
+        ${x.atiende ? `<div><span class="muted">Atendió</span><b>${esc(nombreDe(x.atiende))}</b></div>` : ''}
+        <div><span class="muted">Cómo terminó</span><b>${x.estado === 'resuelta' ? `Resuelta a las ${hora(x.resueltaAt || x.at)} h${quien ? ' · ' + quien : ''}` : e}</b></div>
+      </div></details>`;
+  };
+  return `${sec('SOS de hoy', `<span class="muted small">últimas 24 h · se limpia solo</span>`)}
+    ${lista.length ? `<div class="sos-dia-lista">${lista.map(tarjeta).join('')}</div>` : `<div class="card plana small" style="display:flex;gap:8px;align-items:center">${I('check')} No hubo ningún SOS en las últimas 24 horas.</div>`}`;
+}
+/* En la computadora se despliega con solo pasar el mouse. */
+document.addEventListener('mouseover', e => { const d = e.target.closest && e.target.closest('details.sos-dia'); if (d && matchMedia('(hover:hover)').matches) d.open = true; });
+document.addEventListener('mouseout', e => { const d = e.target.closest && e.target.closest('details.sos-dia');
+  if (d && matchMedia('(hover:hover)').matches && !d.contains(e.relatedTarget)) d.open = false; });
 
 /* ---------- USHUAIA: temporadas, feriados, eventos ---------- */
 function enTemporada(t, iso = hoyISO()){
@@ -737,7 +769,7 @@ function diasHasta(md, iso = hoyISO()){
    días religiosos y los no laborables no cuentan como feriado. */
 const proximoFeriado = () => proximoFeriadoReal();
 R.ushuaia = {
-  titulo: 'Ushuaia', icon: 'pin', color: 'sky', sub: 'Temporadas, feriados y eventos de la ciudad',
+  titulo: 'Ushuaia hoy', icon: 'pin', color: 'sky', sub: 'Temporadas, feriados y eventos de la ciudad',
   render(){
     const s = Store.s, hoy = hoyISO();
     const temp = s.temporadas.map(t => { const on = enTemporada(t);
@@ -848,8 +880,18 @@ const Vuelos = {
     } catch(e){ return null; }
   },
 
+  /* Cada cuánto se vuelve a leer el tablero: cada 2 minutos si hay un vuelo
+     a menos de media hora (así la estima y el "Despegado" llegan a tiempo),
+     y cada 5 el resto del día. */
+  cadencia(){
+    const d = this.d; if (!d) return 2 * MIN;
+    const min = ahoraMin();
+    const cerca = [...(d.arr || []), ...(d.dep || [])].some(v => { const t = this.minutos(v.real || v.hora); return t !== null && Math.abs(t - min) <= 30; });
+    return cerca ? 2 * MIN : 5 * MIN;
+  },
+  recien: [],   /* partidas que acaban de pasar a "Despegado" en esta lectura */
   async pedir(forzar = false){
-    if (!forzar && this.d && Date.now() - this.d.t < 5 * MIN) return this.d;
+    if (!forzar && this.d && Date.now() - this.d.t < this.cadencia()) return this.d;
     if (this.cargando) return this.cargando;
     this.cargando = (async () => {
       const [a, d, vivos] = await Promise.all([
@@ -859,6 +901,11 @@ const Vuelos = {
       ]);
       if (!a && !d){ this.estado = navigator.onLine ? 'sin-fuente' : 'sin-conexion'; return this.d; }
       this.estado = 'ok';
+      /* El momento en que el aeropuerto marca "Despegado" es lo más cercano a
+         tiempo real que hay: ese avión está pasando por arriba del barrio. */
+      const antes = new Set((this.d?.dep || []).filter(v => /despeg|depart/i.test(v.estado)).map(v => v.nro));
+      const hayAntes = !!(this.d && this.d.dep && this.d.dep.length && Date.now() - this.d.t < 15 * MIN);
+      this.recien = hayAntes ? (d?.filas || []).filter(v => /despeg|depart/i.test(v.estado) && !antes.has(v.nro)) : [];
       this.d = { t:Date.now(), arr:a?.filas || [], dep:d?.filas || [], act:a?.act || d?.act || '', vivos:vivos || [] };
       try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
       return this.d;
@@ -878,13 +925,28 @@ const Vuelos = {
       clave:'vivo-' + (v.callsign || v.alt), titulo:v.callsign || 'Un avión sobre el barrio',
       detalle:`${v.alt} m de altura · ${v.vel} km/h`, sentido:'A', vivo:true }));
     const cerca = (t, desde, hasta) => t !== null && min - t >= desde && min - t <= hasta;
-    (d.arr || []).forEach(v => { if (/cancel/i.test(v.estado)) return;
+    /* Llegadas: el avión cruza el barrio unos 2 a 5 minutos antes de tocar
+       tierra, según la hora ESTIMADA que publica el aeropuerto (se corrige
+       sola si viene demorado o adelantado). Si ya figura aterrizado, no. */
+    (d.arr || []).forEach(v => { if (/cancel|aterr|arrib|landed/i.test(v.estado)) return;
       if (cerca(this.minutos(v.real || v.hora), -5, -1)) lista.push({ clave:'a-' + v.nro + (v.real || v.hora),
         titulo:`${v.nro} está llegando`, detalle:`Viene de ${v.lugar} · aterriza ${v.real || v.hora}`, sentido:'A', vivo:false }); });
+    /* Salidas: en cuanto el aeropuerto lo marca "Despegado"; si no llegó a
+       marcarlo, por la hora estimada. */
+    this.recien.forEach(v => lista.push({ clave:'d-' + v.nro + (v.real || v.hora), titulo:`${v.nro} acaba de despegar`,
+      detalle:`Va a ${v.lugar} · el aeropuerto lo marcó despegado`, sentido:'D', vivo:false }));
     (d.dep || []).forEach(v => { if (/cancel/i.test(v.estado)) return;
       if (cerca(this.minutos(v.real || v.hora), 1, 5)) lista.push({ clave:'d-' + v.nro + (v.real || v.hora),
         titulo:`${v.nro} acaba de despegar`, detalle:`Va a ${v.lugar} · salió ${v.real || v.hora}`, sentido:'D', vivo:false }); });
     return lista;
+  },
+  /* El próximo vuelo que va a pasar por arriba del barrio, para mostrarlo. */
+  proximoPaso(){
+    const d = this.d; if (!d) return null;
+    const min = ahoraMin(), cand = [];
+    (d.arr || []).forEach(v => { if (/cancel|aterr|arrib|landed/i.test(v.estado)) return; const t = this.minutos(v.real || v.hora); if (t !== null && t - 3 >= min - 1) cand.push({ v, t:t - 3, tipo:'llega' }); });
+    (d.dep || []).forEach(v => { if (/cancel|despeg|depart/i.test(v.estado)) return; const t = this.minutos(v.real || v.hora); if (t !== null && t + 2 >= min - 1) cand.push({ v, t:t + 2, tipo:'sale' }); });
+    return cand.sort((a, b) => a.t - b.t)[0] || null;
   },
 };
 Vuelos.leer();
@@ -951,6 +1013,11 @@ R.vuelos = {
       'sin-conexion': aviso('warn', 'cloud', 'Sin internet', 'Cuando vuelva la conexión, se actualiza solo.'),
     };
     return `${hay ? '' : (estados[Vuelos.estado] || estados[''])}
+      ${(() => { const pp = Vuelos.proximoPaso(); if (!pp) return '';
+        const hh = `${pad(Math.floor(pp.t / 60) % 24)}:${pad(pp.t % 60)}`, falta = pp.t - ahoraMin();
+        return `<div class="card vuelo-prox"><span class="ic ic-accent">${I('send')}</span><div class="grow"><small class="muted">Próximo paso sobre el barrio</small>
+          <b>${esc(pp.v.nro)} · ${pp.tipo === 'llega' ? 'llegando de' : 'saliendo a'} ${esc(pp.v.lugar)}</b>
+          <span class="small">cerca de las ${hh} h${falta > 0 ? ` · en ${falta >= 60 ? Math.floor(falta / 60) + ' h ' : ''}${falta % 60} min` : ' · ahora'}${pp.v.real && pp.v.real !== pp.v.hora ? ` · estimado ${esc(pp.v.real)} (programado ${esc(pp.v.hora)})` : ''}</span></div></div>`; })()}
       ${hay ? `<div class="garita-kpis"><div class="kpi"><b>${d.arr.length}</b><span>Arribos</span></div><div class="kpi"><b>${d.dep.length}</b><span>Partidas</span></div><div class="kpi"><b>${d.arr.length + d.dep.length}</b><span>Hoy</span></div></div>
         ${horas.length ? `<div class="card"><b style="font-size:14px">Movimientos por hora</b><div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">${horas.map(h => `<div style="flex:1;text-align:center"><div style="height:${Math.round(porHora[h] / pico * 56) + 4}px;background:var(--g-accent);border-radius:4px 4px 0 0"></div><div class="tiny muted">${h}</div></div>`).join('')}</div>
           <p class="muted tiny" style="margin:8px 0 0">El barrio está bajo la traza de aproximación: así se ve cuándo hay más movimiento.</p></div>` : ''}
@@ -961,7 +1028,12 @@ R.vuelos = {
       ${sec('Cuando pasa un avión')}
       ${superficie({ a:'avion-aviso', icon:'send', color:Avion.encendido() ? 'ok' : 'accent', t:Avion.encendido() ? 'Avisarme: está activado' : 'Avisarme: está apagado',
         s:'Cruza un avión por la pantalla cuando uno sobrevuela el barrio' })}
-      <p class="muted tiny">Los que llegan pasan por el barrio unos minutos antes de aterrizar y los que salen, al ratito de despegar. ${Store.s.config.vuelosProxy ? 'Con el Worker configurado se avisa con el avión real.' : 'Se calcula con el horario del tablero.'}</p>
+      <details class="card plana small como-funciona"><summary><b>${I('info')} ¿Cómo sabe la app que pasa un avión?</b></summary>
+        <p>No hay radar: en Tierra del Fuego no hay receptores públicos de aviones (se probaron OpenSky, adsb.lol, adsb.fi y el mapa de Flightradar24, y sobre Ushuaia no devuelven ningún avión; Flightradar24 además no deja que otra página lea sus datos). Lo más cercano a tiempo real es el tablero del aeropuerto:</p>
+        <p>· <b>Llegadas:</b> el avión cruza el barrio unos 3 minutos antes de aterrizar. La app usa la hora <b>estimada</b> del aeropuerto, que se corrige si viene demorado o adelantado.<br>
+           · <b>Salidas:</b> en cuanto el aeropuerto lo marca <b>Despegado</b>, cruza el avión; si todavía no lo marcó, se guía por la hora estimada.<br>
+           · El tablero se vuelve a leer cada 2 minutos cuando hay un vuelo cerca y cada 5 el resto del día.</p>
+        <p>${Store.s.config.vuelosProxy ? 'Hay un Worker configurado: si algún día aparece un receptor en la zona, se usa el avión real.' : 'Si algún día hay un receptor ADS-B en la zona, se puede conectar con un Worker (Ajustes → Aviones en vivo) y el aviso pasa a ser con el avión real.'}</p></details>
       ${sec('Ver en el sitio oficial')}
       ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/arribos-USH', icon:'login', color:'accent', t:'Arribos a Ushuaia', s:'Tablero del aeropuerto · horarios y estado' })}
       ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/partidas-USH', icon:'logout', color:'accent', t:'Partidas de Ushuaia', s:'Tablero del aeropuerto' })}
@@ -995,19 +1067,19 @@ R.perfil = {
       <form data-f="perfil" class="card">
         <div class="field"><label>Teléfono / WhatsApp</label><input name="tel" id="pfTel" value="${esc(u.tel || '')}" inputmode="tel" maxlength="20"></div>
         <div class="field"><label>Oficios o servicios que ofrecés</label><input name="skills" id="pfSkills" value="${esc(u.skills || '')}" maxlength="120" placeholder="Ej: electricista, clases de inglés"></div>
-        <label class="check"><input type="checkbox" name="mostrarTel" ${u.mostrarTel ? 'checked' : ''}><span>Aparecer en "Oficios de vecinos" con mi WhatsApp</span></label>
+        <label class="check"><input type="checkbox" name="mostrarTel" ${u.mostrarTel ? 'checked' : ''}><span>Publicar mi oficio en <b>Profesionales y oficios</b> (Ushuaia y servicios) con mi WhatsApp</span></label>
         <label class="check"><input type="checkbox" name="respondedor" ${u.respondedor ? 'checked' : ''}><span><b>Sé primeros auxilios / RCP o soy del equipo de salud.</b> Avisame si un vecino pide ayuda médica con el SOS.</span></label>
         <hr class="sep"><div class="lbl">Directorio de vecinos</div>
         <div class="grid2"><div class="field"><label>Profesión</label><input name="profesion" id="pfProf" value="${esc(u.profesion || '')}" maxlength="60" placeholder="Médica, abogado, docente…"></div>
           <div class="field"><label>Dirección dentro del barrio</label><input name="direccion" id="pfDir" value="${esc(u.direccion || '')}" maxlength="60" placeholder="Calle 3 N° 42"></div></div>
         <div class="field"><label>Ubicación exacta (para "Cómo llegar")</label><div class="linea-form"><input name="ubicacion" id="pfUbi" value="${esc(u.ubicacion || '')}" placeholder="-54.8195,-68.3790"><button type="button" class="btn btn-sec" data-a="mi-ubicacion" title="Usar mi ubicación actual">${I('pin')}</button></div><div class="ayuda">Tocá el pin estando en tu casa.</div></div>
-        <label class="check"><input type="checkbox" name="enDirectorio" ${u.enDirectorio ? 'checked' : ''}><span>Mostrar a los vecinos mi profesión, teléfono y dirección en el buscador</span></label>
+        <label class="check"><input type="checkbox" name="enDirectorio" ${u.enDirectorio ? 'checked' : ''}><span>Publicar mi profesión en <b>Profesionales y oficios</b> (Ushuaia y servicios) y mostrar mi teléfono y dirección en el buscador, para que me puedan contactar</span></label>
         <div class="field" style="margin-top:10px"><label>Quiénes viven en la casa</label><input name="integrantes" id="pfInt" value="${esc(u.integrantes || '')}" maxlength="160"></div>
         <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
       ${sec('Vehículos', `<button class="link" data-a="nuevo-vehiculo">Sumar</button>`)}
       <div class="card lista">${(u.vehiculos || []).length ? u.vehiculos.map((v, i) => `<div class="it">${I('car')}<div class="txt"><b class="mono">${esc(v.patente)}</b><span>${esc(v.modelo || '')}</span></div><button class="icon-btn" data-a="borrar-vehiculo" data-v="${i}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">La guardia reconoce tus patentes al instante.</p>'}</div>
       ${sec('Mascotas', `<button class="link" data-a="nueva-mascota">Sumar</button>`)}
-      <div class="card lista">${(u.mascotas || []).length ? u.mascotas.map(m => `<div class="it">${m.foto ? fotoHTML(m.foto, 'mini-foto') : I('paw')}<div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.desc || '')}</span></div><button class="icon-btn" data-a="borrar-mascota" data-v="${m.id}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">Si se pierde, la avisás a todo el barrio con un toque.</p>'}</div>
+      <div class="card lista">${(u.mascotas || []).length ? u.mascotas.map(m => `<div class="it">${m.foto ? fotoHTML(m.foto, 'mini-foto') : I('paw')}<div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.desc || '')}${m.foto ? '' : ' · sin foto'}</span></div><button class="icon-btn" data-a="editar-mascota" data-v="${m.id}" aria-label="Editar o sumar foto">${I(m.foto ? 'edit' : 'camera')}</button><button class="icon-btn" data-a="borrar-mascota" data-v="${m.id}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">Si se pierde, la avisás a todo el barrio con un toque.</p>'}</div>
       ${Store.s.infracciones.some(i => i.casa === u.casa) ? superficie({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones de la Administración', s:'Infracciones y descargos de tu casa' }) : ''}
       ${sec('Guardia')}
       ${superficie({ a:'abrir', v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas y con historial' })}
@@ -1047,7 +1119,30 @@ F['vehiculo'] = d => { const u = yo(); Store.cambiar(s => { const x = s.users.fi
 A['borrar-vehiculo'] = el => { const u = yo(); Store.cambiar(s => s.users.find(z => z.id === u.id).vehiculos.splice(+el.dataset.v, 1)); };
 A['nueva-mascota'] = () => hoja('Sumar mascota', `<form data-f="mascota"><div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="30"></div><div class="field"><label>Especie</label><input name="especie" maxlength="20" placeholder="Perro, gata…"></div></div>
   <div class="field"><label>Cómo es</label><input name="desc" maxlength="120" placeholder="Color, tamaño, collar"></div>${campoFoto('fotoMasc')}<button class="btn btn-pri btn-block">Sumar</button></form>`);
-F['mascota'] = d => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); (x.mascotas = x.mascotas || []).push({ id:uid(), nombre:d.nombre.trim(), especie:d.especie.trim(), desc:d.desc.trim(), foto:leerFoto(d.foto) }); }); cerrarHoja(); };
+/* La foto de la mascota: la grande queda en este equipo; a la base va una
+   de 320 px (unos 20 KB) que los vecinos bajan solo si la tocan. */
+async function compartirFotoMascota(mid){
+  const u = yo(), m = (u.mascotas || []).find(x => x.id === mid);
+  if (!m || !m.foto || !m.foto.fotoId || typeof Nube === 'undefined' || !Nube.activa()) return;
+  if (await Nube.compartirFoto(m.foto.fotoId, 320))
+    Store.cambiar(s => { const x = s.users.find(z => z.id === u.id), mm = (x?.mascotas || []).find(z => z.id === mid); if (mm && mm.foto) mm.foto.nube = true; });
+}
+F['mascota'] = (d, form) => {
+  const u = yo(), mid = form?.dataset?.id || '', foto = leerFoto(d.foto);
+  const id = mid || uid();
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.mascotas = x.mascotas || [];
+    const ya = x.mascotas.find(m => m.id === id);
+    if (ya){ Object.assign(ya, { nombre:d.nombre.trim(), especie:d.especie.trim(), desc:d.desc.trim() }); if (foto){ if (ya.foto?.fotoId) Fotos.borrar(ya.foto.fotoId); ya.foto = foto; } }
+    else x.mascotas.push({ id, nombre:d.nombre.trim(), especie:d.especie.trim(), desc:d.desc.trim(), foto }); });
+  cerrarHoja();
+  if (foto) setTimeout(() => compartirFotoMascota(id), 300);
+};
+A['editar-mascota'] = el => {
+  const m = (yo().mascotas || []).find(x => x.id === el.dataset.v); if (!m) return;
+  hoja(`Editar a ${m.nombre}`, `<form data-f="mascota" data-id="${m.id}"><div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="30" value="${esc(m.nombre)}"></div><div class="field"><label>Especie</label><input name="especie" maxlength="20" value="${esc(m.especie || '')}"></div></div>
+    <div class="field"><label>Cómo es</label><input name="desc" maxlength="120" value="${esc(m.desc || '')}"></div>${campoFoto('fotoMasc', m.foto ? 'Cambiar la foto' : 'Sumar una foto')}
+    <button class="btn btn-pri btn-block">Guardar</button></form>`);
+};
 A['borrar-mascota'] = el => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.mascotas = x.mascotas.filter(m => m.id !== el.dataset.v); }); };
 A['pedir-notifs'] = async () => { try { const r = await Notification.requestPermission(); toast(r === 'granted' ? 'Avisos activados' : 'No se activaron', 'bell'); refrescar(); } catch(e){} };
 A['sonido'] = el => { setTimeout(() => { Store.sesion.sinSonido = !el.checked; Store.guardarSesion(); }, 0); return true; };

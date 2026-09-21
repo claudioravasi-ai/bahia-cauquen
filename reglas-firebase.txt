@@ -63,7 +63,13 @@ PEGAR DESDE ACÁ
     "barrio": {
       "publico": {
         ".read": true,
-        "instalado": { ".write": "!data.exists() || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" }
+        "instalado": { ".write": "!data.exists() || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+        /* A dónde se piden los correos (la URL del Apps Script y su frase).
+           Tiene que poder leerlo quien TODAVÍA no está aprobado: si no, el
+           mail de "recibimos tu inscripción" y el aviso a la Administración
+           no salen nunca. La frase no es un secreto fuerte (ver Codigo.gs):
+           las defensas son el tope diario y el registro de envíos. */
+        "correo": { ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" }
       },
 
       "users": {
@@ -75,6 +81,13 @@ PEGAR DESDE ACÁ
             ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
           }
         }
+      },
+
+      /* Quién tiene la app abierta ahora (el contador del encabezado). Cada
+         uno escribe solo lo suyo; lo leen los vecinos aprobados. */
+      "presencia": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+        "$uid": { ".write": "auth.uid === $uid" }
       },
 
       "fotosCasa": {

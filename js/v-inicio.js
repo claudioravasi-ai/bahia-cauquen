@@ -61,10 +61,12 @@ function tarjetaPase(p, { garita = false } = {}){
     <span class="estado e-${est}">${ESTADO_TXT[est]}</span></div>
     <div class="btns" style="margin-top:10px">
       ${garita ? (est === 'esperado' || est === 'vencido' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>` : est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="pase-out" data-id="${p.id}">${I('logout')}Salió</button>` : '')
-        : `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>
-           <button class="btn btn-sm btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar</button>
-           ${est === 'esperado' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}">${I('x')}</button>` : ''}`}
-    </div></div>`;
+        : `${est === 'esperado' || est === 'futuro' || est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>
+           <button class="btn btn-sm btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar</button>` : ''}
+           <button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>
+           ${est === 'esperado' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase">${I('x')}</button>` : ''}
+           <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button>`}
+    </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} El vecino la sacó de su lista ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
 }
 
 /* ---------- avisos urgentes del inicio ---------- */
@@ -82,8 +84,6 @@ function urgentesVecino(){
     `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">${I('check')}Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)));
   const paq = s.paquetes.filter(p => p.hostId === u.id && !p.retirado);
   if (paq.length) out.push(aviso('brand', 'box', `Tenés ${plural(paq.length, 'paquete')} en la garita`, paq.map(p => esc(p.empresa)).join(', ')));
-  Clima.alertas().forEach(a => out.push(aviso(a.nivel, a.icon, a.t, a.x)));
-  const rec = recoleccionAviso(); if (rec) out.push(rec);
   s.reservas.filter(r => r.userId === u.id && (r.fecha === hoy || r.fecha === sumarDias(hoy, 1)) && !r.cancelada).forEach(r => {
     const a = amenity(r.amenity); if (!a) return;
     out.push(aviso('ok', a.icon, `${r.fecha === hoy ? 'Hoy' : 'Mañana'} tenés el ${a.nombre}`, `${a.franjas[r.franja]?.join(' a ') || ''} h${r.invitados ? ' · ' + plural(+r.invitados, 'invitado') : ''}`));
@@ -92,12 +92,12 @@ function urgentesVecino(){
   if (v) out.push(aviso('info', 'vote', 'Votación abierta', esc(v.titulo), `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="votaciones">Votar</button>`));
   return out;
 }
-function recoleccionAviso(){
+function recoleccionHoy(){
   const c = Store.s.config, h = new Date(), hoy = h.getDay(), man = (hoy + 1) % 7;
   const vol = volsProximos().find(v => v.fecha === hoyISO() || v.fecha === sumarDias(hoyISO(), 1));
-  if (vol) return aviso('warn', 'truck', `${vol.fecha === hoyISO() ? 'Hoy' : 'Mañana'} pasan por los voluminosos`, esc(vol.detalle || c.voluminososDetalle));
-  if (c.recoleccion[hoy] && ahoraMin() < minutosDe(c.recoleccionHora)) return aviso('info', 'truck', `Hoy pasa el camión: ${esc(c.recoleccion[hoy])}`, `Alrededor de las ${c.recoleccionHora} h.`);
-  if (c.recoleccion[man] && h.getHours() >= 17) return aviso('info', 'truck', `Mañana pasa el camión: ${esc(c.recoleccion[man])}`, 'Sacá la bolsa esta noche, en el canasto cerrado.');
+  if (vol) return { vol:true, t:`${vol.fecha === hoyISO() ? 'Hoy' : 'Mañana'} pasan por los voluminosos`, x:vol.detalle || c.voluminososDetalle };
+  if (c.recoleccion[hoy] && ahoraMin() < minutosDe(c.recoleccionHora)) return { t:`Hoy pasa el camión: ${c.recoleccion[hoy]}`, x:`Alrededor de las ${c.recoleccionHora} h.` };
+  if (c.recoleccion[man] && h.getHours() >= 17) return { t:`Mañana pasa el camión: ${c.recoleccion[man]}`, x:'Sacá la bolsa esta noche, en el canasto cerrado.' };
   return null;
 }
 
@@ -117,7 +117,7 @@ function recoleccionAviso(){
 /* =========================================================
    LAS ILUSTRACIONES DE LAS SECCIONES
    Cada puerta de la portada es una ventana con un dibujo: una casa para
-   "Tu casa", la foto del barrio para "El barrio" y la bahía de Ushuaia
+   "Tu casa", un barrio soleado y colorido para "El barrio" y la bahía de Ushuaia
    (el faro, el crucero, el avión) para "Ushuaia y servicios". Van como
    SVG dentro del código: no pesan, no dependen de internet y se ven
    nítidos en cualquier pantalla.
@@ -126,7 +126,8 @@ function recoleccionAviso(){
    ========================================================= */
 const ARTE = {
   casa: { svg:`<svg class="arte-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="acC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fbad6"/><stop offset=".8" stop-color="#d9eff0"/></linearGradient><linearGradient id="acT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d98a45"/><stop offset="1" stop-color="#a55a26"/></linearGradient></defs><rect width="400" height="240" fill="url(#acC)"/><circle cx="330" cy="52" r="32" fill="#fff6d1" opacity=".35"/><circle cx="330" cy="52" r="19" fill="#fff6d1"/><path d="M-10 150 L60 78 L100 112 L170 48 L235 118 L285 84 L410 160 V240 H-10Z" fill="#5f8fa3"/><path d="M170 48 L150 68 L162 66 L171 76 L181 64 L192 70Z M60 78 L46 92 L57 90 L63 97 L72 89Z M285 84 L272 96 L282 95 L289 101 L297 94Z" fill="#fff"/><path d="M-10 172 Q90 146 200 164 T410 160 V240 H-10Z" fill="#4c8f6e"/><path d="M-10 202 Q140 180 410 198 V240 H-10Z" fill="#2f6e55"/><g fill="#24574a"><path d="M52 202 L70 146 L88 202Z"/><path d="M28 206 L46 164 L64 206Z" opacity=".85"/><path d="M322 200 L342 136 L362 200Z"/><path d="M352 206 L368 160 L384 206Z" opacity=".85"/></g><rect x="236" y="96" width="14" height="36" rx="2" fill="#6b4636"/><g fill="#fff" opacity=".75"><circle cx="243" cy="85" r="6"/><circle cx="252" cy="72" r="8"/><circle cx="264" cy="57" r="10"/></g><rect x="146" y="138" width="112" height="70" fill="url(#acT)"/><path d="M146 152H258M146 166H258M146 180H258M146 194H258" stroke="#7d421b" stroke-opacity=".35" stroke-width="2"/><path d="M132 144 L202 88 L272 144Z" fill="#b23a2e"/><path d="M132 144 L202 88 L272 144" fill="none" stroke="#fff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="202" cy="120" r="9" fill="#ffd97a" stroke="#8a4b22" stroke-width="2"/><rect x="158" y="154" width="26" height="22" rx="2" fill="#ffd97a"/><rect x="220" y="154" width="26" height="22" rx="2" fill="#ffd97a"/><path d="M171 154v22M158 165h26M233 154v22M220 165h26" stroke="#8a4b22" stroke-width="2"/><rect x="190" y="166" width="24" height="42" rx="3" fill="#5a331c"/><circle cx="208" cy="188" r="2.2" fill="#f2c14e"/><rect x="140" y="206" width="124" height="5" rx="2" fill="#5b3b2a"/><path d="M194 211 L180 240 H224 L210 211Z" fill="#d9c9a8" opacity=".85"/></svg>` },
-  comunidad: { foto:'img/portada-dia.jpg' },
+  /* El barrio dibujado: casas de colores, sol, lupinos y el Martial nevado. */
+  comunidad: { svg:`<svg class="arte-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="abC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4fb3ea"/><stop offset=".75" stop-color="#bfe8fb"/></linearGradient><radialGradient id="abS" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff7c2"/><stop offset=".55" stop-color="#ffd84d"/><stop offset="1" stop-color="#ffd84d" stop-opacity="0"/></radialGradient><linearGradient id="abP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd16a"/><stop offset="1" stop-color="#5eb14f"/></linearGradient></defs><rect width="400" height="240" fill="url(#abC)"/><circle cx="62" cy="50" r="46" fill="url(#abS)"/><circle cx="62" cy="50" r="20" fill="#ffe066"/><g stroke="#ffd84d" stroke-width="3" stroke-linecap="round"><path d="M90.0 50.0 L100.0 50.0"/><path d="M81.8 69.8 L88.9 76.9"/><path d="M62.0 78.0 L62.0 88.0"/><path d="M42.2 69.8 L35.2 76.9"/><path d="M34.0 50.0 L24.0 50.1"/><path d="M42.2 30.2 L35.1 23.2"/><path d="M61.9 22.0 L61.9 12.0"/><path d="M81.7 30.1 L88.8 23.1"/></g><g fill="#fff" opacity=".92"><ellipse cx="250" cy="40" rx="30" ry="10"/><ellipse cx="270" cy="33" rx="18" ry="11"/><ellipse cx="236" cy="35" rx="14" ry="8"/><ellipse cx="350" cy="62" rx="24" ry="8"/><ellipse cx="364" cy="56" rx="13" ry="8"/></g><path d="M-10 128 L50 78 L88 104 L140 56 L190 98 L236 66 L290 108 L338 70 L410 118 V150 H-10Z" fill="#7aa6c2"/><path d="M140 56 L124 72 L135 70 L142 78 L150 70 L160 74Z M236 66 L222 80 L232 78 L238 85 L246 77 L254 80Z M338 70 L326 82 L335 81 L341 87 L348 80Z M50 78 L40 88 L48 87 L53 92 L60 86Z" fill="#fff"/><path d="M-10 150 Q60 118 150 134 T300 126 T410 134 V240 H-10Z" fill="url(#abP)"/><path d="M-10 176 Q120 150 230 166 T410 160 V240 H-10Z" fill="#4fa84a"/><path d="M180 240 C190 214 150 200 186 184 C214 172 250 170 262 160" fill="none" stroke="#e9d7ae" stroke-width="16" stroke-linecap="round"/><path d="M180 240 C190 214 150 200 186 184 C214 172 250 170 262 160" fill="none" stroke="#fff" stroke-width="1.6" stroke-dasharray="6 6" opacity=".8"/><path d="M20 126.6 L29.9 150 L10.1 150Z" fill="#2e7d4f"/><rect x="18.6" y="150" width="2.9" height="4.5" fill="#6b4636"/><path d="M34 121.4 L46.1 150 L21.9 150Z" fill="#2e7d4f"/><rect x="32.2" y="150" width="3.5" height="5.5" fill="#6b4636"/><path d="M372 120 L383 146 L361 146Z" fill="#2e7d4f"/><rect x="370.4" y="146" width="3.2" height="5.0" fill="#6b4636"/><path d="M388 123.9 L397.35 146 L378.65 146Z" fill="#2e7d4f"/><rect x="386.6" y="146" width="2.7" height="4.2" fill="#6b4636"/><path d="M120 131.8 L127.7 150 L112.3 150Z" fill="#2e7d4f"/><rect x="118.9" y="150" width="2.2" height="3.5" fill="#6b4636"/><path d="M300 126.5 L308.25 146 L291.75 146Z" fill="#2e7d4f"/><rect x="298.8" y="146" width="2.4" height="3.8" fill="#6b4636"/><rect x="96" y="134" width="30" height="20" fill="#ff8a5b"/><path d="M91 134 L111.0 121.6 L131 134Z" fill="#c0392b"/><rect x="100.2" y="138.4" width="6.6" height="6.6" rx="1.5" fill="#fff3b0"/><rect x="115.2" y="138.4" width="6.6" height="6.6" rx="1.5" fill="#fff3b0"/><rect x="108.3" y="144.0" width="5.4" height="10.0" rx="1.5" fill="#5a331c"/><rect x="212" y="128" width="28" height="19" fill="#ffd166"/><path d="M207 128 L226.0 116.22 L245 128Z" fill="#3a86ff"/><rect x="215.9" y="132.2" width="6.2" height="6.2" rx="1.5" fill="#fff3b0"/><rect x="229.9" y="132.2" width="6.2" height="6.2" rx="1.5" fill="#fff3b0"/><rect x="223.5" y="137.5" width="5.0" height="9.5" rx="1.5" fill="#5a331c"/><rect x="300" y="132" width="30" height="20" fill="#8ecae6"/><path d="M295 132 L315.0 119.6 L335 132Z" fill="#e76f51"/><rect x="304.2" y="136.4" width="6.6" height="6.6" rx="1.5" fill="#fff3b0"/><rect x="319.2" y="136.4" width="6.6" height="6.6" rx="1.5" fill="#fff3b0"/><rect x="312.3" y="142.0" width="5.4" height="10.0" rx="1.5" fill="#5a331c"/><rect x="30" y="178" width="46" height="32" fill="#f4a261"/><path d="M25 178 L53.0 158.16 L81 178Z" fill="#9b2226"/><rect x="36.4" y="185.0" width="10.1" height="10.1" rx="1.5" fill="#fff3b0"/><rect x="59.4" y="185.0" width="10.1" height="10.1" rx="1.5" fill="#fff3b0"/><rect x="48.9" y="194.0" width="8.3" height="16.0" rx="1.5" fill="#5a331c"/><rect x="110" y="190" width="40" height="28" fill="#a8dadc"/><path d="M105 190 L130.0 172.64 L155 190Z" fill="#6a4c93"/><rect x="115.6" y="196.2" width="8.8" height="8.8" rx="1.5" fill="#fff3b0"/><rect x="135.6" y="196.2" width="8.8" height="8.8" rx="1.5" fill="#fff3b0"/><rect x="126.4" y="204.0" width="7.2" height="14.0" rx="1.5" fill="#5a331c"/><rect x="262" y="182" width="46" height="32" fill="#ffb4c6"/><path d="M257 182 L285.0 162.16 L313 182Z" fill="#2a9d8f"/><rect x="268.4" y="189.0" width="10.1" height="10.1" rx="1.5" fill="#fff3b0"/><rect x="291.4" y="189.0" width="10.1" height="10.1" rx="1.5" fill="#fff3b0"/><rect x="280.9" y="198.0" width="8.3" height="16.0" rx="1.5" fill="#5a331c"/><rect x="334" y="196" width="42" height="30" fill="#ffe29a"/><path d="M329 196 L355.0 177.4 L381 196Z" fill="#d62828"/><rect x="339.9" y="202.6" width="9.2" height="9.2" rx="1.5" fill="#fff3b0"/><rect x="360.9" y="202.6" width="9.2" height="9.2" rx="1.5" fill="#fff3b0"/><rect x="351.2" y="211.0" width="7.6" height="15.0" rx="1.5" fill="#5a331c"/><rect x="58" y="150" width="6" height="14" fill="#6b4636"/><g fill="#fff" opacity=".8"><circle cx="61" cy="144" r="4"/><circle cx="66" cy="136" r="5"/></g><rect x="90.2" y="208.0" width="3.6" height="12.0" fill="#7a5236"/><circle cx="92" cy="202.0" r="10.0" fill="#43a047"/><circle cx="98.0" cy="206.0" r="7.0" fill="#43a047"/><circle cx="86.0" cy="207.0" r="6.5" fill="#43a047"/><rect x="236.0" y="201.6" width="4.0" height="13.2" fill="#7a5236"/><circle cx="238" cy="195.0" r="11.0" fill="#66bb6a"/><circle cx="244.6" cy="199.4" r="7.7" fill="#66bb6a"/><circle cx="231.4" cy="200.5" r="7.2" fill="#66bb6a"/><rect x="316.4" y="222.4" width="3.2" height="10.8" fill="#7a5236"/><circle cx="318" cy="217.0" r="9.0" fill="#43a047"/><circle cx="323.4" cy="220.6" r="6.3" fill="#43a047"/><circle cx="312.6" cy="221.5" r="5.9" fill="#43a047"/><rect x="10.2" y="222.0" width="3.6" height="12.0" fill="#7a5236"/><circle cx="12" cy="216.0" r="10.0" fill="#66bb6a"/><circle cx="18.0" cy="220.0" r="7.0" fill="#66bb6a"/><circle cx="6.0" cy="221.0" r="6.5" fill="#66bb6a"/><rect x="390.6" y="228.8" width="2.9" height="9.6" fill="#7a5236"/><circle cx="392" cy="224.0" r="8.0" fill="#43a047"/><circle cx="396.8" cy="227.2" r="5.6" fill="#43a047"/><circle cx="387.2" cy="228.0" r="5.2" fill="#43a047"/><path d="M129.5 226.1 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="129.5" cy="213.1" rx="2.6" ry="6" fill="#7b4fd6"/><path d="M211.8 225.0 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="211.8" cy="212.0" rx="2.6" ry="6" fill="#b061d9"/><path d="M214.4 229.1 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="214.4" cy="216.1" rx="2.6" ry="6" fill="#e36fb4"/><path d="M155.5 231.1 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="155.5" cy="218.1" rx="2.6" ry="6" fill="#5c6ee0"/><path d="M15.0 230.1 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="15.0" cy="217.1" rx="2.6" ry="6" fill="#7b4fd6"/><path d="M156.6 225.3 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="156.6" cy="212.3" rx="2.6" ry="6" fill="#b061d9"/><path d="M169.8 235.6 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="169.8" cy="222.6" rx="2.6" ry="6" fill="#e36fb4"/><path d="M161.8 227.1 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="161.8" cy="214.1" rx="2.6" ry="6" fill="#5c6ee0"/><path d="M251.0 237.3 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="251.0" cy="224.3" rx="2.6" ry="6" fill="#7b4fd6"/><path d="M204.8 229.6 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="204.8" cy="216.6" rx="2.6" ry="6" fill="#b061d9"/><path d="M390.5 224.7 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="390.5" cy="211.7" rx="2.6" ry="6" fill="#e36fb4"/><path d="M231.6 228.1 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="231.6" cy="215.1" rx="2.6" ry="6" fill="#5c6ee0"/><path d="M57.7 225.6 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="57.7" cy="212.6" rx="2.6" ry="6" fill="#7b4fd6"/><path d="M179.3 235.4 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="179.3" cy="222.4" rx="2.6" ry="6" fill="#b061d9"/><path d="M72.3 232.1 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="72.3" cy="219.1" rx="2.6" ry="6" fill="#e36fb4"/><path d="M210.7 229.2 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="210.7" cy="216.2" rx="2.6" ry="6" fill="#5c6ee0"/><path d="M219.1 224.9 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="219.1" cy="211.9" rx="2.6" ry="6" fill="#7b4fd6"/><path d="M155.7 226.9 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="155.7" cy="213.9" rx="2.6" ry="6" fill="#b061d9"/><path d="M272.2 230.0 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="272.2" cy="217.0" rx="2.6" ry="6" fill="#e36fb4"/><path d="M179.8 232.2 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="179.8" cy="219.2" rx="2.6" ry="6" fill="#5c6ee0"/><path d="M181.3 228.2 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="181.3" cy="215.2" rx="2.6" ry="6" fill="#7b4fd6"/><path d="M225.5 233.8 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="225.5" cy="220.8" rx="2.6" ry="6" fill="#b061d9"/><path d="M97.6 232.0 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="97.6" cy="219.0" rx="2.6" ry="6" fill="#e36fb4"/><path d="M199.9 236.3 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="199.9" cy="223.3" rx="2.6" ry="6" fill="#5c6ee0"/><path d="M291.8 228.0 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="291.8" cy="215.0" rx="2.6" ry="6" fill="#7b4fd6"/><path d="M243.1 225.7 v-9" stroke="#3f7d4a" stroke-width="1.4"/><ellipse cx="243.1" cy="212.7" rx="2.6" ry="6" fill="#b061d9"/><g stroke="#fff" stroke-width="2" opacity=".85"><path d="M0 222 H70 M0 230 H70"/><path d="M4 216 V234"/><path d="M14 216 V234"/><path d="M24 216 V234"/><path d="M34 216 V234"/><path d="M44 216 V234"/><path d="M54 216 V234"/><path d="M64 216 V234"/></g><g fill="none" stroke="#2b3a55" stroke-width="1.8" stroke-linecap="round"><path d="M150 44 q6 -6 12 0 q6 -6 12 0"/><path d="M180 30 q4 -4 8 0 q4 -4 8 0"/></g></svg>` },
   ciudad: { svg:`<svg class="arte-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="auC" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3f7e"/><stop offset=".55" stop-color="#d9775f"/><stop offset="1" stop-color="#f3c77e"/></linearGradient><linearGradient id="auA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d5f80"/><stop offset="1" stop-color="#15344c"/></linearGradient></defs><rect width="400" height="240" fill="url(#auC)"/><circle cx="300" cy="120" r="26" fill="#ffdca0" opacity=".8"/><path d="M40 58 L150 40" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-dasharray="6 5"/><g transform="translate(150 38) rotate(-9)"><path d="M0 0 L26 -1 C31 -1 33 1 33 2 C33 3 31 4 26 4 L0 4Z" fill="#fff"/><path d="M12 1 L4 -9 L9 -9 L19 1Z M12 3 L5 12 L10 12 L19 3Z M1 1 L-3 -5 L1 -5 L5 1Z" fill="#fff"/></g><path d="M-10 156 L30 112 L55 128 L92 66 L116 102 L140 82 L170 120 L206 60 L236 100 L262 86 L300 128 L340 90 L410 140 V175 H-10Z" fill="#4b3f6d"/><path d="M92 66 L80 84 L90 80 L96 88 L104 79Z M206 60 L193 79 L203 76 L210 84 L218 74Z M340 90 L329 104 L338 102 L344 108 L351 101Z M140 82 L133 92 L141 90 L146 95Z" fill="#fff"/><path d="M-10 168 L50 140 L110 156 L170 138 L240 158 L300 142 L410 162 V178 H-10Z" fill="#372f57"/><rect x="6" y="161" width="11" height="9" fill="#e63946"/><path d="M5 161 L11.5 156 L18 161Z" fill="#3b2f4f"/><rect x="18" y="158" width="15" height="12" fill="#f4a261"/><path d="M17 158 L25.5 153 L34 158Z" fill="#3b2f4f"/><rect x="21" y="162" width="3" height="3" fill="#ffe7a3"/><rect x="34" y="161" width="13" height="9" fill="#e76f51"/><path d="M33 161 L40.5 156 L48 161Z" fill="#3b2f4f"/><rect x="37" y="165" width="3" height="3" fill="#ffe7a3"/><rect x="51" y="161" width="9" height="9" fill="#f4a261"/><path d="M50 161 L55.5 156 L61 161Z" fill="#3b2f4f"/><rect x="61" y="158" width="15" height="12" fill="#f4a261"/><path d="M60 158 L68.5 153 L77 158Z" fill="#3b2f4f"/><rect x="82" y="158" width="14" height="12" fill="#e76f51"/><path d="M81 158 L89.0 153 L97 158Z" fill="#3b2f4f"/><rect x="100" y="161" width="9" height="9" fill="#e76f51"/><path d="M99 161 L104.5 156 L110 161Z" fill="#3b2f4f"/><rect x="111" y="159" width="11" height="11" fill="#e9c46a"/><path d="M110 159 L116.5 154 L123 159Z" fill="#3b2f4f"/><rect x="127" y="158" width="11" height="12" fill="#e9c46a"/><path d="M126 158 L132.5 153 L139 158Z" fill="#3b2f4f"/><rect x="130" y="162" width="3" height="3" fill="#ffe7a3"/><rect x="143" y="161" width="14" height="9" fill="#f1faee"/><path d="M142 161 L150.0 156 L158 161Z" fill="#3b2f4f"/><rect x="146" y="165" width="3" height="3" fill="#ffe7a3"/><rect x="163" y="158" width="9" height="12" fill="#e76f51"/><path d="M162 158 L167.5 153 L173 158Z" fill="#3b2f4f"/><rect x="176" y="158" width="14" height="12" fill="#e63946"/><path d="M175 158 L183.0 153 L191 158Z" fill="#3b2f4f"/><rect x="194" y="159" width="13" height="11" fill="#f1faee"/><path d="M193 159 L200.5 154 L208 159Z" fill="#3b2f4f"/><rect x="197" y="163" width="3" height="3" fill="#ffe7a3"/><rect x="209" y="156" width="14" height="14" fill="#2a9d8f"/><path d="M208 156 L216.0 151 L224 156Z" fill="#3b2f4f"/><rect x="212" y="160" width="3" height="3" fill="#ffe7a3"/><rect x="226" y="159" width="13" height="11" fill="#f1faee"/><path d="M225 159 L232.5 154 L240 159Z" fill="#3b2f4f"/><rect x="242" y="162" width="13" height="8" fill="#f4a261"/><path d="M241 162 L248.5 157 L256 162Z" fill="#3b2f4f"/><rect x="257" y="160" width="15" height="10" fill="#e9c46a"/><path d="M256 160 L264.5 155 L273 160Z" fill="#3b2f4f"/><rect x="276" y="157" width="9" height="13" fill="#f4a261"/><path d="M275 157 L280.5 152 L286 157Z" fill="#3b2f4f"/><rect x="290" y="156" width="15" height="14" fill="#f1faee"/><path d="M289 156 L297.5 151 L306 156Z" fill="#3b2f4f"/><rect x="293" y="160" width="3" height="3" fill="#ffe7a3"/><rect x="308" y="159" width="13" height="11" fill="#a8dadc"/><path d="M307 159 L314.5 154 L322 159Z" fill="#3b2f4f"/><rect x="311" y="163" width="3" height="3" fill="#ffe7a3"/><rect x="322" y="159" width="11" height="11" fill="#f4a261"/><path d="M321 159 L327.5 154 L334 159Z" fill="#3b2f4f"/><rect x="325" y="163" width="3" height="3" fill="#ffe7a3"/><rect x="339" y="157" width="11" height="13" fill="#a8dadc"/><path d="M338 157 L344.5 152 L351 157Z" fill="#3b2f4f"/><rect x="342" y="161" width="3" height="3" fill="#ffe7a3"/><rect x="354" y="160" width="14" height="10" fill="#e76f51"/><path d="M353 160 L361.0 155 L369 160Z" fill="#3b2f4f"/><rect x="371" y="158" width="10" height="12" fill="#f4a261"/><path d="M370 158 L376.0 153 L382 158Z" fill="#3b2f4f"/><rect x="374" y="162" width="3" height="3" fill="#ffe7a3"/><rect x="383" y="160" width="15" height="10" fill="#e9c46a"/><path d="M382 160 L390.5 155 L399 160Z" fill="#3b2f4f"/><rect x="0" y="170" width="400" height="70" fill="url(#auA)"/><g stroke="#f3c77e" stroke-opacity=".45" stroke-width="2"><path d="M270 182h60M282 190h36M290 198h22"/></g><path d="M226 200 H330 L318 214 H238Z" fill="#fff"/><rect x="246" y="190" width="62" height="10" rx="2" fill="#f1f1f1"/><rect x="258" y="182" width="36" height="8" rx="2" fill="#e8e8e8"/><rect x="286" y="172" width="9" height="12" fill="#d64545"/><path d="M250 195h54" stroke="#2d5f80" stroke-width="2" stroke-dasharray="3 3"/><ellipse cx="86" cy="222" rx="30" ry="8" fill="#2b2445"/><path d="M78 222 L81 180 H91 L94 222Z" fill="#fff"/><path d="M79.6 206 H92.4 L93 214 H79Z M80.6 190 H91.4 L91.9 198 H80.1Z" fill="#d64545"/><rect x="79" y="174" width="14" height="7" rx="2" fill="#2b2445"/><circle cx="86" cy="177" r="10" fill="#ffe9a8" opacity=".55"/></svg>` },
   gestion: { svg:`<svg class="arte-svg" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="agC" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b3fa0"/><stop offset="1" stop-color="#1c6f73"/></linearGradient></defs><rect width="400" height="240" fill="url(#agC)"/><circle cx="340" cy="30" r="80" fill="#fff" opacity=".06"/><circle cx="40" cy="220" r="70" fill="#fff" opacity=".06"/><rect x="110" y="42" width="130" height="164" rx="12" fill="#fff"/><rect x="128" y="62" width="70" height="9" rx="4" fill="#5b3fa0"/><g fill="#d6d9e4"><rect x="128" y="82" width="94" height="6" rx="3"/><rect x="128" y="96" width="80" height="6" rx="3"/><rect x="128" y="110" width="88" height="6" rx="3"/></g><g fill="#1c9e8f"><rect x="132" y="170" width="14" height="20" rx="2"/><rect x="152" y="156" width="14" height="34" rx="2"/><rect x="172" y="144" width="14" height="46" rx="2"/><rect x="192" y="160" width="14" height="30" rx="2" fill="#f2a541"/></g><circle cx="286" cy="98" r="40" fill="#fff" opacity=".95"/><path d="M286 98 L286 58 A40 40 0 0 1 322 116Z" fill="#f2a541"/><path d="M286 98 L322 116 A40 40 0 0 1 262 130Z" fill="#1c9e8f"/><g><ellipse cx="290" cy="196" rx="26" ry="8" fill="#e0a82e"/><rect x="264" y="178" width="52" height="18" fill="#f2c14e"/><ellipse cx="290" cy="178" rx="26" ry="8" fill="#f7d774"/><ellipse cx="290" cy="170" rx="26" ry="8" fill="#e0a82e"/><rect x="264" y="160" width="52" height="10" fill="#f2c14e"/><ellipse cx="290" cy="160" rx="26" ry="8" fill="#f7d774"/></g></svg>` },
 };
@@ -189,7 +190,7 @@ const SECCIONES = {
         teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votAbiertas ? `${plural(votAbiertas, 'abierta')}` : 'Sin votaciones abiertas', n: votAbiertas || '' }),
         teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:(() => { const h = s.obras.filter(o => o.avisoHoy?.fecha === hoy).length; return h ? `${plural(h, 'aviso')} para hoy` : `${plural(s.obras.filter(o => o.estado === 'activa').length, 'en curso', 'en curso')}`; })(), n: s.obras.filter(o => o.estado === 'activa').length || '' }),
         teja({ v:'viajes', icon:'car', color:'sky', t:'Viajes compartidos', s:'Centro, escuela, aeropuerto', n: s.viajes.filter(v => v.fecha >= hoy).length || '' }),
-        teja({ v:'servicios', icon:'star', color:'wood', t:'Oficios de vecinos', s:'Recomendados por el barrio' }),
+        teja({ v:'servicios', icon:'star', color:'wood', t:'Profesionales y oficios', s:'Vecinos que se pueden contactar' }),
         teja({ v:'mascotas', icon:'paw', color:'ok', t:'Mascotas', s:'Perdidas, encontradas y del barrio' }),
         teja({ v:'compras', icon:'cart', color:'brand', t:'Compras conjuntas', s: compras ? `${plural(compras, 'abierta')}` : 'Leña, gas, lo que sea', n: compras || '' }),
         teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamento', s:'Convivencia, obras, actas' }),
@@ -211,7 +212,8 @@ const SECCIONES = {
       const prox = proximoFeriado();
       return [
         teja({ v:'agenda', icon:'phone', color:'danger', t:'Emergencias y agenda', s:'Bomberos, policía, hospital', destaca:true }),
-        teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
+        teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia hoy', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
+        teja({ v:'servicios', icon:'user', color:'wood', t:'Profesionales y oficios del barrio', s:(() => { const n = s.users.filter(enDirectorioProfesional).length; return n ? `${plural(n, 'vecino', 'vecinos')} para contactar` : 'Médicos, abogados, electricistas…'; })(), n: s.users.filter(enDirectorioProfesional).length || '' }),
         teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: Vuelos.cuantosHoy() || '' }),
         teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
       ].join('');
@@ -347,40 +349,147 @@ const puerta = (k, u, s, hoy) => {
 
 /* =========================================================
    PIZARRA DEL DÍA
-   Todo lo que se anotó para el barrio, lo último primero: los avisos de
-   la guardia y de la Administración, los comunicados, las alertas y las
-   novedades de los vecinos. Se ven los primeros renglones; al tocar uno se
-   lee completo. Lo de compra y venta queda en el pizarrón, para no tapar
-   lo importante.
+   Va arriba de todo en la portada, antes del hotel, en dos columnas:
+     · PARA TODO EL BARRIO: avisos de la guardia y la Administración, los
+       comunicados, las alertas, un SOS abierto, lo nuevo del chat vecinal,
+       las obras en curso, los viajes compartidos, las compras conjuntas,
+       el clima que complica y el camión de mañana. Nadie tiene que acordarse
+       de abrir la campanita o el chat para enterarse.
+     · PARA VOS: lo que es tuyo (alguien pregunta por vos en la garita, un
+       paquete, una votación pendiente, un mensaje, tu propia alerta).
+   Cada aviso es una ventanita con el tono de su importancia, para priorizar
+   de un vistazo:
+     ROJO      importante (alertas, SOS, comunicados, lo urgente),
+     AMARILLO  tener en cuenta (guardia, avisos, obras hoy, perdidos),
+     VERDE     para saber (eventos, viajes, compras, novedades).
+   Mientras no lo viste, TITILA en su tono. Al tocarlo se abre y deja de
+   titilar (en este equipo). El del chat titila hasta leer el último mensaje.
    ========================================================= */
 const TIPOS_PIZARRA = ['guardia', 'aviso', 'alerta', 'evento', 'perdido'];
-function novedadesDelBarrio(){
-  const s = Store.s, hoy = hoyISO();
-  const posts = aLista(s.posts).filter(p => p && (TIPOS_PIZARRA.includes(p.type) || usuario(p.autor)?.rol === 'admin'))
-    .map(p => ({ tipo:'post', id:p.id, at:p.createdAt, p }));
-  const coms = aLista(s.comunicados).filter(c => c && c.para === 'todos' && !c.archivado && (!c.vence || c.vence >= hoy))
-    .map(c => ({ tipo:'com', id:c.id, at:c.at, c }));
-  return [...posts, ...coms].sort((a, b) => b.at - a.at);
-}
+const NIVELES_PZ = { rojo:'Importante', amarillo:'Tener en cuenta', verde:'Para saber' };
+const NIVEL_POST = { alerta:'rojo', guardia:'amarillo', aviso:'amarillo', perdido:'amarillo', evento:'verde' };
+const nivelDeColor = c => c === 'danger' ? 'rojo' : c === 'warn' ? 'amarillo' : 'verde';
+const ORDEN_NIVEL = { rojo:0, amarillo:1, verde:2 };
+/* Los avisos para todos que ya salen por su propio camino en la pizarra
+   (el post, la obra, la compra, el chat) no se repiten. */
+const LINKS_YA_EN_PIZARRA = ['pizarron', 'obras', 'compras', 'viajes', 'chat', 'mascotas'];
+
 const cuandoFue = at => {
   const d = new Date(at), iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const h = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   return iso === hoyISO() ? `Hoy ${h}` : iso === sumarDias(hoyISO(), -1) ? `Ayer ${h}` : `${fechaCorta(iso)} ${h}`;
 };
-function tarjetaNovedad(n, ant){
-  const nueva = ant && n.at > ant;
-  if (n.tipo === 'com'){
-    const c = n.c;
-    return `<button class="novedad n-com ${nueva ? 'nueva' : ''}" data-a="ver-novedad" data-v="com" data-id="${esc(c.id)}">
-      <span class="nov-cab"><span class="pill p-danger">${I(c.tipo === 'reunion' ? 'calendar' : 'tack')}${c.tipo === 'reunion' ? 'Invitación' : 'Comunicado'}</span><time>${cuandoFue(c.at)}</time></span>
-      <b>${esc(c.titulo)}</b><span class="nov-texto">${esc(c.texto || '')}</span>
-      <span class="nov-de">Administración</span></button>`;
+
+/* Lo visto se recuerda por equipo. La primera vez no titila todo lo viejo:
+   solo lo del último día. */
+const Pizarra = {
+  vistos(){
+    const ses = Store.sesion;
+    if (!ses.pzDesde){ ses.pzDesde = Date.now() - DIA; Store.guardarSesion(); }
+    if (!ses.pzVistos || typeof ses.pzVistos !== 'object') ses.pzVistos = {};
+    return ses.pzVistos;
+  },
+  nuevo(k, at){
+    const v = this.vistos();
+    return !v[k] && at > Math.max(Store.sesion.pzDesde || 0, Date.now() - 3 * DIA);
+  },
+  marcar(k){
+    const v = this.vistos(); if (v[k]) return;
+    v[k] = Date.now();
+    const lim = Date.now() - 10 * DIA;
+    Object.keys(v).forEach(x => { if (v[x] < lim) delete v[x]; });
+    Store.guardarSesion();
+    const el = document.querySelector(`.pz[data-k="${CSS.escape(k)}"]`);
+    if (el){ el.classList.remove('titila'); el.querySelector('.pz-nueva')?.remove(); }
+  },
+};
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.pz[data-k]'); if (b) Pizarra.marcar(b.dataset.k); }, true);
+
+function avisosGenerales(){
+  const s = Store.s, u = yo(), hoy = hoyISO(), ahora = Date.now(), out = [];
+  const poner = x => out.push({ nuevo: Pizarra.nuevo(x.k, x.at), ...x });
+  /* Un SOS de otro vecino que sigue abierto. */
+  if (typeof sosEnCampanita === 'function') sosEnCampanita().filter(x => x.userId !== u.id).forEach(x => {
+    const v = usuario(x.userId) || {}, t = TIPOS_SOS[x.tipo] || TIPOS_SOS.otra;
+    poner({ k:'sos-' + x.id, nivel:'rojo', icon:'siren', tag:'SOS', at:x.at, titulo:`${t.nombre} · ${v.casa || ''}`,
+      texto: x.estado === 'resuelta' ? 'Resuelta' : SOS_ESTADO[x.estado] || 'Activa', a:'notifs' });
+  });
+  aLista(s.comunicados).filter(c => c && c.para === 'todos' && !c.archivado && (!c.vence || c.vence >= hoy)).forEach(c =>
+    poner({ k:'com-' + c.id, nivel:'rojo', icon: c.tipo === 'reunion' ? 'calendar' : 'tack', tag: c.tipo === 'reunion' ? 'Invitación' : 'Comunicado',
+      at:c.at, titulo:c.titulo, texto:c.texto, de:'Administración', a:'ver-novedad', v:'com', id:c.id }));
+  aLista(s.posts).filter(p => p && (TIPOS_PIZARRA.includes(p.type) || usuario(p.autor)?.rol === 'admin') && !p.resuelto
+      && (p.fijado || ahora - p.createdAt < 10 * DIA)).forEach(p => {
+    const t = TIPOS_POST[p.type] || TIPOS_POST.aviso, au = autorVisible(p.autor);
+    poner({ k:'post-' + p.id, nivel: NIVEL_POST[p.type] || 'verde', icon:t.icon, tag:t.n, at:p.createdAt, titulo:p.title, texto:p.body,
+      de:`${au.nombre}${au.casa && au.casa !== au.nombre ? ' · ' + au.casa : ''}`, fijo:p.fijado, a:'ver-novedad', v:'post', id:p.id });
+  });
+  /* El chat vecinal: titila hasta que se lee el último mensaje. */
+  const deOtros = aLista(s.msgs).filter(m => m && m.autor !== u.id).sort((a, b) => a.createdAt - b.createdAt);
+  const ult = deOtros.at(-1);
+  if (ult){
+    const sinLeer = deOtros.filter(m => m.createdAt > (Store.sesion.chatVisto || 0));
+    if (sinLeer.length || ahora - ult.createdAt < 12 * HORA){
+      const au = autorVisible(ult.autor);
+      out.push({ k:'chat', nuevo: sinLeer.length > 0, nivel: sinLeer.some(m => m.channel === 'seguridad') ? 'amarillo' : 'verde', icon:'chat',
+        tag:`Chat #${CANALES[ult.channel] || 'General'}`, at:ult.createdAt,
+        titulo: sinLeer.length ? `${plural(sinLeer.length, 'mensaje nuevo', 'mensajes nuevos')} en el chat vecinal` : 'Último mensaje del chat vecinal',
+        texto:`${au.nombre.split(' ')[0]}${au.casa ? ' (' + au.casa + ')' : ''}: ${ult.text}`, a:'abrir', v:'chat', p:ult.channel || 'general' });
+    }
   }
-  const p = n.p, t = TIPOS_POST[p.type] || TIPOS_POST.aviso, a = autorVisible(p.autor);
-  return `<button class="novedad n-${esc(p.type)} ${nueva ? 'nueva' : ''}" data-a="ver-novedad" data-v="post" data-id="${esc(p.id)}">
-    <span class="nov-cab"><span class="pill p-${t.c}">${I(t.icon)}${t.n}</span>${p.fijado ? `<span class="nov-fijo">${I('tack')}</span>` : ''}<time>${cuandoFue(p.createdAt)}</time></span>
-    <b>${esc(p.title)}</b>${p.body ? `<span class="nov-texto">${esc(p.body)}</span>` : ''}
-    <span class="nov-de">${esc(a.nombre)}${a.casa && a.casa !== a.nombre ? ' · ' + esc(a.casa) : ''}</span></button>`;
+  /* Obras en curso: salen solas, y en amarillo si hoy hay movimiento. */
+  aLista(s.obras).filter(o => o && o.estado === 'activa').forEach(o => {
+    const hoyHay = o.avisoHoy && o.avisoHoy.fecha === hoy;
+    poner({ k:'obra-' + o.id + (hoyHay ? '-' + hoy : ''), nivel: hoyHay ? 'amarillo' : 'verde', icon: hoyHay ? 'truck' : 'wrench', tag: hoyHay ? 'Obra hoy' : 'Obra en curso',
+      at: o.ultima || o.createdAt, titulo: hoyHay ? `${o.casa}: ${o.avisoHoy.texto}` : `${o.casa} · ${o.tipo}`,
+      texto: hoyHay ? (o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h` : 'Hoy') : `${ETAPAS[o.etapa] || ''}${o.empresa ? ' · ' + o.empresa : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}`,
+      a:'abrir', v:'obras' });
+  });
+  aLista(s.viajes).filter(v => v && v.fecha >= hoy && v.userId !== u.id).forEach(v => {
+    const au = usuario(v.userId) || {}, libres = v.tipo === 'ofrezco' ? v.lugares - aLista(v.anotados).length : null;
+    poner({ k:'viaje-' + v.id, nivel:'verde', icon:'car', tag:'Viaje compartido', at:v.createdAt || ahora,
+      titulo:`${v.tipo === 'ofrezco' ? 'Llevo' : 'Busco lugar'} → ${v.destino}`, texto:`${relDia(v.fecha)} ${v.hora} h · ${au.casa || ''}${libres !== null ? ' · ' + (libres > 0 ? plural(libres, 'lugar libre', 'lugares libres') : 'completo') : ''}${v.nota ? ' · ' + v.nota : ''}`,
+      a:'abrir', v:'viajes' });
+  });
+  aLista(s.compras).filter(c => c && c.cierra > ahora).forEach(c =>
+    poner({ k:'compra-' + c.id, nivel:'verde', icon:'cart', tag:'Compra conjunta', at:c.createdAt || ahora, titulo:c.titulo,
+      texto:`Cierra ${fechaCorta(isoDe(new Date(c.cierra)))} · ${aLista(c.anotados).reduce((a, x) => a + (+x.cant || 0), 0)} de ${c.meta} ${c.unidad}`, a:'abrir', v:'compras' }));
+  /* El tiempo y el camión: son de todos. */
+  Clima.alertas().forEach(a => poner({ k:'clima-' + hoy + '-' + a.icon, nivel: nivelDeColor(a.nivel), icon:a.icon, tag:'Clima', at: new Date(hoy + 'T06:00').getTime(), titulo:a.t, texto:a.x, a:'abrir', v:'ushuaia' }));
+  const rec = recoleccionHoy();
+  if (rec) poner({ k:'reco-' + hoy + '-' + rec.t, nivel: rec.vol ? 'amarillo' : 'verde', icon:'truck', tag:'Residuos', at: new Date(hoy + 'T07:00').getTime(), titulo:rec.t, texto:rec.x, a:'abrir', v:'recoleccion' });
+  /* Los avisos automáticos para todos que no tienen otro lugar. */
+  noLeidas().filter(n => aLista(n.para).includes('todos') && ahora - n.at < 2 * DIA && !LINKS_YA_EN_PIZARRA.includes(String(n.link || '').split(':')[0]))
+    .forEach(n => out.push({ k:'n-' + n.id, nuevo:true, nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell', tag:'Aviso', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id }));
+  return out.sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || (!!b.fijo - !!a.fijo) || b.at - a.at);
+}
+/* Los avisos que son tuyos y todavía no abriste. */
+function avisosPersonales(){
+  const u = yo();
+  return noLeidas().filter(n => !aLista(n.para).includes('todos'))
+    .map(n => ({ k:'n-' + n.id, nuevo:true, nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell',
+      tag: aLista(n.para).includes(u.id) ? 'Para vos' : 'Para el equipo', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id }))
+    .sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || b.at - a.at);
+}
+const ventanita = x => `<button class="pz nv-${x.nivel} ${x.nuevo ? 'titila' : ''}" data-k="${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
+    <span class="pz-cab"><span class="pz-ic">${I(x.icon)}</span><span class="pz-tag">${esc(x.tag)}</span>${x.fijo ? `<span class="nov-fijo">${I('tack')}</span>` : ''}${x.nuevo ? '<span class="pz-nueva">Nuevo</span>' : ''}<time>${cuandoFue(x.at)}</time></span>
+    <b>${esc(x.titulo)}</b>${x.texto ? `<span class="pz-txt">${esc(x.texto)}</span>` : ''}${x.de ? `<span class="pz-de">${esc(x.de)}</span>` : ''}</button>`;
+
+function pizarraDelDia(){
+  const gen = avisosGenerales(), urg = urgentesVecino(), per = avisosPersonales();
+  const MAX = 8, nuevosGen = gen.filter(x => x.nuevo).length;
+  const mostrar = [...gen.filter(x => x.nuevo || x.nivel === 'rojo'), ...gen.filter(x => !x.nuevo && x.nivel !== 'rojo')].slice(0, MAX);
+  mostrar.sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || b.at - a.at);
+  const colGen = `<div class="pz-col pz-general">
+      <div class="pz-col-cab">${I('muro')}<b>Para todo el barrio</b>${nuevosGen ? `<span class="pill p-brand">${plural(nuevosGen, 'nuevo', 'nuevos')}</span>` : ''}<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button></div>
+      ${mostrar.length ? `<div class="pz-lista">${mostrar.map(ventanita).join('')}</div>` : vacio('muro', 'Hoy no hay avisos para el barrio.')}
+      ${gen.length > MAX ? `<p class="muted tiny" style="margin:8px 2px 0">Y ${plural(gen.length - MAX, 'aviso más', 'avisos más')} en el pizarrón.</p>` : ''}</div>`;
+  const colPer = `<div class="pz-col pz-personal">
+      <div class="pz-col-cab">${I('user')}<b>Para vos</b>${urg.length + per.length ? `<span class="pill p-accent">${urg.length + per.length}</span>` : ''}</div>
+      ${urg.length || per.length ? `<div class="pz-lista una">${urg.join('')}${per.slice(0, 6).map(ventanita).join('')}</div>`
+        : `<div class="pz-nada">${I('check')}<span>No tenés nada pendiente.<small>Lo que sea para vos aparece acá apenas llega.</small></span></div>`}
+      ${per.length > 6 ? `<button class="link" data-a="notifs" style="margin-top:8px">Ver ${plural(per.length - 6, 'aviso más', 'avisos más')}</button>` : ''}</div>`;
+  return `<div class="pz-leyenda">${Object.entries(NIVELES_PZ).map(([k, t]) => `<span class="nv-${k}"><i></i>${t}</span>`).join('')}</div>
+    <div class="pz-dos">${colGen}${colPer}</div>`;
 }
 A['ver-novedad'] = el => {
   const s = Store.s, id = el.dataset.id;
@@ -430,18 +539,6 @@ R.inicio = {
         <div class="v">${dd.snowfall_sum[i] >= 1 ? `❄ ${Math.round(dd.snowfall_sum[i])} cm` : `ráf. ${Math.round(dd.wind_gusts_10m_max[i])}`}</div></div>`; }).join('')}</div>`
       : `<div class="card muted small">${I('cloud')} Cargando el pronóstico…</div>`;
 
-    /* Lo que te pide algo a vos (alguien en la garita, un paquete, tu
-       propia alerta) va arriba de la pizarra, y sólo si hay algo. */
-    const urg = urgentesVecino();
-    const paraVos = urg.length ? `<div class="para-vos">${urg.join('')}</div>` : '';
-
-    const ant = Store.sesion.visitaAnterior || 0;
-    const nov = novedadesDelBarrio();
-    const nuevas = ant ? nov.filter(n => n.at > ant).length : 0;
-    const pizarra = nov.length
-      ? `<div class="pizarra">${nov.slice(0, 6).map(n => tarjetaNovedad(n, ant)).join('')}</div>`
-      : vacio('muro', 'Todavía no hay novedades para el barrio.');
-
     const puertas = ['casa', 'comunidad', 'ciudad', ...(esAdmin() ? ['gestion'] : [])]
       .map(k => puerta(k, u, s, hoy)).join('');
 
@@ -449,8 +546,9 @@ R.inicio = {
        LA PORTADA, DE ARRIBA ABAJO
          1. el saludo y el tiempo de ahora (hero),
          2. los próximos días y la luz del día,
-         3. las propuestas del Hotel Los Cauquenes,
-         4. la pizarra del día: lo último del barrio primero,
+         3. la pizarra del día: lo del barrio y lo tuyo, por color de
+            importancia (va ANTES del hotel: primero lo que importa),
+         4. las propuestas del Hotel Los Cauquenes,
          5. Ushuaia hoy,
          6. por dónde seguir: tres ventanas ilustradas.
        Cada bloque ocupa el ancho entero y reparte su contenido en su
@@ -462,9 +560,8 @@ R.inicio = {
           <div>${sec('Próximos días')}${pron}</div>
           <div>${sec('Luz del día')}${barraLuz(sol)}</div>
         </section>
+        <section class="bloque pizarra-dia">${sec('Pizarra del día')}${pizarraDelDia()}</section>
         <section class="bloque">${tiraPromos()}</section>
-        <section class="bloque">${sec('Pizarra del día', `<span class="sec-extra">${nuevas ? `<span class="pill p-brand">${plural(nuevas, 'nueva', 'nuevas')}</span>` : ''}<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button></span>`)}
-          ${paraVos}${pizarra}</section>
         <section class="bloque">${ushuaiaHoy()}</section>
         <section class="bloque">${sec('Por dónde seguir')}<div class="puertas-arte">${puertas}</div></section>
       </div>`;
@@ -535,7 +632,7 @@ R.visitas = {
   titulo: 'Mis visitas', icon: 'users', color: 'sky', sub: 'Pases con código y QR para la garita',
   render(){
     const u = yo(), s = Store.s, hoy = hoyISO();
-    const mios = s.pases.filter(p => p.hostId === u.id && !p.cancelado);
+    const mios = s.pases.filter(p => p.hostId === u.id && !p.cancelado && !p.borrado);
     const deHoy = mios.filter(p => paseValidoEn(p, hoy) || p.log?.[hoy]);
     const futuros = mios.filter(p => !p.dias?.length && p.fecha > hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
     const fijos = mios.filter(p => p.dias?.length && (p.fechaFin || '') >= hoy);
@@ -548,6 +645,12 @@ R.visitas = {
       ${pedidos.map(r => aviso('info', 'qr', `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}`, `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)).join('')}
       ${sec('Hoy')}${deHoy.length ? deHoy.map(p => tarjetaPase(p)).join('') : vacio('users', 'No anunciaste a nadie para hoy.')}
       ${futuros.length ? sec('Próximas') + futuros.map(p => tarjetaPase(p)).join('') : ''}
+      ${(() => { const idas = s.pases.filter(p => p.hostId === u.id && !p.borrado && !deHoy.includes(p) && !futuros.includes(p) && !fijos.includes(p)
+          && (p.fechaFin || p.fecha) < hoy && (p.fechaFin || p.fecha) >= sumarDias(hoy, -60)).sort((a, b) => (b.fechaFin || b.fecha).localeCompare(a.fechaFin || a.fecha));
+        return idas.length ? sec('Visitas pasadas', `<span class="muted small">últimos 60 días</span>`) + idas.slice(0, 20).map(p => {
+          const dias = Object.keys(p.log || {}).sort(), ult = dias.at(-1), l = ult ? p.log[ult] : null;
+          return tarjetaPase(p).replace(/<span class="estado [^"]*">[^<]*<\/span>/, `<span class="estado e-${p.cancelado ? 'cancelado' : l?.out ? 'salio' : l?.in ? 'adentro' : 'vencido'}">${p.cancelado ? 'Cancelado' : l?.out ? `Salió ${hora(l.out)}` : l?.in ? `Entró ${hora(l.in)}` : 'No vino'}</span>`);
+        }).join('') : ''; })()}
       ${fijos.length ? sec('Personal fijo') + fijos.map(p => {
         const dias = Object.keys(p.log || {}).filter(d => d.startsWith(mes) && p.log[d].in).length;
         return tarjetaPase(p) .replace('</div></div>', `</div><div class="muted small" style="margin-top:8px">${I('check')} Asistencia de este mes: ${plural(dias, 'día')}</div></div>`);
@@ -611,6 +714,61 @@ A['cancelar-pase'] = async el => {
   if (!await confirmar('Cancelar el pase', 'El código deja de servir en la garita.', { si:'Cancelar pase', peligro:true })) return;
   Store.cambiar(s => { const p = s.pases.find(x => x.id === el.dataset.id); if (p) p.cancelado = Date.now(); });
   toast('Pase cancelado', 'x');
+};
+/* =========================================================
+   EDITAR Y BORRAR UNA VISITA
+   El vecino puede corregir o sacar de su lista cualquier visita, también
+   las que ya entraron y salieron. Pero nada se pierde: borrar la esconde
+   de SU lista y la garita la sigue viendo en el historial del día, y cada
+   cambio queda en la auditoría del barrio (qué visita, qué campos, cuándo
+   y quién). Los datos personales de la visita (DNI, patente) no se copian
+   a la auditoría: solo se anota que cambiaron (Ley 25.326).
+   ========================================================= */
+const resumenPase = p => {
+  const dias = Object.keys(p.log || {}).sort(), ult = dias.at(-1), l = ult ? p.log[ult] : null;
+  return `${p.nombre} · ${(TIPOS_PASE[p.tipo] || TIPOS_PASE.visita).n} · ${p.dias?.length ? 'fijo' : fechaCorta(p.fecha)}${l?.in ? ' · entró ' + hora(l.in) : ''}${l?.out ? ' · salió ' + hora(l.out) : ''}`;
+};
+A['editar-pase'] = el => {
+  const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
+  const usado = p.log && Object.keys(p.log).length;
+  hoja('Editar la visita', `<form data-f="editar-pase" data-id="${p.id}">
+    <div class="field"><label>Nombre o empresa</label><input name="nombre" required maxlength="60" value="${esc(p.nombre)}"></div>
+    <div class="grid2"><div class="field"><label>DNI</label><input name="dni" inputmode="numeric" maxlength="11" value="${esc(p.dni || '')}"></div>
+      <div class="field"><label>Patente</label><input name="patente" maxlength="10" style="text-transform:uppercase" value="${esc(p.patente || '')}"></div></div>
+    ${usado || p.dias?.length ? '' : `<div class="grid3"><div class="field"><label>Día</label><input type="date" name="fecha" value="${p.fecha}" required></div>
+      <div class="field"><label>Desde</label><input type="time" name="desde" value="${p.desde}" required></div>
+      <div class="field"><label>Hasta</label><input type="time" name="hasta" value="${p.hasta}" required></div></div>`}
+    <div class="field"><label>Nota</label><input name="nota" maxlength="120" value="${esc(p.nota || '')}"></div>
+    ${usado ? `<p class="muted tiny" style="margin:-2px 0 12px">Esta visita ya pasó por la garita: el día y los horarios de entrada y salida no se cambian.</p>` : ''}
+    <p class="muted tiny" style="margin:0 0 12px">El cambio queda anotado en la auditoría del barrio.</p>
+    <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`);
+};
+F['editar-pase'] = (d, form) => {
+  Store.cambiar(s => {
+    const p = s.pases.find(x => x.id === form.dataset.id); if (!p) return;
+    const nuevo = { nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:normPatente(d.patente), nota:(d.nota || '').trim() };
+    if (d.fecha){ nuevo.fecha = d.fecha; nuevo.desde = d.desde; nuevo.hasta = d.hasta; }
+    const nombres = { nombre:'nombre', dni:'DNI', patente:'patente', nota:'nota', fecha:'día', desde:'desde', hasta:'hasta' };
+    const cambios = Object.keys(nuevo).filter(k => String(p[k] || '') !== String(nuevo[k] || ''));
+    if (!cambios.length) return;
+    const antes = resumenPase(p);
+    Object.assign(p, nuevo);
+    p.editado = { at:Date.now(), por:yo().id };
+    auditar(s, 'Editó una visita', `${yo().casa} · ${antes} · cambió: ${cambios.map(k => nombres[k]).join(', ')}`, p.id);
+  });
+  cerrarHoja(); toast('Visita actualizada', 'check');
+};
+A['borrar-pase'] = async el => {
+  const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
+  const est = estadoPase(p);
+  if (!await confirmar('Borrar la visita', `Sale de tu lista.${est === 'esperado' || est === 'futuro' ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => {
+    const x = s.pases.find(z => z.id === p.id); if (!x) return;
+    if (est === 'esperado' || est === 'futuro') x.cancelado = Date.now();
+    x.borrado = { at:Date.now(), por:yo().id };
+    auditar(s, 'Borró una visita de su lista', `${yo().casa} · ${resumenPase(x)}`, x.id);
+  });
+  toast('Visita borrada de tu lista', 'trash');
 };
 A['link-pedir'] = () => {
   const link = urlApp('pedir/' + yo().id);

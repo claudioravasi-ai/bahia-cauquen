@@ -176,6 +176,7 @@ const Nube = {
       this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
     }
     this.arrancada = true;
+    this.anotarPresencia();
     /* Si administra el barrio, elige desde qué brazo entra. */
     if (mio.rol === 'admin' && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
     /* Las alertas que ya estaban abiertas antes de entrar no saltan ni
@@ -186,6 +187,22 @@ const Nube = {
     /* La cuenta de la garita se reconoce por el correo: si quedó como vecino
        (se inscribió por el portal común), la Administración la corrige sola. */
     if (mio.rol === 'admin') setTimeout(() => this.corregirGarita(), 5000);
+    /* La Administración deja a mano la dirección del correo para quien se
+       inscribe, y manda lo que haya quedado sin salir. */
+    if (mio.rol === 'admin') setTimeout(async () => {
+      await this.publicarCorreo();
+      const n = await Correo.reintentar();
+      if (n) toast(`Salieron ${plural(n, 'correo que estaba pendiente', 'correos que estaban pendientes')}`, 'mail');
+    }, 6000);
+  },
+  async publicarCorreo(){
+    const c = Store.s.config;
+    if (!this.db || !esAdmin() || !c.correoUrl || !c.correoClave) return;
+    const nuevo = { url:c.correoUrl, clave:c.correoClave, adminEmail:c.adminEmail || '' };
+    try {
+      const ref = this.db.ref('barrio/publico/correo');
+      if (JSON.stringify((await ref.get()).val()) !== JSON.stringify(nuevo)) await ref.set(nuevo);
+    } catch(e){ console.warn('No se pudo publicar la dirección del correo (¿faltan publicar las reglas?)', e.message); }
   },
 
   /* La primera vez, la base está vacía: no tiene los espacios comunes, la
@@ -222,6 +239,34 @@ const Nube = {
       } catch(e){ console.warn('No se pudo sembrar', col, e.message); }
     }
     if (puestos) toast('Se cargó el contenido inicial del barrio', 'check');
+  },
+
+  /* =========================================================
+     PRESENCIA: esta app está abierta
+     Cada equipo se anota en barrio/presencia/<uid>/<equipo>. El
+     onDisconnect lo registra el SERVIDOR: si el celular se queda sin
+     batería o se cierra la pestaña, Firebase lo borra solo. Se vuelve a
+     anotar cada vez que se recupera la conexión.
+     ========================================================= */
+  presRef: null,
+  anotarPresencia(){
+    if (this.presRef) return;
+    let eq = '';
+    try { eq = sessionStorage.getItem('bhc.equipo') || ''; } catch(e){}
+    if (!eq){ eq = 'e' + uid(); try { sessionStorage.setItem('bhc.equipo', eq); } catch(e){} }
+    const ref = this.presRef = this.db.ref(`barrio/presencia/${this.uid}/${eq}`);
+    const ahora = firebase.database.ServerValue.TIMESTAMP;
+    this.db.ref('.info/connected').on('value', snap => {
+      if (snap.val() !== true || !this.presRef) return;
+      ref.onDisconnect().remove().then(() => ref.set({ at:ahora, activa:!document.hidden })).catch(() => {});
+    });
+    document.addEventListener('visibilitychange', () => { if (this.presRef) ref.update({ activa:!document.hidden, at:ahora }).catch(() => {}); });
+    this.db.ref('barrio/presencia').on('value', snap => { if (typeof Presencia !== 'undefined') Presencia.poner(snap.val()); },
+      err => console.warn('No se pudo leer la presencia (¿faltan publicar las reglas?)', err.message));
+  },
+  async borrarPresencia(){
+    const r = this.presRef; this.presRef = null;
+    if (r) try { await r.onDisconnect().cancel(); await r.remove(); } catch(e){}
   },
 
   escuchar(ruta, fn){ this.db.ref(ruta).on('value', snap => fn(snap.val())); },
@@ -353,6 +398,9 @@ const Nube = {
   /* Si mi foto todavía no está en la nube (la subí antes de esta versión,
      o recién la cambié), se sube desde este equipo. */
   async fotoCasaAlDia(){
+    /* Las fotos de mis mascotas cargadas antes de esta versión también se
+       comparten, en chico, para que los vecinos las puedan ver. */
+    for (const m of aLista(yo()?.mascotas)) if (m && m.foto && m.foto.fotoId && !m.foto.nube) await compartirFotoMascota(m.id);
     try {
       const u = yo(); if (!this.arrancada || !u || !u.fotoCasa || !u.fotoCasa.fotoId || u.fotoCasa.nube) return;
       const dato = await Fotos.sacar(u.fotoCasa.fotoId); if (!dato) return;
@@ -360,6 +408,17 @@ const Nube = {
       await this.db.ref('barrio/fotosCasa/' + u.fotoCasa.fotoId).set(med);
       Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x && x.fotoCasa && x.fotoCasa.fotoId === u.fotoCasa.fotoId) x.fotoCasa.nube = true; });
     } catch(e){ console.warn('No se pudo subir la foto de la casa', e.message); }
+  },
+  /* Una foto chica que pueden ver los demás (hoy, las de las mascotas):
+     320 px, unos 20 KB. Se guarda junto a las de las casas y cada uno la
+     baja solo cuando la toca. */
+  async compartirFoto(fotoId, max = 320){
+    try {
+      if (!this.arrancada || !fotoId) return false;
+      const dato = await Fotos.sacar(fotoId, false); if (!dato) return false;
+      await this.db.ref('barrio/fotosCasa/' + fotoId).set(await achicarDato(dato, max, .7));
+      return true;
+    } catch(e){ console.warn('No se pudo compartir la foto', e.message); return false; }
   },
   async registrar(d){
     const cred = await this.auth.createUserWithEmailAndPassword(d.email, d.clave);
@@ -372,6 +431,7 @@ const Nube = {
     try { primero = !(await this.db.ref('barrio/publico/instalado').get()).exists(); } catch(e){}
     const u = { id:uid, nombre:d.nombre, casa:d.casa, dni:d.dni, email:d.email, tel:d.tel || '',
       rol: primero ? 'admin' : 'vecino', estado: primero ? 'aprobado' : 'pendiente',
+      profesion:d.profesion || '', enDirectorio:!!d.publicar, mostrarTel:!!d.publicar,
       consentimiento:Date.now(), createdAt:Date.now() };
     await this.db.ref('barrio/users/' + uid).set(u);
     if (primero) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
@@ -387,7 +447,7 @@ const Nube = {
     if (this.libre) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
     return u;
   },
-  async salir(){ try { await this.auth.signOut(); } catch(e){} },
+  async salir(){ await this.borrarPresencia(); try { await this.auth.signOut(); } catch(e){} },
   async cambiarClave(nueva){ return this.auth.currentUser.updatePassword(nueva); },
   /* Cambio de correo: Firebase manda un aviso a la dirección nueva y el
      cambio se hace efectivo cuando la persona lo confirma desde ahí. */

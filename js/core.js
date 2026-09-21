@@ -513,13 +513,13 @@ const Fotos = {
     const db = await this.abrir(); if (!db) return;
     await new Promise(ok => { const t = db.transaction('fotos', 'readwrite'); t.objectStore('fotos').put(dato, id); t.oncomplete = ok; t.onerror = ok; });
   },
-  async sacar(id){
+  async sacar(id, nube = true){
     if (this.cache.has(id)) return this.cache.get(id);
     const db = await this.abrir(); if (!db) return null;
     const v = await new Promise(ok => { const r = db.transaction('fotos').objectStore('fotos').get(id); r.onsuccess = () => ok(r.result || null); r.onerror = () => ok(null); });
     /* Lo que no está en el equipo se pide una sola vez a la nube (hoy, solo
        las fotos del frente de las casas); si no está, no se vuelve a pedir. */
-    if (!v && this.relevo && !this.faltan.has(id)){ try { const b = await this.relevo.bajar(id); if (b){ await this.poner(id, b); return b; } } catch(e){} this.faltan.add(id); }
+    if (!v && nube && this.relevo && !this.faltan.has(id)){ try { const b = await this.relevo.bajar(id); if (b){ await this.poner(id, b); return b; } } catch(e){} this.faltan.add(id); }
     if (v) this.cache.set(id, v);
     return v;
   },
@@ -541,7 +541,9 @@ const Fotos = {
   async hidratar(raiz = document){
     for (const el of $$('[data-foto]', raiz)){
       const id = el.dataset.foto; if (!id || el.dataset.ok) continue;
-      const v = await this.sacar(id);
+      /* Las marcadas "a pedido" (las mascotas) no se bajan solas: se ven con
+         la miniatura y la foto se trae recién cuando alguien la toca. */
+      const v = await this.sacar(id, !('pedido' in el.dataset));
       if (v){ el.style.backgroundImage = `url('${v}')`; el.dataset.ok = '1'; el.classList.remove('solo-mini'); }
       else el.classList.add('solo-mini');
     }
@@ -562,8 +564,8 @@ function achicarDato(dato, max, q){
   });
 }
 /* HTML de una foto: arranca con la miniatura y se hidrata sola. */
-const fotoHTML = (f, cls = 'foto') => f && f.fotoId
-  ? `<div class="${cls}" data-foto="${esc(f.fotoId)}" data-a="ver-foto" style="background-image:url('${f.mini || ''}')"></div>` : '';
+const fotoHTML = (f, cls = 'foto', { aPedido = false } = {}) => f && f.fotoId
+  ? `<div class="${cls}" data-foto="${esc(f.fotoId)}" data-a="ver-foto" ${aPedido ? 'data-pedido title="Tocá para ver la foto"' : ''} style="background-image:url('${f.mini || ''}')"></div>` : '';
 
 /* Registros de rutas (R), acciones de clic (A) y formularios (F).
    Cada archivo de vistas agrega lo suyo. */
@@ -580,7 +582,45 @@ const autorVisible = id => { const u = usuario(id); if (id === 'sistema') return
    de la Administración para mandarlo a mano. No se pierde nada.
    ========================================================= */
 const Correo = {
-  configurado(){ const c = Store.s.config; return !!(c.correoUrl && c.correoClave); },
+  /* A dónde se piden los correos. Lo normal es leerlo de los ajustes del
+     barrio; pero quien se está inscribiendo todavía no puede leer los
+     ajustes (las reglas se los tapan hasta que lo aprueban), y por eso los
+     mails de inscripción NO SALÍAN NUNCA. Para ese caso la Administración
+     deja una copia en barrio/publico/correo, que sí se puede leer. */
+  publico: null,
+  datos(){
+    const c = Store.s.config;
+    if (c.correoUrl && c.correoClave) return { url:c.correoUrl, clave:c.correoClave, adminEmail:c.adminEmail || '' };
+    const p = this.publico;
+    return p && p.url && p.clave ? p : null;
+  },
+  configurado(){ return !!this.datos(); },
+  async traerPublico(){
+    if (this.publico || typeof Nube === 'undefined' || !Nube.activa() || !Nube.db) return;
+    try { this.publico = (await Nube.db.ref('barrio/publico/correo').get()).val(); } catch(e){}
+  },
+  /* Quien todavía no está aprobado no puede anotar en la bandeja de la
+     Administración (la base se lo niega y, peor, frena todo el guardado).
+     Su correo sale igual, sin quedar en el historial. */
+  anota(){
+    if (typeof Nube === 'undefined' || !Nube.activa()) return true;
+    const u = yo(); return !!(u && u.estado === 'aprobado');
+  },
+  /* Lo que devuelve Google cuando algo está mal configurado, en castellano. */
+  motivo(err){
+    const m = String(err && err.message || err || '');
+    if (/Unexpected token|JSON|<!DOCTYPE|not valid JSON/i.test(m)) return 'Google devolvió una página en lugar de una respuesta: la implementación no está como "Quién tiene acceso: Cualquier persona", o la URL no es la de /exec.';
+    if (/Failed to fetch|Load failed|NetworkError|CORS/i.test(m)) return 'No se pudo llegar al Apps Script. Suele ser el acceso ("Cualquier persona", no "Cualquier persona con cuenta de Google"), una URL mal copiada o falta de internet.';
+    if (/no autorizado/i.test(m)) return 'La frase compartida de Ajustes no coincide con CLAVE_COMPARTIDA del Apps Script (o se cambió y no se hizo "Nueva versión").';
+    if (/tope/i.test(m)) return 'Se alcanzó el tope diario del Apps Script (TOPE_DIARIO).';
+    return m || 'Error desconocido';
+  },
+  async pedir(d, cuerpo){
+    const r = await fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ ...cuerpo, clave:d.clave }) });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || 'el Apps Script contestó que no');
+    return j;
+  },
   plantilla(titulo, cuerpoHtml, boton){
     const c = Store.s.config;
     return `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0f1f1e;line-height:1.55">
@@ -596,18 +636,51 @@ const Correo = {
   /* Registra el correo y, si se puede, lo manda. Devuelve true si salió. */
   async enviar({ para, asunto, html, tipo }){
     if (!para) return false;
-    const reg = { id:uid(), para, asunto, html, tipo, at:Date.now(), estado:'pendiente' };
-    Store.cambiar(s => { s.correos.unshift(reg); if (s.correos.length > 300) s.correos.length = 300; });
-    if (!this.configurado()) return false;
-    try {
-      const r = await fetch(Store.s.config.correoUrl, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-        body: JSON.stringify({ para, asunto, html, tipo, clave: Store.s.config.correoClave }) }).then(r => r.json());
-      Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x) x.estado = r && r.ok ? 'enviado' : 'error'; });
-      return !!(r && r.ok);
-    } catch(e){
-      Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x) x.estado = 'error'; });
-      return false;
+    const anota = this.anota();
+    const reg = { id:uid(), para, asunto, html, tipo, at:Date.now(), estado:'pendiente', intentos:0 };
+    if (anota) Store.cambiar(s => { s.correos.unshift(reg); if (s.correos.length > 300) s.correos.length = 300; });
+    if (!this.configurado()) await this.traerPublico();
+    const d = this.datos();
+    if (!d) return false;
+    const marcar = (estado, error = '') => { if (anota) Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x){ x.estado = estado; x.intentos = (x.intentos || 0) + 1; x.error = error; } }); };
+    try { await this.pedir(d, { para, asunto, html, tipo }); marcar('enviado'); return true; }
+    catch(e){ console.warn('No salió el correo', tipo, e); marcar('error', this.motivo(e)); return false; }
+  },
+  /* Lo que quedó sin salir (el Apps Script no estaba configurado, se cayó
+     internet, lo mandó un equipo sin la dirección…) se reintenta solo la
+     próxima vez que la Administración abre la app. Hasta tres intentos por
+     correo y solo de la última semana, para no mandar cosas viejas. */
+  async reintentar(){
+    if (this.reintentando || !esAdmin() || !this.configurado()) return 0;
+    this.reintentando = true;
+    const d = this.datos(), lim = Date.now() - 7 * DIA;
+    const cola = aLista(Store.s.correos).filter(c => c && c.estado !== 'enviado' && c.at > lim && (c.intentos || 0) < 3 && c.para && c.html).slice(0, 20);
+    let n = 0;
+    for (const c of cola){
+      let estado = 'enviado', error = '';
+      try { await this.pedir(d, { para:c.para, asunto:c.asunto, html:c.html, tipo:c.tipo }); n++; }
+      catch(e){ estado = 'error'; error = this.motivo(e); }
+      Store.cambiar(s => { const x = s.correos.find(z => z.id === c.id); if (x){ x.estado = estado; x.error = error; x.intentos = (x.intentos || 0) + 1; } });
+      if (/no autorizado|página en lugar|No se pudo llegar/.test(error)) break;   /* si es la configuración, no insistir */
     }
+    this.reintentando = false;
+    return n;
+  },
+  /* La prueba de Ajustes: primero pregunta si el Apps Script está vivo y
+     después manda un correo de verdad. Devuelve qué pasó, paso por paso. */
+  async probar(para){
+    const d = this.datos();
+    if (!d) return { ok:false, paso:'ajustes', txt:'Falta la URL del Apps Script o la frase compartida en Ajustes → Correo.' };
+    if (!/^https:\/\/script\.google(usercontent)?\.com\/.+\/exec(\?|$)/.test(d.url)) return { ok:false, paso:'url', txt:'La URL tiene que ser la de la aplicación web y terminar en /exec (no la del editor, que termina en /edit).' };
+    try {
+      const vivo = await fetch(d.url).then(r => r.json());
+      if (!vivo || !vivo.ok) return { ok:false, paso:'vivo', txt:'El Apps Script respondió, pero no dice que esté activo. ¿Es el código de apps-script/Codigo.gs?' };
+    } catch(e){ return { ok:false, paso:'vivo', txt:this.motivo(e) }; }
+    try {
+      await this.pedir(d, { para, tipo:'prueba', asunto:'Prueba de correo · Barrio ' + Store.s.config.nombre,
+        html:this.plantilla('Prueba de envío', `<p>Si leés esto, la app del barrio ya manda los correos sola.</p><p style="font-size:13px;color:#6c7d7a">Enviado desde la app el ${fechaLarga(hoyISO())} a las ${hora(Date.now())} h.</p>`) });
+      return { ok:true, txt:`Salió un correo de prueba a ${para}. Si en unos minutos no está en la bandeja de entrada, mirá en Spam.` };
+    } catch(e){ return { ok:false, paso:'envio', txt:this.motivo(e) }; }
   },
 };
 const urlApp = (hash = '') => location.origin + location.pathname + (hash ? '#/' + hash : '');

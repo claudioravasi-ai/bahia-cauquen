@@ -789,6 +789,9 @@ dialog.hoja[open]{animation:hojaIn .32s cubic-bezier(.2,.9,.3,1)}
 .solo-mini{filter:blur(6px) saturate(.8);transform:scale(1)}
 .solo-mini::after{content:"La foto está en el equipo de quien la subió";position:absolute;inset:auto 0 0;padding:8px;font-size:11.5px;font-weight:700;color:#fff;background:rgba(0,0,0,.45);filter:none;text-align:center}
 .mini-foto{width:56px;height:56px;border-radius:12px;background:var(--surface-3) center/cover;flex:none;cursor:zoom-in}
+.masc-foto{position:relative;flex:none;align-self:flex-start}
+.masc-foto i{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:50%;background:var(--surface);color:var(--brand);display:grid;place-items:center;box-shadow:var(--sh-2);pointer-events:none}
+.masc-foto i svg.i{width:13px;height:13px}
 
 /* firmas */
 .firma-box canvas.firma{width:100%;height:150px;border:1.5px dashed var(--line-2);border-radius:14px;background:var(--surface-2);touch-action:none;display:block;cursor:crosshair}
@@ -1260,6 +1263,114 @@ mark{background:var(--warn-soft);color:inherit;border-radius:3px;padding:0 2px}
 .novedad-leer .card{margin:12px 0 0}
 .para-vos{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:8px;margin-bottom:10px}
 .para-vos .aviso{margin:0}
+
+/* ---------- Pizarra del día: dos columnas de ventanitas por color ----------
+   Rojo importante, amarillo tener en cuenta, verde para saber. Lo que no
+   viste titila en su tono; lo visto queda quieto con el tono de fondo. */
+.nv-rojo{--tono:var(--danger)} .nv-amarillo{--tono:#e0a100} .nv-verde{--tono:var(--ok)}
+:root[data-theme="dark"] .nv-amarillo{--tono:var(--warn)}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .nv-amarillo{--tono:var(--warn)} }
+.pz-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin:-4px 2px 10px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.pz-leyenda span{display:inline-flex;align-items:center;gap:6px}
+.pz-leyenda i{width:9px;height:9px;border-radius:50%;background:var(--tono)}
+.pz-dos{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:860px){ .pz-dos{grid-template-columns:minmax(0,1fr)} }
+.pz-col{background:var(--surface-2);border:1px solid var(--line);border-radius:20px;padding:12px;min-width:0}
+.pz-col-cab{display:flex;align-items:center;gap:8px;margin:0 2px 10px;font-size:13.5px}
+.pz-col-cab svg.i{width:17px;height:17px;color:var(--muted)}
+.pz-col .link{font-size:13px;font-weight:700;color:var(--brand);text-decoration:none;background:none;border:0;padding:0;cursor:pointer}
+.pz-col-cab .link{margin-left:auto}
+.pz-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(230px,100%),1fr));gap:8px}
+.pz-lista.una{grid-template-columns:minmax(0,1fr)}
+.pz{position:relative;display:flex;flex-direction:column;gap:3px;width:100%;min-width:0;text-align:left;cursor:pointer;color:var(--ink);font:inherit;
+  background:color-mix(in srgb,var(--tono) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--tono) 32%,var(--line));
+  border-left:4px solid var(--tono);border-radius:14px;padding:8px 10px 9px;transition:transform .15s,box-shadow .15s}
+.pz:hover{transform:translateY(-1px);box-shadow:var(--sh-2)}
+.pz:active{transform:scale(.99)}
+.pz-cab{display:flex;align-items:center;gap:6px;min-width:0}
+.pz-ic{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:none;background:color-mix(in srgb,var(--tono) 20%,transparent);color:var(--tono)}
+.nv-amarillo .pz-ic{color:color-mix(in srgb,var(--tono) 70%,var(--ink))}
+.pz-ic svg.i{width:13px;height:13px}
+.pz-tag{font-size:11px;font-weight:800;letter-spacing:.2px;text-transform:uppercase;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pz-cab time{margin-left:auto;font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap}
+.pz-nueva{font-size:10px;font-weight:800;color:#fff;background:var(--tono);padding:1px 6px;border-radius:999px;white-space:nowrap}
+.nv-amarillo .pz-nueva{color:#3a2a00}
+.pz b{font-size:13.5px;font-weight:800;line-height:1.3;letter-spacing:-.15px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pz-txt{font-size:12.5px;color:var(--ink-2);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.pz-de{font-size:11px;color:var(--muted);font-weight:600}
+.pz.titila{animation:pzTitila 1.7s ease-in-out infinite}
+.pz.nv-rojo.titila{animation-duration:1.15s}
+@keyframes pzTitila{
+  0%,100%{background:color-mix(in srgb,var(--tono) 9%,var(--surface));box-shadow:0 0 0 0 transparent}
+  50%{background:color-mix(in srgb,var(--tono) 30%,var(--surface));box-shadow:0 0 0 3px color-mix(in srgb,var(--tono) 30%,transparent)}}
+/* Lo tuyo que pide una respuesta (la garita pregunta por vos, tu SOS, una
+   visita que pide pase) conserva sus botones, en el mismo formato chico. */
+.pz-personal .aviso{margin:0;padding:10px 11px;border-radius:14px;font-size:13px;border-left:4px solid var(--tono,var(--brand));
+  background:color-mix(in srgb,var(--tono,var(--brand)) 10%,var(--surface))}
+.pz-personal .aviso.a-danger{--tono:var(--danger)} .pz-personal .aviso.a-warn{--tono:#e0a100}
+.pz-personal .aviso.a-ok,.pz-personal .aviso.a-info,.pz-personal .aviso.a-brand{--tono:var(--ok)}
+.pz-personal .aviso.latido,.pz-personal .aviso.a-danger,.pz-personal .aviso.a-warn{animation:pzTitila 1.4s ease-in-out infinite}
+.pz-personal .aviso b{font-size:13.5px}
+.pz-personal .aviso .acciones{margin-top:8px}
+.pz-nada{display:flex;gap:10px;align-items:center;padding:12px;border-radius:14px;background:var(--surface);border:1px dashed var(--line-2);color:var(--ink-2);font-size:13px;font-weight:700}
+.pz-nada svg.i{width:20px;height:20px;color:var(--ok);flex:none}
+.pz-nada small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+@media (prefers-reduced-motion:reduce){
+  .pz.titila,.pz-personal .aviso{animation:none}
+  .pz.titila{background:color-mix(in srgb,var(--tono) 22%,var(--surface));box-shadow:0 0 0 2px color-mix(in srgb,var(--tono) 40%,transparent)}
+}
+
+/* ---------- SOS de hoy (Emergencias y agenda) ---------- */
+.sos-dia-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:8px;margin-bottom:6px;align-items:start}
+.sos-dia{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--danger);border-radius:14px;box-shadow:var(--sh-1);overflow:hidden;transition:box-shadow .15s}
+.sos-dia.s-ok{border-left-color:var(--ok)} .sos-dia.s-warn{border-left-color:var(--warn)}
+.sos-dia[open]{box-shadow:var(--sh-2)}
+.sos-dia summary{list-style:none;display:flex;align-items:center;gap:10px;padding:10px 11px;cursor:pointer}
+.sos-dia summary::-webkit-details-marker{display:none}
+.sos-dia summary .ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none}
+.sd-txt{flex:1;min-width:0}
+.sd-txt b{display:block;font-size:13.5px;font-weight:800;line-height:1.25}
+.sd-txt small{font-size:12px;color:var(--muted);font-weight:600}
+.sos-dia .pill{font-size:10.5px;white-space:nowrap}
+.sd-mas{display:grid;gap:6px;padding:2px 12px 12px 53px;font-size:12.5px;animation:sdAbre .18s ease-out}
+.sd-mas div{display:flex;flex-direction:column}
+.sd-mas .muted{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+@keyframes sdAbre{from{opacity:0;transform:translateY(-4px)}}
+
+/* ---------- Profesionales y oficios ---------- */
+.fichas-prof{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:10px}
+.fichas-prof .card{margin:0}
+.card.prof.mia{border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
+.prof-que{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.prof-que b{font-size:15px}
+
+/* ---------- Vuelos: el próximo paso y cómo funciona ---------- */
+.vuelo-prox{display:flex;gap:12px;align-items:center}
+.vuelo-prox .ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none}
+.vuelo-prox small{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.3px}
+.vuelo-prox b{display:block;font-size:15px}
+.como-funciona summary{cursor:pointer;list-style:none}
+.como-funciona summary::-webkit-details-marker{display:none}
+.como-funciona p{margin:10px 0 0;line-height:1.55;color:var(--ink-2)}
+
+/* ---------- Cuántos hay en la app (encabezado) ---------- */
+.presencia{display:inline-flex;align-items:center;gap:1px;height:34px;padding:0 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2);
+  font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap;flex:none}
+.presencia i{width:7px;height:7px;border-radius:50%;background:#22c55e;margin-right:6px;animation:enVivo 2s infinite}
+.presencia b{color:var(--ink);font-weight:800}
+.presencia:hover{background:var(--surface-3)}
+.presencia .pr-arriba{display:inline-flex;align-items:center}
+.presencia .pr-lt{display:none}
+/* En el teléfono no entra en un renglón: arriba "abiertas/con cuenta" y
+   abajo, chiquito, el total de lotes. */
+@media (max-width:520px){
+  .presencia{height:38px;padding:0 9px;flex-direction:column;justify-content:center;gap:1px;line-height:1.05;font-size:12px}
+  .presencia i{margin-right:4px;width:6px;height:6px}
+  .presencia .pr-lotes{font-size:9.5px;font-weight:700;letter-spacing:.1px}
+  .presencia .pr-bar{display:none} .presencia .pr-lt{display:inline}
+}
+@media (max-width:360px){ .presencia i{display:none} .presencia{padding:0 7px} }
+.pr-n{min-width:52px;font-size:22px;font-weight:800;color:var(--brand);text-align:center}
 
 /* ---------- La campanita ---------- */
 .notifs-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:2px 0 4px;font-size:12.5px;color:var(--muted);font-weight:700}
