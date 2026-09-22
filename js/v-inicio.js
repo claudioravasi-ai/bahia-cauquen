@@ -163,6 +163,7 @@ const SECCIONES = {
         teja({ v:'expensas', icon:'wallet', color:'wood', t:'Mis expensas', s:`Tu cuenta, cupones y pagos` }),
         teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Mis reclamos', s:'Privados con la Administración', n: s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length || '' }),
         teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Familia, autos, mascotas' }),
+        teja({ v:'ayuda', icon:'info', color:'sky', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa' }),
         ...(s.infracciones.some(i => i.casa === u.casa && i.estado === 'notificada')
           ? [teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificación', s:'Podés presentar tu descargo', badge: s.infracciones.filter(i => i.casa === u.casa && i.estado === 'notificada').length })] : []),
       ].join('');
@@ -194,7 +195,8 @@ const SECCIONES = {
         teja({ v:'mascotas', icon:'paw', color:'ok', t:'Mascotas', s:'Perdidas, encontradas y del barrio' }),
         teja({ v:'compras', icon:'cart', color:'brand', t:'Compras conjuntas', s: compras ? `${plural(compras, 'abierta')}` : 'Leña, gas, lo que sea', n: compras || '' }),
         teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamento', s:'Convivencia, obras, actas' }),
-        teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:(s.descargas || []).filter(d => d.url || d.texto).length || '' }),
+        teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
+        teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:descargasVisibles().filter(d => d.url || d.texto).length || '' }),
       ].join('');
     },
   },
@@ -202,20 +204,21 @@ const SECCIONES = {
     titulo:'Ushuaia y servicios', icon:'pin', color:'sky', ancha:true, lema:'Lo de afuera que igual te toca',
     sub:'Lo de afuera del barrio que igual te toca',
     linea(u, s, hoy){
-      const cru = s.cruceros.filter(c => c.fecha === hoy).length;
+      const cru = typeof Cruceros !== 'undefined' ? Cruceros.hoy().length : 0;
       const v = Vuelos.cuantosHoy();
       const f = proximoFeriado();
       return [cru && `${plural(cru, 'crucero recala', 'cruceros recalan')} hoy`, v && `${v} vuelos hoy`,
-        f && `feriado ${relDia(f.fecha)}`].filter(Boolean).join(' · ') || 'Vuelos, residuos, feriados y emergencias';
+        f && `feriado ${relDia(f.fecha)}`].filter(Boolean).join(' · ') || 'Emergencias, agenda, vuelos, cruceros y feriados';
     },
     tejas(u, s, hoy){
       const prox = proximoFeriado();
       return [
-        teja({ v:'agenda', icon:'phone', color:'danger', t:'Emergencias y agenda', s:'Bomberos, policía, hospital', destaca:true }),
+        teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · hospitales · farmacias', destaca:true }),
+        teja({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, súper y oficios del barrio' }),
+        teja({ v:'cruceros', icon:'send', color:'brand', t:'Cruceros', s: Cruceros.linea(), n: Cruceros.hoy().length || '' }),
         teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia hoy', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
         teja({ v:'servicios', icon:'user', color:'wood', t:'Profesionales y oficios del barrio', s:(() => { const n = s.users.filter(enDirectorioProfesional).length; return n ? `${plural(n, 'vecino', 'vecinos')} para contactar` : 'Médicos, abogados, electricistas…'; })(), n: s.users.filter(enDirectorioProfesional).length || '' }),
         teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: Vuelos.cuantosHoy() || '' }),
-        teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
       ].join('');
     },
   },
@@ -243,7 +246,9 @@ const SECCIONES = {
         ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy', n: pasesDelDia().length })}
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
         ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos de la garita', s: turnoAbierto() ? `Ahora: ${esc(turnoAbierto().turno)} · ${esc(aLista(turnoAbierto().guardias).join(', '))}` : 'Horarios y guardias' })}
+        ${teja({ v:'privado', p:'admin', icon:'lock', color:'accent', t:'Mensajes de vecinos', s:'Conversaciones privadas con la Administración' })}
         ${teja({ v:'privado', p:'interno', icon:'shield', color:'brand', t:'Mensajes con la garita', s:'Entre la Administración y la guardia' })}
+        ${teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s:'Abrir una, ver resultados y actas', n: s.votaciones.filter(v => v.cierra > Date.now()).length || '' })}
         ${teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Reclamos', s:'Responder y publicar', n: s.reclamos.filter(r => r.estado !== 'resuelto').length || '' })}
         ${teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones', s:'Firmadas a la garita', n: s.peticiones.filter(p => p.estado === 'pendiente').length || '' })}
         ${teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' })}
@@ -399,11 +404,10 @@ const Pizarra = {
     const lim = Date.now() - 10 * DIA;
     Object.keys(v).forEach(x => { if (v[x] < lim) delete v[x]; });
     Store.guardarSesion();
-    const el = document.querySelector(`.pz[data-k="${CSS.escape(k)}"]`);
-    if (el){ el.classList.remove('titila'); el.querySelector('.pz-nueva')?.remove(); }
+    document.querySelectorAll(`.pz[data-k="${CSS.escape(k)}"],.pzr[data-k="${CSS.escape(k)}"]`).forEach(el => { el.classList.remove('titila'); el.classList.add('leido'); el.querySelector('.pz-nueva')?.remove(); });
   },
 };
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.pz[data-k]'); if (b) Pizarra.marcar(b.dataset.k); }, true);
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.pz[data-k],.pzr[data-k]'); if (b) Pizarra.marcar(b.dataset.k); }, true);
 
 function avisosGenerales(){
   const s = Store.s, u = yo(), hoy = hoyISO(), ahora = Date.now(), out = [];
@@ -474,23 +478,68 @@ const ventanita = x => `<button class="pz nv-${x.nivel} ${x.nuevo ? 'titila' : '
     <span class="pz-cab"><span class="pz-ic">${I(x.icon)}</span><span class="pz-tag">${esc(x.tag)}</span>${x.fijo ? `<span class="nov-fijo">${I('tack')}</span>` : ''}${x.nuevo ? '<span class="pz-nueva">Nuevo</span>' : ''}<time>${cuandoFue(x.at)}</time></span>
     <b>${esc(x.titulo)}</b>${x.texto ? `<span class="pz-txt">${esc(x.texto)}</span>` : ''}${x.de ? `<span class="pz-de">${esc(x.de)}</span>` : ''}</button>`;
 
-function pizarraDelDia(){
-  const gen = avisosGenerales(), urg = urgentesVecino(), per = avisosPersonales();
-  const MAX = 8, nuevosGen = gen.filter(x => x.nuevo).length;
-  const mostrar = [...gen.filter(x => x.nuevo || x.nivel === 'rojo'), ...gen.filter(x => !x.nuevo && x.nivel !== 'rojo')].slice(0, MAX);
-  mostrar.sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || b.at - a.at);
-  const colGen = `<div class="pz-col pz-general">
-      <div class="pz-col-cab">${I('muro')}<b>Para todo el barrio</b>${nuevosGen ? `<span class="pill p-brand">${plural(nuevosGen, 'nuevo', 'nuevos')}</span>` : ''}<button class="link" data-a="abrir" data-v="pizarron">Ver todo</button></div>
-      ${mostrar.length ? `<div class="pz-lista">${mostrar.map(ventanita).join('')}</div>` : vacio('muro', 'Hoy no hay avisos para el barrio.')}
-      ${gen.length > MAX ? `<p class="muted tiny" style="margin:8px 2px 0">Y ${plural(gen.length - MAX, 'aviso más', 'avisos más')} en el pizarrón.</p>` : ''}</div>`;
-  const colPer = `<div class="pz-col pz-personal">
-      <div class="pz-col-cab">${I('user')}<b>Para vos</b>${urg.length + per.length ? `<span class="pill p-accent">${urg.length + per.length}</span>` : ''}</div>
-      ${urg.length || per.length ? `<div class="pz-lista una">${urg.join('')}${per.slice(0, 6).map(ventanita).join('')}</div>`
-        : `<div class="pz-nada">${I('check')}<span>No tenés nada pendiente.<small>Lo que sea para vos aparece acá apenas llega.</small></span></div>`}
-      ${per.length > 6 ? `<button class="link" data-a="notifs" style="margin-top:8px">Ver ${plural(per.length - 6, 'aviso más', 'avisos más')}</button>` : ''}</div>`;
-  return `<div class="pz-leyenda">${Object.entries(NIVELES_PZ).map(([k, t]) => `<span class="nv-${k}"><i></i>${t}</span>`).join('')}</div>
-    <div class="pz-dos">${colGen}${colPer}</div>`;
+/* =========================================================
+   LA PIZARRA, COMPACTA
+   En el teléfono la pizarra en dos columnas, con tarjetas de dos
+   renglones, ocupaba media portada y todo titilaba a la vez: lo
+   importante se perdía entre lo demás. Ahora:
+     · arriba, un semáforo que cuenta lo NO LEÍDO por color;
+     · una sola lista de renglones finos (lo tuyo y lo del barrio juntos),
+       lo no leído primero y, dentro de eso, rojo → amarillo → verde;
+     · solo titila lo no leído, en su tono, y la barrita de color es la
+       que late: lo ya leído queda quieto y más apagado;
+     · se ven pocos (4); el resto, en "Ver todo", que abre la pizarra
+       entera en dos columnas.
+   Lo que pide una decisión tuya (tu SOS abierto, alguien en la garita
+   que pregunta por vos, una visita que pide pase) va arriba como aviso
+   con sus botones: eso no puede quedar escondido en una lista.
+   ========================================================= */
+const MAX_PIZARRA = 4;
+function itemsPizarra(){
+  const per = avisosPersonales().map(x => ({ ...x, tag: x.tag === 'Para vos' ? 'Para vos' : x.tag }));
+  const gen = avisosGenerales();
+  return [...per, ...gen].sort((a, b) => (!!b.nuevo - !!a.nuevo) || (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || (!!b.fijo - !!a.fijo) || b.at - a.at);
 }
+const renglonPz = x => `<button class="pzr nv-${x.nivel} ${x.nuevo ? 'titila' : 'leido'}" data-k="${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
+    <span class="pzr-ic">${I(x.icon)}</span>
+    <span class="pzr-txt"><small>${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</small><b>${esc(x.titulo)}</b></span>
+    <time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></button>`;
+/* Las acciones de lo personal que sí o sí tienen que estar a mano. */
+function decisionesPendientes(){
+  const u = yo(), s = Store.s;
+  return urgentesVecino().filter((h, i) => i < 3 && /latido|a-info/.test(h) && /data-a="(sos-cancelar|llegada-si|sol-pase-si)"/.test(h));
+}
+function pizarraDelDia(){
+  const items = itemsPizarra(), dec = decisionesPendientes();
+  const nuevos = items.filter(x => x.nuevo);
+  const cuenta = n => nuevos.filter(x => x.nivel === n).length;
+  const semaforo = ['rojo', 'amarillo', 'verde'].filter(n => cuenta(n)).map(n =>
+    `<span class="pz-luz nv-${n}"><i></i>${cuenta(n)} ${n === 'rojo' ? (cuenta(n) > 1 ? 'importantes' : 'importante') : n === 'amarillo' ? 'a tener en cuenta' : 'para saber'}</span>`).join('');
+  const ver = items.slice(0, MAX_PIZARRA);
+  const resto = items.length - ver.length;
+  return `<div class="pz-compacta">
+    <div class="pz-cab2"><h2>Pizarra del día</h2>
+      <div class="pz-semaforo">${semaforo || `<span class="pz-luz ok">${I('check')}Nada sin leer</span>`}</div>
+      <button class="link" data-a="pizarra-toda">Ver todo${items.length ? ` (${items.length})` : ''}</button></div>
+    ${dec.length ? `<div class="pz-decisiones">${dec.join('')}</div>` : ''}
+    ${ver.length ? `<div class="pz-renglones">${ver.map(renglonPz).join('')}</div>` : `<div class="pz-nada">${I('check')}<span>Hoy no hay avisos.<small>Lo que llegue para vos o para el barrio aparece acá.</small></span></div>`}
+    ${resto > 0 ? `<button class="pz-mas" data-a="pizarra-toda">${resto} ${resto > 1 ? 'avisos más' : 'aviso más'}${nuevos.length > ver.filter(x => x.nuevo).length ? ` · ${nuevos.length - ver.filter(x => x.nuevo).length} sin leer` : ''}${I('right')}</button>` : ''}
+  </div>`;
+}
+/* La pizarra entera, en una hoja: las dos columnas de antes. */
+function pizarraCompleta(){
+  const gen = avisosGenerales(), urg = urgentesVecino(), per = avisosPersonales();
+  const colGen = `<div class="pz-col pz-general">
+      <div class="pz-col-cab">${I('muro')}<b>Para todo el barrio</b><button class="link" data-a="novedad-al-pizarron">Pizarrón</button></div>
+      ${gen.length ? `<div class="pz-renglones">${gen.map(renglonPz).join('')}</div>` : vacio('muro', 'Hoy no hay avisos para el barrio.')}</div>`;
+  const colPer = `<div class="pz-col pz-personal">
+      <div class="pz-col-cab">${I('user')}<b>Para vos</b></div>
+      ${urg.length || per.length ? `${urg.join('')}<div class="pz-renglones">${per.map(renglonPz).join('')}</div>`
+        : `<div class="pz-nada">${I('check')}<span>No tenés nada pendiente.</span></div>`}</div>`;
+  return `<div class="pz-leyenda">${Object.entries(NIVELES_PZ).map(([k, t]) => `<span class="nv-${k}"><i></i>${t}</span>`).join('')}</div>
+    <div class="pz-dos">${colPer}${colGen}</div>`;
+}
+A['pizarra-toda'] = () => hoja('Pizarra del día', pizarraCompleta(), { ancho:'900px' });
 A['ver-novedad'] = el => {
   const s = Store.s, id = el.dataset.id;
   if (el.dataset.v === 'com'){
@@ -511,6 +560,15 @@ A['ver-novedad'] = el => {
 };
 A['novedad-al-pizarron'] = () => { cerrarHoja(); abrir('pizarron'); };
 
+/* El DEA de la garita, sobre la foto: es lo que alguien tiene que saber
+   sin buscarlo el día que hace falta. */
+const deaHero = () => `<div class="dea-hero">${I('heart')}<span><b>DEA operativo</b>${esc(/garita/i.test(Store.s.config.dea || '') || !Store.s.config.dea ? 'en la garita' : Store.s.config.dea)}</span></div>`;
+/* El pie de la app: chico y en gris, para que esté pero no moleste. */
+const pieApp = () => `<footer class="pie-app">
+    <span>Barrio ${esc(Store.s.config.nombre)} · versión ${esc(window.VERSION || 'sin sellar')}</span>
+    <span>Ushuaia · Tierra del Fuego, Antártida e Islas del Atlántico Sur</span>
+    <span>by Claudio A. Ravasi</span></footer>`;
+
 R.inicio = {
   titulo: 'Inicio', icon: 'home', ancha: true,
   render(){
@@ -524,11 +582,11 @@ R.inicio = {
       <h1>${esc(u.rol === 'vecino' ? u.nombre.split(' ')[0] : u.nombre)}</h1>
       <div class="sub">${esc(u.casa)} · ${fechaLarga(hoy)}</div>
       ${c ? `<div class="clima"><div class="temp">${Math.round(c.temperature_2m)}<small>°C</small></div>
-        <div class="desc"><b>${desc}</b>Sensación ${Math.round(c.apparent_temperature)}°</div></div>
+        <div class="desc"><b>${desc}</b>Sensación ${Math.round(c.apparent_temperature)}°</div>${deaHero()}</div>
         <div class="clima-datos"><span>${I('wind')}${Clima.rumbo(c.wind_direction_10m)} ${Math.round(c.wind_speed_10m)} km/h</span>
           <span>${I('zap')}Ráfagas ${Math.round(c.wind_gusts_10m)}</span>
           <span>${I('sunrise')}${sol.sale}</span><span>${I('sunset')}${sol.pone}</span></div>`
-        : `<div class="clima-datos" style="margin-top:14px"><span>${I('cloud')}Cargando el clima de Ushuaia…</span></div>`}
+        : `<div class="clima">${deaHero()}</div><div class="clima-datos" style="margin-top:14px"><span>${I('cloud')}Cargando el clima de Ushuaia…</span></div>`}
     </div>`;
 
     const pron = Clima.d?.dd ? `<div class="pronostico">${[1,2,3].map(i => {
@@ -539,18 +597,28 @@ R.inicio = {
         <div class="v">${dd.snowfall_sum[i] >= 1 ? `❄ ${Math.round(dd.snowfall_sum[i])} cm` : `ráf. ${Math.round(dd.wind_gusts_10m_max[i])}`}</div></div>`; }).join('')}</div>`
       : `<div class="card muted small">${I('cloud')} Cargando el pronóstico…</div>`;
 
-    const puertas = ['casa', 'comunidad', 'ciudad', ...(esAdmin() ? ['gestion'] : [])]
-      .map(k => puerta(k, u, s, hoy)).join('');
+    /* LOS DOS BRAZOS NO SE REPITEN
+       En modo vecino se ven las tres puertas de cualquier vecino. En modo
+       Administración, la portada es SOLO la gestión: sin "Tu casa", "El
+       barrio" ni "Ushuaia", que ya están en el modo vecino. Antes el modo
+       Administración mostraba todo lo del vecino más lo de la gestión, y
+       quien administra veía dos veces lo mismo. */
+    const puertas = ['casa', 'comunidad', 'ciudad'].map(k => puerta(k, u, s, hoy)).join('');
+    const bloqueSeguir = esAdmin()
+      ? `${sec('Gestión del barrio', puedeAdministrar() && tengoLote() ? `<button class="link" data-a="cambiar-modo">Ver como vecino</button>` : '')}${SECCIONES.gestion.tejas(u, s, hoy)}`
+      : `${sec('Por dónde seguir')}<div class="puertas-arte">${puertas}</div>`;
 
     /* =========================================================
        LA PORTADA, DE ARRIBA ABAJO
          1. el saludo y el tiempo de ahora (hero),
          2. los próximos días y la luz del día,
-         3. la pizarra del día: lo del barrio y lo tuyo, por color de
-            importancia (va ANTES del hotel: primero lo que importa),
-         4. las propuestas del Hotel Los Cauquenes,
-         5. Ushuaia hoy,
-         6. por dónde seguir: tres ventanas ilustradas.
+         3. la pizarra del día, compacta: una línea por aviso y por color
+            de importancia,
+         4. por dónde seguir: las ventanas ilustradas,
+         5. al pie, más tranquilas, las dos cintas (Ushuaia hoy y el
+            Hotel Los Cauquenes): antes iban una debajo de la otra en el
+            medio de la portada y eran demasiado estímulo,
+         6. el pie con la versión y el lugar.
        Cada bloque ocupa el ancho entero y reparte su contenido en su
        propia grilla: en el teléfono se apila y en la computadora se abre.
        ========================================================= */
@@ -560,10 +628,10 @@ R.inicio = {
           <div>${sec('Próximos días')}${pron}</div>
           <div>${sec('Luz del día')}${barraLuz(sol)}</div>
         </section>
-        <section class="bloque pizarra-dia">${sec('Pizarra del día')}${pizarraDelDia()}</section>
-        <section class="bloque">${tiraPromos()}</section>
-        <section class="bloque">${ushuaiaHoy()}</section>
-        <section class="bloque">${sec('Por dónde seguir')}<div class="puertas-arte">${puertas}</div></section>
+        <section class="bloque pizarra-dia">${pizarraDelDia()}</section>
+        <section class="bloque" id="porDondeSeguir">${bloqueSeguir}</section>
+        <section class="bloque cintas-pie">${ushuaiaHoy()}${tiraPromos()}</section>
+        ${pieApp()}
       </div>`;
   },
 };
@@ -579,9 +647,10 @@ function ushuaiaHoy(){
     const on = enTemporada(t), d = on ? diasHasta(t.hasta) : diasHasta(t.desde);
     partes.push(chip(t.icon || 'calendar', esc(t.nombre), on ? (d <= 15 ? `termina en ${plural(d, 'día')}` : 'abierta') : `abre en ${plural(d, 'día')}`, on));
   });
-  const cru = s.cruceros.filter(c => c.fecha === hoy), cruMan = s.cruceros.filter(c => c.fecha === sumarDias(hoy, 1));
-  if (cru.length) partes.unshift(chip('send', `Hoy recala ${esc(cru[0].barco)}`, `${cru.length > 1 ? `y ${cru.length - 1} más · ` : ''}${cru[0].llega ? cru[0].llega + ' h' : ''}${cru[0].pasajeros ? ' · ' + cru[0].pasajeros + ' pasajeros' : ''}`, true));
-  else if (cruMan.length) partes.unshift(chip('send', `Mañana recala ${esc(cruMan[0].barco)}`, cruMan[0].llega ? cruMan[0].llega + ' h' : '', false));
+  const cru = Cruceros.hoy(), cruMan = Cruceros.lista().filter(c => c.fecha === sumarDias(hoy, 1));
+  const chipCru = (icon, t, x, on) => `<button class="uh-chip ${on ? 'on' : ''}" data-a="abrir" data-v="cruceros">${I(icon)}<span><b>${t}</b>${x ? `<small>${x}</small>` : ''}</span></button>`;
+  if (cru.length) partes.unshift(chipCru('send', `Hoy recala ${esc(conMayusculasBarco(cru[0].barco))}`, `${cru.length > 1 ? `y ${cru.length - 1} más · ` : ''}${horaDe(cru[0].llega)} a ${horaDe(cru[0].sale)} h${cru[0].pasajeros ? ' · ' + cru[0].pasajeros + ' pasajeros' : ''}`, true));
+  else if (cruMan.length) partes.unshift(chipCru('send', `Mañana recala ${esc(conMayusculasBarco(cruMan[0].barco))}`, `${horaDe(cruMan[0].llega)} h`, false));
   /* Qué pasa hoy: si es feriado o no laborable, va primero, porque cambia el día. */
   const info = diaInfo(hoy);
   if (info.feriado) partes.unshift(chip('calendar', `Hoy es feriado`, esc(info.feriado.nombre), true));
@@ -1037,7 +1106,7 @@ R.garita = {
         ${teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:'Avisos del día' })}
         ${teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#seguridad y más' })}
         ${teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas' })}
-        ${teja({ v:'agenda', icon:'phone', color:'danger', t:'Emergencias', s:'Teléfonos útiles' })}
+        ${teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'Teléfonos útiles y DEA' })}
         ${teja({ v:'documentos', icon:'file', color:'brand', t:'Reglamento', s:'Normas y protocolos' })}
         ${esGuardia() ? teja({ a:'cerrar-turno', icon:'logout', color:'warn', t:'Cerrar el turno', s:'Cambio de guardia' }) : ''}</div>` : ''}`;
   },
@@ -1158,7 +1227,9 @@ R.bitacora = {
     let dia = '';
     return `<form data-f="bitacora" class="card">
         <div class="seg" style="margin-bottom:10px">${Object.entries(TIPOS_BIT).filter(([k]) => k !== 'acceso').map(([k, t], i) => `<label><input type="radio" name="tipo" value="${k}" ${i === 1 ? 'checked' : ''}><span>${I(t[1])}${t[0]}</span></label>`).join('')}</div>
-        <div class="linea-form"><input name="texto" id="bitTxt" required maxlength="300" placeholder="¿Qué pasó?"><button class="btn btn-pri">${I('send')}</button></div></form>
+        <div class="linea-form"><input name="texto" id="bitTxt" required maxlength="300" placeholder="¿Qué pasó?"><button class="btn btn-pri">${I('send')}</button></div>
+        <label class="check" style="margin:10px 0 0"><input type="checkbox" name="avisar" ${esAdmin() ? 'checked' : ''}><span>${esAdmin() ? 'Avisarle también a la garita (le suena y le aparece en la campanita)' : 'Avisarle también a la Administración'}</span></label>
+        <p class="muted tiny" style="margin:8px 0 0">${I('info')} Lo que se anota acá queda en el <b>libro de guardia</b>: lo leen solo la garita y la Administración, con fecha, hora y quién lo escribió. No lo ven los vecinos y no se puede borrar.</p></form>
       <div class="chips">${['todo', ...Object.keys(TIPOS_BIT)].map(k => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="bitacora" data-p="${k}">${k === 'todo' ? 'Todo' : TIPOS_BIT[k][0]}</button>`).join('')}</div>
       <div class="card">${lista.length ? lista.map(b => {
         const d = isoDe(new Date(b.at)); const sep = d !== dia ? (dia = d, `<div class="sec" style="margin:14px 0 4px"><h2>${relDia(d)}</h2></div>`) : '';
@@ -1167,7 +1238,15 @@ R.bitacora = {
           <div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(autorVisible(b.autor).nombre)}${usuario(b.autor)?.rol === 'guardia' && b.tipo !== 'turno' && guardiasEn(b.at).length ? ' (' + esc(guardiasEn(b.at).join(', ')) + ')' : ''}</span></div></div></div>`; }).join('') : vacio('book', 'Sin registros.')}</div>`;
   },
 };
-F['bitacora'] = (d, form) => { Store.cambiar(s => s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:d.tipo, texto:d.texto.trim(), at:Date.now() })); form.reset(); const i = $('#bitTxt'); if (i) i.value = ''; toast('Anotado', 'book'); };
+F['bitacora'] = (d, form) => {
+  const texto = d.texto.trim(), para = esAdmin() ? 'rol:guardia' : 'rol:admin';
+  Store.cambiar(s => {
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:d.tipo, texto, at:Date.now() });
+    if (d.avisar) notificar(s, { para, titulo:`Libro de guardia · ${(TIPOS_BIT[d.tipo] || TIPOS_BIT.novedad)[0]}`, texto, icon:'book', color: d.tipo === 'incidente' ? 'danger' : 'wood', link:'bitacora', sonido:true, urgente: d.tipo === 'incidente' });
+  });
+  form.reset(); const i = $('#bitTxt'); if (i) i.value = '';
+  toast(d.avisar ? `Anotado en el libro de guardia y avisado a ${esAdmin() ? 'la garita' : 'la Administración'}` : 'Anotado en el libro de guardia', 'book');
+};
 
 /* ---------- Páginas públicas: la visita pide su pase / ve su QR ---------- */
 function pintarPedirPase(hostId){

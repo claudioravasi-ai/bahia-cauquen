@@ -38,7 +38,7 @@ function sincronizarHistorial(){
    están de guardia, la única ventana es la de abrir el turno.
    ========================================================= */
 const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron', 'chat',
-  'obras', 'proveedores', 'agenda', 'vuelos', 'recoleccion', 'ushuaia', 'documentos']);
+  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos']);
 const ventanaPermitida = id => !esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo()));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
@@ -52,6 +52,7 @@ function abrir(id, param = ''){
     pintar();
     return;
   }
+  guardarScroll();
   PILA.push({ id, param });
   history.pushState({ n: PILA.length }, '');
   ventanaNueva = true;
@@ -65,6 +66,23 @@ function volverA(i){
   saltando = true;
   history.go(-cerrar);
   pintar();
+}
+/* =========================================================
+   VOLVER AL MISMO LUGAR
+   Al abrir una ventana se anota por dónde iba la de atrás; al volver, la
+   app la deja exactamente ahí. Antes, entrar a "Tu casa" desde "Por dónde
+   seguir" y volver tiraba a la persona arriba de todo, a la foto.
+   ========================================================= */
+function guardarScroll(){
+  const top = PILA[PILA.length - 1], c = $('#cuerpo');
+  if (top && c) top.scroll = Math.max(c.scrollTop, document.scrollingElement?.scrollTop || 0);
+}
+let scrollPendiente = null;
+function reponerScroll(){
+  const y = scrollPendiente; scrollPendiente = null;
+  if (y == null) return;
+  const poner = () => { const c = $('#cuerpo'); if (c) c.scrollTop = y; if (document.scrollingElement) document.scrollingElement.scrollTop = y; };
+  poner(); requestAnimationFrame(poner); setTimeout(poner, 120);
 }
 function cerrarVentana(){ if (PILA.length > 1) volverA(PILA.length - 2); }
 window.addEventListener('popstate', e => {
@@ -148,7 +166,10 @@ function pintar(){
   catch(err){ console.error(err); html = panelDeError(err); }
   lienzo.innerHTML = `<div class="lomos">${lomos}</div>` + `<section class="ventana ${PILA.length === 1 ? 'inicio' : ''} ${def.ancha ? 'ancha' : ''} ${ventanaNueva ? 'entra' : ''}" data-id="${activa.id}">${cab}<div class="cuerpo" id="cuerpo">${html}</div></section>`;
   lienzo.classList.toggle('apilado', PILA.length > 1);
+  if (!ventanaNueva && activa.scroll != null && pintar.ultimaPila > PILA.length) scrollPendiente = activa.scroll;
+  pintar.ultimaPila = PILA.length;
   ventanaNueva = false;
+  reponerScroll();
   conRed('después de pintar', despuesDePintar);
   conRed('alarmas', pintarAlarmas);
   conRed('comunicados', mostrarComunicado);
@@ -530,7 +551,7 @@ function sosEnLista(x){
       <div class="btns">
         ${mia ? `<button class="btn btn-xs btn-ok" data-a="sos-cancelar" data-id="${x.id}">${I('check')}Ya está solucionado</button>` : ''}
         <button class="btn btn-xs btn-sec" data-a="sos-ver" data-id="${x.id}">Ver la alerta</button>
-        ${!mia && esStaff() && x.estado === 'atendida' ? `<button class="btn btn-xs btn-danger-soft" data-a="sos-cerrar" data-id="${x.id}">Cerrarla</button>` : ''}
+        ${!mia && esStaff() ? `<button class="btn btn-xs btn-danger-soft" data-a="sos-cerrar" data-id="${x.id}">Cerrarla</button>` : ''}
       </div></div></div>`;
 }
 A['sos-repetir'] = () => { Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .56, .5]], 'square', .16); Sonido.vibrar([400, 160, 400]); };
@@ -899,6 +920,7 @@ A['mi-cuenta'] = () => { const u = yo();
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
+    ${esGuardia() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
     ${superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Por si algo no anda y hay que contarlo' })}
     ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
@@ -1013,10 +1035,10 @@ function elegirModo({ alEntrar = false } = {}){
     ${!conLote ? aviso('warn', 'info', 'Tu cuenta no tiene lote asignado', `Figura como <b>${esc(u.casa || 'sin casa')}</b>. En modo vecino no vas a ver expensas ni visitas propias. Podés corregirlo en Administración → Vecinos.`) : ''}
     <button class="superficie ${modoActivo() === 'vecino' ? 'acento' : ''}" data-a="modo" data-v="vecino">
       <span class="ic ic-ok">${I('home')}</span><span class="txt"><b>${conLote ? 'Como vecino/a de ' + esc(u.casa) : 'Como vecino/a'}</b>
-      <small>Tus visitas, tus reservas, tus expensas y el pizarrón. Sin panel de administración.</small></span>${I('right')}</button>
+      <small>Lo mismo que ve cualquier vecino: tu casa, el barrio y Ushuaia. Sin nada de la gestión.</small></span>${I('right')}</button>
     <button class="superficie ${modoActivo() === 'admin' ? 'acento' : ''}" data-a="modo" data-v="admin">
       <span class="ic ic-accent">${I('sliders')}</span><span class="txt"><b>Como Administración</b>
-      <small>Inscripciones, padrón, contabilidad, expensas, garita, reclamos y auditoría.</small></span>${I('right')}</button>
+      <small>Solo la gestión: inscripciones, padrón, contabilidad, expensas, garita y reclamos. Lo tuyo como vecino queda en el otro modo.</small></span>${I('right')}</button>
     <p class="muted tiny" style="margin:14px 0 0">Esta elección es solo tuya, porque administrás el barrio. Los vecinos y la guardia no la ven.</p>`);
 }
 A['cambiar-modo'] = () => elegirModo();
@@ -1280,6 +1302,7 @@ function rutaPublica(){
 function datosDeAfuera(){
   Clima.pedir().then(() => { aplicarTema(); refrescarPronto(); });
   Vuelos.pedir().then(() => refrescarPronto()).catch(() => {});
+  if (typeof Cruceros !== 'undefined') Cruceros.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});
   if (typeof Promos !== 'undefined') Promos.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});
 }
 

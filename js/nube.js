@@ -46,7 +46,7 @@ const Nube = {
   ZONAS: {
     barrio: ['users','padron','amenities','agenda','temporadas','feriados','eventosCiudad','contactos','documentos',
              'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
-             'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos'],
+             'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos'],
   },
@@ -89,6 +89,7 @@ const Nube = {
     padron:          { listas:['titulares'] },
     amenities:       { listas:['franjas'] },
     cruceros:        { listas:['escalas'] },
+    descargas:       { listas:[] },
   },
   comoLaGuardamos(col, x){
     const f = this.FORMAS[col];
@@ -181,7 +182,7 @@ const Nube = {
     if (mio.rol === 'admin' && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
     /* Las alertas que ya estaban abiertas antes de entrar no saltan ni
        suenan: eso lo decide pintarAlarmas() por la hora de cada alerta. */
-    if (mio.rol === 'admin') this.sembrarContenido();
+    if (mio.rol === 'admin') this.sembrarContenido().then(() => this.sumarNuevos());
     Fotos.relevo = { bajar: id => this.bajarFotoCasa(id), subir: async () => {} };
     setTimeout(() => this.fotoCasaAlDia(), 4000);
     /* La cuenta de la garita se reconoce por el correo: si quedó como vecino
@@ -194,6 +195,39 @@ const Nube = {
       const n = await Correo.reintentar();
       if (n) toast(`Salieron ${plural(n, 'correo que estaba pendiente', 'correos que estaban pendientes')}`, 'mail');
     }, 6000);
+  },
+  /* =========================================================
+     LO NUEVO DE CADA VERSIÓN LLEGA A LA BASE
+     sembrarContenido() solo llena lo que está VACÍO. Si la base ya tiene
+     agenda, un lugar nuevo que se agregó al código no aparecería nunca.
+     Esto suma, por id, lo que falta, y anota en config.sumados qué ids ya
+     se sumaron, para no volver a poner algo que la Administración borró a
+     propósito.
+     ========================================================= */
+  async sumarNuevos(){
+    if (!this.db || !esAdmin()) return;
+    const hechos = new Set(aLista(Store.s.config.sumados));
+    const nuevos = {
+      agenda: agendaInicial().filter(a => AGENDA_NUEVOS.includes(a.categoria)),
+      documentos: MARCO_LEGAL.map(d => ({ ...d, createdAt:Date.now(), updatedAt:Date.now() })),
+      descargas: DESCARGAS,
+    };
+    let n = 0; const cambios = {};
+    for (const col in nuevos){
+      let hay = {};
+      try { hay = (await this.db.ref('barrio/' + col).get()).val() || {}; } catch(e){ continue; }
+      nuevos[col].forEach(x => {
+        const clave = col + ':' + x.id;
+        if (hechos.has(clave)) return;
+        hechos.add(clave);
+        if (!hay[x.id]) { cambios[`barrio/${col}/${x.id}`] = JSON.parse(JSON.stringify(x)); n++; }
+      });
+    }
+    try {
+      if (n) await this.db.ref().update(cambios);
+      if (hechos.size !== aLista(Store.s.config.sumados).length) Store.cambiar(s => { s.config.sumados = [...hechos]; });
+      if (n) toast(`Se sumaron ${plural(n, 'novedad', 'novedades')} a la agenda, las normas y las descargas`, 'check');
+    } catch(e){ console.warn('No se pudo sumar lo nuevo', e.message); }
   },
   async publicarCorreo(){
     const c = Store.s.config;
@@ -225,6 +259,7 @@ const Nube = {
          si pone la dirección del lector en Ajustes, las reemplazan las que
          publica el hotel. */
       promos: base.promos,
+      descargas: JSON.parse(JSON.stringify(DESCARGAS)),
     };
     let puestos = 0;
     for (const col in arranque){
@@ -366,8 +401,27 @@ const Nube = {
     if (cfg !== this.ultimo.config){ poner('barrio/config', s.config); this.ultimo.config = cfg; }
     const ml = JSON.stringify(s.motorLog || {});
     if (ml !== this.ultimo.motorLog){ poner('barrio/motorLog', s.motorLog || {}); this.ultimo.motorLog = ml; }
-    const n = Object.keys(cambios).length;
-    if (n) this.db.ref().update(cambios).catch(e => toast('No se pudo guardar en la nube: ' + e.message, 'alert'));
+    /* =========================================================
+       CADA COLECCIÓN VIAJA POR SEPARADO
+       Un update() con varias rutas es TODO O NADA: si una sola ruta no
+       tiene permiso, Firebase rechaza el paquete entero. Así fue como el
+       "Ya está solucionado" del SOS no cerraba nada: junto con la alerta
+       se mandaba una línea a la bitácora de la guardia, que un vecino no
+       puede escribir, y se caía también el cierre de la alerta. La alerta
+       volvía a aparecer como activa en todas las apps.
+       Ahora se agrupa por colección (staff/sos, staff/bitacora, …) y cada
+       grupo se manda solo: si uno falla, los demás llegan igual.
+       ========================================================= */
+    const grupos = {};
+    Object.keys(cambios).forEach(r => { const g = r.split('/').slice(0, 2).join('/'); (grupos[g] = grupos[g] || {})[r] = cambios[r]; });
+    Object.entries(grupos).forEach(([g, paquete]) => {
+      this.db.ref().update(paquete).catch(e => {
+        console.warn('No se pudo guardar', g, e.message);
+        /* Lo que es del personal (bitácora, auditoría) no es tarea del vecino:
+           si no llega, no se lo asusta con un cartel. */
+        if (!/^staff\/(bitacora|auditoria)$/.test(g)) toast('No se pudo guardar en la nube (' + g.split('/')[1] + '): ' + e.message, 'alert');
+      });
+    });
   },
 
   /* ---------- cuentas ---------- */

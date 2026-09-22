@@ -84,8 +84,69 @@ function doPost(e) {
   }
 }
 
-function doGet() {
-  return responder({ok: true, estado: 'activo', enviadosHoy: contarHoy(), tope: TOPE_DIARIO});
+function doGet(e) {
+  var q = e && e.parameter && e.parameter.q;
+  if (q === 'cruceros') return responder(cruceros(e.parameter.forzar === '1'));
+  return responder({ok: true, estado: 'activo', enviadosHoy: contarHoy(), tope: TOPE_DIARIO, cruceros: true});
+}
+
+/**
+ * CRUCEROS EN USHUAIA
+ * ---------------------------------------------------------------------------
+ * El cronograma oficial lo publica el Instituto Fueguino de Turismo en
+ * findelmundo.tur.ar, armado con los datos de la Dirección Provincial de
+ * Puertos. Esa página no deja que la app la lea directo (el navegador lo
+ * impide), pero Google sí puede leerla: este programa la lee, se queda con
+ * lo importante y se lo pasa a la app. Guarda el resultado 3 horas, así
+ * aunque haya 150 vecinos mirando, la página del INFUETUR se lee pocas
+ * veces por día.
+ *
+ * No hace falta configurar nada: con pegar este código nuevo y hacer
+ * "Implementar -> Gestionar implementaciones -> editar -> Nueva versión",
+ * la ventana Cruceros de la app se llena sola.
+ */
+var CRUCEROS_URL = 'https://findelmundo.tur.ar/es/cruceros/cronograma';
+
+function cruceros(forzar) {
+  var cache = CacheService.getScriptCache();
+  if (!forzar) {
+    var guardado = cache.get('cruceros');
+    if (guardado) return JSON.parse(guardado);
+  }
+  var hoy = new Date(), barcos = [], actualizado = '';
+  for (var i = 0; i < 3; i++) {
+    var d = new Date(hoy.getFullYear(), hoy.getMonth() + i, 1);
+    var p = d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2);
+    try {
+      var html = UrlFetchApp.fetch(CRUCEROS_URL + '?p=' + p, {muteHttpExceptions: true}).getContentText('UTF-8');
+      var r = leerCronograma(html);
+      barcos = barcos.concat(r.barcos);
+      if (r.actualizado) actualizado = r.actualizado;
+    } catch (err) { /* un mes que no carga no frena a los otros */ }
+  }
+  var salida = {ok: true, fuente: 'INFUETUR · findelmundo.tur.ar', actualizado: actualizado, leido: new Date().toISOString(), barcos: barcos};
+  try { cache.put('cruceros', JSON.stringify(salida), 3 * 3600); } catch (e) {}
+  return salida;
+}
+
+/* Lee la tabla del cronograma. Cada fila: buque, operador (con enlace),
+   arribo, partida, capacidad de pasajeros y tipo de viaje. */
+function leerCronograma(html) {
+  var limpio = function (s) { return String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&acute;|´/g, "'").replace(/\s+/g, ' ').trim(); };
+  var fecha = function (s) { var m = limpio(s).match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2})/); return m ? m[3] + '-' + m[2] + '-' + m[1] + 'T' + ('0' + m[4]).slice(-2) + ':' + m[5] : ''; };
+  var cuerpo = (html.split('<tbody>')[1] || '').split('</tbody>')[0];
+  var barcos = [];
+  var filas = cuerpo.split(/<tr[^>]*>/).slice(1);
+  for (var i = 0; i < filas.length; i++) {
+    var celdas = filas[i].split(/<td[^>]*>/).slice(1);
+    if (celdas.length < 6) continue;
+    var link = (celdas[1].match(/href="([^"]+)"/) || [])[1] || '';
+    var b = {barco: limpio(celdas[0]), operador: limpio(celdas[1]), web: link, llega: fecha(celdas[2]), sale: fecha(celdas[3]),
+             pasajeros: parseInt(limpio(celdas[4]), 10) || 0, tipo: limpio(celdas[5])};
+    if (b.barco && b.llega) barcos.push(b);
+  }
+  var act = (html.match(/Datos actualizados al d[ií]a ([^.<]+)/) || [])[1] || '';
+  return {barcos: barcos, actualizado: limpio(act)};
 }
 
 function responder(obj) {

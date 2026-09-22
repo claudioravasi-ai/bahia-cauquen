@@ -235,16 +235,7 @@ const ADMIN_TABS = {
       <div class="garita-kpis" style="margin-top:8px">${kpi(pasesDelDia().length, 'Visitas hoy')}${kpi(s.reservas.filter(r => r.fecha >= hoy && r.fecha <= sumarDias(hoy, 7) && !r.cancelada).length, 'Reservas 7 días')}${kpi(s.peticiones.filter(p => p.estado === 'pendiente').length, 'Peticiones')}</div></div>
       <div class="card"><b style="font-size:14px">Ingresos por día (últimos 7)</b>
         <div style="display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:12px">${ingresos7.map(x => `<div style="flex:1;text-align:center"><div class="tiny muted">${x.n}</div><div style="height:${x.n / max * 80}px;min-height:3px;background:var(--brand);border-radius:6px 6px 0 0"></div><div class="tiny muted">${DIAS[fechaDe(x.d).getDay()]}</div></div>`).join('')}</div></div>
-      <div class="mosaico">
-        ${teja({ a:'nuevo-post', v:'aviso', icon:'tack', color:'sky', t:'Comunicado oficial', s:'Suena y llega a todos' })}
-        ${teja({ a:'nueva-votacion', icon:'vote', color:'accent', t:'Nueva votación', s:'Un voto por casa' })}
-        ${teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Reclamos', s:'Responder y publicar' })}
-        ${teja({ v:'privado', p:'admin', icon:'lock', color:'accent', t:'Mensajes', s:'Conversaciones privadas' })}
-        ${teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones', s:'Firmadas a la garita' })}
-        ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy' })}
-        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas y cobranzas', s:'Cupones, pagos y morosos' })}
-        ${teja({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Gastos, cierre y ARCA' })}
-      </div>`;
+      <p class="muted small" style="margin:10px 2px 0">${I('info')} Reclamos, peticiones, garita, comunicados, contabilidad y expensas están en <b>Gestión del barrio</b>; acá, los datos y la configuración.</p>`;
   },
   solicitudes(){
     const s = Store.s, pend = s.users.filter(u => u.estado === 'pendiente'), rech = s.users.filter(u => u.estado === 'rechazado');
@@ -261,8 +252,6 @@ const ADMIN_TABS = {
     return `<form data-f="buscar-vecino-admin" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecAdm" value="${esc(q || '')}" placeholder="Nombre, casa, email o DNI"><button class="btn btn-pri">${I('search')}</button></form>
       ${superficie({ a:'alta-staff', icon:'plus', color:'accent', t:'Dar de alta guardia o administrador', s:'Cuentas del personal' })}
       ${superficie({ a:'pasar-admin', icon:'key', color:'wood', t:'Pasar la Administración a otro vecino', s:'Por ejemplo, a Paula cuando la app esté andando' })}
-      ${superficie({ v:'padron', icon:'users', color:'brand', t:'Padrón de propietarios',
-        s: Store.s.padron.length ? `${plural(Store.s.padron.length, 'unidad', 'unidades')} · buscá por apellido, lote, calle o DNI` : 'Todavía sin cargar: subí la planilla de expensas' })}
       ${Store.s.padron.length ? `<div class="card plana small"><b>${LOTES.length} lotes</b> · ${lotesVecinos().length} de vecinos y ${LOTES.length - lotesVecinos().length} del hotel y las cabañas · ${casasRegistradas()} con cuenta en la app</div>` : ''}
       <div class="card lista">${ls.map(u => `<div class="it">${avatar(u, 'sm')}<div class="txt"><b>${esc(u.nombre)}</b><span>${esc(u.casa)} · ${esc(u.email)}${u.dni ? ' · DNI ' + esc(u.dni) : ''}</span></div>
         <span class="pill ${u.rol === 'admin' ? 'p-accent' : u.rol === 'guardia' ? 'p-brand' : ''}">${u.rol}</span><button class="icon-btn" data-a="gestionar-vecino" data-id="${u.id}" aria-label="Gestionar">${I('more')}</button></div>`).join('')}</div>`;
@@ -324,9 +313,15 @@ const ADMIN_TABS = {
       <button class="btn btn-sec btn-block" data-a="exportar-auditoria">${I('download')}Descargar auditoría (CSV)</button>`;
   },
   datos(){
-    return `<div class="card"><h3>Copia de seguridad</h3><p class="muted small">Mientras la app funcione sin servidor, los datos viven en este equipo. Descargá una copia seguido.</p>
-      <div class="btns"><button class="btn btn-pri" data-a="exportar">${I('download')}Descargar copia</button><label class="btn btn-sec">${I('upload')}Restaurar copia<input type="file" accept="application/json" id="importar" hidden></label></div></div>
-      <div class="card"><h3>Volver a la demo</h3><p class="muted small">Borra todo y carga otra vez los datos de muestra.</p><button class="btn btn-danger-soft" data-a="reiniciar">${I('refresh')}Reiniciar datos</button></div>`;
+    const nube = typeof Nube !== 'undefined' && Nube.activa();
+    return `<div class="card"><h3>Copia de seguridad</h3>
+      ${nube ? `<p class="small" style="color:var(--ink-2);margin-top:0">Los datos del barrio viven en la <b>base del barrio en Firebase</b> (servidores de Google), no en esta computadora: si se rompe o se pierde un celular, no se pierde nada.</p>
+        <p class="small" style="color:var(--ink-2)">Esta copia es un <b>respaldo extra</b>: baja en un archivo todo lo que la Administración ve en este momento (vecinos, padrón, expensas, pagos, reclamos, bitácora, auditoría…). Sirve por si alguna vez se borra algo por error o se quiere guardar el estado de un cierre de mes. Conviene bajarla <b>una vez por mes</b>, después de emitir las expensas, y guardarla en un lugar seguro: tiene datos personales (Ley 25.326).</p>`
+        : `<p class="muted small">La app está funcionando sin servidor (modo de prueba): los datos viven solo en este equipo. Descargá una copia seguido.</p>`}
+      <div class="btns"><button class="btn btn-pri" data-a="exportar">${I('download')}Descargar copia</button>
+        ${nube ? '' : `<label class="btn btn-sec">${I('upload')}Restaurar copia<input type="file" accept="application/json" id="importar" hidden></label>`}</div>
+      ${nube ? `<p class="muted tiny" style="margin:10px 0 0">"Restaurar" no aparece a propósito: con la base del barrio en uso, volcar un archivo viejo pisaría lo que cargaron los vecinos después. Si alguna vez hace falta recuperar algo, se hace a mano desde la copia.</p>` : ''}</div>
+      ${nube ? '' : `<div class="card"><h3>Volver a la demo</h3><p class="muted small">Borra todo y carga otra vez los datos de muestra. Solo existe en el modo de prueba.</p><button class="btn btn-danger-soft" data-a="reiniciar">${I('refresh')}Reiniciar datos</button></div>`}`;
   },
 };
 A['regla'] = el => { setTimeout(() => { Store.cambiar(s => { s.config.motor = s.config.motor || {}; s.config.motor[el.dataset.v] = el.checked; }); }, 0); return true; };
@@ -346,8 +341,12 @@ F['ajustes'] = d => {
 A['correos-reintentar'] = async () => {
   Store.s.correos.forEach(c => { if (c.estado !== 'enviado') c.intentos = 0; });
   const n = await Correo.reintentar();
-  toast(n ? `Salieron ${plural(n, 'correo')}` : 'No salió ninguno: mirá el motivo en cada correo', n ? 'mail' : 'alert');
   refrescar();
+  if (!Correo.enCola) return toast('No había correos pendientes de la última semana para reintentar', 'check');
+  if (n === Correo.enCola) return toast(`Salieron los ${plural(n, 'correo')}`, 'mail');
+  hoja('Reintento de correos', `${aviso(n ? 'warn' : 'danger', 'mail', n ? `Salieron ${n} de ${Correo.enCola}` : 'No salió ninguno', esc(Correo.ultimoError || 'Sin detalle'))}
+    <p class="muted small">El motivo de cada uno queda escrito en rojo en el historial, debajo de cada correo. Si dice "no autorizado", la frase de Ajustes y la del Apps Script no coinciden; si dice "tope", ya se mandaron los del día.</p>
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`);
 };
 /* Prueba el correo con lo que está escrito en el formulario, aunque todavía
    no se haya guardado: así se sabe si anda antes de tocar Guardar. */
@@ -753,8 +752,9 @@ A['circular'] = () => {
       <select name="destino" id="circDestino">${Object.entries(DESTINOS_CIRCULAR).map(([k, D]) =>
         `<option value="${k}">${D.n}${k !== 'uno' ? ` (${cuentas[k]})` : ''}</option>`).join('')}</select>
       <div class="ayuda">Solo entran los que tienen correo cargado. Los que no, se pueden completar en el Padrón.</div></div>
-    <div class="field"><label>Si elegiste un lote, ¿cuál?</label>
-      <input name="lote" list="lotesCirc" placeholder="Ej: Lote 42"><datalist id="lotesCirc">${(typeof LOTES === 'undefined' ? [] : LOTES).map(L => `<option>Lote ${L.lote}</option>`).join('')}</datalist></div>
+    <div class="field" id="circLoteCampo"><label>Si elegiste un lote, ¿cuál?</label>
+      <input name="lote" id="circLote" list="lotesCirc" placeholder="Ej: 148 o Lote 148" autocomplete="off"><datalist id="lotesCirc">${(typeof LOTES === 'undefined' ? [] : LOTES).map(L => `<option>Lote ${L.lote}</option>`).join('')}</datalist>
+      <div id="circCorreos"></div></div>
     <div class="field"><label>Asunto</label><input name="asunto" required maxlength="120" placeholder="Ej: Corte de agua programado"></div>
     <div class="field"><label>Mensaje</label><textarea name="cuerpo" required style="min-height:200px" placeholder="Escribilo como se lo dirías a un vecino. Cada renglón en blanco separa un párrafo."></textarea>
       <div class="ayuda">Se manda con el membrete del barrio y el pie de la Ley 25.326. Si escribís <b>{nombre}</b> o <b>{lote}</b>, la app los reemplaza en cada correo.</div></div>
@@ -764,16 +764,45 @@ A['circular'] = () => {
     ${Correo.configurado() ? '' : `<p class="muted tiny" style="margin:10px 0 0">${I('info')} El envío automático no está configurado: los correos van a quedar en la bandeja de salida para mandarlos a mano. El aviso dentro de la app sale igual.</p>`}</form>`,
     { ancho:'620px' });
 };
+/* =========================================================
+   UN LOTE PUEDE TENER VARIOS CORREOS
+   El del propietario en el padrón y los de cada persona con cuenta en la
+   app (por ejemplo, los dos de una pareja). Al elegir "Un lote en
+   particular" aparecen todos, marcados, y se destilda el que no va.
+   ========================================================= */
+const loteNormal = v => { const m = String(v || '').match(/(\d+[A-Za-z]?)/); return m ? 'Lote ' + m[1] : ''; };
+function correosDelLote(lote){
+  const p = Store.s.padron.find(x => 'Lote ' + x.lote === lote) || {};
+  const out = [];
+  const poner = (email, nombre, de) => { const e = String(email || '').trim().toLowerCase(); if (e && !out.some(x => x.email === e)) out.push({ email:e, nombre:nombre || '', de, casa:lote }); };
+  aLista(p.titulares).forEach(t => poner(t && t.email, t && t.nombre, 'padrón'));
+  poner(p.email, p.propietario, 'padrón');
+  Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').forEach(u => poner(u.email, u.nombre, 'cuenta en la app'));
+  return out;
+}
+document.addEventListener('input', e => {
+  if (!e.target.closest || !e.target.closest('form[data-f="circular"]')) return;
+  if (e.target.id === 'circLote' || e.target.id === 'circDestino'){
+    const caja = $('#circCorreos'), lote = loteNormal($('#circLote')?.value);
+    if (!caja) return;
+    if ($('#circDestino')?.value !== 'uno' || !lote){ caja.innerHTML = ''; return; }
+    const cs = correosDelLote(lote);
+    caja.innerHTML = cs.length ? `<div class="card plana small" style="margin:8px 0 0"><b>¿A cuál de los correos de ${esc(lote)}?</b>
+      ${cs.map(c => `<label class="check" style="margin:6px 0 0"><input type="checkbox" name="mail" value="${esc(c.email)}" checked><span>${esc(c.email)}<small class="muted" style="display:block">${esc(c.nombre || '')}${c.nombre ? ' · ' : ''}${esc(c.de)}</small></span></label>`).join('')}</div>`
+      : `<div class="card plana small" style="margin:8px 0 0">${I('info')} ${esc(lote)} no tiene ningún correo cargado. Completalo en el Padrón.</div>`;
+  }
+});
+document.addEventListener('change', e => { if (e.target.id === 'circDestino') e.target.dispatchEvent(new Event('input', { bubbles:true })); });
 F['circular'] = async d => {
   const D = DESTINOS_CIRCULAR[d.destino];
   let gente = D.lista();
   if (d.destino === 'uno'){
-    const lote = (d.lote || '').trim();
-    if (!/^Lote\s/i.test(lote)){ toast('Escribí el lote, por ejemplo "Lote 42"', 'alert'); return; }
-    const p = Store.s.padron.find(x => 'Lote ' + x.lote === lote) || {};
-    const us = Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado' && u.email);
-    gente = [...us.map(u => ({ email:u.email, nombre:u.nombre, casa:lote })),
-             ...(p.email && !us.some(u => u.email.toLowerCase() === p.email) ? [{ email:p.email, nombre:p.propietario, casa:lote }] : [])];
+    const lote = loteNormal(d.lote);
+    if (!lote){ toast('Escribí el lote, por ejemplo "148" o "Lote 148"', 'alert'); return; }
+    const elegidos = [].concat(d.mail || []).map(x => String(x).toLowerCase());
+    const todos = correosDelLote(lote);
+    if (todos.length && !elegidos.length){ toast('Marcá al menos un correo del lote', 'alert'); return; }
+    gente = todos.filter(c => elegidos.includes(c.email));
   }
   /* Un mismo correo puede estar en el padrón y en una cuenta: se manda una vez. */
   const vistos = new Set();
@@ -805,16 +834,24 @@ F['circular'] = async d => {
   }
 
   /* De a diez, con una pausa: así Gmail no lo toma por un envío masivo. */
-  let salieron = 0;
+  const resultado = [];
   toast(`Mandando a ${gente.length}…`, 'send');
   for (let i = 0; i < gente.length; i += 10){
     const tanda = gente.slice(i, i + 10);
-    const r = await Promise.all(tanda.map(x => Correo.enviar({ para:x.email, asunto:d.asunto, tipo:'circular', html:html(x) })));
-    salieron += r.filter(Boolean).length;
+    const r = await Promise.all(tanda.map(x => Correo.enviarDetalle({ para:x.email, asunto:d.asunto, tipo:'circular', html:html(x) })));
+    r.forEach((y, j) => resultado.push({ ...tanda[j], ...y }));
     if (i + 10 < gente.length) await new Promise(res => setTimeout(res, 800));
   }
-  toast(salieron ? `Salieron ${plural(salieron, 'correo')}` : 'Quedaron en la bandeja de salida', salieron ? 'mail' : 'clock');
+  const salieron = resultado.filter(x => x.ok).length;
   refrescar();
+  /* Lo que pasó con cada correo, a la vista: antes decía "no salió
+     ninguno" sin decir por qué, aunque a veces sí había llegado. */
+  hoja('Resultado del envío', `${aviso(salieron === resultado.length ? 'ok' : salieron ? 'warn' : 'danger', 'mail',
+      salieron === resultado.length ? `Salieron los ${plural(salieron, 'correo')}` : `Salieron ${salieron} de ${resultado.length}`, esc(d.asunto))}
+    <div class="card lista">${resultado.map(x => `<div class="it"><span class="ic ic-${x.ok ? 'ok' : 'danger'}" style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none">${I(x.ok ? 'check' : 'x')}</span>
+      <div class="txt"><b>${esc(x.email)}</b><span>${esc(x.nombre || '')}${x.casa ? ' · ' + esc(x.casa) : ''}</span>${x.ok ? '' : `<span style="color:var(--danger)">${esc(x.error || 'No salió')}</span>`}</div></div>`).join('')}</div>
+    <p class="muted tiny">"Salió" quiere decir que Google lo aceptó y lo mandó. Si no aparece en la bandeja de entrada, mirar en Spam o Correo no deseado.</p>
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Listo</button>`);
 };
 
 /* =========================================================

@@ -267,17 +267,24 @@ function certificadoHTML(lote){
    VENTANA DEL VECINO: su carpeta
    ========================================================= */
 R.expensas = {
-  titulo: 'Expensas', icon: 'wallet', color: 'wood', sub: 'Tu cuenta, tus cupones y tus pagos',
+  icon: 'wallet', color: 'wood', sub: 'Tu cuenta, tus cupones y tus pagos',
+  titulo: p => p && esAdmin() ? `Cuenta del ${p}` : 'Expensas',
   render(p){
     const u = yo(), lote = miLote(), L = loteDe(u);
-    if (esAdmin() && !p) return `${superficie({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas y cobranzas del barrio', s:'Cupones, pagos, morosos y recibos', cls:'acento' })}
-      ${superficie({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Gastos del mes, cierre e impositivo' })}
-      ${sec('Tu propia cuenta')}${carpetaVecino(lote)}`;
+    /* La Administración mira la cuenta de un lote (desde el padrón o morosos). */
+    if (esAdmin() && p && /^Lote\s/i.test(p)) return `<div class="card plana small">${I('eye')} Estás viendo la cuenta del <b>${esc(p)}</b>${propietarioDe(p) ? ' · ' + esc(propietarioDe(p)) : ''}, como la ve el vecino.
+        <div class="btns" style="margin-top:8px">${saldoLote(p) > .5 ? `<button class="btn btn-xs btn-sec" data-a="certificado-deuda" data-v="${esc(p)}">${I('file')}Certificado de deuda</button><button class="btn btn-xs btn-sec" data-a="reclamar-deuda" data-v="${esc(p)}">${I('send')}Reclamar</button>` : ''}
+          <button class="btn btn-xs btn-sec" data-a="ficha-lote" data-v="${esc(p.replace(/^Lote\s*/i, ''))}">${I('user')}Ficha del lote</button></div></div>
+      ${carpetaVecino(p, { ajena:true })}`;
+    /* En modo Administración, "Expensas" a secas muestra la cuenta del
+       propio lote; las del barrio están en Gestión → Expensas y cobranzas
+       (no se repiten acá). */
+    if (esAdmin() && !p) return L ? carpetaVecino(lote) : vacio('wallet', 'Tu cuenta no tiene lote. Las expensas del barrio están en Gestión → Expensas y cobranzas.');
     if (!L) return vacio('wallet', 'Tu cuenta todavía no tiene un lote asignado. Avisale a la Administración.');
     return carpetaVecino(lote);
   },
 };
-function carpetaVecino(lote){
+function carpetaVecino(lote, { ajena = false } = {}){
   const cuenta = cuentaLote(lote), pagar = aPagar(lote), c = cfgExp();
   const L = lote && typeof LOTES !== 'undefined' ? LOTES.find(x => 'Lote ' + x.lote === lote) : null;
   const emitidas = liquidacionesEmitidas().slice().reverse();
@@ -285,7 +292,7 @@ function carpetaVecino(lote){
   const misRecibos = Store.s.recibos.filter(r => r.lote === lote).sort((a, b) => b.at - a.at);
   const alDia = cuenta.saldo <= 0.5;
   return `
-    <button class="tarjeta-pago ${alDia ? 'al-dia' : pagar.vencido ? 'vencida' : ''}" ${alDia ? 'disabled' : 'data-a="pagar-expensas"'}>
+    <button class="tarjeta-pago ${alDia ? 'al-dia' : pagar.vencido ? 'vencida' : ''}" ${alDia || ajena ? 'disabled' : 'data-a="pagar-expensas"'}>
       <span class="tp-arriba">
         <span class="tp-rotulo">${alDia ? 'Tu cuenta está al día' : pagar.vencido ? 'Tenés un saldo vencido' : 'Tu expensa de este mes'}</span>
         ${!alDia ? `<span class="tp-chip">${I('wallet')}Pagar ahora</span>` : `<span class="tp-chip">${I('check')}Sin deuda</span>`}
@@ -293,12 +300,12 @@ function carpetaVecino(lote){
       <span class="tp-monto">${plata(Math.max(0, cuenta.saldo))}</span>
       ${pagar.periodo ? `<span class="tp-detalle">${nombrePeriodo(pagar.periodo)} · vence el ${fechaCorta(pagar.vto1)}${pagar.recargo ? ` · con recargo ${plata(pagar.total)}` : ''}</span>` : ''}
       ${cuenta.informado ? `<span class="tp-detalle">${I('clock')} ${plata(cuenta.informado)} informados, esperando confirmación</span>` : ''}
-      ${!alDia ? `<span class="tp-pie">${I('right')}Tocá para pagar: transferencia, Mercado Pago, MODO o tarjeta</span>` : ''}
+      ${!alDia && !ajena ? `<span class="tp-pie">${I('right')}Tocá para pagar: transferencia, Mercado Pago, MODO o tarjeta</span>` : ''}
     </button>
     ${L ? `<div class="card plana small" style="color:var(--ink-2)">${I('info')} ${esc(lote)} · UF ${L.uf} · coeficiente <b>${L.coef.toFixed(4)} %</b>. De cada $100 de gastos del barrio, a tu lote le corresponden $${L.coef.toFixed(2)}.</div>` : ''}
     ${sec('Tus cupones')}
     ${emitidas.length ? emitidas.slice(0, 12).map(l => { const cu = cuotaDe(l, lote); if (!cu) return '';
-      return `<button class="superficie" data-a="ver-cupon" data-v="${l.periodo}"><span class="ic ic-wood">${I('file')}</span>
+      return `<button class="superficie" data-a="ver-cupon" data-v="${l.periodo}" data-p="${esc(lote)}"><span class="ic ic-wood">${I('file')}</span>
         <span class="txt"><b>${nombrePeriodo(l.periodo)}</b><small>${plata(cu.total + (cu.interes || 0))} · 1º vto ${fechaCorta(vtoDe(l.periodo, 1))}</small></span>${I('right')}</button>`; }).join('')
       : vacio('file', 'Todavía no hay cupones emitidos.')}
     ${sec('Movimientos de tu cuenta')}
@@ -487,12 +494,12 @@ const CONTA = {
           <div class="kpi"><b>${LOTES.length}</b><span>Lotes a prorratear</span></div></div></div>
       ${ant ? `<div class="card plana small">Mes anterior (${nombrePeriodo(ant.periodo)}): ${plata(ant.totalGastos)} · variación ${(((calc.totalGastos - ant.totalGastos) / (ant.totalGastos || 1)) * 100).toFixed(1)} %</div>` : ''}
       ${sec('El mes, paso a paso')}
-      <div class="mosaico">
-        ${teja({ v:'contabilidad', p:'gastos', icon:'file', color:'wood', t:'1 · Cargar gastos', s:'Facturas y pagos del mes', n:calc.gastos || '' })}
-        ${teja({ v:'contabilidad', p:'cierre', icon:'zap', color:'brand', t:'2 · Cerrar el mes', s: emitida ? 'Ya emitida' : 'Prorratear y emitir cupones' })}
-        ${teja({ v:'cobranzas', p:'cobranzas', icon:'wallet', color:'ok', t:'3 · Cobrar', s:'Pagos, morosos y recibos', badge: Store.s.pagos.filter(x => x.estado === 'informado').length })}
-        ${teja({ v:'contabilidad', p:'impositivo', icon:'clipboard', color:'accent', t:'4 · ARCA', s:'Libro de gastos y presentaciones' })}
-      </div>
+      <ol class="pasos-mes">
+        <li class="${calc.gastos ? 'hecho' : ''}"><b>Cargar los gastos</b> <span>${calc.gastos ? plural(calc.gastos, 'comprobante') : 'pestaña Gastos del mes'}</span></li>
+        <li class="${emitida ? 'hecho' : ''}"><b>Cerrar el mes y emitir los cupones</b> <span>${emitida ? 'hecho' : 'pestaña Cierre de mes'}</span></li>
+        <li><b>Cobrar</b> <span>en Expensas y cobranzas</span></li>
+        <li><b>Presentar en ARCA</b> <span>pestaña ARCA</span></li>
+      </ol>
       ${sec('Para el contador')}
       ${superficie({ a:'exportar-contable', icon:'download', color:'sky', t:'Planilla del mes (CSV)', s:'Comprobantes, rubros, IVA y retenciones' })}
       ${superficie({ a:'mandar-contador', icon:'mail', color:'accent', t:'Avisarle al contador', s: cfgExp().contador || 'Todavía no hay correo cargado' })}
@@ -645,12 +652,7 @@ const COBRO = {
         `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="cobranzas" data-p="cobranzas">Ver los pagos</button>`) : ''}
       ${!emitida ? aviso('info', 'file', 'Para cobrar, primero hay que cerrar el mes', 'El cierre reparte los gastos entre los lotes y emite los cupones.',
         `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="cierre">Ir al cierre</button>`) : ''}
-      <div class="mosaico">
-        ${teja({ v:'cobranzas', p:'cupones', icon:'file', color:'wood', t:'Cupones', s:'Emitidos, reenviar por correo' })}
-        ${teja({ v:'cobranzas', p:'cobranzas', icon:'wallet', color:'ok', t:'Pagos', s:'Informados y confirmados', badge: pend })}
-        ${teja({ v:'cobranzas', p:'morosos', icon:'alert', color:'danger', t:'Morosos', s:plataCorta(deuda), n:morosos || '' })}
-        ${teja({ v:'cobranzas', p:'recibos', icon:'check', color:'brand', t:'Recibos', s:'Los que ya se emitieron', n:Store.s.recibos.length || '' })}
-      </div>`;
+      <p class="muted small" style="margin:10px 2px 0">${I('info')} Cupones, pagos, morosos y recibos están en las pestañas de arriba.</p>`;
   },
 
   cupones(){
@@ -931,3 +933,6 @@ REGLAS.push(
           n += marca(s, `arca-${p.id}-${per}-${hoy}`, () => notificar(s, { para:'rol:admin', titulo:`${p.nombre}: vence ${fechaCorta(p.vence)}`, texto:`Período ${nombrePeriodo(per)}`, icon:'clipboard', color:'accent', link:'contabilidad:impositivo' })); });
       return n; } },
 );
+
+/* "Ver cuenta" desde el padrón, la ficha del lote o la lista de morosos. */
+A['ver-cuenta'] = el => { cerrarHoja(); abrir('expensas', el.dataset.v); };

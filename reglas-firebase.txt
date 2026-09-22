@@ -128,6 +128,7 @@ PEGAR DESDE ACÁ
       /* Las promociones del hotel las publica la Administración; las ven todos
          los vecinos aprobados. Sin esta regla, Firebase NIEGA la rama entera y
          la tira de ofertas de la portada no aparece nunca (falla muda). */
+      "descargas":     { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "promos":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
 
       /* Los comunicados importantes: los escribe la Administración, los ve
@@ -165,7 +166,8 @@ PEGAR DESDE ACÁ
         ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
         ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
       },
-      "bitacora": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      "bitacora": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$id": { ".write": "!data.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" } },
       "avisos":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "correos":  { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "impuestos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },

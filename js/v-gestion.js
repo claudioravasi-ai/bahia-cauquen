@@ -706,24 +706,79 @@ A['borrar-voluminoso'] = async el => {
   });
 };
 
-/* ---------- EMERGENCIAS Y AGENDA ---------- */
-R.agenda = {
-  titulo: 'Emergencias y agenda', icon: 'phone', color: 'danger', sub: 'Tocá un teléfono para llamar',
-  render(q){
-    const s = Store.s, qq = (q || '').toLowerCase();
-    const cats = [...new Set(s.agenda.map(a => a.categoria))];
-    const it = a => `<div class="it"><div class="txt"><b>${esc(a.nombre)}</b>${a.detalle ? `<span>${esc(a.detalle)}</span>` : ''}</div>${a.tel ? `<a class="tel-btn" href="${telLink(a.tel)}">${I('phone')}${esc(a.tel)}</a>` : '<span class="muted tiny">sin teléfono</span>'}</div>`;
-    const lista = qq ? s.agenda.filter(a => (a.nombre + ' ' + a.detalle + ' ' + a.categoria).toLowerCase().includes(qq)) : null;
+/* =========================================================
+   EMERGENCIAS y AGENDA, en dos ventanas
+   Antes era una sola ("Emergencias y agenda") y el día que hace falta un
+   número de urgencia había que pasar entre heladerías y gimnasios. Ahora:
+     · EMERGENCIAS: los 4 números grandes, el DEA, los SOS de hoy, los
+       teléfonos del barrio, y las categorías de urgencia hasta farmacias;
+     · AGENDA: todo lo demás de Ushuaia (comidas, taxis, súper…) y los
+       vecinos que compartieron su profesión u oficio con el barrio.
+   ========================================================= */
+const CATS_EMERGENCIA = /emergenc|hospital|farmac/i;
+/* ¿Es un celular (tiene WhatsApp)? En Ushuaia los fijos empiezan con 4
+   después del 2901 (2901-42…, 43…, 44…); los celulares, con 15, 5 o 6.
+   En Buenos Aires (11), con 15 o 6. Ante la duda, no se ofrece WhatsApp:
+   mejor que falte un botón a que abra un chat con un teléfono fijo. */
+const esCelular = tel => {
+  let d = soloDigitos(tel).replace(/^0/, '').replace(/^549?/, '');
+  const m = d.match(/^(2901|2964|11)(\d+)$/); if (!m) return false;
+  return m[1] === '11' ? /^(15|6)/.test(m[2]) : /^(15|5|6)/.test(m[2]);
+};
+const waAR = tel => { let d = soloDigitos(tel).replace(/^0/, ''); if (!d.startsWith('54')) d = '549' + d.replace(/^(\d{2,4})15/, '$1'); return 'https://wa.me/' + d; };
+const renglonAgenda = a => `<div class="it" data-cat="${esc(a.categoria || '')}"><div class="txt"><b>${esc(a.nombre)}</b>${a.detalle ? `<span>${esc(a.detalle)}</span>` : ''}</div>
+  <div class="tel-acciones">${a.tel ? `<a class="tel-btn" href="${telLink(a.tel)}">${I('phone')}${esc(a.tel)}</a>` : '<span class="muted tiny">sin teléfono</span>'}
+  ${a.tel && (a.wa || esCelular(a.tel) || /whats\s?app/i.test(a.nombre + ' ' + (a.detalle || ''))) ? `<a class="tel-btn wa" href="${waAR(a.tel)}" target="_blank" rel="noopener" aria-label="WhatsApp a ${esc(a.nombre)}">${I('chat')}<span>WhatsApp</span></a>` : ''}</div></div>`;
+R.emergencias = {
+  titulo: 'Emergencias', icon: 'siren', color: 'danger', sub: 'Tocá un teléfono para llamar',
+  render(){
+    const s = Store.s;
+    const cats = [...new Set(s.agenda.map(a => a.categoria))].filter(c => CATS_EMERGENCIA.test(c));
     return `<div class="btns" style="margin-bottom:12px"><a class="btn btn-danger" href="tel:911">${I('phone')}911</a><a class="btn btn-danger-soft" href="tel:107">107 Ambulancia</a><a class="btn btn-danger-soft" href="tel:100">100 Bomberos</a><a class="btn btn-danger-soft" href="tel:101">101 Policía</a></div>
-      <div class="card"><b>${I('heart')} Desfibrilador (DEA) del barrio</b><div class="small" style="color:var(--ink-2);margin-top:4px">${esc(s.config.dea)}</div></div>
+      <div class="card"><b>${I('heart')} Desfibrilador (DEA) del barrio · operativo</b><div class="small" style="color:var(--ink-2);margin-top:4px">${esc(s.config.dea)}</div></div>
       ${sosDelDia()}
-      ${sec('Del barrio')}<div class="card lista">${s.contactos.map(c => it({ nombre:c.nombre, detalle:c.detalle, tel:c.tel })).join('')}</div>
-      <form data-f="buscar-agenda" class="linea-form" style="margin:16px 0 4px"><input name="q" id="qAgenda" value="${esc(q || '')}" placeholder="Buscar farmacia, taxi, veterinaria…"><button class="btn btn-pri">${I('search')}</button></form>
-      ${lista ? `<div class="card lista">${lista.length ? lista.map(it).join('') : vacio('search', 'Sin resultados')}</div>`
-        : cats.map(c => `${sec(esc(c))}<div class="card lista">${s.agenda.filter(a => a.categoria === c).map(it).join('')}</div>`).join('')}`;
+      ${sec('Del barrio')}<div class="card lista">${s.contactos.map(c => renglonAgenda({ nombre:c.nombre, detalle:c.detalle, tel:c.tel, wa: c.wa !== false })).join('')}</div>
+      ${cats.map(c => `${sec(esc(c))}<div class="card lista">${s.agenda.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('')}
+      ${superficie({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, supermercados, oficios del barrio' })}`;
   },
 };
-F['buscar-agenda'] = d => abrir('agenda', d.q || '');
+/* Los vecinos que eligieron compartir su profesión u oficio con el barrio
+   entran solos a la agenda, con su celular. No hay que cargar nada: se
+   toma de su ficha y desaparece si dejan de compartirlo. */
+function oficiosDelBarrio(){
+  const s = Store.s;
+  if (typeof enDirectorioProfesional !== 'function') return [];
+  return s.users.filter(enDirectorioProfesional).filter(x => x.tel && (x.mostrarTel || x.enDirectorio)).map(x => ({
+    categoria:'🏘️ Profesionales y oficios del barrio',
+    nombre:`${[publicaProfesion(x) ? x.profesion : '', publicaOficio(x) ? x.skills : ''].filter(Boolean).join(' · ')}`,
+    detalle:`${x.nombre} · ${x.casa}`, tel:x.tel, wa:true }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+R.agenda = {
+  titulo: 'Agenda de Ushuaia', icon: 'book', color: 'sky', sub: 'Comidas, taxis, compras y oficios del barrio',
+  render(q){
+    const s = Store.s, qq = normTxt(q || '');
+    const todo = [...oficiosDelBarrio(), ...s.agenda.filter(a => !CATS_EMERGENCIA.test(a.categoria))];
+    const cats = [...new Set(todo.map(a => a.categoria))];
+    const lista = qq ? todo.filter(a => normTxt(a.nombre + ' ' + a.detalle + ' ' + a.categoria).includes(qq)
+      || (qq.length > 3 && normTxt(a.nombre + ' ' + a.categoria).includes(qq.replace(/s$/, '')))) : null;
+    const catsHit = lista ? [...new Set(lista.map(a => a.categoria))] : [];
+    return `<form data-f="buscar-agenda" class="linea-form" id="buscaAgenda" style="margin-bottom:6px"><input name="q" id="qAgenda" value="${esc(q || '')}" placeholder="Buscar: taxi, empanadas, farmacia, electricista…"><button class="btn btn-pri">${I('search')}</button></form>
+      <div class="chips" style="margin-bottom:6px">${cats.map(c => `<button class="chip" data-a="agenda-ir" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+      ${lista ? `<div id="agendaResultados">${sec(`${plural(lista.length, 'resultado')} para "${esc(q)}"`, `<button class="link" data-a="abrir" data-v="agenda">Ver toda la agenda</button>`)}
+          ${catsHit.map(c => `<div class="muted tiny" style="margin:8px 4px 4px;font-weight:800">${esc(c)}</div><div class="card lista">${lista.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('') || vacio('search', 'Sin resultados. Probá con otra palabra.')}</div>`
+        : cats.map(c => `<div class="agenda-cat" id="cat-${esc(normTxt(c).replace(/[^a-z0-9]+/g, '-'))}">${sec(esc(c))}<div class="card lista">${todo.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div></div>`).join('')}
+      ${!oficiosDelBarrio().length ? `<p class="muted tiny">Los vecinos que compartan su profesión u oficio con el barrio (en Mi casa) aparecen acá solos, con su celular y WhatsApp.</p>` : ''}
+      ${superficie({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · hospitales · farmacias' })}`;
+  },
+};
+/* Buscar lleva a los resultados, no arriba de todo. */
+F['buscar-agenda'] = d => { abrir('agenda', d.q || ''); setTimeout(() => $('#agendaResultados')?.scrollIntoView({ behavior:'smooth', block:'start' }), 80); };
+A['agenda-ir'] = el => {
+  const id = 'cat-' + normTxt(el.dataset.v).replace(/[^a-z0-9]+/g, '-');
+  if (!document.getElementById(id)) { abrir('agenda', ''); }
+  setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior:'smooth', block:'start' }), 80);
+};
 
 /* =========================================================
    LOS SOS DEL DÍA
@@ -785,18 +840,11 @@ R.ushuaia = {
     const relig = agenda.filter(f => f.ambito === 'católica' || f.ambito === 'judía').slice(0, 10);
     const chipAmbito = f => `<span class="pill ${ {nacional:'p-brand', provincial:'p-accent', municipal:'p-wood', 'católica':'', 'judía':''}[f.ambito] || ''}">${esc(f.ambito)}</span>`;
     const evs = s.eventosCiudad.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
-    const cru = s.cruceros.filter(c => c.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 8);
-    const hoyCru = s.cruceros.filter(c => c.fecha === hoy);
+        const hoyCru = Cruceros.hoy();
     return `${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
       ${hoyCru.length ? aviso('info', 'send', `Hoy recala${hoyCru.length > 1 ? 'n' : ''} ${hoyCru.map(c => esc(c.barco)).join(', ')}`, `${hoyCru.reduce((a, c) => a + (+c.pasajeros || 0), 0) || ''} pasajeros en el centro · más tránsito y más gente en los comercios`) : ''}
       ${sec('Temporadas')}${temp}
-      ${sec('Cruceros', esAdmin() ? `<button class="link" data-a="abrir" data-v="admin" data-p="contenido|cruceros">Cargar recaladas</button>` : '')}
-      ${cru.length ? `<div class="card lista">${cru.map(c => `<div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('send')}</span>
-        <div class="txt"><b>${esc(c.barco)}</b><span>${fechaCorta(c.fecha)}${c.llega ? ' · llega ' + c.llega : ''}${c.sale ? ' · sale ' + c.sale : ''}${c.pasajeros ? ' · ' + c.pasajeros + ' pasajeros' : ''}${c.muelle ? ' · ' + esc(c.muelle) : ''}</span></div>
-        <span class="pill ${c.fecha === hoy ? 'p-ok' : ''}">${relDia(c.fecha)}</span></div>`).join('')}</div>`
-        : `<div class="card"><p class="small" style="margin:0;color:var(--ink-2)">No hay recaladas cargadas. ${enTemporada(s.temporadas.find(t => /crucero/i.test(t.nombre)) || {desde:'10-15',hasta:'04-15'}) ? 'Estamos en temporada: el calendario del puerto se carga desde Administración → Contenido → Recaladas de cruceros.' : 'La temporada todavía no empezó.'}</p>
-          ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="abrir" data-v="admin" data-p="contenido|cruceros">${I('plus')}Cargar el calendario</button>` : ''}
-          <a class="btn btn-sm btn-sec" style="margin-top:10px" href="https://www.puertoushuaia.gob.ar" target="_blank" rel="noopener">${I('link')}Puerto de Ushuaia</a></div>`}
+      ${sec('Cruceros')}${superficie({ v:'cruceros', icon:'send', color:'brand', t:'Arribos y partidas de cruceros', s: Cruceros.linea() + ' · cronograma oficial del puerto' })}
       ${sec('Hoy')}
       <div class="card ${info.laboral ? '' : 'plana'}" style="${info.laboral ? '' : 'background:var(--warn-soft)'}">
         <div class="row"><span class="ic ic-${info.laboral ? 'ok' : 'warn'}" style="width:44px;height:44px;border-radius:14px;display:grid;place-items:center">${I(info.laboral ? 'check' : 'calendar')}</span>
@@ -838,6 +886,123 @@ F['evento-ciudad'] = d => { Store.cambiar(s => s.eventosCiudad.push({ id:uid(), 
    salen arribos y partidas del día, con estado, estima y puerta.
    El Worker del barrio (Ajustes → Vuelos) ya no hace falta para el tablero:
    queda solo para ver los aviones en vivo sobre el barrio. */
+/* =========================================================
+   CRUCEROS
+   Salen del cronograma oficial del Instituto Fueguino de Turismo
+   (findelmundo.tur.ar), armado con los datos de la Dirección Provincial
+   de Puertos. El navegador no puede leer esa página directo, así que la
+   lee el Apps Script del correo (?q=cruceros) y la devuelve lista; él
+   mismo la guarda 3 horas. Acá se guarda otras 3 horas en el equipo.
+   Si el Apps Script todavía no tiene esta parte, se usan las recaladas
+   que la Administración cargue a mano (Contenido → Recaladas).
+   Lo que NO hay: la posición del barco en el mar en tiempo real (eso es
+   AIS, y los servicios que lo dan son pagos). Lo que sí: a qué hora llega
+   y sale cada uno, y si en este momento está amarrado en el puerto.
+   ========================================================= */
+/* Datos generales de los barcos que más vienen (eslora aproximada, en
+   metros). Si un barco no está, la ficha se arma con lo que da el
+   cronograma: pasajeros, operador y tipo de viaje. */
+const FICHAS_BARCOS = {
+  'VENTUS AUSTRALIS':89, 'STELLA AUSTRALIS':89, 'OCEAN ALBATROS':104, 'SYLVIA EARLE':104, 'GREG MORTIMER':104, 'OCEAN EXPLORER':104,
+  'OCEAN VICTORY':104, 'DOUGLAS MAWSON':104, 'HONDIUS':108, 'ORTELIUS':91, 'PLANCIUS':89, 'SEA SPIRIT':91, 'OCEAN NOVA':73,
+  'FRIDTJOF NANSEN':140, 'ROALD AMUNDSEN':140, 'SEABOURN VENTURE':170, 'SEABOURN PURSUIT':170, 'VIKING POLARIS':205, 'VIKING OCTANTIS':205,
+  "L'AUSTRAL":142, 'LE BOREAL':142, 'LE LYRIAL':142, 'NAT. GEO. ENDURANCE':124, 'NAT. GEO. RESOLUTION':124, 'SCENIC ECLIPSE':168, 'SCENIC ECLIPSE II':168,
+  'WORLD NAVIGATOR':126, 'WORLD VOYAGER':126, 'WORLD TRAVELLER':126, 'SH VEGA':108, 'SH MINERVA':108, 'SH DIANA':125, 'ULTRAMARINE':128,
+  'MAGELLAN EXPLORER':90, 'HANSEATIC INSPIRATION':139, 'HANSEATIC SPIRIT':139, 'BARK EUROPA':56, 'VIKING JUPITER':228,
+  'CELEBRITY EQUINOX':317, 'MAJESTIC PRINCESS':330, 'OOSTERDAM':285, 'ZAANDAM':237, 'MSC MAGNIFICA':293, 'COSTA SERENA':290,
+  'QUEEN ANNE':322, 'CARNIVAL FIRENZE':272, 'SEVEN SEAS MARINER':216, 'SILVER NOVA':244, 'AZAMARA JOURNEY':181,
+};
+const Cruceros = {
+  KEY:'bhc.cruceros', d:null, cargando:null,
+  leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
+  /* Todo junto: lo oficial y lo que cargó la Administración, sin repetir. */
+  lista(){
+    if (!this.d) this.leer();
+    const of = (this.d?.barcos || []).map(b => ({ ...b, fecha:b.llega.slice(0, 10), oficial:true }));
+    const man = aLista(Store.s.cruceros).filter(c => c && c.fecha).map(c => ({ barco:c.barco, fecha:c.fecha,
+      llega:c.fecha + 'T' + (c.llega || '00:00'), sale:c.fecha + 'T' + (c.sale || c.llega || '23:59'), pasajeros:+c.pasajeros || 0,
+      operador:c.naviera || c.operador || '', tipo:c.tipo || '', nota:c.nota || '' }))
+      .filter(c => !of.some(o => o.fecha === c.fecha && normTxt(o.barco) === normTxt(c.barco)));
+    return [...of, ...man].sort((a, b) => a.llega.localeCompare(b.llega));
+  },
+  hoy(){ const h = hoyISO(); return this.lista().filter(c => c.fecha === h || (c.llega.slice(0, 10) <= h && c.sale.slice(0, 10) >= h)); },
+  enPuerto(){ const n = new Date(), ya = `${isoDe(n)}T${pad(n.getHours())}:${pad(n.getMinutes())}`; return this.lista().filter(c => c.llega <= ya && c.sale >= ya); },
+  linea(){
+    const hoy = this.hoy(), ahora = this.enPuerto();
+    if (ahora.length) return `${plural(ahora.length, 'barco en el puerto', 'barcos en el puerto')} ahora`;
+    if (hoy.length) return `${plural(hoy.length, 'recalada', 'recaladas')} hoy`;
+    const prox = this.lista().find(c => c.fecha > hoyISO());
+    return prox ? `Próximo: ${conMayusculasBarco(prox.barco)} ${relDia(prox.fecha)}` : 'Arribos y partidas';
+  },
+  pasajerosHoy(){ return this.hoy().reduce((a, c) => a + (c.pasajeros || 0), 0); },
+  url(){ const d = typeof Correo !== 'undefined' ? Correo.datos() : null; return d && d.url; },
+  async pedir(forzar = false){
+    if (!this.d) this.leer();
+    if (!forzar && this.d && Date.now() - this.d.t < 3 * HORA) return this.d;
+    if (this.cargando) return this.cargando;
+    const u = this.url(); if (!u) return null;
+    this.cargando = fetch(u + (u.includes('?') ? '&' : '?') + 'q=cruceros' + (forzar ? '&forzar=1' : ''))
+      .then(r => r.json()).then(j => {
+        if (!j || !Array.isArray(j.barcos)) throw new Error('El Apps Script todavía no tiene la parte de cruceros');
+        this.d = { t:Date.now(), barcos:j.barcos, actualizado:j.actualizado || '', fuente:j.fuente || '' };
+        try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
+        return this.d;
+      }).catch(e => { this.error = e.message; return null; }).finally(() => { this.cargando = null; });
+    return this.cargando;
+  },
+  /* Qué clase de barco es, dicho en simple. */
+  clase(c){
+    const p = c.pasajeros || 0, t = normTxt(c.tipo);
+    if (/velero|bark|yate/i.test(c.barco)) return 'Velero o yate: pocos pasajeros, navegación a vela y a motor.';
+    if (p > 1000) return 'Crucero grande: varios restaurantes, teatro, piscinas, gimnasio y spa. Recala por el día en viajes que unen el Atlántico y el Pacífico.';
+    if (/antart/.test(t)) return 'Barco de expedición polar: casco reforzado para el hielo, botes zodiac para desembarcar, charlas de naturalistas y, en muchos, kayak.';
+    if (/regional/.test(t)) return 'Crucero regional por el Canal Beagle, el Estrecho de Magallanes y el Cabo de Hornos, con desembarcos en la Patagonia chilena.';
+    return p > 400 ? 'Crucero mediano con salidas de expedición.' : 'Barco de expedición chico.';
+  },
+};
+const horaDe = iso => iso ? iso.slice(11, 16) : '';
+const diaDe = iso => iso ? (iso.slice(0, 10) === hoyISO() ? 'hoy' : relDia(iso.slice(0, 10))) : '';
+function fichaCrucero(c){
+  const n = new Date(), ya = `${isoDe(n)}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const estado = c.llega <= ya && c.sale >= ya ? ['ok', 'En el puerto ahora'] : c.sale < ya ? ['', 'Ya zarpó'] : ['sky', 'Por llegar'];
+  const eslora = FICHAS_BARCOS[normTxt(c.barco).toUpperCase().trim()] || FICHAS_BARCOS[c.barco.toUpperCase().trim()];
+  return `<div class="card crucero"><div class="row" style="align-items:flex-start">
+      <span class="ic ic-${estado[0] || 'brand'}" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('send')}</span>
+      <div class="grow"><b style="font-size:15.5px">${esc(conMayusculasBarco(c.barco))}</b>
+        <div class="muted small">${c.operador ? esc(c.operador) : ''}${c.tipo ? ' · ' + esc(c.tipo) : ''}</div></div>
+      <span class="pill ${estado[0] ? 'p-' + estado[0] : ''}">${estado[1]}</span></div>
+    <div class="crucero-datos">
+      <div><span>Llega</span><b>${horaDe(c.llega) || '—'} h</b><small>${diaDe(c.llega)}</small></div>
+      <div><span>Sale</span><b>${horaDe(c.sale) || '—'} h</b><small>${diaDe(c.sale)}</small></div>
+      <div><span>Pasajeros</span><b>${c.pasajeros ? c.pasajeros.toLocaleString('es-AR') : '—'}</b><small>capacidad</small></div>
+      <div><span>Eslora</span><b>${eslora ? '≈ ' + eslora + ' m' : '—'}</b><small>${eslora ? 'largo del barco' : 'sin dato'}</small></div>
+    </div>
+    <p class="small" style="margin:8px 0 0;color:var(--ink-2)">${esc(Cruceros.clase(c))}${c.nota ? ' ' + esc(c.nota) : ''}</p>
+    ${c.web ? `<a class="link small" href="${esc(c.web)}" target="_blank" rel="noopener">${I('right')} Sitio de ${esc(c.operador || 'la naviera')}</a>` : ''}</div>`;
+}
+const conMayusculasBarco = t => String(t || '').trim().toLowerCase().replace(/(^|[\s.'´-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\bSh\b/, 'SH').replace(/\bMsc\b/, 'MSC').replace(/\bIi\b/, 'II');
+R.cruceros = {
+  titulo: 'Cruceros', icon: 'send', color: 'brand', sub: 'Arribos y partidas del puerto de Ushuaia',
+  render(){
+    const todos = Cruceros.lista(), hoy = hoyISO();
+    const ahora = Cruceros.enPuerto(), deHoy = Cruceros.hoy();
+    const prox = todos.filter(c => c.fecha > hoy && c.fecha <= sumarDias(hoy, 21));
+    const porDia = {}; prox.forEach(c => (porDia[c.fecha] = porDia[c.fecha] || []).push(c));
+    const d = Cruceros.d;
+    return `<div class="admin-hero" style="background:var(--g-brand)">
+        <b style="font-size:18px">${ahora.length ? plural(ahora.length, 'barco amarrado ahora', 'barcos amarrados ahora') : deHoy.length ? plural(deHoy.length, 'recalada hoy', 'recaladas hoy') : 'Hoy no recala ningún crucero'}</b>
+        <div class="small" style="opacity:.85">${deHoy.length ? `Hasta ${Cruceros.pasajerosHoy().toLocaleString('es-AR')} pasajeros en la ciudad: más tránsito en el centro, el puerto y la Ruta 3.` : 'Día tranquilo en el puerto.'}</div></div>
+      ${deHoy.length ? sec('Hoy') + deHoy.map(fichaCrucero).join('') : ''}
+      ${sec('Próximas tres semanas', `<button class="link" data-a="cruceros-actualizar">Actualizar</button>`)}
+      ${Object.keys(porDia).length ? Object.entries(porDia).map(([f, cs]) => `<details class="crucero-dia"><summary><b>${fechaLarga(f)}</b><span class="muted small">${relDia(f)} · ${plural(cs.length, 'barco')} · ${cs.reduce((a, c) => a + (c.pasajeros || 0), 0).toLocaleString('es-AR')} pasajeros</span></summary>${cs.map(fichaCrucero).join('')}</details>`).join('')
+        : `<div class="card plana small">${Cruceros.url() ? (Cruceros.error ? esc(Cruceros.error) + '. Hay que actualizar el Apps Script con el código nuevo (apps-script/Codigo.gs) y hacer "Nueva versión".' : 'No hay recaladas anunciadas para las próximas tres semanas.') : 'Para que los cruceros lleguen solos hace falta el Apps Script del correo configurado (Administración → Ajustes → Correo).'}</div>`}
+      <p class="muted tiny" style="margin-top:12px">Fuente: cronograma oficial del Instituto Fueguino de Turismo con datos de la Dirección Provincial de Puertos${d?.actualizado ? `, actualizado al ${esc(d.actualizado)}` : ''}. Se revisa solo cada 3 horas. Las horas son las anunciadas: pueden cambiar por el clima. La eslora es aproximada.</p>
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido|cruceros', icon:'plus', color:'accent', t:'Cargar una recalada a mano', s:'Para un barco que no figure en el cronograma' }) : ''}`;
+  },
+  alPintar(){ if (!Cruceros.d || Date.now() - Cruceros.d.t > 3 * HORA) Cruceros.pedir().then(v => { if (v && PILA.at(-1)?.id === 'cruceros') refrescar(); }); },
+};
+A['cruceros-actualizar'] = () => Cruceros.pedir(true).then(v => { refrescar(); toast(v ? 'Cruceros actualizados' : 'No se pudo leer el cronograma' + (Cruceros.error ? ': ' + Cruceros.error : ''), v ? 'refresh' : 'alert'); });
+
 const Vuelos = {
   KEY:'bhc.vuelos', TABLERO:'https://flightstats.londonsupplygroup.com/', d:null, estado:'', cargando:null,
   leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
@@ -1162,6 +1327,12 @@ A['pedir-baja'] = () => { const u = yo(); Store.cambiar(s => { notificar(s, { pa
    Contenido → Descargas, así se puede sumar una app, un instructivo o
    una planilla sin tocar el programa.
    ========================================================= */
+/* Lo que viene de fábrica (Vitalia) se ve aunque la base todavía no lo
+   tenga: hasta que la Administración entra y se suma solo. */
+const descargasVisibles = () => {
+  const ds = aLista(Store.s.descargas).filter(Boolean);
+  return [...ds, ...DESCARGAS.filter(f => f.url && !ds.some(d => d.id === f.id))];
+};
 const TIPOS_DESCARGA = {
   app:      { n:'Aplicación', icon:'smartphone', c:'accent' },
   doc:      { n:'Documento', icon:'file', c:'brand' },
@@ -1171,7 +1342,7 @@ const TIPOS_DESCARGA = {
 R.descargas = {
   titulo: 'Descargas', icon: 'download', color: 'sky', sub: 'Apps, documentos y planillas del barrio',
   render(){
-    const s = Store.s, ds = (s.descargas || []).filter(d => d.url || d.texto);
+    const s = Store.s, ds = descargasVisibles().filter(d => d.url || d.texto);
     const porTipo = {};
     ds.forEach(d => { const t = TIPOS_DESCARGA[d.tipo] ? d.tipo : 'doc'; (porTipo[t] = porTipo[t] || []).push(d); });
     const bloque = (t) => {
@@ -1191,8 +1362,29 @@ R.descargas = {
       <p class="muted tiny">Las aplicaciones se abren en el navegador y se instalan desde ahí: en el iPhone con Compartir → Agregar a la pantalla de inicio, y en Android con el menú → Instalar aplicación.</p>`;
   },
 };
+/* =========================================================
+   ANTES DE ABRIR UNA APP DE SALUD
+   Vitalia (y cualquier descarga marcada con "deslinde") no se abre
+   directo: primero una ventana que deja claro que no es una app médica,
+   que el barrio no responde por la exactitud de sus cálculos y que no
+   reemplaza a un profesional. Hay que marcar "Entendí" para seguir.
+   ========================================================= */
+const DESLINDE_SALUD = `<b>Antes de abrirla, leé esto:</b>
+  <ul style="margin:8px 0 0;padding-left:18px;line-height:1.55">
+    <li><b>No es una aplicación médica</b> ni un dispositivo de salud. No diagnostica, no indica tratamientos y no reemplaza la consulta con un médico, nutricionista u otro profesional.</li>
+    <li>Sus cálculos, planes y sugerencias son orientativos. <b>Ni el barrio, ni la Administración, ni quien la desarrolló garantizan su exactitud</b> ni responden por decisiones tomadas en base a ella.</li>
+    <li>Si tenés una enfermedad, tomás medicación, estás embarazada o hay menores de por medio, consultá antes con tu profesional.</li>
+    <li>Se comparte como un espacio para los vecinos y para contribuir a la salud física. Es una aplicación aparte: lo que cargues ahí no pasa por la app del barrio.</li>
+  </ul>`;
 A['descargar'] = el => {
-  const d = (Store.s.descargas || []).find(x => x.id === el.dataset.id); if (!d) return;
+  const d = descargasVisibles().find(x => x.id === el.dataset.id); if (!d) return;
+  if (d.deslinde && !el.dataset.ok){
+    hoja(d.titulo, `<div class="aviso a-warn" style="display:block">${DESLINDE_SALUD}</div>
+      <label class="check" style="margin:14px 0 0"><input type="checkbox" id="deslindeOk" onchange="document.getElementById('deslindeSeguir').disabled=!this.checked"><span>Entendí: no es una app médica y la uso bajo mi responsabilidad.</span></label>
+      <button class="btn btn-pri btn-block btn-grande" id="deslindeSeguir" style="margin-top:12px" disabled data-a="descargar" data-id="${esc(d.id)}" data-ok="1">${I('right')}Seguir</button>`);
+    return;
+  }
+  if (d.deslinde && el.dataset.ok && d.url){ cerrarHoja(); window.open(d.url, '_blank', 'noopener'); return; }
   if (d.url && /^https?:/i.test(d.url)){
     hoja(d.titulo, `${d.detalle ? `<p class="small" style="margin:0 0 14px;color:var(--ink-2)">${esc(d.detalle)}</p>` : ''}
       ${d.texto ? `<div class="card plana small" style="white-space:pre-wrap">${esc(d.texto)}</div>` : ''}

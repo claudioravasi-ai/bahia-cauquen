@@ -166,6 +166,10 @@ function migrar(s){
   if (!Array.isArray(s.avistamientos)) s.avistamientos = [];
   if (!Array.isArray(s.contactos)) s.contactos = JSON.parse(JSON.stringify(CONTACTOS));
   if (!Array.isArray(s.descargas)) s.descargas = JSON.parse(JSON.stringify(DESCARGAS));
+  /* Lo que viene de fábrica y el equipo tenía guardado sin dirección (la
+     Vitalia, antes de tener su enlace) se completa con la versión nueva. */
+  DESCARGAS.forEach(f => { const x = s.descargas.find(d => d && d.id === f.id);
+    if (!x) s.descargas.push(JSON.parse(JSON.stringify(f))); else if (!x.url && f.url) Object.assign(x, f); });
   /* Padrón con nombres de propietarios: se importa desde Administración. */
   if (!Array.isArray(s.padron)) s.padron = [];
   if (!s.motorLog || typeof s.motorLog !== 'object') s.motorLog = {};
@@ -249,8 +253,90 @@ const CONTACTOS = [
    dirección. Las que vienen de fábrica están sin dirección hasta que
    alguien la pegue: la app no inventa enlaces. */
 const DESCARGAS = [
-  { id:'d1', tipo:'app', titulo:'VITALIA by Mónica Ponzio', detalle:'Seguimiento nutricional. Pegá su dirección en Contenido → Descargas.', url:'', icon:'heart', color:'ok' },
+  { id:'d1', tipo:'app', titulo:'Vitalia by Mónica Ponzio', detalle:'Seguimiento nutricional y hábitos saludables. No es una app médica.', url:'https://claudioravasi-ai.github.io/Vitalia/#/inicio', icon:'heart', color:'ok', deslinde:true },
   { id:'d2', tipo:'planilla', titulo:'Modelo de planilla del padrón', detalle:'CSV con los 152 lotes y sus coeficientes, para completar los propietarios', url:'', icon:'clipboard', color:'wood' },
+];
+
+/* =========================================================
+   MARCO LEGAL DEL BARRIO (normas públicas)
+   Buscado el 22-09-2026 en el sistema legislativo del Concejo Deliberante
+   de Ushuaia. El reglamento interno y el estatuto de la Asociación Civil
+   Barrio Bahía Cauquén NO están publicados en internet: los tiene que
+   cargar la Administración (Contenido → Documentos).
+   Estas normas se suman solas a la base del barrio la primera vez que
+   entra la Administración (ver Nube.sumarNuevos).
+   ========================================================= */
+const MARCO_LEGAL = [
+  { id:'ley-om2102', tipo:'Norma municipal', titulo:'Ordenanza 2102/1999 · Barrios cerrados en Ushuaia',
+    link:'https://sistemalegislativo.concejoushuaia.gob.ar/files/ORDENANZA/2102.pdf', texto:
+`Ordenanza Municipal N° 2102, sancionada el 10/11/1999 por el Concejo Deliberante de Ushuaia. Incorpora al Código de Planeamiento Urbano el capítulo "Barrios Cerrados". Es la norma municipal bajo la que funciona Bahía Cauquén.
+
+1.1 DEFINICIÓN
+Barrio cerrado es todo emprendimiento urbanístico destinado al uso residencial predominante, con equipamiento comunitario propio, dentro del ejido urbano y con su perímetro materializado mediante cercamiento.
+
+1.2 MODALIDAD
+Se implanta en terrenos de dominio privado y se constituye mediante un Convenio de Cesión de Uso Exclusivo de las Calles y Espacios Públicos Municipales, firmado entre el Municipio y una Sociedad Civil que deben conformar todos los propietarios de las parcelas del barrio. El convenio lo refrenda el Concejo Deliberante y sigue vigente mientras se cumplan las condiciones de la norma y no se manifieste en contra la mitad más uno de esa Sociedad Civil.
+
+1.3 LOCALIZACIÓN
+Solo en zonas residenciales R3 y R4, o en Áreas de Proyectos Especiales con aprobación del Concejo Deliberante.
+
+1.4 REQUISITOS (lo que más toca a los vecinos)
+• No se requiere la prestación de servicios municipales dentro del barrio.
+• El mantenimiento de las redes de servicios, las calles, el equipamiento comunitario y los espacios verdes es SIEMPRE responsabilidad de los propietarios, conformados en Sociedad Civil.
+• Los organismos públicos (poder de policía) y las empresas de servicios públicos tienen libre acceso a las calles internas y control sobre los servicios comunes.
+• Superficie máxima afectada al régimen: 15 hectáreas (con un margen del 10 % por topografía).
+
+1.6 INDICADORES Y ASPECTOS CONSTRUCTIVOS
+• Barrios sobre la costa de mar o ríos: deben garantizar el libre acceso público por una franja de al menos 25 metros desde la línea máxima de marea.
+• Circulación pública perimetral por una calle de no menos de 20 metros (o cesión de una franja de 10 metros donde no exista).
+• El cerramiento del perímetro debe ser TRANSPARENTE: está prohibido hacerlo con muro.
+• Agua y cloaca aprobadas por la Dirección Provincial de Obras y Servicios Sanitarios. Si hay planta depuradora propia, está a cargo de la entidad que nuclea a los residentes; tercerizarla requiere aprobación del Municipio y de la DPOSS.
+• Energía eléctrica y alumbrado para viviendas, espacios comunes y calles.
+• Recolección de residuos domiciliaria y diaria, con transporte al relleno sanitario municipal.
+• Calles mejoradas o pavimentadas con red pluvial; todas las redes de infraestructura, subterráneas (no se permite tendido aéreo).
+
+1.7 TASAS MUNICIPALES
+Mientras esté vigente el convenio por el que la asociación presta los servicios, el barrio tributa como Zona "C" de la Ordenanza Tarifaria.
+
+1.8 AUTORIDAD DE APLICACIÓN
+El Departamento Ejecutivo Municipal, a través de la Subsecretaría de Planeamiento y Gestión del Espacio Urbano.
+
+Promulgada por el Intendente Jorge A. Garramuño (Expediente 7578/99). Texto transcripto del PDF oficial del Concejo Deliberante; ante cualquier duda vale el original.` },
+  { id:'ley-om6600', tipo:'Norma municipal', titulo:'Ordenanza 6600/2026 · Pavimentación de Los Ñires, Etapa II',
+    link:'https://sistemalegislativo.concejoushuaia.gob.ar/files/ORDENANZA/6600.pdf', texto:
+`Ordenanza Municipal N° 6600, del 23/02/2026. Es la única ordenanza vigente que nombra expresamente a la Asociación Civil Barrio Bahía Cauquén.
+
+QUÉ DISPONE
+• Art. 1: declara de utilidad pública, bajo el régimen de Contribución por Mejoras, la obra "Pavimentación Calle Los Ñires. Etapa II": asfalto en unos 2.700 metros.
+• Art. 3: el Municipio paga el 20 % del costo; los beneficiarios, el 80 % (60 % los frentistas de Los Ñires por metro de frente y 40 % los no frentistas, con un monto fijo por contribuyente), más un 10 % de redeterminación de precios e imprevistos.
+• Art. 4: quiénes pagan: propietarios, condóminos, sucesiones, personas jurídicas, fideicomisos, y en forma solidaria usufructuarios y quienes exploten el inmueble.
+• Art. 9: el certificado de deuda de Rentas es título ejecutivo; la mora en una cuota habilita a reclamar todo el saldo.
+
+LO QUE TOCA AL BARRIO
+• Art. 10: la Asociación Civil Barrio Bahía Cauquén (CUIT 30-71010005-1), por pedido propio, abona el total de lo que el Municipio facture por esta contribución, sin distinguir parcela ni beneficiario (Sección J, macizos 39 a 46, 115, 116 y 117). Es decir: la contribución no le llega a cada propietario por separado, la paga el barrio.
+• Art. 12: antes de firmar el contrato de obra, el Municipio tiene que haber cobrado el 30 % del 80 % a cargo de los beneficiarios.
+• Art. 14: crea la Mesa de Representación Vecinal Los Ñires, con un representante titular y un suplente por cada barrio del sector. Es consultiva: acompaña y hace aportes, sin frenar plazos.
+
+Resumen hecho a partir del texto publicado por el Concejo Deliberante; ante cualquier duda vale el original.` },
+  { id:'ley-ccyc-conjuntos', tipo:'Ley nacional', titulo:'Código Civil y Comercial · Conjuntos inmobiliarios (arts. 2073 a 2086)',
+    link:'https://servicios.infoleg.gob.ar/infolegInternet/anexos/235000-239999/235975/norma.htm', texto:
+`Desde 2015 el Código Civil y Comercial de la Nación regula los barrios cerrados como "conjuntos inmobiliarios". En pocas palabras:
+
+• Art. 2073 · Qué son: barrios cerrados, clubes de campo, parques industriales y todo emprendimiento urbanístico con usos mixtos.
+• Art. 2074 · Características: cerramiento, partes comunes y privativas, estado de indivisión forzosa y perpetua de lo común, un reglamento con sus órganos de funcionamiento, limitaciones y restricciones, y una entidad con personería que agrupa a los propietarios.
+• Art. 2075 · Marco legal: lo urbanístico (zonas, dimensiones, usos) lo fijan las normas de cada jurisdicción —en Ushuaia, la Ordenanza 2102—. Además, todos los conjuntos deben someterse al derecho real de propiedad horizontal, y los que ya existían (como los organizados como asociación civil) deben adecuarse.
+• Art. 2076 y 2077 · Qué es común y qué es de cada uno: calles, cercos, accesos, espacios verdes y equipamiento son comunes; el lote y lo construido son privativos.
+• Art. 2078 · Facultades y obligaciones: cada propietario usa lo suyo y lo común según el reglamento, sin perturbar a los demás.
+• Art. 2079 y 2080 · Límites perimetrales y restricciones: el reglamento puede fijar normas de construcción, uso, seguridad, horarios y ambiente.
+• Art. 2081 · Gastos y contribuciones: los propietarios pagan las expensas comunes en la proporción que fija el reglamento.
+• Art. 2082 · Cesión de la unidad: si el propietario presta o alquila su lote, el reglamento puede fijar cómo usan los terceros los espacios e instalaciones comunes.
+• Art. 2083 · Invitados y usuarios no propietarios: el reglamento puede extender el uso de lo común al grupo familiar y prever un régimen de invitados (en la app, los pases de visita).
+• Art. 2085 · Transmisión: el reglamento puede poner limitaciones pero no impedir vender; puede prever un derecho de preferencia para el consorcio o los demás propietarios.
+• Art. 2086 · Sanciones: ante conductas graves o reiteradas contra el reglamento, el consorcio puede aplicar las sanciones que ese reglamento prevea (en la app, las infracciones, con descargo del vecino).
+
+Relacionados que usa la app: art. 2048 (el certificado de deuda de expensas es título ejecutivo) y art. 2060 (decisiones por consulta escrita a los propietarios, base de las votaciones).
+
+Resumen orientativo. No reemplaza el texto del Código ni el consejo de un abogado.` },
 ];
 
 /* Temporadas de Ushuaia. Las fechas cambian por disposición provincial
@@ -634,17 +720,19 @@ const Correo = {
       <p style="font-size:11.5px;color:#6c7d7a">Tus datos se usan solo para la vida del barrio y el control de acceso (Ley 25.326). Podés pedir verlos, corregirlos o borrarlos escribiendo a la Administración.</p></div></div>`;
   },
   /* Registra el correo y, si se puede, lo manda. Devuelve true si salió. */
-  async enviar({ para, asunto, html, tipo }){
-    if (!para) return false;
+  async enviar(x){ return (await this.enviarDetalle(x)).ok; },
+  /* Lo mismo, pero dice el motivo si no salió: para mostrarlo en pantalla. */
+  async enviarDetalle({ para, asunto, html, tipo }){
+    if (!para) return { ok:false, error:'Sin dirección de correo' };
     const anota = this.anota();
     const reg = { id:uid(), para, asunto, html, tipo, at:Date.now(), estado:'pendiente', intentos:0 };
     if (anota) Store.cambiar(s => { s.correos.unshift(reg); if (s.correos.length > 300) s.correos.length = 300; });
     if (!this.configurado()) await this.traerPublico();
     const d = this.datos();
-    if (!d) return false;
+    if (!d){ const error = 'El envío automático no está configurado (Ajustes → Correo): quedó en la bandeja de salida.'; if (anota) Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x) x.error = error; }); return { ok:false, error }; }
     const marcar = (estado, error = '') => { if (anota) Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x){ x.estado = estado; x.intentos = (x.intentos || 0) + 1; x.error = error; } }); };
-    try { await this.pedir(d, { para, asunto, html, tipo }); marcar('enviado'); return true; }
-    catch(e){ console.warn('No salió el correo', tipo, e); marcar('error', this.motivo(e)); return false; }
+    try { await this.pedir(d, { para, asunto, html, tipo }); marcar('enviado'); return { ok:true }; }
+    catch(e){ console.warn('No salió el correo', tipo, e); const error = this.motivo(e); marcar('error', error); return { ok:false, error }; }
   },
   /* Lo que quedó sin salir (el Apps Script no estaba configurado, se cayó
      internet, lo mandó un equipo sin la dirección…) se reintenta solo la
@@ -652,14 +740,14 @@ const Correo = {
      correo y solo de la última semana, para no mandar cosas viejas. */
   async reintentar(){
     if (this.reintentando || !esAdmin() || !this.configurado()) return 0;
-    this.reintentando = true;
+    this.reintentando = true; this.ultimoError = ''; this.enCola = 0;
     const d = this.datos(), lim = Date.now() - 7 * DIA;
     const cola = aLista(Store.s.correos).filter(c => c && c.estado !== 'enviado' && c.at > lim && (c.intentos || 0) < 3 && c.para && c.html).slice(0, 20);
-    let n = 0;
+    let n = 0; this.enCola = cola.length;
     for (const c of cola){
       let estado = 'enviado', error = '';
       try { await this.pedir(d, { para:c.para, asunto:c.asunto, html:c.html, tipo:c.tipo }); n++; }
-      catch(e){ estado = 'error'; error = this.motivo(e); }
+      catch(e){ estado = 'error'; error = this.motivo(e); this.ultimoError = error; }
       Store.cambiar(s => { const x = s.correos.find(z => z.id === c.id); if (x){ x.estado = estado; x.error = error; x.intentos = (x.intentos || 0) + 1; } });
       if (/no autorizado|página en lugar|No se pudo llegar/.test(error)) break;   /* si es la configuración, no insistir */
     }

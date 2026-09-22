@@ -322,3 +322,32 @@ F['avistamiento'] = d => {
   Store.cambiar(s => s.avistamientos.unshift({ id:uid(), especie:d.especie, lugar:d.lugar.trim(), userId:u.id, at:Date.now() }));
   cerrarHoja(); toast('Gracias por avisar', 'eye'); Motor.correr();
 };
+
+/* =========================================================
+   PREGUNTAS FRECUENTES
+   Idea tomada de BarrioHub: una ayuda corta, en castellano de vecino,
+   para lo que más se pregunta. Cada respuesta tiene su botón que lleva
+   directo a donde se hace.
+   ========================================================= */
+const FAQ = [
+  ['¿Cómo aviso que viene una visita?', 'En Tu casa → Autorizar una visita. Cargás el nombre (y la patente si viene en auto) y la app arma un código y un QR para mandarle por WhatsApp. La garita lo ve al instante.', 'nuevo-pase', '', 'Autorizar una visita'],
+  ['¿Qué hago en una emergencia?', 'Mantené apretado el botón rojo SOS arriba a la derecha durante 3 segundos y elegí qué pasa. Salta en la garita, en la Administración y en las apps abiertas del barrio. Cuando se resuelva, tocá "Ya está solucionado". El DEA (desfibrilador) está en la garita.', 'abrir', 'emergencias', 'Ver Emergencias'],
+  ['¿Cómo pago las expensas?', 'En Tu casa → Mis expensas ves el saldo y el cupón del mes. Tocá la tarjeta para pagar por transferencia (alias y CBU a mano) y avisá el pago con el comprobante: la Administración lo confirma y te llega el recibo.', 'abrir', 'expensas', 'Mis expensas'],
+  ['¿Cómo reservo el quincho, el SUM o la cancha?', 'En Tu casa → Reservas elegís el espacio, el día y el turno. Si está ocupado se ve en gris.', 'abrir', 'reservas', 'Reservas'],
+  ['¿Cómo hago un reclamo a la Administración?', 'En Tu casa → Mis reclamos. Es privado: lo ven solo vos y la Administración, que te contesta por ahí. Si otros vecinos tienen el mismo problema, la Administración puede publicarlo en el pizarrón.', 'abrir', 'reclamos', 'Mis reclamos'],
+  ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el pizarrón y el chat. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Los mensajes privados y los reclamos no los ve nadie más.', 'abrir', 'perfil', 'Mi casa'],
+  ['¿Cómo aparezco en la agenda como profesional u oficio?', 'En Mi casa cargá tu profesión u oficio y tu celular, y marcá que se muestre al barrio. Aparecés solo en Profesionales y oficios y en la Agenda, con botón de WhatsApp.', 'abrir', 'perfil', 'Mi casa'],
+  ['¿Dónde están las normas del barrio?', 'En El barrio → Normas y reglamento, con un buscador ("¿hasta qué hora puedo hacer obra?"). Ahí también están la ordenanza municipal de barrios cerrados y lo que dice el Código Civil.', 'abrir', 'documentos', 'Normas'],
+  ['¿Qué significan los colores de la Pizarra del día?', 'Rojo: importante. Amarillo: para tener en cuenta. Verde: para saber. Lo que todavía no leíste titila en su color; al tocarlo se queda quieto.', '', '', ''],
+  ['La app quedó rara o no abre una ventana', 'Tu cuenta (tu foto arriba a la derecha) → Actualizar la app. Baja todo de nuevo sin borrar tus datos.', 'actualizar-app', '', 'Actualizar la app'],
+];
+R.ayuda = {
+  titulo: 'Preguntas frecuentes', icon: 'info', color: 'ok', sub: 'Cómo se hace cada cosa',
+  render(){
+    return `${FAQ.map(([p, r, a, v, b]) => `<details class="faq card"><summary><b>${esc(p)}</b>${I('right')}</summary>
+      <p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.55">${esc(r)}</p>
+      ${a ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="${a}" data-v="${v}">${esc(b)}${I('right')}</button>` : ''}</details>`).join('')}
+      <p class="muted small">¿No está lo que buscás? Escribile a la Administración desde Tu casa → Mensajes.</p>`;
+  },
+};
+A['abrir-ayuda'] = () => { cerrarHoja(); abrir('ayuda'); };

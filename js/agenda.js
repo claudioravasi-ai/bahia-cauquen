@@ -105,4 +105,49 @@ const AGENDA = {
     { n:'Municipalidad de Ushuaia', d:'Consultas', t:'2901-422089' },
     { n:'Secretaría de Turismo', d:'Información turística', t:'2901-432001' },
   ],
+  /* Sumado el 22-09-2026 (ver AGENDA_NUEVOS), del listado oficial de gastronomía de Turismo
+     Ushuaia (actualización 30-03-2026). Van al final para no mover los
+     números de lo que ya estaba en la base. */
+  '🥟 Para llevar y delivery': [
+    { n:'Lo de Quique', d:'Pontón Río Negro 852 · comida casera, porciones grandes', t:'2901-424200' },
+    { n:'Un Lugar Empanadas', d:'Gob. Deloqui 415', t:'2901-607323' },
+    { n:'Lo del Gordo', d:'Gob. Deloqui 1482', t:'2901-514488' },
+    { n:'Del Celíaco', d:'Roca 157 · sin TACC', t:'2901-464456' },
+    { n:'Arte Gastronómico (comida para celíacos)', d:'Fuegia Basket 465', t:'2901-583174' },
+    { n:'Isla Vegana', d:'Don Bosco 56', t:'2901-587903' },
+    { n:'La Marmita', d:'Rivadavia 332', t:'2901-482795' },
+    { n:'Raíces Criollas', d:'San Martín 1222', t:'2901-569755' },
+    { n:'Sabrosísimo', d:'Perón 185', t:'2901-444439' },
+    { n:'Los Arrayanes', d:'Arturo Coronado 351', t:'2901-408956' },
+    { n:'Parrilla y Rotisería Lo de Martínez', d:'Perón Norte 33', t:'2901-444898' },
+    { n:'Delivery Verona', d:'San Martín 718', t:'2901-553929' },
+    { n:'Mac Pipi', d:'San Martín 957', t:'2901-437225' },
+    { n:'Zekhausser', d:'Río Grande 118', t:'2901-432002' },
+    { n:'Don Fidel (salumería, fiambrería, vinería)', d:'9 de Julio 128', t:'2901-477232' },
+    { n:'Dieguito Parrilla y Pizzería', d:'Magallanes 967', t:'2901-430013' },
+    { n:'El Rincón del Bely', d:'San Martín 1306', t:'2901-503029' },
+    { n:'La Pronto Pizzería', d:'Pastor Lawrence 771', t:'2901-444999' },
+    { n:'Pizzería Manija (delivery)', d:'Concejal Rubinos 122', t:'2901-444363' },
+  ],
+  '🍰 Cafés, panaderías y dulces': [
+    { n:'Tante Sara Resto', d:'San Martín 701', t:'2901-581778' },
+    { n:'Tante Sara Cosas Ricas (panadería)', d:'San Martín 175', t:'2901-581778' },
+    { n:'Lucciano\'s Helados', d:'Paseo del Fuego Shopping · Perito Moreno 1460', t:'2901-538080' },
+    { n:'Münch Coffee & Bakery', d:'Kayen 202', t:'2901-519641' },
+    { n:'Vitta Bake Shop', d:'San Martín 1130', t:'2901-540415' },
+    { n:'Laguna Café del Barrio', d:'Costa de la Laguna 1420 · B° Andino', t:'2901-469704' },
+    { n:'El Recreo Café y Tetería', d:'Antártida Argentina 117', t:'2901-581128' },
+    { n:'Abuela Goye (chocolates)', d:'San Martín 267', t:'2901-423266' },
+    { n:'Laguna Negra (chocolates)', d:'San Martín 513', t:'2901-417597' },
+  ],
+  '🏡 Cerca del barrio': [
+    { n:'Reinamora · Hotel Los Cauquenes', d:'Calle Reinamora 3462 · dentro del predio', t:'11-6515-4946' },
+    { n:'Tío Alberto · Hotel Los Ñires', d:'Av. Los Ñires 3040', t:'2901-532842' },
+    { n:'La Cravia · Hotel Arakur', d:'Héroes de Malvinas 2671', t:'2901-442901' },
+    { n:'Paseo del Fuego Shopping (patio de comidas)', d:'Perito Moreno 1460', t:'' },
+  ],
 };
+
+/* Categorías que se sumaron después de que la base ya tenía la agenda:
+   Nube.sumarNuevos() las agrega una sola vez. */
+const AGENDA_NUEVOS = ['🥟 Para llevar y delivery', '🍰 Cafés, panaderías y dulces', '🏡 Cerca del barrio'];
