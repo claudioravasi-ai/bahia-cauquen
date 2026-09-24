@@ -211,3 +211,26 @@ liquidación de septiembre todos aparecerían debiendo agosto. Antes de emitir, 
 **Lo que ve el vecino:** en su cuenta, *Tus próximas expensas (estimadas)*; y en El barrio →
 **Las cuentas del barrio**, el tablero transparente: gastos mes a mes, en qué se gasta, previsto
 contra real y la morosidad total, sin nombres.
+
+## 11. Libro contable y carpeta del contador (desde el 24-09-2026)
+
+**Dónde:** Gestión → Contabilidad → pestañas **Libro contable** y **Carpeta del contador**. Solo la Administración.
+
+**Dos libros enlazados.** Expensas es la fuente (gastos del mes → cupón; pagos → cobranza). El libro
+contable se arma **solo**: un asiento por cada gasto y uno por cada cobro confirmado. La Administración
+puede **corregir** un asiento (cuenta, neto, IVA, percepciones, retenciones, fecha y medio de pago,
+nota) **sin tocar la expensa ni el cupón**. El original queda guardado ("Volver al original").
+Si después se cambia el gasto en Expensas, el asiento muestra **"cambió el origen"**: se toma el cambio
+o se deja la versión corregida. Los asientos **manuales** sirven para lo que no pasa por Expensas
+(ingresos de terceros en la cuenta 4.4, una comisión, un ajuste). Nada se borra: se anula.
+
+**Carpeta del mes:** resumen, saldo por cuenta, libro diario, comprobantes recibidos (neto, IVA,
+percepciones, CUIT), cobranzas por lote, retenciones practicadas, banco (saldo inicial del último
+resumen importado + cobros − pagos) y la lista de presentaciones con vencimiento (IVA, Ingresos Brutos
+AREF, retenciones, F.931). En PDF y en tres planillas CSV, y se le puede mandar un aviso al contador.
+**Cerrar el mes para el contador** congela el libro de ese mes.
+
+**Datos fiscales** (en la misma pestaña): condición frente al IVA, Ingresos Brutos (AREF) con número
+y vencimiento de la exención, y vencimiento del certificado de exención de Ganancias. La app avisa
+60 días antes. Todo es una guía: la condición la confirma el contador (Ley 19.640 en TDF; los ingresos
+de terceros quedan aparte para que él evalúe si tributan).

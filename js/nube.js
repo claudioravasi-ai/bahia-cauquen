@@ -48,7 +48,7 @@ const Nube = {
              'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
              'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
-    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes'],
+    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos'],
   },
 
   /* =========================================================

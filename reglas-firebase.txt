@@ -209,6 +209,8 @@ PEGAR DESDE ACÁ
       /* Ingresos frecuentes (proveedores del hotel, personal doméstico…):
          los carga la Administración y los lee la garita. */
       "frecuentes": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* El libro contable: solo la Administración. */
+      "asientos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "impuestos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "auditoria": {
         ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",

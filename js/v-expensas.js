@@ -494,7 +494,7 @@ F['informar-pago'] = d => {
    ========================================================= */
 const TABS_CONTA = [['resumen','Resumen'],['gastos','Gastos del mes'],['cierre','Cierre de mes'],['impositivo','ARCA'],['parametros','Parámetros']];
 R.contabilidad = {
-  titulo: 'Contabilidad', icon: 'file', color: 'brand', ancha: true, sub: 'Gastos, cierre de mes e impositivo',
+  titulo: 'Contabilidad', icon: 'file', color: 'brand', ancha: true, sub: 'Gastos, libro contable, carpeta del contador, cierre e impositivo',
   render(p){
     if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
     const [tab, sub] = String(p || 'resumen').split('|');
