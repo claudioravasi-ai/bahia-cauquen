@@ -166,3 +166,48 @@ que ya pagó.
 - Un día después del segundo: aviso de mora, con intereses corriendo.
 - Cinco días antes de cada presentación de ARCA: aviso a la Administración.
 - Las multas firmes se cargan solas en la liquidación del mes siguiente.
+
+## 10. Expensas automáticas (desde el 24-09-2026)
+
+**Dónde:** Gestión → Expensas y cobranzas → pestaña **Automáticas** (la primera).
+
+**Punto de partida, una sola vez:** *Traer la liquidación de agosto* con el archivo
+`datos-privados/liquidacion-agosto-2026.json` (no está en GitHub). Trae:
+
+- los 27 gastos de agosto con proveedor, CUIT, comprobante y cuotas (total $ 49.781.720,42, igual al PDF);
+- el banco (saldo al cierre $ 18.352.576,55) y el patrimonio (deudas e intereses a cobrar $ 46.341.751,19);
+- el estado de cuenta de los 152 lotes: deuda previa, interés, saldo a favor, expensas, fondo y
+  redondeo. Cada lote queda con su saldo real (suma de los 152: $ 96.071.901,22, igual al PDF).
+
+> Al armar ese archivo apareció un error del padrón importado el 19-09: al **Lote 150** le había
+> quedado como total del cupón el total general de la liquidación ($ 96.071.901,22). Ya está
+> corregido en `datos-privados/padron-agosto-2026.json` (su total es $ 274.522,50).
+
+**Qué desarrolla sola, hasta diciembre:**
+
+| Qué | Cómo |
+|---|---|
+| Gastos | Cada gasto de agosto es *todos los meses* (se actualiza por inflación), *en cuotas* (sigue hasta la última: la tasa municipal 33 de 36 termina en noviembre, el seguro 5 de 6 en septiembre, los postes 3 de 3 ya terminaron), *solo en invierno* (retro de nieve, mayo a septiembre) o *una sola vez* (flete, certificación de copias, limpieza de pluviales). Se puede cambiar gasto por gasto en "Cómo se calcula". |
+| Ingresos | Cobro en término (94,7 % en agosto), recupero de deudas ($ 3,4 M por mes) e intereses cobrados. Si ya hay pagos confirmados en la app para ese mes, se usan los reales. |
+| Devengado / percibido / por pagar | Gastos del mes, lo que entra al banco, y lo del mes siguiente que se paga con esa cobranza. |
+| Banco y deuda | Saldo del banco mes a mes; deuda de vecinos con su actualización. |
+| Deuda | Tres métodos: interés por mora de Parámetros, inflación, o inflación + interés puro. En agosto Octavo Piso aplicó **4,81 % mensual** a los saldos de un mes (hay un botón para adoptarlo). |
+| Cada lote | Cuota de cada mes = gasto × coeficiente + Fondo de Infraestructura + redondeo. Tabla de los 152, "si no paga" para los morosos, PDF y CSV. |
+
+**Los centavos identifican al lote:** el total de cada cupón termina en el número de lote
+(Lote 148 → $ …,48; Lote 9 → $ …,09; Lote 133A → $ …,33). Es la columna *Redondeo* de
+Octavo Piso: se suman entre 0 y 99 centavos. Vale también para el 2º vencimiento y las estimaciones.
+
+**Cierre automático:** el día de cierre (1º por defecto) la app completa con **estimados** los
+gastos del mes anterior que todavía no tienen factura y avisa a la Administración para que
+revise y emita. Cuando se carga la factura real del mismo proveedor, el estimado se borra solo.
+La **emisión sola** existe pero viene **apagada**, porque se lleva en paralelo con Octavo Piso.
+
+**Ojo mientras se lleve en paralelo:** la app cobra interés a quien tenga saldo impago *en la
+app*. Si los pagos de septiembre se hacen por fuera (a Octavo Piso) y no se registran acá, en la
+liquidación de septiembre todos aparecerían debiendo agosto. Antes de emitir, registrar los pagos
+(Pagos → Registrar un pago a mano, o el extracto) o seguir usando la app solo como comparación.
+
+**Lo que ve el vecino:** en su cuenta, *Tus próximas expensas (estimadas)*; y en El barrio →
+**Las cuentas del barrio**, el tablero transparente: gastos mes a mes, en qué se gasta, previsto
+contra real y la morosidad total, sin nombres.

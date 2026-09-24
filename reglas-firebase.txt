@@ -14,7 +14,9 @@ QUÉ HACEN, EN CASTELLANO
 
 2. NADIE SE APRUEBA SOLO. Un vecino puede crear su propio registro, pero
    solo con estado "pendiente" y rol "vecino", y después no puede cambiarse
-   ni el estado ni el rol. Eso solo lo hace la Administración.
+   ni el estado, ni el rol, ni el lote, ni ser representante del lote para
+   votar, ni aprobarse su propia carta poder. Eso solo lo hace la
+   Administración.
 
 3. LA PRIMERA CUENTA ES LA EXCEPCIÓN. Mientras /barrio/publico/instalado no
    existe, la primera cuenta que se crea queda como Administración y deja esa
@@ -76,7 +78,7 @@ PEGAR DESDE ACÁ
         ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
         "$uid": {
           ".read": "auth.uid === $uid",
-          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/publico/instalado').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val())))",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/publico/instalado').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val() && newData.child('casa').val() === data.child('casa').val() && newData.child('representante').val() === data.child('representante').val() && newData.child('poderOk').val() === data.child('poderOk').val())))",
           "recomiendan": {
             ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
           }
@@ -90,9 +92,37 @@ PEGAR DESDE ACÁ
         "$uid": { ".write": "auth.uid === $uid" }
       },
 
+      /* Las fotos se leen UNA POR UNA, sabiendo su id (que solo está en el
+         registro donde se publicó): nadie puede bajar la lista entera. */
       "fotosCasa": {
+        "$id": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (!newData.exists() || (newData.isString() && newData.val().length < 150000))" }
+      },
+      /* La copia "para bajar" de una foto (1280 px), que vence a los pocos
+         días y la Administración borra. Se lee también de a una. */
+      "fotosDescarga": {
+        "$id": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 700000))" }
+      },
+      "fotosIdx": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+      },
+
+      /* Los equipos anotados para recibir avisos push. NADIE los lee desde la
+         app: solo el Apps Script, con la cuenta de servicio. Cada uno escribe
+         los suyos. */
+      "pushTokens": {
+        "$uid": { ".write": "auth.uid === $uid && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+      },
+
+      /* El camión de la basura: lo registra la garita, lo ven todos. */
+      "camion":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+
+      /* Avisos urgentes por zona: los manda la garita o la Administración;
+         cada vecino escribe SOLO su respuesta. */
+      "alertas": {
         ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
-        "$id": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (!newData.exists() || (newData.isString() && newData.val().length < 150000))" }
+        ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { "respuestas": { "$uid": { ".write": "auth.uid === $uid && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" } } }
       },
 
       "config":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
@@ -170,6 +200,9 @@ PEGAR DESDE ACÁ
         "$id": { ".write": "!data.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" } },
       "avisos":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "correos":  { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      /* Ingresos frecuentes (proveedores del hotel, personal doméstico…):
+         los carga la Administración y los lee la garita. */
+      "frecuentes": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "impuestos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "auditoria": {
         ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",

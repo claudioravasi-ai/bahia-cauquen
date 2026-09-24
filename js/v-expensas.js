@@ -43,6 +43,22 @@ const plataCorta = n => { n = +n || 0; const a = Math.abs(n);
 const vtoDe = (periodo, cual = 1) => { const [a, m] = periodo.split('-').map(Number); const c = cfgExp();
   const d = new Date(a, m, cual === 1 ? c.vto1 : c.vto2); return isoDe(d); };   /* vence al mes siguiente */
 
+/* =========================================================
+   LOS CENTAVOS DICEN DE QUÉ LOTE ES EL PAGO
+   El total de cada cupón termina en los centavos del número de lote: el
+   Lote 148 paga $ …,48; el Lote 9, $ …,09; el 133A, $ …,33. Así, cuando
+   entra una transferencia al banco, se sabe de quién es sin preguntar.
+   Es la columna "Redondeo" de la liquidación: se suman entre 0 y 99
+   centavos al total del cupón (saldo anterior + intereses + expensas).
+   ========================================================= */
+const centavosDelLote = lote => { const m = String(lote || '').replace(/^Lote\s*/i, '').match(/\d+/); return m ? (+m[0]) % 100 : 0; };
+function conCentavosDelLote(monto, lote){
+  const c = Math.round((+monto || 0) * 100);
+  if (c <= 0) return { total:c / 100, redondeo:0 };
+  const r = ((centavosDelLote(lote) - (c % 100)) + 100) % 100;
+  return { total:(c + r) / 100, redondeo:r / 100 };
+}
+
 /* ---------- cálculo ---------- */
 const gastosDe = p => Store.s.gastos.filter(g => g.periodo === p && !g.anulado);
 const liquidacionDe = p => Store.s.liquidaciones.find(l => l.periodo === p);
@@ -56,6 +72,11 @@ function cuentaLote(lote){
   const movs = [];
   liquidacionesEmitidas().forEach(l => {
     const c = cuotaDe(l, lote); if (!c) return;
+    /* La primera liquidación que se trajo de Octavo Piso trae el saldo que el
+       lote arrastraba de antes (deuda, o saldo a favor si es negativo). */
+    if (c.saldoInicial) movs.push(c.saldoInicial > 0
+      ? { fecha:l.emitidaAt - 1, periodo:l.periodo, detalle:`Saldo anterior a ${nombrePeriodo(l.periodo)}${c.judicial ? ' (en gestión judicial)' : ''}`, debe:c.saldoInicial, tipo:'saldo' }
+      : { fecha:l.emitidaAt - 1, periodo:l.periodo, detalle:`Saldo a favor anterior a ${nombrePeriodo(l.periodo)}`, haber:-c.saldoInicial, tipo:'saldo' });
     movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:`Expensas ${nombrePeriodo(l.periodo)}`, debe:c.total, tipo:'cuota' });
     if (c.interes) movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:'Intereses por saldo impago', debe:c.interes, tipo:'interes' });
   });
@@ -80,7 +101,9 @@ function aPagar(lote){
   if (!l) return { saldo:cuenta.saldo, total:cuenta.saldo, periodo:'', vto1:'', vto2:'', recargo:0 };
   const v1 = vtoDe(l.periodo, 1), v2 = vtoDe(l.periodo, 2);
   const hoy = hoyISO();
-  const recargo = hoy > v1 ? cuenta.saldo * c.recargo2 / 100 : 0;
+  let recargo = hoy > v1 ? cuenta.saldo * c.recargo2 / 100 : 0;
+  /* Con recargo, el total se lleva a los centavos del lote. */
+  if (recargo) recargo = conCentavosDelLote(cuenta.saldo + recargo, lote).total - cuenta.saldo;
   return { saldo:cuenta.saldo, total:cuenta.saldo + recargo, recargo, periodo:l.periodo, vto1:v1, vto2:v2, vencido:hoy > v2, informado:cuenta.informado };
 }
 
@@ -111,9 +134,14 @@ function calcularLiquidacion(periodo){
     const multa = multasFirmes[lote] || 0;
     /* Interés sobre lo que quedó impago del mes anterior. */
     const saldoPrevio = Math.max(0, saldoLote(lote));
-    const interes = anterior && saldoPrevio > 0 ? saldoPrevio * c.interesMensual / 100 : 0;
-    const total = expensas + mejoras + part + multa + c.fondoFijo;
-    return { lote, uf:L.uf, coef:L.coef, expensas, mejoras, particulares:part, multas:multa, fondo:c.fondoFijo, interes, total };
+    const interes = anterior && saldoPrevio > 0 ? Math.round(saldoPrevio * c.interesMensual) / 100 : 0;
+    const sinRedondeo = Math.round((expensas + mejoras + part + multa + c.fondoFijo) * 100) / 100;
+    /* El redondeo se calcula sobre lo que el vecino va a pagar en total
+       (lo que arrastra + intereses + este mes), para que ESE número termine
+       en los centavos de su lote. */
+    const { redondeo } = conCentavosDelLote(Math.max(0, saldoLote(lote)) + interes + sinRedondeo, lote);
+    const total = Math.round((sinRedondeo + redondeo) * 100) / 100;
+    return { lote, uf:L.uf, coef:L.coef, expensas, mejoras, particulares:part, multas:multa, fondo:c.fondoFijo, interes, redondeo, total };
   });
   return { periodo, gastos:gs.length, porColumna, porRubro,
     totalGastos:Object.values(porColumna).reduce((a, b) => a + b, 0),
@@ -160,7 +188,8 @@ function cuponHTML(lote, periodo){
   const previos = cuenta.movs.filter(m => m.fecha < hasta);
   const saldoAnterior = previos.length ? previos[previos.length - 1].saldo : 0;
   const total1 = saldoAnterior + c.total + (c.interes || 0);
-  const total2 = total1 * (1 + cf.recargo2 / 100);
+  /* El 2º vencimiento también termina en los centavos del lote. */
+  const total2 = conCentavosDelLote(total1 * (1 + cf.recargo2 / 100), lote).total;
   const fila = (t, v) => `<tr><td>${t}</td><td class="n">${plata(v)}</td></tr>`;
   return `<h2>Cupón de pago · ${nombrePeriodo(periodo)}</h2>
     <div class="caja"><b>${esc(prop || 'Propietario')}</b><br>${esc(lote)} · UF ${esc(c.uf)} · coeficiente ${c.coef.toFixed(4)} %</div>
@@ -172,6 +201,7 @@ function cuponHTML(lote, periodo){
       ${c.multas ? fila('Multas, obleas y otros', c.multas) : ''}
       ${c.particulares ? fila('Gastos particulares de la unidad', c.particulares) : ''}
       ${fila('Fondo de Infraestructura', c.fondo)}
+      ${c.redondeo ? fila(`Redondeo (los centavos identifican al ${esc(lote)})`, c.redondeo) : ''}
       <tr class="total"><td>Total 1º vencimiento · ${fechaCorta(vtoDe(periodo, 1))}</td><td class="n">${plata(total1)}</td></tr>
       <tr class="total"><td>Total 2º vencimiento · ${fechaCorta(vtoDe(periodo, 2))} (+${cf.recargo2} %)</td><td class="n">${plata(total2)}</td></tr>
     </table>
@@ -319,6 +349,7 @@ function carpetaVecino(lote, { ajena = false } = {}){
     ${misPagos.some(p => p.estado === 'informado') ? sec('Pagos informados') + misPagos.filter(p => p.estado === 'informado').map(p => `<div class="card" style="padding:12px 14px">
       <div class="row">${p.foto ? fotoHTML(p.foto, 'mini-foto') : `<span class="ic ic-warn" style="width:44px;height:44px;border-radius:12px;display:grid;place-items:center">${I('clock')}</span>`}
       <div class="grow"><b>${plata(p.monto)}</b><div class="muted small">${fechaCorta(p.fecha)} · ${esc(p.medio)} · esperando que la Administración lo confirme</div></div></div></div>`).join('') : ''}
+    ${typeof proximasDelLote === 'function' ? proximasDelLote(lote) : ''}
     ${sec('Datos para transferir')}
     <div class="card lista">
       <div class="it"><div class="txt"><b>Alias</b><span>${esc(Store.s.config.alias || '—')}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(Store.s.config.alias || '')}">${I('copy')}</button></div>
@@ -365,7 +396,8 @@ A['pagar-expensas'] = () => {
       ${pagar.periodo ? `<div class="muted small">${nombrePeriodo(pagar.periodo)} · ${lote}</div>` : ''}</div>
 
     ${sec('Elegí cómo')}
-    ${c.mpLink ? medio('wallet', 'sky', 'Mercado Pago', 'Saldo, débito, crédito o la billetera que uses', `data-a="pago-link" data-v="${esc(c.mpLink)}" data-t="Mercado Pago"`) : ''}
+    ${MercadoPago.activo() ? medio('wallet', 'sky', 'Pagar online', 'Tarjeta de crédito o débito, saldo o QR de Mercado Pago · el recibo sale solo', `data-a="pago-mp"`) : ''}
+    ${!MercadoPago.activo() && c.mpLink ? medio('wallet', 'sky', 'Mercado Pago', 'Saldo, débito, crédito o la billetera que uses', `data-a="pago-link" data-v="${esc(c.mpLink)}" data-t="Mercado Pago"`) : ''}
     ${c.modoLink ? medio('smartphone', 'accent', 'MODO', 'Pagás desde la app de tu banco', `data-a="pago-link" data-v="${esc(c.modoLink)}" data-t="MODO"`) : ''}
     ${medio('copy', 'brand', 'Transferencia', 'Alias, CBU e importe listos para copiar', `data-a="pago-transferencia"`)}
     ${medio('home', 'wood', 'Efectivo en la Administración', 'De lunes a viernes, en el horario de atención', `data-a="pago-efectivo"`)}
@@ -376,7 +408,7 @@ A['pagar-expensas'] = () => {
 
     ${sec('Cuando ya pagaste')}
     ${medio('camera', 'ok', 'Informar el pago', 'Subís el comprobante y te llega el recibo a la app', `data-a="informar-pago"`)}
-    <p class="muted tiny" style="margin-top:12px">Los pagos con Mercado Pago o MODO igual conviene informarlos: así la Administración los concilia y te emite el recibo enseguida.</p>`,
+    <p class="muted tiny" style="margin-top:12px">${MercadoPago.activo() ? 'Lo que pagás con "Pagar online" se acredita solo, con recibo: no hace falta informarlo. Las transferencias y el efectivo sí se informan.' : 'Los pagos con Mercado Pago o MODO igual conviene informarlos: así la Administración los concilia y te emite el recibo enseguida.'}</p>`,
     { ancho:'520px' });
 };
 A['pago-link'] = el => {
@@ -440,7 +472,7 @@ F['informar-pago'] = d => {
   const u = yo(), lote = miLote();
   Store.cambiar(s => {
     s.pagos.unshift({ id:uid(), lote, userId:u.id, monto:+d.monto, fecha:d.fecha, medio:d.medio, nota:(d.nota || '').trim(),
-      foto:leerFoto(d.foto), estado:'informado', at:Date.now() });
+      foto:fotoParaOtros(d.foto, 60), estado:'informado', at:Date.now() });
     notificar(s, { para:'rol:admin', titulo:`Pago informado · ${lote}`, texto:`${plata(+d.monto)} · ${d.medio}`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas' });
     auditar(s, 'Informó un pago', `${lote} · ${plata(+d.monto)}`);
   });
@@ -471,7 +503,7 @@ R.contabilidad = {
   },
 };
 
-const TABS_COBRO = [['resumen','Resumen'],['cupones','Cupones'],['cobranzas','Pagos'],['morosos','Morosos'],['recibos','Recibos']];
+const TABS_COBRO = [['plan','Automáticas'],['resumen','Resumen'],['cupones','Cupones'],['cobranzas','Pagos'],['morosos','Morosos'],['recibos','Recibos']];
 R.cobranzas = {
   titulo: 'Expensas y cobranzas', icon: 'wallet', color: 'wood', ancha: true, sub: 'Cupones, pagos, deuda y recibos',
   render(p){
@@ -525,7 +557,7 @@ const CONTA = {
         return `${sec(`${r} · ${RUBROS[r]}`, `<span class="muted small">${plata(sub)} · ${(sub / (total || 1) * 100).toFixed(1)} %</span>`)}
           ${del.map(g => `<div class="card" style="padding:12px 14px"><div class="row" style="align-items:flex-start">
             ${g.foto ? fotoHTML(g.foto, 'mini-foto') : `<span class="ic ic-wood" style="width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none">${I('file')}</span>`}
-            <div class="grow"><b>${esc(g.proveedor)}</b><div class="muted small">${esc(g.tipoComp || '')} ${esc(g.nroComp || '')}${g.cuit ? ' · CUIT ' + esc(g.cuit) : ''}</div>
+            <div class="grow"><b>${esc(g.proveedor)}</b>${g.estimado ? ' <span class="pill p-warn">estimado</span>' : g.importado ? ' <span class="pill">de Octavo Piso</span>' : ''}<div class="muted small">${esc(g.tipoComp || '')} ${esc(g.nroComp || '')}${g.cuit ? ' · CUIT ' + esc(g.cuit) : ''}</div>
               <div class="muted small">${esc(COLUMNAS[g.columna])}${g.lote ? ' · ' + esc(g.lote) : ''}${g.cuotaN ? ` · pago ${g.cuotaN} de ${g.cuotaDe}` : ''}${g.retGan ? ' · ret. Gan. ' + plata(g.retGan) : ''}${g.retSuss ? ' · ret. SUSS ' + plata(g.retSuss) : ''}</div></div>
             <div style="text-align:right"><b class="num">${plata(g.total)}</b>
               <div class="btns" style="margin-top:6px;justify-content:flex-end"><button class="icon-btn" data-a="editar-gasto" data-id="${g.id}" aria-label="Editar">${I('edit')}</button>
@@ -609,7 +641,9 @@ const CONTA = {
         <div class="field"><label>Cuenta</label><input name="cuenta" value="${esc(c.cuenta || '')}"></div>
         <div class="grid2"><div class="field"><label>Enlace de cobro de Mercado Pago</label><input name="mpLink" type="url" value="${esc(e.mpLink || '')}" placeholder="https://mpago.la/...">
           <div class="ayuda">Se crea una vez en Mercado Pago → Cobrar → Link de pago. Los vecinos pagan con saldo, débito o crédito.</div></div>
-          <div class="field"><label>Enlace de cobro de MODO</label><input name="modoLink" type="url" value="${esc(e.modoLink || '')}" placeholder="https://..."></div></div></div>
+          <div class="field"><label>Enlace de cobro de MODO</label><input name="modoLink" type="url" value="${esc(e.modoLink || '')}" placeholder="https://..."></div></div>
+        <label class="check" style="margin-top:6px"><input type="checkbox" name="mpOnline" ${e.mpOnline ? 'checked' : ''}><span><b>Cobro online con acreditación automática (Mercado Pago)</b> · el vecino paga con tarjeta, saldo o QR desde la app y el pago se acredita solo, con recibo. Hace falta poner el token de Mercado Pago en el Apps Script (ver PAGOS.md).</span></label>
+        ${e.mpOnline ? `<div class="btns" style="margin-top:8px"><button type="button" class="btn btn-sm btn-sec" data-a="mp-conciliar">${I('refresh')}Traer ahora los pagos de Mercado Pago</button></div>` : ''}</div>
       <div class="card"><h3>Impositivo (ARCA)</h3>
         <div class="grid2"><div class="field"><label>CUIT del barrio</label><input name="cuit" value="${esc(c.cuit || '')}"></div>
           <div class="field"><label>Condición</label><input name="condicion" value="${esc(e.condicion || 'Exento')}"></div></div>
@@ -627,6 +661,7 @@ F['parametros-exp'] = d => {
     ['vto1','vto2','recargo2','interesMensual','fondoFijo'].forEach(k => { if (d[k] !== undefined && d[k] !== '') c.exp[k] = +d[k]; });
     ['mpLink','modoLink','condicion','iibb','contador'].forEach(k => { if (d[k] !== undefined) c.exp[k] = String(d[k]).trim(); });
     c.exp.empleados = !!d.empleados;
+    c.exp.mpOnline = !!d.mpOnline;
     c.expensasVence = +d.vto1 || c.expensasVence;
     auditar(s, 'Cambió los parámetros de expensas', '');
   });
@@ -789,19 +824,25 @@ A['previsualizar'] = el => {
 };
 A['emitir-liquidacion'] = async el => {
   const periodo = el.dataset.v, calc = calcularLiquidacion(periodo);
-  if (!await confirmar('Emitir la liquidación', `Se van a generar ${calc.cuotas.length} cupones por ${plata(calc.totalCuotas)} y cada vecino va a recibir el suyo.`, { si:'Emitir' })) return;
+  const est = gastosDe(periodo).filter(g => g.estimado).length;
+  if (!await confirmar('Emitir la liquidación', `Se van a generar ${calc.cuotas.length} cupones por ${plata(calc.totalCuotas)} y cada vecino va a recibir el suyo.${est ? ` <b>Ojo: ${plural(est, 'gasto es estimado', 'gastos son estimados')}</b> (todavía no se cargó la factura real).` : ''}`, { si:'Emitir' })) return;
+  emitirLiquidacion(periodo);
+};
+/* Emitir un período: se usa desde el botón y desde el cierre automático. */
+function emitirLiquidacion(periodo, { auto = false } = {}){
+  const calc = calcularLiquidacion(periodo);
   Store.cambiar(s => {
-    const l = { id:uid(), periodo, estado:'emitida', emitidaAt:Date.now(), por:yo().id,
+    const l = { id:uid(), periodo, estado:'emitida', emitidaAt:Date.now(), por: auto ? 'sistema' : yo().id, estimados: gastosDe(periodo).filter(g => g.estimado).length,
       porColumna:calc.porColumna, porRubro:calc.porRubro, totalGastos:calc.totalGastos, totalCuotas:calc.totalCuotas, cuotas:calc.cuotas };
     const i = s.liquidaciones.findIndex(x => x.periodo === periodo);
     if (i >= 0) s.liquidaciones[i] = l; else s.liquidaciones.push(l);
     s.infracciones.forEach(x => { if (x.estado === 'firme' && !x.liquidada && x.monto) x.liquidada = periodo; });
     notificar(s, { para:'todos', titulo:`Expensas de ${nombrePeriodo(periodo)}`, texto:`Ya podés ver tu cupón. Primer vencimiento: ${fechaCorta(vtoDe(periodo, 1))}.`, icon:'wallet', color:'wood', link:'expensas', sonido:true });
-    auditar(s, 'Emitió la liquidación', `${nombrePeriodo(periodo)} · ${plata(calc.totalCuotas)} · ${calc.cuotas.length} cupones`);
+    auditar(s, auto ? 'Emitió sola la liquidación (cierre automático)' : 'Emitió la liquidación', `${nombrePeriodo(periodo)} · ${plata(calc.totalCuotas)} · ${calc.cuotas.length} cupones`);
   });
   toast('Liquidación emitida', 'check');
   mandarCupones(periodo);
-};
+}
 A['reabrir-liquidacion'] = async el => {
   if (!await confirmar('Reabrir el período', 'Los cupones dejan de estar emitidos hasta que lo vuelvas a cerrar. Los pagos ya registrados no se tocan.', { si:'Reabrir', peligro:true })) return;
   Store.cambiar(s => { const l = s.liquidaciones.find(x => x.periodo === el.dataset.v); if (l) l.estado = 'borrador';
@@ -935,4 +976,145 @@ REGLAS.push(
 );
 
 /* "Ver cuenta" desde el padrón, la ficha del lote o la lista de morosos. */
+/* =========================================================
+   CONFIRMAR UN PAGO Y EMITIR EL RECIBO
+   (Estas acciones se habían perdido en una edición del 20-09 y los botones
+   "Confirmar y emitir recibo", "Rechazar", "Registrar un pago a mano" y
+   "Certificado de deuda" no hacían nada. Vuelven, y la confirmación queda
+   en una función que usa también la acreditación automática de Mercado
+   Pago.)
+   ========================================================= */
+function confirmarPago(id, { auto = false } = {}){
+  let numero = '';
+  Store.cambiar(s => {
+    const pago = s.pagos.find(x => x.id === id); if (!pago || pago.estado === 'confirmado') return;
+    const c = cfgExp();
+    numero = 'R-' + String((c.reciboNro || 0) + 1).padStart(5, '0');
+    s.config.exp = Object.assign({}, c, { reciboNro: (c.reciboNro || 0) + 1 });
+    pago.estado = 'confirmado'; pago.recibo = numero; pago.confirmadoPor = auto ? 'sistema' : yo().id; pago.confirmadoAt = Date.now();
+    s.recibos.unshift({ id:uid(), numero, lote:pago.lote, monto:pago.monto, fecha:pago.fecha, medio:pago.medio,
+      concepto:`Expensas${pago.nota ? ' · ' + pago.nota : ''}`, pagoId:pago.id, at:Date.now(), por: auto ? 'sistema' : yo().id });
+    notificar(s, { para:s.users.filter(u => u.casa === pago.lote).map(u => u.id), titulo:'Recibimos tu pago', texto:`${plata(pago.monto)} · recibo ${numero}`, icon:'check', color:'ok', link:'expensas', sonido:true });
+    auditar(s, auto ? 'Acreditó solo un pago de Mercado Pago' : 'Confirmó un pago', `${pago.lote} · ${plata(pago.monto)} · recibo ${numero}${pago.mpId ? ' · MP ' + pago.mpId : ''}`);
+  });
+  return numero;
+}
+A['confirmar-pago'] = el => { if (confirmarPago(el.dataset.id)) toast('Pago confirmado y recibo emitido', 'check'); };
+A['rechazar-pago'] = async el => {
+  if (!await confirmar('Rechazar el pago', 'El vecino recibe el aviso para que lo revise.', { si:'Rechazar', peligro:true })) return;
+  Store.cambiar(s => { const p = s.pagos.find(x => x.id === el.dataset.id); if (!p) return; p.estado = 'rechazado';
+    notificar(s, { para:s.users.filter(u => u.casa === p.lote).map(u => u.id), titulo:'No pudimos confirmar tu pago', texto:`${plata(p.monto)} · revisá el comprobante o escribinos`, icon:'alert', color:'danger', link:'expensas' });
+    auditar(s, 'Rechazó un pago informado', `${p.lote} · ${plata(p.monto)}`); });
+};
+A['pago-manual'] = () => hoja('Registrar un pago', `<form data-f="pago-manual">
+  <div class="field"><label>Lote</label><select name="lote" required>${LOTES.map(L => `<option value="Lote ${L.lote}">${esc(nombreLote(L))}${propietarioDe('Lote ' + L.lote) ? ' · ' + esc(propietarioDe('Lote ' + L.lote)) : ''}</option>`).join('')}</select></div>
+  <div class="grid2"><div class="field"><label>Importe</label><input type="number" step="0.01" name="monto" required></div>
+    <div class="field"><label>Fecha</label><input type="date" name="fecha" required value="${hoyISO()}"></div></div>
+  <div class="field"><label>Medio</label><select name="medio"><option>Transferencia</option><option>Depósito</option><option>Efectivo</option><option>Cheque</option><option>Mercado Pago</option><option>Otro</option></select></div>
+  <div class="field"><label>Nota</label><input name="nota" maxlength="120"></div>
+  <button class="btn btn-pri btn-block">${I('check')}Registrar y emitir recibo</button></form>`);
+F['pago-manual'] = d => {
+  const id = uid();
+  Store.cambiar(s => { s.pagos.unshift({ id, lote:d.lote, userId:yo().id, monto:+d.monto, fecha:d.fecha, medio:d.medio, nota:(d.nota || '').trim(), estado:'informado', at:Date.now() }); });
+  cerrarHoja();
+  if (confirmarPago(id)) toast('Pago registrado y recibo emitido', 'check');
+};
+A['certificado-deuda'] = el => imprimir(`Certificado de deuda · ${el.dataset.v}`, certificadoHTML(el.dataset.v));
+
+/* =========================================================
+   PAGO ONLINE CON MERCADO PAGO
+   El vecino toca "Pagar online", el Apps Script arma el enlace de pago
+   (con el access token que vive SOLO en el Apps Script) y Mercado Pago
+   cobra: tarjeta de crédito o débito, saldo en cuenta, billeteras o QR.
+   Al volver, la app le pregunta a Mercado Pago (a través del Apps Script)
+   cómo salió. Y la app de la Administración, cada vez que se abre y cada
+   15 minutos, trae los pagos aprobados de los últimos días y acredita
+   solos los que falten, con su recibo: nadie tiene que confirmar a mano,
+   y aunque el vecino cierre el navegador sin volver, el pago entra igual.
+   ========================================================= */
+const MercadoPago = {
+  activo(){ return !!cfgExp().mpOnline && typeof Nube !== 'undefined' && Nube.activa() && !!Correo.datos(); },
+  async pedir(cuerpo){
+    const d = Correo.datos(); if (!d) throw new Error('Falta configurar el Apps Script (Ajustes → Correo)');
+    const r = await fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ ...cuerpo, clave:d.clave }) });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || 'El Apps Script contestó que no');
+    return j;
+  },
+  loteDeRef: ref => (String(ref || '').split('|')[0] || '').trim(),
+  /* El vecino vuelve de Mercado Pago: la dirección trae el número de pago. */
+  async alVolver(){
+    const q = new URLSearchParams(location.search);
+    const id = q.get('payment_id') || q.get('collection_id');
+    if (!q.has('mp') || !id || id === 'null'){ if (q.has('mp')) this.limpiarDireccion(); return; }
+    this.limpiarDireccion();
+    const esperar = (n = 0) => new Promise(ok => { const t = () => (yo() && Nube.arrancada) || n++ > 60 ? ok() : setTimeout(t, 250); t(); });
+    await esperar();
+    try {
+      const { pago } = await this.pedir({ accion:'mp-verificar', pago:id });
+      const lote = this.loteDeRef(pago.ref) || miLote();
+      if (pago.estado === 'approved'){
+        if (!Store.s.pagos.some(p => p.mpId === pago.id)) Store.cambiar(s => {
+          s.pagos.unshift({ id:uid(), lote, userId:yo().id, monto:+pago.monto, fecha:(pago.fecha || '').slice(0, 10) || hoyISO(), medio:'Mercado Pago',
+            nota:'Aprobado por Mercado Pago', mpId:pago.id, estado:'informado', at:Date.now() });
+          notificar(s, { para:'rol:admin', titulo:`Pago con Mercado Pago · ${lote}`, texto:`${plata(+pago.monto)} · aprobado`, icon:'wallet', color:'ok', link:'cobranzas:cobranzas' });
+        });
+        hoja('¡Pago aprobado!', `${aviso('ok', 'check', `Mercado Pago aprobó tu pago de ${plata(+pago.monto)}`, `${esc(lote)} · operación ${esc(pago.id)}`)}
+          <p class="small">El recibo se emite solo y te llega a la app en cuanto la Administración abra la suya (no tiene que confirmarlo a mano).</p>
+          <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Listo</button>`);
+      } else if (['pending', 'in_process', 'authorized'].includes(pago.estado)){
+        hoja('Pago pendiente', `${aviso('warn', 'clock', 'Mercado Pago todavía no acreditó el pago', 'Pasa con los pagos en efectivo (Rapipago, Pago Fácil) o cuando el banco lo está revisando. Cuando se apruebe, se acredita solo.')}
+          <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`);
+      } else {
+        hoja('El pago no salió', `${aviso('danger', 'alert', 'Mercado Pago no aprobó el pago', 'No se cobró nada. Podés intentar con otro medio.')}
+          <button class="btn btn-pri btn-block" data-a="pagar-expensas">Intentar de nuevo</button>`);
+      }
+    } catch(e){ toast('No se pudo consultar el pago: ' + e.message, 'alert'); }
+  },
+  limpiarDireccion(){
+    const q = new URLSearchParams(location.search);
+    ['mp','payment_id','collection_id','collection_status','status','external_reference','payment_type','merchant_order_id','preference_id','site_id','processing_mode','merchant_account_id'].forEach(k => q.delete(k));
+    history.replaceState(history.state, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+  },
+  /* La Administración acredita sola lo que entró. */
+  conciliando:false, ultima:0,
+  async conciliar(forzar = false){
+    if (!esAdmin() || !this.activo() || this.conciliando) return 0;
+    if (!forzar && Date.now() - this.ultima < 15 * MIN) return 0;
+    this.conciliando = true; this.ultima = Date.now();
+    let n = 0;
+    try {
+      const { pagos } = await this.pedir({ accion:'mp-recientes', dias:20 });
+      for (const mp of pagos || []){
+        const lote = this.loteDeRef(mp.ref);
+        if (!LOTES.some(L => 'Lote ' + L.lote === lote)) continue;
+        const ya = Store.s.pagos.find(p => p.mpId === mp.id);
+        if (ya && ya.estado === 'confirmado') continue;
+        let id = ya && ya.id;
+        if (!id){ id = uid(); Store.cambiar(s => { s.pagos.unshift({ id, lote, userId:'sistema', monto:+mp.monto, fecha:(mp.fecha || '').slice(0, 10) || hoyISO(), medio:'Mercado Pago', nota:'Aprobado por Mercado Pago', mpId:mp.id, estado:'informado', at:Date.now() }); }); }
+        if (confirmarPago(id, { auto:true })) n++;
+      }
+      if (n) toast(`Se acreditaron solos ${plural(n, 'pago', 'pagos')} de Mercado Pago`, 'wallet');
+    } catch(e){ console.warn('Mercado Pago', e.message); this.error = e.message; }
+    this.conciliando = false;
+    return n;
+  },
+};
+A['pago-mp'] = async el => {
+  const lote = miLote(), pagar = aPagar(lote), u = yo();
+  const total = Math.round((pagar.total || Math.max(0, saldoLote(lote))) * 100) / 100;
+  if (!(total >= 100)){ toast('No hay saldo para pagar', 'check'); return; }
+  el.disabled = true;
+  toast('Abriendo Mercado Pago…', 'wallet');
+  try {
+    const j = await MercadoPago.pedir({ accion:'mp-crear', lote, periodo:pagar.periodo || periodoHoy(), monto:total, uid:u.id, email:u.email,
+      titulo:`Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} · ${lote} · Barrio ${Store.s.config.nombre}`,
+      volver: location.origin + location.pathname + '?mp=1' });
+    location.href = j.url;
+  } catch(e){ el.disabled = false; toast('No se pudo abrir el pago: ' + e.message, 'alert'); }
+};
+A['mp-conciliar'] = async () => { const n = await MercadoPago.conciliar(true); if (!n) toast(MercadoPago.error ? 'Mercado Pago: ' + MercadoPago.error : 'No hay pagos nuevos de Mercado Pago', 'wallet'); refrescar(); };
+setTimeout(() => MercadoPago.alVolver(), 500);
+setInterval(() => { if (yo() && esAdmin()) MercadoPago.conciliar(); }, 5 * MIN);
+
 A['ver-cuenta'] = el => { cerrarHoja(); abrir('expensas', el.dataset.v); };

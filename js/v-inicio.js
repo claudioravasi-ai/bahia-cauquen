@@ -83,7 +83,10 @@ function urgentesVecino(){
     `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}${r.patente ? ' · ' + esc(r.patente) : ''}`,
     `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">${I('check')}Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)));
   const paq = s.paquetes.filter(p => p.hostId === u.id && !p.retirado);
-  if (paq.length) out.push(aviso('brand', 'box', `Tenés ${plural(paq.length, 'paquete')} en la garita`, paq.map(p => esc(p.empresa)).join(', ')));
+  if (paq.length) out.push(aviso('brand', 'box', `Tenés ${plural(paq.length, 'paquete')} en la garita`, paq.map(p => esc(p.empresa)).join(', '),
+    `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="mis-paquetes">Ver y confirmar</button>`));
+  if (typeof alertasParaMi === 'function') alertasParaMi().filter(a => !respuestaDe(a)).forEach(a => out.push(aviso('danger latido', 'siren', `Aviso urgente: ${esc(a.titulo)}`, esc(a.zona),
+    `<button class="btn btn-xs btn-ok" data-a="alerta-responder" data-id="${a.id}" data-v="ok">Recibido</button><button class="btn btn-xs btn-danger-soft" data-a="alerta-responder" data-id="${a.id}" data-v="ayuda">Necesito ayuda</button>`)));
   s.reservas.filter(r => r.userId === u.id && (r.fecha === hoy || r.fecha === sumarDias(hoy, 1)) && !r.cancelada).forEach(r => {
     const a = amenity(r.amenity); if (!a) return;
     out.push(aviso('ok', a.icon, `${r.fecha === hoy ? 'Hoy' : 'Mañana'} tenés el ${a.nombre}`, `${a.franjas[r.franja]?.join(' a ') || ''} h${r.invitados ? ' · ' + plural(+r.invitados, 'invitado') : ''}`));
@@ -163,6 +166,8 @@ const SECCIONES = {
         teja({ v:'expensas', icon:'wallet', color:'wood', t:'Mis expensas', s:`Tu cuenta, cupones y pagos` }),
         teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Mis reclamos', s:'Privados con la Administración', n: s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length || '' }),
         teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Familia, autos, mascotas' }),
+        teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = s.paquetes.filter(p => p.hostId === u.id && !p.confirmado).length; return n ? `${plural(n, 'por retirar o confirmar')}` : 'Lo que llega a la garita'; })(), badge: s.paquetes.filter(p => p.hostId === u.id && !p.retirado).length }),
+        teja({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial', s:'Tu QR para la garita y los espacios comunes' }),
         teja({ v:'ayuda', icon:'info', color:'sky', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa' }),
         ...(s.infracciones.some(i => i.casa === u.casa && i.estado === 'notificada')
           ? [teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificación', s:'Podés presentar tu descargo', badge: s.infracciones.filter(i => i.casa === u.casa && i.estado === 'notificada').length })] : []),
@@ -195,6 +200,7 @@ const SECCIONES = {
         teja({ v:'mascotas', icon:'paw', color:'ok', t:'Mascotas', s:'Perdidas, encontradas y del barrio' }),
         teja({ v:'compras', icon:'cart', color:'brand', t:'Compras conjuntas', s: compras ? `${plural(compras, 'abierta')}` : 'Leña, gas, lo que sea', n: compras || '' }),
         teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamento', s:'Convivencia, obras, actas' }),
+        teja({ v:'tablero', icon:'wallet', color:'wood', t:'Las cuentas del barrio', s:'En qué se gasta, mes a mes, y la morosidad (sin nombres)' }),
         teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
         teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:descargasVisibles().filter(d => d.url || d.texto).length || '' }),
       ].join('');
@@ -219,6 +225,8 @@ const SECCIONES = {
         teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia hoy', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
         teja({ v:'servicios', icon:'user', color:'wood', t:'Profesionales y oficios del barrio', s:(() => { const n = s.users.filter(enDirectorioProfesional).length; return n ? `${plural(n, 'vecino', 'vecinos')} para contactar` : 'Médicos, abogados, electricistas…'; })(), n: s.users.filter(enDirectorioProfesional).length || '' }),
         teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: Vuelos.cuantosHoy() || '' }),
+        teja({ v:'municipio', icon:'pin', color:'sky', t:'Municipalidad de Ushuaia', s:'Trámites, reclamos urbanos, residuos, turnos' }),
+        teja({ v:'sismos', icon:'sismo', color:'warn', t:'Sismos', s: (() => { const x = typeof Sismos !== 'undefined' && Sismos.destacado(); return x ? `M ${x.mag.toFixed(1)} · ${x.lugar} · ${hace(x.at)}` : 'En vivo en la región'; })() }),
       ].join('');
     },
   },
@@ -239,7 +247,7 @@ const SECCIONES = {
         <div class="mosaico">
         ${teja({ v:'admin', icon:'sliders', color:'accent', t:'Administración', s:'Inscripciones, vecinos, contenido y ajustes', badge: pend, destaca:true })}
         ${teja({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Gastos del mes, cierre y ARCA' })}
-        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas y cobranzas', s:'Cupones, pagos, morosos y recibos', badge: s.pagos.filter(x => x.estado === 'informado').length })}
+        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas y cobranzas', s:'Automáticas, cupones, pagos, morosos y recibos', badge: s.pagos.filter(x => x.estado === 'informado').length })}
         </div>
         ${sec('Día a día')}<div class="mosaico">
         ${teja({ v:'padron', icon:'users', color:'brand', t:'Padrón', s: s.padron.length ? `${plural(s.padron.length, 'unidad', 'unidades')} · buscá por apellido o lote` : 'Sin cargar' })}
@@ -253,6 +261,8 @@ const SECCIONES = {
         ${teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones', s:'Firmadas a la garita', n: s.peticiones.filter(p => p.estado === 'pendiente').length || '' })}
         ${teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' })}
         ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día', n: s.proveedores.filter(p => artEstado(p)[1] !== 'ok').length || '' })}
+        ${teja({ v:'frecuentes', icon:'qr', color:'brand', t:'Ingresos frecuentes', s:'Proveedores del hotel, personal doméstico… con QR fijo', n: aLista(s.frecuentes).filter(f => f && !f.baja).length || '' })}
+        ${teja({ v:'alertas', icon:'siren', color:'danger', t:'Avisos urgentes por zona', s:'Corte de luz, nieve, portón… con "Recibido" o "Necesito ayuda"', n: aLista(s.alertas).filter(alertaActiva).length || '' })}
         ${teja({ v:'obras', p:'pendientes', icon:'wrench', color:'wood', t:'Obras por aprobar', s:'Registro de obras', n: s.obras.filter(o => o.estado === 'pendiente').length || '' })}
         ${teja({ v:'comunicados', icon:'tack', color:'danger', t:'Comunicados importantes', s:'Ventana, sonido y acuse de recibo', n:(s.comunicados || []).filter(c => !c.archivado).length || '' })}
         ${teja({ a:'nuevo-post', v:'aviso', icon:'muro', color:'sky', t:'Publicar en el pizarrón', s:'Para lo que no es urgente' })}
@@ -388,6 +398,7 @@ const cuandoFue = at => {
 /* Lo visto se recuerda por equipo. La primera vez no titila todo lo viejo:
    solo lo del último día. */
 const Pizarra = {
+  volver: false,
   vistos(){
     const ses = Store.sesion;
     if (!ses.pzDesde){ ses.pzDesde = Date.now() - DIA; Store.guardarSesion(); }
@@ -407,7 +418,23 @@ const Pizarra = {
     document.querySelectorAll(`.pz[data-k="${CSS.escape(k)}"],.pzr[data-k="${CSS.escape(k)}"]`).forEach(el => { el.classList.remove('titila'); el.classList.add('leido'); el.querySelector('.pz-nueva')?.remove(); });
   },
 };
-document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('.pz[data-k],.pzr[data-k]'); if (b) Pizarra.marcar(b.dataset.k); }, true);
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.pz[data-k],.pzr[data-k]');
+  if (!b) return;
+  Pizarra.marcar(b.dataset.k);
+  /* Tocado desde la pizarra abierta en la hoja: lo que se abra (otra hoja o
+     una ventana) se cierra con "Atrás" o con la X y deja de nuevo la
+     pizarra abierta. */
+  Pizarra.volver = !!b.closest('#hoja');
+}, true);
+/* Se cerró la hoja de un aviso que se abrió desde la pizarra: vuelve la
+   pizarra. (Si lo que se abrió fue una ventana, abrir() ya limpió la marca
+   y la pizarra vuelve cuando se cierra esa ventana.) */
+document.addEventListener('close', e => {
+  if (!e.target || e.target.id !== 'hoja' || !Pizarra.volver) return;
+  Pizarra.volver = false;
+  setTimeout(() => { if (!hojaAbierta()) A['pizarra-toda'](); }, 40);
+}, true);
 
 function avisosGenerales(){
   const s = Store.s, u = yo(), hoy = hoyISO(), ahora = Date.now(), out = [];
@@ -421,8 +448,13 @@ function avisosGenerales(){
   aLista(s.comunicados).filter(c => c && c.para === 'todos' && !c.archivado && (!c.vence || c.vence >= hoy)).forEach(c =>
     poner({ k:'com-' + c.id, nivel:'rojo', icon: c.tipo === 'reunion' ? 'calendar' : 'tack', tag: c.tipo === 'reunion' ? 'Invitación' : 'Comunicado',
       at:c.at, titulo:c.titulo, texto:c.texto, de:'Administración', a:'ver-novedad', v:'com', id:c.id }));
+  /* LO GENERAL QUEDA 24 HORAS, AUNQUE YA LO HAYAS LEÍDO
+     Un aviso para todo el barrio no desaparece al abrirlo: sigue en la
+     pizarra (quieto, sin titilar) hasta cumplir 24 horas, o hasta que
+     quien lo subió lo baja. Las excepciones: lo que la Administración deja
+     fijado, y un evento, que queda hasta el día en que se hace. */
   aLista(s.posts).filter(p => p && (TIPOS_PIZARRA.includes(p.type) || usuario(p.autor)?.rol === 'admin') && !p.resuelto
-      && (p.fijado || ahora - p.createdAt < 10 * DIA)).forEach(p => {
+      && (p.fijado || ahora - p.createdAt < DIA || (p.type === 'evento' && p.fecha && p.fecha >= hoy))).forEach(p => {
     const t = TIPOS_POST[p.type] || TIPOS_POST.aviso, au = autorVisible(p.autor);
     poner({ k:'post-' + p.id, nivel: NIVEL_POST[p.type] || 'verde', icon:t.icon, tag:t.n, at:p.createdAt, titulo:p.title, texto:p.body,
       de:`${au.nombre}${au.casa && au.casa !== au.nombre ? ' · ' + au.casa : ''}`, fijo:p.fijado, a:'ver-novedad', v:'post', id:p.id });
@@ -459,11 +491,21 @@ function avisosGenerales(){
       texto:`Cierra ${fechaCorta(isoDe(new Date(c.cierra)))} · ${aLista(c.anotados).reduce((a, x) => a + (+x.cant || 0), 0)} de ${c.meta} ${c.unidad}`, a:'abrir', v:'compras' }));
   /* El tiempo y el camión: son de todos. */
   Clima.alertas().forEach(a => poner({ k:'clima-' + hoy + '-' + a.icon, nivel: nivelDeColor(a.nivel), icon:a.icon, tag:'Clima', at: new Date(hoy + 'T06:00').getTime(), titulo:a.t, texto:a.x, a:'abrir', v:'ushuaia' }));
+  /* Los sismos fuertes o cercanos de las últimas 24 horas. */
+  if (typeof Sismos !== 'undefined') Sismos.paraPizarra().forEach(x => poner({ k:'sismo-' + x.id, nivel: Sismos.nivel(x), icon:'sismo', tag:'Sismo', at:x.at,
+    titulo:`Magnitud ${x.mag.toFixed(1)} · ${x.lugar}`, texto:`A ${x.km.toLocaleString('es-AR')} km del barrio${x.tsunami ? ' · con marca de tsunami' : ''}`, a:'abrir', v:'sismos' }));
+  /* El camión de la basura adentro del barrio, en vivo. */
+  const cam = typeof Camion !== 'undefined' && Camion.adentro();
+  if (cam) poner({ k:'camion-' + cam.id, nivel:'amarillo', icon:'tacho', tag:'Residuos · ahora', at:cam.entra, titulo:'El camión de la basura está en el barrio', texto:`Entró a las ${hora(cam.entra)} h`, a:'abrir', v:'recoleccion' });
+  /* Los avisos urgentes que siguen activos (para todo el barrio o tu zona). */
+  if (typeof alertas === 'function') alertas().filter(a => alertaActiva(a) && (!aLista(a.lotes).length || alertaMeToca(a))).forEach(a =>
+    poner({ k:'alerta-' + a.id, nivel:'rojo', icon:(TIPOS_ALERTA[a.tipo] || TIPOS_ALERTA.otro).icon, tag:'Aviso urgente', at:a.at, titulo:a.titulo, texto:`${a.zona}${a.texto ? ' · ' + a.texto : ''}`, a:'abrir', v:'alertas' }));
   const rec = recoleccionHoy();
   if (rec) poner({ k:'reco-' + hoy + '-' + rec.t, nivel: rec.vol ? 'amarillo' : 'verde', icon:'truck', tag:'Residuos', at: new Date(hoy + 'T07:00').getTime(), titulo:rec.t, texto:rec.x, a:'abrir', v:'recoleccion' });
-  /* Los avisos automáticos para todos que no tienen otro lugar. */
-  noLeidas().filter(n => aLista(n.para).includes('todos') && ahora - n.at < 2 * DIA && !LINKS_YA_EN_PIZARRA.includes(String(n.link || '').split(':')[0]))
-    .forEach(n => out.push({ k:'n-' + n.id, nuevo:true, nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell', tag:'Aviso', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id }));
+  /* Los avisos automáticos para todos que no tienen otro lugar: también
+     quedan 24 horas aunque ya se hayan leído (leídos, quietos). */
+  misNotifs().filter(n => aLista(n.para).includes('todos') && ahora - n.at < DIA && !LINKS_YA_EN_PIZARRA.includes(String(n.link || '').split(':')[0]))
+    .forEach(n => out.push({ k:'n-' + n.id, nuevo:!aLista(n.leidas).includes(u.id), nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell', tag:'Aviso', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id }));
   return out.sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || (!!b.fijo - !!a.fijo) || b.at - a.at);
 }
 /* Los avisos que son tuyos y todavía no abriste. */
@@ -539,7 +581,7 @@ function pizarraCompleta(){
   return `<div class="pz-leyenda">${Object.entries(NIVELES_PZ).map(([k, t]) => `<span class="nv-${k}"><i></i>${t}</span>`).join('')}</div>
     <div class="pz-dos">${colPer}${colGen}</div>`;
 }
-A['pizarra-toda'] = () => hoja('Pizarra del día', pizarraCompleta(), { ancho:'900px' });
+A['pizarra-toda'] = () => { Pizarra.volver = false; hoja('Pizarra del día', pizarraCompleta(), { ancho:'900px' }); };
 A['ver-novedad'] = el => {
   const s = Store.s, id = el.dataset.id;
   if (el.dataset.v === 'com'){
@@ -577,16 +619,26 @@ R.inicio = {
     const saludo = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
     const [desc] = c ? Clima.cod(c.weather_code) : [''];
     const sol = Clima.sol();
+    /* LA FOTO DE PORTADA, CENTRADA Y PAREJA
+       El DEA va solo, arriba a la derecha, para que no se mezcle con el
+       tiempo. Abajo, todo centrado: saludo, nombre, temperatura, y los
+       datos del tiempo en una grilla de casillas iguales (cuatro en una
+       fila, o dos y dos en el teléfono), así ningún renglón queda a medio
+       llenar. El sismo va debajo, a lo ancho de esa misma grilla. */
     const hero = `<div class="hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
-      <div class="saludo">${saludo},</div>
-      <h1>${esc(u.rol === 'vecino' ? u.nombre.split(' ')[0] : u.nombre)}</h1>
-      <div class="sub">${esc(u.casa)} · ${fechaLarga(hoy)}</div>
-      ${c ? `<div class="clima"><div class="temp">${Math.round(c.temperature_2m)}<small>°C</small></div>
-        <div class="desc"><b>${desc}</b>Sensación ${Math.round(c.apparent_temperature)}°</div>${deaHero()}</div>
-        <div class="clima-datos"><span>${I('wind')}${Clima.rumbo(c.wind_direction_10m)} ${Math.round(c.wind_speed_10m)} km/h</span>
-          <span>${I('zap')}Ráfagas ${Math.round(c.wind_gusts_10m)}</span>
-          <span>${I('sunrise')}${sol.sale}</span><span>${I('sunset')}${sol.pone}</span></div>`
-        : `<div class="clima">${deaHero()}</div><div class="clima-datos" style="margin-top:14px"><span>${I('cloud')}Cargando el clima de Ushuaia…</span></div>`}
+      ${deaHero()}
+      <div class="hero-centro">
+        <div class="saludo">${saludo},</div>
+        <h1>${esc(u.rol === 'vecino' ? u.nombre.split(' ')[0] : u.nombre)}</h1>
+        <div class="sub">${esc(u.casa)} · ${fechaLarga(hoy)}</div>
+        ${c ? `<div class="clima"><div class="temp">${Math.round(c.temperature_2m)}<small>°C</small></div>
+          <div class="desc"><b>${desc}</b>Sensación ${Math.round(c.apparent_temperature)}°</div></div>
+          <div class="clima-datos"><span>${I('wind')}${Clima.rumbo(c.wind_direction_10m)} ${Math.round(c.wind_speed_10m)} km/h</span>
+            <span>${I('zap')}Ráfagas ${Math.round(c.wind_gusts_10m)}</span>
+            <span>${I('sunrise')}${sol.sale}</span><span>${I('sunset')}${sol.pone}</span></div>`
+          : `<div class="clima-datos una"><span>${I('cloud')}Cargando el clima de Ushuaia…</span></div>`}
+        ${sismoHero()}
+      </div>
     </div>`;
 
     const pron = Clima.d?.dd ? `<div class="pronostico">${[1,2,3].map(i => {
@@ -628,6 +680,7 @@ R.inicio = {
           <div>${sec('Próximos días')}${pron}</div>
           <div>${sec('Luz del día')}${barraLuz(sol)}</div>
         </section>
+        ${(() => { const t = typeof tarjetaPush === 'function' && !esStaff() ? tarjetaPush(true) : ''; return t ? `<section class="bloque">${t}</section>` : ''; })()}
         <section class="bloque pizarra-dia">${pizarraDelDia()}</section>
         <section class="bloque" id="porDondeSeguir">${bloqueSeguir}</section>
         <section class="bloque cintas-pie">${ushuaiaHoy()}${tiraPromos()}</section>
@@ -1065,6 +1118,9 @@ R.garita = {
     return `
       ${PILA.length === 1 ? `<div class="titulo-vista" style="margin-top:16px"><h1>Garita</h1><p>${fechaLarga(hoy)}</p></div>` : ''}
       ${bandaTurno()}
+      ${bandaCamion(true)}
+      ${alertas().filter(alertaActiva).map(a => { const ay = destinatariosAlerta(a).filter(v => a.respuestas?.[v.id]?.r === 'ayuda').length;
+        return aviso(ay ? 'danger latido' : 'warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, `${esc(a.zona)} · ${ay ? plural(ay, 'casa pide', 'casas piden') + ' ayuda' : 'nadie pidió ayuda'}`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`); }).join('')}
       ${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
       <div class="garita-kpis"><div class="kpi"><b>${esperados}</b><span>Esperados</span></div><div class="kpi"><b>${adentro}</b><span>Adentro</span></div><div class="kpi"><b>${paq.length}</b><span>Paquetes</span></div></div>
       <form data-f="validar" class="card">
@@ -1073,7 +1129,9 @@ R.garita = {
           <button class="btn btn-pri">${I('search')}</button></div>
         <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-sm btn-sec" data-a="escanear">${I('scan')}Escanear QR</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="llegada-nueva">${I('gate')}Llegó sin aviso</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="paquete-nuevo">${I('box')}Llegó un paquete</button></div>
+          <button type="button" class="btn btn-sm btn-sec" data-a="paquete-nuevo">${I('box')}Llegó un paquete</button>
+          <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button>
+          <button type="button" class="btn btn-sm btn-sec" data-a="alerta-nueva">${I('siren')}Aviso urgente</button></div>
       </form>
       ${s.peticiones.filter(p => p.estado === 'pendiente').map(p => aviso('warn latido', 'edit', `Petición de ${esc(p.casa)} sin recibir`, esc(TIPOS_PET[p.tipo]?.n || ''), `<button class="btn btn-xs btn-sec" data-a="ver-peticion" data-id="${p.id}">Leer y firmar</button>`)).join('')}
       ${s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => aviso('info', 'truck', `Obra en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h · ${esc(o.empresa || '')}` : esc(o.empresa || ''))).join('')}
@@ -1126,6 +1184,8 @@ function validar(q){
   const txt = String(q || '').trim().replace(/^BHC:/i, '');
   const dig = soloDigitos(txt), pat = normPatente(txt);
   if (!txt){ toast('Escribí un código, una patente o un DNI', 'search'); return; }
+  /* Pase fijo de un ingreso frecuente (F-…) o credencial de vecino (V-…). */
+  if (typeof validarCodigoEspecial === 'function' && validarCodigoEspecial(txt)) return;
   const pases = s.pases.filter(p => !p.cancelado && ((dig.length === 6 && p.codigo === dig) || (pat.length >= 6 && normPatente(p.patente) === pat) || (dig.length >= 7 && p.dni === dig)));
   const vecino = pat.length >= 6 ? s.users.find(u => (u.vehiculos || []).some(v => normPatente(v.patente) === pat)) : null;
   if (!pases.length && !vecino){
@@ -1180,18 +1240,7 @@ F['llegada'] = d => {
   });
   cerrarHoja(); toast('Consultando al vecino…', 'send');
 };
-A['paquete-nuevo'] = () => hoja('Llegó un paquete', `<form data-f="paquete">
-  <div class="field"><label>¿Para qué casa?</label><select name="hostId" required>${opcionesCasas()}</select></div>
-  <div class="grid2"><div class="field"><label>Empresa</label><input name="empresa" required maxlength="40" list="empresas" placeholder="Mercado Libre"></div>
-    <div class="field"><label>Detalle</label><input name="detalle" maxlength="60" placeholder="Caja chica"></div></div>
-  <datalist id="empresas"><option>Mercado Libre</option><option>Correo Argentino</option><option>Andreani</option><option>OCA</option><option>DHL</option><option>Via Cargo</option></datalist>
-  <button class="btn btn-pri btn-block">${I('box')}Guardar y avisar</button></form>`);
-F['paquete'] = d => {
-  Store.cambiar(s => { s.paquetes.unshift({ id:uid(), hostId:d.hostId, empresa:d.empresa, detalle:d.detalle, recibido:Date.now(), retirado:null });
-    notificar(s, { para:d.hostId, titulo:'Tenés un paquete en la garita', texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''}`, icon:'box', color:'wood' }); });
-  cerrarHoja(); toast('Paquete guardado. El vecino ya sabe.', 'box');
-};
-A['paquete-entregado'] = el => Store.cambiar(s => { const p = s.paquetes.find(x => x.id === el.dataset.id); if (p) p.retirado = Date.now(); });
+/* Los paquetes (con foto y confirmación del vecino) están en v-servicio.js. */
 A['aviso-visto'] = el => Store.cambiar(s => { const a = s.avisos.find(x => x.id === el.dataset.id); if (a){ a.visto = Date.now();
   notificar(s, { para:a.userId, titulo:'La guardia vio tu aviso', texto:AVISOS_GUARDIA[a.tipo]?.t || '', icon:'shield', color:'ok' }); } });
 A['ronda-casa'] = el => { Store.cambiar(s => s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'ronda', texto:`Ronda por ${el.dataset.v} (casa sola): sin novedades.`, at:Date.now() })); toast('Anotado en la bitácora', 'book'); };

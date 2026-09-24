@@ -143,7 +143,7 @@ F['nuevo-post'] = d => {
     });
     cerrarHoja(); toast(`Aviso enviado a ${d.destino}`, 'send'); return;
   }
-  const p = { id:uid(), type:d.type, title:d.title.trim(), body:(d.body || '').trim(), autor:u.id, createdAt:Date.now(), reactions:{}, comments:[], foto:leerFoto(d.foto) };
+  const p = { id:uid(), type:d.type, title:d.title.trim(), body:(d.body || '').trim(), autor:u.id, createdAt:Date.now(), reactions:{}, comments:[], foto:fotoParaOtros(d.foto, 7) };
   if (d.type === 'evento'){ p.fecha = d.fecha || ''; p.horaEv = d.horaEv || ''; p.lugar = d.lugar || ''; p.voy = [u.id]; }
   if (d.type === 'ofrezco' || d.type === 'busco'){ p.category = d.category; p.price = (d.price || '').trim(); }
   Store.cambiar(s => {

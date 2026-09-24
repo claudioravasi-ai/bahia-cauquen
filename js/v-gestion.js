@@ -186,14 +186,17 @@ function formReserva(am, fecha, i){
       <div class="field"><label>Motivo</label><input name="nota" maxlength="60" placeholder="Cumpleaños"></div></div>
     <div class="field"><label>Lista de invitados (opcional)</label><textarea name="lista" placeholder="Un invitado por renglón. Nombre, patente&#10;Ej: Laura Gómez, AB123CD"></textarea>
       <div class="ayuda">Cada invitado recibe su pase con QR para ese día y ese horario. Así no tenés que anunciarlos de a uno.</div></div>
-    <label class="check"><input type="checkbox" required><span>Leí las reglas: ${esc(am.reglas)}</span></label>
+    ${+am.deposito ? `<div class="card plana small">${I('wallet')} <b>Depósito de garantía: ${plata(+am.deposito)}</b>. Se entrega en la Administración antes del turno y se devuelve después de revisar el espacio.</div>` : ''}
+    <label class="check"><input type="checkbox" name="acepto" required><span>Leí y acepto el reglamento: ${esc(am.reglas)}</span></label>
+    <p class="muted tiny" style="margin:4px 0 0">La víspera te llega un recordatorio y, al terminar, te pedimos que cuentes cómo quedó el espacio.</p>
     <button class="btn btn-pri btn-block" style="margin-top:10px">${I('calendar')}Confirmar reserva</button></form>`);
 }
 F['reservar'] = (d, form) => {
   const am = amenity(form.dataset.v), [fecha, fr] = form.dataset.p.split('|'), i = +fr, u = yo();
   if (Store.s.reservas.some(r => r.amenity === am.id && r.fecha === fecha && r.franja === i && !r.cancelada)){ toast('Alguien lo reservó recién. Elegí otro turno.', 'alert'); cerrarHoja(); refrescar(); return; }
   const invitados = String(d.lista || '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, am.invitadosMax).map(l => { const [n, p] = l.split(','); return { nombre:n.trim(), patente:(p || '').trim().toUpperCase() }; });
-  const r = { id:uid(), amenity:am.id, userId:u.id, fecha, franja:i, invitados:Math.max(+d.invitados || 0, invitados.length), nota:(d.nota || '').trim(), createdAt:Date.now(), pases:[] };
+  const r = { id:uid(), amenity:am.id, userId:u.id, fecha, franja:i, invitados:Math.max(+d.invitados || 0, invitados.length), nota:(d.nota || '').trim(), createdAt:Date.now(), pases:[],
+    reglamentoAceptado:Date.now(), deposito:+am.deposito || 0, depositoEstado: +am.deposito ? 'pendiente' : '' };
   const [d0, d1] = am.franjas[i];
   Store.cambiar(s => {
     invitados.forEach(inv => { const p = { id:uid(), hostId:u.id, tipo:'invitado', nombre:inv.nombre, patente:inv.patente, fecha, desde:d0, hasta:d1 === '01:00' ? '23:59' : d1, codigo:codigoPase(), log:{}, createdAt:Date.now(), reserva:r.id, nota:`${am.nombre}${r.nota ? ' · ' + r.nota : ''}` };
@@ -218,11 +221,39 @@ A['ver-reserva'] = el => {
   const am = amenity(r.amenity) || {}, v = usuario(r.userId) || {}, mia = r.userId === yo().id;
   const horas = (fechaDe(r.fecha).getTime() + minutosDe(am.franjas[r.franja][0]) * MIN - Date.now()) / HORA;
   hoja(am.nombre, `<div class="card plana"><b>${fechaLarga(r.fecha)}</b><div class="muted small">${am.franjas[r.franja].join(' a ')} h · ${esc(v.casa || '')}${r.nota ? ' · ' + esc(r.nota) : ''}</div>
-      ${r.invitados ? `<div class="small" style="margin-top:6px">${plural(+r.invitados, 'invitado')}${r.pases?.length ? ` · ${r.pases.length} con pase` : ''}</div>` : ''}</div>
+      ${r.invitados ? `<div class="small" style="margin-top:6px">${plural(+r.invitados, 'invitado')}${r.pases?.length ? ` · ${r.pases.length} con pase` : ''}</div>` : ''}
+      ${r.reglamentoAceptado ? `<div class="tiny muted" style="margin-top:4px">Reglamento aceptado el ${fechaHora(r.reglamentoAceptado)}</div>` : ''}
+      ${r.deposito ? `<div class="small" style="margin-top:6px">${I('wallet')} Depósito ${plata(r.deposito)} · ${({ pendiente:'por entregar', recibido:'entregado', devuelto:'devuelto', retenido:'retenido por daños' })[r.depositoEstado] || ''}</div>` : ''}</div>
+    ${r.cierre ? `<div class="card ${r.cierre.estado === 'ok' ? '' : 'plana'}"><b>${r.cierre.estado === 'ok' ? '✔ El espacio quedó bien' : r.cierre.estado === 'danos' ? '⚠ Informó daños' : '⚠ Informó faltantes'}</b>
+      ${r.cierre.detalle ? `<p class="small" style="margin:6px 0 0">${esc(r.cierre.detalle)}</p>` : ''}${fotoHTML(r.cierre.foto, 'post-foto')}<div class="tiny muted">${hace(r.cierre.at)}</div></div>`
+      : (mia || esAdmin()) && reservaTermino(r) ? `<button class="btn btn-pri btn-block" data-a="reserva-cierre" data-id="${r.id}">${I('clipboard')}Contar cómo quedó el espacio</button>` : ''}
+    ${esAdmin() && r.deposito ? `<div class="btns" style="margin:10px 0">${['recibido','devuelto','retenido'].filter(e => e !== r.depositoEstado).map(e => `<button class="btn btn-xs btn-sec" data-a="reserva-deposito" data-id="${r.id}" data-v="${e}">Depósito ${({ recibido:'entregado', devuelto:'devuelto', retenido:'retenido' })[e]}</button>`).join('')}</div>` : ''}
     ${r.pases?.length && mia ? `<button class="btn btn-wa btn-block" data-a="compartir-invitados" data-id="${r.id}">${I('share')}Reenviar pases</button>` : ''}
     ${(mia || esAdmin()) ? `${horas < 24 && mia ? aviso('warn', 'clock', 'Falta menos de un día', 'Si cancelás ahora, avisá a la Administración por si alguien más lo necesitaba.') : ''}
       <button class="btn btn-danger-soft btn-block" style="margin-top:10px" data-a="cancelar-reserva" data-id="${r.id}">Cancelar reserva</button>` : ''}`);
 };
+/* ---------- el cierre de una reserva: cómo quedó el espacio ---------- */
+const reservaTermino = r => { const am = amenity(r.amenity); if (!am || r.cancelada) return false;
+  const fin = am.franjas[r.franja][1], t = fechaDe(r.fecha).getTime() + (minutosDe(fin) <= minutosDe(am.franjas[r.franja][0]) ? DIA : 0) + minutosDe(fin) * MIN;
+  return Date.now() >= t; };
+A['reserva-cierre'] = el => {
+  const r = Store.s.reservas.find(x => x.id === el.dataset.id); if (!r) return;
+  hoja('¿Cómo quedó el espacio?', `<form data-f="reserva-cierre" data-id="${r.id}">
+    <div class="field"><div class="seg">${[['ok','Quedó bien'],['danos','Hubo daños'],['faltantes','Faltan cosas']].map(([k, t], j) => `<label><input type="radio" name="estado" value="${k}" ${j ? '' : 'checked'}><span>${t}</span></label>`).join('')}</div></div>
+    <div class="field"><label>Detalle (opcional)</label><textarea name="detalle" maxlength="400" placeholder="Ej: se rompió una silla; faltan dos vasos"></textarea></div>
+    ${campoFoto('fotoCierre', 'Foto (opcional)')}
+    <button class="btn btn-pri btn-block">${I('check')}Enviar</button></form>`);
+};
+F['reserva-cierre'] = (d, form) => {
+  Store.cambiar(s => { const r = s.reservas.find(x => x.id === form.dataset.id); if (!r) return;
+    r.cierre = { estado:d.estado, detalle:(d.detalle || '').trim(), foto:fotoParaOtros(d.foto, 30), at:Date.now(), por:yo().id };
+    const am = amenity(r.amenity) || {};
+    notificar(s, { para:'rol:admin', titulo:`${am.nombre}: ${d.estado === 'ok' ? 'quedó bien' : d.estado === 'danos' ? 'informaron daños' : 'informaron faltantes'}`, texto:`${usuario(r.userId)?.casa || ''} · ${fechaCorta(r.fecha)}${d.detalle ? ' · ' + d.detalle.trim().slice(0, 80) : ''}`, icon:am.icon || 'calendar', color: d.estado === 'ok' ? 'ok' : 'warn', link:'reservas' }); });
+  cerrarHoja(); toast('Gracias: la Administración ya lo sabe', 'check');
+};
+A['reserva-deposito'] = el => { Store.cambiar(s => { const r = s.reservas.find(x => x.id === el.dataset.id); if (!r) return; r.depositoEstado = el.dataset.v;
+  if (el.dataset.v !== 'recibido') notificar(s, { para:r.userId, titulo: el.dataset.v === 'devuelto' ? 'Te devolvimos el depósito' : 'El depósito quedó retenido', texto:`${amenity(r.amenity)?.nombre} · ${fechaCorta(r.fecha)}`, icon:'wallet', color: el.dataset.v === 'devuelto' ? 'ok' : 'warn', link:'reservas' });
+  auditar(s, 'Depósito de reserva: ' + el.dataset.v, `${usuario(r.userId)?.casa || ''} · ${fechaCorta(r.fecha)}`, r.id); }); cerrarHoja(); toast('Anotado', 'check'); };
 A['cancelar-reserva'] = async el => {
   if (!await confirmar('Cancelar reserva', 'Se liberan el turno y los pases de tus invitados.', { si:'Cancelar reserva', peligro:true })) return;
   Store.cambiar(s => { const r = s.reservas.find(x => x.id === el.dataset.id); if (!r) return; r.cancelada = Date.now();
@@ -240,9 +271,16 @@ A['desbloquear'] = el => { Store.cambiar(s => { s.bloqueos = s.bloqueos.filter(b
 /* ---------- RECLAMOS (privados entre el vecino y la Administración) ---------- */
 const CAT_RECL = {
   alumbrado:['Alumbrado','lamp'], calles:['Calles, nieve y hielo','snow'], agua:['Agua y cloacas','drop'], verdes:['Espacios verdes','tree'],
-  seguridad:['Seguridad','shield'], convivencia:['Convivencia (ruidos, mascotas, tránsito)','users'], residuos:['Residuos','truck'], otro:['Otro','info'],
+  seguridad:['Seguridad','shield'], convivencia:['Convivencia (ruidos, mascotas, tránsito)','users'], residuos:['Residuos','truck'],
+  mantenimiento:['Mantenimiento de partes comunes','wrench'], porton:['Portón, barrera y accesos','gate'], otro:['Otro','info'],
 };
-const EST_RECL = { abierto:['Abierto','warn'], en_curso:['En curso','sky'], resuelto:['Resuelto','ok'] };
+/* El seguimiento de un reclamo, en cuatro pasos: reportado → asignado (ya
+   tiene responsable y fecha estimada) → en curso → resuelto. La clave
+   "abierto" se conserva para los reclamos que ya estaban cargados. */
+const EST_RECL = { abierto:['Reportado','warn'], asignado:['Asignado','accent'], en_curso:['En curso','sky'], resuelto:['Resuelto','ok'] };
+const PASOS_RECL = ['abierto', 'asignado', 'en_curso', 'resuelto'];
+const pasosReclamo = r => { const i = Math.max(0, PASOS_RECL.indexOf(r.estado));
+  return `<div class="pasos-recl">${PASOS_RECL.map((k, j) => `<span class="${j < i ? 'hecho' : j === i ? 'ahora' : ''}"><i></i>${EST_RECL[k][0]}</span>`).join('')}</div>`; };
 R.reclamos = {
   titulo: 'Reclamos', icon: 'clipboard', color: 'warn', sub: () => esAdmin() ? 'Todos los reclamos del barrio' : 'Privados entre vos y la Administración',
   render(f){
@@ -258,7 +296,9 @@ R.reclamos = {
         return `<div class="card"><div class="row" style="align-items:flex-start"><span class="ic ic-${e[1]}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none">${I(c[1])}</span>
           <div class="grow"><b style="font-size:15px">${esc(r.titulo)}</b><div class="muted small">${c[0]}${esAdmin() ? ' · ' + esc(r.anonimo ? 'Anónimo para los vecinos' : autorVisible(r.userId).casa) : ''} · ${dias ? `hace ${dias} d` : 'hoy'}${r.publico ? ' · Publicado en el pizarrón' : ''}</div></div>
           <span class="pill p-${e[1]}">${e[0]}</span></div>
-          ${r.lugar ? `<div class="small" style="margin-top:8px">${I('pin')} ${esc(r.lugar)}</div>` : ''}
+          ${pasosReclamo(r)}
+          ${r.responsable || r.fechaEstimada ? `<div class="small" style="margin-top:8px">${r.responsable ? `${I('user')} <b>${esc(r.responsable)}</b>` : ''}${r.fechaEstimada ? `${r.responsable ? ' · ' : ''}${I('calendar')} ${r.estado === 'resuelto' ? 'estimado para' : 'fecha estimada:'} <b>${fechaLarga(r.fechaEstimada)}</b>${r.estado !== 'resuelto' && r.fechaEstimada < hoyISO() ? ' <span class="pill p-danger">atrasado</span>' : ''}` : ''}</div>` : ''}
+          ${r.lugar ? `<div class="small" style="margin-top:8px">${I('pin')} ${r.coords ? `<a href="https://www.google.com/maps?q=${esc(r.coords)}" target="_blank" rel="noopener">${esc(r.lugar)}</a>` : esc(r.lugar)}</div>` : ''}
           <p class="small" style="margin:8px 0 0;color:var(--ink-2)">${esc(r.detalle)}</p>${fotoHTML(r.foto, 'post-foto')}
           <div class="timeline">${(r.historial || []).map(h => `<div class="ev"><b>${EST_RECL[h.estado]?.[0] || ''}</b> · ${esc(h.texto)}<small>${esc(autorVisible(h.por).nombre)} · ${hace(h.at)}</small></div>`).join('')}</div>
           <div class="btns" style="margin-top:12px">${r.publico && r.userId !== u.id && !esStaff() ? `<button class="btn btn-sm ${r.apoyos?.includes(u.id) ? 'btn-accent' : 'btn-sec'}" data-a="apoyar" data-id="${r.id}">${I('users')}Me pasa también · ${r.apoyos?.length || 0}</button>` : r.apoyos?.length ? `<span class="pill">${I('users')}${plural(r.apoyos.length, 'vecino más', 'vecinos más')}</span>` : ''}
@@ -269,7 +309,8 @@ A['nuevo-reclamo'] = () => hoja('Nuevo reclamo', `<form data-f="reclamo">
   <div class="field"><label>Tema</label><select name="categoria" id="reclCat">${Object.entries(CAT_RECL).map(([k, c]) => `<option value="${k}">${c[0]}</option>`).join('')}</select></div>
   <div class="field"><label>Título</label><input name="titulo" required maxlength="80" placeholder="Ej: Luminaria apagada"></div>
   <div class="field"><label>Detalle</label><textarea name="detalle" required maxlength="800"></textarea></div>
-  <div class="field"><label>¿Dónde?</label><input name="lugar" maxlength="80" placeholder="Calle 3, frente a la casa 12"></div>
+  <div class="field"><label>¿Dónde?</label><div class="linea-form"><input name="lugar" id="reclLugar" maxlength="80" placeholder="Calle 3, frente a la casa 12"><button type="button" class="btn btn-sec" data-a="recl-ubicacion" title="Usar dónde estoy">${I('pin')}</button></div>
+    <input type="hidden" name="coords" id="reclCoords"><div class="ayuda" id="reclUbiTxt">Con el botón se anota el lugar exacto con el GPS del teléfono.</div></div>
   ${campoFoto('fotoRecl')}
   <label class="check" id="anonBox" hidden><input type="checkbox" name="anonimo"><span>Si la Administración le manda un recordatorio amable al vecino, que no sepa que fui yo.</span></label>
   <button class="btn btn-pri btn-block" style="margin-top:8px">${I('send')}Enviar a la Administración</button></form>`);
@@ -277,18 +318,32 @@ document.addEventListener('change', e => { if (e.target.id === 'reclCat'){ const
 F['reclamo'] = d => {
   const u = yo();
   Store.cambiar(s => {
-    const r = { id:uid(), userId:u.id, categoria:d.categoria, titulo:d.titulo.trim(), detalle:d.detalle.trim(), lugar:(d.lugar || '').trim(), foto:leerFoto(d.foto), anonimo:!!d.anonimo,
+    const r = { id:uid(), userId:u.id, categoria:d.categoria, titulo:d.titulo.trim(), detalle:d.detalle.trim(), lugar:(d.lugar || '').trim() || (d.coords ? 'Ubicación del GPS' : ''), coords:d.coords || '', foto:fotoParaOtros(d.foto, 45), anonimo:!!d.anonimo,
       estado:'abierto', apoyos:[], createdAt:Date.now(), historial:[{ at:Date.now(), por:u.id, estado:'abierto', texto:'Reclamo creado' }] };
     s.reclamos.unshift(r);
     notificar(s, { para:'rol:admin', titulo:`Reclamo: ${r.titulo}`, texto:`${CAT_RECL[r.categoria][0]} · ${u.casa}`, icon:'clipboard', color:'warn', link:'reclamos' });
   });
   cerrarHoja(); toast('Reclamo enviado. Te avisamos cada novedad.', 'send');
 };
+A['recl-ubicacion'] = () => {
+  const txt = $('#reclUbiTxt');
+  if (!navigator.geolocation){ toast('Este equipo no tiene GPS', 'pin'); return; }
+  if (txt) txt.textContent = 'Buscando la ubicación…';
+  navigator.geolocation.getCurrentPosition(p => {
+    const c = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`;
+    const i = $('#reclCoords'), l = $('#reclLugar'); if (i) i.value = c;
+    if (l && !l.value.trim()) l.value = 'Ubicación del GPS';
+    if (txt) txt.textContent = `Anotado: ${c} (±${Math.round(p.coords.accuracy)} m)`;
+  }, () => { if (txt) txt.textContent = 'No se pudo tomar la ubicación: escribí el lugar.'; }, { enableHighAccuracy:true, timeout:10000 });
+};
 A['apoyar'] = el => { const u = yo(); Store.cambiar(s => { const r = s.reclamos.find(x => x.id === el.dataset.id); if (!r) return; r.apoyos = r.apoyos || []; const i = r.apoyos.indexOf(u.id); i >= 0 ? r.apoyos.splice(i, 1) : r.apoyos.push(u.id); }); };
 A['gestionar-reclamo'] = el => {
   const r = Store.s.reclamos.find(x => x.id === el.dataset.id); if (!r) return;
   hoja('Actualizar reclamo', `<form data-f="gestionar-reclamo" data-id="${r.id}">
     <div class="field"><label>Estado</label><div class="seg">${Object.entries(EST_RECL).map(([k, e]) => `<label><input type="radio" name="estado" value="${k}" ${r.estado === k ? 'checked' : ''}><span>${e[0]}</span></label>`).join('')}</div></div>
+    <div class="grid2"><div class="field"><label>Responsable</label><input name="responsable" maxlength="60" list="reclResp" value="${esc(r.responsable || '')}" placeholder="Quién lo resuelve"></div>
+      <div class="field"><label>Fecha estimada</label><input name="fechaEstimada" type="date" value="${esc(r.fechaEstimada || '')}"></div></div>
+    <datalist id="reclResp">${aLista(Store.s.proveedores).map(p => `<option>${esc(p.empresa)}${p.rubro ? ' (' + esc(p.rubro) + ')' : ''}</option>`).join('')}<option>Mantenimiento del barrio</option><option>Garita</option><option>Administración</option></datalist>
     <div class="field"><label>Mensaje para el vecino</label><textarea name="texto" required maxlength="400" placeholder="Ej: El electricista viene el viernes."></textarea></div>
     <label class="check"><input type="checkbox" name="publico" ${r.publico ? 'checked' : ''}><span>Es de interés general: publicarlo en el pizarrón (sin el nombre del vecino)</span></label>
     ${r.categoria === 'convivencia' ? `<hr class="sep"><div class="field"><label>Recordatorio amable a una casa (opcional)</label><select name="casaAviso"><option value="">No mandar</option>${opcionesLotes()}</select>
@@ -298,7 +353,12 @@ A['gestionar-reclamo'] = el => {
 F['gestionar-reclamo'] = (d, form) => {
   Store.cambiar(s => {
     const r = s.reclamos.find(x => x.id === form.dataset.id); if (!r) return;
-    r.estado = d.estado; r.historial.push({ at:Date.now(), por:yo().id, estado:d.estado, texto:d.texto.trim() });
+    const resp = String(d.responsable || '').trim(), fe = d.fechaEstimada || '';
+    const cambios = [resp && resp !== r.responsable ? `Responsable: ${resp}` : '', fe && fe !== r.fechaEstimada ? `Fecha estimada: ${fechaLarga(fe)}` : ''].filter(Boolean).join(' · ');
+    r.responsable = resp; r.fechaEstimada = fe;
+    /* Si se le puso responsable y seguía como "reportado", pasa solo a "asignado". */
+    if (d.estado === 'abierto' && resp) d.estado = 'asignado';
+    r.estado = d.estado; r.historial.push({ at:Date.now(), por:yo().id, estado:d.estado, texto:d.texto.trim() + (cambios ? ` (${cambios})` : '') });
     const para = [r.userId, ...(r.apoyos || [])];
     notificar(s, { para, titulo:`Reclamo ${EST_RECL[d.estado][0].toLowerCase()}: ${r.titulo}`, texto:d.texto.trim(), icon:'clipboard', color:EST_RECL[d.estado][1], link:'reclamos' });
     if (d.publico && !r.publico){ r.publico = true;
@@ -373,7 +433,8 @@ function escrutinio(v){
   const porCoef = v.conteo === 'coeficiente';
   const total = porCoef ? 100 : (typeof LOTES !== 'undefined' ? LOTES.length : totalLotes());
   const val = x => typeof x === 'object' && x ? x.i : x;
-  const entradas = Object.entries(v.votos || {});
+  const entradas = Object.entries(v.votos || {}).filter(([, x]) => !(x && x.desacuerdo));
+  const desacuerdos = Object.values(v.votos || {}).filter(x => x && x.desacuerdo).length;
   const cuenta = (v.opciones || []).map(() => 0);
   let emitido = 0;
   entradas.forEach(([casa, voto]) => {
@@ -388,10 +449,47 @@ function escrutinio(v){
   const favor = cuenta[ganadora] || 0;
   const regla = MAYORIAS[v.mayoria] || MAYORIAS.simple;
   const hayMayoria = emitido > 0 && regla.f(emitido, favor, total);
-  return { porCoef, total, cuenta, emitido, lotes, quorumPedido, quorumLogrado, hayQuorum, ganadora, favor, regla, hayMayoria,
+  return { porCoef, total, cuenta, emitido, lotes, desacuerdos, quorumPedido, quorumLogrado, hayQuorum, ganadora, favor, regla, hayMayoria,
     valida: hayQuorum && hayMayoria, cerrada: v.cierra <= Date.now() };
 }
 const fmtPeso = (n, porCoef) => porCoef ? n.toFixed(3) + ' %' : String(Math.round(n));
+
+/* =========================================================
+   ¿QUIÉN VOTA POR EL LOTE?
+   El voto es de la unidad funcional y lo emite su TITULAR (el propietario),
+   no quien vive ahí: así lo dice el régimen de propiedad horizontal y de
+   conjuntos inmobiliarios (CCyC arts. 2044 a 2086). Por eso:
+     · el INQUILINO o un familiar no vota, salvo que el propietario le dé una
+       CARTA PODER y la Administración la apruebe;
+     · si el lote tiene un REPRESENTANTE designado (varios cotitulares, una
+       sociedad, un sucesorio), vale solo su voto;
+     · si no lo tiene y los titulares votan DISTINTO, el voto del lote queda
+       "en desacuerdo" y NO SE COMPUTA hasta que coincidan: la app les avisa
+       a los dos. Nadie pisa el voto del otro.
+   En un plebiscito (consulta no vinculante) la Administración puede abrir
+   el voto a todos los residentes; sigue siendo un voto por lote.
+   Todo esto hay que confirmarlo con el reglamento de copropiedad del barrio.
+   ========================================================= */
+const RELACIONES = { propietario:'Propietario/a', cotitular:'Cotitular', inquilino:'Inquilino/a', familiar:'Familiar o conviviente' };
+const esTitular = u => !u.relacion || u.relacion === 'propietario' || u.relacion === 'cotitular';
+const poderVigente = u => !!(u.poderOk && (!u.poderHasta || u.poderHasta >= hoyISO()));
+const representanteDe = casa => Store.s.users.find(x => x.casa === casa && x.estado === 'aprobado' && x.representante);
+function puedeVotarEn(v, u){
+  if (!u || esStaff()) return { ok:false, motivo:'' };
+  if (!/^Lote\s/i.test(u.casa || '')) return { ok:false, motivo:'Tu cuenta no tiene un lote asignado, así que no puede emitir el voto de una unidad. Avisale a la Administración.' };
+  if (v.quienVota === 'residentes') return { ok:true };
+  if (!esTitular(u) && !poderVigente(u)) return { ok:false, motivo:`En esta votación vota el propietario de ${u.casa}. Si te autorizó, cargá la carta poder en Mi casa y, cuando la Administración la apruebe, vas a poder votar.` };
+  const rep = representanteDe(u.casa);
+  if (rep && rep.id !== u.id) return { ok:false, motivo:`Por ${u.casa} vota ${rep.nombre}, representante designado del lote.` };
+  return { ok:true };
+}
+/* El voto del lote a partir de lo que votó cada titular. */
+function votoDelLote(personas, casa){
+  const rep = representanteDe(casa), p = personas || {};
+  if (rep && p[rep.id] !== undefined) return { i:p[rep.id], desacuerdo:false };
+  const vals = [...new Set(Object.values(p))];
+  return vals.length === 1 ? { i:vals[0], desacuerdo:false } : { i:-1, desacuerdo:vals.length > 1 };
+}
 
 R.votaciones = {
   titulo: 'Votaciones', icon: 'vote', color: 'accent', sub: 'Un voto por lote · queda asentado en la auditoría',
@@ -406,7 +504,9 @@ R.votaciones = {
       const miVoto = v.votos[u.casa], mio = val(miVoto);
       const quien = miVoto && typeof miVoto === 'object' && miVoto.por ? nombreDe(miVoto.por) : '';
       const ver = !abierta || mio !== undefined || esAdmin();
-      const puedeVotar = abierta && !esStaff() && /^Lote\s/i.test(u.casa || '');
+      const permiso = puedeVotarEn(v, u), puedeVotar = abierta && permiso.ok;
+      const miPersona = miVoto && miVoto.personas ? miVoto.personas[u.id] : undefined;
+      const enDesacuerdo = miVoto && miVoto.desacuerdo;
       return `<div class="card"><div class="row" style="align-items:flex-start"><div class="grow"><b style="font-size:16px">${esc(v.titulo)}</b>
         <div class="muted small">${abierta ? `Cierra el ${fechaLarga(isoDe(new Date(v.cierra)))}` : 'Cerrada'} · votaron ${plural(e.lotes, 'lote')} de ${e.total === 100 ? (typeof LOTES !== 'undefined' ? LOTES.length : '') : e.total}</div></div>
         <span class="pill p-${T.c === 'accent' ? 'accent' : T.c === 'brand' ? 'brand' : ''}">${abierta ? 'Abierta' : 'Cerrada'}</span></div>
@@ -419,7 +519,10 @@ R.votaciones = {
           return puedeVotar ? `<button class="opcion ${mio === i ? 'elegida' : ''}" data-a="votar" data-id="${v.id}" data-v="${i}">${ver ? `<span class="barra" style="width:${pct}%"></span>` : ''}<span>${mio === i ? I('check') : ''}${esc(o)}</span>${ver ? `<span class="pct">${pct.toFixed(0)}%</span>` : ''}</button>`
             : `<div class="opcion ${!abierta && i === e.ganadora && e.emitido ? 'elegida' : ''}"><span class="barra" style="width:${pct}%"></span><span>${esc(o)}</span><span class="pct">${fmtPeso(e.cuenta[i], e.porCoef)} · ${pct.toFixed(0)}%</span></div>`; }).join('')}
         ${abierta && mio !== undefined ? `<p class="muted tiny" style="margin:4px 0 0">${quien && quien !== u.nombre ? `Votó ${esc(quien)} por ${esc(u.casa)}` : 'Tu lote ya votó'} · el voto es de la unidad funcional: cualquiera de la casa puede cambiarlo hasta el cierre, y siempre cuenta uno solo.</p>` : ''}
-        ${abierta && !puedeVotar && !esStaff() ? `<p class="muted tiny">Tu cuenta no tiene un lote asignado, así que no puede emitir el voto de una unidad. Avisale a la Administración.</p>` : ''}
+        ${abierta && enDesacuerdo ? aviso('warn', 'alert', `En ${esc(u.casa)} hay votos distintos`, `${Object.entries(miVoto.personas || {}).map(([id, i]) => `${esc(nombreDe(id))}: ${esc(v.opciones[i] || '')}`).join(' · ')}. El voto del lote no se cuenta hasta que coincidan${miPersona !== undefined ? '' : ''}.`) : ''}
+        ${abierta && !puedeVotar && permiso.motivo ? `<p class="muted tiny">${esc(permiso.motivo)}</p>` : ''}
+        <p class="muted tiny" style="margin:2px 0 0">${v.quienVota === 'residentes' ? 'Votan los residentes del lote (propietarios o inquilinos), un voto por lote.' : 'Vota el titular del lote (o quien tenga su carta poder aprobada), un voto por lote.'}</p>
+        ${!abierta && e.desacuerdos ? `<p class="muted tiny">${plural(e.desacuerdos, 'lote no se computó', 'lotes no se computaron')} porque sus titulares votaron distinto.</p>` : ''}
         ${!abierta ? `<div class="aviso a-${e.valida ? 'ok' : 'warn'}" style="margin-top:12px">${I(e.valida ? 'check' : 'alert')}<div class="txt">
           <b>${v.tipo === 'plebiscito' ? (e.emitido ? `Ganó "${esc(v.opciones[e.ganadora])}"` : 'Nadie votó') + ' · consulta no vinculante'
             : e.valida ? `Aprobado: "${esc(v.opciones[e.ganadora])}"` : e.emitido ? 'No se alcanzó la mayoría necesaria' : 'Nadie votó'}</b>
@@ -439,19 +542,31 @@ R.votaciones = {
   },
 };
 A['votar'] = el => {
-  const u = yo();
-  if (!/^Lote\s/i.test(u.casa || '')){ toast('Tu cuenta no tiene un lote asignado', 'alert'); return; }
-  let antes;
+  const u = yo(), v0 = Store.s.votaciones.find(x => x.id === el.dataset.id); if (!v0) return;
+  const permiso = puedeVotarEn(v0, u);
+  if (!permiso.ok){ toast(permiso.motivo || 'No podés votar en esta votación', 'alert'); return; }
+  let antes, resultado;
   Store.cambiar(s => {
     const v = s.votaciones.find(x => x.id === el.dataset.id); if (!v || v.cierra <= Date.now()) return;
+    v.votos = v.votos && typeof v.votos === 'object' ? v.votos : {};
     antes = v.votos[u.casa];
     const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === u.casa) : null;
-    v.votos[u.casa] = { i:+el.dataset.v, por:u.id, at:Date.now(), uf:L?.uf || '', coef:L?.coef || 0 };
+    /* Cada titular deja SU voto; el del lote sale de todos juntos. Los votos
+       viejos (de antes de este cambio) se toman como el de quien los emitió. */
+    const personas = Object.assign({}, antes && antes.personas ? antes.personas : antes && antes.por ? { [antes.por]:antes.i } : {});
+    personas[u.id] = +el.dataset.v;
+    resultado = votoDelLote(personas, u.casa);
+    v.votos[u.casa] = { i:resultado.i, desacuerdo:resultado.desacuerdo, personas, por:u.id, at:Date.now(), uf:L?.uf || '', coef:L?.coef || 0 };
+    if (resultado.desacuerdo){
+      const otros = Object.keys(personas).filter(id => id !== u.id);
+      notificar(s, { para:otros, titulo:`En ${u.casa} votaron distinto`, texto:`"${v.titulo}": el voto del lote no se cuenta hasta que coincidan.`, icon:'vote', color:'warn', link:'votaciones', sonido:true });
+    }
     /* Queda asentado: es lo que le da respaldo al resultado. */
     auditar(s, antes !== undefined ? 'Cambió el voto de una unidad' : 'Emitió el voto de una unidad',
-      `${u.casa}${L ? ' (UF ' + L.uf + ')' : ''} · "${v.titulo}" · opción: ${v.opciones[+el.dataset.v]}`, u.id);
+      `${u.casa}${L ? ' (UF ' + L.uf + ')' : ''} · "${v.titulo}" · ${u.nombre} (${RELACIONES[u.relacion] || 'titular'}${poderVigente(u) ? ', con carta poder' : ''}) eligió: ${v.opciones[+el.dataset.v]}${resultado.desacuerdo ? ' · el lote queda en desacuerdo' : ''}`, u.id);
   });
-  toast(antes !== undefined ? `Cambiaste el voto de ${yo().casa}` : `Voto registrado por ${yo().casa}`, 'vote');
+  if (resultado?.desacuerdo) toast(`Tu voto quedó, pero en ${yo().casa} hay votos distintos: no se cuenta hasta que coincidan`, 'alert');
+  else toast(antes !== undefined ? `Cambiaste el voto de ${yo().casa}` : `Voto registrado por ${yo().casa}`, 'vote');
 };
 A['nueva-votacion'] = () => hoja('Nueva votación', `<form data-f="votacion">
   <div class="field"><label>Tipo</label><select name="tipo" required>${Object.entries(TIPOS_VOTACION).map(([k, T]) => `<option value="${k}">${T.n}</option>`).join('')}</select>
@@ -467,6 +582,8 @@ A['nueva-votacion'] = () => hoja('Nueva votación', `<form data-f="votacion">
   <div class="grid2">
     <div class="field"><label>Quórum mínimo de participación (%)</label><input type="number" name="quorum" min="0" max="100" step="1" value="0"><div class="ayuda">0 = sin exigencia de quórum.</div></div>
     <div class="field"><label>Cierra</label><input type="date" name="cierra" required min="${sumarDias(hoyISO(), 1)}" value="${sumarDias(hoyISO(), 15)}"></div></div>
+  <div class="field"><label>¿Quién vota por cada lote?</label><select name="quienVota"><option value="propietarios">El propietario (o quien tenga su carta poder aprobada)</option><option value="residentes">Cualquier residente del lote: propietario o inquilino (solo para plebiscitos)</option></select>
+    <div class="ayuda">Siempre es un voto por lote. Si votan distinto dos titulares del mismo lote sin representante designado, ese lote no se computa hasta que coincidan.</div></div>
   <button class="btn btn-pri btn-block">${I('vote')}Abrir la votación</button>
   <p class="muted tiny" style="margin:10px 0 0">Al abrirla se avisa a todo el barrio y queda asentada en la auditoría. Ni la moción ni las opciones se pueden cambiar después: si hay que corregir algo, se abre otra.</p></form>`, { ancho:'620px' });
 F['votacion'] = d => {
@@ -475,7 +592,7 @@ F['votacion'] = d => {
   const T = TIPOS_VOTACION[d.tipo] || TIPOS_VOTACION.plebiscito;
   Store.cambiar(s => {
     s.votaciones.unshift({ id:uid(), titulo:d.titulo.trim(), detalle:(d.detalle || '').trim(), opciones:ops,
-      tipo:d.tipo, conteo:d.conteo, mayoria:d.mayoria, quorum:+d.quorum || 0,
+      tipo:d.tipo, conteo:d.conteo, mayoria:d.mayoria, quorum:+d.quorum || 0, quienVota: d.tipo === 'plebiscito' && d.quienVota === 'residentes' ? 'residentes' : 'propietarios',
       cierra:fechaDe(d.cierra).getTime() + 23 * HORA, votos:{}, creadaPor:yo().id, createdAt:Date.now() });
     notificar(s, { para:'todos', titulo:'Nueva votación del barrio', texto:d.titulo.trim(), icon:'vote', color:'accent', link:'votaciones', sonido:true });
     auditar(s, 'Abrió una votación', `${T.n} · "${d.titulo.trim()}" · cierra ${d.cierra}`);
@@ -492,7 +609,7 @@ A['acta-votacion'] = el => {
     const i = typeof voto === 'object' ? voto.i : voto;
     const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === casa) : null;
     return `<tr><td>${esc(casa)}</td><td>${esc(voto.uf || L?.uf || '')}</td><td class="n">${(voto.coef ?? L?.coef ?? 0).toFixed(4)}</td>
-      <td>${esc(propietarioDe(casa) || '')}</td><td>${esc(v.opciones[i] || '')}</td><td>${voto.at ? fechaHora(voto.at) : ''}</td></tr>`;
+      <td>${esc(propietarioDe(casa) || '')}</td><td>${voto.desacuerdo ? '<i>No computado: los titulares votaron distinto</i>' : esc(v.opciones[i] || '')}${voto.por && usuario(voto.por) && !esTitular(usuario(voto.por)) ? ' <i>(con carta poder)</i>' : ''}</td><td>${voto.at ? fechaHora(voto.at) : ''}</td></tr>`;
   }).join('');
   imprimir(`Acta · ${v.titulo}`, `
     <h1>Acta de ${T.n.toLowerCase()}</h1>
@@ -653,10 +770,18 @@ R.recoleccion = {
     /* Los retiros de voluminosos son una lista de fechas con su detalle:
        la Administración anota todas las del año y la app avisa la víspera. */
     const vols = volsProximos();
-    return `<div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${c.recoleccion[d] ? I('truck') + esc(c.recoleccion[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
+    const viajes = typeof Camion !== 'undefined' ? Camion.lista().slice(0, 6) : [];
+    return `${typeof bandaCamion === 'function' ? bandaCamion(esStaff()) : ''}
+      <div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${c.recoleccion[d] ? I('truck') + esc(c.recoleccion[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
       <p class="muted small">El camión pasa desde las ${c.recoleccionHora} h. Si al otro día es feriado, puede cambiar: la app avisa.</p>
       ${(() => { const man = diaInfo(sumarDias(hoyIso, 1));
         return man.feriado ? aviso('warn', 'calendar', `Mañana es feriado: ${esc(man.feriado.nombre)}`, 'La recolección puede no pasar o pasar más tarde.') : ''; })()}
+      ${superficie({ a:'link', v:'https://www.ushuaia.gob.ar/servicios-municipales', icon:'pin', color:'sky', t:'Residuos en la Municipalidad', s:'Guía de servicios oficial: recolección y voluminosos' })}
+      ${sec('El camión en la pantalla')}
+      ${superficie({ a:'camion-aviso', icon:'tacho', color: typeof Camion !== 'undefined' && Camion.encendido() ? 'ok' : 'accent', t: typeof Camion !== 'undefined' && Camion.encendido() ? 'Mostrar el camión: activado' : 'Mostrar el camión: apagado',
+        s:'Cuando la garita registra la entrada, cruza un camión por la pantalla hasta que sale, con su melodía' })}
+      ${superficie({ a:'camion-probar', icon:'volume', color:'sky', t:'Escuchar la melodía del camión', s:'La que suena cuando entra' })}
+      ${viajes.length ? `<div class="card lista">${viajes.map(v => `<div class="it"><div class="txt"><b>${fechaCorta(isoDe(new Date(v.entra)))} · ${hora(v.entra)} a ${v.sale ? hora(v.sale) : 'sigue adentro'}</b><span>${esc(v.patente)}${v.empresa ? ' · ' + esc(v.empresa) : ''}${v.sale ? ' · ' + Math.max(1, Math.round((v.sale - v.entra) / MIN)) + ' min en el barrio' : ''}</span></div></div>`).join('')}</div>` : ''}
       ${sec('Voluminosos', esAdmin() ? `<button class="link" data-a="nuevo-voluminoso">Anotar un retiro</button>` : '')}
       ${vols.length ? vols.map(v => `<div class="card"><div class="row">
           <span class="ic ic-${v.fecha === hoyIso ? 'danger' : 'wood'}" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('truck')}</span>
@@ -1229,7 +1354,11 @@ R.perfil = {
           <label class="btn btn-sm btn-sec">${I('camera')}${u.fotoCasa ? 'Cambiar foto' : 'Sacar o elegir foto'}<input type="file" accept="image/*" capture="environment" data-foto-in="fotoCasaIn" hidden></label>
           <input type="hidden" id="fotoCasaIn" data-a="" >
         </div></div></div>
+      ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Un QR personal para identificarte en la garita y los espacios comunes. Sin datos sensibles.' })}
       <form data-f="perfil" class="card">
+        ${tengoLote() ? `<div class="grid2"><div class="field"><label>Tu relación con ${esc(u.casa)}</label><select name="relacion" id="pfRel">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${u.relacion === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="" ${!u.relacion ? 'selected' : ''}>Sin indicar</option></select>
+          <div class="ayuda">En las votaciones vota el titular del lote. ${u.representante ? '<b>Sos el representante designado del lote.</b>' : ''}</div></div>
+          ${u.relacion === 'inquilino' || u.relacion === 'familiar' ? `<div class="field"><label>Carta poder para votar</label>${u.poderOk ? `<p class="small" style="margin:6px 0 0">${I('check')} Aprobada${u.poderHasta ? ' hasta el ' + fechaCorta(u.poderHasta) : ''}</p>` : u.poderFoto ? '<p class="small muted" style="margin:6px 0 0">Enviada, esperando que la Administración la apruebe.</p>' : `<button type="button" class="btn btn-sm btn-sec" data-a="subir-poder">${I('upload')}Cargar la carta poder</button>`}</div>` : ''}</div>` : ''}
         <div class="field"><label>Teléfono / WhatsApp</label><input name="tel" id="pfTel" value="${esc(u.tel || '')}" inputmode="tel" maxlength="20"></div>
         <div class="field"><label>Oficios o servicios que ofrecés</label><input name="skills" id="pfSkills" value="${esc(u.skills || '')}" maxlength="120" placeholder="Ej: electricista, clases de inglés"></div>
         <label class="check"><input type="checkbox" name="mostrarTel" ${u.mostrarTel ? 'checked' : ''}><span>Publicar mi oficio en <b>Profesionales y oficios</b> (Ushuaia y servicios) con mi WhatsApp</span></label>
@@ -1254,7 +1383,7 @@ R.perfil = {
         <div class="seg">${[['auto','Automático','sunrise'],['light','Día','sun'],['dark','Noche','moon']].map(([k, t, ic]) => `<label><input type="radio" name="tema" ${tema === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
         <div class="ayuda">En automático sigue el sol de Ushuaia: hoy amanece ${Clima.sol().sale} y anochece ${Clima.sol().pone}.</div>
         <div class="lbl" style="margin-top:14px">Avisos en este equipo</div>
-        ${notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
+        ${typeof Push !== 'undefined' && Push.estado() !== 'demo' ? tarjetaPush(false) : notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
         <label class="check" style="margin-top:10px"><input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span>Sonido cuando escribe la guardia o la Administración</span></label></div>
       ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras' })}
       ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
@@ -1262,8 +1391,21 @@ R.perfil = {
       ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', cls:'peligro' })}`;
   },
 };
-F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, integrantes:d.integrantes.trim(),
+F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { ...('relacion' in d ? { relacion:d.relacion } : {}), tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, integrantes:d.integrantes.trim(),
   profesion:(d.profesion || '').trim(), direccion:(d.direccion || '').trim(), ubicacion:(d.ubicacion || '').trim(), enDirectorio:!!d.enDirectorio })); toast('Guardado', 'check'); };
+/* La carta poder: el propietario autoriza al inquilino (o a un familiar)
+   a votar por el lote. La Administración la revisa y la aprueba. */
+A['subir-poder'] = () => hoja('Carta poder para votar', `<form data-f="poder">
+  <p class="small" style="margin:0 0 10px">Una nota firmada por el propietario de ${esc(yo().casa)} que te autoriza a votar en su nombre (con su DNI y la firma). Sacale una foto.</p>
+  ${campoFoto('fotoPoder', 'Foto de la carta poder')}
+  <div class="field"><label>Vale hasta (opcional)</label><input type="date" name="hasta" min="${hoyISO()}"></div>
+  <button class="btn btn-pri btn-block">${I('send')}Enviar a la Administración</button></form>`);
+F['poder'] = d => {
+  const foto = fotoParaOtros(d.foto, 60); if (!foto){ toast('Falta la foto de la carta poder', 'camera'); return; }
+  Store.cambiar(s => { const x = s.users.find(z => z.id === yo().id); x.poderFoto = foto; x.poderHasta = d.hasta || ''; x.poderOk = false;
+    notificar(s, { para:'rol:admin', titulo:`Carta poder para votar · ${x.casa}`, texto:`${x.nombre} (${RELACIONES[x.relacion] || ''}) pide votar por el lote`, icon:'vote', color:'accent', link:'admin' }); });
+  cerrarHoja(); toast('Enviada: la Administración la revisa', 'send');
+};
 /* La foto del frente se guarda apenas se elige. */
 document.addEventListener('change', e => {
   const i = e.target.closest('input[data-foto-in="fotoCasaIn"]');

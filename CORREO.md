@@ -59,6 +59,12 @@ var CLAVE_COMPARTIDA = 'bahia-cauquen-ushuaia-2026-lupinos-y-viento';
 
 Anotala: la vas a necesitar en el paso 6.
 
+> **Desde la versión del 24-09-2026 la frase ya no se pierde al pegar código nuevo.**
+> La primera vez que el programa corre con una frase de verdad, la guarda en
+> *Configuración del proyecto (engranaje) → Propiedades del script → CLAVE_COMPARTIDA*.
+> Si más adelante pegás un `Codigo.gs` nuevo y la línea vuelve a decir
+> `CAMBIAR-por-una-frase…`, se sigue usando la guardada.
+
 También podés ajustar, si querés:
 
 ```js
@@ -155,3 +161,26 @@ problema.
 2. **Implementar → Administrar implementaciones → editar → Nueva versión → Implementar.**
    (Si no hacés una versión nueva, sigue corriendo la vieja.)
 3. Cambiala también en **Ajustes → Correo** de la app.
+
+## Si la app dice "La frase compartida de Ajustes no coincide"
+
+Pasó el 24-09-2026. Tres causas posibles, de la más probable a la menos:
+
+1. **El navegador rellenó el campo solo.** Hasta esa fecha, la frase en *Ajustes → Correo*
+   era un campo de tipo contraseña al lado de un campo de correo, y Chrome y Safari lo
+   completaban con la contraseña guardada de la cuenta. Al tocar Guardar, esa contraseña
+   pisaba la frase. Ahora es un campo común con la opción **Mostrar la frase**: abrilo,
+   tildá *Mostrar*, borrá lo que haya y pegá la frase exacta del Apps Script.
+2. **Se pegó el `Codigo.gs` nuevo** (el de los cruceros) y la línea `CLAVE_COMPARTIDA`
+   quedó con otra frase. Copiá la que figura ahí.
+3. **No se hizo "Nueva versión"** después de cambiar la frase en el Apps Script.
+
+Con el `Codigo.gs` nuevo, el botón **Probar el envío** dice cuántas letras tiene cada frase
+y si la diferencia es solo de mayúsculas o de espacios (sin mostrar la frase).
+
+## "No se puede abrir el archivo en estos momentos" al abrir la dirección /exec
+
+Es un aviso de Google Drive, no del programa: aparece cuando el navegador tiene **varias
+cuentas de Google abiertas a la vez**. El programa anda igual (la app lo lee sin problema).
+Para verlo en el navegador, abrí la dirección en una ventana de incógnito.
+

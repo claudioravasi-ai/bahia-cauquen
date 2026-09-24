@@ -146,10 +146,10 @@ const Motor = {
    un esquema de campos y una colección del estado. */
 const LISTAS = {
   contactos:  { t:'Contactos del barrio', icon:'phone', campos:[['nombre','Nombre'],['detalle','Detalle'],['tel','Teléfono','tel']], titulo:x => x.nombre, sub:x => `${x.detalle || ''} · ${x.tel || 'sin teléfono'}` },
-  amenities:  { t:'Espacios comunes', icon:'calendar', campos:[['nombre','Nombre'],['reglas','Reglas','area'],['invitadosMax','Máximo de invitados','number'],['franjasTxt','Turnos (uno por renglón, 12:00-17:00)','area']],
+  amenities:  { t:'Espacios comunes', icon:'calendar', campos:[['nombre','Nombre'],['reglas','Reglas','area'],['invitadosMax','Máximo de invitados','number'],['deposito','Depósito de garantía ($, 0 = sin depósito)','number'],['franjasTxt','Turnos (uno por renglón, 12:00-17:00)','area']],
                 titulo:x => x.nombre, sub:x => x.franjas.map(f => f.join('–')).join(' · '),
                 entrada:x => ({ ...x, franjasTxt:(x.franjas || []).map(f => f.join('-')).join('\n') }),
-                salida:(d, x) => ({ ...x, nombre:d.nombre, reglas:d.reglas, invitadosMax:+d.invitadosMax || 0, icon:x.icon || 'calendar', color:x.color || 'brand', id:x.id || 'am' + uid(),
+                salida:(d, x) => ({ ...x, nombre:d.nombre, reglas:d.reglas, invitadosMax:+d.invitadosMax || 0, deposito:+d.deposito || 0, icon:x.icon || 'calendar', color:x.color || 'brand', id:x.id || 'am' + uid(),
                   franjas:d.franjasTxt.split('\n').map(l => l.trim().split(/\s*[-–a]\s*/)).filter(f => f.length === 2 && /\d{1,2}:\d{2}/.test(f[0]) && /\d{1,2}:\d{2}/.test(f[1])).map(f => f.map(h => h.padStart(5, '0'))) }) },
   temporadas: { t:'Temporadas de Ushuaia', icon:'sun', campos:[['nombre','Nombre'],['desde','Empieza (MM-DD)'],['hasta','Termina (MM-DD)'],['nota','Nota','area']], titulo:x => x.nombre, sub:x => `${x.desde} a ${x.hasta}` },
   /* Solo lo provincial, lo municipal y los puentes: los nacionales y los
@@ -275,13 +275,20 @@ const ADMIN_TABS = {
       <div class="card plana small">${I('info')} Los vencimientos, el recargo, el interés, el CBU y lo impositivo se configuran en <b>Contabilidad → Parámetros</b>, junto a las expensas.
         <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="parametros">${I('right')}Ir a Parámetros</button></div></div>
       <div class="card"><h3>Correo</h3><p class="muted small" style="margin-top:0">Para que la app mande los mails de inscripción y claves. Instrucciones en <span class="mono">apps-script/Codigo.gs</span>.</p>
-        ${campo('correoUrl', 'URL del Apps Script (termina en /exec)', 'url')}${campo('correoClave', 'Frase compartida', 'password')}
+        ${campo('correoUrl', 'URL del Apps Script (termina en /exec)', 'url')}<div class="field"><label>Frase compartida</label>
+          <input name="correoClave" type="text" class="frase-oculta" value="${esc(c.correoClave ?? '')}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
+          <label class="check" style="margin:6px 0 0"><input type="checkbox" data-a="frase-ver"><span>Mostrar la frase</span></label>
+          <div class="ayuda">Tiene que ser idéntica a la de <span class="mono">var CLAVE_COMPARTIDA</span> del Apps Script. Antes este campo era de tipo contraseña y el navegador lo rellenaba solo con la clave guardada de la cuenta: al tocar Guardar, esa clave pisaba la frase.</div></div>
         <div class="card plana small" style="margin:0 0 10px">${I('info')} Los correos salen de la cuenta de Google con la que se <b>creó el proyecto</b> de Apps Script (si lo hiciste con ${esc(Store.s.config.garitaEmail || 'la casilla de la garita')}, salen de ahí). El correo de la Administración de arriba es el que <b>recibe</b> los avisos.</div>
         <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-correo">${I('send')}Probar el envío</button></div>
         <div id="probarCorreo"></div></div>
       <div class="card"><h3>Promociones del Hotel Los Cauquenes (opcional)</h3>
         <p class="muted small" style="margin-top:0">Las promociones se cargan a mano en <b>Contenido → Promociones</b> y eso ya funciona. Esto es solo si querés que se lean solas del sitio del Hotel Los Cauquenes: hace falta un programita propio que las devuelva en JSON (está explicado en CONECTAR.md), porque el navegador no puede leer otra web directamente.</p>
         ${campo('promosUrl', 'Dirección del lector de promociones', 'url')}</div>
+      <div class="card"><h3>Avisos al celular con la pantalla apagada</h3>
+        <p class="muted small" style="margin-top:0">Para que el camión, el SOS, los avisos urgentes y los paquetes lleguen aunque el celular esté bloqueado. Son dos pasos de una sola vez, explicados en <span class="mono">AVISOS.md</span>: la clave pública va acá y la cuenta de servicio, en el Apps Script.</p>
+        ${campo('pushVapid', 'Clave pública de avisos (Firebase → Cloud Messaging → Certificados push web)', 'text')}
+        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-push">${I('send')}Ver si el Apps Script está listo</button></div><div id="probarPush"></div></div>
       <div class="card"><h3>Aviones en vivo (opcional)</h3>${campo('vuelosProxy', 'URL del Worker que reenvía ADS-B', 'url', 'Ver CONECTAR.md. Arribos y partidas se leen solos del tablero del aeropuerto: esto es solo para ver los aviones que están en el aire.')}</div>
       <button class="btn btn-pri btn-block">${I('check')}Guardar ajustes</button></form>`;
   },
@@ -330,7 +337,7 @@ F['buscar-vecino-admin'] = d => abrir('admin', 'vecinos|' + (d.q || ''));
 F['ajustes'] = d => {
   Store.cambiar(s => {
     const c = s.config;
-    ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminososDetalle','silencio','obraHorario','correoUrl','correoClave','vuelosProxy','promosUrl'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
+    ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminososDetalle','silencio','obraHorario','correoUrl','correoClave','vuelosProxy','promosUrl','pushVapid'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
     ['casas','datosDias'].forEach(k => { if (d[k] !== '' && d[k] !== undefined) c[k] = +d[k]; });
     c.recoleccion = {}; [0,1,2,3,4,5,6].forEach(i => { const v = String(d['rec' + i] || '').trim(); if (v) c.recoleccion[i] = v; });
     auditar(s, 'Cambió los ajustes del barrio', '');
@@ -338,6 +345,18 @@ F['ajustes'] = d => {
   toast('Ajustes guardados', 'check');
   if (typeof Nube !== 'undefined' && Nube.activa()) Nube.publicarCorreo();
 };
+A['probar-push'] = async () => {
+  const caja = $('#probarPush'), d = Correo.datos();
+  if (!d){ caja.innerHTML = `<div style="margin-top:10px">${aviso('warn', 'alert', 'Primero configurá el correo', 'Los avisos usan el mismo Apps Script.')}</div>`; return; }
+  caja.innerHTML = `<div class="card plana small" style="margin:10px 0 0">${I('refresh')} Preguntando…</div>`;
+  try {
+    const j = await fetch(d.url).then(r => r.json());
+    const ok = j.push && j.version >= 3;
+    caja.innerHTML = `<div style="margin-top:10px">${aviso(ok ? 'ok' : 'warn', ok ? 'check' : 'alert', ok ? 'El Apps Script puede mandar avisos' : 'Al Apps Script le falta un paso',
+      ok ? (Store.s.config.pushVapid ? 'Ahora cada vecino activa los avisos en su equipo (Mi casa → Avisos).' : 'Falta pegar acá la clave pública y Guardar.') : j.version >= 3 ? 'Falta la propiedad FCM_CUENTA (ver AVISOS.md).' : 'Tiene la versión vieja del código: pegá el Codigo.gs nuevo y hacé "Nueva versión".')}</div>`;
+  } catch(e){ caja.innerHTML = `<div style="margin-top:10px">${aviso('danger', 'alert', 'No se pudo consultar', esc(Correo.motivo(e)))}</div>`; }
+};
+A['frase-ver'] = el => { const i = el.closest('form')?.correoClave; if (i) i.classList.toggle('frase-oculta', !el.checked); };
 A['correos-reintentar'] = async () => {
   Store.s.correos.forEach(c => { if (c.estado !== 'enviado') c.intentos = 0; });
   const n = await Correo.reintentar();
@@ -395,10 +414,17 @@ A['gestionar-vecino'] = el => {
   hoja(u.nombre, `<form data-f="gestionar-vecino" data-id="${u.id}">
     <div class="grid2"><div class="field"><label>Casa</label><input name="casa" value="${esc(u.casa)}"></div><div class="field"><label>Rol</label><select name="rol">${['vecino','guardia','admin'].map(r => `<option ${u.rol === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div></div>
     <div class="field"><label>Email</label><input name="email" type="email" value="${esc(u.email)}"></div>
+    ${/^Lote\s/i.test(u.casa || '') ? `<div class="grid2"><div class="field"><label>Relación con el lote</label><select name="relacion">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${u.relacion === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="" ${!u.relacion ? 'selected' : ''}>Sin indicar</option></select></div>
+      <div class="field"><label>Votaciones</label><label class="check" style="margin:6px 0 0"><input type="checkbox" name="representante" ${u.representante ? 'checked' : ''}><span>Representante designado del ${esc(u.casa)} (solo vale su voto)</span></label></div></div>
+      ${u.poderFoto ? `<div class="card plana small"><b>Carta poder</b>${u.poderHasta ? ' · hasta ' + fechaCorta(u.poderHasta) : ''}${fotoHTML(u.poderFoto, 'post-foto')}
+        <label class="check" style="margin-top:8px"><input type="checkbox" name="poderOk" ${u.poderOk ? 'checked' : ''}><span>Aprobada: puede votar por el lote</span></label></div>` : ''}` : ''}
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
     <div class="btns" style="margin-top:10px"><button class="btn btn-sec" data-a="nueva-clave" data-id="${u.id}">${I('key')}Nueva clave</button><button class="btn btn-danger-soft" data-a="baja-vecino" data-id="${u.id}">${I('trash')}Dar de baja</button></div>`);
 };
-F['gestionar-vecino'] = (d, form) => { Store.cambiar(s => { const x = s.users.find(z => z.id === form.dataset.id); Object.assign(x, { casa:d.casa.trim(), rol:d.rol, email:d.email.trim().toLowerCase() }); auditar(s, 'Editó un vecino', `${x.nombre} · ${x.casa} · ${x.rol}`, x.id); }); cerrarHoja(); toast('Guardado', 'check'); };
+F['gestionar-vecino'] = (d, form) => { Store.cambiar(s => { const x = s.users.find(z => z.id === form.dataset.id); Object.assign(x, { casa:d.casa.trim(), rol:d.rol, email:d.email.trim().toLowerCase() });
+  if ('relacion' in d){ x.relacion = d.relacion; x.representante = !!d.representante; if (x.poderFoto) x.poderOk = !!d.poderOk;
+    /* Un solo representante por lote. */
+    if (x.representante) s.users.forEach(o => { if (o.id !== x.id && o.casa === x.casa && o.representante) o.representante = false; }); } auditar(s, 'Editó un vecino', `${x.nombre} · ${x.casa} · ${x.rol}`, x.id); }); cerrarHoja(); toast('Guardado', 'check'); };
 A['nueva-clave'] = el => { const c = generarClave(); Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); x.clave = c; auditar(s, 'Generó una clave nueva', x.nombre, x.id); }); hoja('Clave nueva', `<div class="codigo-grande">${c}</div><button class="btn btn-sec btn-block" data-a="copiar" data-v="${c}">${I('copy')}Copiar</button>`); };
 A['baja-vecino'] = async el => {
   if (!await confirmar('Dar de baja', 'Se borran sus datos personales, sus mensajes privados y sus pases. Lo que publicó en el pizarrón queda sin nombre.', { si:'Dar de baja', peligro:true })) return;

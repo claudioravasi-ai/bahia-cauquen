@@ -136,7 +136,7 @@ const Store = {
 function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
     bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
-    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[] };
+    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
   if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
@@ -448,9 +448,13 @@ function codigoPase(){
    para: id de usuario, 'todos', 'rol:guardia', 'rol:admin',
    'staff' o una lista de esos.
    ========================================================= */
-function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false }){
-  s.notifs.unshift({ id: uid(), para: [].concat(para), titulo, texto, icon, color, link, urgente, sonido: sonido || urgente, de: Store.sesion.userId, at: Date.now(), leidas: [] });
+function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true }){
+  const n = { id: uid(), para: [].concat(para), titulo, texto, icon, color, link, urgente, sonido: sonido || urgente, de: Store.sesion.userId, at: Date.now(), leidas: [] };
+  s.notifs.unshift(n);
   if (s.notifs.length > 400) s.notifs.length = 400;
+  /* Lo que suena también sale como aviso push: llega con el celular
+     bloqueado (ver js/push.js). */
+  if (push && typeof empujarAviso === 'function') setTimeout(() => empujarAviso(n), 0);
 }
 /* =========================================================
    LO QUE LA BASE SE COME: LAS LISTAS VACÍAS
@@ -617,7 +621,10 @@ const Fotos = {
   /* De un archivo del celular a { fotoId, mini } listo para guardar. */
   async desdeArchivo(file, max = 1280){
     const grande = await comprimir(file, max, .8);
-    const mini = await achicarDato(grande, 48, .5);
+    /* La vista previa que viaja con el registro: 96 px, unos 3 KB. Antes
+       era de 48 px y se veía como una mancha. La foto buena se baja al
+       tocarla (ver Nube.compartirDescarga). */
+    const mini = await achicarDato(grande, 96, .6);
     const fotoId = 'f' + uid();
     await this.poner(fotoId, grande);
     if (this.relevo){ try { await this.relevo.subir(fotoId, grande); } catch(e){} }
@@ -651,7 +658,28 @@ function achicarDato(dato, max, q){
 }
 /* HTML de una foto: arranca con la miniatura y se hidrata sola. */
 const fotoHTML = (f, cls = 'foto', { aPedido = false } = {}) => f && f.fotoId
-  ? `<div class="${cls}" data-foto="${esc(f.fotoId)}" data-a="ver-foto" ${aPedido ? 'data-pedido title="Tocá para ver la foto"' : ''} style="background-image:url('${f.mini || ''}')"></div>` : '';
+  ? `<div class="${cls}" data-foto="${esc(f.fotoId)}" data-a="ver-foto" role="button" tabindex="0" aria-label="Ver la foto y guardarla en este equipo" ${aPedido ? 'data-pedido' : ''} title="Tocá para ver la foto y guardarla en este equipo" style="background-image:url('${f.mini || ''}')"></div>` : '';
+
+/* Guardar una foto en el equipo (descargas, o Fotos en el celular). No queda
+   en la app ni en la base del barrio: es un archivo del equipo. En el
+   celular se abre el menú de compartir, que tiene "Guardar imagen"; en la
+   computadora se descarga directo. */
+async function guardarFotoEnEquipo(dato, nombre = 'foto-barrio.jpg'){
+  try {
+    const blob = await (await fetch(dato)).blob();
+    const archivo = new File([blob], nombre, { type: blob.type || 'image/jpeg' });
+    const tactil = matchMedia('(pointer:coarse)').matches;
+    if (tactil && navigator.canShare && navigator.canShare({ files:[archivo] })){
+      try { await navigator.share({ files:[archivo], title:'Foto del barrio' }); return true; }
+      catch(e){ if (e && e.name === 'AbortError') return false; }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 20000);
+    return true;
+  } catch(e){ toast('No se pudo guardar la foto: ' + e.message, 'alert'); return false; }
+}
 
 /* Registros de rutas (R), acciones de clic (A) y formularios (F).
    Cada archivo de vistas agrega lo suyo. */
@@ -697,14 +725,22 @@ const Correo = {
     const m = String(err && err.message || err || '');
     if (/Unexpected token|JSON|<!DOCTYPE|not valid JSON/i.test(m)) return 'Google devolvió una página en lugar de una respuesta: la implementación no está como "Quién tiene acceso: Cualquier persona", o la URL no es la de /exec.';
     if (/Failed to fetch|Load failed|NetworkError|CORS/i.test(m)) return 'No se pudo llegar al Apps Script. Suele ser el acceso ("Cualquier persona", no "Cualquier persona con cuenta de Google"), una URL mal copiada o falta de internet.';
-    if (/no autorizado/i.test(m)) return 'La frase compartida de Ajustes no coincide con CLAVE_COMPARTIDA del Apps Script (o se cambió y no se hizo "Nueva versión").';
+    if (/no autorizado/i.test(m)){
+      /* El Apps Script nuevo dice en qué difieren, sin revelar la frase. */
+      const p = err && err.pista;
+      if (p && p.scriptSinFrase) return 'El Apps Script no tiene frase: en la línea var CLAVE_COMPARTIDA quedó "CAMBIAR-por-una-frase…". Escribí ahí tu frase, Guardar, e Implementar → Gestionar implementaciones → editar → Nueva versión.';
+      if (p && p.soloMayusculas) return 'Las dos frases son iguales salvo MAYÚSCULAS y minúsculas. Tienen que ser idénticas letra por letra: corregila en Ajustes → Correo.';
+      if (p && p.soloEspacios) return 'Las dos frases son iguales salvo los espacios. Corregila en Ajustes → Correo para que sea idéntica a la del Apps Script.';
+      if (p) return `La frase de Ajustes no es la del Apps Script: la del Apps Script tiene ${p.largoScript} caracteres y la de Ajustes ${p.largoApp}. Copiá la que está entre comillas en la línea var CLAVE_COMPARTIDA del Apps Script y pegala en Ajustes → Correo → Frase compartida (con "Mostrar" tildado para ver que quedó bien) y tocá Guardar.`;
+      return 'La frase compartida de Ajustes no coincide con CLAVE_COMPARTIDA del Apps Script (o se cambió y no se hizo "Nueva versión").';
+    }
     if (/tope/i.test(m)) return 'Se alcanzó el tope diario del Apps Script (TOPE_DIARIO).';
     return m || 'Error desconocido';
   },
   async pedir(d, cuerpo){
     const r = await fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ ...cuerpo, clave:d.clave }) });
     const j = await r.json();
-    if (!j || !j.ok) throw new Error((j && j.error) || 'el Apps Script contestó que no');
+    if (!j || !j.ok){ const e = new Error((j && j.error) || 'el Apps Script contestó que no'); e.pista = j && j.pista; throw e; }
     return j;
   },
   plantilla(titulo, cuerpoHtml, boton){

@@ -189,7 +189,7 @@ A['obra-avance'] = el => { const o = Store.s.obras.find(x => x.id === el.dataset
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`); };
 F['obra-avance'] = (d, form) => {
   Store.cambiar(s => { const o = s.obras.find(x => x.id === form.dataset.id); if (!o) return; o.etapa = +d.etapa; o.ultima = Date.now();
-    o.historial.push({ at:Date.now(), etapa:+d.etapa, texto:d.texto.trim(), foto:leerFoto(d.foto), por:yo().id });
+    o.historial.push({ at:Date.now(), etapa:+d.etapa, texto:d.texto.trim(), foto:fotoParaOtros(d.foto, 30), por:yo().id });
     if (o.etapa === ETAPAS.length - 1){ o.estado = 'finalizada'; auditar(s, 'Obra finalizada', o.casa, o.id); }
     if (o.userId !== yo().id) notificar(s, { para:o.userId, titulo:'Novedad en tu obra', texto:d.texto.trim(), icon:'wrench', color:'wood', link:'obras' }); });
   cerrarHoja(); toast('Obra actualizada', 'wrench');
@@ -267,7 +267,7 @@ function sugerirNivel(){ const c = $('#infCasa'), n = $('#infNivel'), s = $('#in
   const k = Store.s.infracciones.filter(i => i.casa === c.value && i.estado !== 'anulada' && Date.now() - i.at < 365 * DIA).length; s.textContent = `Sugerido por ${plural(k, 'antecedente')} en 12 meses`; }
 const _nuevaInf = A['nueva-infraccion']; A['nueva-infraccion'] = () => { _nuevaInf(); sugerirNivel(); };
 F['infraccion'] = d => {
-  Store.cambiar(s => { const i = { id:uid(), casa:d.casa, tipo:d.tipo, detalle:d.detalle.trim(), nivel:d.nivel, monto:d.monto.trim(), foto:leerFoto(d.foto), at:Date.now(), estado:'notificada', por:yo().id };
+  Store.cambiar(s => { const i = { id:uid(), casa:d.casa, tipo:d.tipo, detalle:d.detalle.trim(), nivel:d.nivel, monto:d.monto.trim(), foto:fotoParaOtros(d.foto, 45), at:Date.now(), estado:'notificada', por:yo().id };
     s.infracciones.unshift(i);
     notificar(s, { para:s.users.filter(x => x.casa === d.casa && x.estado === 'aprobado').map(x => x.id), titulo:'Notificación de la Administración', texto:`${TIPOS_INF[d.tipo]} · podés presentar tu descargo`, icon:'alert', color:'danger', link:'infracciones' });
     auditar(s, 'Registró una infracción', `${d.casa} · ${TIPOS_INF[d.tipo]} · ${d.nivel}`, i.id); });

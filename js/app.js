@@ -38,7 +38,7 @@ function sincronizarHistorial(){
    están de guardia, la única ventana es la de abrir el turno.
    ========================================================= */
 const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron', 'chat',
-  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos']);
+  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio']);
 const ventanaPermitida = id => !esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo()));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
@@ -53,7 +53,13 @@ function abrir(id, param = ''){
     return;
   }
   guardarScroll();
-  PILA.push({ id, param });
+  /* Una ventana nunca se abre DEBAJO de una hoja: antes, tocar un aviso en
+     la pizarra abría la ventana detrás y la hoja la seguía tapando. Si la
+     hoja era la pizarra, se anota para volver a ella al cerrar la ventana. */
+  const alVolver = typeof Pizarra !== 'undefined' && Pizarra.volver ? 'pizarra' : '';
+  if (typeof Pizarra !== 'undefined') Pizarra.volver = false;
+  if (hojaAbierta()) cerrarHoja();
+  PILA.push({ id, param, alVolver });
   history.pushState({ n: PILA.length }, '');
   ventanaNueva = true;
   pintar();
@@ -62,10 +68,17 @@ let saltando = false;
 function volverA(i){
   const cerrar = PILA.length - 1 - i;
   if (cerrar <= 0){ $('#cuerpo')?.scrollTo({ top:0, behavior:'smooth' }); return; }
+  const top = PILA[PILA.length - 1];
   PILA.length = i + 1;
   saltando = true;
   history.go(-cerrar);
   pintar();
+  if (cerrar === 1) volverALaPizarra(top);
+}
+/* Si la ventana que se cierra se abrió desde la pizarra, se vuelve a la
+   pizarra abierta, para seguir leyendo donde se estaba. */
+function volverALaPizarra(cerrada){
+  if (cerrada && cerrada.alVolver === 'pizarra' && typeof A['pizarra-toda'] === 'function') setTimeout(() => A['pizarra-toda'](), 60);
 }
 /* =========================================================
    VOLVER AL MISMO LUGAR
@@ -90,7 +103,7 @@ window.addEventListener('popstate', e => {
   const d = $('#hoja');
   if (d && d.open){ d.close(); history.pushState({ n: PILA.length }, ''); return; }
   const n = (e.state && e.state.n) || 1;
-  if (PILA.length > n){ PILA.length = Math.max(1, n); pintar(); }
+  if (PILA.length > n){ const top = PILA[PILA.length - 1], una = PILA.length - Math.max(1, n) === 1; PILA.length = Math.max(1, n); pintar(); if (una) volverALaPizarra(top); }
   else sincronizarHistorial();
 });
 
@@ -105,6 +118,108 @@ document.addEventListener('touchend', e => {
   const t = e.changedTouches[0], dx = t.clientX - gesto.x, dy = Math.abs(t.clientY - gesto.y);
   gesto = null;
   if (dx > 70 && dy < 60) cerrarVentana();
+}, { passive:true });
+
+/* =========================================================
+   ESTIRAR PARA ACTUALIZAR
+   Arriba de todo de una ventana, arrastrar hacia abajo "estira" la
+   ventana; al soltar pasados unos 70 px se actualiza TODO: la base del
+   barrio (se reconecta y vuelve a pedir), el clima, los vuelos, los
+   cruceros, los sismos y la versión de la app. La app ya se actualiza
+   sola, pero así la persona VE que lo que tiene adelante está al día.
+   En la computadora hace lo mismo un "tirón" hacia arriba con la rueda o
+   el panel táctil cuando la ventana ya está arriba de todo.
+   ========================================================= */
+const Estirar = {
+  UMBRAL: 70, y0: null, x0: 0, d: 0, girando: false, el: null, rueda: 0, ruedaT: 0,
+  indicador(){
+    if (this.el && this.el.isConnected) return this.el;
+    this.el = document.createElement('div');
+    this.el.className = 'estirar'; this.el.setAttribute('aria-live', 'polite');
+    this.el.innerHTML = `<span class="estirar-ic">${I('refresh')}</span><b></b>`;
+    document.body.appendChild(this.el);
+    return this.el;
+  },
+  mostrar(d){
+    const el = this.indicador(), listo = d >= this.UMBRAL;
+    el.classList.add('ver'); el.classList.toggle('listo', listo);
+    el.style.setProperty('--estirar', Math.min(d, 110) + 'px');
+    el.style.setProperty('--giro', Math.round(d * 3) + 'deg');
+    el.querySelector('b').textContent = listo ? 'Soltá para actualizar' : 'Estirá para actualizar';
+    const v = $('.ventana'); if (v){ v.style.transition = 'none'; v.style.transform = `translateY(${Math.round(Math.min(d, 110) * .55)}px)`; }
+  },
+  soltar(){
+    const v = $('.ventana'); if (v){ v.style.transition = 'transform .28s cubic-bezier(.2,.9,.3,1.2)'; v.style.transform = ''; }
+  },
+  esconder(demora = 0){
+    setTimeout(() => { if (this.el){ this.el.classList.remove('ver', 'listo', 'girando', 'hecho'); } }, demora);
+  },
+  arriba(){ const c = $('#cuerpo'); return !!c && c.scrollTop <= 0; },
+  async actualizar(){
+    if (this.girando) return;
+    this.girando = true;
+    const el = this.indicador();
+    el.classList.add('ver', 'girando'); el.classList.remove('listo');
+    el.style.setProperty('--estirar', '64px');
+    el.querySelector('b').textContent = 'Actualizando…';
+    const tareas = [];
+    try { if (typeof Clima !== 'undefined'){ if (Clima.d) Clima.d.t = 0; tareas.push(Clima.pedir()); } } catch(e){}
+    try { if (typeof Vuelos !== 'undefined') tareas.push(Vuelos.pedir(true)); } catch(e){}
+    try { if (typeof Cruceros !== 'undefined') tareas.push(Cruceros.pedir(true)); } catch(e){}
+    try { if (typeof Sismos !== 'undefined') tareas.push(Sismos.pedir(true)); } catch(e){}
+    try {
+      if (typeof Nube !== 'undefined' && Nube.activa() && Nube.db){
+        /* Cortar y volver a conectar hace que Firebase pida todo de nuevo
+           al servidor: si alguna escucha había quedado dormida (el celular
+           estuvo en el bolsillo), se despierta. */
+        Nube.db.goOffline(); Nube.db.goOnline();
+        tareas.push(Nube.db.ref('barrio/config/nombre').get());
+      }
+    } catch(e){}
+    try { if ('serviceWorker' in navigator) tareas.push(navigator.serviceWorker.getRegistration().then(r => r && r.update())); } catch(e){}
+    await Promise.race([Promise.allSettled(tareas), new Promise(ok => setTimeout(ok, 8000))]);
+    try { refrescar(); } catch(e){}
+    Store.sesion.actualizadoAt = Date.now(); Store.guardarSesion();
+    el.classList.remove('girando'); el.classList.add('hecho');
+    el.querySelector('b').textContent = `Todo al día · ${new Date().toLocaleTimeString('es-AR', { hourCycle:'h23' })}`;
+    this.girando = false;
+    this.esconder(1400);
+  },
+};
+document.addEventListener('touchstart', e => {
+  Estirar.y0 = null; Estirar.d = 0;
+  if (Estirar.girando || e.touches.length !== 1 || hojaAbierta()) return;
+  const c = $('#cuerpo'), t = e.touches[0];
+  if (!c || !c.contains(e.target) || c.scrollTop > 0 || t.clientX < 28) return;
+  Estirar.y0 = t.clientY; Estirar.x0 = t.clientX;
+}, { passive:true });
+document.addEventListener('touchmove', e => {
+  if (Estirar.y0 == null) return;
+  const t = e.touches[0], dy = t.clientY - Estirar.y0, dx = Math.abs(t.clientX - Estirar.x0);
+  if (dy <= 0 || !Estirar.arriba() || (dx > dy && Estirar.d < 10)){ if (Estirar.d){ Estirar.soltar(); Estirar.esconder(); } Estirar.y0 = null; Estirar.d = 0; return; }
+  /* Resistencia: cuanto más se estira, más cuesta, como una goma. */
+  Estirar.d = Math.round(dy * .5);
+  if (Estirar.d > 6) Estirar.mostrar(Estirar.d);
+}, { passive:true });
+['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, () => {
+  if (Estirar.y0 == null) return;
+  const d = Estirar.d; Estirar.y0 = null; Estirar.d = 0;
+  Estirar.soltar();
+  if (d >= Estirar.UMBRAL) Estirar.actualizar(); else Estirar.esconder();
+}, { passive:true }));
+document.addEventListener('wheel', e => {
+  if (Estirar.girando || hojaAbierta() || e.deltaY >= 0 || !Estirar.arriba()){ Estirar.rueda = 0; return; }
+  const c = $('#cuerpo'); if (!c || !c.contains(e.target)) return;
+  const ahora = Date.now();
+  if (ahora - Estirar.ruedaT > 450) Estirar.rueda = 0;
+  Estirar.ruedaT = ahora;
+  Estirar.rueda += -e.deltaY;
+  Estirar.mostrar(Math.min(110, Estirar.rueda / 4));
+  clearTimeout(Estirar.ruedaFin);
+  Estirar.ruedaFin = setTimeout(() => {
+    const d = Estirar.rueda / 4; Estirar.rueda = 0; Estirar.soltar();
+    if (d >= Estirar.UMBRAL) Estirar.actualizar(); else Estirar.esconder();
+  }, 260);
 }, { passive:true });
 
 const inicioId = () => esGuardia() ? 'garita' : 'inicio';
@@ -365,6 +480,7 @@ function despuesDePintar(){
   if (typeof Reloj !== 'undefined') Reloj.arrancar();
   const def = R[PILA[PILA.length - 1]?.id];
   if (def && def.alPintar) def.alPintar(PILA[PILA.length - 1].param);
+  if (typeof Servicio !== 'undefined') conRed('servicio', () => Servicio.despues());
 }
 
 /* =========================================================
@@ -852,6 +968,8 @@ A['sos-enviar'] = el => {
        mandaban las dos cosas y sonaba dos veces. */
     s.bitacora.unshift({ id:uid(), autor:'sistema', tipo:'incidente', texto:`SOS ${t.nombre} desde ${u.casa} (${u.nombre}).`, at:Date.now() });
   });
+  /* A todos los equipos del barrio, aunque tengan la pantalla apagada. */
+  if (typeof Push !== 'undefined') Push.enviar({ para:'todos', titulo:`🚨 SOS · ${t.nombre}`, texto:`${u.casa} · ${u.nombre}`, tag:'sos-' + idSos, urgente:true });
   const g = Store.s.config.garitaTel || contactoTel('Garita');
   hoja('Ayuda en camino', `
     <div class="aviso a-danger latido">${I('siren')}<div class="txt"><b>La guardia ya recibió tu alerta</b>Quedate en un lugar seguro. Si podés, llamá también:</div></div>
@@ -1053,11 +1171,36 @@ A['modo'] = el => {
 };
 
 A['demo'] = el => { entrarComo(el.dataset.v); toast(`Entraste como ${nombreDe(el.dataset.v)}`, 'login'); };
+/* =========================================================
+   TOCAR UNA FOTO = VERLA BIEN Y BAJARLA AL EQUIPO
+   En la lista se ve la vista previa chica (96 px). Al tocarla:
+     1. si la foto está en este equipo (la subí yo), se usa esa;
+     2. si no, se baja la copia "para bajar" que dejó quien la subió
+        (barrio/fotosDescarga, 1280 px, se borra sola a los pocos días);
+     3. las fotos del frente de las casas y de las mascotas, de su lugar.
+   Se muestra grande y se guarda en el equipo (en la computadora se
+   descarga sola; en el celular, con el botón, que abre "Guardar imagen").
+   En la app no queda guardada: no ocupa lugar ni en la base ni acá.
+   ========================================================= */
+let fotoAbierta = null;
 A['ver-foto'] = async el => {
-  const id = el.dataset.foto; const v = await Fotos.sacar(id);
-  if (!v){ toast('Esa foto quedó guardada en el equipo de quien la subió', 'image'); return; }
-  hoja('Foto', `<img class="foto-full" src="${v}" alt=""><div class="btns" style="margin-top:12px"><a class="btn btn-sec" href="${v}" download="foto-barrio.jpg">${I('download')}Guardar en este equipo</a></div>`, { ancho:'760px' });
+  const id = el.dataset.foto; if (!id) return;
+  if (el.dataset.bajando) return;
+  el.dataset.bajando = '1'; el.classList.add('bajando');
+  let v = await Fotos.sacar(id, false);
+  try { if (!v && typeof Nube !== 'undefined' && Nube.activa()) v = await Nube.bajarDescarga(id); } catch(e){}
+  if (!v) v = await Fotos.sacar(id);
+  delete el.dataset.bajando; el.classList.remove('bajando');
+  if (!v){ toast('Esa foto ya no está disponible para bajar: las copias duran unos días y esta es anterior o ya venció.', 'image'); return; }
+  el.style.backgroundImage = `url('${v}')`; el.classList.remove('solo-mini');
+  const nombre = `barrio-bahia-cauquen-${hoyISO()}-${id}.jpg`;
+  fotoAbierta = { v, nombre };
+  hoja('Foto', `<img class="foto-full" src="${v}" alt="">
+    <div class="btns" style="margin-top:12px"><button class="btn btn-pri grow" data-a="guardar-foto">${I('download')}Guardar en este equipo</button></div>
+    <p class="muted small" style="margin:8px 2px 0">Queda en las descargas o en la galería de este equipo, no en la app.</p>`, { ancho:'760px' });
+  if (matchMedia('(pointer:fine)').matches && await guardarFotoEnEquipo(v, nombre)) toast('La foto se guardó en las descargas', 'download');
 };
+A['guardar-foto'] = async () => { if (fotoAbierta && await guardarFotoEnEquipo(fotoAbierta.v, fotoAbierta.nombre)) toast('Foto guardada en este equipo', 'download'); };
 A['copiar'] = el => copiar(el.dataset.v);
 A['ver-inscripcion'] = el => { location.hash = '#/inscripcion/' + el.dataset.v; pintarInscripcion(el.dataset.v); };
 
@@ -1270,10 +1413,18 @@ document.addEventListener('change', async e => {
   } catch(err){ toast('No se pudo leer esa imagen', 'alert'); }
 });
 const leerFoto = v => { try { return v ? JSON.parse(v) : null; } catch(e){ return null; } };
+/* La foto de algo que ven otros (un aviso, un reclamo, una obra): además de
+   la vista previa que va en el registro, deja por unos días una copia
+   buena "para bajar", que cada uno trae recién cuando la toca. */
+const fotoParaOtros = (v, dias = 7) => {
+  const f = leerFoto(v);
+  if (f && f.fotoId && typeof Nube !== 'undefined' && Nube.activa()) setTimeout(() => Nube.compartirDescarga(f.fotoId, dias), 200);
+  return f;
+};
 const campoFoto = (id, etiqueta = 'Foto (opcional)') => `
   <div class="field"><label>${etiqueta}</label><div class="foto-in">
     <label class="foto-prev" id="${id}Prev" style="cursor:pointer">${I('camera')}<input type="file" accept="image/*" capture="environment" data-foto-in="${id}" hidden></label>
-    <div class="muted small">La foto se guarda en este equipo. A los demás les llega una miniatura.</div>
+    <div class="muted small">A los demás les llega una vista previa; la foto buena la bajan al tocarla (queda para bajar unos días).</div>
     <input type="hidden" name="foto" id="${id}"></div></div>`;
 
 /* Un cambio de otra pestaña, o de otro vecino a través de la base del barrio. */
@@ -1337,6 +1488,10 @@ const PIEZAS = [
   ['js/admin.js',      () => typeof REGLAS],
   ['js/v-vecinos.js',  () => typeof normTxt],
   ['js/v-expensas.js', () => typeof RUBROS],
+  ['js/v-plan.js',     () => typeof anioPlan],
+  ['js/v-servicio.js', () => typeof Servicio],
+  ['js/push.js',       () => typeof Push],
+  ['js/sismos.js',     () => typeof Sismos],
   ['js/nube.js',       () => typeof Nube],
 ];
 function piezasQueFaltan(){
@@ -1458,6 +1613,9 @@ async function arrancar(){
   /* El clima y los vuelos se refrescan solos, sin que haya que entrar. */
   setInterval(datosDeAfuera, 10 * MIN);
   Avion.arrancar();
+  Sismos.arrancar();
+  Servicio.arrancar();
+  Push.arrancar();
   registrarServiceWorker();
 }
 

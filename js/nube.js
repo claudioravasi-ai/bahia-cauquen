@@ -46,9 +46,9 @@ const Nube = {
   ZONAS: {
     barrio: ['users','padron','amenities','agenda','temporadas','feriados','eventosCiudad','contactos','documentos',
              'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
-             'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas'],
+             'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
-    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos'],
+    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes'],
   },
 
   /* =========================================================
@@ -90,6 +90,9 @@ const Nube = {
     amenities:       { listas:['franjas'] },
     cruceros:        { listas:['escalas'] },
     descargas:       { listas:[] },
+    alertas:         { listas:['lotes'], objetos:['respuestas'] },
+    frecuentes:      { listas:['dias'] },
+    camion:          { listas:[] },
   },
   comoLaGuardamos(col, x){
     const f = this.FORMAS[col];
@@ -188,6 +191,7 @@ const Nube = {
     /* La cuenta de la garita se reconoce por el correo: si quedó como vecino
        (se inscribió por el portal común), la Administración la corrige sola. */
     if (mio.rol === 'admin') setTimeout(() => this.corregirGarita(), 5000);
+    if (mio.rol === 'admin') setTimeout(() => this.limpiarFotos(), 20000);
     /* La Administración deja a mano la dirección del correo para quien se
        inscribe, y manda lo que haya quedado sin salir. */
     if (mio.rol === 'admin') setTimeout(async () => {
@@ -371,6 +375,44 @@ const Nube = {
 
   recordar(col, arr){ this.ultimo[col] = {}; arr.forEach(x => { if (x && x.id) this.ultimo[col][x.id] = JSON.stringify(x); }); },
 
+  /* =========================================================
+     LO QUE UN VECINO ESCRIBE EN UN REGISTRO QUE NO ES SUYO
+     Una votación, un comunicado o un aviso urgente los crea la
+     Administración; el vecino solo agrega SU voto, SU "visto" o SU
+     respuesta. Las reglas le permiten escribir únicamente esa parte, así
+     que si la app manda el registro entero, Firebase lo rechaza todo: los
+     votos y los acuses de los vecinos no se guardaban (en ?local no se nota
+     porque no hay reglas). Acá se dice, por colección, quién puede escribir
+     el registro completo y qué campos van sueltos para los demás:
+       'hijos' → cada clave del objeto por separado (votos[lote], respuestas[uid])
+       'campo' → el campo entero (la lista de vistos, la de recomendaciones)
+     ========================================================= */
+  PARCIALES: {
+    votaciones:  { quien:'admin', campos:{ votos:'hijos' } },
+    comunicados: { quien:'admin', campos:{ vistos:'campo', respuestas:'hijos' } },
+    alertas:     { quien:'staff', campos:{ respuestas:'hijos' } },
+    users:       { quien:'admin', propio:true, campos:{ recomiendan:'campo' } },
+  },
+  soloSuParte(col, x){
+    const P = this.PARCIALES[col], u = yo(); if (!P || !u) return null;
+    if (P.quien === 'staff' ? (u.rol === 'admin' || u.rol === 'guardia') : u.rol === 'admin') return null;
+    if (P.propio && x && x.id === u.id) return null;
+    return P;
+  },
+  cambiosSueltos(col, P, viejo, nuevo){
+    const base = `barrio/${col}/${nuevo.id}`, out = [];
+    Object.entries(P.campos).forEach(([f, modo]) => {
+      const a = viejo && viejo[f], b = nuevo[f];
+      if (JSON.stringify(a ?? null) === JSON.stringify(b ?? null)) return;
+      if (modo === 'campo'){ out.push([`${base}/${f}`, b ?? null]); return; }
+      const va = a && typeof a === 'object' ? a : {}, vb = b && typeof b === 'object' ? b : {};
+      new Set([...Object.keys(va), ...Object.keys(vb)]).forEach(k => {
+        if (JSON.stringify(va[k] ?? null) !== JSON.stringify(vb[k] ?? null)) out.push([`${base}/${f}/${k}`, vb[k] ?? null]);
+      });
+    });
+    return out;
+  },
+
   /* Guardar = mandar a la nube solo lo que cambió. */
   guardar(){
     if (!this.arrancada || !this.uid) return;
@@ -389,9 +431,12 @@ const Nube = {
       arr.forEach(x => {
         if (!x || !x.id) return;
         const txt = JSON.stringify(x); ahora[x.id] = txt;
-        if (antes[x.id] !== txt) rutasDe(col, x).forEach(r => poner(r, JSON.parse(txt)));
+        if (antes[x.id] === txt) return;
+        const P = this.soloSuParte(col, x);
+        if (P){ if (antes[x.id]) this.cambiosSueltos(col, P, JSON.parse(antes[x.id]), JSON.parse(txt)).forEach(([r, v]) => poner(r, v)); return; }
+        rutasDe(col, x).forEach(r => poner(r, JSON.parse(txt)));
       });
-      Object.keys(antes).forEach(id => { if (!(id in ahora)){
+      Object.keys(antes).forEach(id => { if (!(id in ahora) && !this.soloSuParte(col, { id })){
         const viejo = JSON.parse(antes[id]);
         rutasDe(col, viejo).forEach(r => poner(r, null));
       }});
@@ -473,6 +518,42 @@ const Nube = {
       await this.db.ref('barrio/fotosCasa/' + fotoId).set(await achicarDato(dato, max, .7));
       return true;
     } catch(e){ console.warn('No se pudo compartir la foto', e.message); return false; }
+  },
+  /* =========================================================
+     LA COPIA "PARA BAJAR" DE UNA FOTO
+     Una foto que ven otros (aviso, mascota perdida, reclamo, obra) deja una
+     copia de 1280 px en barrio/fotosDescarga/<id>. NO baja con el resto
+     de los datos: cada uno la pide al tocar la foto, la ve y la guarda en su
+     equipo. Vence sola (7 días un aviso, más un reclamo o un comprobante) y
+     la app de la Administración borra las vencidas: la base no se llena.
+     Se lee solo sabiendo el id (nadie puede listar todas las fotos): el id
+     está únicamente en el registro donde se publicó.
+     ========================================================= */
+  async compartirDescarga(fotoId, dias = 7){
+    try {
+      if (!this.arrancada || !fotoId) return false;
+      const dato = await Fotos.sacar(fotoId, false); if (!dato) return false;
+      let buena = await achicarDato(dato, 1280, .76);
+      if (buena.length > 590000) buena = await achicarDato(dato, 1024, .68);
+      const at = Date.now(), vence = at + dias * DIA;
+      await this.db.ref('barrio/fotosDescarga/' + fotoId).set({ d:buena, at, vence });
+      await this.db.ref('barrio/fotosIdx/' + fotoId).set({ at, vence, de:this.uid }).catch(() => {});
+      return true;
+    } catch(e){ console.warn('No se pudo dejar la foto para bajar (¿faltan publicar las reglas?)', e.message); return false; }
+  },
+  async bajarDescarga(fotoId){
+    if (!this.db || !this.uid) return null;
+    const v = (await this.db.ref('barrio/fotosDescarga/' + fotoId).get()).val();
+    return v && typeof v.d === 'string' ? v.d : null;
+  },
+  /* La Administración borra las copias vencidas (una vez por día). */
+  async limpiarFotos(){
+    if (!this.db || !esAdmin()) return;
+    try {
+      const idx = (await this.db.ref('barrio/fotosIdx').get()).val() || {}, ahora = Date.now(), fotos = {}, indice = {};
+      Object.entries(idx).forEach(([id, x]) => { if (!x || !x.vence || x.vence < ahora){ fotos['barrio/fotosDescarga/' + id] = null; indice['barrio/fotosIdx/' + id] = null; } });
+      if (Object.keys(fotos).length){ await this.db.ref().update(fotos); await this.db.ref().update(indice); }
+    } catch(e){ console.warn('No se pudieron limpiar las fotos vencidas', e.message); }
   },
   async registrar(d){
     const cred = await this.auth.createUserWithEmailAndPassword(d.email, d.clave);
