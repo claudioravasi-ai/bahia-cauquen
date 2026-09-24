@@ -142,8 +142,33 @@ const Nube = {
        otra sesión en este equipo, no tienen que subir a la base del barrio. */
     [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff].forEach(col => { if (Array.isArray(s[col])) s[col] = []; });
     s.notifs = []; s.motorLog = {}; this.ultimo = {};
-    const yoNodo = await this.db.ref('barrio/users/' + this.uid).get().catch(() => null);
-    const mio = yoNodo && yoNodo.exists() ? yoNodo.val() : null;
+    /* Leer la ficha propia. Si la base falla (conexión lenta, un corte),
+       NO es lo mismo que "no hay ficha": antes se confundía y la cuenta de
+       la garita terminaba en la pantalla de completar datos. Se reintenta. */
+    let yoNodo = null, fallo = null;
+    for (let i = 0; i < 4; i++){
+      try { yoNodo = await this.db.ref('barrio/users/' + this.uid).get(); fallo = null; break; }
+      catch(e){ fallo = e; await new Promise(r => setTimeout(r, 1200 * (i + 1))); }
+    }
+    if (fallo){ toast('No se pudo leer tu ficha en la base del barrio. Revisá la conexión y volvé a entrar.', 'alert'); console.warn('Ficha', fallo); return; }
+    let mio = yoNodo && yoNodo.exists() ? yoNodo.val() : null;
+    /* LA CUENTA DE LA GARITA NO COMPLETA DATOS: si su ficha no está, se crea
+       sola (nombre y lote "Garita") y la app de la Administración la
+       habilita como garita apenas se abre. */
+    if (!mio && esCorreoGarita(this.auth.currentUser.email)){
+      const g = { id:this.uid, nombre:'Garita', casa:'Garita', dni:'', email:this.auth.currentUser.email, tel:'', rol:'vecino', estado:'pendiente', consentimiento:Date.now(), createdAt:Date.now() };
+      try { await this.db.ref('barrio/users/' + this.uid).set(g); mio = g; } catch(e){ console.warn('No se pudo crear la ficha de la garita', e.message); }
+    }
+    /* La garita esperando que la habiliten: pantalla simple, y entra sola
+       en cuanto la app de la Administración la habilita (sin tocar nada). */
+    if (mio && esCorreoGarita(mio.email) && mio.estado !== 'aprobado'){
+      $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+        <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
+        <h1 style="font-size:30px">Garita</h1><div class="panel"><p style="margin:0 0 10px"><b>La cuenta de la garita se está habilitando.</b></p>
+        <p style="margin:0;opacity:.9">No hace falta completar ningún dato. Entra sola apenas la Administración abra la app (lo hace automáticamente, sin tocar nada). Podés dejar esta pantalla abierta.</p></div></section>`;
+      this.escuchar('barrio/users/' + this.uid, v => { if (v && v.estado === 'aprobado') location.reload(); });
+      return;
+    }
     Store.sesion.userId = this.uid; Store.guardarSesion();
     if (!mio){
       /* Hay cuenta pero no hay ficha de vecino. Pasa cuando el alta quedó a
@@ -190,7 +215,7 @@ const Nube = {
     setTimeout(() => this.fotoCasaAlDia(), 4000);
     /* La cuenta de la garita se reconoce por el correo: si quedó como vecino
        (se inscribió por el portal común), la Administración la corrige sola. */
-    if (mio.rol === 'admin') setTimeout(() => this.corregirGarita(), 5000);
+    if (mio.rol === 'admin'){ setTimeout(() => this.corregirGarita(), 5000); setInterval(() => this.corregirGarita(), 60000); }
     if (mio.rol === 'admin') setTimeout(() => this.limpiarFotos(), 20000);
     /* La Administración deja a mano la dirección del correo para quien se
        inscribe, y manda lo que haya quedado sin salir. */
@@ -484,10 +509,13 @@ const Nube = {
      aparece en pantalla, así no pesa en el arranque de nadie.
      ========================================================= */
   corregirGarita(){
-    const g = Store.s.users.find(x => esCorreoGarita(x.email) && x.estado === 'aprobado' && (x.rol !== 'guardia' || x.casa !== 'Garita'));
+    /* También la que quedó pendiente: la cuenta de la garita entra sin que
+       la Administración tenga que aprobarla a mano. Solo puede entrar con ese
+       correo quien tiene su contraseña. */
+    const g = Store.s.users.find(x => esCorreoGarita(x.email) && x.estado !== 'rechazado' && (x.estado !== 'aprobado' || x.rol !== 'guardia' || x.casa !== 'Garita'));
     if (!g) return;
-    Store.cambiar(s => { const x = s.users.find(z => z.id === g.id); x.rol = 'guardia'; x.casa = 'Garita'; x.nombre = 'Garita';
-      auditar(s, 'La cuenta de la garita quedó con permisos de garita', x.email, x.id); });
+    Store.cambiar(s => { const x = s.users.find(z => z.id === g.id); x.rol = 'guardia'; x.casa = 'Garita'; x.nombre = 'Garita'; x.estado = 'aprobado'; x.aprobadoAt = x.aprobadoAt || Date.now();
+      auditar(s, 'La cuenta de la garita quedó habilitada como garita', x.email, x.id); });
   },
   async bajarFotoCasa(id){
     if (!this.db || !this.uid) return null;
