@@ -508,7 +508,7 @@ R.cobranzas = {
   titulo: 'Expensas', icon: 'wallet', color: 'wood', ancha: true, sub: 'Automáticas, cupones, pagos, morosos y recibos',
   render(p){
     if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
-    const [tab, sub] = String(p || 'resumen').split('|');
+    const [tab, sub] = String(p || 'plan').split('|');
     const pend = Store.s.pagos.filter(x => x.estado === 'informado').length;
     return `<div class="tabs-in">${TABS_COBRO.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="abrir" data-v="cobranzas" data-p="${k}">${t}${k === 'cobranzas' && pend ? `<span class="dot-badge">${pend}</span>` : ''}</button>`).join('')}</div>
       ${(COBRO[tab] || COBRO.resumen)(sub)}`;
@@ -525,6 +525,9 @@ const CONTA = {
           <div class="kpi"><b>${calc.gastos}</b><span>Comprobantes</span></div>
           <div class="kpi"><b>${LOTES.length}</b><span>Lotes a prorratear</span></div></div></div>
       ${ant ? `<div class="card plana small">Mes anterior (${nombrePeriodo(ant.periodo)}): ${plata(ant.totalGastos)} · variación ${(((calc.totalGastos - ant.totalGastos) / (ant.totalGastos || 1)) * 100).toFixed(1)} %</div>` : ''}
+      ${typeof cfgPlan === 'function' ? (cfgPlan().base
+        ? superficie({ a:'abrir', v:'cobranzas', p:'plan', icon:'zap', color:'wood', t:`Expensas automáticas: ${nombrePeriodo(per)} estimado en ${plata(mesPlan(per).total)}`, s:'El año desarrollado mes a mes desde la última liquidación', cls:'acento' })
+        : superficie({ a:'abrir', v:'cobranzas', p:'plan', icon:'zap', color:'wood', t:'Activar las expensas automáticas', s:'Traer una vez la liquidación de agosto y la app desarrolla sola los meses siguientes', cls:'acento' })) : ''}
       ${sec('El mes, paso a paso')}
       <ol class="pasos-mes">
         <li class="${calc.gastos ? 'hecho' : ''}"><b>Cargar los gastos</b> <span>${calc.gastos ? plural(calc.gastos, 'comprobante') : 'pestaña Gastos del mes'}</span></li>
