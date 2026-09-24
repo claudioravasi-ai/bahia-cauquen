@@ -339,6 +339,7 @@ const FAQ = [
   ['¿Cómo aparezco en la agenda como profesional u oficio?', 'En Mi casa cargá tu profesión u oficio y tu celular, y marcá que se muestre al barrio. Aparecés solo en Profesionales y oficios y en la Agenda, con botón de WhatsApp.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Dónde están las normas del barrio?', 'En El barrio → Normas y reglamento, con un buscador ("¿hasta qué hora puedo hacer obra?"). Ahí también están la ordenanza municipal de barrios cerrados y lo que dice el Código Civil.', 'abrir', 'documentos', 'Normas'],
   ['¿Qué significan los colores de la Pizarra del día?', 'Rojo: importante. Amarillo: para tener en cuenta. Verde: para saber. Lo que todavía no leíste titila en su color; al tocarlo se queda quieto.', '', '', ''],
+  ['¿Quién responde por la app y por mis datos?', 'La app la hizo un vecino, Claudio A. Ravasi, en forma gratuita. La maneja la Administración del barrio, que es la responsable de los datos (Ley 25.326 de Protección de Datos Personales). Cada uno responde por lo que publica. No reemplaza al 911, al 107 ni a los bomberos. Todo el detalle legal está en los términos de uso; también se abren tocando "by Claudio A. Ravasi" al pie de la portada.', 'abrir', 'legal', 'Términos de uso y responsabilidad'],
   ['La app quedó rara o no abre una ventana', 'Tu cuenta (tu foto arriba a la derecha) → Actualizar la app. Baja todo de nuevo sin borrar tus datos.', 'actualizar-app', '', 'Actualizar la app'],
 ];
 R.ayuda = {

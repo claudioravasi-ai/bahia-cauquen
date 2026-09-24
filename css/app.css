@@ -1481,6 +1481,16 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 @media (max-width:380px){.dea-hero{font-size:12px}.dea-hero b{font-size:13.5px}}
 
 /* ---- Pie de la app ---- */
+.pie-app button{background:none;border:0;padding:2px 6px;font:inherit;color:inherit;cursor:pointer;text-decoration:underline;text-decoration-color:color-mix(in srgb, currentColor 40%, transparent);text-underline-offset:2px}
+.pie-app button:hover{color:var(--brand)}
+.pie-app .pie-autor{font-weight:600}
+.legal{font-size:14px;line-height:1.6;color:var(--ink-2);overflow-wrap:anywhere}
+.legal h3{font-size:15px;color:var(--ink);margin:18px 0 6px}
+.legal p{margin:0 0 9px;text-align:justify;hyphens:auto}
+.legal .legal-cab{text-align:left;border-bottom:2px solid var(--brand);padding-bottom:10px;margin-bottom:6px}
+.legal .legal-cab b{display:block;color:var(--ink);font-size:15.5px;line-height:1.35}
+.legal .legal-cab span,.legal .legal-firma span{font-size:12px;color:var(--muted)}
+.legal .legal-firma{text-align:right;margin-top:20px;font-weight:600;color:var(--ink)}
 .pie-app{display:flex;flex-direction:column;align-items:center;gap:2px;padding:26px 12px 18px;text-align:center;font-size:11px;line-height:1.5;color:var(--muted);opacity:.8}
 .cintas-pie{opacity:.92}
 
@@ -1565,6 +1575,9 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 .estirar .estirar-ic{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand)}
 .estirar .estirar-ic svg.i{width:18px;height:18px;transform:rotate(var(--giro, 0deg))}
 .estirar.listo .estirar-ic{background:var(--brand);color:var(--brand-ink)}
+/* Mientras se sostiene, el anillo se llena en un segundo. */
+.estirar.sosteniendo .estirar-ic{background:conic-gradient(var(--brand) calc(var(--sostener, 0) * 360deg), var(--brand-soft) 0);color:var(--brand)}
+.estirar.sosteniendo .estirar-ic svg.i{background:var(--surface, #fff);border-radius:50%;padding:2px;box-sizing:content-box}
 .estirar.girando .estirar-ic svg.i{animation:estirar-gira .8s linear infinite}
 .estirar.hecho .estirar-ic{background:var(--ok-soft);color:var(--ok)}
 @keyframes estirar-gira{to{transform:rotate(360deg)}}

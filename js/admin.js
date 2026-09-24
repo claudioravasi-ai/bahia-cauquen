@@ -15,7 +15,7 @@ const REGLAS = [
       return marca(s, 'viento-' + hoy, () => { publicarSistema(s, 'aviso', a.t, a.x); notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'wind', color:'warn', link:'pizarron', sonido:true }); }); } },
   { id:'clima-nieve', n:'Nieve prevista → no dejar autos en la calle', d:'Si se anuncia nieve, a partir de las 18 h avisa a todos.',
     run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'snow'); if (!a || new Date().getHours() < 18) return 0;
-      return marca(s, 'nieve-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'snow', color:'sky', link:'inicio' })); } },
+      return marca(s, 'nieve-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'snow', color:'sky', link:'ushuaia' })); } },
   { id:'clima-hielo', n:'Helada → cuidado en las subidas', d:'Con mínima bajo cero, avisa a la guardia a las 6 h para echar arena o sal.',
     run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'thermo'); if (!a || new Date().getHours() < 6) return 0;
       return marca(s, 'hielo-' + hoy, () => notificar(s, { para:'staff', titulo:'Helada: revisar subidas', texto:'Echar arena o sal en las subidas y el acceso.', icon:'thermo', color:'warn' })); } },

@@ -507,7 +507,7 @@ R['mis-paquetes'] = {
 const MUNICIPIO = [
   ['Trámites en línea', 'Portal de trámites de la Municipalidad', 'https://tramites.ushuaia.gob.ar/', 'file', 'brand'],
   ['Atención al vecino', 'Reclamos urbanos: alumbrado, calles, baches', 'https://www.ushuaia.gob.ar/atencion-vecino', 'clipboard', 'warn'],
-  ['Guía de servicios y residuos', 'Recolección, voluminosos y el resto de los servicios', 'https://www.ushuaia.gob.ar/servicios-municipales', 'tacho', 'ok'],
+  ['Guía de servicios', 'Todos los servicios municipales de la ciudad', 'https://www.ushuaia.gob.ar/servicios-municipales', 'info', 'ok'],
   ['Ventanilla digital', 'Presentaciones sin ir a la Municipalidad', 'https://www.ushuaia.gob.ar/ventanilla-digital', 'send', 'sky'],
   ['Autogestión y tasas', 'Boletas, deudas y pagos municipales', 'https://www.ushuaia.gob.ar/autogestion', 'wallet', 'wood'],
   ['Turnos', 'Licencia de conducir y otros turnos', 'https://www.ushuaia.gob.ar/turnos', 'calendar', 'accent'],
@@ -519,9 +519,9 @@ const MUNICIPIO = [
   ['Rentas', 'Dirección General de Rentas', 'https://www.ushuaia.gob.ar/rentas', 'file', 'brand'],
 ];
 R.municipio = {
-  titulo:'Municipalidad de Ushuaia', icon:'pin', color:'sky', ancha:true, sub:'Trámites, reclamos urbanos, residuos y servicios',
+  titulo:'Municipalidad de Ushuaia', icon:'pin', color:'sky', ancha:true, sub:'Trámites, reclamos urbanos y servicios',
   render(){
-    return `<p class="muted small" style="margin:0 0 12px">Atajos al sitio oficial de la Municipalidad. Lo que es del barrio (reclamos internos, la garita, las expensas) sigue siendo por la app.</p>
+    return `<p class="muted small" style="margin:0 0 12px">Atajos al sitio oficial de la Municipalidad. Lo que es del barrio (reclamos internos, la garita, las expensas, la recolección de residuos que hace la empresa contratada) sigue siendo por la app.</p>
       <div class="mosaico">${MUNICIPIO.map(([t, x, url, icon, color]) => teja({ a:'link', v:url, icon, color, t, s:x })).join('')}</div>`;
   },
 };

@@ -776,7 +776,7 @@ R.recoleccion = {
       <p class="muted small">El camión pasa desde las ${c.recoleccionHora} h. Si al otro día es feriado, puede cambiar: la app avisa.</p>
       ${(() => { const man = diaInfo(sumarDias(hoyIso, 1));
         return man.feriado ? aviso('warn', 'calendar', `Mañana es feriado: ${esc(man.feriado.nombre)}`, 'La recolección puede no pasar o pasar más tarde.') : ''; })()}
-      ${superficie({ a:'link', v:'https://www.ushuaia.gob.ar/servicios-municipales', icon:'pin', color:'sky', t:'Residuos en la Municipalidad', s:'Guía de servicios oficial: recolección y voluminosos' })}
+      <p class="muted small">La recolección del barrio la hace <b>${esc(c.camionEmpresa || 'SEINCO S.A.')}</b>, la empresa contratada por el barrio.</p>
       ${sec('El camión en la pantalla')}
       ${superficie({ a:'camion-aviso', icon:'tacho', color: typeof Camion !== 'undefined' && Camion.encendido() ? 'ok' : 'accent', t: typeof Camion !== 'undefined' && Camion.encendido() ? 'Mostrar el camión: activado' : 'Mostrar el camión: apagado',
         s:'Cuando la garita registra la entrada, cruza un camión por la pantalla hasta que sale, con su melodía' })}

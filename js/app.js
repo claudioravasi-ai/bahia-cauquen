@@ -38,11 +38,20 @@ function sincronizarHistorial(){
    están de guardia, la única ventana es la de abrir el turno.
    ========================================================= */
 const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron', 'chat',
-  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio']);
+  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda']);
 const ventanaPermitida = id => !esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo()));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
   if (!ventanaPermitida(id)){ toast(VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
+  /* Una ventana nunca se abre DEBAJO de una hoja: antes, tocar un aviso en
+     la pizarra abría la ventana detrás y la hoja la seguía tapando. Si la
+     hoja era la pizarra, se anota para volver a ella al cerrar la ventana.
+     Va antes de mirar si la ventana ya estaba abierta: si no, un aviso que
+     lleva a una ventana de atrás (la portada) cerraba la pizarra, la volvía
+     a abrir y parecía que "destellaba" sin hacer nada. */
+  const alVolver = typeof Pizarra !== 'undefined' && Pizarra.volver ? 'pizarra' : '';
+  if (typeof Pizarra !== 'undefined') Pizarra.volver = false;
+  if (hojaAbierta()) cerrarHoja();
   const ya = PILA.findIndex(v => v.id === id);
   if (ya >= 0){
     PILA[ya].param = param;
@@ -53,12 +62,6 @@ function abrir(id, param = ''){
     return;
   }
   guardarScroll();
-  /* Una ventana nunca se abre DEBAJO de una hoja: antes, tocar un aviso en
-     la pizarra abría la ventana detrás y la hoja la seguía tapando. Si la
-     hoja era la pizarra, se anota para volver a ella al cerrar la ventana. */
-  const alVolver = typeof Pizarra !== 'undefined' && Pizarra.volver ? 'pizarra' : '';
-  if (typeof Pizarra !== 'undefined') Pizarra.volver = false;
-  if (hojaAbierta()) cerrarHoja();
   PILA.push({ id, param, alVolver });
   history.pushState({ n: PILA.length }, '');
   ventanaNueva = true;
@@ -121,17 +124,23 @@ document.addEventListener('touchend', e => {
 }, { passive:true });
 
 /* =========================================================
-   ESTIRAR PARA ACTUALIZAR
+   ESTIRAR PARA ACTUALIZAR (sosteniendo un segundo)
    Arriba de todo de una ventana, arrastrar hacia abajo "estira" la
-   ventana; al soltar pasados unos 70 px se actualiza TODO: la base del
-   barrio (se reconecta y vuelve a pedir), el clima, los vuelos, los
-   cruceros, los sismos y la versión de la app. La app ya se actualiza
-   sola, pero así la persona VE que lo que tiene adelante está al día.
-   En la computadora hace lo mismo un "tirón" hacia arriba con la rueda o
-   el panel táctil cuando la ventana ya está arriba de todo.
+   ventana. Antes alcanzaba con llegar arriba de todo y seguir un poco:
+   cualquiera que subía rápido la página terminaba actualizando sin
+   querer. Ahora hay que ESTIRAR Y SOSTENER: pasados unos 90 px, un
+   anillo se llena durante un segundo; recién cuando está lleno dice
+   "Soltá para actualizar". Si se suelta antes, no pasa nada.
+   El gesto tiene que EMPEZAR con la ventana ya arriba de todo: el envión
+   de una subida rápida no cuenta.
+   En la computadora es lo mismo con la rueda o el panel táctil: un tirón
+   hacia arriba sostenido más de un segundo, empezando arriba de todo.
+   Al actualizar se pide TODO de nuevo: la base del barrio (se reconecta),
+   el clima, los vuelos, los cruceros, los sismos y la versión de la app.
    ========================================================= */
 const Estirar = {
-  UMBRAL: 70, y0: null, x0: 0, d: 0, girando: false, el: null, rueda: 0, ruedaT: 0,
+  UMBRAL: 90, SOSTENER: 1000, y0: null, x0: 0, d: 0, girando: false, el: null,
+  listoDesde: 0, armado: false, reloj: null, rueda: 0, ruedaT: 0, ruedaIni: 0, ruedaVale: false,
   indicador(){
     if (this.el && this.el.isConnected) return this.el;
     this.el = document.createElement('div');
@@ -140,26 +149,45 @@ const Estirar = {
     document.body.appendChild(this.el);
     return this.el;
   },
+  /* Cuánto falta del segundo sostenido (0 a 1). */
+  progreso(){ return this.armado ? 1 : this.listoDesde ? Math.min(1, (Date.now() - this.listoDesde) / this.SOSTENER) : 0; },
   mostrar(d){
-    const el = this.indicador(), listo = d >= this.UMBRAL;
-    el.classList.add('ver'); el.classList.toggle('listo', listo);
-    el.style.setProperty('--estirar', Math.min(d, 110) + 'px');
+    const el = this.indicador(), llego = d >= this.UMBRAL;
+    if (llego && !this.listoDesde && !this.armado){
+      this.listoDesde = Date.now();
+      clearTimeout(this.reloj);
+      this.reloj = setTimeout(() => { if (this.listoDesde){ this.armado = true; this.mostrar(this.d || this.UMBRAL); } }, this.SOSTENER);
+      clearInterval(this.anillo);
+      this.anillo = setInterval(() => { if (!this.listoDesde || this.armado) return clearInterval(this.anillo); el.style.setProperty('--sostener', this.progreso().toFixed(2)); }, 50);
+    }
+    if (!llego && !this.armado) this.cancelarEspera();
+    el.classList.add('ver'); el.classList.toggle('listo', this.armado); el.classList.toggle('sosteniendo', llego && !this.armado);
+    el.style.setProperty('--estirar', Math.min(d, 120) + 'px');
     el.style.setProperty('--giro', Math.round(d * 3) + 'deg');
-    el.querySelector('b').textContent = listo ? 'Soltá para actualizar' : 'Estirá para actualizar';
-    const v = $('.ventana'); if (v){ v.style.transition = 'none'; v.style.transform = `translateY(${Math.round(Math.min(d, 110) * .55)}px)`; }
+    el.style.setProperty('--sostener', this.progreso().toFixed(2));
+    el.querySelector('b').textContent = this.armado ? 'Soltá para actualizar' : llego ? 'Sostené un segundo…' : 'Estirá y sostené para actualizar';
+    const v = $('.ventana'); if (v){ v.style.transition = 'none'; v.style.transform = `translateY(${Math.round(Math.min(d, 120) * .5)}px)`; }
+  },
+  cancelarEspera(){ this.listoDesde = 0; clearTimeout(this.reloj); clearInterval(this.anillo); },
+  /* Se soltó: actualiza solo si llegó a sostener el segundo entero. */
+  terminar(){
+    const vale = this.armado;
+    this.cancelarEspera(); this.armado = false;
+    this.soltar();
+    if (vale) this.actualizar(); else this.esconder();
   },
   soltar(){
     const v = $('.ventana'); if (v){ v.style.transition = 'transform .28s cubic-bezier(.2,.9,.3,1.2)'; v.style.transform = ''; }
   },
   esconder(demora = 0){
-    setTimeout(() => { if (this.el){ this.el.classList.remove('ver', 'listo', 'girando', 'hecho'); } }, demora);
+    setTimeout(() => { if (this.el){ this.el.classList.remove('ver', 'listo', 'sosteniendo', 'girando', 'hecho'); } }, demora);
   },
-  arriba(){ const c = $('#cuerpo'); return !!c && c.scrollTop <= 0; },
+  arriba(){ const c = $('#cuerpo'); return !!c && c.scrollTop <= 0 && (document.scrollingElement?.scrollTop || 0) <= 0; },
   async actualizar(){
     if (this.girando) return;
     this.girando = true;
     const el = this.indicador();
-    el.classList.add('ver', 'girando'); el.classList.remove('listo');
+    el.classList.add('ver', 'girando'); el.classList.remove('listo', 'sosteniendo');
     el.style.setProperty('--estirar', '64px');
     el.querySelector('b').textContent = 'Actualizando…';
     const tareas = [];
@@ -187,39 +215,39 @@ const Estirar = {
   },
 };
 document.addEventListener('touchstart', e => {
-  Estirar.y0 = null; Estirar.d = 0;
+  Estirar.y0 = null; Estirar.d = 0; Estirar.cancelarEspera(); Estirar.armado = false;
   if (Estirar.girando || e.touches.length !== 1 || hojaAbierta()) return;
   const c = $('#cuerpo'), t = e.touches[0];
-  if (!c || !c.contains(e.target) || c.scrollTop > 0 || t.clientX < 28) return;
+  if (!c || !c.contains(e.target) || !Estirar.arriba() || t.clientX < 28) return;
   Estirar.y0 = t.clientY; Estirar.x0 = t.clientX;
 }, { passive:true });
 document.addEventListener('touchmove', e => {
   if (Estirar.y0 == null) return;
   const t = e.touches[0], dy = t.clientY - Estirar.y0, dx = Math.abs(t.clientX - Estirar.x0);
-  if (dy <= 0 || !Estirar.arriba() || (dx > dy && Estirar.d < 10)){ if (Estirar.d){ Estirar.soltar(); Estirar.esconder(); } Estirar.y0 = null; Estirar.d = 0; return; }
+  if (dy <= 0 || !Estirar.arriba() || (dx > dy && Estirar.d < 10)){ if (Estirar.d){ Estirar.cancelarEspera(); Estirar.armado = false; Estirar.soltar(); Estirar.esconder(); } Estirar.y0 = null; Estirar.d = 0; return; }
   /* Resistencia: cuanto más se estira, más cuesta, como una goma. */
   Estirar.d = Math.round(dy * .5);
   if (Estirar.d > 6) Estirar.mostrar(Estirar.d);
 }, { passive:true });
 ['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, () => {
   if (Estirar.y0 == null) return;
-  const d = Estirar.d; Estirar.y0 = null; Estirar.d = 0;
-  Estirar.soltar();
-  if (d >= Estirar.UMBRAL) Estirar.actualizar(); else Estirar.esconder();
+  Estirar.y0 = null; Estirar.d = 0;
+  Estirar.terminar();
 }, { passive:true }));
 document.addEventListener('wheel', e => {
-  if (Estirar.girando || hojaAbierta() || e.deltaY >= 0 || !Estirar.arriba()){ Estirar.rueda = 0; return; }
-  const c = $('#cuerpo'); if (!c || !c.contains(e.target)) return;
-  const ahora = Date.now();
-  if (ahora - Estirar.ruedaT > 450) Estirar.rueda = 0;
+  const c = $('#cuerpo'), ahora = Date.now();
+  /* Un gesto nuevo empieza después de un respiro de la rueda. Solo vale si
+     empieza con la ventana ya arriba de todo: el envión de una subida
+     rápida que llega arriba no cuenta. */
+  if (ahora - Estirar.ruedaT > 450){ Estirar.rueda = 0; Estirar.ruedaIni = ahora; Estirar.ruedaVale = Estirar.arriba() && e.deltaY < 0; }
   Estirar.ruedaT = ahora;
+  if (!Estirar.ruedaVale || Estirar.girando || hojaAbierta() || !c || !c.contains(e.target)) return;
+  if (e.deltaY > 0 || !Estirar.arriba()){ Estirar.ruedaVale = false; Estirar.rueda = 0; Estirar.cancelarEspera(); Estirar.armado = false; Estirar.soltar(); Estirar.esconder(); return; }
   Estirar.rueda += -e.deltaY;
-  Estirar.mostrar(Math.min(110, Estirar.rueda / 4));
+  Estirar.d = Math.min(120, Estirar.rueda / 4);
+  Estirar.mostrar(Estirar.d);
   clearTimeout(Estirar.ruedaFin);
-  Estirar.ruedaFin = setTimeout(() => {
-    const d = Estirar.rueda / 4; Estirar.rueda = 0; Estirar.soltar();
-    if (d >= Estirar.UMBRAL) Estirar.actualizar(); else Estirar.esconder();
-  }, 260);
+  Estirar.ruedaFin = setTimeout(() => { Estirar.rueda = 0; Estirar.d = 0; Estirar.ruedaVale = false; Estirar.terminar(); }, 300);
 }, { passive:true });
 
 const inicioId = () => esGuardia() ? 'garita' : 'inicio';
@@ -735,7 +763,8 @@ function pintarBienvenida(modo = 'inicio'){
         'Lo podés cambiar cuando quieras desde Mi casa.')}
       ${nube ? grupo('Tu contraseña', campo('Elegila', `<input name="clave" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">`), 'Es personal. Si en tu casa hay más de un vecino, cada uno tiene la suya.') : ''}
       ${grupo('Privacidad',
-        `<label class="check"><input type="checkbox" name="acepto" required><span>Acepto que la Administración use estos datos solo para la vida del barrio y el control de acceso (Ley 25.326). Puedo pedir verlos, corregirlos o borrarlos.</span></label>`)}
+        `<label class="check"><input type="checkbox" name="acepto" required><span>Acepto que la Administración use estos datos solo para la vida del barrio y el control de acceso (Ley 25.326). Puedo pedir verlos, corregirlos o borrarlos.</span></label>
+         <label class="check"><input type="checkbox" name="aceptoTerminos" required><span>Leí y acepto los <button type="button" class="link" data-a="ver-legal">Términos de uso y el deslinde de responsabilidad</button>.</span></label>`)}
       <button class="btn btn-pri btn-block btn-grande">${I('send')}Enviar mi inscripción</button>
     </form>`;
     pie = `<button class="enlace" data-a="bienvenida" data-v="inicio">${I('left')}Volver</button>
@@ -867,7 +896,10 @@ A['notif'] = el => {
   const u = yo(); const n = aLista(Store.s.notifs).find(x => x.id === el.dataset.id); if (!n) return;
   Store.cambiar(() => marcarVistoAviso(n, u));
   pintarTop();
-  if (n.link && R[n.link.split(':')[0]]){ cerrarHoja(); const [id, p] = n.link.split(':'); abrir(id, p || ''); return; }
+  /* Los avisos del tiempo van a "Ushuaia hoy"; uno que "lleva" a la
+     portada (donde ya se está) se lee acá, en vez de no hacer nada. */
+  const link = typeof ICONOS_CLIMA !== 'undefined' && ICONOS_CLIMA.includes(n.icon) && (!n.link || n.link === 'inicio') ? 'ushuaia' : n.link;
+  if (link && R[link.split(':')[0]] && link.split(':')[0] !== inicioId() && ventanaPermitida(link.split(':')[0])){ cerrarHoja(); const [id, p] = link.split(':'); abrir(id, p || ''); return; }
   const quedan = noLeidas().length + sosEnCampanita().length;
   hoja('Aviso', `<div class="aviso-leido"><span class="ic ic-${n.color || 'brand'}">${I(n.icon || 'bell')}</span>
       <div><b>${esc(n.titulo)}</b><time>${hace(n.at)}</time></div></div>
@@ -1493,6 +1525,7 @@ const PIEZAS = [
   ['js/v-plan.js',     () => typeof anioPlan],
   ['js/v-contable.js', () => typeof Libro],
   ['js/v-servicio.js', () => typeof Servicio],
+  ['js/v-legal.js',   () => typeof LEGAL],
   ['js/push.js',       () => typeof Push],
   ['js/sismos.js',     () => typeof Sismos],
   ['js/nube.js',       () => typeof Nube],

@@ -225,7 +225,7 @@ const SECCIONES = {
         teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia hoy', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
         teja({ v:'servicios', icon:'user', color:'wood', t:'Profesionales y oficios del barrio', s:(() => { const n = s.users.filter(enDirectorioProfesional).length; return n ? `${plural(n, 'vecino', 'vecinos')} para contactar` : 'Médicos, abogados, electricistas…'; })(), n: s.users.filter(enDirectorioProfesional).length || '' }),
         teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: Vuelos.cuantosHoy() || '' }),
-        teja({ v:'municipio', icon:'pin', color:'sky', t:'Municipalidad de Ushuaia', s:'Trámites, reclamos urbanos, residuos, turnos' }),
+        teja({ v:'municipio', icon:'pin', color:'sky', t:'Municipalidad de Ushuaia', s:'Trámites, reclamos urbanos, turnos' }),
         teja({ v:'sismos', icon:'sismo', color:'warn', t:'Sismos', s: (() => { const x = typeof Sismos !== 'undefined' && Sismos.destacado(); return x ? `M ${x.mag.toFixed(1)} · ${x.lugar} · ${hace(x.at)}` : 'En vivo en la región'; })() }),
       ].join('');
     },
@@ -390,6 +390,24 @@ const ORDEN_NIVEL = { rojo:0, amarillo:1, verde:2 };
    (el post, la obra, la compra, el chat) no se repiten. */
 const LINKS_YA_EN_PIZARRA = ['pizarron', 'obras', 'compras', 'viajes', 'chat', 'mascotas'];
 
+/* Los avisos del tiempo llevan a "Ushuaia hoy", vengan de donde vengan. */
+const ICONOS_CLIMA = ['snow', 'wind', 'thermo'];
+/* EL MISMO AVISO, UNA SOLA VEZ
+   La nieve prevista salía tres veces: como alerta del clima, como aviso
+   automático de la tarde y como el aviso de ayer, que seguía. Si dos
+   renglones dicen lo mismo, queda uno: el que lleva a una ventana. */
+const normTit = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+function sinRepetidos(lista){
+  const por = new Map();
+  lista.forEach(x => {
+    const k = normTit(x.titulo), y = por.get(k);
+    if (!y) por.set(k, x);
+    else if (y.a !== 'abrir' && x.a === 'abrir') por.set(k, { ...x, nuevo: x.nuevo && y.nuevo });
+    else if (!x.nuevo && y.nuevo) y.nuevo = false;
+  });
+  return [...por.values()];
+}
+
 const cuandoFue = at => {
   const d = new Date(at), iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const h = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -439,6 +457,7 @@ document.addEventListener('close', e => {
 
 function avisosGenerales(){
   const s = Store.s, u = yo(), hoy = hoyISO(), ahora = Date.now(), out = [];
+  const medianoche = new Date(hoy + 'T00:00').getTime();
   const poner = x => out.push({ nuevo: Pizarra.nuevo(x.k, x.at), ...x });
   /* Un SOS de otro vecino que sigue abierto. */
   if (typeof sosEnCampanita === 'function') sosEnCampanita().filter(x => x.userId !== u.id).forEach(x => {
@@ -454,8 +473,12 @@ function avisosGenerales(){
      pizarra (quieto, sin titilar) hasta cumplir 24 horas, o hasta que
      quien lo subió lo baja. Las excepciones: lo que la Administración deja
      fijado, y un evento, que queda hasta el día en que se hace. */
-  aLista(s.posts).filter(p => p && (TIPOS_PIZARRA.includes(p.type) || usuario(p.autor)?.rol === 'admin') && !p.resuelto
-      && (p.fijado || ahora - p.createdAt < DIA || (p.type === 'evento' && p.fecha && p.fecha >= hoy))).forEach(p => {
+  /* Lo que publica el SISTEMA solo (el viento, el resultado de una
+     votación…) no dura 24 horas: se renueva a las 00 h de cada día, así la
+     pizarra de hoy no arrastra los avisos automáticos de ayer. */
+  aLista(s.posts).filter(p => p && (TIPOS_PIZARRA.includes(p.type) || p.autor === 'sistema' || usuario(p.autor)?.rol === 'admin') && !p.resuelto
+      && (p.autor === 'sistema' ? p.createdAt >= medianoche
+        : (p.fijado || ahora - p.createdAt < DIA || (p.type === 'evento' && p.fecha && p.fecha >= hoy)))).forEach(p => {
     const t = TIPOS_POST[p.type] || TIPOS_POST.aviso, au = autorVisible(p.autor);
     poner({ k:'post-' + p.id, nivel: NIVEL_POST[p.type] || 'verde', icon:t.icon, tag:t.n, at:p.createdAt, titulo:p.title, texto:p.body,
       de:`${au.nombre}${au.casa && au.casa !== au.nombre ? ' · ' + au.casa : ''}`, fijo:p.fijado, a:'ver-novedad', v:'post', id:p.id });
@@ -503,11 +526,15 @@ function avisosGenerales(){
     poner({ k:'alerta-' + a.id, nivel:'rojo', icon:(TIPOS_ALERTA[a.tipo] || TIPOS_ALERTA.otro).icon, tag:'Aviso urgente', at:a.at, titulo:a.titulo, texto:`${a.zona}${a.texto ? ' · ' + a.texto : ''}`, a:'abrir', v:'alertas' }));
   const rec = recoleccionHoy();
   if (rec) poner({ k:'reco-' + hoy + '-' + rec.t, nivel: rec.vol ? 'amarillo' : 'verde', icon:'truck', tag:'Residuos', at: new Date(hoy + 'T07:00').getTime(), titulo:rec.t, texto:rec.x, a:'abrir', v:'recoleccion' });
-  /* Los avisos automáticos para todos que no tienen otro lugar: también
-     quedan 24 horas aunque ya se hayan leído (leídos, quietos). */
-  misNotifs().filter(n => aLista(n.para).includes('todos') && ahora - n.at < DIA && !LINKS_YA_EN_PIZARRA.includes(String(n.link || '').split(':')[0]))
-    .forEach(n => out.push({ k:'n-' + n.id, nuevo:!aLista(n.leidas).includes(u.id), nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell', tag:'Aviso', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id }));
-  return out.sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || (!!b.fijo - !!a.fijo) || b.at - a.at);
+  /* Los avisos automáticos para todos que no tienen otro lugar: quedan
+     en la pizarra aunque ya se hayan leído (leídos, quietos), pero solo los
+     del día: a las 00 h se van y entran los nuevos. */
+  misNotifs().filter(n => aLista(n.para).includes('todos') && n.at >= medianoche && !LINKS_YA_EN_PIZARRA.includes(String(n.link || '').split(':')[0]))
+    .forEach(n => out.push({ k:'n-' + n.id, nuevo:!aLista(n.leidas).includes(u.id), nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell', tag:'Aviso', at:n.at, titulo:n.titulo, texto:n.texto,
+      ...(ICONOS_CLIMA.includes(n.icon) ? { a:'abrir', v:'ushuaia' } : { a:'notif', id:n.id }) }));
+  /* La garita no ve lo que lleva a secciones de vecinos (viajes, compras,
+     votaciones): tocarlo no la llevaba a ningún lado. */
+  return sinRepetidos(out).filter(x => x.a !== 'abrir' || typeof ventanaPermitida !== 'function' || ventanaPermitida(x.v)).sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || (!!b.fijo - !!a.fijo) || b.at - a.at);
 }
 /* Los avisos que son tuyos y todavía no abriste. */
 function avisosPersonales(){
@@ -610,7 +637,8 @@ const deaHero = () => `<div class="dea-hero">${I('heart')}<span><b>DEA operativo
 const pieApp = () => `<footer class="pie-app">
     <span>Barrio ${esc(Store.s.config.nombre)} · versión ${esc(window.VERSION || 'sin sellar')}</span>
     <span>Ushuaia · Tierra del Fuego, Antártida e Islas del Atlántico Sur</span>
-    <span>by Claudio A. Ravasi</span></footer>`;
+    <button class="pie-autor" data-a="abrir" data-v="legal" title="Términos de uso, datos personales y deslinde de responsabilidad">by Claudio A. Ravasi</button>
+    <button class="pie-legal" data-a="abrir" data-v="legal">Términos de uso · Datos personales · Responsabilidad</button></footer>`;
 
 R.inicio = {
   titulo: 'Inicio', icon: 'home', ancha: true,
