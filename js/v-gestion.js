@@ -1352,7 +1352,7 @@ R.perfil = {
         <div class="grow"><b style="font-size:14.5px">Foto del frente de tu casa</b>
           <p class="muted small" style="margin:4px 0 10px">Sirve para que la guardia y los vecinos reconozcan tu domicilio de una mirada. La foto grande queda en este equipo; a la app solo sube una miniatura.</p>
           <label class="btn btn-sm btn-sec">${I('camera')}${u.fotoCasa ? 'Cambiar foto' : 'Sacar o elegir foto'}<input type="file" accept="image/*" capture="environment" data-foto-in="fotoCasaIn" hidden></label>
-          <input type="hidden" id="fotoCasaIn" data-a="" >
+          <input type="hidden" id="fotoCasaIn">
         </div></div></div>
       ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Un QR personal para identificarte en la garita y los espacios comunes. Sin datos sensibles.' })}
       <form data-f="perfil" class="card">

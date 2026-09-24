@@ -309,7 +309,7 @@ R.expensas = {
     /* En modo Administración, "Expensas" a secas muestra la cuenta del
        propio lote; las del barrio están en Gestión → Expensas y cobranzas
        (no se repiten acá). */
-    if (esAdmin() && !p) return L ? carpetaVecino(lote) : vacio('wallet', 'Tu cuenta no tiene lote. Las expensas del barrio están en Gestión → Expensas y cobranzas.');
+    if (esAdmin() && !p) return L ? carpetaVecino(lote) : vacio('wallet', 'Tu cuenta no tiene lote. Las expensas del barrio están en Gestión → Expensas.');
     if (!L) return vacio('wallet', 'Tu cuenta todavía no tiene un lote asignado. Avisale a la Administración.');
     return carpetaVecino(lote);
   },
@@ -505,7 +505,7 @@ R.contabilidad = {
 
 const TABS_COBRO = [['plan','Automáticas'],['resumen','Resumen'],['cupones','Cupones'],['cobranzas','Pagos'],['morosos','Morosos'],['recibos','Recibos']];
 R.cobranzas = {
-  titulo: 'Expensas y cobranzas', icon: 'wallet', color: 'wood', ancha: true, sub: 'Cupones, pagos, deuda y recibos',
+  titulo: 'Expensas', icon: 'wallet', color: 'wood', ancha: true, sub: 'Automáticas, cupones, pagos, morosos y recibos',
   render(p){
     if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
     const [tab, sub] = String(p || 'resumen').split('|');
@@ -529,7 +529,7 @@ const CONTA = {
       <ol class="pasos-mes">
         <li class="${calc.gastos ? 'hecho' : ''}"><b>Cargar los gastos</b> <span>${calc.gastos ? plural(calc.gastos, 'comprobante') : 'pestaña Gastos del mes'}</span></li>
         <li class="${emitida ? 'hecho' : ''}"><b>Cerrar el mes y emitir los cupones</b> <span>${emitida ? 'hecho' : 'pestaña Cierre de mes'}</span></li>
-        <li><b>Cobrar</b> <span>en Expensas y cobranzas</span></li>
+        <li><b>Cobrar</b> <span>en Gestión → Expensas</span></li>
         <li><b>Presentar en ARCA</b> <span>pestaña ARCA</span></li>
       </ol>
       ${sec('Para el contador')}
@@ -698,7 +698,8 @@ const COBRO = {
         <div class="grow"><b>${nombrePeriodo(l.periodo)}</b><div class="muted small">${plural(l.cuotas.length, 'cupón', 'cupones')} · ${plata(l.totalCuotas || l.totalGastos)} · emitida ${hace(l.emitidaAt)}</div></div></div>
       <div class="btns" style="margin-top:10px">
         <button class="btn btn-sm btn-sec" data-a="ver-liquidacion" data-v="${l.periodo}">${I('file')}Ver liquidación</button>
-        <button class="btn btn-sm btn-pri" data-a="mandar-cupones" data-v="${l.periodo}">${I('mail')}Reenviar cupones</button></div></div>`).join('');
+        <button class="btn btn-sm btn-pri" data-a="mandar-cupones" data-v="${l.periodo}">${I('mail')}Reenviar cupones</button></div></div>`).join('')
+      + `<p class="muted tiny" style="margin-top:8px">${plural(destinatariosDeCupon().length, 'dirección de correo', 'direcciones de correo')} para recibir cupones: las de las cuentas con lote (vecinos y Administración) y las del padrón. Las que falten se cargan en Padrón (columna correo) o cada vecino en su cuenta.</p>`;
   },
 
   recibos(){
@@ -849,14 +850,127 @@ A['reabrir-liquidacion'] = async el => {
     auditar(s, 'Reabrió un período', el.dataset.v); });
 };
 A['ver-liquidacion'] = el => imprimir(`Liquidación ${nombrePeriodo(el.dataset.v)}`, liquidacionHTML(el.dataset.v));
-A['mandar-cupones'] = el => mandarCupones(el.dataset.v);
+/* REENVIAR CUPONES: a todos, a un lote (eligiendo a cuál de sus correos)
+   o solo a mí para ver cómo llega. Dice qué pasó con cada correo. */
+A['mandar-cupones'] = el => {
+  const periodo = el.dataset.v, gente = destinatariosDeCupon(), yoU = yo();
+  const lotesCon = [...new Set(gente.map(x => x.casa))].sort((a, b) => a.localeCompare(b, 'es', { numeric:true }));
+  hoja(`Cupones de ${nombrePeriodo(periodo)}`, `
+    ${superficie({ a:'cupones-a-todos', v:periodo, icon:'users', color:'brand', t:`A todos (${plural(gente.length, 'correo')})`, s:`${plural(lotesCon.length, 'lote')} con correo cargado, de ${LOTES.length}` })}
+    ${yoU && yoU.email && /^Lote\s/i.test(yoU.casa || '') ? superficie({ a:'cupones-a-mi', v:periodo, icon:'mail', color:'sky', t:'Solo a mí, para probar', s:`${esc(yoU.email)} · cupón de ${esc(yoU.casa)}` }) : ''}
+    <form data-f="cupon-a-lote" data-v="${periodo}" class="card" style="margin-top:10px">
+      <b>A un lote</b>
+      <div class="field" style="margin-top:8px"><label>Lote</label><select name="lote" id="cuponLote" required><option value="">Elegí un lote…</option>${LOTES.map(L => { const casa = 'Lote ' + L.lote, n = gente.filter(x => x.casa === casa).length;
+        return `<option value="${casa}">${esc(nombreLote(L))}${propietarioDe(casa) ? ' · ' + esc(propietarioDe(casa)) : ''}${n ? ` · ${plural(n, 'correo')}` : ' · sin correo'}</option>`; }).join('')}</select></div>
+      <div id="cuponLoteCorreos" class="small muted">Elegí un lote para ver sus correos.</div>
+      <button class="btn btn-pri btn-block" style="margin-top:10px">${I('send')}Mandar el cupón</button></form>
+    <div id="cuponesResultado"></div>`, { ancho:'560px' });
+};
+/* Un celular argentino, escrito como sea ("2901 15 12-3456", "+54 9 2901…",
+   "15 123456"), al formato que pide WhatsApp: 549 + característica + número,
+   sin el 0 ni el 15. Sin característica se asume Ushuaia (2901). */
+function waNumeroAR(tel){
+  let d = soloDigitos(tel).replace(/^00/, '');
+  if (!d) return '';
+  if (d.startsWith('54')){ d = d.slice(2); if (d.startsWith('9')) d = d.slice(1); }
+  d = d.replace(/^0/, '');
+  const m = d.match(/^(\d{2,4})15(\d{6,8})$/);
+  if (m && (m[1] + m[2]).length === 10) d = m[1] + m[2];
+  if (/^15\d{6}$/.test(d)) d = d.slice(2);
+  if (d.length <= 8) d = '2901' + d;
+  return d.length === 10 ? '549' + d : '';
+}
+/* Los números del cupón de un lote (lo mismo que el cupón impreso y el mail). */
+function montosCupon(periodo, casa){
+  const l = liquidacionDe(periodo), cu = l ? cuotaDe(l, casa) : null; if (!cu) return null;
+  const previos = cuentaLote(casa).movs.filter(m => m.fecha < l.emitidaAt);
+  const saldoAnt = previos.length ? previos[previos.length - 1].saldo : 0;
+  const total1 = saldoAnt + cu.total + (cu.interes || 0);
+  return { cu, saldoAnt, total1, total2:conCentavosDelLote(total1 * (1 + (cfgExp().recargo2 || 0) / 100), casa).total };
+}
+function textoCuponWA(periodo, casa){
+  const m = montosCupon(periodo, casa); if (!m) return '';
+  const c = Store.s.config;
+  return `Barrio ${c.nombre} · Expensas de ${nombrePeriodo(periodo)} · ${casa}\n\n` +
+    `Total a pagar: ${plata(m.total1)} hasta el ${fechaCorta(vtoDe(periodo, 1))}.\n` +
+    `2º vencimiento (${fechaCorta(vtoDe(periodo, 2))}): ${plata(m.total2)}.\n\n` +
+    `Transferencia · Alias: ${c.alias || '—'} · CBU: ${c.cbu || '—'}\n` +
+    `Titular: Barrio ${c.nombre} · CUIT ${c.cuit || ''}\n` +
+    `Los centavos (,${String(centavosDelLote(casa)).padStart(2, '0')}) identifican a tu lote: transferí el importe exacto.\n\n` +
+    `Tu cupón y tus pagos, en la app del barrio: ${urlApp('expensas')}`;
+}
+/* Al elegir un lote: sus correos, un correo nuevo y WhatsApp. */
+document.addEventListener('change', e => {
+  if (e.target.id !== 'cuponLote') return;
+  const casa = e.target.value, box = $('#cuponLoteCorreos'); if (!box) return;
+  if (!casa){ box.innerHTML = 'Elegí un lote para ver sus correos.'; return; }
+  const ms = destinatariosDeCupon().filter(x => x.casa === casa);
+  const p = Store.s.padron.find(x => 'Lote ' + x.lote === casa);
+  const tels = [...new Map([...Store.s.users.filter(u => u.casa === casa && u.estado === 'aprobado' && u.tel).map(u => [waNumeroAR(u.tel), u.nombre]),
+    ...(p && p.tel ? [[waNumeroAR(p.tel), p.propietario || 'Propietario/a']] : [])].filter(([t]) => t)).entries()];
+  const periodo = e.target.closest('form')?.dataset.v || '';
+  box.innerHTML = `${ms.length ? `<div class="lbl" style="margin-top:4px">Correos de ${esc(casa)}</div>` + ms.map((x, i) => `<label class="check"><input type="checkbox" name="c${i}" value="${esc(x.email)}" checked><span>${esc(x.email)} <span class="muted">· ${esc(x.nombre || '')}</span></span></label>`).join('')
+      : `<p class="small" style="margin:4px 0 6px;color:var(--warn)">${esc(casa)} no tiene correo registrado.</p>`}
+    <div class="field" style="margin-top:6px"><label>${ms.length ? 'Otro correo (opcional)' : 'Escribí el correo'}</label><input name="otro" type="email" placeholder="correo@ejemplo.com" autocomplete="off"></div>
+    ${p ? `<label class="check" style="margin:-4px 0 8px"><input type="checkbox" name="guardar" checked><span>Guardar en el padrón lo que escriba acá (correo y celular) para la próxima</span></label>` : ''}
+    <div class="lbl" style="margin-top:4px">O por WhatsApp</div>
+    ${tels.map(([t, n]) => `<button type="button" class="btn btn-sm btn-wa" style="margin:0 6px 6px 0" data-a="cupon-wa" data-v="${periodo}" data-p="${esc(casa)}" data-t="${t}">${I('phone')}${esc(String(n).split(/[ ,]/)[0])} · +${t.slice(0, 2)} ${t.slice(2, 3)} ${t.slice(3, 7)} ${t.slice(7)}</button>`).join('')}
+    <div class="linea-form"><input name="wa" id="cuponWa" inputmode="tel" placeholder="Celular: 2901 15 123456" autocomplete="off"><button type="button" class="btn btn-wa" data-a="cupon-wa" data-v="${periodo}" data-p="${esc(casa)}">${I('phone')}Enviar</button></div>
+    <div class="ayuda">Se abre WhatsApp con el mensaje armado (importe, vencimientos, alias y CBU): solo hay que tocar Enviar. Por WhatsApp no va el PDF: el vecino lo ve en la app.</div>`;
+});
+A['cupon-wa'] = el => {
+  const periodo = el.dataset.v, casa = el.dataset.p;
+  const escrito = $('#cuponWa')?.value || '';
+  const tel = el.dataset.t || waNumeroAR(escrito);
+  if (!tel){ toast('Ese celular no parece válido. Escribilo con la característica: 2901 15 123456', 'alert'); return; }
+  const texto = textoCuponWA(periodo, casa); if (!texto){ toast('Ese lote no tiene cupón en esta liquidación', 'alert'); return; }
+  window.open(waLink(tel, texto), '_blank', 'noopener');
+  Store.cambiar(s => {
+    const f = document.querySelector('form[data-f="cupon-a-lote"]');
+    if (!el.dataset.t && f?.guardar?.checked){ const p = s.padron.find(x => 'Lote ' + x.lote === casa); if (p && !p.tel) p.tel = escrito.trim(); }
+    auditar(s, 'Mandó el cupón por WhatsApp', `${casa} · ${nombrePeriodo(periodo)} · +${tel}`);
+  });
+};
+function mostrarResultadoCupones(res){
+  const box = $('#cuponesResultado'); if (!box) return;
+  const ok = res.filter(r => r.ok).length, mal = res.filter(r => !r.ok);
+  box.innerHTML = `<div style="margin-top:12px">${aviso(mal.length ? (ok ? 'warn' : 'danger') : 'ok', mal.length ? 'alert' : 'check',
+    mal.length ? `Salieron ${ok} de ${res.length}` : `Salieron los ${plural(res.length, 'correo')}`, mal.length ? 'El motivo de cada uno está abajo.' : 'Si alguno no llega en unos minutos, que mire en Spam.')}</div>
+    <div class="card lista">${res.map(r => `<div class="it"><span class="ic ic-${r.ok ? 'ok' : 'danger'}" style="width:30px;height:30px;border-radius:10px;display:grid;place-items:center">${I(r.ok ? 'check' : 'x')}</span>
+      <div class="txt"><b>${esc(r.casa)} · ${esc(r.email)}</b>${r.ok ? '' : `<span style="color:var(--danger)">${esc(r.error || 'No salió')}</span>`}</div></div>`).join('')}</div>`;
+}
+A['cupones-a-todos'] = async el => {
+  const periodo = el.dataset.v;
+  if (!await confirmar('Mandar a todos', `Se manda el cupón de ${nombrePeriodo(periodo)} a ${plural(destinatariosDeCupon().length, 'correo')}, de a diez con una pausa.`, { si:'Mandar' })) return;
+  const res = await mandarCupones(periodo, { detalle:true });
+  A['mandar-cupones']({ dataset:{ v:periodo } }); mostrarResultadoCupones(res);
+};
+A['cupones-a-mi'] = async el => {
+  const u = yo(), res = await mandarCupones(el.dataset.v, { detalle:true, solo:[{ email:u.email, nombre:u.nombre, casa:u.casa }] });
+  mostrarResultadoCupones(res);
+};
+F['cupon-a-lote'] = async (d, form) => {
+  const casa = d.lote; if (!casa){ toast('Elegí un lote', 'alert'); return; }
+  const nombre = propietarioDe(casa) || 'Propietario/a';
+  const mails = Object.keys(d).filter(k => /^c\d+$/.test(k)).map(k => d[k]).filter(Boolean);
+  const otro = String(d.otro || '').trim().toLowerCase();
+  if (otro && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(otro)){ toast('Ese correo no parece válido', 'alert'); return; }
+  if (otro) mails.push(otro);
+  if (!mails.length){ toast('Ese lote no tiene correo: escribilo, o mandalo por WhatsApp', 'alert'); return; }
+  /* Lo escrito a mano queda en el padrón, así la próxima ya está. */
+  if (otro && d.guardar) Store.cambiar(s => { const p = s.padron.find(x => 'Lote ' + x.lote === casa); if (p && !p.email){ p.email = otro; auditar(s, 'Cargó un correo en el padrón', `${casa} · ${otro}`); } });
+  const res = await mandarCupones(form.dataset.v, { detalle:true, solo:mails.map(email => ({ email, nombre, casa })) });
+  mostrarResultadoCupones(res);
+};
 /* El cupón le llega a CADA lote: al vecino con cuenta y, si no la tiene, al
    propietario del padrón. Si el envío automático no está configurado, los
    correos quedan igual en la bandeja de salida (Administración → Correos) y
    se mandan a mano: nunca se pierde un cupón. */
 function destinatariosDeCupon(){
   const out = new Map();
-  Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && u.email && /^Lote\s/i.test(u.casa || ''))
+  /* Toda cuenta aprobada que tenga lote: vecinos y TAMBIÉN la Administración
+     que vive en el barrio (antes se la salteaba por tener rol admin). */
+  Store.s.users.filter(u => u.estado === 'aprobado' && u.rol !== 'guardia' && u.email && /^Lote\s/i.test(u.casa || '') && !esCorreoGarita(u.email))
     .forEach(u => out.set(u.email.toLowerCase(), { email:u.email, nombre:u.nombre, casa:u.casa }));
   Store.s.padron.filter(p => p.email).forEach(p => {
     const casa = 'Lote ' + p.lote;
@@ -866,42 +980,54 @@ function destinatariosDeCupon(){
   });
   return [...out.values()];
 }
-async function mandarCupones(periodo, { silencioso = false } = {}){
-  const l = liquidacionDe(periodo); if (!l) return 0;
-  const gente = destinatariosDeCupon();
-  if (!gente.length){ if (!silencioso) toast('No hay correos cargados. Cargá el padrón para poder enviarlos.', 'info'); return 0; }
+async function mandarCupones(periodo, { silencioso = false, detalle = false, solo = null } = {}){
+  const l = liquidacionDe(periodo); if (!l) return detalle ? [] : 0;
+  const gente = solo || destinatariosDeCupon();
+  if (!gente.length){ if (!silencioso) toast('No hay ningún correo para mandar: cargalos en el Padrón (columna correo) o que cada vecino se inscriba en la app.', 'info'); return detalle ? [] : 0; }
+  const resultados = [];
   const c = cfgExp();
   let n = 0;
   for (let i = 0; i < gente.length; i += 10){
     const tanda = gente.slice(i, i + 10);
-    const r = await Promise.all(tanda.map(x => {
-      const cu = cuotaDe(l, x.casa); if (!cu) return false;
-      return Correo.enviar({ para:x.email, asunto:`Expensas de ${nombrePeriodo(periodo)} · ${x.casa}`, tipo:'cupon',
+    const r = await Promise.all(tanda.map(async x => {
+      const cu = cuotaDe(l, x.casa);
+      if (!cu){ resultados.push({ ...x, ok:false, error:'Ese lote no tiene cupón en esta liquidación' }); return false; }
+      /* Lo que hay que pagar de verdad: lo que arrastra + intereses + el mes
+         (termina en los centavos del lote, como el cupón). */
+      const hasta = l.emitidaAt, previos = cuentaLote(x.casa).movs.filter(m => m.fecha < hasta);
+      const saldoAnt = previos.length ? previos[previos.length - 1].saldo : 0;
+      const total1 = saldoAnt + cu.total + (cu.interes || 0);
+      const total2 = conCentavosDelLote(total1 * (1 + (c.recargo2 || 0) / 100), x.casa).total;
+      const envio = await Correo.enviarDetalle({ para:x.email, asunto:`Expensas de ${nombrePeriodo(periodo)} · ${x.casa}`, tipo:'cupon',
         html:Correo.plantilla(`Expensas de ${nombrePeriodo(periodo)}`,
           `<p>Hola ${esc(String(x.nombre || '').split(/[ ,]/)[0] || 'vecino/a')}:</p>
            <p>Este es el cupón de <b>${esc(x.casa)}</b>.</p>
-           <p style="font-size:26px;font-weight:800;color:#0d6b66;margin:14px 0">${plata(cu.total + (cu.interes || 0))}</p>
+           <p style="font-size:26px;font-weight:800;color:#0d6b66;margin:14px 0">${plata(total1)}</p>
            <table style="width:100%;border-collapse:collapse;font-size:14px">
+             ${saldoAnt ? `<tr><td style="padding:4px 0;color:#555">${saldoAnt > 0 ? 'Saldo anterior' : 'Saldo a favor'}</td><td style="text-align:right">${plata(saldoAnt)}</td></tr>` : ''}
              <tr><td style="padding:4px 0;color:#555">Expensas por coeficiente (${cu.coef.toFixed(4)} %)</td><td style="text-align:right">${plata(cu.expensas || 0)}</td></tr>
              ${cu.fondo ? `<tr><td style="padding:4px 0;color:#555">Fondo de Infraestructura</td><td style="text-align:right">${plata(cu.fondo)}</td></tr>` : ''}
              ${cu.particulares ? `<tr><td style="padding:4px 0;color:#555">Gastos particulares</td><td style="text-align:right">${plata(cu.particulares)}</td></tr>` : ''}
              ${cu.multas ? `<tr><td style="padding:4px 0;color:#555">Multas</td><td style="text-align:right">${plata(cu.multas)}</td></tr>` : ''}
              ${cu.interes ? `<tr><td style="padding:4px 0;color:#555">Intereses por saldo impago</td><td style="text-align:right">${plata(cu.interes)}</td></tr>` : ''}
+             ${cu.redondeo ? `<tr><td style="padding:4px 0;color:#555">Redondeo (los centavos identifican al ${esc(x.casa)})</td><td style="text-align:right">${plata(cu.redondeo)}</td></tr>` : ''}
            </table>
            <p style="margin-top:16px">Primer vencimiento: <b>${fechaCorta(vtoDe(periodo, 1))}</b><br>
-             Segundo vencimiento: ${fechaCorta(vtoDe(periodo, 2))} — ${plata((cu.total + (cu.interes || 0)) * (1 + (c.recargo2 || 0) / 100))} con el recargo del ${c.recargo2} %.</p>
+             Segundo vencimiento: ${fechaCorta(vtoDe(periodo, 2))} — ${plata(total2)} con el recargo del ${c.recargo2} %.</p>
            <p>Podés pagar por transferencia:<br>
              Alias <b>${esc(Store.s.config.alias || '—')}</b><br>
              CBU <span style="font-family:monospace">${esc(Store.s.config.cbu || '—')}</span><br>
              ${esc(Store.s.config.cuenta || '')}</p>
            <p>Después de pagar, informá el pago desde la app y te llega el recibo.</p>`,
           { texto:'Ver mi cupón en la app', url:urlApp('expensas') }) });
+      resultados.push({ ...x, ok:envio.ok, error:envio.error });
+      return envio.ok;
     }));
     n += r.filter(Boolean).length;
     if (i + 10 < gente.length) await new Promise(res => setTimeout(res, 800));
   }
-  if (!silencioso) toast(n ? `${plural(n, 'cupón enviado', 'cupones enviados')} por correo` : `Los ${gente.length} cupones quedaron en la bandeja de salida`, n ? 'mail' : 'clock');
-  return n;
+  if (!silencioso && !detalle) toast(n ? `${plural(n, 'cupón enviado', 'cupones enviados')} por correo` : `No salió ninguno: ${resultados.find(r => r.error)?.error || 'quedaron en la bandeja de salida'}`, n ? 'mail' : 'alert');
+  return detalle ? resultados : n;
 }
 
 A['reclamar-deuda'] = el => {

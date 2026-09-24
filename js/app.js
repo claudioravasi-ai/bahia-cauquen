@@ -231,10 +231,11 @@ function pintarTop(){
   const nl = noLeidas().length + sosEnCampanita().length;
   const modo = modoActivo();
   const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[modo] || '';
+  $('#top').classList.toggle('con-modo', puedeAdministrar());
   $('#top').innerHTML = `
     <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
       <span class="logo">${LOGO}</span>
-      <span style="min-width:0"><b>Barrio ${esc(Store.s.config.nombre)}</b>
+      <span class="marca-txt"><b><span class="marca-pre">Barrio </span>${esc(Store.s.config.nombre)}</b>
         <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
           : `<span class="rol-chip">${rol}</span><span class="casa"> · ${esc(u.casa)}</span>`}</small></span>
     </button>
@@ -1380,6 +1381,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]');
   if (!el) return;
   const f = A[el.dataset.a];
+  if (!el.dataset.a) return;   /* data-a vacío: no es un botón */
   if (!f){ console.warn('Acción sin código:', el.dataset.a); toast(`Esa acción no está en esta versión ("${el.dataset.a}")`, 'alert'); return; }
   /* Los tildes y opciones tienen que poder marcarse: a ellos no se les frena el clic. */
   if (el.tagName !== 'INPUT') e.preventDefault();

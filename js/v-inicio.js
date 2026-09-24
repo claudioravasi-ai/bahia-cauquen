@@ -247,12 +247,13 @@ const SECCIONES = {
         <div class="mosaico">
         ${teja({ v:'admin', icon:'sliders', color:'accent', t:'Administración', s:'Inscripciones, vecinos, contenido y ajustes', badge: pend, destaca:true })}
         ${teja({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Gastos del mes, cierre y ARCA' })}
-        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas y cobranzas', s:'Automáticas, cupones, pagos, morosos y recibos', badge: s.pagos.filter(x => x.estado === 'informado').length })}
+        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas', s:'Automáticas, cupones, pagos, morosos y recibos', badge: s.pagos.filter(x => x.estado === 'informado').length })}
         </div>
         ${sec('Día a día')}<div class="mosaico">
         ${teja({ v:'padron', icon:'users', color:'brand', t:'Padrón', s: s.padron.length ? `${plural(s.padron.length, 'unidad', 'unidades')} · buscá por apellido o lote` : 'Sin cargar' })}
         ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy', n: pasesDelDia().length })}
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
+        ${teja({ a:'ver-presencia', icon:'users', color:'ok', t:'Conectados ahora', s: typeof Presencia !== 'undefined' ? `${Presencia.personas()} con la app abierta · ${Presencia.inscriptos()} vecinos con cuenta` : 'Quién tiene la app abierta' })}
         ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos de la garita', s: turnoAbierto() ? `Ahora: ${esc(turnoAbierto().turno)} · ${esc(aLista(turnoAbierto().guardias).join(', '))}` : 'Horarios y guardias' })}
         ${teja({ v:'privado', p:'admin', icon:'lock', color:'accent', t:'Mensajes de vecinos', s:'Conversaciones privadas con la Administración' })}
         ${teja({ v:'privado', p:'interno', icon:'shield', color:'brand', t:'Mensajes con la garita', s:'Entre la Administración y la guardia' })}
