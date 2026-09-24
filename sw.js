@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20260924-094609';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260924-094609',
-  './js/firebase-config.js?v=20260924-094609', './js/icons.js?v=20260924-094609', './js/agenda.js?v=20260924-094609', './js/padron.js?v=20260924-094609', './js/core.js?v=20260924-094609', './js/seed.js?v=20260924-094609', './js/clima.js?v=20260924-094609', './js/calendario.js?v=20260924-094609',
-  './js/v-inicio.js?v=20260924-094609', './js/v-comunidad.js?v=20260924-094609', './js/v-gestion.js?v=20260924-094609', './js/admin.js?v=20260924-094609', './js/v-vecinos.js?v=20260924-094609', './js/v-expensas.js?v=20260924-094609', './js/v-plan.js?v=20260924-094609', './js/v-servicio.js?v=20260924-094609', './js/push.js?v=20260924-094609', './js/sismos.js?v=20260924-094609', './js/nube.js?v=20260924-094609', './js/app.js?v=20260924-094609',
+const CACHE = 'bhc-20260924-095224';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260924-095224',
+  './js/firebase-config.js?v=20260924-095224', './js/icons.js?v=20260924-095224', './js/agenda.js?v=20260924-095224', './js/padron.js?v=20260924-095224', './js/core.js?v=20260924-095224', './js/seed.js?v=20260924-095224', './js/clima.js?v=20260924-095224', './js/calendario.js?v=20260924-095224',
+  './js/v-inicio.js?v=20260924-095224', './js/v-comunidad.js?v=20260924-095224', './js/v-gestion.js?v=20260924-095224', './js/admin.js?v=20260924-095224', './js/v-vecinos.js?v=20260924-095224', './js/v-expensas.js?v=20260924-095224', './js/v-plan.js?v=20260924-095224', './js/v-servicio.js?v=20260924-095224', './js/push.js?v=20260924-095224', './js/sismos.js?v=20260924-095224', './js/nube.js?v=20260924-095224', './js/app.js?v=20260924-095224',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

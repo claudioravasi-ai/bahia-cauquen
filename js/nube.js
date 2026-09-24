@@ -152,22 +152,30 @@ const Nube = {
     }
     if (fallo){ toast('No se pudo leer tu ficha en la base del barrio. Revisá la conexión y volvé a entrar.', 'alert'); console.warn('Ficha', fallo); return; }
     let mio = yoNodo && yoNodo.exists() ? yoNodo.val() : null;
-    /* LA CUENTA DE LA GARITA NO COMPLETA DATOS: si su ficha no está, se crea
-       sola (nombre y lote "Garita") y la app de la Administración la
-       habilita como garita apenas se abre. */
-    if (!mio && esCorreoGarita(this.auth.currentUser.email)){
-      const g = { id:this.uid, nombre:'Garita', casa:'Garita', dni:'', email:this.auth.currentUser.email, tel:'', rol:'vecino', estado:'pendiente', consentimiento:Date.now(), createdAt:Date.now() };
-      try { await this.db.ref('barrio/users/' + this.uid).set(g); mio = g; } catch(e){ console.warn('No se pudo crear la ficha de la garita', e.message); }
-    }
-    /* La garita esperando que la habiliten: pantalla simple, y entra sola
-       en cuanto la app de la Administración la habilita (sin tocar nada). */
-    if (mio && esCorreoGarita(mio.email) && mio.estado !== 'aprobado'){
-      $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
-        <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
-        <h1 style="font-size:30px">Garita</h1><div class="panel"><p style="margin:0 0 10px"><b>La cuenta de la garita se está habilitando.</b></p>
-        <p style="margin:0;opacity:.9">No hace falta completar ningún dato. Entra sola apenas la Administración abra la app (lo hace automáticamente, sin tocar nada). Podés dejar esta pantalla abierta.</p></div></section>`;
-      this.escuchar('barrio/users/' + this.uid, v => { if (v && v.estado === 'aprobado') location.reload(); });
-      return;
+    /* =========================================================
+       LA GARITA ENTRA SOLA, SIN LA ADMINISTRACIÓN
+       La cuenta garitabarriobahiacauquen@gmail.com se habilita ella misma
+       como garita: si su ficha no está, o quedó como vecino o pendiente, la
+       escribe con rol "guardia", lote "Garita" y aprobada. Las reglas de
+       Firebase lo permiten SOLO a quien entra con ese correo exacto (y con
+       su contraseña), y solo como garita: nunca como Administración.
+       No pide nombre, DNI ni nada.
+       ========================================================= */
+    const correo = this.auth.currentUser.email || '';
+    if (esCorreoGarita(correo) && (!mio || mio.estado !== 'aprobado' || mio.rol !== 'guardia' || mio.casa !== 'Garita')){
+      const g = { ...(mio || {}), id:this.uid, nombre:'Garita', casa:'Garita', dni:'', email:correo.toLowerCase(), tel:(mio && mio.tel) || '',
+        rol:'guardia', estado:'aprobado', aprobadoAt:(mio && mio.aprobadoAt) || Date.now(), consentimiento:(mio && mio.consentimiento) || Date.now(), createdAt:(mio && mio.createdAt) || Date.now() };
+      try { await this.db.ref('barrio/users/' + this.uid).set(g); mio = g; }
+      catch(e){
+        /* Solo pasa si en Firebase siguen las reglas viejas. */
+        console.warn('La garita no pudo habilitarse sola', e.message);
+        $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+          <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
+          <h1 style="font-size:30px">Garita</h1><div class="panel"><p style="margin:0 0 10px"><b>Falta publicar las reglas nuevas de Firebase.</b></p>
+          <p style="margin:0 0 12px;opacity:.9">La garita entra sola, pero para eso Firebase tiene que tener las reglas del archivo <b>reglas-firebase.txt</b> nuevo (Realtime Database → Reglas → pegar → Publicar). Después tocá "Probar de nuevo".</p>
+          <button class="btn btn-pri btn-block" onclick="location.reload()">Probar de nuevo</button></div></section>`;
+        return;
+      }
     }
     Store.sesion.userId = this.uid; Store.guardarSesion();
     if (!mio){
