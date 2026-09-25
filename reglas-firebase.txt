@@ -177,7 +177,8 @@ PEGAR DESDE ACÁ
           "respuestas": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
         }
       },
-      "motorLog":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+      "motorLog":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+                         "$marca": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".validate": "newData.isNumber()" } }
     },
 
     /* LA CARPETA PRIVADA, POR COLECCIÓN (desde el 25-09-2026).
@@ -261,6 +262,13 @@ PEGAR DESDE ACÁ
 -----------------------------------------------------------
 HASTA ACÁ
 -----------------------------------------------------------
+
+✔ LAS MARCAS DEL MOTOR, DE A UNA (25-09-2026, mediodía)
+barrio/motorLog ya no se puede escribir entero: solo cada marca por separado
+(barrio/motorLog/<marca>, un número). Una copia vieja de la app que mande la
+lista entera queda rechazada en vez de borrar las marcas de los demás (eso
+hacía que los avisos automáticos se repitieran en la campanita de la garita).
+Si estas reglas no se publican, la app nueva igual anda: escribe de a una.
 
 ✔ LA CARPETA PRIVADA QUEDÓ CERRADA (25-09-2026)
 Antes era privado/<vecino>/… y la garita y la Administración podían leerla

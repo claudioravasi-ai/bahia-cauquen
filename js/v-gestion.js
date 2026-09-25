@@ -1210,8 +1210,14 @@ const Vuelos = {
      pasan unos minutos antes de tocar tierra y los que salen, poco después
      de despegar. Si hay Worker, lo que manda es el avión de verdad. */
   minutos(h){ const m = String(h || '').match(/(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; },
+  /* Solo cruza un avión que puede estar pasando ahora: (1) la lectura del
+     tablero tiene que ser de los últimos 15 minutos (no una vieja guardada
+     en el equipo); (2) un "Despegado" cuenta solo si la hora del vuelo
+     (estimada o programada) está entre 2 horas antes y 20 minutos después
+     de ahora; (3) el cartel dice siempre la hora del vuelo. */
+  horaPosible(v, min, antes = 120, despues = 20){ const t = this.minutos(v.real || v.hora); return t !== null && min - t <= antes && t - min <= despues; },
   sobrevuelos(){
-    const d = this.d; if (!d) return [];
+    const d = this.d; if (!d || Date.now() - (d.t || 0) > 15 * MIN) return [];
     const ahora = new Date(), min = ahora.getHours() * 60 + ahora.getMinutes(), lista = [];
     (d.vivos || []).filter(v => !v.suelo && v.alt && v.alt < 4500).forEach(v => lista.push({
       clave:'vivo-' + (v.callsign || v.alt), titulo:v.callsign || 'Un avión sobre el barrio',
@@ -1225,8 +1231,8 @@ const Vuelos = {
         titulo:`${v.nro} está llegando`, detalle:`Viene de ${v.lugar} · aterriza ${v.real || v.hora}`, sentido:'A', vivo:false }); });
     /* Salidas: en cuanto el aeropuerto lo marca "Despegado"; si no llegó a
        marcarlo, por la hora estimada. */
-    this.recien.forEach(v => lista.push({ clave:'d-' + v.nro + (v.real || v.hora), titulo:`${v.nro} acaba de despegar`,
-      detalle:`Va a ${v.lugar} · el aeropuerto lo marcó despegado`, sentido:'D', vivo:false }));
+    this.recien.filter(v => this.horaPosible(v, min)).forEach(v => lista.push({ clave:'d-' + v.nro + (v.real || v.hora), titulo:`${v.nro} acaba de despegar`,
+      detalle:`Va a ${v.lugar} · salió ${v.real || v.hora}`, sentido:'D', vivo:false }));
     (d.dep || []).forEach(v => { if (/cancel/i.test(v.estado)) return;
       if (cerca(this.minutos(v.real || v.hora), 1, 5)) lista.push({ clave:'d-' + v.nro + (v.real || v.hora),
         titulo:`${v.nro} acaba de despegar`, detalle:`Va a ${v.lugar} · salió ${v.real || v.hora}`, sentido:'D', vivo:false }); });
@@ -1320,12 +1326,6 @@ R.vuelos = {
       ${sec('Cuando pasa un avión')}
       ${superficie({ a:'avion-aviso', icon:'send', color:Avion.encendido() ? 'ok' : 'accent', t:Avion.encendido() ? 'Avisarme: está activado' : 'Avisarme: está apagado',
         s:'Cruza un avión por la pantalla cuando uno sobrevuela el barrio' })}
-      <details class="card plana small como-funciona"><summary><b>${I('info')} ¿Cómo sabe la app que pasa un avión?</b></summary>
-        <p>No hay radar: en Tierra del Fuego no hay receptores públicos de aviones (se probaron OpenSky, adsb.lol, adsb.fi y el mapa de Flightradar24, y sobre Ushuaia no devuelven ningún avión; Flightradar24 además no deja que otra página lea sus datos). Lo más cercano a tiempo real es el tablero del aeropuerto:</p>
-        <p>· <b>Llegadas:</b> el avión cruza el barrio unos 3 minutos antes de aterrizar. La app usa la hora <b>estimada</b> del aeropuerto, que se corrige si viene demorado o adelantado.<br>
-           · <b>Salidas:</b> en cuanto el aeropuerto lo marca <b>Despegado</b>, cruza el avión; si todavía no lo marcó, se guía por la hora estimada.<br>
-           · El tablero se vuelve a leer cada 2 minutos cuando hay un vuelo cerca y cada 5 el resto del día.</p>
-        <p>${Store.s.config.vuelosProxy ? 'Hay un Worker configurado: si algún día aparece un receptor en la zona, se usa el avión real.' : 'Si algún día hay un receptor ADS-B en la zona, se puede conectar con un Worker (Ajustes → Aviones en vivo) y el aviso pasa a ser con el avión real.'}</p></details>
       ${sec('Ver en el sitio oficial')}
       ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/arribos-USH', icon:'login', color:'accent', t:'Arribos a Ushuaia', s:'Tablero del aeropuerto · horarios y estado' })}
       ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/partidas-USH', icon:'logout', color:'accent', t:'Partidas de Ushuaia', s:'Tablero del aeropuerto' })}

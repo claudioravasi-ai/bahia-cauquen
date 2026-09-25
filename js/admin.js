@@ -7,24 +7,30 @@
 /* ---------- MOTOR DE AUTOMATIZACIONES ----------
    Reglas que corren solas cada minuto mientras la app está abierta
    en algún equipo. Cada una deja una marca en motorLog para no
-   repetirse (y así dos pestañas abiertas no duplican avisos).
-   Con servidor, este mismo archivo corre como tarea programada. */
+   repetirse. Con la base del barrio la marca se RECLAMA antes de actuar
+   (ver marca() y Motor.reclamar): la gana un solo equipo y ese es el
+   único que da el aviso, aunque haya cien apps abiertas a la vez. */
 const REGLAS = [
   { id:'clima-viento', n:'Viento fuerte → aviso en el pizarrón', d:'Con ráfagas de 60 km/h o más publica un aviso para asegurar objetos sueltos.',
     run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'wind'); if (!a) return 0;
-      return marca(s, 'viento-' + hoy, () => { publicarSistema(s, 'aviso', a.t, a.x); notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'wind', color:'warn', link:'pizarron', sonido:true }); }); } },
+      return marca(s, 'viento-' + hoy, () => { publicarSistema(s, 'aviso', a.t, a.x); notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'wind', color:'warn', link:'pizarron', sonido:true, vence:finDelDia(hoy) }); }); } },
   { id:'clima-nieve', n:'Nieve prevista → no dejar autos en la calle', d:'Si se anuncia nieve, a partir de las 18 h avisa a todos.',
     run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'snow'); if (!a || new Date().getHours() < 18) return 0;
-      return marca(s, 'nieve-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'snow', color:'sky', link:'ushuaia' })); } },
+      return marca(s, 'nieve-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'snow', color:'sky', link:'ushuaia', vence:finDelDia(hoy) })); } },
   { id:'clima-hielo', n:'Helada → cuidado en las subidas', d:'Con mínima bajo cero, avisa a la guardia a las 6 h para echar arena o sal.',
     run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'thermo'); if (!a || new Date().getHours() < 6) return 0;
-      return marca(s, 'hielo-' + hoy, () => notificar(s, { para:'staff', titulo:'Helada: revisar subidas', texto:'Echar arena o sal en las subidas y el acceso.', icon:'thermo', color:'warn' })); } },
-  { id:'recoleccion', n:'Recolección → recordatorio la noche anterior', d:'A las 20 h avisa qué pasa mañana (y los voluminosos).',
-    run(s, hoy){ if (new Date().getHours() < 20) return 0; const man = (new Date().getDay() + 1) % 7, t = recoleccionDias()[man];
-      const vol = volsProximos().some(v => v.fecha === sumarDias(hoy, 1));
+      return marca(s, 'hielo-' + hoy, () => notificar(s, { para:'staff', titulo:'Helada: revisar subidas', texto:'Echar arena o sal en las subidas y el acceso.', icon:'thermo', color:'warn', vence:finDelDia(hoy) })); } },
+  /* Sale SOLO la víspera de un día con camión (lunes, miércoles y viernes
+     en el barrio) y dice "Mañana pasa el camión de residuos" (pedido de
+     Claudio, 25-09-2026); si al otro día no hay camión, no sale nada. Se va
+     sola a medianoche (a la mañana la pizarra ya dice "Hoy pasa…"), o antes
+     si la garita registra la entrada del camión. */
+  { id:'recoleccion', n:'Recolección → recordatorio la noche anterior', d:'A las 20 h, la víspera de cada día con camión, avisa "Mañana pasa el camión de residuos" (y si son los voluminosos).',
+    run(s, hoy){ if (new Date().getHours() < 20) return 0; const man = sumarDias(hoy, 1), t = recoleccionDias()[fechaDe(man).getDay()];
+      const vol = volsProximos().find(v => v.fecha === man);
       if (!t && !vol) return 0;
-      const volT = vol || esVoluminoso(t);
-      return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo: volT ? 'Mañana retiran los voluminosos' : `Mañana a la mañana pasa el camión: ${String(t).toLowerCase()}`, texto: volT ? s.config.voluminososDetalle : 'Sacá la bolsa en el canasto cerrado.', icon:'truck', color:'ok', link:'recoleccion' })); } },
+      const a = anuncioCamion('Mañana', vol ? 'Voluminosos' : t, vol && vol.detalle);
+      return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'truck', color:'ok', link:'recoleccion', vence:finDelDia(hoy) })); } },
   { id:'reserva-recordatorio', n:'Reservas → recordatorio el día anterior', d:'Avisa al vecino que al otro día tiene un espacio reservado.',
     run(s, hoy){ let n = 0; const man = sumarDias(hoy, 1);
       s.reservas.filter(r => r.fecha === man && !r.cancelada).forEach(r => { const a = s.amenities.find(x => x.id === r.amenity);
@@ -108,7 +114,7 @@ const REGLAS = [
   { id:'feriado', n:'Feriado mañana → aviso y recolección', d:'El día anterior avisa del feriado (la recolección puede cambiar).',
     run(s, hoy){ const man = sumarDias(hoy, 1), info = diaInfo(man);
       const f = info.feriado || info.noLaborable; if (!f || new Date().getHours() < 12) return 0;
-      return marca(s, 'fer-' + f.fecha, () => notificar(s, { para:'todos',
+      return marca(s, 'fer-' + f.fecha, () => notificar(s, { para:'todos', vence:finDelDia(hoy),
         titulo: info.feriado ? `Mañana es feriado ${f.ambito}: ${f.nombre}` : `Mañana es día no laborable: ${f.nombre}`,
         texto:'La recolección, la Administración y los comercios pueden cambiar sus horarios.', icon:'calendar', color:'sky', link:'ushuaia' })); } },
   { id:'zorros', n:'Dos avistamientos en el día → alerta de fauna', d:'Si dos vecinos avisan lo mismo en 24 h, se avisa a todos.',
@@ -116,6 +122,11 @@ const REGLAS = [
       if (v.length >= 2) n += marca(s, `fau-${e}-${hoy}`, () => { publicarSistema(s, 'aviso', `${ESPECIES[e].n} en el barrio`, `Hubo ${v.length} avisos hoy (${[...new Set(v.map(x => x.lugar))].join(', ')}). Guardá la basura en canastos cerrados y no les des de comer.`);
         notificar(s, { para:'todos', titulo:`${ESPECIES[e].n} en el barrio`, texto:`${v.length} avisos hoy`, icon:'paw', color:'warn', link:'pizarron' }); }); }); return n; } },
   { id:'sos-respondedores', n:'SOS médica → avisar a vecinos con RCP', d:'Los vecinos que marcaron "sé primeros auxilios" reciben la alerta médica.', run(){ return 0; } },
+  /* Una vez por día, los avisos generales repetidos quedan en uno (con los
+     "visto" de todos) y se borran los que ya no sirven. Así se limpió lo que
+     dejaron las versiones anteriores, cuando cada equipo repetía los avisos. */
+  { id:'avisos-limpieza', n:'Avisos repetidos o vencidos → se juntan y se borran', d:'Una vez por día: los avisos iguales quedan en uno solo y se borran los vencidos (el tiempo de otro día, el camión que ya pasó) y los de más de 60 días.',
+    run(s, hoy){ return marca(s, 'limpia-avisos-' + hoy, () => limpiarAvisos(s)); } },
   { id:'privacidad', n:`Datos de visitas → borrar a los N días`, d:'Borra DNI y patente de pases y llegadas viejas (Ley 25.326, principio de finalidad).',
     run(s){ const lim = Date.now() - (s.config.datosDias || 90) * DIA; let n = 0;
       s.pases.forEach(p => { if (p.createdAt < lim && (p.dni || p.patente) && !(p.dias && (p.fechaFin || '') >= hoyISO())){ p.dni = ''; p.patente = ''; n++; } });
@@ -124,21 +135,80 @@ const REGLAS = [
       return n; } },
 ];
 const motorActivo = id => Store.s?.config?.motor?.[id] !== false;
-function marca(s, clave, fn){ if (s.motorLog[clave]) return 0; s.motorLog[clave] = Date.now(); fn(); return 1; }
-function publicarSistema(s, type, title, body){ s.posts.unshift({ id:uid(), type, title, body, autor:'sistema', createdAt:Date.now(), reactions:{}, comments:[] }); }
+/* =========================================================
+   LA MARCA DE CADA AVISO AUTOMÁTICO
+   Sin base (modo prueba) se anota y se actúa en el momento. Con la base del
+   barrio, el motor corre en TODOS los equipos abiertos: antes cada uno
+   anotaba la marca en su copia y mandaba la lista entera, y dos equipos que
+   actuaban a la vez se pisaban las marcas; además, cada equipo que abría la
+   app corría el motor antes de que bajaran las marcas de la base. Resultado:
+   "Helada: revisar subidas" y "Mañana pasa el camión" repetidos en la
+   campanita (lo vio Claudio en la garita el 25-09-2026). Ahora la marca se
+   pide con una transacción de Firebase (Nube.reclamarMarca): solo el equipo
+   que la gana da el aviso.
+   ========================================================= */
+function marca(s, clave, fn){
+  if (s.motorLog[clave] || Motor.pedidas.has(clave)) return 0;
+  if (Motor.enNube()){ Motor.pedidas.set(clave, { fn, regla:Motor.regla }); return 1; }
+  s.motorLog[clave] = Date.now(); Motor.conMarca(clave, fn); return 1;
+}
+function publicarSistema(s, type, title, body){
+  const id = Automatico.clave ? idAutomatico() : uid();
+  if (aLista(s.posts).some(p => p && p.id === id)) return;
+  s.posts.unshift({ id, type, title, body, autor:'sistema', createdAt:Date.now(), reactions:{}, comments:[] });
+}
+/* Los avisos generales iguales quedan en uno (el último, con los "visto" de
+   todos) y se borran los vencidos y los de más de 60 días. Solo los
+   generales: los personales de cada vecino no se tocan desde otro equipo. */
+function limpiarAvisos(s){
+  const general = n => aLista(n.para).some(p => p === 'todos' || p === 'staff' || String(p).startsWith('rol:'));
+  const ahora = Date.now(), lim = ahora - 60 * DIA, quedan = new Map(), fuera = new Set();
+  aLista(s.notifs).filter(n => n && general(n)).sort((a, b) => (b.at || 0) - (a.at || 0)).forEach(n => {
+    if ((n.at || 0) < lim || (avisoVencido(n, ahora) && ahora - (n.at || 0) > HORA)){ fuera.add(n.id); return; }
+    const k = claveAviso(n), y = quedan.get(k);
+    if (!y){ quedan.set(k, n); return; }
+    if (ahora - (n.at || 0) < 10 * MIN) return;
+    const l = listaDe(y, 'leidas'); aLista(n.leidas).forEach(id => { if (!l.includes(id)) l.push(id); });
+    fuera.add(n.id);
+  });
+  if (fuera.size) s.notifs = aLista(s.notifs).filter(n => !n || !fuera.has(n.id));
+}
 const Motor = {
-  corriendo:false,
+  corriendo:false, regla:null,
+  pedidas:new Map(),
+  enNube(){ return typeof Nube !== 'undefined' && Nube.activa() && !!Nube.db; },
+  /* Lo que hace una regla, con su marca a la vista: los avisos y las
+     publicaciones que salen de acá llevan un id fijo (idAutomatico). */
+  conMarca(clave, fn){ Automatico.clave = clave; Automatico.n = 0; try { fn(); } finally { Automatico.clave = null; } },
   correr(){
     if (this.corriendo || !Store.s || !yo()) return;
+    /* Con la base: hasta que no bajaron las marcas, la configuración y los
+       datos del barrio, el motor no corre. Antes corría al abrir la app, con
+       las marcas vacías, y repetía todos los avisos del día en cada equipo
+       que se abría (ver Nube.listoParaMotor). */
+    if (this.enNube() && !Nube.listoParaMotor()) return;
     this.corriendo = true;
     try {
       const hoy = hoyISO(); let total = 0;
       const s = Store.s;
-      for (const r of REGLAS){ if (!motorActivo(r.id)) continue; try { const n = r.run(s, hoy) || 0; if (n){ total += n; s.motorCuenta = s.motorCuenta || {}; s.motorCuenta[r.id] = (s.motorCuenta[r.id] || 0) + n; } } catch(e){ console.warn('Regla', r.id, e); } }
+      for (const r of REGLAS){ if (!motorActivo(r.id)) continue; this.regla = r.id;
+        try { const n = r.run(s, hoy) || 0; if (n){ total += n; if (!this.enNube()) this.contar(r.id, n); } } catch(e){ console.warn('Regla', r.id, e); } }
+      this.regla = null;
       /* limpia marcas de más de 60 días */
       const lim = Date.now() - 60 * DIA; for (const k in s.motorLog) if (s.motorLog[k] < lim) delete s.motorLog[k];
       if (total){ Store.guardar(); Store.avisar(false); }
-    } finally { this.corriendo = false; }
+    } finally { this.corriendo = false; this.regla = null; }
+    if (this.pedidas.size) this.reclamar();
+  },
+  contar(id, n = 1){ const s = Store.s; s.motorCuenta = s.motorCuenta || {}; s.motorCuenta[id] = (s.motorCuenta[id] || 0) + n; },
+  /* Cada marca pedida se reclama en la base; el equipo que la gana actúa. */
+  reclamar(){
+    [...this.pedidas].forEach(([clave, p]) => {
+      if (p.enCurso) return; p.enCurso = true;
+      Nube.reclamarMarca(clave)
+        .then(mia => { this.pedidas.delete(clave); if (mia) Store.cambiar(() => { this.conMarca(clave, p.fn); if (p.regla) this.contar(p.regla); }); })
+        .catch(e => { this.pedidas.delete(clave); console.warn('Marca del motor', clave, e && e.message); });
+    });
   },
 };
 
@@ -270,7 +340,7 @@ const ADMIN_TABS = {
       <div class="card"><h3>Contacto</h3><div class="grid2">${campo('garitaTel', 'Teléfono de la garita', 'tel')}${campo('adminTel', 'Teléfono de la Administración', 'tel')}</div>${campo('adminEmail', 'Email de la Administración (recibe avisos de inscripciones)', 'email')}</div>
       <div class="card"><h3>Residuos</h3><div class="grid3">${[1,2,3,4,5,6,0].map(d => `<div class="field"><label>${DIAS[d]}</label><input name="rec${d}" value="${esc(recoleccionDias()[d] || '')}" placeholder="—"></div>`).join('')}</div>
         <div class="grid2">${campo('recoleccionHora', 'Hora del camión', 'time')}${campo('voluminososDetalle', 'Qué se retira en los voluminosos')}</div>
-        <div class="ayuda" style="margin:-4px 0 10px">Hoy: martes y jueves a la mañana, todos los residuos; sábados, voluminosos. Si un día dice "voluminosos", la app avisa "retiran los voluminosos" en lugar de "pasa el camión".</div>
+        <div class="ayuda" style="margin:-4px 0 10px">Hoy: martes y jueves a la mañana, todos los residuos; sábados, voluminosos. La víspera de cada día con camión la app avisa "Mañana pasa el camión de residuos" (y "… voluminosos" si ese día dice voluminosos). Los días sin camión se dejan vacíos (o "No pasa"): esa noche no sale ningún aviso.</div>
         <div class="card plana small" style="margin:0">${I('info')} Las fechas de retiros especiales de voluminosos se anotan en <b>Residuos</b>, una por una: ahí se pueden cargar todas las del año.
           <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-xs btn-sec" data-a="abrir" data-v="recoleccion">${I('truck')}Ir a Residuos</button></div></div></div>
       <div class="card"><h3>Convivencia</h3><div class="grid2">${campo('silencio', 'Horario de silencio')}${campo('obraHorario', 'Horario de obras')}</div></div>

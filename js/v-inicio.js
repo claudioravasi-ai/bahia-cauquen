@@ -113,15 +113,13 @@ function avisoCamionViejo(n){
 function recoleccionHoy(){
   const c = Store.s.config, dias = recoleccionDias(), h = new Date(), hoy = h.getDay(), man = (hoy + 1) % 7;
   const vol = volsProximos().find(v => v.fecha === hoyISO() || v.fecha === sumarDias(hoyISO(), 1));
-  if (vol) return { vol:true, t:`${vol.fecha === hoyISO() ? 'Hoy' : 'Mañana'} pasan por los voluminosos`, x:vol.detalle || c.voluminososDetalle };
+  if (vol) return anuncioCamion(vol.fecha === hoyISO() ? 'Hoy' : 'Mañana', 'Voluminosos', vol.detalle);
   /* Si la garita ya registró el camión hoy, "hoy pasa" no va más: mientras
      está adentro se ve el aviso en vivo, y cuando sale ya pasó. */
-  if (dias[hoy] && ahoraMin() < minutosDe(c.recoleccionHora) && !camionPasoHoy())
-    return esVoluminoso(dias[hoy]) ? { vol:true, t:'Hoy retiran los voluminosos', x:`Por la mañana, desde las ${c.recoleccionHora} h. ${c.voluminososDetalle || ''}` }
-      : { t:`Hoy pasa el camión: ${dias[hoy].toLowerCase()}`, x:`Por la mañana, desde las ${c.recoleccionHora} h.` };
-  if (dias[man] && h.getHours() >= 17)
-    return esVoluminoso(dias[man]) ? { vol:true, t:'Mañana retiran los voluminosos', x:c.voluminososDetalle || 'Dejalos en el frente esta noche.' }
-      : { t:`Mañana pasa el camión: ${dias[man].toLowerCase()}`, x:'Sacá la bolsa esta noche, en el canasto cerrado.' };
+  if (dias[hoy] && ahoraMin() < minutosDe(c.recoleccionHora) && !camionPasoHoy()) return anuncioCamion('Hoy', dias[hoy]);
+  /* La víspera de un día con camión (desde las 17 h): "Mañana pasa el
+     camión de residuos". Si mañana no hay camión, no se dice nada. */
+  if (dias[man] && h.getHours() >= 17) return anuncioCamion('Mañana', dias[man]);
   return null;
 }
 
@@ -1131,6 +1129,8 @@ F['cerrar-turno'] = d => {
     if (x){
       x.cerradoAt = ahora;
       x.policias = policiasDe(x).map(p => salen.has(p.id) && !p.sale ? { ...p, sale:ahora } : p);
+      /* La ronda que el que se va dejó abierta queda INCOMPLETA en la bitácora. */
+      x.policias.filter(p => salen.has(p.id)).forEach(p => { const rc = rondaEnCurso(p); if (rc) cerrarRondaIncompleta(s, p, rc, ahora, 'el policía se retiró en plena ronda'); });
       salen.forEach(pid => bajarCodigo(s, pid));
       x.policias.filter(p => salen.has(p.id)).forEach(p => s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'acceso', texto:`Salida del policía ${p.nombre}${p.matricula ? ' (' + p.matricula + ')' : ''} · ${hora(ahora)} h · ${plural(p.rondas.length, 'ronda')}.`, at:ahora - 2 }));
     }
@@ -1168,7 +1168,7 @@ function parteTurnoHtml(t, nota = ''){
     </table>
     ${nota ? `<p style="background:#fff7e0;border-radius:10px;padding:10px 12px;margin:0 0 14px"><b>Novedades para el turno siguiente:</b><br>${esc(nota)}</p>` : ''}
     ${ps.length ? `<h3 style="font-size:15px;margin:16px 0 6px">Policía contratada</h3>${ps.map(p => `<p style="margin:0 0 8px"><b>${esc(p.nombre)}</b>${p.matricula ? ' · mat. ' + esc(p.matricula) : ''} · ingresó ${hora(p.entra)} h${p.sale ? ' · salió ' + hora(p.sale) + ' h' : p.paso ? ' · siguió en el turno siguiente' : ' · sigue en el barrio'}<br>
-      ${p.rondas.length ? p.rondas.map((r, i) => `Ronda ${i + 1}: ${hora(r.inicio)}${r.fin ? ' a ' + hora(r.fin) + ' (' + minutos(r.inicio, r.fin) + ' min)' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}: ${pasosDeRonda(r).map(x => esc(nombrePunto(x.punto)) + ' ' + hora(x.at)).join(', ')}` : ''}`).join('<br>') : 'Sin rondas anotadas.'}</p>`).join('')}` : ''}
+      ${p.rondas.length ? p.rondas.map((r, i) => `Ronda ${i + 1}${r.incompleta ? ' (INCOMPLETA)' : ''}: ${hora(r.inicio)}${r.fin ? ' a ' + hora(r.fin) + ' (' + minutos(r.inicio, r.fin) + ' min)' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}: ${pasosDeRonda(r).map(x => esc(nombrePunto(x.punto)) + ' ' + hora(x.at)).join(', ')}` : ''}`).join('<br>') : 'Sin rondas anotadas.'}</p>`).join('')}` : ''}
     <h3 style="font-size:15px;margin:16px 0 6px">Bitácora del turno</h3>
     ${lineas.length ? `<table style="border-collapse:collapse;font-size:13px">${lineas.map(b => fila(hora(b.at), esc(b.texto || ''))).join('')}</table>` : '<p style="margin:0">Sin anotaciones.</p>'}
     <p style="font-size:12px;color:#6c7d7a;margin-top:16px">Lo mandó la app de la garita al cerrarse el turno. Tiene datos personales: es para uso interno de la Administración (Ley 25.326, art. 10).</p>`);
@@ -1220,7 +1220,8 @@ function policiasConocidos(){
 }
 function resumenPolicia(t){
   const ps = policiasDe(t); if (!ps.length) return '';
-  return ' Policía: ' + ps.map(p => `${p.nombre}${p.matricula ? ' (' + p.matricula + ')' : ''} desde ${hora(p.entra)}${p.sale ? ' a ' + hora(p.sale) : ''}, ${plural(p.rondas.length, 'ronda')}`).join('; ') + '.';
+  return ' Policía: ' + ps.map(p => { const inc = p.rondas.filter(r => r.incompleta).length, rc = rondaEnCurso(p);
+    return `${p.nombre}${p.matricula ? ' (' + p.matricula + ')' : ''} desde ${hora(p.entra)}${p.sale ? ' a ' + hora(p.sale) : ''}, ${plural(p.rondas.length, 'ronda')}${inc ? ` (${plural(inc, 'incompleta', 'incompletas')})` : ''}${rc ? ', una en curso' : ''}`; }).join('; ') + '.';
 }
 /* Cambia un policía del turno abierto y guarda. */
 function cambiarPolicia(pid, fn, renglon){
@@ -1229,8 +1230,9 @@ function cambiarPolicia(pid, fn, renglon){
     const x = aLista(s.bitacora).find(b => b.id === t.id); if (!x) return;
     x.policias = policiasDe(x);
     const p = x.policias.find(q => q.id === pid); if (!p) return;
-    fn(p, x);
-    if (renglon) s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:renglon(p), at:Date.now() });
+    fn(p, x, s);
+    const texto = renglon && renglon(p);
+    if (texto) s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto, at:Date.now() });
   });
   refrescar();
 }
@@ -1246,7 +1248,7 @@ function bandaPolicia(){
         <div class="policia-cab"><div class="grow"><b>${esc(p.nombre)}</b><span class="muted small">${p.matricula ? 'Mat. ' + esc(p.matricula) + ' · ' : ''}ingresó ${hora(p.entra)} h${p.sale ? ' · salió ' + hora(p.sale) + ' h' : p.paso ? ' · pasó al turno siguiente' : ''}${!p.sale && !p.paso && codigoVigente(p.id) ? ` · código <span class="mono">${codigoVigente(p.id).id}</span>` : ''}</span></div>
           <span class="pill ${rc ? (dur > RONDA_LARGA ? 'p-danger' : 'p-accent') : ''}">${plural(p.rondas.length, 'ronda')}</span></div>
         ${rc ? `<div class="aviso a-${dur > RONDA_LARGA ? 'danger latido' : 'info'}" style="margin:8px 0 0">${I('clock')}<div class="txt"><b>En ronda desde las ${hora(rc.inicio)} h · ${dur} min</b>${dur > RONDA_LARGA ? `Una ronda lleva unos ${RONDA_MIN} minutos: conviene comunicarse con el policía.` : `Vuelve alrededor de las ${hora(rc.inicio + RONDA_MIN * MIN)} h.`}</div></div>` : ''}
-        ${p.rondas.length ? `<div class="rondas">${p.rondas.map((r, i) => `<span class="ronda">${i + 1}. ${hora(r.inicio)}${r.fin ? '–' + hora(r.fin) + ' · ' + minutos(r.inicio, r.fin) + ' min' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}` : ''}${guardia && !p.sale ? `<button class="x" data-a="policia-ronda-borrar" data-id="${p.id}" data-v="${r.id}" aria-label="Borrar la ronda">×</button>` : ''}</span>`).join('')}</div>` : ''}
+        ${p.rondas.length ? `<div class="rondas">${p.rondas.map((r, i) => `<span class="ronda">${i + 1}. ${hora(r.inicio)}${r.fin ? '–' + hora(r.fin) + ' · ' + minutos(r.inicio, r.fin) + ' min' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}` : ''}${r.incompleta ? ' · <b>incompleta</b>' : ''}${guardia && !p.sale ? `<button class="x" data-a="policia-ronda-borrar" data-id="${p.id}" data-v="${r.id}" aria-label="Borrar la ronda">×</button>` : ''}</span>`).join('')}</div>` : ''}
         ${(() => { const r = rc || p.rondas.filter(x => x.pasos.length).slice(-1)[0]; return r && puntosActivos().length ? recorridoRonda(r) : ''; })()}
         ${guardia && !p.sale && !p.paso ? `<div class="btns" style="margin-top:8px">
           <button class="btn btn-sm ${rc ? 'btn-ok' : 'btn-pri'}" data-a="policia-ronda" data-id="${p.id}">${I(rc ? 'check' : 'pin')}${rc ? 'Terminó la ronda' : 'Sale a una ronda'}</button>
@@ -1296,7 +1298,7 @@ function recorridoRonda(r){
   const fin = r.fin || Date.now();
   const completa = total && n >= total;
   return `<div class="recorrido ${completa ? 'completa' : ''}">
-    <div class="rec-cab"><b>${completa ? 'Ronda completa' : r.fin ? 'Ronda cerrada' : 'Ronda en curso'}</b>
+    <div class="rec-cab"><b>${completa ? 'Ronda completa' : r.incompleta ? 'Ronda incompleta' : r.fin ? 'Ronda cerrada' : 'Ronda en curso'}</b>
       <span>${n} de ${total} puntos · ${minutos(r.inicio, fin)} min</span></div>
     <div class="rec-barra" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${n}"><i style="width:${total ? Math.round(n / total * 100) : 0}%"></i></div>
     <ol class="rec-lista">${pts.map((pt, i) => { const at = hechos.get(pt.id);
@@ -1309,13 +1311,46 @@ function pasosSueltos(t){
   const asignados = new Set(); registrosTurno().forEach(x => policiasDe(x).forEach(p => p.rondas.forEach(r => r.pasos.forEach(id => asignados.add(id)))));
   return aLista(Store.s.pasos).filter(x => x && x.at >= t.at && !asignados.has(x.id)).sort((a, b) => a.at - b.at);
 }
-/* El equipo de la garita arma las rondas con los pasos que llegan. */
+/* Cómo quedó una ronda con QR: cuántos puntos se pasaron y cuáles faltaron. */
+function estadoRonda(r){
+  const pts = puntosActivos(), hechos = new Set(pasosDeRonda(r).map(x => x.punto));
+  const faltan = pts.filter(pt => !hechos.has(pt.id)).map(pt => pt.nombre);
+  return { n: pts.length - faltan.length, total: pts.length, faltan };
+}
+const conQR = r => !!(r && (r.qr || aLista(r.pasos).length));
+const ultimoPaso = r => Math.max(r.inicio + MIN, ...pasosDeRonda(r).map(z => z.at));
+/* =========================================================
+   LA RONDA QUE NO SE TERMINÓ TAMBIÉN VA A LA BITÁCORA
+   La completa ya dejaba su renglón. La que quedaba a medias (faltó escanear
+   algún punto, pasó más de una hora, el policía se fue en plena ronda) se
+   cerraba en silencio. Ahora se cierra como INCOMPLETA y deja su renglón en
+   la bitácora de la garita, con los puntos que faltaron: así figura en el
+   parte del turno. (Pregunta de Claudio, 25-09-2026.)
+   El renglón lleva un id fijo por ronda: si la garita tiene la app abierta
+   en dos equipos, queda uno solo.
+   ========================================================= */
+function cerrarRondaIncompleta(s, p, r, fin, motivo){
+  if (!r) return false;
+  r.fin = r.fin || Math.max(r.inicio + MIN, fin || Date.now());
+  const e = estadoRonda(r);
+  if (conQR(r) && e.total && e.n >= e.total) return false;
+  r.incompleta = true;
+  const id = 'ri-' + r.id;
+  if (aLista(s.bitacora).some(b => b && b.id === id)) return true;
+  s.bitacora.unshift({ id, autor:yo()?.id || 'sistema', tipo:'acceso', at:Date.now() - 1,
+    texto:`Ronda ${p.rondas.indexOf(r) + 1} del policía ${p.nombre} INCOMPLETA (${motivo}): ${conQR(r) && e.total ? `${e.n}/${e.total} puntos, faltó ${e.faltan.join(', ')}` : 'no se anotó el regreso'} · ${hora(r.inicio)} a ${hora(r.fin)} h.` });
+  return true;
+}
+/* El equipo de la garita arma las rondas con los pasos que llegan, y
+   cierra como incompleta la ronda con QR que pasó una hora sin terminarse. */
 function procesarPasos(){
   if (!esGuardia()) return;
   const t = turnoAbierto(); if (!t) return;
-  const sueltos = pasosSueltos(t); if (!sueltos.length) return;
+  const sueltos = pasosSueltos(t), ahora = Date.now();
+  const vencida = r => r && !r.fin && conQR(r) && ahora - r.inicio > HORA;
+  if (!sueltos.length && !policiasAdentro(t).some(p => vencida(rondaEnCurso(p)))) return;
   const total = puntosActivos().length;
-  let cambios = false, renglones = [];
+  let cambios = false; const renglones = [];
   Store.cambiar(s => {
     const x = aLista(s.bitacora).find(b => b.id === t.id); if (!x) return;
     x.policias = policiasDe(x);
@@ -1326,18 +1361,22 @@ function procesarPasos(){
       const p = cod && adentro.find(q => q.id === cod.pid);
       if (!p) return;
       let r = rondaEnCurso(p);
-      /* Una ronda abierta hace más de una hora no se estira: empieza otra. */
-      if (r && ps.at - r.inicio > HORA){ r.fin = r.fin || Math.max(r.inicio + MIN, ...pasosDeRonda(r).map(z => z.at)); r = null; }
+      /* Una ronda abierta hace más de una hora no se estira: se cierra
+         (incompleta, a la bitácora) y empieza otra. */
+      if (r && ps.at - r.inicio > HORA){ r.fin = r.fin || ultimoPaso(r); cerrarRondaIncompleta(s, p, r, r.fin, 'pasó más de una hora sin completar los puntos'); r = null; }
       if (!r){ r = { id:'q-' + ps.id, inicio:ps.at, qr:true, pasos:[] }; p.rondas.push(r); }
       if (!r.pasos.includes(ps.id)) r.pasos.push(ps.id);
       cambios = true;
       const pts = new Set(r.pasos.map(id => (aLista(s.pasos).find(z => z.id === id) || {}).punto));
-      if (r.qr && total && pts.size >= total){
+      if (total && pts.size >= total){
         r.fin = ps.at;
-        renglones.push(`Ronda ${p.rondas.indexOf(r) + 1} del policía ${p.nombre} completa por QR: ${total}/${total} puntos, ${hora(r.inicio)} a ${hora(r.fin)} h (${minutos(r.inicio, r.fin)} min).`);
+        renglones.push({ id:'rc-' + r.id, texto:`Ronda ${p.rondas.indexOf(r) + 1} del policía ${p.nombre} completa por QR: ${total}/${total} puntos, ${hora(r.inicio)} a ${hora(r.fin)} h (${minutos(r.inicio, r.fin)} min).` });
       }
     });
-    renglones.forEach(texto => s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto, at:Date.now() }));
+    /* La que quedó abierta más de una hora sin completarse, aunque no
+       lleguen más pasos. */
+    adentro.forEach(p => { const r = rondaEnCurso(p); if (vencida(r)){ r.fin = ultimoPaso(r); cerrarRondaIncompleta(s, p, r, r.fin, 'pasó más de una hora sin completar los puntos'); cambios = true; } });
+    renglones.forEach(({ id, texto }) => { if (!aLista(s.bitacora).some(b => b && b.id === id)) s.bitacora.unshift({ id, autor:yo().id, tipo:'acceso', texto, at:Date.now() }); });
   });
   if (cambios) refrescarPronto();
 }
@@ -1540,11 +1579,15 @@ A['policia-codigo-nuevo'] = async el => {
 A['policia-ronda'] = el => {
   const pid = el.dataset.id, ahora = Date.now();
   let fin = null;
-  cambiarPolicia(pid, p => {
+  let incompleta = false;
+  cambiarPolicia(pid, (p, x, s) => {
     const rc = rondaEnCurso(p);
-    if (rc){ rc.fin = ahora; fin = rc; } else p.rondas.push({ id:uid(), inicio:ahora });
-  }, p => fin ? `Ronda ${p.rondas.length} del policía ${p.nombre}: ${hora(fin.inicio)} a ${hora(fin.fin)} h (${minutos(fin.inicio, fin.fin)} min).` : `El policía ${p.nombre} sale a la ronda ${p.rondas.length} · ${hora(ahora)} h.`);
-  toast(fin ? 'Ronda terminada' : 'Ronda en marcha', 'shield');
+    if (!rc){ p.rondas.push({ id:uid(), inicio:ahora }); return; }
+    rc.fin = ahora; fin = rc;
+    /* Si escaneó QR y le faltaron puntos, queda INCOMPLETA en la bitácora. */
+    if (conQR(rc)) incompleta = cerrarRondaIncompleta(s, p, rc, ahora, 'la garita la dio por terminada');
+  }, p => incompleta ? null : fin ? `Ronda ${p.rondas.indexOf(fin) + 1} del policía ${p.nombre}: ${hora(fin.inicio)} a ${hora(fin.fin)} h (${minutos(fin.inicio, fin.fin)} min)${conQR(fin) ? ` · QR ${estadoRonda(fin).n}/${estadoRonda(fin).total} puntos` : ''}.` : `El policía ${p.nombre} sale a la ronda ${p.rondas.length} · ${hora(ahora)} h.`);
+  toast(fin ? (incompleta ? 'Ronda cerrada como incompleta' : 'Ronda terminada') : 'Ronda en marcha', 'shield');
 };
 A['policia-ronda-mano'] = el => hoja('Anotar una ronda', `<form data-f="policia-ronda-mano"><input type="hidden" name="pid" value="${esc(el.dataset.id)}">
   <div class="grid2"><div class="field"><label>Salió</label><input name="desde" type="time" required value="${horaInput(Date.now() - RONDA_MIN * MIN)}"></div>
@@ -1569,7 +1612,7 @@ A['policia-salida'] = el => hoja('Salida del policía', `<form data-f="policia-s
 F['policia-salida'] = d => {
   const sale = horaPasada(d.sale);
   Store.cambiar(s => bajarCodigo(s, d.pid));
-  cambiarPolicia(d.pid, p => { const rc = rondaEnCurso(p); if (rc) rc.fin = Math.max(rc.inicio + MIN, sale); p.sale = Math.max(sale, p.entra + MIN); },
+  cambiarPolicia(d.pid, (p, x, s) => { const rc = rondaEnCurso(p); if (rc) cerrarRondaIncompleta(s, p, rc, Math.max(rc.inicio + MIN, sale), 'el policía se retiró en plena ronda'); p.sale = Math.max(sale, p.entra + MIN); },
     p => `Salida del policía ${p.nombre}${p.matricula ? ' (mat. ' + p.matricula + ')' : ''} · ${hora(p.sale)} h · ${plural(p.rondas.length, 'ronda')} en el turno.`);
   cerrarHoja(); toast('Salida anotada', 'check');
 };

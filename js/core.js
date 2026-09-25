@@ -194,11 +194,34 @@ const RECOLECCION_VIEJA = { 1:'Húmedos', 2:'Reciclables', 3:'Húmedos', 4:'Reci
    martes, jueves y sábado). */
 const RECOLECCION_BARRIO = { 2:'Todos los residuos', 4:'Todos los residuos', 6:'Voluminosos' };
 const RECOLECCION_PROVISORIA = { 2:'Residuos', 4:'Residuos', 6:'Residuos' };
+/* Un día cargado en Ajustes como "No pasa", "No hay", "—" o "Sin servicio"
+   es un día SIN camión. Antes se tomaba como el tipo de residuo del día y el
+   aviso de la noche decía "Mañana pasa el camión: No pasa". ("No
+   reciclables" sí es un tipo de residuo: ese no se toca.) */
+const sinCamion = v => { const t = String(v || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return !t || /^[-–—.x\s]+$/.test(t) || /^(no|ninguno|ninguna|nada|feriado)$/.test(t) || /\bno (pasa|hay|viene)\b/.test(t) || /^sin (servicio|recoleccion|camion|residuos)\b/.test(t); };
 function recoleccionDias(){
   const r = Store.s.config.recoleccion || {}, t = JSON.stringify(r);
-  return !Object.keys(r).length || t === JSON.stringify(RECOLECCION_VIEJA) || t === JSON.stringify(RECOLECCION_PROVISORIA) ? RECOLECCION_BARRIO : r;
+  if (!Object.keys(r).length || t === JSON.stringify(RECOLECCION_VIEJA) || t === JSON.stringify(RECOLECCION_PROVISORIA)) return RECOLECCION_BARRIO;
+  const out = {}; Object.keys(r).forEach(d => { if (!sinCamion(r[d])) out[d] = r[d]; });
+  return Object.keys(out).length ? out : RECOLECCION_BARRIO;
 }
 const esVoluminoso = t => /volumin/i.test(String(t || ''));
+/* =========================================================
+   CÓMO SE ANUNCIA EL CAMIÓN (pedido de Claudio, 25-09-2026)
+   La víspera de cada día con camión: "Mañana pasa el camión de residuos";
+   si ese día son los voluminosos (los sábados), "Mañana pasa el camión de
+   residuos voluminosos". El mismo día, antes de la hora: "Hoy pasa…".
+   Si al otro día no hay camión, no se anuncia nada.
+   ========================================================= */
+function anuncioCamion(cuando, tipo, detalle = ''){
+  const c = Store.s.config, vol = esVoluminoso(tipo);
+  const t = `${cuando} pasa el camión de residuos${vol ? ' voluminosos' : ''}`;
+  const que = tipo && !vol ? `Se lleva ${String(tipo).toLowerCase()}. ` : '';
+  const x = cuando === 'Hoy' ? `${que}Por la mañana, desde las ${c.recoleccionHora} h.${vol && (detalle || c.voluminososDetalle) ? ' ' + (detalle || c.voluminososDetalle) : ''}`
+    : vol ? (detalle || c.voluminososDetalle || 'Dejalos en el frente esta noche.') : `${que}Sacá la bolsa esta noche, en el canasto cerrado.`;
+  return { t, x, vol };
+}
 const CONFIG_BASE = {
   nombre: 'Bahía Cauquén',
   ciudad: 'Ushuaia, Tierra del Fuego',
@@ -471,9 +494,25 @@ function codigoPase(){
    para: id de usuario, 'todos', 'rol:guardia', 'rol:admin',
    'staff' o una lista de esos.
    ========================================================= */
-function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '' }){
-  const n = { id: uid(), para: [].concat(para), titulo, texto, icon, color, link, urgente, sonido: sonido || urgente, de: Store.sesion.userId, at: Date.now(), leidas: [] };
+/* =========================================================
+   LOS AVISOS AUTOMÁTICOS SALEN UNA VEZ PARA TODO EL BARRIO
+   El motor corre en cada equipo que tiene la app abierta. El aviso que da
+   ("Helada: revisar subidas") lleva un id FIJO sacado de su marca
+   (m-hielo-2026-09-25-1): si otro equipo lo diera en el mismo instante,
+   escribe en el mismo lugar de la base y queda uno solo. Además lo firma
+   "sistema" y no el vecino cuyo equipo lo generó (antes, ese vecino era el
+   único del barrio que no lo veía).
+   ========================================================= */
+const Automatico = { clave:null, n:0 };
+const idAutomatico = () => 'm-' + String(Automatico.clave).replace(/[.#$\[\]\/\s]/g, '_') + '-' + (++Automatico.n);
+function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '', vence = 0 }){
+  const auto = !!Automatico.clave, id = auto ? idAutomatico() : uid();
+  /* Ya está (lo dio otro equipo y ya bajó): no se repite ni se le borra a
+     nadie el "visto". */
+  if (auto && aLista(s.notifs).some(x => x && x.id === id)) return;
+  const n = { id, para: [].concat(para), titulo, texto, icon, color, link, urgente, sonido: sonido || urgente, de: auto ? 'sistema' : Store.sesion.userId, at: Date.now(), leidas: [] };
   if (camionId) n.camionId = camionId;
+  if (vence) n.vence = vence;
   s.notifs.unshift(n);
   if (s.notifs.length > 400) s.notifs.length = 400;
   /* Lo que suena también sale como aviso push: llega con el celular
@@ -520,8 +559,45 @@ function avisoCaduco(n){
   if (n.camionId){ const v = Camion.lista().find(c => c.id === n.camionId); return !!(v && v.sale); }
   return Date.now() - (n.at || 0) > 2 * MIN && !Camion.adentro();
 }
-const misNotifs = () => { const u = yo(); return u ? aLista(Store.s.notifs).filter(n => meToca(n, u) && !avisoCaduco(n)) : []; };
-const noLeidas = () => { const u = yo(); return misNotifs().filter(n => !aLista(n.leidas).includes(u.id)); };
+/* =========================================================
+   HASTA CUÁNDO SIRVE UN AVISO
+   Los avisos automáticos del día (la helada, la nieve, el viento, el
+   camión de mañana, el feriado de mañana) traen `vence` y a esa hora se
+   van solos. Los anteriores a esta versión no lo traen: los del tiempo y el
+   "mañana pasa el camión" valen el día en que salieron — y si al otro día
+   no había camión (los viejos "Mañana pasa el camión: No pasa" o "Húmedos"
+   de un jueves a la noche), no valieron nunca. El del camión, además, se va
+   apenas la garita registra la entrada.
+   ========================================================= */
+const finDelDia = (iso, dias = 0) => fechaDe(sumarDias(iso, dias + 1)).getTime() - 1;
+function avisoVencido(n, ahora = Date.now()){
+  if (!n) return true;
+  const dia = isoDe(new Date(n.at || 0));
+  /* El "mañana pasa el camión" se va apenas la garita registra la entrada. */
+  const recordatorio = n.icon === 'truck' && String(n.link || '').split(':')[0] === 'recoleccion' && /^(ma[nñ]ana|hoy)\b.*(cami[oó]n|volumin)/i.test(n.titulo || '');
+  if (recordatorio && typeof Camion !== 'undefined' && Camion.lista().some(v => v.entra && v.entra > n.at)) return true;
+  if (n.vence) return n.vence < ahora;
+  if (['thermo', 'snow', 'wind'].includes(n.icon)) return ahora > finDelDia(dia);
+  if (recordatorio && /^ma[nñ]ana/i.test(n.titulo || '')){
+    const man = sumarDias(dia, 1);
+    const hay = recoleccionDias()[fechaDe(man).getDay()] || (typeof volsProximos === 'function' && volsProximos().some(v => v.fecha === man));
+    return !hay || ahora > finDelDia(dia);
+  }
+  return false;
+}
+/* EL MISMO AVISO, UNA SOLA VEZ EN LA CAMPANITA
+   Iguales = mismo título, mismo texto y misma ventana. Se muestra el último;
+   al abrirlo se dan por vistos todos (marcarVistoAviso, en app.js). */
+const normAviso = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+const claveAviso = n => [n.titulo, n.texto, String(n.link || '').split(':')[0]].map(normAviso).join('|');
+function unoDeCada(lista){
+  const vistos = new Set();
+  return lista.slice().sort((a, b) => (b.at || 0) - (a.at || 0)).filter(n => { const k = claveAviso(n); if (vistos.has(k)) return false; vistos.add(k); return true; });
+}
+const misNotifs = () => { const u = yo(); if (!u) return []; const ahora = Date.now(); return aLista(Store.s.notifs).filter(n => meToca(n, u) && !avisoCaduco(n) && !avisoVencido(n, ahora)); };
+/* Todos los no vistos, repetidos incluidos (para marcarlos). */
+const noLeidasTodas = () => { const u = yo(); return misNotifs().filter(n => !aLista(n.leidas).includes(u.id)); };
+const noLeidas = () => unoDeCada(noLeidasTodas());
 
 /* Aviso del sistema operativo cuando la app está en segundo plano
    (en esta versión, mientras esté abierta en alguna pestaña). */

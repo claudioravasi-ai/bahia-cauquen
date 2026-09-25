@@ -141,7 +141,8 @@ const Nube = {
     /* Se vacía todo lo que maneja la nube: si quedaron datos de la demo o de
        otra sesión en este equipo, no tienen que subir a la base del barrio. */
     [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff].forEach(col => { if (Array.isArray(s[col])) s[col] = []; });
-    s.notifs = []; s.motorLog = {}; this.ultimo = {}; this.configLista = false;
+    s.notifs = []; s.motorLog = {}; this.ultimo = {}; this.configLista = false; this.motorListo = false;
+    this.listos = new Set(); this.esperados = new Set(); this.arranqueAt = Date.now();
     /* Leer la ficha propia. Si la base falla (conexión lenta, un corte),
        NO es lo mismo que "no hay ficha": antes se confundía y la cuenta de
        la garita terminaba en la pantalla de completar datos. Se reintenta. */
@@ -366,10 +367,41 @@ const Nube = {
         else Store.s[col] = arr;
         Store.s.notifs.sort((a, b) => b.at - a.at);
         this.recordar(col, arr);
+        /* Los avisos generales también quedan anotados como "lo que ya está
+           en la base". Antes no: cada equipo, al guardar por primera vez,
+           volvía a escribir TODOS los avisos generales con su copia, y si en
+           el medio alguien había marcado uno como visto, se lo borraba (el
+           aviso volvía a aparecer). Lo encontró la prueba de varios equipos. */
+        if (col === 'notifsTodos') this.recordar('notifs', Store.s.notifs);
         this.listos.add(base + col);
         if (this.arrancada) this.llegoAlgo();
-      }, err => { if (!opcional) console.warn('No se pudo leer', base, col, err.message); });
+      }, err => { this.listos.add(base + col); if (!opcional) console.warn('No se pudo leer', base, col, err.message); });
+      if (!opcional) this.esperados.add(base + col);
     });
+  },
+  /* =========================================================
+     EL MOTOR ESPERA A QUE HAYA LLEGADO TODO
+     Las reglas del motor deciden por lo que hay (y por lo que NO hay): con
+     la configuración todavía de fábrica, el camión "pasaba" los días viejos
+     ("Mañana pasa el camión: Húmedos"); sin las liquidaciones, "falta
+     cerrar el mes". Por eso el motor recién corre cuando llegaron la
+     configuración, las marcas y la primera lectura de cada colección (o su
+     error). Si algo no contesta en 30 s, corre igual.
+     ========================================================= */
+  listoParaMotor(){
+    if (!this.arrancada || !this.configLista || !this.motorListo) return false;
+    if (Date.now() - (this.arranqueAt || 0) > 30000) return true;
+    for (const k of this.esperados || []) if (!this.listos.has(k)) return false;
+    return true;
+  },
+  esperarMotor(){
+    clearInterval(this.esperandoMotor);
+    this.esperandoMotor = setInterval(() => {
+      if (!this.arrancada){ clearInterval(this.esperandoMotor); return; }
+      if (!this.listoParaMotor()) return;
+      clearInterval(this.esperandoMotor);
+      if (typeof Motor !== 'undefined') setTimeout(() => Motor.correr(), 800);
+    }, 400);
   },
   /* =========================================================
      LA CARPETA PRIVADA, ORDENADA POR COLECCIÓN (desde el 25-09-2026)
@@ -417,7 +449,8 @@ const Nube = {
         this.juntarPv(def.col);
         this.listos.add('pv/' + f);
         if (this.arrancada) this.llegoAlgo();
-      }, err => console.warn('No se pudo leer', 'pv/' + f, err.message));
+      }, err => { this.listos.add('pv/' + f); console.warn('No se pudo leer', 'pv/' + f, err.message); });
+      this.esperados.add('pv/' + f);
     });
   },
   juntarPv(col){
@@ -425,7 +458,7 @@ const Nube = {
     Object.entries(this.PV).filter(([, d]) => d.col === col).forEach(([f]) => (this.pvDatos[f] || []).forEach(x => { if (x.id && !vistos.has(x.id)){ vistos.add(x.id); arr.push(x); } }));
     if (col === 'notifs') Store.s.notifs = [...Store.s.notifs.filter(n => this.esNotifGeneral(n)), ...arr].sort((a, b) => b.at - a.at);
     else Store.s[col] = arr;
-    this.recordar(col, arr);
+    this.recordar(col, col === 'notifs' ? Store.s.notifs : arr);
   },
   /* Mudanza, una sola vez: lo que había en la carpeta vieja (privado/…) pasa
      a pv/… y la carpeta vieja se borra, para que no quede ninguna copia con
@@ -463,11 +496,28 @@ const Nube = {
       if (this.arrancada) this.llegoAlgo();
     });
     /* Las marcas del motor son compartidas: así un aviso automático sale una
-       sola vez para todo el barrio y no una por equipo encendido. */
+       sola vez para todo el barrio y no una por equipo encendido. Hasta que
+       no llega esta lectura, el motor no corre (Motor.correr mira motorListo). */
+    this.motorListo = false;
     this.db.ref('barrio/motorLog').on('value', snap => {
       Store.s.motorLog = snap.val() || {};
       this.ultimo.motorLog = JSON.stringify(Store.s.motorLog);
+      if (!this.motorListo){ this.motorListo = true; this.esperarMotor(); }
     });
+  },
+  motorListo: false,
+  /* Pide una marca del motor: la gana el primer equipo que la anota en la
+     base (transacción de Firebase) y solo ese da el aviso. Si ya estaba,
+     o la anotó otro un instante antes, devuelve false. */
+  async reclamarMarca(clave){
+    if (!this.db || !this.arrancada) return false;
+    const at = Date.now();
+    const r = await this.db.ref('barrio/motorLog/' + clave).transaction(cur => cur ? undefined : at, undefined, false);
+    if (!r || !r.committed || r.snapshot.val() !== at) return false;
+    Store.s.motorLog[clave] = at;
+    let antes = {}; try { antes = JSON.parse(this.ultimo.motorLog || '{}') || {}; } catch(e){}
+    antes[clave] = at; this.ultimo.motorLog = JSON.stringify(antes);
+    return true;
   },
 
   recordar(col, arr){ this.ultimo[col] = {}; arr.forEach(x => { if (x && x.id) this.ultimo[col][x.id] = JSON.stringify(x); }); },
@@ -560,8 +610,24 @@ const Nube = {
       });
       this.ultimo.config = cfg;
     }
-    const ml = JSON.stringify(s.motorLog || {});
-    if (ml !== this.ultimo.motorLog){ poner('barrio/motorLog', s.motorLog || {}); this.ultimo.motorLog = ml; }
+    /* Las marcas del motor van DE A UNA (barrio/motorLog/<marca>) y solo
+       después de haber leído las de la base. Antes se mandaba la lista
+       entera: un equipo que todavía no tenía la marca que otro acababa de
+       poner la borraba, y el aviso volvía a salir. Borrar, solo las de más
+       de 60 días (una copia vieja de otra pestaña no puede borrar marcas). */
+    if (this.motorListo){
+      const ml = s.motorLog || {}, txt = JSON.stringify(ml);
+      if (txt !== this.ultimo.motorLog){
+        let antes = {}; try { antes = JSON.parse(this.ultimo.motorLog || '{}') || {}; } catch(e){}
+        const lim = Date.now() - 59 * DIA;
+        new Set([...Object.keys(antes), ...Object.keys(ml)]).forEach(k => {
+          if ((antes[k] ?? null) === (ml[k] ?? null)) return;
+          if (ml[k] == null){ if (antes[k] < lim) poner('barrio/motorLog/' + k, null); return; }
+          poner('barrio/motorLog/' + k, ml[k]);
+        });
+        this.ultimo.motorLog = txt;
+      }
+    }
     /* =========================================================
        CADA COLECCIÓN VIAJA POR SEPARADO
        Un update() con varias rutas es TODO O NADA: si una sola ruta no

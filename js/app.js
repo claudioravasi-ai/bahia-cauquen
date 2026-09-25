@@ -893,9 +893,14 @@ function abrirNotifs(){
       <span class="ic ic-${n.color || 'brand'}">${I(n.icon || 'bell')}</span>
       <span class="txt"><b>${esc(n.titulo)}</b>${n.texto ? `<span>${esc(n.texto)}</span>` : ''}<time>${hace(n.at)}</time></span>${I('right')}</button>`).join('')}` : ''}`);
 }
-const marcarVistoAviso = (n, u) => { const l = listaDe(n, 'leidas'); if (!l.includes(u.id)) l.push(u.id); };
+/* Abrir un aviso da por vistos también sus repetidos (mismo título, texto
+   y ventana): en la campanita se muestran como uno solo. */
+const marcarVistoAviso = (n, u) => {
+  const k = claveAviso(n);
+  [n, ...noLeidasTodas().filter(x => x !== n && claveAviso(x) === k)].forEach(x => { const l = listaDe(x, 'leidas'); if (!l.includes(u.id)) l.push(u.id); });
+};
 A['notifs'] = abrirNotifs;
-A['notifs-leidas'] = () => { const u = yo(); Store.cambiar(() => noLeidas().forEach(n => marcarVistoAviso(n, u))); pintarTop(); abrirNotifs(); };
+A['notifs-leidas'] = () => { const u = yo(); Store.cambiar(() => noLeidasTodas().forEach(n => marcarVistoAviso(n, u))); pintarTop(); abrirNotifs(); };
 /* Abrir un aviso lo da por visto: si lleva a una ventana, va ahí; si no,
    se lee entero en la hoja y al cerrarla ya no está en la lista. */
 A['notif'] = el => {
@@ -1378,7 +1383,7 @@ async function cerrarSesion(){
        salir: se borra lo que vino de la nube y queda solo la preferencia de
        pantalla. Al volver a entrar se baja todo de nuevo. */
     [...Nube.ZONAS.barrio, ...Nube.ZONAS.privado, ...Nube.ZONAS.staff].forEach(col => { if (Array.isArray(Store.s[col])) Store.s[col] = []; });
-    Store.s.notifs = []; Store.s.motorLog = {}; Nube.ultimo = {}; Nube.arrancada = false;
+    Store.s.notifs = []; Store.s.motorLog = {}; Nube.ultimo = {}; Nube.arrancada = false; Nube.motorListo = false;
     Store.guardar();
   }
   Store.sesion.userId = null; Store.sesion.modo = ''; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
