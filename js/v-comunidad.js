@@ -177,21 +177,63 @@ R.chat = {
     const msgs = Store.s.msgs.filter(m => m.channel === canal).sort((a, b) => a.createdAt - b.createdAt).slice(-200);
     let dia = '';
     return `<div class="chat-wrap">
-      <div class="chips">${Object.entries(CANALES).map(([k, n]) => `<button class="chip ${k === canal ? 'on' : ''}" data-a="abrir" data-v="chat" data-p="${k}"># ${n}</button>`).join('')}</div>
+      <div class="chips">${Object.entries(CANALES).map(([k, n]) => `<button class="chip ${k === canal ? 'on' : ''}" data-a="abrir" data-v="chat" data-p="${k}"># ${n}</button>`).join('')}
+        <button class="chip" data-a="hist-chat" data-v="${canal}" title="Mensajes de hace más de ${Historial.VENTANA.msgs[1]} días">${I('clock')}Anteriores</button></div>
       <div class="chat" id="chatBox">${msgs.length ? msgs.map((m, i) => {
         const d = isoDe(new Date(m.createdAt)); const sep = d !== dia ? (dia = d, `<div class="dia-sep">${relDia(d)}</div>`) : '';
         const mia = m.autor === u.id, au = autorVisible(m.autor), oficial = ['admin','guardia'].includes(usuario(m.autor)?.rol);
         const mismo = i > 0 && msgs[i - 1].autor === m.autor && !sep && m.createdAt - msgs[i - 1].createdAt < 5 * MIN;
         return `${sep}<div class="msg ${mia ? 'mia' : ''} ${oficial && !mia ? 'oficial' : ''}">${!mia && !mismo ? `<div class="quien">${esc(au.nombre)}${au.casa ? ' · ' + esc(au.casa) : ''}</div>` : ''}
           <div class="b">${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`; }).join('') : vacio('chat', 'Nadie escribió todavía. ¡Arrancá la charla!')}</div>
-      <form class="chatbar" data-f="chat" data-canal="${canal}"><input name="text" id="chatIn" required maxlength="600" placeholder="Mensaje en #${CANALES[canal]}" autocomplete="off"><button class="btn btn-pri">${I('send')}</button></form></div>`;
+      <form class="chatbar" data-f="chat" data-canal="${canal}"><input name="text" id="chatIn" required maxlength="600" placeholder="Mensaje en #${CANALES[canal]} · sin nombres, usá el lote" autocomplete="off"><button class="btn btn-pri">${I('send')}</button></form></div>`;
   },
   alPintar(){ const c = $('#cuerpo'); if (c && !refrescandoChat) c.scrollTop = c.scrollHeight; },
 };
 let refrescandoChat = false;
+/* =========================================================
+   NORMA DE CONDUCTA DEL CHAT VECINAL (pedido de Claudio, 25-09-2026)
+   En el chat no se nombra a nadie: ni vecinos ni gente de la
+   Administración o de la garita. Se habla del lote ("el Lote 148"), no de
+   la persona. La app lo revisa ANTES de enviar: si el mensaje trae un
+   nombre o un apellido de alguien del barrio, no sale.
+   De dónde salen los nombres: las cuentas de la app y el padrón. Se toman
+   las palabras de 3 letras o más y se dejan afuera las que también son
+   palabras comunes del castellano (Rosa, Luna, Paz, Flores…): un
+   "florecen las flores" no puede quedar bloqueado. El número de lote
+   siempre se puede escribir.
+   ========================================================= */
+const PALABRAS_COMUNES = new Set(('rosa luna paz sol luz mar cruz flores flor campos campo rios rio torres torre vega sierra costa lago monte montes blanco blanca '
+  + 'franco bravo rico leal prado roca leon bosque fuentes fuente calle valle mesa lobo cano rey reyes santos santo alegre moreno morena rubio castillo palacios iglesias '
+  + 'ramos olivera olivares pinto nieves nieve dolores angeles angel pilar mercedes gloria soledad consuelo esperanza aurora victoria amparo rocio paloma estrella '
+  + 'clara blanco sosa miel oro plata piedra piedras manzano pereira robles soria salas mena bueno buena justo justa feliz serrano marino rivera ribera toro toros '
+  + 'gallo cordero conejo lobos peña pena sala casa casas villa villar barrio lote lotes garita guardia administracion admin vecino vecina vecinos todos todas '
+  + 'hola gracias buenas buenos dias tardes noches que como para por con los las del una uno unos unas este esta esto ese esa eso hay muy mas bien mal '
+  + 'agua gas luz cable perro perros gato gatos auto autos obra obras').split(' '));
+function nombresDelBarrio(){
+  const s = Store.s, set = new Set();
+  const sumar = t => normTxt(t).split(/[^a-zñ]+/).forEach(w => { if (w.length >= 3 && !PALABRAS_COMUNES.has(w)) set.add(w); });
+  aLista(s.users).forEach(x => { if (x && x.nombre && x.nombre !== 'Garita') sumar(x.nombre); });
+  aLista(s.padron).forEach(p => { if (!p) return; sumar(p.propietario || ''); aLista(p.titulares).forEach(t => sumar(typeof t === 'string' ? t : (t && t.nombre) || '')); });
+  aLista(Store.s.config.nombresChat).forEach(sumar);   /* por si la Administración quiere sumar alguno (guardias, personal) */
+  ['sa', 'srl', 'sas', 'suc', 'sucesion', 'otros', 'otra', 'otro'].forEach(w => set.delete(w));
+  return set;
+}
+/* Devuelve la palabra que no puede ir, o '' si el mensaje está bien. */
+function nombreEnMensaje(texto){
+  const nombres = nombresDelBarrio();
+  const palabras = normTxt(texto).split(/[^a-zñ]+/).filter(Boolean);
+  return palabras.find(w => nombres.has(w)) || '';
+}
 F['chat'] = (d, form) => {
   const canal = form.dataset.canal, u = yo();
-  Store.cambiar(s => { s.msgs.push({ id:uid(), channel:canal, autor:u.id, text:d.text.trim(), createdAt:Date.now() }); if (s.msgs.length > 2000) s.msgs.splice(0, s.msgs.length - 2000); });
+  const prohibido = nombreEnMensaje(d.text);
+  if (prohibido){
+    hoja('El mensaje no se envió', `${aviso('danger', 'alert', 'Norma de conducta del chat vecinal', `En el chat no se nombra a vecinos ni a personas de la Administración o de la garita. La palabra "${esc(prohibido)}" coincide con un nombre del barrio.`)}
+      <p class="small" style="margin:0 0 12px;color:var(--ink-2)">Nombrá el lote en lugar de la persona: por ejemplo, <b>"el Lote 148"</b>. Si es algo privado, escribile directamente desde Vecinos o a la Administración desde Tu casa → Mensajes.</p>
+      <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido, lo corrijo</button>`);
+    return;
+  }
+  Store.cambiar(s => { s.msgs.push({ id:uid(), channel:canal, autor:u.id, text:d.text.trim(), createdAt:Date.now() }); });
   const i = $('#chatIn'); if (i){ i.value = ''; i.focus(); }
   const c = $('#cuerpo'); if (c) c.scrollTop = c.scrollHeight;
 };
@@ -330,8 +372,12 @@ F['avistamiento'] = d => {
    directo a donde se hace.
    ========================================================= */
 const FAQ = [
-  ['¿Cómo aviso que viene una visita?', 'En Tu casa → Autorizar una visita. Cargás el nombre (y la patente si viene en auto) y la app arma un código y un QR para mandarle por WhatsApp. La garita lo ve al instante.', 'nuevo-pase', '', 'Autorizar una visita'],
-  ['¿Qué hago en una emergencia?', 'Mantené apretado el botón rojo SOS arriba a la derecha durante 3 segundos y elegí qué pasa. Salta en la garita, en la Administración y en las apps abiertas del barrio. Cuando se resuelva, tocá "Ya está solucionado". El DEA (desfibrilador) está en la garita.', 'abrir', 'emergencias', 'Ver Emergencias'],
+  ['¿Cómo aviso que viene una visita?', 'En Tu casa → Autorizar una visita. Cargás el nombre (y la patente si viene en auto) y la app arma un código y un QR para mandarle por WhatsApp. La garita lo ve al instante, con tu nombre como quien autorizó. Si viene varias veces (empleada, personal de una obra), marcá "Viene varias veces": es un solo QR para todos esos días.', 'nuevo-pase', '', 'Autorizar una visita'],
+  ['¿Cuánto tiempo queda mi historial de visitas?', 'En la app ves las visitas de los últimos {DIAS} días. Las anteriores no se pierden: pasan al archivo histórico del barrio, sin DNI ni patente, y las ves cuando quieras en Mis visitas → "Ver mi historial completo". Así la app no baja todo cada vez que la abrís y sigue rápida.', 'abrir', 'visitas', 'Mis visitas'],
+  ['¿Cómo pido el DEA (desfibrilador)?', 'En Ushuaia y servicios → Emergencias, al lado del corazón rojo: mantené apretado el botón verde SOLICITARLO durante 2 segundos y contestá SÍ. A la garita le salta la alarma con tu lote y tu apellido hasta que salen con el DEA; a vos te avisa cuando va en camino. Llamá también al 911.', 'abrir', 'emergencias', 'Ver Emergencias'],
+  ['¿Puedo nombrar a alguien en el chat vecinal?', 'No. Es una norma de conducta: en el chat no se escriben nombres ni apellidos de vecinos ni de la Administración o la garita, y la app no deja enviar el mensaje. Se nombra el lote ("el Lote 148"). Para algo personal, escribile en privado.', 'abrir', 'chat', 'Chat vecinal'],
+  ['¿Cómo aviso que tengo una obra?', 'En El barrio → Obras → Registrar mi obra. La ven al instante la Administración, la garita y todo el barrio, y aparece en la Pizarra del día mientras dure. Los días con mixer o camión mandá el "Aviso del día". La garita no la puede editar; la Administración sí.', 'abrir', 'obras', 'Obras'],
+  ['¿Qué hago en una emergencia?', 'Mantené apretado el botón rojo SOS arriba a la derecha durante 3 segundos y elegí qué pasa. Salta en la garita, en la Administración y en las apps abiertas del barrio. Cuando se resuelva, tocá "Ya está solucionado". El DEA (desfibrilador) está en la garita y se pide desde Emergencias.', 'abrir', 'emergencias', 'Ver Emergencias'],
   ['¿Cómo pago las expensas?', 'En Tu casa → Mis expensas ves el saldo y el cupón del mes. Tocá la tarjeta para pagar por transferencia (alias y CBU a mano) y avisá el pago con el comprobante: la Administración lo confirma y te llega el recibo.', 'abrir', 'expensas', 'Mis expensas'],
   ['¿Cómo reservo el quincho, el SUM o la cancha?', 'En Tu casa → Reservas elegís el espacio, el día y el turno. Si está ocupado se ve en gris.', 'abrir', 'reservas', 'Reservas'],
   ['¿Cómo hago un reclamo a la Administración?', 'En Tu casa → Mis reclamos. Es privado: lo ven solo vos y la Administración, que te contesta por ahí. Si otros vecinos tienen el mismo problema, la Administración puede publicarlo en el pizarrón.', 'abrir', 'reclamos', 'Mis reclamos'],
@@ -368,9 +414,9 @@ const FAQ_DATOS = [
     '• Ámbito local: Ordenanza Municipal 2102/1999 de barrios cerrados de Ushuaia, el estatuto y el reglamento interno del barrio.',
   ]],
   ['¿Quién es el responsable de los datos? ¿Qué papel cumple cada uno?', [
-    'En simple: el dueño y responsable de la base es el barrio. Google solo presta los servidores y no puede usar los datos para nada más. Quien hizo la app no es el responsable de la base.',
+    'En simple: el dueño y responsable de la base es el barrio. La empresa del servidor solo presta los equipos donde se guarda la base y no puede usar los datos para nada más. Quien hizo la app no es el responsable de la base.',
     '• Responsable del archivo (art. 2 de la Ley 25.326): el barrio, por medio de su entidad administradora, que decide la finalidad del tratamiento, aprueba las cuentas, asigna los roles y responde los pedidos de los titulares.',
-    '• Prestador de servicios informatizados, o encargado del tratamiento (art. 25): Google LLC, a través de Firebase y Google Apps Script, bajo sus condiciones de tratamiento y seguridad de datos. Por ley no puede aplicar los datos a un fin distinto del contratado ni cederlos, ni siquiera para conservarlos, y debe destruirlos al terminar la prestación.',
+    '• Prestador de servicios informatizados, o encargado del tratamiento (art. 25): la empresa que presta el servidor, la base de datos y el servicio de correo de la aplicación, bajo sus condiciones de tratamiento y seguridad de datos. Por ley no puede aplicar los datos a un fin distinto del contratado ni cederlos, ni siquiera para conservarlos, y debe destruirlos al terminar la prestación.',
     '• Personas autorizadas (Administración y garita): acceden solo a lo que su función requiere y están obligadas al secreto profesional sobre los datos (art. 10), una obligación que sigue vigente aun después de dejar la función.',
     '• Autor de la app (Claudio A. Ravasi, vecino, en forma gratuita): desarrolló la herramienta. No es el responsable del archivo ni decide sobre los datos. Su rol, si tiene alguno dentro del barrio, es el mismo que el de cualquier otro vecino con esa función.',
   ]],
@@ -385,15 +431,15 @@ const FAQ_DATOS = [
     '• Calidad y minimización (art. 4 inc. 1): los datos obligatorios son nombre y apellido, lote, correo y DNI (este último, para verificar que sos del barrio antes de aprobar la cuenta). Teléfono, profesión u oficio, vehículos, mascotas y foto del frente de la casa son optativos.',
     '• Finalidad (art. 4 inc. 3): comunicación, seguridad, administración y convivencia del barrio. Ningún dato se usa para publicidad ni para un fin distinto o incompatible. La app no tiene publicidad ni herramientas de seguimiento o de estadística de terceros.',
     '• Exactitud (art. 4 inc. 4 y 5): cada vecino corrige sus propios datos en Mi casa, en cualquier momento.',
-    '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran.',
+    '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran. Pasado ese plazo, la visita queda solo en el archivo histórico del barrio (quién vino, a qué lote y cuándo), sin DNI ni patente, con las mismas reglas de acceso que el resto: cada vecino ve solo las suyas.',
     '• Privacidad por defecto: lo optativo nace oculto. Tu teléfono, tu oficio o tu dirección se muestran a otros vecinos solo si vos lo marcás, y lo podés quitar cuando quieras.',
     '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, la garita no puede leer expensas, pagos, reclamos ni las conversaciones de los vecinos con la Administración, y la Administración no puede leer las conversaciones de un vecino con la garita.',
   ]],
   ['¿Está todo cifrado (encriptado)? ¿Qué medidas de seguridad hay?', [
     'En simple: sí, en el viaje y en el guardado. Y además el servidor decide quién puede leer cada cosa.',
     '• En el viaje: toda la comunicación entre tu equipo y la base del barrio viaja cifrada (HTTPS/TLS, el estándar de la banca en línea). Nadie en el camino (un wifi público, el proveedor de internet) puede leerla ni alterarla.',
-    '• En el guardado: los servidores de Google almacenan los datos cifrados con AES-256.',
-    '• Contraseñas: no se guardan. El sistema de cuentas de Google conserva solo una huella criptográfica irreversible (hash). Nadie puede verlas: ni la Administración, ni la garita, ni quien hizo la app. Si alguien la olvida, pide una nueva por correo.',
+    '• En el guardado: los servidores de la base de datos almacenan los datos cifrados con AES-256.',
+    '• Contraseñas: no se guardan. El sistema de cuentas del servidor conserva solo una huella criptográfica irreversible (hash). Nadie puede verlas: ni la Administración, ni la garita, ni quien hizo la app. Si alguien la olvida, pide una nueva por correo.',
     '• Control de acceso en el servidor: las reglas de la base definen, carpeta por carpeta, qué puede leer y escribir cada rol, y cada vecino solo puede abrir su propia carpeta. Aunque alguien manipulara la app en su teléfono, el servidor no le entrega lo que no le corresponde. Es la medida central que recomienda la Resolución AAIP 47/2018, junto con la identificación de cada usuario y el registro de lo que se hace.',
     '• Trazabilidad: cada acción relevante de la Administración (aprobar una cuenta, cambiar un rol, confirmar un pago, editar datos) queda en un registro de auditoría con autor, fecha y hora.',
     '• Equipos compartidos: al cerrar sesión se borra de ese equipo todo lo que vino del barrio.',
@@ -425,8 +471,8 @@ const FAQ_DATOS = [
     'Las peticiones a la garita se firman a mano en la pantalla, por el vecino y por el guardia. Jurídicamente es una firma electrónica (art. 5 de la Ley 25.506), no una firma digital con certificado. Por eso no reemplaza la firma de un instrumento que la ley exige firmado (art. 288 del Código Civil y Comercial), pero sí es un medio de prueba que el juez valora (art. 319). Cada petición lleva un sello criptográfico SHA-256: si alguien cambiara una sola letra después de firmada, el sello deja de coincidir y la alteración queda en evidencia.',
   ]],
   ['¿Dónde están guardados los datos? ¿Salen del país?', [
-    'En los servidores de Google (Firebase) en los Estados Unidos, con certificaciones internacionales de seguridad (ISO 27001 y SOC 2, entre otras). Los correos se envían por Google Apps Script y, si pagás en línea, el pago lo procesa Mercado Pago con sus propios resguardos.',
-    'La Ley 25.326 restringe la transferencia a países sin un nivel de protección adecuado (art. 12), y los Estados Unidos no figuran en la lista de la Disposición DNPDP 60-E/2016. La transferencia es lícita porque el titular la consiente expresamente al inscribirse: el Decreto 1558/2001 (art. 12) dispone que en ese caso la prohibición no rige. Además, Google actúa como prestador de servicios con las obligaciones del art. 25 de la ley.',
+    'En los servidores de la base de datos, en los Estados Unidos, con certificaciones internacionales de seguridad (ISO 27001 y SOC 2, entre otras). Los correos los envía el servicio de correo de la aplicación y, si pagás en línea, el pago lo procesa Mercado Pago con sus propios resguardos.',
+    'La Ley 25.326 restringe la transferencia a países sin un nivel de protección adecuado (art. 12), y los Estados Unidos no figuran en la lista de la Disposición DNPDP 60-E/2016. La transferencia es lícita porque el titular la consiente expresamente al inscribirse: el Decreto 1558/2001 (art. 12) dispone que en ese caso la prohibición no rige. Además, la empresa del servidor actúa como prestador de servicios con las obligaciones del art. 25 de la ley.',
   ]],
   ['¿Qué derechos tengo y cómo los ejerzo?', [
     '• Acceso: saber qué datos tuyos hay, de dónde salieron y para qué se usan. Es gratuito cada seis meses (antes, si acreditás un interés legítimo), y la respuesta debe llegar dentro de los 10 días corridos (art. 14). Tiene que ser clara y comprensible (art. 15).',
@@ -460,10 +506,9 @@ R.ayuda = {
   titulo: 'Preguntas frecuentes', icon: 'info', color: 'ok', sub: 'Cómo se hace cada cosa',
   render(){
     const item = (p, cuerpo) => `<details class="faq card"><summary><b>${esc(p)}</b>${I('right')}</summary>${cuerpo}</details>`;
-    return `${FAQ.map(([p, r, a, v, b]) => item(p, `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.55">${esc(r)}</p>
+    return `${FAQ.map(([p, r, a, v, b]) => item(p, `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.55">${faqTexto(r)}</p>
       ${a ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="${a}" data-v="${v}">${esc(b)}${I('right')}</button>` : ''}`)).join('')}
       <div class="sec" id="faqDatos"><h2>${I('lock')} Tus datos: privacidad y seguridad</h2></div>
-      <p class="small" style="color:var(--ink-2);margin:-4px 0 12px;line-height:1.55">Cómo cuida la app tu información, explicado en simple y con la norma que respalda cada punto, para que cualquier vecino (también quien sea abogado) lo pueda controlar.</p>
       ${FAQ_DATOS.map(([p, ps]) => item(p, ps.map(t => `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.6">${faqTexto(t)}</p>`).join(''))).join('')}
       <div class="btns" style="margin:4px 0 16px"><button class="btn btn-sm btn-sec" data-a="faq-datos-pdf">${I('download')}Descargar o imprimir esta sección</button>
         <button class="btn btn-sm btn-sec" data-a="abrir" data-v="legal">${I('file')}Términos de uso completos${I('right')}</button></div>

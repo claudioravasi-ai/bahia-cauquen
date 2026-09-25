@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20260925-123353';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260925-123353',
-  './js/firebase-config.js?v=20260925-123353', './js/icons.js?v=20260925-123353', './js/agenda.js?v=20260925-123353', './js/padron.js?v=20260925-123353', './js/core.js?v=20260925-123353', './js/seed.js?v=20260925-123353', './js/clima.js?v=20260925-123353', './js/calendario.js?v=20260925-123353',
-  './js/v-inicio.js?v=20260925-123353', './js/v-comunidad.js?v=20260925-123353', './js/v-gestion.js?v=20260925-123353', './js/admin.js?v=20260925-123353', './js/v-vecinos.js?v=20260925-123353', './js/v-expensas.js?v=20260925-123353', './js/v-plan.js?v=20260925-123353', './js/v-contable.js?v=20260925-123353', './js/v-servicio.js?v=20260925-123353', './js/v-legal.js?v=20260925-123353', './js/push.js?v=20260925-123353', './js/sismos.js?v=20260925-123353', './js/nube.js?v=20260925-123353', './js/app.js?v=20260925-123353',
+const CACHE = 'bhc-20260925-142146';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260925-142146',
+  './js/firebase-config.js?v=20260925-142146', './js/icons.js?v=20260925-142146', './js/agenda.js?v=20260925-142146', './js/padron.js?v=20260925-142146', './js/core.js?v=20260925-142146', './js/seed.js?v=20260925-142146', './js/clima.js?v=20260925-142146', './js/calendario.js?v=20260925-142146',
+  './js/v-inicio.js?v=20260925-142146', './js/v-comunidad.js?v=20260925-142146', './js/v-gestion.js?v=20260925-142146', './js/admin.js?v=20260925-142146', './js/v-vecinos.js?v=20260925-142146', './js/v-expensas.js?v=20260925-142146', './js/v-plan.js?v=20260925-142146', './js/v-contable.js?v=20260925-142146', './js/v-servicio.js?v=20260925-142146', './js/v-legal.js?v=20260925-142146', './js/push.js?v=20260925-142146', './js/sismos.js?v=20260925-142146', './js/nube.js?v=20260925-142146', './js/historial.js?v=20260925-142146', './js/app.js?v=20260925-142146',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

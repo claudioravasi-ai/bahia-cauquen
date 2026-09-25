@@ -402,6 +402,10 @@ function refrescarPronto(){
   if (refrescoTimer) clearTimeout(refrescoTimer);
   refrescoTimer = setTimeout(() => {
     refrescoTimer = null;
+    /* Las alarmas (SOS, pedido del DEA) no esperan: van en su propia capa y
+       se dibujan aunque haya una hoja abierta. Antes, una garita con una hoja
+       abierta no veía el SOS hasta cerrarla. */
+    if (!tocando && hojaAbierta() && yo()) conRed('alarmas', pintarAlarmas);
     if (tocando || hojaAbierta()) return;     /* se reintenta al soltar o al cerrar */
     refrescoPedido = false;
     if (yo()) refrescar();
@@ -582,7 +586,9 @@ const sosAvisadas = sosMemoria('bhc.sosAvisadas');   /* ya sonó y saltó acá *
 const sosOcultas = sosMemoria('bhc.sosOcultas');     /* la sacaron de la pantalla con "Entendido" */
 const sosEnPantalla = new Set();                      /* vecinos: las que saltaron en esta sesión */
 
-const sosAbiertas = () => aLista(Store.s.sos).filter(x => x && x.estado !== 'resuelta');
+/* Los pedidos del DEA viajan por el mismo canal (staff/sos, tipo 'dea') pero
+   NO son un SOS para todo el barrio: los atiende la garita (ver PEDIDO DEL DEA). */
+const sosAbiertas = () => aLista(Store.s.sos).filter(x => x && x.estado !== 'resuelta' && x.tipo !== 'dea');
 /* Las que van en la campanita de quien mira. */
 const sosEnCampanita = () => {
   const u = yo(); if (!u) return [];
@@ -600,11 +606,15 @@ const sosQueVeo = () => {
 function pintarAlarmas(){
   const box = $('#alarmas'); if (!box) return;
   const u = yo();
-  if (!u){ box.innerHTML = ''; return; }
+  if (!u){ box.innerHTML = ''; Dea.silencio(); return; }
+  /* La garita: un pedido del DEA tapa todo hasta que alguien sale con él. */
+  if (Dea.pintarEnGarita(box)) return;
   /* Las que llegan en vivo y este equipo todavía no mostró: saltan y suenan una vez. */
   const recien = sosAbiertas().filter(x => x.userId !== u.id && x.estado !== 'atendida' && !sosAvisadas.has(x.id) && Date.now() - x.at < SOS_EN_VIVO);
   recien.forEach(x => { sosAvisadas.add(x.id); sosEnPantalla.add(x.id); sosOcultas.delete(x.id); });
   if (recien.length){
+    /* La hoja es un diálogo modal y queda por encima de todo: se cierra para que se vea la alerta. */
+    if (hojaAbierta()) cerrarHoja();
     Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .56, .5]], 'square', .16);
     Sonido.vibrar([400, 160, 400, 160, 400]);
     sosAvisoDelSistema(recien[0]);
@@ -709,6 +719,127 @@ A['sos-repetir'] = () => { Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .
    en su campanita hasta que quien la pidió avise que está solucionada. */
 A['sos-entendido'] = el => { sosOcultas.add(el.dataset.id); sosEnPantalla.delete(el.dataset.id); pintarAlarmas(); pintarTop(); };
 A['sos-ver'] = el => { cerrarHoja(); sosOcultas.delete(el.dataset.id); sosEnPantalla.add(el.dataset.id); pintarAlarmas(); };
+
+/* =========================================================
+   PEDIDO DEL DEA (pedido de Claudio, 25-09-2026)
+   En Emergencias, al lado del corazón que late, el botón verde
+   "SOLICITARLO". Para que no salga por un toque sin querer: hay que
+   mantenerlo apretado 2 segundos y después contestar SÍ en una ventana
+   grande ("ESTÁ POR SOLICITAR EL DEA. ¿ES UNA EMERGENCIA?"). NO = no pasó
+   nada. SÍ = a la garita le salta la pantalla roja titilante con el lote y
+   el apellido, "Llamar al 911" y "Voy en camino con el DEA", y suena sin
+   parar (más aviso push con sonido) hasta que tocan "Voy en camino con el
+   DEA". Ahí se le va la alarma y al vecino le llega que el DEA va en camino.
+   Viaja en staff/sos con tipo 'dea' (esa carpeta ya la pueden escribir
+   todos los vecinos y la lee la garita): no depende de reglas nuevas.
+   ========================================================= */
+const DEA_ESPERA = 2000, DEA_VIGENCIA = 6 * 3600e3;
+const TIPO_DEA = { nombre:'Pedido del DEA', icon:'heart', llamar:'911' };
+const apellidoDe = n => { const p = String(n || '').trim().split(/\s+/); return p.length > 1 ? p[p.length - 1] : p[0] || ''; };
+const Dea = {
+  timer: null, cuenta: null, bucle: null,
+  pedidos: () => aLista(Store.s.sos).filter(x => x && x.tipo === 'dea' && x.estado === 'activa' && Date.now() - x.at < DEA_VIGENCIA).sort((a, b) => a.at - b.at),
+  mio: () => { const u = yo(); return u ? aLista(Store.s.sos).filter(x => x && x.tipo === 'dea' && x.userId === u.id && x.estado !== 'resuelta' && Date.now() - x.at < 2 * 3600e3).sort((a, b) => b.at - a.at)[0] : null; },
+  sonar(){ Sonido.tocar([[1175, 0, .3], [880, .32, .3], [1175, .64, .3], [880, .96, .4]], 'square', .2); Sonido.vibrar([500, 150, 500, 150, 500]); },
+  silencio(){ if (this.bucle){ clearInterval(this.bucle); this.bucle = null; } },
+  pintarEnGarita(box){
+    const lista = esGuardia() ? this.pedidos() : [];
+    if (!lista.length){ this.silencio(); return false; }
+    const x = lista[0], v = usuario(x.userId) || {};
+    if (!this.bucle){ this.sonar(); this.bucle = setInterval(() => this.sonar(), 2600); this.avisoDelSistema(x, v); }
+    if (hojaAbierta()) cerrarHoja();   /* la hoja (diálogo modal) taparía la alarma */
+    const L = v.casa && typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === v.casa) : null;
+    const mapa = x.coords ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(x.coords)}` : '';
+    box.innerHTML = `<div class="sos-pantalla dea-pantalla" role="alertdialog" aria-label="Emergencia: piden el DEA"><div class="sos-caja">
+      <div class="sos-cab">${I('heart')}<div><b>EMERGENCIA · PIDEN EL DEA</b><span>${hace(x.at)}${lista.length > 1 ? ` · y ${lista.length - 1} pedido más` : ''}</span></div></div>
+      <div class="sos-vecino">${v.fotoCasa ? fotoHTML(v.fotoCasa, 'casa-foto grande') : `<span class="casa-foto grande vacia">${I('home')}</span>`}
+        <div class="grow"><b class="dea-apellido">${esc(apellidoDe(v.nombre) || 'Vecino/a').toUpperCase()}</b><div class="sos-dato">${esc(v.nombre || '')}</div>
+          <div class="sos-lote">${esc(v.casa || 'Lote sin dato')}${L ? ' · UF ' + L.uf : ''}</div>
+          ${v.direccion ? `<div class="sos-dato">${esc(v.direccion)}</div>` : ''}</div></div>
+      <div class="sos-botones">
+        <a class="btn btn-block sos-b-claro dea-911" href="tel:911">${I('phone')}LLAMAR AL 911</a>
+        <button class="btn btn-block dea-voy" data-a="dea-voy" data-id="${x.id}">${I('heart')}VOY EN CAMINO CON EL DEA</button>
+        ${mapa ? `<a class="btn btn-block sos-b-tenue" href="${mapa}" target="_blank" rel="noopener">${I('pin')}Dónde está (GPS del pedido)</a>` : ''}
+        ${v.tel ? `<a class="btn btn-block sos-b-tenue" href="${telLink(v.tel)}">${I('phone')}Llamar a ${esc((v.nombre || '').split(' ')[0])}</a>` : ''}
+        <p class="sos-nota">La alarma suena hasta que alguien de la garita toca "Voy en camino con el DEA".</p>
+      </div></div></div>`;
+    Fotos.hidratar(box);
+    return true;
+  },
+  avisoDelSistema(x, v){
+    try { if (!('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
+      new Notification('🚨 EMERGENCIA · Piden el DEA', { body:`${v.casa || ''} · ${apellidoDe(v.nombre)}`, icon:'icons/icon-192.png', tag:'dea-' + x.id, requireInteraction:true }); } catch(e){}
+  },
+  /* El botón verde se mantiene apretado 2 segundos. */
+  apretar(e){
+    const b = e.target.closest && e.target.closest('#deaBtn'); if (!b) return;
+    e.preventDefault(); if (Dea.timer) return;
+    Sonido.despertar(); b.classList.add('cargando'); Sonido.vibrar(40);
+    const desde = Date.now(), txt = b.querySelector('span');
+    Dea.cuenta = setInterval(() => { const p = Math.min(1, (Date.now() - desde) / DEA_ESPERA);
+      b.style.setProperty('--dea-carga', (p * 100).toFixed(1) + '%'); if (txt) txt.textContent = p < 1 ? `Mantené… ${Math.ceil((DEA_ESPERA - (Date.now() - desde)) / 1000)}` : 'SOLICITARLO'; }, 50);
+    Dea.timer = setTimeout(() => { Dea.soltar(false); Sonido.vibrar([90, 60, 90]); Dea.preguntar(); }, DEA_ESPERA);
+  },
+  soltar(cancelado = true){
+    const b = $('#deaBtn');
+    if (Dea.timer){ clearTimeout(Dea.timer); Dea.timer = null; }
+    if (Dea.cuenta){ clearInterval(Dea.cuenta); Dea.cuenta = null; }
+    if (!b) return;
+    const estaba = b.classList.contains('cargando');
+    b.classList.remove('cargando'); b.style.removeProperty('--dea-carga');
+    const txt = b.querySelector('span'); if (txt) txt.textContent = 'SOLICITARLO';
+    if (cancelado && estaba) toast('Para pedir el DEA, mantené apretado el botón 2 segundos', 'heart');
+  },
+  preguntar(){
+    hoja('¿Es una emergencia?', `<div class="dea-pregunta">${I('heart')}<p>ESTÁ POR SOLICITAR EL DEA,<br>¿ES UNA EMERGENCIA?</p></div>
+      <div class="dea-sino"><button class="btn dea-si" data-a="dea-si">SÍ</button><button class="btn btn-sec dea-no" data-a="dea-no">NO</button></div>
+      <p class="muted small" style="margin:12px 0 0;text-align:center">SÍ: a la garita le salta la alarma con tu lote y tu apellido. NO: no se manda nada.</p>`);
+  },
+};
+document.addEventListener('pointerdown', e => Dea.apretar(e));
+['pointerup','pointercancel'].forEach(t => document.addEventListener(t, () => { if (Dea.timer) Dea.soltar(true); }));
+document.addEventListener('pointermove', e => {
+  if (!Dea.timer) return; const b = $('#deaBtn'); if (!b) return; const r = b.getBoundingClientRect();
+  if (e.clientX < r.left - 24 || e.clientX > r.right + 24 || e.clientY < r.top - 24 || e.clientY > r.bottom + 24) Dea.soltar(true);
+});
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('#deaBtn')) e.preventDefault(); });
+window.addEventListener('blur', () => { if (Dea.timer) Dea.soltar(false); });
+A['dea-no'] = () => { cerrarHoja(); toast('No se mandó nada', 'check'); };
+A['dea-si'] = () => {
+  const u = yo(); if (!u) return;
+  if (Dea.mio()){ cerrarHoja(); toast('Tu pedido del DEA ya está en la garita', 'heart'); return; }
+  const id = uid(), apellido = apellidoDe(u.nombre);
+  Store.cambiar(s => {
+    s.sos.unshift({ id, userId:u.id, tipo:'dea', at:Date.now(), estado:'activa' });
+    s.bitacora.unshift({ id:uid(), autor:'sistema', tipo:'incidente', texto:`Pedido del DEA desde ${u.casa} (${u.nombre}).`, at:Date.now() });
+    notificar(s, { para:'rol:admin', titulo:'Emergencia: piden el DEA', texto:`${u.casa} · ${apellido}`, icon:'heart', color:'danger', link:'emergencias', urgente:true });
+  });
+  if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => {
+    const coords = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
+    Store.cambiar(s => { const x = s.sos.find(o => o.id === id); if (x) x.coords = coords; });
+  }, () => {}, { enableHighAccuracy:true, timeout:8000 });
+  if (typeof Push !== 'undefined') Push.enviar({ para:'rol:guardia', titulo:'🚨 EMERGENCIA · Piden el DEA', texto:`${u.casa} · ${apellido}`, tag:'dea-' + id, urgente:true, sonido:'sos', link:'garita' });
+  const g = Store.s.config.garitaTel || contactoTel('Garita');
+  hoja('Pedido enviado a la garita', `<div class="aviso a-danger latido">${I('heart')}<div class="txt"><b>La garita ya recibió tu pedido del DEA</b>Mientras llega, llamá al 911 y, si sabés, empezá la reanimación (RCP).</div></div>
+    <div class="btns" style="margin-top:6px"><a class="btn btn-danger" href="tel:911">${I('phone')}Llamar al 911</a>
+      ${g ? `<a class="btn btn-sec" href="${telLink(g)}">${I('gate')}Llamar a la garita</a>` : ''}</div>
+    <p class="muted small" style="margin:14px 0 0">Cuando alguien de la garita salga con el DEA, te llega un aviso.</p>`);
+};
+A['dea-voy'] = el => {
+  Dea.silencio();
+  Store.cambiar(s => {
+    const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
+    x.estado = 'en_camino'; x.atiende = yo().id; x.enCaminoAt = Date.now();
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`Sale el DEA hacia ${usuario(x.userId)?.casa || ''}.`, at:Date.now() });
+    notificar(s, { para:x.userId, titulo:'El DEA va en camino', texto:'La garita salió con el desfibrilador.', icon:'heart', color:'ok', urgente:true, sonido:true });
+    notificar(s, { para:'rol:admin', titulo:'El DEA va en camino', texto:usuario(x.userId)?.casa || '', icon:'heart', color:'ok' });
+  });
+  toast('Avisamos al vecino: el DEA va en camino', 'heart');
+};
+A['dea-listo'] = el => {
+  Store.cambiar(s => { const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return; x.estado = 'resuelta'; x.resueltaAt = Date.now(); x.resuelve = yo().id; });
+  toast('Listo, pedido cerrado', 'check');
+};
 
 function pitido(){ Sonido.tocar([[880, 0, .22], [880, .35, .22], [880, .7, .22]], 'square', .1); Sonido.vibrar([300, 150, 300, 150, 300]); }
 
@@ -1580,6 +1711,7 @@ const PIEZAS = [
   ['js/push.js',       () => typeof Push],
   ['js/sismos.js',     () => typeof Sismos],
   ['js/nube.js',       () => typeof Nube],
+  ['js/historial.js',  () => typeof Historial],
 ];
 function piezasQueFaltan(){
   const falta = [];

@@ -395,10 +395,11 @@ const ADMIN_TABS = {
         ${c.estado !== 'enviado' ? `<button class="btn btn-xs btn-sec" data-a="correo-manual" data-id="${c.id}">${I('send')}Mandar</button>` : ''}</div></div>`).join('') : vacio('mail', 'No hay correos.')}`;
   },
   auditoria(){
-    const a = Store.s.auditoria.slice(0, 200);
+    const a = aLista(Store.s.auditoria).filter(Boolean).sort((x, y) => y.at - x.at).slice(0, 200);
     return `<p class="muted small" style="margin-top:0">Registro de las acciones sensibles: altas, bajas, peticiones firmadas, cambios de contenido y recordatorios. No se puede editar desde la app.</p>
       <div class="card lista">${a.length ? a.map(x => `<div class="it"><div class="txt"><b>${esc(x.accion)}</b><span>${esc(x.detalle || '')} · ${esc(autorVisible(x.por).nombre)} · ${fechaHora(x.at)}</span></div></div>`).join('') : '<p class="muted small">Vacío.</p>'}</div>
-      <button class="btn btn-sec btn-block" data-a="exportar-auditoria">${I('download')}Descargar auditoría (CSV)</button>`;
+      <p class="muted tiny">Acá se ven los últimos ${Historial.VENTANA.auditoria[1]} días. La auditoría completa sigue en la base (no se borra) y se trae solo cuando la pedís.</p>
+      <div class="btns"><button class="btn btn-sec grow" data-a="hist-auditoria">${I('clock')}Ver toda la auditoría</button><button class="btn btn-sec grow" data-a="exportar-auditoria">${I('download')}Descargar lo reciente (CSV)</button></div>`;
   },
   datos(){
     const nube = typeof Nube !== 'undefined' && Nube.activa();

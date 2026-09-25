@@ -46,7 +46,7 @@ const normPatente = t => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 function textoPase(p){
   const u = usuario(p.hostId) || {}, c = Store.s.config;
   const cuando = p.dias?.length ? `${p.dias.map(d => DIAS[d]).join(', ')} de ${p.desde} a ${p.hasta} (hasta el ${fechaCorta(p.fechaFin)})` : `${fechaLarga(p.fecha)} de ${p.desde} a ${p.hasta}`;
-  return `¡Hola${p.nombre ? ' ' + p.nombre.split(' ')[0] : ''}! Te espero en el barrio ${c.nombre} (${u.casa || ''}).\n\n` +
+  return `¡Hola${p.nombre ? ' ' + p.nombre.split(' ')[0] : ''}! ${p.autoriza || u.nombre || 'Un vecino'} (${u.casa || ''}) te autorizó a entrar al barrio ${c.nombre}.\n\n` +
     `Tu código de ingreso: ${p.codigo}\nVálido: ${cuando}.\nMostralo en la garita (código o QR).\n\n` +
     `Tu pase con QR: ${urlApp('pase/' + p.id)}\nCómo llegar: ${c.mapa}`;
 }
@@ -57,7 +57,8 @@ function tarjetaPase(p, { garita = false } = {}){
   return `<div class="card" style="padding:13px 14px"><div class="pase">
     ${casaFoto || `<span class="ic ic-${t.c}">${I(t.icon)}</span>`}
     <div class="datos"><b>${esc(p.nombre)}</b>
-      <span>${garita ? `<b style="display:inline;color:var(--ink)">${esc(host.casa || '')}</b> · ` : ''}${t.n} · ${franja}${p.patente ? ' · ' + esc(p.patente) : ''}</span></div>
+      <span>${garita ? `<b style="display:inline;color:var(--ink)">${esc(host.casa || '')}</b> · ` : ''}${t.n} · ${franja}${p.patente ? ' · ' + esc(p.patente) : ''}</span>
+      ${garita ? `<span class="autoriza">${I('check')}Autorizó: <b>${esc(p.autoriza || host.nombre || 'vecino')}</b>${host.casa ? ' · ' + esc(host.casa) : ''}</span>` : ''}</div>
     <span class="estado e-${est}">${ESTADO_TXT[est]}</span></div>
     <div class="btns" style="margin-top:10px">
       ${garita ? (est === 'esperado' || est === 'vencido' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>` : est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="pase-out" data-id="${p.id}">${I('logout')}Salió</button>` : '')
@@ -72,7 +73,10 @@ function tarjetaPase(p, { garita = false } = {}){
 /* ---------- avisos urgentes del inicio ---------- */
 function urgentesVecino(){
   const u = yo(), s = Store.s, out = [], hoy = hoyISO();
-  s.sos.filter(x => x.userId === u.id && x.estado !== 'resuelta').forEach(x => out.push(aviso('danger latido', 'siren',
+  const deaMio = typeof Dea !== 'undefined' ? Dea.mio() : null;
+  if (deaMio) out.push(aviso(deaMio.estado === 'en_camino' ? 'ok' : 'danger latido', 'heart', deaMio.estado === 'en_camino' ? 'El DEA va en camino' : 'Tu pedido del DEA está en la garita',
+    deaMio.estado === 'en_camino' ? 'La garita salió con el desfibrilador.' : 'Esperando que salgan con el DEA. Llamá al 911.', `<button class="btn btn-xs btn-sec" data-a="dea-listo" data-id="${deaMio.id}">Ya no hace falta</button>`));
+  s.sos.filter(x => x.userId === u.id && x.estado !== 'resuelta' && x.tipo !== 'dea').forEach(x => out.push(aviso('danger latido', 'siren',
     x.estado === 'en_camino' ? `La guardia va en camino (${nombreDe(x.atiende)})` : x.estado === 'atendida' ? 'La guardia dio por atendida tu alerta' : 'Tu alerta SOS está activa',
     x.estado === 'atendida' ? 'Si ya está todo bien, confirmalo para que se cierre en todo el barrio.' : 'La guardia, la Administración y los vecinos ya fueron avisados.',
     `<button class="btn btn-xs btn-ok" data-a="sos-cancelar" data-id="${x.id}">${I('check')}Ya está solucionado</button>`)));
@@ -239,10 +243,9 @@ const SECCIONES = {
       const prox = proximoFeriado();
       return [
         teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · hospitales · farmacias', destaca:true }),
-        teja({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, súper y oficios del barrio' }),
+        teja({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, súper y más' }),
         teja({ v:'cruceros', icon:'send', color:'brand', t:'Cruceros', s: Cruceros.linea(), n: Cruceros.hoy().length || '' }),
         teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia hoy', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
-        teja({ v:'servicios', icon:'user', color:'wood', t:'Profesionales y oficios del barrio', s:(() => { const n = s.users.filter(enDirectorioProfesional).length; return n ? `${plural(n, 'vecino', 'vecinos')} para contactar` : 'Médicos, abogados, electricistas…'; })(), n: s.users.filter(enDirectorioProfesional).length || '' }),
         teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: Vuelos.cuantosHoy() || '' }),
         teja({ v:'municipio', icon:'pin', color:'sky', t:'Municipalidad de Ushuaia', s:'Trámites, reclamos urbanos, turnos' }),
         teja({ v:'sismos', icon:'sismo', color:'warn', t:'Sismos', s: (() => { const x = typeof Sismos !== 'undefined' && Sismos.destacado(); return x ? `M ${x.mag.toFixed(1)} · ${x.lugar} · ${hace(x.at)}` : 'En vivo en la región'; })() }),
@@ -283,7 +286,7 @@ const SECCIONES = {
         ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día', n: s.proveedores.filter(p => artEstado(p)[1] !== 'ok').length || '' })}
         ${teja({ v:'frecuentes', icon:'qr', color:'brand', t:'Ingresos frecuentes', s:'Proveedores del hotel, personal doméstico… con QR fijo', n: aLista(s.frecuentes).filter(f => f && !f.baja).length || '' })}
         ${teja({ v:'alertas', icon:'siren', color:'danger', t:'Avisos urgentes por zona', s:'Corte de luz, nieve, portón… con "Recibido" o "Necesito ayuda"', n: aLista(s.alertas).filter(alertaActiva).length || '' })}
-        ${teja({ v:'obras', p:'pendientes', icon:'wrench', color:'wood', t:'Obras por aprobar', s:'Registro de obras', n: s.obras.filter(o => o.estado === 'pendiente').length || '' })}
+        ${teja({ v:'obras', p: s.obras.some(o => o.estado === 'pendiente') ? 'pendientes' : 'activas', icon:'wrench', color:'wood', t:'Obras', s:'De los vecinos y del barrio · editar, pausar o sumar una', n: s.obras.filter(o => o.estado === 'activa').length || '' })}
         ${teja({ v:'comunicados', icon:'tack', color:'danger', t:'Comunicados importantes', s:'Ventana, sonido y acuse de recibo', n:(s.comunicados || []).filter(c => !c.archivado).length || '' })}
         ${teja({ a:'nuevo-post', v:'aviso', icon:'muro', color:'sky', t:'Publicar en el pizarrón', s:'Para lo que no es urgente' })}
         ${teja({ v:'proteccion', icon:'lock', color:'ok', t:'Protección de datos', s:'Registro en la AAIP, confidencialidad e incidentes', n: typeof tareasDatosPendientes === 'function' ? tareasDatosPendientes() || '' : '' })}
@@ -517,7 +520,7 @@ function avisosGenerales(){
     }
   }
   /* Obras en curso: salen solas, y en amarillo si hoy hay movimiento. */
-  aLista(s.obras).filter(o => o && o.estado === 'activa').forEach(o => {
+  aLista(s.obras).filter(o => o && o.estado === 'activa' && (!o.inicio || o.inicio <= hoy)).forEach(o => {
     const hoyHay = o.avisoHoy && o.avisoHoy.fecha === hoy;
     poner({ k:'obra-' + o.id + (hoyHay ? '-' + hoy : ''), nivel: hoyHay ? 'amarillo' : 'verde', icon: hoyHay ? 'truck' : 'wrench', tag: hoyHay ? 'Obra hoy' : 'Obra en curso',
       at: o.ultima || o.createdAt, titulo: hoyHay ? `${o.casa}: ${o.avisoHoy.texto}` : `${o.casa} · ${o.tipo}`,
@@ -811,7 +814,6 @@ R.visitas = {
     const pedidos = s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente');
     const mes = hoy.slice(0, 7);
     return `
-      ${superficie({ a:'nuevo-pase', icon:'plus', t:'Autorizar una visita', s:'Visita, delivery, proveedor, personal fijo o remís', cls:'acento' })}
       ${superficie({ a:'link-pedir', icon:'share', color:'accent', t:'Pasale un enlace a tu visita', s:'Completa sus datos desde su celular y vos lo aprobás con un toque' })}
       ${pedidos.map(r => aviso('info', 'qr', `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}`, `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)).join('')}
       ${sec('Hoy')}${deHoy.length ? deHoy.map(p => tarjetaPase(p)).join('') : vacio('users', 'No anunciaste a nadie para hoy.')}
@@ -831,7 +833,9 @@ R.visitas = {
       ${sec('Avisos a la guardia')}
       ${superficie({ a:'modo-viaje', icon:'lock', color:'wood', t: u.viaje && u.viaje.hasta >= hoy ? `Casa sola hasta el ${fechaCorta(u.viaje.hasta)}` : 'Me voy de viaje', s: u.viaje && u.viaje.hasta >= hoy ? 'La guardia suma rondas. Tocá para cambiar.' : 'La guardia suma rondas mientras la casa está sola' })}
       ${superficie({ a:'aviso-guardia', icon:'shield', color:'brand', t:'Aviso rápido a la guardia', s:'Llego tarde, ruidos raros, se cortó la luz…' })}
-      <p class="muted tiny" style="margin-top:14px">Los datos de tus visitas (DNI y patente) se borran solos a los ${Store.s.config.datosDias} días (Ley 25.326).</p>`;
+      ${sec('Historial')}
+      ${superficie({ a:'hist-mis-visitas', icon:'clock', color:'sky', t:'Ver mi historial completo', s:'Todas tus visitas desde el primer día. Se trae de la base solo cuando lo pedís.' })}
+      <p class="muted tiny" style="margin-top:14px">En la app quedan las visitas de los últimos ${Historial.diasVisitas()} días; las anteriores pasan al archivo histórico del barrio, sin DNI ni patente (Ley 25.326), y las ves con el botón de arriba.</p>`;
   },
 };
 A['nuevo-pase'] = (el) => {
@@ -847,23 +851,28 @@ A['nuevo-pase'] = (el) => {
     <div class="grid3"><div class="field"><label>Día</label><input type="date" name="fecha" value="${hoy}" min="${hoy}" required></div>
       <div class="field"><label>Desde</label><input type="time" name="desde" value="${desde}" required></div>
       <div class="field"><label>Hasta</label><input type="time" name="hasta" value="${hasta}" required></div></div>
-    <label class="check"><input type="checkbox" name="fijo"><span><b>Viene siempre</b> (empleada, jardinero, niñera…)</span></label>
-    <div id="fijoBox" hidden><div class="field" style="margin-top:8px"><label>Días</label><div class="seg dias-sel">${[1,2,3,4,5,6,0].map(d =>
+    <label class="check"><input type="checkbox" name="fijo" ${tipo0 === 'personal' ? 'checked' : ''}><span><b>Viene varias veces</b> (empleada, jardinero, personal de una obra por un tiempo…)</span></label>
+    <div id="fijoBox" ${tipo0 === 'personal' ? '' : 'hidden'}><p class="muted tiny" style="margin:6px 0 0">Se genera <b>un solo QR</b> que sirve todos los días elegidos, en ese horario, hasta la fecha final. No hay que hacer uno por día.</p><div class="field" style="margin-top:8px"><label>Días</label><div class="seg dias-sel">${[1,2,3,4,5,6,0].map(d =>
       `<label><input type="checkbox" name="dias" value="${d}" ${d >= 1 && d <= 5 ? 'checked' : ''}><span>${DIAS[d]}</span></label>`).join('')}</div></div>
       <div class="field"><label>Hasta la fecha</label><input type="date" name="fechaFin" value="${sumarDias(hoy, 90)}"></div></div>
     <div class="field" style="margin-top:8px"><label>Nota para la guardia (opcional)</label><input name="nota" maxlength="120" placeholder="Ej: deja la caja en la puerta"></div>
     <button class="btn btn-pri btn-block">${I('qr')}Crear el pase</button></form>`);
 };
-document.addEventListener('change', e => { if (e.target.name === 'fijo'){ const b = $('#fijoBox'); if (b) b.hidden = !e.target.checked; } });
+document.addEventListener('change', e => {
+  if (e.target.name === 'fijo'){ const b = $('#fijoBox'); if (b) b.hidden = !e.target.checked; }
+  /* Personal fijo o de obra: casi siempre viene varias veces. */
+  if (e.target.name === 'tipo' && e.target.closest('form[data-f="nuevo-pase"]') && ['personal', 'proveedor'].includes(e.target.value)){
+    const f = e.target.form.querySelector('[name=fijo]'); if (f && !f.checked){ f.checked = true; const b = $('#fijoBox'); if (b) b.hidden = false; } }
+});
 F['nuevo-pase'] = d => {
   const u = yo();
   if (minutosDe(d.hasta) <= minutosDe(d.desde) && d.hasta !== '00:00'){ toast('La hora de salida tiene que ser después de la de entrada', 'clock'); return; }
   const dias = d.fijo ? [].concat(d.dias || []).map(Number) : null;
   if (d.fijo && !dias.length){ toast('Elegí al menos un día', 'calendar'); return; }
   const p = { id:uid(), hostId:u.id, tipo:d.tipo, nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:(d.patente || '').toUpperCase().trim(),
-    fecha:d.fecha, desde:d.desde, hasta:d.hasta, nota:(d.nota || '').trim(), codigo:codigoPase(), log:{}, createdAt:Date.now() };
+    fecha:d.fecha, desde:d.desde, hasta:d.hasta, nota:(d.nota || '').trim(), codigo:codigoPase(), log:{}, createdAt:Date.now(), autoriza:u.nombre };
   if (dias){ p.dias = dias; p.fechaFin = d.fechaFin || sumarDias(d.fecha, 90); }
-  Store.cambiar(s => { s.pases.unshift(p); if (p.fecha === hoyISO()) notificar(s, { para:'rol:guardia', titulo:'Nueva visita anunciada', texto:`${p.nombre} → ${u.casa} · ${p.desde}–${p.hasta}`, icon:'users', color:'sky', link:'garita' }); });
+  Store.cambiar(s => { s.pases.unshift(p); if (p.fecha === hoyISO()) notificar(s, { para:'rol:guardia', titulo:'Nueva visita anunciada', texto:`${u.nombre} (${u.casa}) autorizó a ${p.nombre} · ${p.desde}–${p.hasta}`, icon:'users', color:'sky', link:'garita' }); });
   verPase(p.id, true);
 };
 function verPase(id, recien = false){
@@ -871,7 +880,8 @@ function verPase(id, recien = false){
   const u = usuario(p.hostId) || {};
   hoja(recien ? '¡Pase listo!' : 'Pase de ingreso', `
     <div class="ticket"><div class="tk-top"><small>Ingreso a ${esc(Store.s.config.nombre)}</small><h3>${esc(p.nombre)}</h3>
-      <div style="opacity:.85;font-size:13px">${esc(u.casa || '')} · ${p.dias?.length ? p.dias.map(d => DIAS[d]).join(' ') : relDia(p.fecha)} · ${p.desde}–${p.hasta}</div></div>
+      <div style="opacity:.85;font-size:13px">${esc(u.casa || '')} · ${p.dias?.length ? p.dias.map(d => DIAS[d]).join(' ') : relDia(p.fecha)} · ${p.desde}–${p.hasta}</div>
+      <div style="opacity:.85;font-size:12px;margin-top:4px">Autorizó: ${esc(p.autoriza || u.nombre || '')}${p.dias?.length ? ` · mismo QR todos esos días hasta el ${fechaCorta(p.fechaFin)}` : ''}</div></div>
       <div class="bottom"><div class="qr-box" data-qr="BHC:${p.codigo}"></div><div class="codigo-grande">${p.codigo}</div>
       <div class="muted small">Mostralo en la garita. También sirve dictar el código.</div></div></div>
     <div class="btns" style="margin-top:14px">
@@ -952,7 +962,7 @@ A['sol-pase-si'] = el => {
   const u = yo(); let nuevo;
   Store.cambiar(s => {
     const r = s.solicitudesPase.find(x => x.id === el.dataset.id); if (!r) return;
-    nuevo = { id:uid(), hostId:u.id, tipo:'visita', nombre:r.nombre, dni:r.dni, patente:r.patente, fecha:r.fecha, desde:r.desde, hasta:r.hasta, codigo:codigoPase(), log:{}, createdAt:Date.now() };
+    nuevo = { id:uid(), hostId:u.id, tipo:'visita', nombre:r.nombre, dni:r.dni, patente:r.patente, fecha:r.fecha, desde:r.desde, hasta:r.hasta, codigo:codigoPase(), log:{}, createdAt:Date.now(), autoriza:u.nombre };
     s.pases.unshift(nuevo); r.estado = 'aprobado'; r.paseId = nuevo.id;
   });
   toast('Aprobado. Su QR ya aparece en su celular.', 'check');
@@ -1701,6 +1711,7 @@ R.garita = {
           <button type="button" class="btn btn-sm btn-sec" data-a="llegada-nueva">${I('gate')}Llegó sin aviso</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="paquete-nuevo">${I('box')}Llegó un paquete</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button>
+          <button type="button" class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('clock')}Historial de visitas</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="alerta-nueva">${I('siren')}Aviso urgente</button></div>
       </form>
       ${s.peticiones.filter(p => p.estado === 'pendiente').map(p => aviso('warn latido', 'edit', `Petición de ${esc(p.casa)} sin recibir`, esc(TIPOS_PET[p.tipo]?.n || ''), `<button class="btn btn-xs btn-sec" data-a="ver-peticion" data-id="${p.id}">Leer y firmar</button>`)).join('')}
@@ -1782,7 +1793,7 @@ function movimiento(id, tipo){
     p.log = p.log || {}; p.log[hoy] = p.log[hoy] || {}; p.log[hoy][tipo] = Date.now();
     const casa = usuario(p.hostId)?.casa || '';
     notificar(s, { para:p.hostId, titulo: tipo === 'in' ? `${p.nombre} entró al barrio` : `${p.nombre} salió del barrio`, texto:`${hora(Date.now())} h`, icon: tipo === 'in' ? 'login' : 'logout', color:'ok', link:'visitas' });
-    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: ${p.nombre} (${TIPOS_PASE[p.tipo]?.n || ''}) → ${casa}${p.patente ? ' · ' + p.patente : ''}`, at:Date.now() });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: ${p.nombre} (${TIPOS_PASE[p.tipo]?.n || ''}) → ${casa} · autorizó ${p.autoriza || nombreDe(p.hostId)}${p.patente ? ' · ' + p.patente : ''}`, at:Date.now() });
   });
   cerrarHoja();
   toast(tipo === 'in' ? 'Ingreso registrado. El vecino ya fue avisado.' : 'Salida registrada', tipo === 'in' ? 'login' : 'logout');
@@ -1842,7 +1853,7 @@ R.bitacora = {
   render(p){
     if (!esStaff()) return vacio('lock', 'El libro de guardia es solo para la guardia y la Administración.');
     const filtro = p || 'todo';
-    const lista = Store.s.bitacora.filter(b => filtro === 'todo' || b.tipo === filtro).slice(0, 120);
+    const lista = aLista(Store.s.bitacora).filter(b => b && (filtro === 'todo' || b.tipo === filtro)).sort((a, b) => b.at - a.at).slice(0, 120);
     let dia = '';
     return `<form data-f="bitacora" class="card">
         <div class="seg" style="margin-bottom:10px">${Object.entries(TIPOS_BIT).filter(([k]) => k !== 'acceso').map(([k, t], i) => `<label><input type="radio" name="tipo" value="${k}" ${i === 1 ? 'checked' : ''}><span>${I(t[1])}${t[0]}</span></label>`).join('')}</div>
@@ -1850,6 +1861,8 @@ R.bitacora = {
         <label class="check" style="margin:10px 0 0"><input type="checkbox" name="avisar" ${esAdmin() ? 'checked' : ''}><span>${esAdmin() ? 'Avisarle también a la garita (le suena y le aparece en la campanita)' : 'Avisarle también a la Administración'}</span></label>
         <p class="muted tiny" style="margin:8px 0 0">${I('info')} Lo que se anota acá queda en el <b>libro de guardia</b>: lo leen solo la garita y la Administración, con fecha, hora y quién lo escribió. No lo ven los vecinos y no se puede borrar.</p></form>
       <div class="chips">${['todo', ...Object.keys(TIPOS_BIT)].map(k => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="bitacora" data-p="${k}">${k === 'todo' ? 'Todo' : TIPOS_BIT[k][0]}</button>`).join('')}</div>
+      <div class="btns" style="margin:0 0 10px"><button class="btn btn-sm btn-sec" data-a="hist-bitacora">${I('clock')}Ver el libro completo</button><button class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('users')}Historial histórico de visitas</button></div>
+      <p class="muted tiny" style="margin:-4px 0 10px">Acá se ven los últimos ${Historial.VENTANA.bitacora[1]} días; lo anterior se trae de la base solo cuando lo pedís, así la app no se hace pesada.</p>
       <div class="card">${lista.length ? lista.map(b => {
         const d = isoDe(new Date(b.at)); const sep = d !== dia ? (dia = d, `<div class="sec" style="margin:14px 0 4px"><h2>${relDia(d)}</h2></div>`) : '';
         const t = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad;

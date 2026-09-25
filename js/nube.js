@@ -223,6 +223,8 @@ const Nube = {
        (se inscribió por el portal común), la Administración la corrige sola. */
     if (mio.rol === 'admin'){ setTimeout(() => this.corregirGarita(), 5000); setInterval(() => this.corregirGarita(), 60000); }
     if (mio.rol === 'admin') setTimeout(() => this.limpiarFotos(), 20000);
+    /* Lo viejo pasa al archivo histórico una vez por día (js/historial.js). */
+    setTimeout(() => { if (typeof Historial !== 'undefined' && this.listoParaMotor()) Historial.archivar(); }, 45000);
     /* La Administración deja a mano la dirección del correo para quien se
        inscribe, y manda lo que haya quedado sin salir. */
     if (mio.rol === 'admin') setTimeout(async () => {
@@ -359,7 +361,9 @@ const Nube = {
 
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
-      this.db.ref(`${base}/${col}`).on('value', snap => {
+      /* Bitácora, auditoría y chat bajan solo lo reciente (ver js/historial.js). */
+      const ref = this.db.ref(`${base}/${col}`), q = typeof Historial !== 'undefined' ? Historial.consulta(ref, col) : ref;
+      q.on('value', snap => {
         const v = snap.val() || {};
         const arr = Object.keys(v).map(k => this.comoLaGuardamos(col, v[k]));
         if (col === 'notifsTodos') Store.s.notifs = [...arr, ...Store.s.notifs.filter(n => !this.esNotifGeneral(n))];

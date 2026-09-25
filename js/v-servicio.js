@@ -502,15 +502,17 @@ R['mis-paquetes'] = {
 /* =========================================================
    6. SERVICIOS DE USHUAIA: atajos a la Municipalidad
    Direcciones verificadas en el sitio oficial (ushuaia.gob.ar) el
-   24-09-2026. Si alguna cambia, se corrige acá.
+   24-09-2026 y otra vez el 25-09-2026, una por una. Se sacaron las que
+   no llevaban a su página: "Turnos" terminaba en el ingreso a la
+   Ventanilla Digital (el mismo lugar que la teja de la Ventanilla) y
+   "Guía de servicios" era solo un índice de las demás. Queda solo lo que
+   abre directo lo que dice. Si alguna cambia, se corrige acá.
    ========================================================= */
 const MUNICIPIO = [
-  ['Trámites en línea', 'Portal de trámites de la Municipalidad', 'https://tramites.ushuaia.gob.ar/', 'file', 'brand'],
-  ['Atención al vecino', 'Reclamos urbanos: alumbrado, calles, baches', 'https://www.ushuaia.gob.ar/atencion-vecino', 'clipboard', 'warn'],
-  ['Guía de servicios', 'Todos los servicios municipales de la ciudad', 'https://www.ushuaia.gob.ar/servicios-municipales', 'info', 'ok'],
-  ['Ventanilla digital', 'Presentaciones sin ir a la Municipalidad', 'https://www.ushuaia.gob.ar/ventanilla-digital', 'send', 'sky'],
-  ['Autogestión y tasas', 'Boletas, deudas y pagos municipales', 'https://www.ushuaia.gob.ar/autogestion', 'wallet', 'wood'],
-  ['Turnos', 'Licencia de conducir y otros turnos', 'https://www.ushuaia.gob.ar/turnos', 'calendar', 'accent'],
+  ['Trámites en línea', 'Requisitos de cada trámite y cómo iniciarlo', 'https://tramites.ushuaia.gob.ar/', 'file', 'brand'],
+  ['Atención al vecino', 'Formulario de reclamos: alumbrado, calles, baches', 'https://www.ushuaia.gob.ar/atencion-vecino', 'clipboard', 'warn'],
+  ['Ventanilla digital', 'Ingresás con tu DNI: presentaciones y turnos', 'https://ventanilla.ushuaia.gob.ar/', 'send', 'sky'],
+  ['Autogestión y tasas', 'Imprimir boletas de inmuebles, autos y comercios', 'https://www.ushuaia.gob.ar/autogestion', 'wallet', 'wood'],
   ['Defensa Civil', 'Emergencias, nieve, incendios · teléfono 103', 'https://www.ushuaia.gob.ar/defensa-civil', 'siren', 'danger'],
   ['Farmacias de turno', 'Las de hoy, al día', 'https://www.ushuaia.gob.ar/farmacias-de-turno', 'heart', 'danger'],
   ['Cuándo llega el colectivo', 'Mi Bondi: el colectivo en tiempo real', 'https://www.ushuaia.gob.ar/mi-bondi', 'car', 'sky'],
@@ -522,7 +524,8 @@ R.municipio = {
   titulo:'Municipalidad de Ushuaia', icon:'pin', color:'sky', ancha:true, sub:'Trámites, reclamos urbanos y servicios',
   render(){
     return `<p class="muted small" style="margin:0 0 12px">Atajos al sitio oficial de la Municipalidad. Lo que es del barrio (reclamos internos, la garita, las expensas, la recolección de residuos que hace la empresa contratada) sigue siendo por la app.</p>
-      <div class="mosaico">${MUNICIPIO.map(([t, x, url, icon, color]) => teja({ a:'link', v:url, icon, color, t, s:x })).join('')}</div>`;
+      <div class="mosaico">${MUNICIPIO.map(([t, x, url, icon, color]) => teja({ a:'link', v:url, icon, color, t, s:x })).join('')}</div>
+      <p class="muted tiny" style="margin-top:12px">Cada teja abre la página oficial en una pestaña aparte; la app queda abierta atrás.</p>`;
   },
 };
 

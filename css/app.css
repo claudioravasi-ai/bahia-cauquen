@@ -483,6 +483,9 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .pase .datos{flex:1;min-width:0}
 .pase .datos b{display:block;font-size:15px;line-height:1.25}
 .pase .datos span{display:block;font-size:12.5px;color:var(--muted)}
+.pase .datos .autoriza{display:flex;align-items:center;gap:4px;margin-top:3px;color:var(--ok);font-weight:600}
+.pase .datos .autoriza b{display:inline;font-size:12.5px;color:var(--ink)}
+.pase .datos .autoriza svg{width:13px;height:13px;flex:none}
 .codigo-grande{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:38px;font-weight:800;letter-spacing:8px;text-align:center;color:var(--brand);margin:6px 0}
 .qr-box{background:#fff;border-radius:18px;padding:14px;width:min(240px,70vw);margin:4px auto 10px;box-shadow:var(--sh-2)}
 .qr-box svg,.qr-box img{width:100%;height:auto;display:block}
@@ -1782,3 +1785,30 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 .bienvenida .codigo-grande{color:#fff;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25)}
 /* Una dirección web larga dentro de un párrafo no puede ensanchar la ventana. */
 #cuerpo p,#cuerpo li{overflow-wrap:break-word}
+
+/* ===== DEA: el corazón que late y el botón para pedirlo (25-09-2026) ===== */
+.dea-fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dea-fila .grow{min-width:160px}
+.dea-corazon{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;flex:none;background:color-mix(in srgb,#e11d2e 14%,transparent)}
+.dea-corazon svg.i{width:32px;height:32px;color:#e11d2e;fill:#e11d2e;animation:deaLate 1s ease-in-out infinite}
+@keyframes deaLate{0%,100%{transform:scale(1)}15%{transform:scale(1.22)}30%{transform:scale(1)}45%{transform:scale(1.14)}60%{transform:scale(1)}}
+.dea-pedir{--dea-carga:0%;position:relative;overflow:hidden;border:0;border-radius:999px;padding:12px 18px;min-height:46px;font:inherit;font-weight:800;letter-spacing:.5px;
+  color:#fff;background:#16a34a;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  animation:deaTitila 1.1s ease-in-out infinite alternate}
+.dea-pedir::before{content:'';position:absolute;inset:0;width:var(--dea-carga);background:#0b5d27;transition:width .05s linear}
+.dea-pedir span{position:relative}
+.dea-pedir.cargando{animation:none;box-shadow:0 0 0 4px color-mix(in srgb,#16a34a 35%,transparent)}
+@keyframes deaTitila{from{background:#16a34a;box-shadow:0 0 0 0 rgba(22,163,74,.55)}to{background:#22c55e;box-shadow:0 0 0 8px rgba(22,163,74,0)}}
+@media (max-width:420px){ .dea-pedir{width:100%} }
+.dea-pregunta{text-align:center;padding:6px 0 4px}
+.dea-pregunta svg.i{width:48px;height:48px;color:#e11d2e;fill:#e11d2e;animation:deaLate 1s ease-in-out infinite}
+.dea-pregunta p{margin:10px 0 0;font-size:24px;line-height:1.25;font-weight:800;letter-spacing:-.3px;color:var(--ink)}
+.dea-sino{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.dea-sino .btn{min-height:64px;font-size:24px;font-weight:800;justify-content:center}
+.dea-si{background:#dc2626;color:#fff}
+/* La pantalla de la garita: más roja y titilando más rápido que un SOS. */
+.dea-pantalla{animation-duration:.6s}
+.dea-apellido{font-size:30px!important;letter-spacing:.5px}
+.dea-voy{background:#16a34a;color:#fff;font-size:18px;font-weight:800;min-height:58px;animation:deaTitila .9s ease-in-out infinite alternate}
+.dea-911{font-size:18px;font-weight:800;min-height:54px}
+@media (prefers-reduced-motion:reduce){ .dea-corazon svg.i,.dea-pregunta svg.i{animation:none} .dea-pedir,.dea-voy{animation:none} }

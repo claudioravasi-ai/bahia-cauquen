@@ -106,7 +106,7 @@ R.dm = {
     if (h && h.msgs.some(m => m.de !== u.id && !m.leido)){ h.msgs.forEach(m => { if (m.de !== u.id) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
     marcarVistoLink('dm:' + p);
     let dia = '';
-    return `<div class="chat-wrap"><div class="chat">${h && h.msgs.length ? h.msgs.map(m => { const d = isoDe(new Date(m.at)); const sep = d !== dia ? (dia = d, `<div class="dia-sep">${relDia(d)}</div>`) : '';
+    return `<div class="chat-wrap">${botonHistHilo('dms', h)}<div class="chat">${h && h.msgs.length ? h.msgs.map(m => { const d = isoDe(new Date(m.at)); const sep = d !== dia ? (dia = d, `<div class="dia-sep">${relDia(d)}</div>`) : '';
         return `${sep}<div class="msg ${m.de === u.id ? 'mia' : ''}"><div class="b">${esc(m.text)}<time>${hora(m.at)}${m.de === u.id && m.leido ? ' ✓✓' : ''}</time></div></div>`; }).join('')
         : vacio('chat', `Escribile a ${esc(otro.nombre.split(' ')[0])}. Nadie más ve esta conversación.`)}</div>
       <form class="chatbar" data-f="dm" data-u="${esc(p)}"><input name="text" id="dmIn" required maxlength="800" placeholder="Mensaje privado…" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
@@ -142,13 +142,15 @@ R.obras = {
     else if (filtro === 'pendientes') ls = ls.filter(o => o.estado === 'pendiente');
     const hoyObra = s.obras.filter(o => o.avisoHoy && o.avisoHoy.fecha === hoyISO());
     ls.sort((a, b) => (b.ultima || b.createdAt) - (a.ultima || a.createdAt));
-    const puede = o => o.userId === u.id || esAdmin();
-    return `${!esGuardia() ? superficie({ a:'nueva-obra', icon:'plus', t:'Registrar mi obra', s:'La Administración la aprueba y queda visible para el barrio', cls:'acento' }) : ''}
+    const puede = o => !esGuardia() && (o.userId === u.id || esAdmin());
+    return `${!esGuardia() ? superficie({ a:'nueva-obra', icon:'plus', t: esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', s: esAdmin() ? 'De un lote o del barrio (espacios comunes). La ven al instante todos: vecinos y garita.' : 'La ven al instante la Administración, la garita y todo el barrio', cls:'acento' }) : ''}
+      <p class="muted tiny" style="margin:0 0 10px">${I('info')} Cada obra en curso aparece todos los días en la Pizarra del día, desde que empieza hasta que termina. Los días con movimiento (mixer, camión, grúa) su dueño manda el "Aviso del día" y sale en amarillo. ${esGuardia() ? 'La garita las ve pero no las edita.' : 'La garita las ve pero no las puede editar; la Administración sí.'}</p>
       ${hoyObra.map(o => aviso('warn', 'truck', `Hoy en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h` : '')).join('')}
-      <div class="chips">${[['activas','En curso'],['pendientes','Por aprobar'],['finalizadas','Terminadas'],['todas','Todas']].map(([k, t]) => `<button class="chip ${k === filtro ? 'on' : ''}" data-a="abrir" data-v="obras" data-p="${k}">${t}</button>`).join('')}</div>
+      <div class="chips">${[['activas','En curso'], ...(s.obras.some(o => o.estado === 'pendiente') ? [['pendientes','Por aprobar']] : []),['finalizadas','Terminadas'],['todas','Todas']].map(([k, t]) => `<button class="chip ${k === filtro ? 'on' : ''}" data-a="abrir" data-v="obras" data-p="${k}">${t}</button>`).join('')}</div>
       ${ls.length ? ls.map(o => { const pct = Math.round((o.etapa + 1) / ETAPAS.length * 100), ult = o.historial?.at(-1);
         return `<div class="card"><div class="row" style="align-items:flex-start"><span class="ic ic-wood" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('wrench')}</span>
-          <div class="grow"><b style="font-size:15px">${esc(o.casa)} · ${esc(o.tipo)}</b><div class="muted small">${esc(o.empresa || 'Sin empresa cargada')}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</div></div>
+          <div class="grow"><b style="font-size:15px">${esc(o.casa)} · ${esc(o.tipo)}</b><div class="muted small">${esc(o.empresa || 'Sin empresa cargada')}${o.inicio ? ' · desde ' + fechaCorta(o.inicio) : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</div>
+            <div class="muted tiny">Cargada por ${o.porAdmin ? 'la Administración' : esc(autorVisible(o.userId).nombre)}${o.detalle ? ' · ' + esc(o.detalle) : ''}</div></div>
           <span class="pill ${o.estado === 'activa' ? 'p-ok' : o.estado === 'pendiente' ? 'p-warn' : o.estado === 'pausada' ? 'p-danger' : ''}">${{ activa:'En curso', pendiente:'Por aprobar', pausada:'Pausada', finalizada:'Terminada' }[o.estado]}</span></div>
           <div class="etapas">${ETAPAS.map((e, i) => `<i class="${i < o.etapa ? 'hecha' : i === o.etapa ? 'actual' : ''}" title="${e}"></i>`).join('')}</div>
           <div class="row small" style="justify-content:space-between"><b>${esc(ETAPAS[o.etapa])}</b><span class="muted">${pct}%</span></div>
@@ -156,27 +158,55 @@ R.obras = {
           ${puede(o) ? `<div class="btns" style="margin-top:12px">
             ${o.estado === 'pendiente' && esAdmin() ? `<button class="btn btn-sm btn-ok" data-a="obra-aprobar" data-id="${o.id}">${I('check')}Aprobar</button>` : ''}
             ${o.estado !== 'finalizada' && o.estado !== 'pendiente' ? `<button class="btn btn-sm btn-pri" data-a="obra-avance" data-id="${o.id}">${I('edit')}Actualizar etapa</button><button class="btn btn-sm btn-sec" data-a="obra-hoy" data-id="${o.id}">${I('truck')}Aviso del día</button>` : ''}
-            ${o.userId === u.id ? `<button class="btn btn-sm btn-sec" data-a="nuevo-pase" data-v="proveedor">${I('qr')}Pase para el personal</button>` : ''}
+            <button class="btn btn-sm btn-sec" data-a="obra-editar" data-id="${o.id}">${I('edit')}Editar</button>
+            ${o.userId === u.id && !o.porAdmin ? `<button class="btn btn-sm btn-sec" data-a="nuevo-pase" data-v="proveedor">${I('qr')}Pase para el personal</button>` : ''}
+            ${esAdmin() ? `<button class="btn btn-sm btn-danger-soft" data-a="obra-borrar" data-id="${o.id}" title="Borrar la obra">${I('trash')}</button>` : ''}
             ${esAdmin() && o.estado === 'activa' ? `<button class="btn btn-sm btn-danger-soft" data-a="obra-pausa" data-id="${o.id}">Pausar</button>` : ''}
             ${esAdmin() && o.estado === 'pausada' ? `<button class="btn btn-sm btn-ok" data-a="obra-reanudar" data-id="${o.id}">Reanudar</button>` : ''}</div>` : ''}</div>`; }).join('') : vacio('wrench', 'No hay obras en esta lista.')}
       <p class="muted tiny">El personal de obra ingresa con ART vigente (Ley 24.557). La guardia lo verifica en Proveedores.</p>`;
   },
 };
-A['nueva-obra'] = () => hoja('Registrar mi obra', `<form data-f="nueva-obra">
-  <div class="grid2"><div class="field"><label>Tipo</label><select name="tipo">${TIPOS_OBRA.map(t => `<option>${t}</option>`).join('')}</select></div>
-    <div class="field"><label>Etapa actual</label><select name="etapa">${ETAPAS.map((e, i) => `<option value="${i}">${e}</option>`).join('')}</select></div></div>
-  <div class="grid2"><div class="field"><label>Empresa / constructor</label><input name="empresa" maxlength="60"></div><div class="field"><label>Teléfono del responsable</label><input name="tel" inputmode="tel" maxlength="20"></div></div>
-  <div class="grid2"><div class="field"><label>Inicio</label><input type="date" name="inicio" value="${hoyISO()}"></div><div class="field"><label>Fin estimado</label><input type="date" name="finEstimado"></div></div>
-  <div class="field"><label>Detalle</label><textarea name="detalle" maxlength="400" placeholder="Qué se hace, si va a haber camiones, mixer, grúa…"></textarea></div>
+const formObra = (o = {}) => `
+  ${esAdmin() && !o.id ? `<div class="field"><label>¿De quién es la obra?</label><select name="casa"><option value="Barrio">Del barrio (espacios comunes, calles, portón…)</option>${opcionesLotes('')}</select>
+    <div class="ayuda">Cada obra es un registro aparte: una del barrio y la de un vecino conviven sin pisarse.</div></div>` : ''}
+  <div class="grid2"><div class="field"><label>Tipo</label><select name="tipo">${[...TIPOS_OBRA, 'Obra del barrio'].map(t => `<option ${t === o.tipo ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    <div class="field"><label>Etapa actual</label><select name="etapa">${ETAPAS.map((e, i) => `<option value="${i}" ${i === (o.etapa || 0) ? 'selected' : ''}>${e}</option>`).join('')}</select></div></div>
+  <div class="grid2"><div class="field"><label>Empresa / constructor</label><input name="empresa" maxlength="60" value="${esc(o.empresa || '')}"></div><div class="field"><label>Teléfono del responsable</label><input name="tel" inputmode="tel" maxlength="20" value="${esc(o.tel || '')}"></div></div>
+  <div class="grid2"><div class="field"><label>Inicio</label><input type="date" name="inicio" value="${o.inicio || hoyISO()}" required></div><div class="field"><label>Fin estimado</label><input type="date" name="finEstimado" value="${o.finEstimado || ''}"></div></div>
+  <div class="field"><label>Detalle</label><textarea name="detalle" maxlength="400" placeholder="Qué se hace, si va a haber camiones, mixer, grúa…">${esc(o.detalle || '')}</textarea></div>`;
+A['obra-editar'] = el => { const o = Store.s.obras.find(x => x.id === el.dataset.id); if (!o || esGuardia()) return;
+  hoja(`Editar la obra · ${o.casa}`, `<form data-f="obra-editar" data-id="${o.id}">${formObra(o)}<button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`); };
+F['obra-editar'] = (d, form) => {
+  if (esGuardia()) return;
+  Store.cambiar(s => { const o = s.obras.find(x => x.id === form.dataset.id); if (!o || !(o.userId === yo().id || esAdmin())) return;
+    Object.assign(o, { tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(), ultima:Date.now() });
+    if (o.etapa === ETAPAS.length - 1 && o.estado !== 'finalizada'){ o.estado = 'finalizada'; }
+    listaDe(o, 'historial').push({ at:Date.now(), etapa:o.etapa, texto:'Datos de la obra editados', por:yo().id });
+    auditar(s, 'Editó una obra', `${o.casa} · ${o.tipo}`, o.id); });
+  cerrarHoja(); toast('Obra actualizada', 'wrench');
+};
+A['obra-borrar'] = async el => {
+  if (!esAdmin()) return;
+  if (!await confirmar('Borrar la obra', 'Sale de la lista y de la pizarra. Queda anotado en la auditoría.', { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; auditar(s, 'Borró una obra', `${o.casa} · ${o.tipo}`, o.id); s.obras = s.obras.filter(x => x.id !== o.id); });
+  toast('Obra borrada', 'trash');
+};
+A['nueva-obra'] = () => hoja(esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', `<form data-f="nueva-obra">
+  ${formObra()}
   <label class="check"><input type="checkbox" required><span>Respeto el horario de obra (${esc(Store.s.config.obraHorario)}) y el personal ingresa con ART.</span></label>
-  <button class="btn btn-pri btn-block" style="margin-top:10px">${I('send')}Enviar a la Administración</button></form>`);
+  <button class="btn btn-pri btn-block" style="margin-top:10px">${I('send')}Publicar la obra</button></form>`);
 F['nueva-obra'] = d => {
   const u = yo();
-  Store.cambiar(s => { s.obras.unshift({ id:uid(), userId:u.id, casa:u.casa, tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(),
-      estado: esAdmin() ? 'activa' : 'pendiente', createdAt:Date.now(), ultima:Date.now(), historial:[{ at:Date.now(), etapa:+d.etapa, texto:d.detalle.trim() || 'Obra registrada', por:u.id }] });
-    notificar(s, { para:'rol:admin', titulo:`Obra para aprobar: ${u.casa}`, texto:d.tipo, icon:'wrench', color:'wood', link:'obras:pendientes' });
-    auditar(s, 'Registró una obra', `${u.casa} · ${d.tipo}`); });
-  cerrarHoja(); abrir('obras', esAdmin() ? 'activas' : 'pendientes'); toast('Obra registrada', 'wrench');
+  if (esGuardia()) return;
+  /* Sin aprobación previa (pedido de Claudio): la obra queda en curso al
+     instante y la ven la Administración, la garita y todo el barrio. La
+     Administración igual puede pausarla, editarla o borrarla. */
+  const casa = esAdmin() && d.casa ? d.casa : u.casa, porAdmin = esAdmin() && d.casa && d.casa !== u.casa;
+  Store.cambiar(s => { s.obras.unshift({ id:uid(), userId:u.id, casa, porAdmin: !!porAdmin, tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(),
+      estado:'activa', createdAt:Date.now(), ultima:Date.now(), historial:[{ at:Date.now(), etapa:+d.etapa, texto:d.detalle.trim() || 'Obra registrada', por:u.id }] });
+    notificar(s, { para:'todos', titulo:`Nueva obra en ${casa === 'Barrio' ? 'el barrio' : casa}`, texto:`${d.tipo}${d.empresa.trim() ? ' · ' + d.empresa.trim() : ''}${d.inicio ? ' · desde ' + fechaCorta(d.inicio) : ''}${d.finEstimado ? ' hasta ' + fechaCorta(d.finEstimado) : ''}`, icon:'wrench', color:'wood', link:'obras' });
+    auditar(s, 'Registró una obra', `${casa} · ${d.tipo}`); });
+  cerrarHoja(); abrir('obras', 'activas'); toast('Obra publicada: ya la ve todo el barrio', 'wrench');
 };
 A['obra-aprobar'] = el => Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; o.estado = 'activa'; o.ultima = Date.now();
   o.historial.push({ at:Date.now(), etapa:o.etapa, texto:'Aprobada por la Administración', por:yo().id });

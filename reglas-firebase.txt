@@ -151,11 +151,12 @@ PEGAR DESDE ACÁ
       "liquidaciones": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
 
       "posts":         { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
-      "msgs":          { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      "msgs":          { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".indexOn": ["createdAt"] },
       "reservas":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "compras":       { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "viajes":        { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
-      "obras":         { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
+      /* Obras: las registra cada vecino y la Administración; la garita las ve pero no las edita. */
+      "obras":         { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'guardia'" },
       "cruceros":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "eventosCiudad": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "avistamientos": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
@@ -210,6 +211,25 @@ PEGAR DESDE ACÁ
       }
     },
 
+    /* EL ARCHIVO HISTÓRICO (desde el 25-09-2026, ver js/historial.js).
+       Lo viejo de la carpeta privada (visitas de más de 90 días, mensajes
+       de más de 120) se muda acá una vez por día, para que la app no baje
+       todo cada vez que se abre. Mismas reglas que pv: cada vecino lee solo
+       lo suyo, cada rol la carpeta que le toca. A las visitas se les saca
+       el DNI y la patente antes de archivarlas. */
+    "hist": {
+      "$carpeta": {
+        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'))",
+        "$uid": {
+          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs')",
+          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs') && (auth.uid === $uid || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones') && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
+          "$id": {
+            ".write": "!data.exists() && ($carpeta === 'solicitudesPase' || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'))"
+          }
+        }
+      }
+    },
+
     /* La carpeta VIEJA (privado/<vecino>/…). La app de la Administración la
        muda sola a pv/ la primera vez que se abre con la versión nueva, y
        después la borra. Mientras tanto la lee y la escribe solo la
@@ -243,7 +263,7 @@ PEGAR DESDE ACÁ
         ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
       },
       "bitacora": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
-        "$id": { ".write": "!data.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" } },
+        "$id": { ".write": "!data.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }, ".indexOn": ["at"] },
       "avisos":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       "correos":  { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
       /* Ingresos frecuentes (proveedores del hotel, personal doméstico…):
@@ -254,6 +274,7 @@ PEGAR DESDE ACÁ
       "impuestos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "auditoria": {
         ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        ".indexOn": ["at"],
         "$id": { ".write": "!data.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
       }
     }
@@ -262,6 +283,17 @@ PEGAR DESDE ACÁ
 -----------------------------------------------------------
 HASTA ACÁ
 -----------------------------------------------------------
+
+✔ ARCHIVO HISTÓRICO Y OBRAS (25-09-2026, tarde)
+- hist/…: lo viejo de la carpeta privada (visitas de más de 90 días, sin
+  DNI ni patente; mensajes privados de más de 120 días) se muda acá una vez
+  por día. Mismas reglas que pv. Si estas reglas NO se publican, la app no
+  borra nada: la mudanza falla y todo queda donde estaba.
+- Índices (".indexOn") en staff/bitacora, staff/auditoria y barrio/msgs:
+  así cada equipo baja solo lo reciente (60/90/60 días) y lo anterior se
+  trae con un botón. Sin los índices anda igual, pero Firebase manda todo y
+  filtra en el teléfono.
+- barrio/obras: la garita ya no puede escribirlas (las ve, no las edita).
 
 ✔ LAS MARCAS DEL MOTOR, DE A UNA (25-09-2026, mediodía)
 barrio/motorLog ya no se puede escribir entero: solo cada marca por separado

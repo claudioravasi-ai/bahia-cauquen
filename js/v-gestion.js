@@ -661,7 +661,7 @@ function chatInterno(idP){
   const h = s.privados.find(x => x.userId === garitaId && x.con === 'interno');
   const msgs = h ? aLista(h.msgs) : [];
   if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
-  return `<div class="chat-wrap"><div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
+  return `<div class="chat-wrap">${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
       <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
       : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
     <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno"><input name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
@@ -700,7 +700,7 @@ R.privado = {
     const chips = esStaff() ? '' : `<div class="chips">
       <button class="chip ${con === 'admin' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="admin">${I('sliders')}Administración</button>
       <button class="chip ${con === 'guardia' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="guardia">${I('shield')}Guardia</button></div>`;
-    return `<div class="chat-wrap">${chips}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
+    return `<div class="chat-wrap">${chips}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
         <div class="b">${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
         : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? 'Escribile a la guardia. Nadie más lo ve.' : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
       <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}"><input name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? 'Mensaje a la guardia' : 'Mensaje a la Administración'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
@@ -843,6 +843,11 @@ A['borrar-voluminoso'] = async el => {
        vecinos que compartieron su profesión u oficio con el barrio.
    ========================================================= */
 const CATS_EMERGENCIA = /emergenc|hospital|farmac/i;
+/* Los teléfonos de la garita y de la Administración están en Ajustes; si el
+   contacto de la lista no tiene número propio, se toma de ahí. */
+const telGarita = () => Store.s.config.garitaTel || (aLista(Store.s.contactos).find(k => /garita/i.test(k.nombre)) || {}).tel || '';
+const telAdmin = () => Store.s.config.adminTel || (aLista(Store.s.contactos).find(k => /administraci/i.test(k.nombre)) || {}).tel || '';
+const telContacto = k => k.tel || (/garita/i.test(k.nombre) ? Store.s.config.garitaTel : /administraci/i.test(k.nombre) ? Store.s.config.adminTel : '') || '';
 /* ¿Es un celular (tiene WhatsApp)? En Ushuaia los fijos empiezan con 4
    después del 2901 (2901-42…, 43…, 44…); los celulares, con 15, 5 o 6.
    En Buenos Aires (11), con 15 o 6. Ante la duda, no se ofrece WhatsApp:
@@ -861,10 +866,19 @@ R.emergencias = {
   render(){
     const s = Store.s;
     const cats = [...new Set(s.agenda.map(a => a.categoria))].filter(c => CATS_EMERGENCIA.test(c));
+    const c = s.config, mio = typeof Dea !== 'undefined' ? Dea.mio() : null;
     return `<div class="btns" style="margin-bottom:12px"><a class="btn btn-danger" href="tel:911">${I('phone')}911</a><a class="btn btn-danger-soft" href="tel:107">107 Ambulancia</a><a class="btn btn-danger-soft" href="tel:100">100 Bomberos</a><a class="btn btn-danger-soft" href="tel:101">101 Policía</a></div>
-      <div class="card"><b>${I('heart')} Desfibrilador (DEA) del barrio · operativo</b><div class="small" style="color:var(--ink-2);margin-top:4px">${esc(s.config.dea)}</div></div>
+      ${telGarita() || telAdmin() ? `<div class="btns" style="margin-bottom:12px">
+        ${telGarita() ? `<a class="btn btn-pri grow" href="${telLink(telGarita())}">${I('gate')}Garita · ${esc(telGarita())}</a>` : ''}
+        ${telAdmin() ? `<a class="btn btn-sec grow" href="${telLink(telAdmin())}">${I('sliders')}Administración · ${esc(telAdmin())}</a>` : ''}</div>` : ''}
+      <div class="card dea-card"><div class="dea-fila"><span class="dea-corazon" aria-hidden="true">${I('heart')}</span>
+        <div class="grow"><b>Desfibrilador (DEA) del barrio · operativo</b><div class="small" style="color:var(--ink-2);margin-top:2px">${esc(c.dea)}</div></div>
+        ${esGuardia() ? '' : `<button type="button" class="dea-pedir" id="deaBtn" aria-label="Solicitar el DEA: mantener apretado 2 segundos"><span>SOLICITARLO</span></button>`}</div>
+        ${mio ? `<div style="margin-top:12px">${aviso(mio.estado === 'en_camino' ? 'ok' : 'danger latido', 'heart', mio.estado === 'en_camino' ? 'El DEA va en camino' : 'Tu pedido del DEA está en la garita',
+            mio.estado === 'en_camino' ? `Salió ${hace(mio.enCaminoAt || mio.at)}.` : 'Esperando que salgan con el DEA. Llamá al 911.', `<button class="btn btn-xs btn-sec" data-a="dea-listo" data-id="${mio.id}">Ya no hace falta</button>`)}</div>`
+        : esGuardia() ? '' : `<p class="muted tiny" style="margin:10px 0 0">En una emergencia (alguien se desmayó y no respira), <b>mantené apretado SOLICITARLO 2 segundos</b> y confirmá: a la garita le salta la alarma con tu lote y tu apellido. Llamá también al 911.</p>`}</div>
       ${sosDelDia()}
-      ${sec('Del barrio')}<div class="card lista">${s.contactos.map(c => renglonAgenda({ nombre:c.nombre, detalle:c.detalle, tel:c.tel, wa: c.wa !== false })).join('')}</div>
+      ${sec('Del barrio')}<div class="card lista">${s.contactos.map(k => renglonAgenda({ nombre:k.nombre, detalle:k.detalle, tel:telContacto(k), wa: k.wa !== false })).join('')}</div>
       ${cats.map(c => `${sec(esc(c))}<div class="card lista">${s.agenda.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('')}
       ${superficie({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, supermercados, oficios del barrio' })}`;
   },
@@ -919,7 +933,7 @@ function sosDelDia(){
   const lista = aLista(Store.s.sos).filter(x => x && Date.now() - x.at < DIA).sort((a, b) => b.at - a.at);
   const est = x => x.estado === 'resuelta' ? ['ok', 'Resuelta'] : x.estado === 'atendida' ? ['warn', 'Atendida, falta confirmar'] : x.estado === 'en_camino' ? ['warn', 'La guardia va en camino'] : ['danger', 'Activa'];
   const tarjeta = x => {
-    const t = TIPOS_SOS[x.tipo] || TIPOS_SOS.otra, v = usuario(x.userId) || {}, [c, e] = est(x);
+    const t = x.tipo === 'dea' ? TIPO_DEA : TIPOS_SOS[x.tipo] || TIPOS_SOS.otra, v = usuario(x.userId) || {}, [c, e] = x.tipo === 'dea' && x.estado === 'en_camino' ? ['ok', 'El DEA fue en camino'] : est(x);
     const quien = x.estado === 'resuelta' && x.resuelve ? (x.resuelve === x.userId ? 'la dio por solucionada el vecino' : `la cerró ${esc(nombreDe(x.resuelve))}`) : '';
     return `<details class="sos-dia s-${c}" tabindex="0">
       <summary><span class="ic ic-${c === 'ok' ? 'ok' : 'danger'}">${I(t.icon)}</span><span class="sd-txt"><b>${esc(t.nombre)}</b><small>${hora(x.at)} h · ${esc(v.casa || '')}</small></span><span class="pill p-${c}">${e}</span></summary>
