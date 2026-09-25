@@ -180,24 +180,63 @@ PEGAR DESDE ACÁ
       "motorLog":      { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
     },
 
-    "privado": {
-      ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
-      "$uid": {
-        ".read": "auth.uid === $uid || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
-        ".write": "auth.uid === $uid || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
-
-        "notifs": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" },
-
-        "dms": {
-          ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
-          ".read": "auth.uid === $uid || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'"
-        },
-
-        "solicitudesPase": { ".write": true }
+    /* LA CARPETA PRIVADA, POR COLECCIÓN (desde el 25-09-2026).
+       pv/<carpeta>/<vecino>/<id>. Cada vecino lee SOLO lo suyo. Cada carpeta
+       entera la lee solo el rol que la necesita:
+         Administración: privados (sus mensajes con vecinos), reclamos,
+                         infracciones, pagos, recibos.
+         Garita:         privadosGuardia (sus mensajes con vecinos).
+         Las dos:        privadosInterno (garita ↔ Administración), peticiones,
+                         pases, solicitudesPase, llegadas, paquetes.
+         Nadie más:      dms (mensajes entre vecinos) y notifs (avisos personales).
+       Escribir: el dueño; quien puede leer esa carpeta; cualquier vecino
+       aprobado en dms y notifs (para mandarle un mensaje o un aviso a otro);
+       los titulares del mismo lote en pagos, recibos e infracciones; y
+       cualquiera, solo para CREAR, en solicitudesPase (el pedido de pase de
+       una visita sin cuenta). La Administración puede CREAR (no leer ni
+       cambiar) en privadosGuardia: lo necesita la mudanza desde la carpeta
+       vieja. */
+    "pv": {
+      "$carpeta": {
+        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'))",
+        "$uid": {
+          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs')",
+          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs') && (auth.uid === $uid || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones') && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
+          "$id": {
+            ".write": "!data.exists() && ($carpeta === 'solicitudesPase' || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'))"
+          }
+        }
       }
     },
 
+    /* La carpeta VIEJA (privado/<vecino>/…). La app de la Administración la
+       muda sola a pv/ la primera vez que se abre con la versión nueva, y
+       después la borra. Mientras tanto la lee y la escribe solo la
+       Administración. Cuando esté vacía se puede sacar este bloque. */
+    "privado": {
+      ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+      ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'"
+    },
+
     "staff": {
+      /* Puntos de control de la ronda, con su clave: los leen la garita y la
+         Administración; los edita la Administración. */
+      "puntos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* Códigos de ronda: uno por policía y por noche (6 números, vence a
+         las 14 h). Los crea la garita al registrar el ingreso; los leen
+         solo la garita y la Administración. */
+      "rondaCodigos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      /* Pasos de ronda: los manda el teléfono del policía al escanear un QR,
+         SIN cuenta. Se aceptan solo nuevos, con la hora del servidor, con la
+         clave del punto (impresa en el QR) Y con un código de ronda vigente
+         (el que la garita le dio al policía): un vecino que escanea un QR no
+         puede registrar nada. Leen garita y Administración. */
+      "pasos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": {
+          ".write": "!data.exists()",
+          ".validate": "newData.hasChildren(['id', 'punto', 'k', 'c', 'nombre', 'at']) && newData.child('c').isString() && newData.child('c').val().length === 6 && root.child('staff/rondaCodigos').child(newData.child('c').val()).child('vence').val() > now && newData.child('id').val() === $id && newData.child('at').val() === now && newData.child('nombre').isString() && newData.child('nombre').val().length >= 2 && newData.child('nombre').val().length <= 60 && newData.child('punto').isString() && root.child('staff/puntos').child(newData.child('punto').val()).child('k').val() === newData.child('k').val() && root.child('staff/puntos').child(newData.child('punto').val()).child('activo').val() !== false"
+        }
+      },
       "sos": {
         ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
         ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'"
@@ -223,15 +262,28 @@ PEGAR DESDE ACÁ
 HASTA ACÁ
 -----------------------------------------------------------
 
-⚠ PARA QUE LA ADMINISTRACIÓN TAMPOCO LEA LOS MENSAJES ENTRE VECINOS
-En el bloque "privado" → "$uid" → "dms", cambiá la línea ".read" por:
+✔ LA CARPETA PRIVADA QUEDÓ CERRADA (25-09-2026)
+Antes era privado/<vecino>/… y la garita y la Administración podían leerla
+entera (en Firebase un permiso dado arriba no se puede quitar abajo). Ahora
+es pv/<carpeta>/<vecino>/…: cada rol lee solo las carpetas que necesita, y
+los mensajes entre vecinos (dms) no los puede leer nadie más que los dos que
+conversan. La Administración muda sola lo viejo la primera vez que abre la
+app con esta versión.
 
-    ".read": "auth.uid === $uid"
+ORDEN PARA PUBLICAR ESTA VERSIÓN
+  1. Publicar estas reglas (Realtime Database → Reglas → pegar → Publicar).
+  2. Subir la app a GitHub.
+  3. Abrir la app con la cuenta de la Administración (Claudio): hace la
+     mudanza sola en unos segundos. Recién ahí los vecinos ven sus cosas
+     viejas en la carpeta nueva.
 
-Ojo: si la cambiás, la Administración deja de ver esas conversaciones en
-cualquier caso, incluso si un vecino pide que se revisen.
-
-CÓMO PROBAR QUE ESTÁN BIEN
-  1. Entrá con la cuenta de un vecino y abrí la consola del navegador (F12).
-  2. Pegá:  firebase.database().ref('privado').get().then(s => console.log(s.val())).catch(e => console.log('BLOQUEADO', e.message))
-  3. Tiene que decir BLOQUEADO. Si muestra datos, las reglas no se publicaron.
+CÓMO PROBAR QUE ESTÁN BIEN (consola del navegador, F12, con la app abierta)
+  Con la cuenta de un VECINO:
+     firebase.database().ref('pv/pases').get().then(s => console.log('VE', s.val())).catch(e => console.log('BLOQUEADO', e.message))
+     → tiene que decir BLOQUEADO (solo puede leer pv/pases/<su uid>).
+  Con la cuenta de la GARITA:
+     firebase.database().ref('pv/reclamos').get().then(s => console.log('VE', s.val())).catch(e => console.log('BLOQUEADO', e.message))
+     → BLOQUEADO.
+  Con CUALQUIER cuenta, incluida la Administración:
+     firebase.database().ref('pv/dms').get().then(s => console.log('VE', s.val())).catch(e => console.log('BLOQUEADO', e.message))
+     → BLOQUEADO. Si alguna muestra datos, las reglas no se publicaron.

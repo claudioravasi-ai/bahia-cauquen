@@ -12,14 +12,14 @@
      /barrio    lo que ven todos los vecinos aprobados:
                 pizarrón, chat, reservas, votaciones, padrón,
                 documentos, obras, compras, viajes, perfiles.
-     /privado/<uid>   lo de cada vecino: sus mensajes con la
-                Administración, sus mensajes con otros vecinos,
-                sus reclamos, sus peticiones, sus pases y sus
-                avisos personales. Lo lee él y el personal
-                (la guardia necesita los pases; la
-                Administración, los reclamos y peticiones).
-     /staff     lo de la guardia y la Administración: llegadas,
-                paquetes, bitácora, SOS, correos y auditoría.
+     /pv/<carpeta>/<uid>   lo de cada vecino (desde el 25-09-2026;
+                antes /privado/<uid>): sus mensajes, reclamos,
+                peticiones, pases, pagos y avisos personales. Cada
+                vecino lee solo lo suyo; cada carpeta entera la lee
+                solo el rol que la necesita (ver Nube.PV). Los
+                mensajes entre vecinos no los lee nadie más.
+     /staff     lo de la guardia y la Administración: bitácora,
+                SOS, correos, auditoría, puntos y pasos de ronda.
    ========================================================= */
 /* La configuración puede venir con cualquiera de los dos nombres: el que usa
    este proyecto (FIREBASE) o el que copia y pega la consola de Firebase
@@ -48,7 +48,7 @@ const Nube = {
              'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
              'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
-    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos'],
+    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos'],
   },
 
   /* =========================================================
@@ -70,7 +70,7 @@ const Nube = {
     notifs:          { listas:['para','leidas'] },
     notifsTodos:     { listas:['para','leidas'] },
     privados:        { listas:['msgs'] },
-    bitacora:        { listas:['guardias'] },
+    bitacora:        { listas:['guardias','policias'] },
     dms:             { listas:['msgs'] },
     msgs:            { listas:[] },
     pases:           { listas:['dias','listaInvitados'], objetos:['log'] },
@@ -128,7 +128,7 @@ const Nube = {
     return new Promise(ok => {
       this.auth.onAuthStateChanged(async user => {
         this.uid = user ? user.uid : null;
-        if (!user){ Store.sesion.userId = null; Store.guardarSesion(); this.arrancada = false; pintar(); return ok(true); }
+        if (!user){ Store.sesion.userId = null; Store.guardarSesion(); this.arrancada = false; if (!(typeof rutaPublica === 'function' && location.hash.startsWith('#/') && rutaPublica())) pintar(); return ok(true); }
         await this.cargar();
         ok(true);
       });
@@ -141,7 +141,7 @@ const Nube = {
     /* Se vacía todo lo que maneja la nube: si quedaron datos de la demo o de
        otra sesión en este equipo, no tienen que subir a la base del barrio. */
     [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff].forEach(col => { if (Array.isArray(s[col])) s[col] = []; });
-    s.notifs = []; s.motorLog = {}; this.ultimo = {};
+    s.notifs = []; s.motorLog = {}; this.ultimo = {}; this.configLista = false;
     /* Leer la ficha propia. Si la base falla (conexión lenta, un corte),
        NO es lo mismo que "no hay ficha": antes se confundía y la cuenta de
        la garita terminaba en la pantalla de completar datos. Se reintenta. */
@@ -205,13 +205,10 @@ const Nube = {
     const staff = mio.rol === 'admin' || mio.rol === 'guardia';
     this.escucharColeccion('barrio', this.ZONAS.barrio);
     this.escucharConfig();
-    if (staff){
-      this.escucharColeccion('staff', this.ZONAS.staff);
-      this.escucharPrivadoTodos();
-    } else {
-      this.escucharColeccion('privado/' + this.uid, this.ZONAS.privado);
-      this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
-    }
+    if (staff) this.escucharColeccion('staff', this.ZONAS.staff);
+    else this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
+    this.escucharPv(mio.rol);
+    if (mio.rol === 'admin') setTimeout(() => this.mudarPrivado(), 3000);
     this.arrancada = true;
     this.anotarPresencia();
     /* Si administra el barrio, elige desde qué brazo entra. */
@@ -374,28 +371,95 @@ const Nube = {
       }, err => { if (!opcional) console.warn('No se pudo leer', base, col, err.message); });
     });
   },
-  /* La guardia y la Administración leen la carpeta privada de todos. */
-  escucharPrivadoTodos(){
-    this.db.ref('privado').on('value', snap => {
-      const v = snap.val() || {};
-      const juntado = {};
-      this.ZONAS.privado.forEach(c => juntado[c] = []);
-      Object.keys(v).forEach(uid => this.ZONAS.privado.forEach(col => {
-        const nodo = v[uid] && v[uid][col];
-        if (nodo) Object.keys(nodo).forEach(id => { if (!juntado[col].some(x => x.id === id)) juntado[col].push(this.comoLaGuardamos(col, nodo[id])); });
-      }));
-      this.ZONAS.privado.forEach(col => {
-        if (col === 'notifs') Store.s.notifs = [...Store.s.notifs.filter(n => this.esNotifGeneral(n)), ...juntado.notifs].sort((a, b) => b.at - a.at);
-        else Store.s[col] = juntado[col];
-        this.recordar(col, juntado[col]);
-      });
-      if (this.arrancada) this.llegoAlgo();
+  /* =========================================================
+     LA CARPETA PRIVADA, ORDENADA POR COLECCIÓN (desde el 25-09-2026)
+     Antes era privado/<vecino>/<colección>, y la garita y la Administración
+     tenían permiso para leer "privado" entero: en Firebase un permiso dado
+     arriba no se puede quitar abajo, así que técnicamente podían leer todo,
+     también los mensajes entre vecinos. Ahora es pv/<carpeta>/<vecino>/<id>:
+     las reglas dan cada CARPETA solo al rol que la necesita, y cada vecino
+     lee únicamente lo suyo (pv/<carpeta>/<su uid>).
+     Los mensajes privados se guardan en tres carpetas según con quién son:
+     "privados" (con la Administración), "privadosGuardia" (con la garita) e
+     "privadosInterno" (garita ↔ Administración). En la app siguen siendo una
+     sola colección (Store.s.privados) con su campo `con`.
+     ========================================================= */
+  PV: {
+    privados:        { col:'privados',        leen:['admin'] },
+    privadosGuardia: { col:'privados',        leen:['guardia'] },
+    privadosInterno: { col:'privados',        leen:['admin', 'guardia'] },
+    dms:             { col:'dms',             leen:[] },
+    notifs:          { col:'notifs',          leen:[] },
+    reclamos:        { col:'reclamos',        leen:['admin'] },
+    infracciones:    { col:'infracciones',    leen:['admin'] },
+    pagos:           { col:'pagos',           leen:['admin'] },
+    recibos:         { col:'recibos',         leen:['admin'] },
+    peticiones:      { col:'peticiones',      leen:['admin', 'guardia'] },
+    pases:           { col:'pases',           leen:['admin', 'guardia'] },
+    solicitudesPase: { col:'solicitudesPase', leen:['admin', 'guardia'] },
+    llegadas:        { col:'llegadas',        leen:['admin', 'guardia'] },
+    paquetes:        { col:'paquetes',        leen:['admin', 'guardia'] },
+  },
+  carpetaDe(col, x){
+    if (col !== 'privados') return col;
+    return x && x.con === 'guardia' ? 'privadosGuardia' : x && x.con === 'interno' ? 'privadosInterno' : 'privados';
+  },
+  pvDatos: {},
+  escucharPv(rol){
+    this.pvDatos = {};
+    Object.entries(this.PV).forEach(([f, def]) => {
+      const todo = def.leen.includes(rol);
+      this.db.ref(todo ? `pv/${f}` : `pv/${f}/${this.uid}`).on('value', snap => {
+        const v = snap.val() || {}, arr = [];
+        const meter = nodo => { if (nodo && typeof nodo === 'object') Object.keys(nodo).forEach(id => { const x = nodo[id]; if (x && typeof x === 'object') arr.push(this.comoLaGuardamos(def.col, x)); }); };
+        if (todo) Object.values(v).forEach(meter); else meter(v);
+        this.pvDatos[f] = arr;
+        this.juntarPv(def.col);
+        this.listos.add('pv/' + f);
+        if (this.arrancada) this.llegoAlgo();
+      }, err => console.warn('No se pudo leer', 'pv/' + f, err.message));
     });
   },
+  juntarPv(col){
+    const vistos = new Set(), arr = [];
+    Object.entries(this.PV).filter(([, d]) => d.col === col).forEach(([f]) => (this.pvDatos[f] || []).forEach(x => { if (x.id && !vistos.has(x.id)){ vistos.add(x.id); arr.push(x); } }));
+    if (col === 'notifs') Store.s.notifs = [...Store.s.notifs.filter(n => this.esNotifGeneral(n)), ...arr].sort((a, b) => b.at - a.at);
+    else Store.s[col] = arr;
+    this.recordar(col, arr);
+  },
+  /* Mudanza, una sola vez: lo que había en la carpeta vieja (privado/…) pasa
+     a pv/… y la carpeta vieja se borra, para que no quede ninguna copia con
+     el permiso viejo. La hace la Administración al abrir la app (es la única
+     que puede leer la carpeta vieja con las reglas nuevas). Si algo falla,
+     no borra nada y lo vuelve a intentar la próxima vez. */
+  async mudarPrivado(){
+    if (!this.db || yo()?.rol !== 'admin') return;
+    let viejo;
+    try { viejo = (await this.db.ref('privado').get()).val(); } catch(e){ console.warn('Mudanza de la carpeta privada: no se pudo leer la vieja', e.message); return; }
+    if (!viejo) return;
+    const cambios = {}; let n = 0;
+    Object.entries(viejo).forEach(([uid, cols]) => Object.entries(cols || {}).forEach(([col, nodo]) => {
+      if (!this.ZONAS.privado.includes(col) || !nodo || typeof nodo !== 'object') return;
+      Object.entries(nodo).forEach(([id, x]) => { if (x && typeof x === 'object'){ cambios[`pv/${this.carpetaDe(col, x)}/${uid}/${id}`] = x; n++; } });
+    }));
+    /* En tandas de 400: si una tanda falla, no se borra nada y se reintenta
+       la próxima vez. Los de privadosGuardia van de a uno: ahí la
+       Administración solo puede CREAR, así que en un reintento los que ya
+       pasaron se rechazan (y está bien: ya están). */
+    try {
+      const rutas = Object.keys(cambios).filter(r => !r.startsWith('pv/privadosGuardia/'));
+      for (const r of Object.keys(cambios).filter(r => r.startsWith('pv/privadosGuardia/'))) await this.db.ref(r).set(cambios[r]).catch(() => {});
+      for (let i = 0; i < rutas.length; i += 400){ const t = {}; rutas.slice(i, i + 400).forEach(r => { t[r] = cambios[r]; }); await this.db.ref().update(t); }
+      await this.db.ref('privado').remove();
+      console.info(`Carpeta privada mudada: ${n} registros`);
+    } catch(e){ console.warn('Mudanza de la carpeta privada: no se completó, se reintenta al volver a entrar', e.message); }
+  },
   escucharConfig(){
+    this.configLista = false;
     this.db.ref('barrio/config').on('value', snap => {
       const c = snap.val(); if (c) Store.s.config = Object.assign({}, CONFIG_BASE, c);
       this.ultimo.config = JSON.stringify(Store.s.config);
+      this.configLista = true;
       if (this.arrancada) this.llegoAlgo();
     });
     /* Las marcas del motor son compartidas: así un aviso automático sale una
@@ -454,8 +518,8 @@ const Nube = {
     const rutasDe = (col, x) => {
       if (this.ZONAS.barrio.includes(col)) return [`barrio/${col}/${x.id}`];
       if (this.ZONAS.staff.includes(col)) return [`staff/${col}/${x.id}`];
-      if (col === 'notifs') return this.esNotifGeneral(x) ? [`barrio/notifsTodos/${x.id}`] : this.duenos(col, x).map(u => `privado/${u}/notifs/${x.id}`);
-      return this.duenos(col, x).filter(Boolean).map(u => `privado/${u}/${col}/${x.id}`);
+      if (col === 'notifs') return this.esNotifGeneral(x) ? [`barrio/notifsTodos/${x.id}`] : this.duenos(col, x).map(u => `pv/notifs/${u}/${x.id}`);
+      return this.duenos(col, x).filter(Boolean).map(u => `pv/${this.carpetaDe(col, x)}/${u}/${x.id}`);
     };
     [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff].forEach(col => {
       if (col === 'notifsTodos') return;
@@ -475,8 +539,27 @@ const Nube = {
       }});
       this.ultimo[col] = ahora;
     });
+    /* =========================================================
+       LA CONFIGURACIÓN SE GUARDA CAMPO POR CAMPO, Y NUNCA ANTES DE LEERLA
+       Antes se mandaba la configuración ENTERA cada vez que cambiaba algo, y
+       también apenas arrancaba la app, cuando todavía tenía la copia vieja
+       que quedó guardada en el equipo (la de la nube tarda un instante en
+       llegar). Cualquier equipo de la Administración que se abría pisaba así
+       lo último que se había guardado desde otro: por eso la clave de los
+       avisos push y los días de residuos "se borraban solos" al rato.
+       Ahora: (1) nada de la configuración sale hasta que llegó la de la nube;
+       (2) sale solo el campo que cambió en este equipo (barrio/config/<campo>),
+       así dos equipos que tocan cosas distintas no se pisan; (3) solo la
+       Administración la escribe (a los demás, las reglas se lo niegan igual).
+       ========================================================= */
     const cfg = JSON.stringify(s.config);
-    if (cfg !== this.ultimo.config){ poner('barrio/config', s.config); this.ultimo.config = cfg; }
+    if (this.configLista && cfg !== this.ultimo.config && yo()?.rol === 'admin'){
+      let antes = {}; try { antes = JSON.parse(this.ultimo.config || '{}') || {}; } catch(e){}
+      new Set([...Object.keys(antes), ...Object.keys(s.config)]).forEach(k => {
+        if (JSON.stringify(antes[k] ?? null) !== JSON.stringify(s.config[k] ?? null)) poner('barrio/config/' + k, s.config[k] === undefined ? null : JSON.parse(JSON.stringify(s.config[k])));
+      });
+      this.ultimo.config = cfg;
+    }
     const ml = JSON.stringify(s.motorLog || {});
     if (ml !== this.ultimo.motorLog){ poner('barrio/motorLog', s.motorLog || {}); this.ultimo.motorLog = ml; }
     /* =========================================================
@@ -491,7 +574,10 @@ const Nube = {
        grupo se manda solo: si uno falla, los demás llegan igual.
        ========================================================= */
     const grupos = {};
-    Object.keys(cambios).forEach(r => { const g = r.split('/').slice(0, 2).join('/'); (grupos[g] = grupos[g] || {})[r] = cambios[r]; });
+    /* En pv/ el grupo es la carpeta DE CADA VECINO (pv/pagos/<uid>): un pago
+       que se copia a los otros titulares del lote no puede arrastrar al
+       propio si alguna copia se rechaza. */
+    Object.keys(cambios).forEach(r => { const g = r.split('/').slice(0, r.startsWith('pv/') ? 3 : 2).join('/'); (grupos[g] = grupos[g] || {})[r] = cambios[r]; });
     Object.entries(grupos).forEach(([g, paquete]) => {
       this.db.ref().update(paquete).catch(e => {
         console.warn('No se pudo guardar', g, e.message);

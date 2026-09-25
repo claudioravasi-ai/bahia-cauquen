@@ -120,6 +120,17 @@ const Push = {
         .then(r => r.json()).then(j => { if (j && !j.ok) console.warn('Aviso push:', j.error); }).catch(() => {});
     } catch(e){}
   },
+  /* Igual que enviar(), pero espera la respuesta: para la prueba de Ajustes. */
+  async enviarYContar({ para, titulo, texto = '', link = '', urgente = false, incluirme = true }){
+    const d = Correo.datos(), cfg = configFirebase();
+    if (typeof Nube === 'undefined' || !Nube.activa() || !Nube.uid) throw new Error('En la demo no hay avisos push');
+    if (!d || !d.url || !cfg) throw new Error('Falta configurar el correo (los avisos usan el mismo Apps Script)');
+    const r = await fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify({ accion:'push', clave:d.clave, db:cfg.databaseURL, para, excluir: incluirme ? '' : Nube.uid, titulo, texto, link, tag:'prueba-' + Date.now(), urgente, sonido:'' }) });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || 'el Apps Script contestó que no');
+    return j;
+  },
   /* Tocar el aviso abre la app en la ventana que corresponde. */
   abrirEnlace(link){
     if (!link || !yo()) return;
@@ -135,6 +146,12 @@ const Push = {
       setTimeout(intentar, 300);
     }
     setTimeout(() => this.alDia(), 8000);
+    /* El aviso "Entró el camión" que quedó en la bandeja del teléfono se
+       quita cuando el camión ya salió (igual que en la campanita). */
+    setInterval(() => {
+      if (!('serviceWorker' in navigator) || typeof Camion === 'undefined' || typeof Nube === 'undefined' || !Nube.arrancada || Camion.adentro()) return;
+      navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(n => { if (String(n.tag || '').startsWith('camion-')) n.close(); })).catch(() => {});
+    }, 60000);
   },
 };
 
@@ -161,3 +178,19 @@ A['push-activar'] = () => Push.activar();
 A['push-desactivar'] = () => Push.desactivar();
 A['push-nomolestar'] = () => { try { localStorage.setItem('bhc.push.nomolestar', '1'); } catch(e){} refrescar(); };
 A['push-probar'] = () => { Push.enviar({ para:[yo().id], titulo:'Prueba de aviso', texto:'Si ves esto con la pantalla bloqueada, los avisos funcionan.', link:'perfil', incluirme:true }); toast('Pedido enviado. Bloqueá el teléfono: llega en unos segundos.', 'send'); };
+
+/* Aviso de prueba a un grupo (Ajustes → Avisos al celular). */
+A['push-grupo'] = async el => {
+  const v = $('#pushGrupo')?.value || 'yo', caja = $('#pushGrupoRes');
+  const para = v === 'yo' ? [yo().id] : v.startsWith('lote:') ? Store.s.users.filter(u => u.casa === v.slice(5) && u.estado === 'aprobado').map(u => u.id) : v;
+  if (Array.isArray(para) && !para.length){ caja.innerHTML = `<div style="margin-top:8px">${aviso('warn', 'users', 'Ese lote no tiene cuentas en la app', 'No hay a quién mandarle el aviso.')}</div>`; return; }
+  const nombre = $('#pushGrupo').selectedOptions[0]?.textContent || '';
+  el.disabled = true; caja.innerHTML = `<div class="card plana small" style="margin:8px 0 0">${I('refresh')} Mandando…</div>`;
+  try {
+    const j = await Push.enviarYContar({ para, titulo:'Aviso de prueba del barrio', texto:`Prueba mandada por la Administración (${nombre.toLowerCase()}). Si lo ves con el teléfono bloqueado, los avisos andan.`, link:'inicio' });
+    caja.innerHTML = `<div style="margin-top:8px">${aviso(j.enviados ? 'ok' : 'warn', 'bell', j.enviados ? `Llegó a ${plural(j.enviados, 'equipo')}` : 'No había equipos anotados en ese grupo',
+      j.enviados ? (j.borrados ? `${plural(j.borrados, 'equipo viejo se sacó', 'equipos viejos se sacaron')} de la lista.` : 'Fijate en los teléfonos: tiene que haber sonado.') : 'Cada persona tiene que tocar "Activar avisos" en Mi casa, en cada equipo.')}</div>`;
+    auditar(Store.s, 'Mandó un aviso de prueba', nombre + ' · ' + (j.enviados || 0) + ' equipos'); Store.guardar();
+  } catch(e){ caja.innerHTML = `<div style="margin-top:8px">${aviso('danger', 'alert', 'No salió', esc(e.message))}</div>`; }
+  el.disabled = false;
+};

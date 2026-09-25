@@ -100,15 +100,19 @@ const Store = {
     try { const m = sessionStorage.getItem('bhc.modo'); if (m !== null) this.sesion.modo = m || ''; } catch(e){}
     if (this.bc) this.bc.onmessage = e => {
       if (e.data === 'cambio'){
-        try { this.s = JSON.parse(localStorage.getItem(this.KEY)); migrar(this.s); } catch(err){}
+        try { const cfg = this.cfgPropia(); this.s = JSON.parse(localStorage.getItem(this.KEY)); migrar(this.s); if (cfg) this.s.config = cfg; } catch(err){}
         this.avisar(true);
       }
     };
     /* Otra pestaña sin BroadcastChannel: el evento storage cubre el hueco. */
     window.addEventListener('storage', e => {
-      if (e.key === this.KEY && e.newValue){ try { this.s = JSON.parse(e.newValue); migrar(this.s); this.avisar(true); } catch(err){} }
+      if (e.key === this.KEY && e.newValue){ try { const cfg = this.cfgPropia(); this.s = JSON.parse(e.newValue); migrar(this.s); if (cfg) this.s.config = cfg; this.avisar(true); } catch(err){} }
     });
   },
+  /* Con la base del barrio, la configuración de esta pestaña es la que
+     bajó de la nube: la copia de otra pestaña (que puede ser vieja) no la
+     reemplaza. */
+  cfgPropia(){ return typeof Nube !== 'undefined' && Nube.activa() && Nube.configLista && this.s ? this.s.config : null; },
   guardar(){
     try {
       localStorage.setItem(this.KEY, JSON.stringify(this.s));
@@ -136,7 +140,7 @@ const Store = {
 function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
     bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
-    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[] };
+    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
   if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
@@ -183,10 +187,18 @@ function migrar(s){
    No se reescribe la configuración desde acá: un vecino no puede guardarla
    y el guardado entero fallaría. Al guardar Ajustes queda lo que se cargue. */
 const RECOLECCION_VIEJA = { 1:'Húmedos', 2:'Reciclables', 3:'Húmedos', 4:'Reciclables', 5:'Húmedos' };
+/* Lo que hace SEINCO en el barrio (dicho por Claudio el 25-09-2026): martes
+   y jueves a la mañana se llevan todos los residuos; los sábados, los
+   voluminosos. Es lo que se usa mientras la configuración siga siendo una de
+   las de fábrica (la vieja de lunes a viernes o la provisoria "Residuos"
+   martes, jueves y sábado). */
+const RECOLECCION_BARRIO = { 2:'Todos los residuos', 4:'Todos los residuos', 6:'Voluminosos' };
+const RECOLECCION_PROVISORIA = { 2:'Residuos', 4:'Residuos', 6:'Residuos' };
 function recoleccionDias(){
-  const r = Store.s.config.recoleccion || {};
-  return JSON.stringify(r) === JSON.stringify(RECOLECCION_VIEJA) ? { 2:'Residuos', 4:'Residuos', 6:'Residuos' } : r;
+  const r = Store.s.config.recoleccion || {}, t = JSON.stringify(r);
+  return !Object.keys(r).length || t === JSON.stringify(RECOLECCION_VIEJA) || t === JSON.stringify(RECOLECCION_PROVISORIA) ? RECOLECCION_BARRIO : r;
 }
+const esVoluminoso = t => /volumin/i.test(String(t || ''));
 const CONFIG_BASE = {
   nombre: 'Bahía Cauquén',
   ciudad: 'Ushuaia, Tierra del Fuego',
@@ -209,7 +221,7 @@ const CONFIG_BASE = {
   cuenta: 'Cuenta Corriente 1759-0 346-4 · Banco Galicia',
   mapa: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Barrio Bahía Cauquén, Ushuaia'),
   casas: 152,
-  recoleccion: { 2:'Residuos', 4:'Residuos', 6:'Residuos' },
+  recoleccion: { 2:'Todos los residuos', 4:'Todos los residuos', 6:'Voluminosos' },
   recoleccionHora: '08:00',
   expensasUrl: 'https://www.octavo-piso.com.ar/users/sign_in',
   expensasVence: 10,
@@ -459,8 +471,9 @@ function codigoPase(){
    para: id de usuario, 'todos', 'rol:guardia', 'rol:admin',
    'staff' o una lista de esos.
    ========================================================= */
-function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true }){
+function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '' }){
   const n = { id: uid(), para: [].concat(para), titulo, texto, icon, color, link, urgente, sonido: sonido || urgente, de: Store.sesion.userId, at: Date.now(), leidas: [] };
+  if (camionId) n.camionId = camionId;
   s.notifs.unshift(n);
   if (s.notifs.length > 400) s.notifs.length = 400;
   /* Lo que suena también sale como aviso push: llega con el celular
@@ -493,7 +506,21 @@ function meToca(n, u = yo()){
   if (!u || !n || n.de === u.id) return false;
   return aLista(n.para).some(p => p === 'todos' || p === u.id || p === 'rol:' + u.rol || (p === 'staff' && (u.rol === 'admin' || u.rol === 'guardia')));
 }
-const misNotifs = () => { const u = yo(); return u ? aLista(Store.s.notifs).filter(n => meToca(n, u)) : []; };
+/* "Entró el camión de la basura" sirve solo mientras el camión está en el
+   barrio. Cuando la garita registra la salida (o pasaron 8 horas), el aviso
+   deja de existir para todos: antes quedaba en la campanita y a las 20 h un
+   vecino abría la app y leía que el camión había entrado, cuando ya se había
+   ido a la mañana. Confunde y no sirve para nada. */
+function avisoCaduco(n){
+  if (!n || n.icon !== 'tacho' || String(n.link || '').split(':')[0] !== 'recoleccion') return false;
+  if (Date.now() - (n.at || 0) > 8 * HORA) return true;
+  if (typeof Camion === 'undefined') return false;
+  /* Atado a su viaje: si el aviso llega un instante antes que el registro
+     del camión, NO se lo toma por viejo (tiene que sonar). */
+  if (n.camionId){ const v = Camion.lista().find(c => c.id === n.camionId); return !!(v && v.sale); }
+  return Date.now() - (n.at || 0) > 2 * MIN && !Camion.adentro();
+}
+const misNotifs = () => { const u = yo(); return u ? aLista(Store.s.notifs).filter(n => meToca(n, u) && !avisoCaduco(n)) : []; };
 const noLeidas = () => { const u = yo(); return misNotifs().filter(n => !aLista(n.leidas).includes(u.id)); };
 
 /* Aviso del sistema operativo cuando la app está en segundo plano

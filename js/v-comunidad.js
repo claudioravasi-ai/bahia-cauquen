@@ -335,20 +335,143 @@ const FAQ = [
   ['¿Cómo pago las expensas?', 'En Tu casa → Mis expensas ves el saldo y el cupón del mes. Tocá la tarjeta para pagar por transferencia (alias y CBU a mano) y avisá el pago con el comprobante: la Administración lo confirma y te llega el recibo.', 'abrir', 'expensas', 'Mis expensas'],
   ['¿Cómo reservo el quincho, el SUM o la cancha?', 'En Tu casa → Reservas elegís el espacio, el día y el turno. Si está ocupado se ve en gris.', 'abrir', 'reservas', 'Reservas'],
   ['¿Cómo hago un reclamo a la Administración?', 'En Tu casa → Mis reclamos. Es privado: lo ven solo vos y la Administración, que te contesta por ahí. Si otros vecinos tienen el mismo problema, la Administración puede publicarlo en el pizarrón.', 'abrir', 'reclamos', 'Mis reclamos'],
-  ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el pizarrón y el chat. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Los mensajes privados y los reclamos no los ve nadie más.', 'abrir', 'perfil', 'Mi casa'],
+  ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el pizarrón y el chat. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Tus mensajes privados y tus reclamos no los ve ningún otro vecino. Más abajo, en "Tus datos: privacidad y seguridad", está todo el detalle.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Cómo aparezco en la agenda como profesional u oficio?', 'En Mi casa cargá tu profesión u oficio y tu celular, y marcá que se muestre al barrio. Aparecés solo en Profesionales y oficios y en la Agenda, con botón de WhatsApp.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Dónde están las normas del barrio?', 'En El barrio → Normas y reglamento, con un buscador ("¿hasta qué hora puedo hacer obra?"). Ahí también están la ordenanza municipal de barrios cerrados y lo que dice el Código Civil.', 'abrir', 'documentos', 'Normas'],
   ['¿Qué significan los colores de la Pizarra del día?', 'Rojo: importante. Amarillo: para tener en cuenta. Verde: para saber. Lo que todavía no leíste titila en su color; al tocarlo se queda quieto.', '', '', ''],
   ['¿Quién responde por la app y por mis datos?', 'La app la hizo un vecino, Claudio A. Ravasi, en forma gratuita. La maneja la Administración del barrio, que es la responsable de los datos (Ley 25.326 de Protección de Datos Personales). Cada uno responde por lo que publica. No reemplaza al 911, al 107 ni a los bomberos. Todo el detalle legal está en los términos de uso; también se abren tocando "by Claudio A. Ravasi" al pie de la portada.', 'abrir', 'legal', 'Términos de uso y responsabilidad'],
   ['La app quedó rara o no abre una ventana', 'Tu cuenta (tu foto arriba a la derecha) → Actualizar la app. Baja todo de nuevo sin borrar tus datos.', 'actualizar-app', '', 'Actualizar la app'],
 ];
+/* =========================================================
+   TUS DATOS: PRIVACIDAD Y SEGURIDAD
+   Pedido de Claudio (25-09-2026): que cualquier vecino, y también un vecino
+   abogado, entienda cómo se cuidan los datos y bajo qué normas.
+   REGLA DE ORO al editar esto: escribir solo lo que la app HACE. Nada de
+   "todo está encriptado" o "cumple todo" a secas: una promesa exagerada es
+   lo primero que un abogado detecta, y le quita valor a todo lo demás.
+   Si cambia el comportamiento de la app (reglas de Firebase, qué baja cada
+   rol, fotos, plazos de borrado), hay que cambiar también este texto.
+   ========================================================= */
+const FAQ_DATOS = [
+  ['En pocas palabras: ¿mis datos están seguros?', [
+    'Sí. La app pide solo lo necesario; cada persona ve únicamente lo que le corresponde según su función, y eso lo controla el servidor, no la pantalla; todo viaja cifrado y queda guardado cifrado; las contraseñas no las puede ver nadie; los datos de las visitas se borran solos; y nada se vende, se publica ni se entrega a terceros ajenos al barrio sin tu consentimiento.',
+    'Está hecha conforme a la Ley 25.326 de Protección de los Datos Personales, a las garantías de privacidad de la Constitución Nacional y a los tratados internacionales de derechos humanos que tienen su misma jerarquía. En cada punto de abajo está primero la explicación en simple y después el fundamento jurídico, para que cualquier vecino (también quien sea abogado) lo pueda controlar.',
+  ]],
+  ['¿Qué normas la rigen?', [
+    'En simple: la privacidad está protegida por la Constitución, por tratados de derechos humanos, por una ley específica de datos personales y por el Código Civil y el Código Penal. La app aplica todas.',
+    '• Constitución Nacional: art. 18 (inviolabilidad de la correspondencia y los papeles privados), art. 19 (esfera de intimidad y autonomía personal) y art. 43, tercer párrafo (hábeas data: conocer, rectificar, actualizar, suprimir y exigir confidencialidad de los datos propios). La Corte Suprema definió el alcance del derecho a la intimidad en "Ponzetti de Balbín c/ Editorial Atlántida" (Fallos 306:1892, 1984) y extendió la protección a las comunicaciones y los datos personales en "Halabi c/ PEN" (Fallos 332:111, 2009).',
+    '• Tratados con jerarquía constitucional (art. 75 inc. 22 CN): Declaración Universal de Derechos Humanos, art. 12; Declaración Americana de los Derechos y Deberes del Hombre, arts. V, IX y X; Pacto Internacional de Derechos Civiles y Políticos, art. 17; Convención Americana sobre Derechos Humanos, art. 11.2 y 11.3. Todos prohíben las injerencias arbitrarias en la vida privada, el domicilio y la correspondencia, y obligan a protegerlas por ley.',
+    '• Ley 25.326 de Protección de los Datos Personales y su Decreto Reglamentario 1558/2001. Sus capítulos I a IV son de orden público y rigen en todo el país (art. 44), también en Tierra del Fuego. Ley 27.483, que aprueba el Convenio 108 del Consejo de Europa para la protección de las personas respecto del tratamiento automatizado de datos de carácter personal.',
+    '• Normas de la autoridad de control: Ley 27.275 y Decreto 746/2017 (la Agencia de Acceso a la Información Pública, AAIP, es la autoridad de aplicación de la Ley 25.326), Resolución AAIP 47/2018 (medidas de seguridad recomendadas para el tratamiento informatizado de datos) y Disposición DNPDP 60-E/2016 (transferencias internacionales).',
+    '• Código Civil y Comercial: arts. 51 (inviolabilidad de la persona humana y su dignidad), 52 (intimidad, honor, imagen e identidad), 53 (derecho a la propia imagen), 1770 (protección de la vida privada) y 2073 a 2086 (conjuntos inmobiliarios).',
+    '• Código Penal, según la Ley 26.388 de delitos informáticos: arts. 153 (violación de comunicaciones electrónicas), 153 bis (acceso indebido a un sistema informático), 157 bis (acceso ilegítimo a un banco de datos personales y revelación de sus datos) y 117 bis (inserción de datos falsos en un archivo de datos personales).',
+    '• Ámbito local: Ordenanza Municipal 2102/1999 de barrios cerrados de Ushuaia, el estatuto y el reglamento interno del barrio.',
+  ]],
+  ['¿Quién es el responsable de los datos? ¿Qué papel cumple cada uno?', [
+    'En simple: el dueño y responsable de la base es el barrio. Google solo presta los servidores y no puede usar los datos para nada más. Quien hizo la app no es el responsable de la base.',
+    '• Responsable del archivo (art. 2 de la Ley 25.326): el barrio, por medio de su entidad administradora, que decide la finalidad del tratamiento, aprueba las cuentas, asigna los roles y responde los pedidos de los titulares.',
+    '• Prestador de servicios informatizados, o encargado del tratamiento (art. 25): Google LLC, a través de Firebase y Google Apps Script, bajo sus condiciones de tratamiento y seguridad de datos. Por ley no puede aplicar los datos a un fin distinto del contratado ni cederlos, ni siquiera para conservarlos, y debe destruirlos al terminar la prestación.',
+    '• Personas autorizadas (Administración y garita): acceden solo a lo que su función requiere y están obligadas al secreto profesional sobre los datos (art. 10), una obligación que sigue vigente aun después de dejar la función.',
+    '• Autor de la app (Claudio A. Ravasi, vecino, en forma gratuita): desarrolló la herramienta. No es el responsable del archivo ni decide sobre los datos. Su rol, si tiene alguno dentro del barrio, es el mismo que el de cualquier otro vecino con esa función.',
+  ]],
+  ['¿Con qué derecho se tratan mis datos? (base de licitud)', [
+    'En simple: porque lo aceptaste expresamente al inscribirte, después de poder leer para qué se usan; y, en lo básico del padrón y las expensas, porque lo exige tu relación con el barrio.',
+    '• Consentimiento libre, expreso e informado (art. 5 inc. 1): la inscripción exige tildar una casilla de aceptación de los términos de uso y la política de datos, que se pueden leer completos antes de aceptar. Queda registrada la fecha y la hora de la aceptación.',
+    '• Deber de información previa (art. 6): la app informa la finalidad, quiénes reciben los datos, quién es el responsable, qué datos son obligatorios y cuáles optativos, y cómo ejercer los derechos de acceso, rectificación y supresión.',
+    '• Además, los datos del padrón (nombre, DNI, domicilio) y los de expensas no requieren consentimiento: están comprendidos en las excepciones del art. 5 inc. 2, apartado c (listados limitados a nombre, DNI, identificación tributaria, ocupación, fecha de nacimiento y domicilio) y apartado d (datos que derivan de una relación contractual y son necesarios para cumplirla), en este caso la relación de cada propietario con el conjunto inmobiliario.',
+  ]],
+  ['¿Qué datos pide y cómo se aplican los principios de la ley?', [
+    'En simple: se pide lo mínimo, se usa solo para lo que se dijo, se puede corregir y se borra cuando ya no hace falta.',
+    '• Calidad y minimización (art. 4 inc. 1): los datos obligatorios son nombre y apellido, lote, correo y DNI (este último, para verificar que sos del barrio antes de aprobar la cuenta). Teléfono, profesión u oficio, vehículos, mascotas y foto del frente de la casa son optativos.',
+    '• Finalidad (art. 4 inc. 3): comunicación, seguridad, administración y convivencia del barrio. Ningún dato se usa para publicidad ni para un fin distinto o incompatible. La app no tiene publicidad ni herramientas de seguimiento o de estadística de terceros.',
+    '• Exactitud (art. 4 inc. 4 y 5): cada vecino corrige sus propios datos en Mi casa, en cualquier momento.',
+    '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran.',
+    '• Privacidad por defecto: lo optativo nace oculto. Tu teléfono, tu oficio o tu dirección se muestran a otros vecinos solo si vos lo marcás, y lo podés quitar cuando quieras.',
+    '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, la garita no puede leer expensas, pagos, reclamos ni las conversaciones de los vecinos con la Administración, y la Administración no puede leer las conversaciones de un vecino con la garita.',
+  ]],
+  ['¿Está todo cifrado (encriptado)? ¿Qué medidas de seguridad hay?', [
+    'En simple: sí, en el viaje y en el guardado. Y además el servidor decide quién puede leer cada cosa.',
+    '• En el viaje: toda la comunicación entre tu equipo y la base del barrio viaja cifrada (HTTPS/TLS, el estándar de la banca en línea). Nadie en el camino (un wifi público, el proveedor de internet) puede leerla ni alterarla.',
+    '• En el guardado: los servidores de Google almacenan los datos cifrados con AES-256.',
+    '• Contraseñas: no se guardan. El sistema de cuentas de Google conserva solo una huella criptográfica irreversible (hash). Nadie puede verlas: ni la Administración, ni la garita, ni quien hizo la app. Si alguien la olvida, pide una nueva por correo.',
+    '• Control de acceso en el servidor: las reglas de la base definen, carpeta por carpeta, qué puede leer y escribir cada rol, y cada vecino solo puede abrir su propia carpeta. Aunque alguien manipulara la app en su teléfono, el servidor no le entrega lo que no le corresponde. Es la medida central que recomienda la Resolución AAIP 47/2018, junto con la identificación de cada usuario y el registro de lo que se hace.',
+    '• Trazabilidad: cada acción relevante de la Administración (aprobar una cuenta, cambiar un rol, confirmar un pago, editar datos) queda en un registro de auditoría con autor, fecha y hora.',
+    '• Equipos compartidos: al cerrar sesión se borra de ese equipo todo lo que vino del barrio.',
+    '• El programa de la app no contiene ningún nombre ni dato de vecinos: el padrón se carga aparte, dentro de la base protegida.',
+    '• Límite, dicho con honestidad: no es un cifrado "de punta a punta" como el de WhatsApp. Quien tiene un rol autorizado ve lo que necesita para su tarea. El art. 9 de la Ley 25.326 exige adoptar las medidas técnicas y organizativas necesarias; ninguna ley exige, porque nadie la puede dar, una garantía de seguridad absoluta. La seguridad también depende de que cada uno cuide su contraseña y su teléfono.',
+  ]],
+  ['¿Quién puede ver cada cosa?', [
+    '• Los otros vecinos: tu nombre y tu lote en el pizarrón y el chat del barrio; tu teléfono, oficio o dirección solo si vos lo autorizás. Nunca tu DNI, tu correo, tus expensas, tus reclamos, tus visitas ni tus mensajes.',
+    '• La garita: lo que necesita para la seguridad: tus visitas y pases, tus paquetes, tus peticiones firmadas, los avisos que le mandás, las conversaciones con ella y la foto del frente de tu casa para ubicar el domicilio.',
+    '• La Administración: lo que necesita para administrar: el padrón, las expensas y los pagos, los reclamos y las conversaciones con ella.',
+    '• Mensajes entre vecinos: solo los ven los dos que conversan. Las reglas del servidor no dejan que nadie más los lea: ni otro vecino, ni la garita, ni la Administración.',
+    '• Rondas del policía con QR: cuando escanea un punto de control, se guardan su nombre, el punto y la hora (del servidor, no del teléfono). Solo cuenta si el teléfono tiene el código de ronda que la garita le da al policía de turno esa noche: un vecino que escanee un QR no puede registrar nada. Lo ven solo la garita y la Administración, y sirve para comprobar que la ronda se hizo.',
+    '• Si pedís un SOS: la alerta salta en la pantalla de todos, con el tipo de emergencia, tu nombre, tu lote y la ubicación GPS de ese momento, para que cualquiera sepa dónde está pasando y pueda ayudar. La ubicación se toma solo cuando vos apretás el SOS, nunca antes ni después. Tu teléfono lo ven solo la garita y la Administración. Es un uso consentido por el propio titular al pedir ayuda y limitado a la emergencia (arts. 4 y 5 de la Ley 25.326).',
+    '• La lista de equipos anotados para recibir avisos en el celular: no la puede leer ninguna persona desde la app; solo el programa que envía los avisos.',
+  ]],
+  ['¿Qué pasa con los datos sensibles, como la salud?', [
+    'En simple: la app no arma fichas de salud de nadie. Si pedís ayuda por una emergencia médica, ese dato se usa solo para atenderte.',
+    'Los datos de salud son "datos sensibles" (arts. 2 y 7 de la Ley 25.326) y tienen la protección más alta: nadie está obligado a darlos, y está prohibido formar archivos que los revelen. La app no los pide. El único caso es el SOS de emergencia médica: lo activa el propio titular, se registra solo el tipo de emergencia (no diagnósticos) y se trata exclusivamente para atenderla.',
+  ]],
+  ['¿Y mis fotos, y la imagen de otras personas?', [
+    'La foto original queda en tu equipo. A la base del barrio va solo una versión reducida, lo justo para verla en la pantalla. Las copias en buena calidad que se comparten para descargar tienen vencimiento.',
+    'Nadie puede captar ni publicar la imagen de otra persona sin su consentimiento (art. 53 del Código Civil y Comercial). Está prohibido en los términos de uso y la Administración puede retirarla.',
+  ]],
+  ['¿Y los datos de mis visitas, que no son usuarios de la app?', [
+    'La visita completa un formulario donde se le informa que sus datos (DNI y patente) sirven solo para el ingreso al barrio y que se borran solos a los {DIAS} días. Debe aceptarlo para continuar (arts. 5 y 6 de la Ley 25.326). El registro de auditoría no guarda ni el DNI ni la patente.',
+  ]],
+  ['¿Tienen valor las firmas que se hacen en la pantalla?', [
+    'En simple: sí, como prueba, y no se pueden alterar sin que se note.',
+    'Las peticiones a la garita se firman a mano en la pantalla, por el vecino y por el guardia. Jurídicamente es una firma electrónica (art. 5 de la Ley 25.506), no una firma digital con certificado. Por eso no reemplaza la firma de un instrumento que la ley exige firmado (art. 288 del Código Civil y Comercial), pero sí es un medio de prueba que el juez valora (art. 319). Cada petición lleva un sello criptográfico SHA-256: si alguien cambiara una sola letra después de firmada, el sello deja de coincidir y la alteración queda en evidencia.',
+  ]],
+  ['¿Dónde están guardados los datos? ¿Salen del país?', [
+    'En los servidores de Google (Firebase) en los Estados Unidos, con certificaciones internacionales de seguridad (ISO 27001 y SOC 2, entre otras). Los correos se envían por Google Apps Script y, si pagás en línea, el pago lo procesa Mercado Pago con sus propios resguardos.',
+    'La Ley 25.326 restringe la transferencia a países sin un nivel de protección adecuado (art. 12), y los Estados Unidos no figuran en la lista de la Disposición DNPDP 60-E/2016. La transferencia es lícita porque el titular la consiente expresamente al inscribirse: el Decreto 1558/2001 (art. 12) dispone que en ese caso la prohibición no rige. Además, Google actúa como prestador de servicios con las obligaciones del art. 25 de la ley.',
+  ]],
+  ['¿Qué derechos tengo y cómo los ejerzo?', [
+    '• Acceso: saber qué datos tuyos hay, de dónde salieron y para qué se usan. Es gratuito cada seis meses (antes, si acreditás un interés legítimo), y la respuesta debe llegar dentro de los 10 días corridos (art. 14). Tiene que ser clara y comprensible (art. 15).',
+    '• Rectificación, actualización y supresión: que se corrija lo inexacto o se borre lo que no corresponde, dentro de los 5 días hábiles (art. 16). Muchos datos los corregís vos mismo en Mi casa.',
+    '• Baja: podés pedir la baja de tu cuenta y la supresión de tus datos. La excepción es la que prevé la propia ley (art. 16 inc. 5): los datos que el barrio tiene obligación legal de conservar, como los contables y los de expensas, que se guardan diez años (art. 328 del Código Civil y Comercial).',
+    '• Cómo: se pide a la Administración, desde Tu casa → Mensajes o por correo.',
+    '• Si no te responden o la respuesta no te satisface, tenés dos caminos: la denuncia administrativa ante la AAIP (argentina.gob.ar/aaip) y la acción judicial de hábeas data (art. 43 CN y arts. 33 y siguientes de la Ley 25.326).',
+  ]],
+  ['¿Quién controla que se cumpla? ¿Qué pasa si alguien no cumple?', [
+    'La autoridad de control es la Agencia de Acceso a la Información Pública (AAIP), un organismo nacional con facultades de fiscalización, que puede recibir denuncias, inspeccionar y sancionar (arts. 29 y 31 de la Ley 25.326). Las sanciones administrativas van del apercibimiento a la suspensión, la multa, la clausura o la cancelación del archivo, y se aplican con independencia de la responsabilidad civil por los daños y de la penal.',
+    'En lo penal, quien acceda sin autorización a los datos o los revele comete un delito (arts. 153 bis y 157 bis del Código Penal). En lo civil, la afectación de la intimidad o la imagen se repara según los arts. 52, 53 y 1770 del Código Civil y Comercial. Dentro del barrio, el uso indebido de la app habilita a la Administración a suspender la cuenta.',
+    'Las decisiones internas también siguen reglas de debido proceso: las infracciones al reglamento son graduales, se notifican y se puede presentar un descargo antes de cualquier sanción, y las votaciones dejan acta y registro de cada voto.',
+  ]],
+  ['¿Qué le corresponde hacer al barrio para cumplir del todo?', [
+    'La app pone las herramientas técnicas. Hay obligaciones que son del barrio como responsable del archivo, y se dicen acá con transparencia:',
+    '• Inscribir la base de datos en el Registro Nacional de Bases de Datos de la AAIP (art. 21). La ley condiciona la licitud del archivo a su inscripción (art. 3). Es un trámite en línea y gratuito. Estado hoy: {AAIP}.',
+    '• Designar a quién se dirigen los pedidos de los titulares y responderlos en los plazos legales. Hoy: {ARCO}.',
+    '• Pedir a quienes tienen acceso por su función (Administración, guardias) que suscriban un compromiso de confidencialidad (art. 10), y quitar el acceso a quien deja la función. Hoy: {CONF}.',
+    '• Llevar un registro de incidentes de seguridad y avisar a los afectados si alguno ocurre, como recomienda la Resolución AAIP 47/2018.',
+    '• Cargar en la app el estatuto y el reglamento interno vigentes.',
+    '• Recomendación del autor: que un abogado del barrio revise los términos de uso y esta política antes de aprobarlos formalmente.',
+  ]],
+];
+/* El plazo de borrado de las visitas es el de Ajustes: se completa al mostrar. */
+const faqTexto = t => { const c = typeof cfgDatos === 'function' ? cfgDatos() : {};
+  return esc(t).replace(/\{DIAS\}/g, String(Store.s.config.datosDias || 90))
+    .replace(/\{AAIP\}/g, c.inscripta ? `inscripta${c.inscripcionFecha ? ' el ' + fechaCorta(c.inscripcionFecha) : ''}${c.inscripcionNro ? ', N.º ' + esc(c.inscripcionNro) : ''}` : 'en trámite')
+    .replace(/\{ARCO\}/g, c.responsableArco ? esc(c.responsableArco) : 'la Administración del barrio')
+    .replace(/\{CONF\}/g, c.compromisosFirmados ? 'firmados' : 'en preparación'); };
 R.ayuda = {
   titulo: 'Preguntas frecuentes', icon: 'info', color: 'ok', sub: 'Cómo se hace cada cosa',
   render(){
-    return `${FAQ.map(([p, r, a, v, b]) => `<details class="faq card"><summary><b>${esc(p)}</b>${I('right')}</summary>
-      <p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.55">${esc(r)}</p>
-      ${a ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="${a}" data-v="${v}">${esc(b)}${I('right')}</button>` : ''}</details>`).join('')}
+    const item = (p, cuerpo) => `<details class="faq card"><summary><b>${esc(p)}</b>${I('right')}</summary>${cuerpo}</details>`;
+    return `${FAQ.map(([p, r, a, v, b]) => item(p, `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.55">${esc(r)}</p>
+      ${a ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="${a}" data-v="${v}">${esc(b)}${I('right')}</button>` : ''}`)).join('')}
+      <div class="sec" id="faqDatos"><h2>${I('lock')} Tus datos: privacidad y seguridad</h2></div>
+      <p class="small" style="color:var(--ink-2);margin:-4px 0 12px;line-height:1.55">Cómo cuida la app tu información, explicado en simple y con la norma que respalda cada punto, para que cualquier vecino (también quien sea abogado) lo pueda controlar.</p>
+      ${FAQ_DATOS.map(([p, ps]) => item(p, ps.map(t => `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.6">${faqTexto(t)}</p>`).join(''))).join('')}
+      <div class="btns" style="margin:4px 0 16px"><button class="btn btn-sm btn-sec" data-a="faq-datos-pdf">${I('download')}Descargar o imprimir esta sección</button>
+        <button class="btn btn-sm btn-sec" data-a="abrir" data-v="legal">${I('file')}Términos de uso completos${I('right')}</button></div>
       <p class="muted small">¿No está lo que buscás? Escribile a la Administración desde Tu casa → Mensajes.</p>`;
   },
 };
 A['abrir-ayuda'] = () => { cerrarHoja(); abrir('ayuda'); };
+A['faq-datos-pdf'] = () => imprimir('Tus datos: privacidad y seguridad', `<h1>Barrio ${esc(Store.s.config.nombre)}</h1>
+  <p><b>Tus datos: privacidad y seguridad</b><br>Cómo cuida la app la información de los vecinos, y su fundamento jurídico · ${fechaLarga(hoyISO())}</p>
+  ${FAQ_DATOS.map(([p, ps]) => `<h2>${esc(p)}</h2>${ps.map(t => `<p>${faqTexto(t)}</p>`).join('')}`).join('')}
+  <p style="margin-top:24px"><small>Texto informativo. No reemplaza los términos de uso ni el asesoramiento de un abogado.</small></p>`);

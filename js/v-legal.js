@@ -5,7 +5,7 @@
    Preguntas frecuentes. El texto está acá, en un solo lugar: si cambia,
    se cambia la fecha de VERSION_LEGAL y listo.
    ========================================================= */
-const VERSION_LEGAL = '24 de septiembre de 2026';
+const VERSION_LEGAL = '25 de septiembre de 2026';
 
 const LEGAL = [
   ['1. Partes y objeto', [
@@ -27,7 +27,9 @@ const LEGAL = [
   ['5. Protección de datos personales', [
     'La Aplicación fue diseñada conforme a la Ley 25.326 de Protección de los Datos Personales, su Decreto Reglamentario 1558/2001, las disposiciones de la Agencia de Acceso a la Información Pública (AAIP) como órgano de control, el art. 43 de la Constitución Nacional (hábeas data), los arts. 51, 52, 53 y 1770 del CCyC (dignidad, intimidad e imagen de las personas) y las garantías de la Constitución de la Provincia de Tierra del Fuego, Antártida e Islas del Atlántico Sur.',
     'Principios aplicados: se recogen solo los datos necesarios para la vida del Barrio (nombre, lote, correo, y los que cada Vecino decida agregar); cada Usuario ve únicamente lo que su rol le permite; los datos de contacto se muestran a los demás solo si su titular lo autoriza; los mensajes privados y los reclamos son reservados; las fotografías publicadas se conservan en baja resolución y el archivo original se entrega a quien lo descarga, sin quedar almacenado en la base; el acceso está protegido por cuentas personales y reglas de seguridad en el servidor.',
-    'Los datos se alojan en servicios de Google LLC (Firebase y Google Apps Script), que pueden encontrarse fuera del país. Al usar la Aplicación, el Usuario presta su consentimiento libre, expreso e informado para ese tratamiento y transferencia (arts. 5 y 12 de la Ley 25.326), limitado a las finalidades de comunicación, seguridad, administración y convivencia del Barrio.',
+    'Medidas de seguridad (art. 9 de la Ley 25.326 y Resolución AAIP 47/2018): comunicaciones cifradas (HTTPS/TLS); almacenamiento cifrado por el proveedor; contraseñas conservadas solo como huella criptográfica irreversible; reglas de acceso aplicadas en el servidor, por las que cada Usuario accede solo a su propia información y cada rol solo a las carpetas que su función requiere; los mensajes entre Vecinos no son accesibles para la Administración ni para la guardia; registro de auditoría de las acciones de la Administración; y borrado de los datos locales al cerrar sesión. Quienes acceden por su función (Administración y guardia) están obligados al secreto (art. 10).',
+    'Ante un pedido de auxilio (SOS), el nombre, el lote, el tipo de emergencia y la ubicación del Usuario al momento de pedirlo se muestran a todos los Usuarios del Barrio, con la finalidad exclusiva de que puedan saber dónde ocurre y prestar ayuda. La ubicación se toma solo en ese momento y por acto del propio titular.',
+    'Los datos se alojan en servicios de Google LLC (Firebase y Google Apps Script), que pueden encontrarse fuera del país. Al usar la Aplicación, el Usuario presta su consentimiento libre, expreso e informado para ese tratamiento y transferencia (arts. 5 y 12 de la Ley 25.326 y art. 12 del Decreto 1558/2001), limitado a las finalidades de comunicación, seguridad, administración y convivencia del Barrio. Google LLC actúa como prestador de servicios informatizados en los términos del art. 25 de la Ley 25.326.',
     'Los datos sensibles (art. 2 y 7 de la Ley 25.326), como la información de salud que pudiera surgir de un pedido de auxilio, se tratan solo para atender la emergencia y no se ceden a terceros ajenos a ella.',
     'Todo titular puede ejercer en forma gratuita los derechos de acceso (a intervalos no inferiores a seis meses, salvo interés legítimo), rectificación, actualización y supresión (arts. 14 y 16 de la Ley 25.326), dirigiéndose a la Administración del Barrio, que es quien dispone de los datos. La AAIP, órgano de control de la Ley 25.326, tiene la atribución de atender las denuncias y reclamos que se interpongan con relación al incumplimiento de las normas sobre protección de datos personales.',
   ]],
@@ -92,3 +94,99 @@ A['legal-pdf'] = () => imprimir('Términos de uso y responsabilidad', `<h1>Barri
   <p><b>Términos y condiciones de uso, política de protección de datos personales y deslinde de responsabilidad</b><br>Versión del ${VERSION_LEGAL}</p>
   ${textoLegal().replace(/<h3>/g, '<h2>').replace(/<\/h3>/g, '</h2>')}
   <p style="margin-top:28px"><b>Claudio A. Ravasi</b><br>Autor de la Aplicación</p>`);
+
+/* =========================================================
+   PROTECCIÓN DE DATOS: LO QUE LE TOCA AL BARRIO
+   La app pone las herramientas; hay obligaciones que son del barrio como
+   responsable de la base (Ley 25.326). Esta ventana (solo Administración)
+   las ordena: la inscripción en el Registro Nacional de Bases de Datos de la
+   AAIP con las respuestas ya redactadas, quién atiende los pedidos de los
+   vecinos, el compromiso de confidencialidad para imprimir y firmar, y un
+   registro de incidentes de seguridad. Todo queda en config.proteccion.
+   ========================================================= */
+const cfgDatos = () => Object.assign({ inscripta:false, inscripcionFecha:'', inscripcionNro:'', responsableArco:'', compromisosFirmados:false, compromisosFecha:'', incidentes:[] }, Store.s.config.proteccion || {});
+function tareasDatosPendientes(){ const c = cfgDatos(); return [!c.inscripta, !c.responsableArco, !c.compromisosFirmados].filter(Boolean).length; }
+const RESPUESTAS_AAIP = () => {
+  const c = Store.s.config;
+  return [
+    ['Responsable de la base', `Barrio ${c.nombre} (entidad administradora), CUIT ${c.cuit || '—'}, domicilio ${c.domicilio || '—'}, correo ${c.adminEmail || '—'}.`],
+    ['Nombre de la base', `Vecinos, visitas y administración del Barrio ${c.nombre}.`],
+    ['Finalidad', 'Comunicación entre vecinos y con la Administración, seguridad y control de acceso al barrio, administración y cobro de expensas, convivencia y gestión de espacios comunes.'],
+    ['Datos que se tratan', 'Identificatorios (nombre, DNI, lote, correo, teléfono optativo); de visitas (nombre, DNI y patente, borrados a los ' + (c.datosDias || 90) + ' días); de pagos de expensas; ubicación solo al pedir un SOS; del personal de guardia y del policía contratado (nombre, matrícula, celular para enviarle su código de ronda, horarios y rondas). No se tratan datos sensibles salvo el tipo de emergencia de un SOS, informado por el propio titular.'],
+    ['Origen de los datos', 'Los aporta el propio titular al inscribirse o al usar la app; los de visitas, el vecino que las anuncia o la propia visita; los del padrón, la liquidación de expensas del barrio.'],
+    ['Cesiones', 'No se ceden datos a terceros, salvo obligación legal u orden judicial.'],
+    ['Transferencia internacional', 'Sí: los datos se alojan en servidores de Google LLC (Firebase) en los Estados Unidos, que actúa como prestador de servicios (art. 25). La transferencia cuenta con el consentimiento expreso de los titulares (art. 12 de la Ley 25.326 y art. 12 del Decreto 1558/2001).'],
+    ['Medidas de seguridad', 'Conexiones cifradas (HTTPS/TLS); almacenamiento cifrado por el proveedor; contraseñas guardadas solo como huella irreversible; reglas de acceso en el servidor por rol; cada vecino accede solo a sus datos; registro de auditoría; borrado automático de datos de visitas; compromiso de confidencialidad del personal con acceso.'],
+    ['Conservación', 'Datos de visitas: ' + (c.datosDias || 90) + ' días. Datos contables y de expensas: 10 años (art. 328 del Código Civil y Comercial). El resto, mientras el titular tenga cuenta.'],
+    ['Derechos de los titulares', 'Acceso, rectificación, actualización y supresión, gratuitos, ante la Administración' + (cfgDatos().responsableArco ? ` (${cfgDatos().responsableArco})` : '') + '. Plazos: 10 días corridos para el acceso y 5 días hábiles para rectificar o suprimir.'],
+  ];
+};
+R.proteccion = {
+  titulo: 'Protección de datos', icon: 'lock', color: 'ok', sub: 'Lo que le toca al barrio como responsable de la base',
+  render(){
+    if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
+    const c = cfgDatos();
+    const paso = (ok, t, x) => `<div class="it"><span class="ic ic-${ok ? 'ok' : 'warn'}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(ok ? 'check' : 'alert')}</span><div class="txt"><b>${t}</b><span>${x}</span></div></div>`;
+    return `<p class="muted small" style="margin:0 0 12px">La app ya cumple su parte (cifrado, acceso por rol, borrado de visitas, auditoría). Estas tareas son del barrio como responsable de la base de datos (Ley 25.326). Van también en Preguntas frecuentes, para que los vecinos sepan que se hacen.</p>
+      <div class="card lista">
+        ${paso(c.inscripta, 'Base inscripta en el Registro Nacional de Bases de Datos (AAIP)', c.inscripta ? `Inscripta${c.inscripcionFecha ? ' el ' + fechaCorta(c.inscripcionFecha) : ''}${c.inscripcionNro ? ' · N.º ' + esc(c.inscripcionNro) : ''}` : 'Pendiente. Es lo que hace lícito el archivo (arts. 3 y 21).')}
+        ${paso(!!c.responsableArco, 'Quién atiende los pedidos de los vecinos sobre sus datos', c.responsableArco ? esc(c.responsableArco) : 'Pendiente: nombre y correo de quien responde (10 días corridos para el acceso, 5 hábiles para corregir o borrar).')}
+        ${paso(c.compromisosFirmados, 'Compromiso de confidencialidad firmado por guardias y Administración', c.compromisosFirmados ? `Firmados${c.compromisosFecha ? ' el ' + fechaCorta(c.compromisosFecha) : ''}` : 'Pendiente (art. 10: deber de secreto). Imprimilo abajo.')}
+        ${paso(true, 'Registro de incidentes de seguridad', `${plural(aLista(c.incidentes).length, 'incidente anotado', 'incidentes anotados')}`)}
+      </div>
+      ${sec('Cómo inscribir la base en la AAIP')}
+      <div class="card small" style="line-height:1.6">
+        <p style="margin:0 0 8px">1. Entrá a <b>argentina.gob.ar/aaip/datospersonales</b> y buscá la inscripción de bases de datos en el Registro Nacional de Bases de Datos. El trámite es en línea y gratuito, con la <b>clave fiscal de la entidad del barrio</b> (CUIT ${esc(Store.s.config.cuit || '—')}), por Trámites a Distancia (TAD).</p>
+        <p style="margin:0 0 8px">2. Te van a preguntar lo de abajo: las respuestas ya están redactadas con lo que hace la app. Copialas.</p>
+        <p style="margin:0">3. Cuando termines, anotá acá la fecha y el número. Si cambia algo importante (otra finalidad, otro proveedor), hay que actualizar la inscripción.</p>
+        <p class="muted tiny" style="margin:10px 0 0">El nombre exacto de los pasos puede cambiar en el sitio de la AAIP; lo que se declara es siempre esto.</p></div>
+      <div class="card lista">${RESPUESTAS_AAIP().map(([t, x], i) => `<div class="it"><div class="txt"><b>${esc(t)}</b><span style="white-space:normal">${esc(x)}</span></div><button class="icon-btn" data-a="aaip-copiar" data-v="${i}" aria-label="Copiar">${I('copy')}</button></div>`).join('')}</div>
+      <div class="btns"><button class="btn btn-sm btn-sec" data-a="aaip-imprimir">${I('file')}Imprimir las respuestas</button></div>
+      ${sec('Anotar lo hecho')}
+      <form data-f="proteccion" class="card">
+        <label class="check"><input type="checkbox" name="inscripta" ${c.inscripta ? 'checked' : ''}><span>La base ya está inscripta en la AAIP</span></label>
+        <div class="grid2"><div class="field"><label>Fecha de inscripción</label><input type="date" name="inscripcionFecha" value="${esc(c.inscripcionFecha)}"></div>
+          <div class="field"><label>Número de registro</label><input name="inscripcionNro" maxlength="40" value="${esc(c.inscripcionNro)}"></div></div>
+        <div class="field"><label>Quién atiende los pedidos sobre datos (nombre y correo)</label><input name="responsableArco" maxlength="120" value="${esc(c.responsableArco)}" placeholder="Paula Juncos · barriobahiacauquen@gmail.com"></div>
+        <label class="check"><input type="checkbox" name="compromisosFirmados" ${c.compromisosFirmados ? 'checked' : ''}><span>Guardias y Administración firmaron el compromiso de confidencialidad</span></label>
+        <div class="field"><label>Fecha de las firmas</label><input type="date" name="compromisosFecha" value="${esc(c.compromisosFecha)}"></div>
+        <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
+      ${sec('Compromiso de confidencialidad')}
+      ${superficie({ a:'compromiso-imprimir', icon:'file', color:'brand', t:'Imprimir el compromiso', s:'Uno por persona: guardias (también los que cubren francos) y quienes administran' })}
+      ${sec('Registro de incidentes', `<button class="link" data-a="incidente-nuevo">Anotar un incidente</button>`)}
+      ${aLista(c.incidentes).length ? `<div class="card lista">${aLista(c.incidentes).slice().reverse().map(x => `<div class="it"><div class="txt"><b>${fechaCorta(x.fecha)} · ${esc(x.que)}</b><span style="white-space:normal">Afectados: ${esc(x.afectados || '—')} · Medidas: ${esc(x.medidas || '—')}${x.avisados ? ' · Se avisó a los afectados' : ''}</span></div></div>`).join('')}</div>`
+        : vacio('lock', 'Sin incidentes. Anotá cualquiera: una contraseña que se filtró, un teléfono de la garita perdido, un acceso que no correspondía.')}
+      <p class="muted tiny">Ante un incidente: cambiar las contraseñas involucradas, sacar el acceso a quien no corresponde, avisar a los vecinos afectados y dejarlo anotado acá (Resolución AAIP 47/2018).</p>`;
+  },
+};
+A['aaip-copiar'] = el => { const r = RESPUESTAS_AAIP()[+el.dataset.v]; if (!r) return; try { navigator.clipboard.writeText(r[1]); } catch(e){} toast(`Copiado: ${r[0]}`, 'copy'); };
+A['aaip-imprimir'] = () => imprimir('Inscripción en la AAIP', `<h1>Barrio ${esc(Store.s.config.nombre)}</h1><p><b>Respuestas para la inscripción de la base en el Registro Nacional de Bases de Datos (AAIP)</b><br>${fechaLarga(hoyISO())}</p>
+  ${RESPUESTAS_AAIP().map(([t, x]) => `<h2>${esc(t)}</h2><p>${esc(x)}</p>`).join('')}`);
+F['proteccion'] = d => {
+  Store.cambiar(s => { s.config.proteccion = Object.assign({}, cfgDatos(), { inscripta:!!d.inscripta, inscripcionFecha:d.inscripcionFecha || '', inscripcionNro:String(d.inscripcionNro || '').trim(),
+    responsableArco:String(d.responsableArco || '').trim(), compromisosFirmados:!!d.compromisosFirmados, compromisosFecha:d.compromisosFecha || '' });
+    auditar(s, 'Actualizó las tareas de protección de datos', ''); });
+  toast('Guardado', 'check'); refrescar();
+};
+A['incidente-nuevo'] = () => hoja('Anotar un incidente de seguridad', `<form data-f="incidente">
+  <div class="field"><label>Fecha</label><input type="date" name="fecha" required value="${hoyISO()}"></div>
+  <div class="field"><label>Qué pasó</label><textarea name="que" required maxlength="400" placeholder="Ej: se perdió el teléfono de la garita con la sesión abierta."></textarea></div>
+  <div class="field"><label>A quiénes afecta</label><input name="afectados" maxlength="200"></div>
+  <div class="field"><label>Qué se hizo</label><textarea name="medidas" maxlength="400" placeholder="Ej: se cambió la contraseña de la garita y se cerró la sesión en todos los equipos."></textarea></div>
+  <label class="check"><input type="checkbox" name="avisados"><span>Se avisó a los afectados</span></label>
+  <button class="btn btn-pri btn-block">${I('check')}Anotar</button></form>`);
+F['incidente'] = d => {
+  Store.cambiar(s => { const c = cfgDatos(); s.config.proteccion = Object.assign({}, c, { incidentes:[...aLista(c.incidentes), { id:uid(), fecha:d.fecha, que:d.que.trim(), afectados:(d.afectados || '').trim(), medidas:(d.medidas || '').trim(), avisados:!!d.avisados, at:Date.now() }] });
+    auditar(s, 'Anotó un incidente de seguridad', d.que.trim().slice(0, 80)); });
+  cerrarHoja(); toast('Incidente anotado', 'check'); refrescar();
+};
+A['compromiso-imprimir'] = () => { const c = Store.s.config;
+  imprimir('Compromiso de confidencialidad', `<h1>Barrio ${esc(c.nombre)}</h1><p><b>Compromiso de confidencialidad sobre datos personales</b></p>
+  <p>En la ciudad de Ushuaia, a los ____ días del mes de ______________ de 20____, quien suscribe, ____________________________________________, DNI ______________, en su carácter de ______________________ (guardia / integrante de la Administración / otro), declara:</p>
+  <p>1. Que en el ejercicio de su función accede a datos personales de los vecinos, de sus visitas y de terceros, a través de la aplicación del Barrio ${esc(c.nombre)} y de otros registros del barrio.</p>
+  <p>2. Que se obliga a guardar secreto sobre esos datos, conforme el art. 10 de la Ley 25.326 de Protección de los Datos Personales, y que esta obligación subsiste aun después de finalizada su relación con el barrio.</p>
+  <p>3. Que usará los datos exclusivamente para las tareas de su función (seguridad, control de acceso, administración), y que no los copiará, fotografiará, reenviará ni comunicará a terceros, salvo orden judicial o de autoridad competente.</p>
+  <p>4. Que mantendrá en reserva su contraseña, no dejará la sesión abierta en equipos sin supervisión, y avisará de inmediato a la Administración ante la pérdida de un equipo o cualquier acceso indebido.</p>
+  <p>5. Que conoce que el acceso ilegítimo a un banco de datos personales o la revelación de su contenido pueden constituir delito (arts. 153 bis y 157 bis del Código Penal), sin perjuicio de la responsabilidad civil y de las sanciones que correspondan.</p>
+  <p style="margin-top:48px">Firma: ______________________________ &nbsp;&nbsp; Aclaración: ______________________________</p>
+  <p style="margin-top:28px">Por la Administración del Barrio: ______________________________</p>`); };

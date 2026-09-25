@@ -1,11 +1,11 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20260925-080245';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260925-080245',
-  './js/firebase-config.js?v=20260925-080245', './js/icons.js?v=20260925-080245', './js/agenda.js?v=20260925-080245', './js/padron.js?v=20260925-080245', './js/core.js?v=20260925-080245', './js/seed.js?v=20260925-080245', './js/clima.js?v=20260925-080245', './js/calendario.js?v=20260925-080245',
-  './js/v-inicio.js?v=20260925-080245', './js/v-comunidad.js?v=20260925-080245', './js/v-gestion.js?v=20260925-080245', './js/admin.js?v=20260925-080245', './js/v-vecinos.js?v=20260925-080245', './js/v-expensas.js?v=20260925-080245', './js/v-plan.js?v=20260925-080245', './js/v-contable.js?v=20260925-080245', './js/v-servicio.js?v=20260925-080245', './js/v-legal.js?v=20260925-080245', './js/push.js?v=20260925-080245', './js/sismos.js?v=20260925-080245', './js/nube.js?v=20260925-080245', './js/app.js?v=20260925-080245',
-  './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png'];
+const CACHE = 'bhc-20260925-095250';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260925-095250',
+  './js/firebase-config.js?v=20260925-095250', './js/icons.js?v=20260925-095250', './js/agenda.js?v=20260925-095250', './js/padron.js?v=20260925-095250', './js/core.js?v=20260925-095250', './js/seed.js?v=20260925-095250', './js/clima.js?v=20260925-095250', './js/calendario.js?v=20260925-095250',
+  './js/v-inicio.js?v=20260925-095250', './js/v-comunidad.js?v=20260925-095250', './js/v-gestion.js?v=20260925-095250', './js/admin.js?v=20260925-095250', './js/v-vecinos.js?v=20260925-095250', './js/v-expensas.js?v=20260925-095250', './js/v-plan.js?v=20260925-095250', './js/v-contable.js?v=20260925-095250', './js/v-servicio.js?v=20260925-095250', './js/v-legal.js?v=20260925-095250', './js/push.js?v=20260925-095250', './js/sismos.js?v=20260925-095250', './js/nube.js?v=20260925-095250', './js/app.js?v=20260925-095250',
+  './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
@@ -21,23 +21,36 @@ self.addEventListener('fetch', e => {
 /* =========================================================
    AVISOS CON LA PANTALLA APAGADA
    Google (Firebase Cloud Messaging) despierta este service worker aunque la
-   app esté dormida o el celular bloqueado, y acá se muestra el aviso. Si la
-   app está a la vista, no se muestra nada: ya sonó adentro.
+   app esté dormida o el celular bloqueado, y acá se muestra el aviso: con
+   el ícono del barrio, la casita en la barra de estado, el sonido de
+   notificación del equipo (silent:false) y vibración.
+   Siempre se muestra. Antes se callaba si la app estaba a la vista, pero
+   Safari (iPhone) da de baja la suscripción de una página que recibe
+   avisos sin mostrarlos, y a partir de ahí no llegaba nada más.
    ========================================================= */
+const ICONO_TIPO = { camion:'🚛 ', sos:'🆘 ', urgente:'⚠️ ', paquete:'📦 ' };
 self.addEventListener('push', e => {
   let j = {};
   try { j = e.data ? e.data.json() : {}; } catch(err){ j = { data:{ texto: e.data ? e.data.text() : '' } }; }
   const d = j.data || j.notification || j || {};
-  const titulo = d.titulo || d.title || 'Barrio Bahía Cauquén';
   const urgente = d.urgente === '1' || d.urgente === true;
+  let titulo = d.titulo || d.title || 'Barrio Bahía Cauquén';
+  const pre = ICONO_TIPO[d.sonido] || (urgente ? ICONO_TIPO.urgente : '');
+  if (pre && /^[\p{L}\p{N}¡¿]/u.test(titulo)) titulo = pre + titulo;
   const op = {
-    body: d.texto || d.body || '', icon:'./icons/icon-192.png', badge:'./icons/icon-192.png', lang:'es-AR',
-    tag: d.tag || undefined, renotify: !!d.tag, requireInteraction: urgente,
-    vibrate: d.sonido === 'camion' ? [120, 60, 120, 60, 120, 200, 300] : urgente ? [400, 150, 400, 150, 400] : [150, 80, 150],
-    data:{ link: d.link || '' },
+    body: d.texto || d.body || '', icon:'./icons/icon-192.png', badge:'./icons/badge.png', lang:'es-AR', dir:'ltr',
+    tag: d.tag || undefined, renotify: !!d.tag, requireInteraction: urgente || d.sonido === 'sos',
+    silent: false, timestamp: Date.now(),
+    vibrate: d.sonido === 'camion' ? [120, 60, 120, 60, 120, 200, 300] : (urgente || d.sonido === 'sos') ? [500, 150, 500, 150, 500, 150, 500] : [200, 100, 200],
+    actions: [{ action:'abrir', title:'Abrir' }],
+    data:{ link: d.link || '', sonido: d.sonido || '' },
   };
   e.waitUntil(self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(cs => {
-    if (cs.some(c => c.visibilityState === 'visible' && c.focused)) return;
+    /* Con la app a la vista ya sonó adentro (con su melodía): el aviso del
+       sistema aparece igual, pero sin repetir el sonido. En iPhone no se
+       toca nada, para que Safari no lo tome como un aviso "escondido". */
+    const iOS = /iPhone|iPad|iPod/.test(self.navigator.userAgent || '');
+    if (!iOS && cs.some(c => c.visibilityState === 'visible' && c.focused)){ op.silent = true; delete op.vibrate; }
     return self.registration.showNotification(titulo, op);
   }));
 });

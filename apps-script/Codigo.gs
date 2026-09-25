@@ -93,7 +93,7 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 3;
+var VERSION_SCRIPT = 4;
 
 function doPost(e) {
   try {
@@ -232,14 +232,17 @@ function mandarPush(d) {
   var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.messaging');
   var url = 'https://fcm.googleapis.com/v1/projects/' + cuenta.project_id + '/messages:send';
   /* Solo datos: el que arma la notificación es el service worker de la app,
-     así se ve igual en todos los equipos y puede vibrar o insistir. */
+     así se ve igual en todos los equipos y puede vibrar o insistir.
+     Urgencia siempre alta: con "normal", Android deja el aviso para cuando
+     el teléfono se despierta solo (a veces varios minutos), y el camión o un
+     paquete ya no sirven tarde. Solo viajan avisos que suenan. */
   var datos = {titulo: String(d.titulo || 'Barrio Bahía Cauquén').slice(0, 120), texto: String(d.texto || '').slice(0, 300),
     link: String(d.link || ''), tag: String(d.tag || ''), urgente: d.urgente ? '1' : '', sonido: String(d.sonido || '')};
   var pedidos = destino.equipos.map(function (e) {
     return {url: url, method: 'post', contentType: 'application/json', muteHttpExceptions: true,
       headers: {Authorization: 'Bearer ' + acceso},
       payload: JSON.stringify({message: {token: e.t, data: datos,
-        webpush: {headers: {Urgency: d.urgente ? 'high' : 'normal', TTL: String(d.urgente ? 3600 : 10800)}}}})};
+        webpush: {headers: {Urgency: 'high', TTL: String(d.urgente ? 3600 : 10800)}}}})};
   });
   var enviados = 0, borrar = {};
   for (var i = 0; i < pedidos.length; i += 50) {

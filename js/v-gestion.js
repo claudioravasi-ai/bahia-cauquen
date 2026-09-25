@@ -773,7 +773,7 @@ R.recoleccion = {
     const viajes = typeof Camion !== 'undefined' ? Camion.lista().slice(0, 6) : [];
     return `${typeof bandaCamion === 'function' ? bandaCamion(esStaff()) : ''}
       <div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${recoleccionDias()[d] ? I('truck') + esc(recoleccionDias()[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
-      <p class="muted small">El camión pasa desde las ${c.recoleccionHora} h. Si al otro día es feriado, puede cambiar: la app avisa.</p>
+      <p class="muted small">Pasa por la mañana, desde las ${c.recoleccionHora} h. Si ese día es feriado, puede cambiar: la app avisa.</p>
       ${(() => { const man = diaInfo(sumarDias(hoyIso, 1));
         return man.feriado ? aviso('warn', 'calendar', `Mañana es feriado: ${esc(man.feriado.nombre)}`, 'La recolección puede no pasar o pasar más tarde.') : ''; })()}
       <p class="muted small">La recolección del barrio la hace <b>${esc(c.camionEmpresa || 'SEINCO S.A.')}</b>, la empresa contratada por el barrio.</p>
@@ -789,6 +789,8 @@ R.recoleccion = {
             <div class="muted small">${esc(v.detalle || c.voluminososDetalle)}</div></div>
           <span class="pill ${v.fecha === hoyIso ? 'p-danger' : ''}">${relDia(v.fecha)}</span>
           ${esAdmin() ? `<button class="icon-btn" data-a="borrar-voluminoso" data-v="${v.fecha}" aria-label="Borrar">${I('trash')}</button>` : ''}</div></div>`).join('')
+        : Object.values(recoleccionDias()).some(esVoluminoso) ? `<div class="card"><b>Todos los ${[1,2,3,4,5,6,0].filter(d => esVoluminoso(recoleccionDias()[d])).map(d => DIAS_L[d].toLowerCase() + 's').join(' y ')}</b><p class="small" style="margin:6px 0 0;color:var(--ink-2)">${esc(c.voluminososDetalle)}</p>
+           ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="nuevo-voluminoso">${I('plus')}Anotar un retiro especial</button>` : ''}</div>`
         : `<div class="card"><b>Sin retiros anotados</b><p class="small" style="margin:6px 0 0;color:var(--ink-2)">${esc(c.voluminososDetalle)}</p>
            ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="nuevo-voluminoso">${I('plus')}Anotar el próximo retiro</button>` : ''}</div>`}
       ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'accent', t:'Cambiar los días del camión', s:'Qué se retira cada día y a qué hora pasa' }) : ''}

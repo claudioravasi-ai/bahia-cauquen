@@ -276,6 +276,9 @@ function pintarTop(){
 
 function pintar(){
   aplicarTema();
+  /* El QR de un punto de ronda abre su pantallita aunque el teléfono tenga
+     una sesión abierta: nada la tapa hasta que se cierra. */
+  if (/^#\/(punto|ronda)\//.test(location.hash)){ rutaPublica(); return; }
   const u = yo();
   if (!u){ PILA.length = 0; return pintarBienvenida(); }
   if (!$('#lienzo')){
@@ -667,6 +670,8 @@ function sosPanelVecino(s0, t){
       : 'La guardia y la Administración ya fueron avisadas.'}</div>
     <div class="sos-botones">
       ${medicaRespondedor ? `<a class="btn btn-block sos-b-claro" href="tel:107">${I('heart')}Llamar al 107</a>` : ''}
+      ${(() => { const punto = s0.coords || u.ubicacion;
+        return punto ? `<a class="btn btn-block sos-b-claro" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(punto)}" target="_blank" rel="noopener">${I('pin')}Dónde está pasando${s0.coords ? ' (GPS de la alerta)' : ' (ubicación del lote)'}</a>` : ''; })()}
       <div class="btns"><button class="btn btn-sec grow" data-a="sos-entendido" data-id="${s0.id}">${I('check')}Entendido</button></div>
       <a class="btn btn-block sos-b-oscuro" href="tel:${t.llamar}">${I('phone')}Emergencias ${t.llamar}</a>
       <p class="sos-nota">Queda en tu campanita hasta que ${esc((u.nombre || 'el vecino').split(' ')[0])} avise que ya está solucionado.</p>
@@ -739,6 +744,7 @@ function pintarBienvenida(modo = 'inicio'){
         campo(nube ? 'Contraseña' : 'Clave de vecino', `<input name="clave" type="${nube ? 'password' : 'text'}" required autocomplete="current-password" placeholder="${nube ? '••••••••' : 'VEC-XXXX'}" ${nube ? '' : 'style="text-transform:uppercase;letter-spacing:2px"'}>`))}
       <button class="btn btn-pri btn-block btn-grande">${I('login')}Entrar</button>
       ${nube ? `<button type="button" class="btn btn-sec btn-block" data-a="olvide">Olvidé mi contraseña</button>` : ''}
+      ${nube && typeof Push !== 'undefined' && Push.esIOS() && !Push.instalada() ? `<p class="tiny" style="opacity:.85;margin:12px 0 0;line-height:1.5">${I('smartphone')} <b>En iPhone, instalá la app</b> para no tener que volver a entrar: Safari → Compartir → "Agregar a inicio". Si se usa desde Safari y pasa una semana sin abrirla, Safari borra la sesión (es una regla de Apple). Tampoco la abras desde un enlace de WhatsApp o del correo: se abre en otro navegador, sin tu sesión.</p>` : ''}
     </form>`;
     pie = `<button class="enlace" data-a="bienvenida" data-v="inicio">${I('left')}Volver</button>
            <button class="enlace" data-a="bienvenida" data-v="registro">Todavía no tengo cuenta</button>`;
@@ -981,7 +987,7 @@ function elegirSOS(){
     ${Object.entries(TIPOS_SOS).map(([k, t]) => `<button class="superficie ${k === 'medica' || k === 'incendio' ? 'peligro' : ''}" data-a="sos-enviar" data-v="${k}">
       <span class="ic ic-danger">${I(t.icon)}</span><span class="txt"><b>${t.nombre}</b>
       <small>${k === 'medica' ? 'Guardia, Administración y vecinos (con aviso a quienes saben primeros auxilios)' : 'Guardia, Administración y todos los vecinos'}</small></span>${I('right')}</button>`).join('')}
-    <p class="muted tiny" style="margin:14px 0 0">Si te equivocaste, cerrá esta ventana: todavía no se mandó nada.</p>`);
+    <p class="muted tiny" style="margin:14px 0 0">La alerta les muestra a todos tu nombre, tu lote y, si el teléfono lo permite, tu ubicación en este momento, para que sepan dónde está pasando. Si te equivocaste, cerrá esta ventana: todavía no se mandó nada.</p>`);
 }
 A['sos-enviar'] = el => {
   const u = yo(), tipo = el.dataset.v, t = TIPOS_SOS[tipo];
@@ -990,8 +996,11 @@ A['sos-enviar'] = el => {
      exactamente dónde está (puede no estar en su casa). */
   if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => {
     const coords = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
-    Store.cambiar(s => { const x = s.sos.find(o => o.id === idSos); if (x) x.coords = coords;
-      const me = s.users.find(z => z.id === u.id); if (me && !me.ubicacion) me.ubicacion = coords; });
+    /* La ubicación va dentro de la alerta y la ven TODOS los vecinos (pedido
+       de Claudio, 25-09): así cualquiera sabe dónde está pasando y puede
+       ayudar. No se guarda como "ubicación del lote" en la ficha: quien pide
+       ayuda puede no estar en su casa. */
+    Store.cambiar(s => { const x = s.sos.find(o => o.id === idSos); if (x) x.coords = coords; });
   }, () => {}, { enableHighAccuracy:true, timeout:8000 });
   Store.cambiar(s => {
     const id = idSos;
@@ -1002,7 +1011,7 @@ A['sos-enviar'] = el => {
     s.bitacora.unshift({ id:uid(), autor:'sistema', tipo:'incidente', texto:`SOS ${t.nombre} desde ${u.casa} (${u.nombre}).`, at:Date.now() });
   });
   /* A todos los equipos del barrio, aunque tengan la pantalla apagada. */
-  if (typeof Push !== 'undefined') Push.enviar({ para:'todos', titulo:`🚨 SOS · ${t.nombre}`, texto:`${u.casa} · ${u.nombre}`, tag:'sos-' + idSos, urgente:true });
+  if (typeof Push !== 'undefined') Push.enviar({ para:'todos', titulo:`🚨 SOS · ${t.nombre}`, texto:`${u.casa} · ${u.nombre}`, tag:'sos-' + idSos, urgente:true, sonido:'sos', link:'emergencias' });
   const g = Store.s.config.garitaTel || contactoTel('Garita');
   hoja('Ayuda en camino', `
     <div class="aviso a-danger latido">${I('siren')}<div class="txt"><b>La guardia ya recibió tu alerta</b>Quedate en un lugar seguro. Si podés, llamá también:</div></div>
@@ -1066,13 +1075,13 @@ A['mi-cuenta'] = () => { const u = yo();
       <div class="seg">${[['auto', 'Automático', 'sunrise'], ['light', 'Día', 'sun'], ['dark', 'Noche', 'moon']].map(([k, t, ic]) =>
         `<label><input type="radio" name="temaRapido" ${(Store.sesion.tema || 'auto') === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
       <div class="ayuda">En automático sigue la salida y la puesta del sol en Ushuaia (hoy: ${Clima.sol().sale} a ${Clima.sol().pone}).</div></div>
-    ${esGuardia() ? superficie({ a:'cerrar-turno', icon:'logout', color:'warn', t:'Cerrar el turno', s:'Deja anotado quién trabajó y sale de la app' }) : ''}
+    ${esGuardia() ? superficie({ a:'cerrar-turno', icon:'clock', color:'warn', t:'Cerrar el turno', s:'Deja las novedades y abre el turno siguiente, sin salir' }) : ''}
     ${(() => { const otros = esGuardia() ? [] : Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
     ${esGuardia() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
-    ${superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Por si algo no anda y hay que contarlo' })}
+    ${puedeAdministrar() ? superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Solo para quien administra: por si algo no anda' }) : ''}
     ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
 
@@ -1420,10 +1429,45 @@ document.addEventListener('click', e => {
   try { const r = f(el, e); if (r && r.catch) r.catch(err => avisarFalla(err, el.dataset.a)); }
   catch(err){ avisarFalla(err, el.dataset.a); }
 });
+/* =========================================================
+   ENTRAR SOLO CON EL BOTÓN "ENTRAR"
+   En Android, Chrome completa el correo y la contraseña guardados ("tocar
+   para completar") y además ENVÍA el formulario solo, como si se hubiera
+   apretado Enter: la app se abría sin que la persona tocara Entrar.
+   Ahora el formulario de ingreso se acepta solo si: se tocó el botón
+   Entrar, o se apretó Enter después de escribir la contraseña a mano.
+   Un envío que llega justo después del autocompletado se ignora, y el
+   botón titila para indicar que falta tocarlo.
+   ========================================================= */
+const Ingreso = {
+  toque:0, tecleo:false,
+  valido(form){
+    if (form.dataset.f !== 'entrar') return true;
+    if (Date.now() - this.toque < 2500) return true;
+    return this.tecleo && Date.now() - (this.enter || 0) < 1500;
+  },
+};
+['pointerdown', 'click'].forEach(ev => document.addEventListener(ev, e => {
+  const b = e.target.closest && e.target.closest('form[data-f="entrar"] button:not([type="button"])');
+  if (b && e.isTrusted) Ingreso.toque = Date.now();
+}, true));
+document.addEventListener('input', e => {
+  const i = e.target; if (!i.form || i.form.dataset.f !== 'entrar' || i.name !== 'clave') return;
+  /* Lo que escribe una persona trae inputType ("insertText", "deleteContentBackward"…);
+     el autocompletado del navegador no trae, o trae "insertReplacementText". */
+  Ingreso.tecleo = !!(e.inputType && e.inputType !== 'insertReplacementText');
+}, true);
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.form && e.target.form.dataset.f === 'entrar') Ingreso.enter = Date.now(); }, true);
+
 document.addEventListener('submit', e => {
   const form = e.target.closest('form[data-f]');
   if (!form) return;
   e.preventDefault();
+  if (!Ingreso.valido(form)){
+    const b = form.querySelector('button:not([type="button"])');
+    if (b){ b.classList.remove('titila'); void b.offsetWidth; b.classList.add('titila'); }
+    return;
+  }
   const f = F[form.dataset.f];
   if (!f){ toast(`Ese formulario no está en esta versión ("${form.dataset.f}")`, 'alert'); return; }
   const fd = new FormData(form), d = {};
@@ -1479,6 +1523,8 @@ function rutaPublica(){
   const h = location.hash;
   if (h.startsWith('#/pedir/')){ pintarPedirPase(decodeURIComponent(h.slice(8))); return true; }
   if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return true; }
+  if (h.startsWith('#/punto/')){ if (!$('#puntoPublico')) pintarPunto(h.slice(8)); return true; }
+  if (h.startsWith('#/ronda/')){ if (!$('#puntoPublico')) pintarRondaHabilitar(h.slice(8)); return true; }
   return false;
 }
 
@@ -1604,7 +1650,36 @@ function pintarEspera(){
       </div></div></div>`;
 }
 
+/* =========================================================
+   LA ALTURA DE LA PANTALLA, MEDIDA (sobre todo para iPhone)
+   En iPhone, con la app instalada o en Safari, "100dvh" a veces vale otra
+   cosa al abrir la app, al volver de otra o al girar el teléfono: la página
+   queda más alta que la pantalla, se corre hacia arriba y el encabezado
+   (nombre, lote, campanita, SOS) queda tapado o aparece recién al tocar.
+   Se mide la altura de verdad (innerHeight) y se vuelve a medir cada vez
+   que puede haber cambiado, con un par de repeticiones porque Safari
+   informa el tamaño nuevo un momento después. Si la página quedó corrida,
+   se la vuelve arriba (el que se desplaza es el lienzo, nunca la página).
+   ========================================================= */
+const Alto = {
+  medir(){
+    const h = window.innerHeight; if (!h) return;
+    document.documentElement.style.setProperty('--alto', h + 'px');
+    const enCampo = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if (!enCampo && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
+  },
+  pronto(){ this.medir(); [60, 350, 900].forEach(ms => setTimeout(() => this.medir(), ms)); },
+  arrancar(){
+    this.pronto();
+    ['resize', 'orientationchange', 'pageshow', 'focus'].forEach(ev => window.addEventListener(ev, () => this.pronto()));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.pronto(); });
+    /* Al cerrar el teclado, Safari deja la página corrida hacia arriba. */
+    document.addEventListener('focusout', () => setTimeout(() => this.medir(), 120));
+  },
+};
+
 async function arrancar(){
+  Alto.arrancar();
   Store.cargar();
   aplicarTema();
   history.replaceState({ n:1 }, '');
@@ -1646,6 +1721,8 @@ async function arrancar(){
   datosDeAfuera();
   Motor.correr();
   setInterval(() => { Motor.correr(); aplicarTema(); if (yo()) refrescarPronto(); }, 60000);
+  /* Los pasos de ronda escaneados por el policía se asignan en la garita. */
+  setInterval(() => { try { if (yo() && typeof procesarPasos === 'function') procesarPasos(); } catch(e){ console.warn('Pasos de ronda', e); } }, 15000);
   /* El clima y los vuelos se refrescan solos, sin que haya que entrar. */
   setInterval(datosDeAfuera, 10 * MIN);
   Avion.arrancar();

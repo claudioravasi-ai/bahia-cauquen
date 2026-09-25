@@ -130,7 +130,7 @@ F['camion-entra'] = d => {
     viaje = { id:uid(), patente, empresa:String(d.empresa || '').trim(), entra, sale:null, por:yo().id };
     s.camion.unshift(viaje); if (s.camion.length > 120) s.camion.length = 120;
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Ingreso del camión de residuos · ${patente}${viaje.empresa ? ' · ' + viaje.empresa : ''} · ${hora(entra)} h`, at:Date.now() });
-    notificar(s, { para:'rol:vecino', titulo:'Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, icon:'tacho', color:'ok', link:'recoleccion', sonido:true, push:false });
+    notificar(s, { para:'rol:vecino', titulo:'Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, icon:'tacho', color:'ok', link:'recoleccion', sonido:true, push:false, camionId:viaje.id });
   });
   if (typeof Push !== 'undefined') Push.enviar({ para:'rol:vecino', titulo:'🚛 Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, link:'recoleccion', tag:'camion-' + viaje.id, sonido:'camion' });
   cerrarHoja(); toast('Entrada registrada. Los vecinos ya fueron avisados.', 'tacho');

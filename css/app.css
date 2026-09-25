@@ -71,11 +71,15 @@ svg.i{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-widt
    El botón Atrás del celular cierra la última.
    ================================================ */
 html,body{height:100%}
-body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+/* La altura sale de --alto (medida en app.js, ver Alto): en iPhone "100dvh"
+   a veces no coincide con la pantalla y el encabezado quedaba tapado. */
+html{overflow:hidden;overscroll-behavior:none}
+body{display:flex;flex-direction:column;height:100vh;height:var(--alto,100dvh);overflow:hidden;overscroll-behavior:none}
 #app{flex:1;display:flex;flex-direction:column;min-height:0}
 /* En un teléfono angosto entran: marca, modo, avisos, cuenta y SOS. Si no se
    achica nada, se amontonan y quedan botones de 20 px imposibles de tocar. */
-.top{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:var(--surface);border-bottom:1px solid var(--line);flex:none;z-index:30}
+.top{display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:var(--surface);border-bottom:1px solid var(--line);flex:none;z-index:30;
+  position:sticky;top:0;min-height:calc(56px + env(safe-area-inset-top));-webkit-transform:translateZ(0);transform:translateZ(0)}
 @media (max-width:430px){
   .top{gap:6px;padding-left:10px;padding-right:10px}
   .top .marca small{font-size:11px}
@@ -401,7 +405,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .ic-sky{background:var(--sky-soft);color:var(--sky)}
 .ic-warn{background:var(--warn-soft);color:var(--warn)}
 
-.hoy{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.hoy{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:10px}
 .hoy .card{margin:0;display:flex;gap:12px;align-items:flex-start}
 .hoy .ic{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none}
 .hoy b{display:block;font-size:14.5px;line-height:1.3}
@@ -1735,3 +1739,46 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
      contador de conectados: se ve en Administración. */
   .top.con-modo .presencia{display:none}
 }
+
+/* El botón Entrar titila cuando el navegador intentó entrar solo (ver Ingreso en app.js). */
+.btn.titila{animation:titilaBtn .45s ease-in-out 3}
+@keyframes titilaBtn{50%{transform:scale(1.04);box-shadow:0 0 0 6px color-mix(in srgb,var(--brand-2) 35%,transparent)}}
+
+/* Policía contratada dentro del turno de la garita (bandaPolicia en v-inicio.js). */
+.policia-card{padding:13px 14px}
+.policia{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}
+.policia.fuera{opacity:.7}
+.policia-cab{display:flex;align-items:center;gap:10px}
+.policia-cab .grow{min-width:0}
+.policia-cab b{display:block;font-size:14.5px}
+.rondas{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.ronda{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;font-weight:700;padding:7px 10px;border-radius:10px;background:var(--brand-soft);color:var(--ink);font-variant-numeric:tabular-nums}
+.ronda .x{border:0;background:none;color:var(--muted);font-size:15px;line-height:1;padding:0 0 0 2px;cursor:pointer}
+
+/* Un correo largo (sin espacios) no puede empujar la ventana a lo ancho en 320 px. */
+.perfil-cab .muted,.superficie small,.lista .txt span{overflow-wrap:anywhere}
+/* Puntos de control de la ronda en curso (o la última): lista de control
+   ordenada, con barra de avance y la hora de cada punto a la derecha. */
+.recorrido{margin-top:10px;border:1px solid var(--line);border-radius:14px;padding:12px 12px 6px;background:var(--surface)}
+.recorrido.completa{border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.rec-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.rec-cab b{font-size:13.5px}
+.rec-cab span{font-size:12px;color:var(--muted);font-weight:700}
+.rec-barra{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:8px 0 6px}
+.rec-barra i{display:block;height:100%;border-radius:inherit;background:var(--ok);transition:width .4s ease}
+.rec-lista{list-style:none;margin:0;padding:0}
+.rec-lista li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.rec-lista li:first-child{border-top:0}
+.rec-n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;border:1.5px dashed var(--line);color:var(--muted)}
+.rec-n svg.i{width:15px;height:15px}
+.rec-lista li.hecho .rec-n{border:0;background:var(--ok);color:#fff}
+.rec-txt{min-width:0;display:flex;flex-direction:column}
+.rec-txt b{font-size:13.5px;line-height:1.25}
+.rec-txt small{font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+.rec-lista li:not(.hecho) .rec-txt b{color:var(--ink-2)}
+.rec-hora{font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.rec-lista li:not(.hecho) .rec-hora{font-weight:600;color:var(--muted);font-style:italic}
+/* El código de ronda sobre la portada oscura de las pantallas públicas. */
+.bienvenida .codigo-grande{color:#fff;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25)}
+/* Una dirección web larga dentro de un párrafo no puede ensanchar la ventana. */
+#cuerpo p,#cuerpo li{overflow-wrap:break-word}

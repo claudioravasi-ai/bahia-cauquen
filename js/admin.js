@@ -23,7 +23,8 @@ const REGLAS = [
     run(s, hoy){ if (new Date().getHours() < 20) return 0; const man = (new Date().getDay() + 1) % 7, t = recoleccionDias()[man];
       const vol = volsProximos().some(v => v.fecha === sumarDias(hoy, 1));
       if (!t && !vol) return 0;
-      return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo: vol ? 'Mañana pasan por los voluminosos' : `Mañana pasa el camión: ${t}`, texto: vol ? s.config.voluminososDetalle : 'Sacá la bolsa en el canasto cerrado.', icon:'truck', color:'ok', link:'recoleccion' })); } },
+      const volT = vol || esVoluminoso(t);
+      return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo: volT ? 'Mañana retiran los voluminosos' : `Mañana a la mañana pasa el camión: ${String(t).toLowerCase()}`, texto: volT ? s.config.voluminososDetalle : 'Sacá la bolsa en el canasto cerrado.', icon:'truck', color:'ok', link:'recoleccion' })); } },
   { id:'reserva-recordatorio', n:'Reservas → recordatorio el día anterior', d:'Avisa al vecino que al otro día tiene un espacio reservado.',
     run(s, hoy){ let n = 0; const man = sumarDias(hoy, 1);
       s.reservas.filter(r => r.fecha === man && !r.cancelada).forEach(r => { const a = s.amenities.find(x => x.id === r.amenity);
@@ -269,7 +270,8 @@ const ADMIN_TABS = {
       <div class="card"><h3>Contacto</h3><div class="grid2">${campo('garitaTel', 'Teléfono de la garita', 'tel')}${campo('adminTel', 'Teléfono de la Administración', 'tel')}</div>${campo('adminEmail', 'Email de la Administración (recibe avisos de inscripciones)', 'email')}</div>
       <div class="card"><h3>Residuos</h3><div class="grid3">${[1,2,3,4,5,6,0].map(d => `<div class="field"><label>${DIAS[d]}</label><input name="rec${d}" value="${esc(recoleccionDias()[d] || '')}" placeholder="—"></div>`).join('')}</div>
         <div class="grid2">${campo('recoleccionHora', 'Hora del camión', 'time')}${campo('voluminososDetalle', 'Qué se retira en los voluminosos')}</div>
-        <div class="card plana small" style="margin:0">${I('info')} Las fechas de los retiros de voluminosos se anotan en <b>Residuos</b>, una por una: ahí se pueden cargar todas las del año.
+        <div class="ayuda" style="margin:-4px 0 10px">Hoy: martes y jueves a la mañana, todos los residuos; sábados, voluminosos. Si un día dice "voluminosos", la app avisa "retiran los voluminosos" en lugar de "pasa el camión".</div>
+        <div class="card plana small" style="margin:0">${I('info')} Las fechas de retiros especiales de voluminosos se anotan en <b>Residuos</b>, una por una: ahí se pueden cargar todas las del año.
           <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-xs btn-sec" data-a="abrir" data-v="recoleccion">${I('truck')}Ir a Residuos</button></div></div></div>
       <div class="card"><h3>Convivencia</h3><div class="grid2">${campo('silencio', 'Horario de silencio')}${campo('obraHorario', 'Horario de obras')}</div></div>
       <div class="card plana small">${I('info')} Los vencimientos, el recargo, el interés, el CBU y lo impositivo se configuran en <b>Contabilidad → Parámetros</b>, junto a las expensas.
@@ -281,14 +283,23 @@ const ADMIN_TABS = {
           <div class="ayuda">Tiene que ser idéntica a la de <span class="mono">var CLAVE_COMPARTIDA</span> del Apps Script. Antes este campo era de tipo contraseña y el navegador lo rellenaba solo con la clave guardada de la cuenta: al tocar Guardar, esa clave pisaba la frase.</div></div>
         <div class="card plana small" style="margin:0 0 10px">${I('info')} Los correos salen de la cuenta de Google con la que se <b>creó el proyecto</b> de Apps Script (si lo hiciste con ${esc(Store.s.config.garitaEmail || 'la casilla de la garita')}, salen de ahí). El correo de la Administración de arriba es el que <b>recibe</b> los avisos.</div>
         <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-correo">${I('send')}Probar el envío</button></div>
-        <div id="probarCorreo"></div></div>
+        <div id="probarCorreo"></div>
+        <label class="check" style="margin:12px 0 0"><input type="checkbox" name="parteTurno" ${c.parteTurno !== false ? 'checked' : ''}><span>Al cerrarse cada turno de la garita, mandar el parte (guardias, novedades, policía, rondas y bitácora) al correo de la Administración</span></label></div>
       <div class="card"><h3>Promociones del Hotel Los Cauquenes (opcional)</h3>
         <p class="muted small" style="margin-top:0">Las promociones se cargan a mano en <b>Contenido → Promociones</b> y eso ya funciona. Esto es solo si querés que se lean solas del sitio del Hotel Los Cauquenes: hace falta un programita propio que las devuelva en JSON (está explicado en CONECTAR.md), porque el navegador no puede leer otra web directamente.</p>
         ${campo('promosUrl', 'Dirección del lector de promociones', 'url')}</div>
       <div class="card"><h3>Avisos al celular con la pantalla apagada</h3>
         <p class="muted small" style="margin-top:0">Para que el camión, el SOS, los avisos urgentes y los paquetes lleguen aunque el celular esté bloqueado. Son dos pasos de una sola vez, explicados en <span class="mono">AVISOS.md</span>: la clave pública va acá y la cuenta de servicio, en el Apps Script.</p>
-        ${campo('pushVapid', 'Clave pública de avisos (Firebase → Cloud Messaging → Certificados push web)', 'text')}
-        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-push">${I('send')}Ver si el Apps Script está listo</button></div><div id="probarPush"></div></div>
+        <div class="field"><label>Clave pública de avisos (Firebase → Cloud Messaging → Certificados push web)</label>
+          <input name="pushVapid" type="text" value="${esc(c.pushVapid ?? '')}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="BK… (un texto de 87 caracteres)">
+          <div class="ayuda">${c.pushVapid ? `${I('check')} Guardada en la base del barrio (termina en <span class="mono">…${esc(String(c.pushVapid).slice(-6))}</span>). Ya no se borra sola: antes la pisaba otro equipo de la Administración al abrirse con una copia vieja de los ajustes.` : 'Es la clave <b>pública</b> (empieza con B). La privada no va nunca en la app.'}</div></div>
+        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-push">${I('send')}Ver si el Apps Script está listo</button></div><div id="probarPush"></div>
+        <div class="field" style="margin-top:14px"><label>Mandar un aviso de prueba a…</label>
+          <div class="validador"><select id="pushGrupo"><option value="yo">Solo a mis equipos</option><option value="rol:guardia">La garita</option><option value="rol:admin">La Administración</option><option value="rol:vecino">Todos los vecinos</option><option value="todos">Todo el barrio</option>
+            ${LOTES.map(l => `<option value="lote:Lote ${l.lote}">Lote ${l.lote}</option>`).join('')}</select>
+          <button type="button" class="btn btn-sec" data-a="push-grupo">${I('send')}Mandar</button></div>
+          <div class="ayuda">Sirve para comprobar que los avisos llegan con el teléfono bloqueado. Dice a cuántos equipos llegó; un equipo cuenta solo si activó los avisos.</div></div>
+        <div id="pushGrupoRes"></div></div>
       <div class="card"><h3>Aviones en vivo (opcional)</h3>${campo('vuelosProxy', 'URL del Worker que reenvía ADS-B', 'url', 'Ver CONECTAR.md. Arribos y partidas se leen solos del tablero del aeropuerto: esto es solo para ver los aviones que están en el aire.')}</div>
       <button class="btn btn-pri btn-block">${I('check')}Guardar ajustes</button></form>`;
   },
@@ -335,9 +346,20 @@ A['regla'] = el => { setTimeout(() => { Store.cambiar(s => { s.config.motor = s.
 A['motor-ahora'] = () => { Motor.correr(); toast('Motor ejecutado', 'zap'); refrescar(); };
 F['buscar-vecino-admin'] = d => abrir('admin', 'vecinos|' + (d.q || ''));
 F['ajustes'] = d => {
+  const vapid = String(d.pushVapid || '').replace(/\s+/g, '');
+  if (vapid && !/^B[A-Za-z0-9_-]{80,95}$/.test(vapid)){
+    toast(vapid.length < 60 ? 'Esa parece la clave PRIVADA de avisos. Acá va la pública: la larga, que empieza con B.' : 'La clave de avisos no tiene el formato esperado: tiene que empezar con B y tener unos 87 caracteres.', 'alert');
+    return;
+  }
   Store.cambiar(s => {
     const c = s.config;
-    ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminososDetalle','silencio','obraHorario','correoUrl','correoClave','vuelosProxy','promosUrl','pushVapid'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
+    ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminososDetalle','silencio','obraHorario','correoUrl','correoClave','vuelosProxy','promosUrl'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
+    /* La clave de avisos se pega desde la consola de Firebase y a veces viene
+       con espacios o saltos de línea en el medio. Vacía no borra la que ya
+       está: se reemplaza pegando otra. */
+    const vapid = String(d.pushVapid || '').replace(/\s+/g, '');
+    if (vapid) c.pushVapid = vapid;
+    c.parteTurno = !!d.parteTurno;
     ['casas','datosDias'].forEach(k => { if (d[k] !== '' && d[k] !== undefined) c[k] = +d[k]; });
     c.recoleccion = {}; [0,1,2,3,4,5,6].forEach(i => { const v = String(d['rec' + i] || '').trim(); if (v) c.recoleccion[i] = v; });
     auditar(s, 'Cambió los ajustes del barrio', '');
@@ -353,7 +375,7 @@ A['probar-push'] = async () => {
     const j = await fetch(d.url).then(r => r.json());
     const ok = j.push && j.version >= 3;
     caja.innerHTML = `<div style="margin-top:10px">${aviso(ok ? 'ok' : 'warn', ok ? 'check' : 'alert', ok ? 'El Apps Script puede mandar avisos' : 'Al Apps Script le falta un paso',
-      ok ? (Store.s.config.pushVapid ? 'Ahora cada vecino activa los avisos en su equipo (Mi casa → Avisos).' : 'Falta pegar acá la clave pública y Guardar.') : j.version >= 3 ? 'Falta la propiedad FCM_CUENTA (ver AVISOS.md).' : 'Tiene la versión vieja del código: pegá el Codigo.gs nuevo y hacé "Nueva versión".')}</div>`;
+      ok ? (Store.s.config.pushVapid ? 'Ahora cada vecino activa los avisos en su equipo (Mi casa → Avisos).' : 'Falta pegar acá la clave pública y Guardar.') + (j.version < 4 ? ' Conviene pegar el Codigo.gs nuevo (versión 4) y hacer "Nueva versión": manda los avisos con prioridad alta, para que Android no los demore con la pantalla apagada.' : '') : j.version >= 3 ? 'Falta la propiedad FCM_CUENTA (ver AVISOS.md).' : 'Tiene la versión vieja del código: pegá el Codigo.gs nuevo y hacé "Nueva versión".')}</div>`;
   } catch(e){ caja.innerHTML = `<div style="margin-top:10px">${aviso('danger', 'alert', 'No se pudo consultar', esc(Correo.motivo(e)))}</div>`; }
 };
 A['frase-ver'] = el => { const i = el.closest('form')?.correoClave; if (i) i.classList.toggle('frase-oculta', !el.checked); };

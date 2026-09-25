@@ -147,6 +147,10 @@ function seed(){
         anotados:[ { userId:'u_martin', cant:3 }, { userId:'u_diego', cant:4 }, { userId:'u_lucia', cant:5 } ], createdAt:n - DIA },
     ],
     solicitudesPase: [],
+    /* Puntos de control de la ronda (solo en la demo: en el barrio los crea la Administración). */
+    puntos: typeof puntosSugeridos === 'function' ? puntosSugeridos() : [],
+    pasos: [],
+    rondaCodigos: [],
     peticiones: [],
     auditoria: [ { id:uid(), at:n - 30*DIA, por:'u_admin', accion:'Aprobó una inscripción', detalle:'Lucía Fernández · Lote 42', ref:'u_lucia' } ],
     obras: [
