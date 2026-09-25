@@ -20,7 +20,7 @@ const REGLAS = [
     run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'thermo'); if (!a || new Date().getHours() < 6) return 0;
       return marca(s, 'hielo-' + hoy, () => notificar(s, { para:'staff', titulo:'Helada: revisar subidas', texto:'Echar arena o sal en las subidas y el acceso.', icon:'thermo', color:'warn' })); } },
   { id:'recoleccion', n:'Recolección → recordatorio la noche anterior', d:'A las 20 h avisa qué pasa mañana (y los voluminosos).',
-    run(s, hoy){ if (new Date().getHours() < 20) return 0; const man = (new Date().getDay() + 1) % 7, t = s.config.recoleccion[man];
+    run(s, hoy){ if (new Date().getHours() < 20) return 0; const man = (new Date().getDay() + 1) % 7, t = recoleccionDias()[man];
       const vol = volsProximos().some(v => v.fecha === sumarDias(hoy, 1));
       if (!t && !vol) return 0;
       return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo: vol ? 'Mañana pasan por los voluminosos' : `Mañana pasa el camión: ${t}`, texto: vol ? s.config.voluminososDetalle : 'Sacá la bolsa en el canasto cerrado.', icon:'truck', color:'ok', link:'recoleccion' })); } },
@@ -267,7 +267,7 @@ const ADMIN_TABS = {
       <div class="card"><h3>El barrio</h3>${campo('nombre', 'Nombre')}${campo('ciudad', 'Ciudad')}<div class="grid2">${campo('casas', 'Cantidad de casas', 'number')}${campo('datosDias', 'Borrar datos de visitas a los (días)', 'number')}</div>
         ${campo('mapa', 'Enlace de Google Maps del acceso', 'url', 'Es el "cómo llegar" que reciben las visitas.')}${campo('dea', 'Dónde está el desfibrilador (DEA)')}</div>
       <div class="card"><h3>Contacto</h3><div class="grid2">${campo('garitaTel', 'Teléfono de la garita', 'tel')}${campo('adminTel', 'Teléfono de la Administración', 'tel')}</div>${campo('adminEmail', 'Email de la Administración (recibe avisos de inscripciones)', 'email')}</div>
-      <div class="card"><h3>Residuos</h3><div class="grid3">${[1,2,3,4,5,6,0].map(d => `<div class="field"><label>${DIAS[d]}</label><input name="rec${d}" value="${esc(c.recoleccion[d] || '')}" placeholder="—"></div>`).join('')}</div>
+      <div class="card"><h3>Residuos</h3><div class="grid3">${[1,2,3,4,5,6,0].map(d => `<div class="field"><label>${DIAS[d]}</label><input name="rec${d}" value="${esc(recoleccionDias()[d] || '')}" placeholder="—"></div>`).join('')}</div>
         <div class="grid2">${campo('recoleccionHora', 'Hora del camión', 'time')}${campo('voluminososDetalle', 'Qué se retira en los voluminosos')}</div>
         <div class="card plana small" style="margin:0">${I('info')} Las fechas de los retiros de voluminosos se anotan en <b>Residuos</b>, una por una: ahí se pueden cargar todas las del año.
           <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-xs btn-sec" data-a="abrir" data-v="recoleccion">${I('truck')}Ir a Residuos</button></div></div></div>

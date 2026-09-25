@@ -176,6 +176,17 @@ function migrar(s){
   s.config = Object.assign({}, CONFIG_BASE, s.config || {});
 }
 
+/* LOS DÍAS DEL CAMIÓN
+   De fábrica venían de lunes a viernes, y el barrio los tiene martes,
+   jueves y sábado (SEINCO). Si la Administración nunca los cambió (siguen
+   exactamente los de fábrica viejos), se toman martes, jueves y sábado.
+   No se reescribe la configuración desde acá: un vecino no puede guardarla
+   y el guardado entero fallaría. Al guardar Ajustes queda lo que se cargue. */
+const RECOLECCION_VIEJA = { 1:'Húmedos', 2:'Reciclables', 3:'Húmedos', 4:'Reciclables', 5:'Húmedos' };
+function recoleccionDias(){
+  const r = Store.s.config.recoleccion || {};
+  return JSON.stringify(r) === JSON.stringify(RECOLECCION_VIEJA) ? { 2:'Residuos', 4:'Residuos', 6:'Residuos' } : r;
+}
 const CONFIG_BASE = {
   nombre: 'Bahía Cauquén',
   ciudad: 'Ushuaia, Tierra del Fuego',
@@ -198,7 +209,7 @@ const CONFIG_BASE = {
   cuenta: 'Cuenta Corriente 1759-0 346-4 · Banco Galicia',
   mapa: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Barrio Bahía Cauquén, Ushuaia'),
   casas: 152,
-  recoleccion: { 1:'Húmedos', 2:'Reciclables', 3:'Húmedos', 4:'Reciclables', 5:'Húmedos' },
+  recoleccion: { 2:'Residuos', 4:'Residuos', 6:'Residuos' },
   recoleccionHora: '08:00',
   expensasUrl: 'https://www.octavo-piso.com.ar/users/sign_in',
   expensasVence: 10,

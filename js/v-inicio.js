@@ -95,12 +95,29 @@ function urgentesVecino(){
   if (v) out.push(aviso('info', 'vote', 'Votación abierta', esc(v.titulo), `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="votaciones">Votar</button>`));
   return out;
 }
+/* El último viaje del camión que la garita registró hoy (o null). */
+function camionPasoHoy(){
+  const l = typeof Camion !== 'undefined' ? Camion.lista() : [];
+  return l.find(v => v.entra && isoDe(new Date(v.entra)) === hoyISO()) || null;
+}
+/* Un aviso del camión que ya quedó viejo: el recordatorio ("mañana pasa",
+   "hoy pasa") cuando después entró el camión. El "entró el camión" no va
+   en la pizarra: mientras está adentro ya está el renglón en vivo, y cuando
+   la garita marca la salida desaparece con él. (Sigue en la campanita.) */
+function avisoCamionViejo(n){
+  if (!n || String(n.link || '').split(':')[0] !== 'recoleccion') return false;
+  const l = typeof Camion !== 'undefined' ? Camion.lista() : [];
+  if (n.icon === 'tacho') return true;
+  return /cami[oó]n|voluminosos/i.test(n.titulo || '') && l.some(v => v.entra && v.entra > n.at);
+}
 function recoleccionHoy(){
-  const c = Store.s.config, h = new Date(), hoy = h.getDay(), man = (hoy + 1) % 7;
+  const c = Store.s.config, dias = recoleccionDias(), h = new Date(), hoy = h.getDay(), man = (hoy + 1) % 7;
   const vol = volsProximos().find(v => v.fecha === hoyISO() || v.fecha === sumarDias(hoyISO(), 1));
   if (vol) return { vol:true, t:`${vol.fecha === hoyISO() ? 'Hoy' : 'Mañana'} pasan por los voluminosos`, x:vol.detalle || c.voluminososDetalle };
-  if (c.recoleccion[hoy] && ahoraMin() < minutosDe(c.recoleccionHora)) return { t:`Hoy pasa el camión: ${c.recoleccion[hoy]}`, x:`Alrededor de las ${c.recoleccionHora} h.` };
-  if (c.recoleccion[man] && h.getHours() >= 17) return { t:`Mañana pasa el camión: ${c.recoleccion[man]}`, x:'Sacá la bolsa esta noche, en el canasto cerrado.' };
+  /* Si la garita ya registró el camión hoy, "hoy pasa" no va más: mientras
+     está adentro se ve el aviso en vivo, y cuando sale ya pasó. */
+  if (dias[hoy] && ahoraMin() < minutosDe(c.recoleccionHora) && !camionPasoHoy()) return { t:`Hoy pasa el camión: ${dias[hoy]}`, x:`Alrededor de las ${c.recoleccionHora} h.` };
+  if (dias[man] && h.getHours() >= 17) return { t:`Mañana pasa el camión: ${dias[man]}`, x:'Sacá la bolsa esta noche, en el canasto cerrado.' };
   return null;
 }
 
@@ -529,7 +546,7 @@ function avisosGenerales(){
   /* Los avisos automáticos para todos que no tienen otro lugar: quedan
      en la pizarra aunque ya se hayan leído (leídos, quietos), pero solo los
      del día: a las 00 h se van y entran los nuevos. */
-  misNotifs().filter(n => aLista(n.para).includes('todos') && n.at >= medianoche && !LINKS_YA_EN_PIZARRA.includes(String(n.link || '').split(':')[0]))
+  misNotifs().filter(n => aLista(n.para).includes('todos') && n.at >= medianoche && !avisoCamionViejo(n) && !LINKS_YA_EN_PIZARRA.includes(String(n.link || '').split(':')[0]))
     .forEach(n => out.push({ k:'n-' + n.id, nuevo:!aLista(n.leidas).includes(u.id), nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell', tag:'Aviso', at:n.at, titulo:n.titulo, texto:n.texto,
       ...(ICONOS_CLIMA.includes(n.icon) ? { a:'abrir', v:'ushuaia' } : { a:'notif', id:n.id }) }));
   /* La garita no ve lo que lleva a secciones de vecinos (viajes, compras,
@@ -539,7 +556,7 @@ function avisosGenerales(){
 /* Los avisos que son tuyos y todavía no abriste. */
 function avisosPersonales(){
   const u = yo();
-  return noLeidas().filter(n => !aLista(n.para).includes('todos'))
+  return noLeidas().filter(n => !aLista(n.para).includes('todos') && !avisoCamionViejo(n))
     .map(n => ({ k:'n-' + n.id, nuevo:true, nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell',
       tag: aLista(n.para).includes(u.id) ? 'Para vos' : 'Para el equipo', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id }))
     .sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || b.at - a.at);

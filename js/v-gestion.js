@@ -772,7 +772,7 @@ R.recoleccion = {
     const vols = volsProximos();
     const viajes = typeof Camion !== 'undefined' ? Camion.lista().slice(0, 6) : [];
     return `${typeof bandaCamion === 'function' ? bandaCamion(esStaff()) : ''}
-      <div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${c.recoleccion[d] ? I('truck') + esc(c.recoleccion[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
+      <div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${recoleccionDias()[d] ? I('truck') + esc(recoleccionDias()[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
       <p class="muted small">El camión pasa desde las ${c.recoleccionHora} h. Si al otro día es feriado, puede cambiar: la app avisa.</p>
       ${(() => { const man = diaInfo(sumarDias(hoyIso, 1));
         return man.feriado ? aviso('warn', 'calendar', `Mañana es feriado: ${esc(man.feriado.nombre)}`, 'La recolección puede no pasar o pasar más tarde.') : ''; })()}
