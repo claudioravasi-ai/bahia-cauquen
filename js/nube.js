@@ -65,7 +65,8 @@ const Nube = {
      resto de la app puede confiar en que están. Poner un campo de más no
      molesta; que falte uno rompe la app. */
   FORMAS: {
-    users:           { listas:['mascotas','vehiculos'] },
+    users:           { listas:['mascotas','vehiculos'], objetos:['retiroPubs'] },
+
     posts:           { listas:['comments','voy'], objetos:['reactions'] },
     notifs:          { listas:['para','leidas'] },
     notifsTodos:     { listas:['para','leidas'] },
@@ -109,8 +110,22 @@ const Nube = {
       case 'dms': return [x.a, x.b];
       case 'reclamos': case 'peticiones': return [x.userId];
       case 'pases': case 'solicitudesPase': case 'llegadas': case 'paquetes': return [x.hostId];
-      case 'infracciones': case 'pagos': case 'recibos':
+      case 'infracciones':
         return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
+      /* PAGOS Y RECIBOS VAN POR LOTE (arreglado el 26-09-2026). Antes se
+         buscaba `x.casa`, pero un pago guarda `lote`: no coincidía con
+         nadie y el pago informado por un vecino NO llegaba a la base (o
+         iba a parar a la carpeta de una cuenta sin casa, que el vecino no
+         puede escribir, y Firebase rechazaba todo el guardado). Ahora van a
+         todas las cuentas aprobadas de ese lote, más quien lo informó; y si
+         el lote no tiene ninguna cuenta (un propietario sin la app), a una
+         carpeta del lote ("lote-148") que lee la Administración. */
+      case 'pagos': case 'recibos': {
+        const lote = x.lote || x.casa;
+        const us = Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').map(u => u.id);
+        if (x.userId && usuario(x.userId)?.casa === lote && !us.includes(x.userId)) us.push(x.userId);
+        return us.length ? us : lote ? ['lote-' + String(lote).replace(/^Lote\s*/i, '').replace(/[.#$/\[\]\s]/g, '')] : [];
+      }
       case 'notifs': return aLista(x.para).filter(p => p && !String(p).startsWith('rol:') && p !== 'todos' && p !== 'staff');
       default: return [];
     }
@@ -223,6 +238,8 @@ const Nube = {
        (se inscribió por el portal común), la Administración la corrige sola. */
     if (mio.rol === 'admin'){ setTimeout(() => this.corregirGarita(), 5000); setInterval(() => this.corregirGarita(), 60000); }
     if (mio.rol === 'admin') setTimeout(() => this.limpiarFotos(), 20000);
+    if (mio.rol === 'admin' && !this.repartiendo){ this.repartiendo = true; setTimeout(() => this.repartirPagos(), 30000); setInterval(() => this.repartirPagos(), 10 * MIN); }
+
     /* Lo viejo pasa al archivo histórico una vez por día (js/historial.js). */
     setTimeout(() => { if (typeof Historial !== 'undefined' && this.listoParaMotor()) Historial.archivar(); }, 45000);
     /* La Administración deja a mano la dirección del correo para quien se
@@ -440,7 +457,36 @@ const Nube = {
     if (col !== 'privados') return col;
     return x && x.con === 'guardia' ? 'privadosGuardia' : x && x.con === 'interno' ? 'privadosInterno' : 'privados';
   },
-  pvDatos: {},
+  pvDatos: {}, pvDonde: {},
+  /* =========================================================
+     CADA PAGO Y CADA RECIBO, EN LA CARPETA DE CADA VECINO DEL LOTE
+     La app de la Administración revisa (al abrir y cada tanto) que cada
+     pago y cada recibo esté en la carpeta de todas las cuentas del lote:
+       · un vecino que se inscribió después ve igual sus pagos anteriores;
+       · lo que quedó en "lote-148" (propietario sin cuenta) pasa a la
+         carpeta del vecino cuando se inscribe;
+       · las copias que quedaron en la carpeta equivocada (el error de
+         "casa" y "lote", arreglado el 26-09-2026) se borran.
+     ========================================================= */
+  repartirPagos(){
+    if (!this.db || yo()?.rol !== 'admin' || !this.listoParaMotor || !this.listoParaMotor()) return 0;
+    if (!Store.s.users.some(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || ''))) return 0;
+    const cambios = {};
+    ['pagos', 'recibos'].forEach(f => {
+      const donde = this.pvDonde[f] || {};
+      aLista(Store.s[f]).forEach(x => {
+        if (!x || !x.id) return;
+        const quiero = this.duenos(f, x), hay = donde[x.id] || [];
+        quiero.filter(d => !hay.includes(d)).forEach(d => { cambios[`pv/${f}/${d}/${x.id}`] = x; });
+        hay.filter(d => !quiero.includes(d) && (d.startsWith('lote-') || (usuario(d) && usuario(d).casa !== (x.lote || x.casa)) || !usuario(d)))
+          .forEach(d => { cambios[`pv/${f}/${d}/${x.id}`] = null; });
+      });
+    });
+    const n = Object.keys(cambios).length;
+    if (n) this.db.ref().update(JSON.parse(JSON.stringify(cambios, (k, v) => v === undefined ? null : v))).catch(e => console.warn('No se pudieron repartir los pagos', e.message));
+    return n;
+  },
+
   escucharPv(rol){
     this.pvDatos = {};
     Object.entries(this.PV).forEach(([f, def]) => {
@@ -448,7 +494,10 @@ const Nube = {
       this.db.ref(todo ? `pv/${f}` : `pv/${f}/${this.uid}`).on('value', snap => {
         const v = snap.val() || {}, arr = [];
         const meter = nodo => { if (nodo && typeof nodo === 'object') Object.keys(nodo).forEach(id => { const x = nodo[id]; if (x && typeof x === 'object') arr.push(this.comoLaGuardamos(def.col, x)); }); };
-        if (todo) Object.values(v).forEach(meter); else meter(v);
+        /* Quien lee la carpeta entera (la Administración) anota además en
+           qué carpetas está cada registro: lo usa repartirPagos(). */
+        if (todo){ const donde = {}; Object.entries(v).forEach(([dueno, nodo]) => { meter(nodo); if (nodo && typeof nodo === 'object') Object.keys(nodo).forEach(id => { (donde[id] = donde[id] || []).push(dueno); }); }); this.pvDonde[f] = donde; }
+        else meter(v);
         this.pvDatos[f] = arr;
         this.juntarPv(def.col);
         this.listos.add('pv/' + f);
@@ -458,8 +507,16 @@ const Nube = {
     });
   },
   juntarPv(col){
-    const vistos = new Set(), arr = [];
-    Object.entries(this.PV).filter(([, d]) => d.col === col).forEach(([f]) => (this.pvDatos[f] || []).forEach(x => { if (x.id && !vistos.has(x.id)){ vistos.add(x.id); arr.push(x); } }));
+    const vistos = new Map(), arr = [];
+    /* El mismo registro puede estar en la carpeta de varios vecinos del
+       lote. Si alguna copia quedó vieja (un pago "informado" que en otra
+       carpeta ya figura "confirmado"), gana la más avanzada. */
+    const peso = x => col === 'pagos' ? (x.estado === 'confirmado' || x.estado === 'rechazado' ? 2 : 1) * 1e13 + (x.confirmadoAt || x.at || 0) : 0;
+    Object.entries(this.PV).filter(([, d]) => d.col === col).forEach(([f]) => (this.pvDatos[f] || []).forEach(x => {
+      if (!x.id) return;
+      if (!vistos.has(x.id)){ vistos.set(x.id, arr.length); arr.push(x); }
+      else if (peso(x) > peso(arr[vistos.get(x.id)])) arr[vistos.get(x.id)] = x;
+    }));
     if (col === 'notifs') Store.s.notifs = [...Store.s.notifs.filter(n => this.esNotifGeneral(n)), ...arr].sort((a, b) => b.at - a.at);
     else Store.s[col] = arr;
     this.recordar(col, col === 'notifs' ? Store.s.notifs : arr);

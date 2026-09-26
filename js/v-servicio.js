@@ -119,7 +119,7 @@ A['camion-entra'] = () => {
     <div class="grid2"><div class="field"><label>Patente</label><input name="patente" required maxlength="10" style="text-transform:uppercase" value="${esc(ult?.patente || c.camionPatente || '')}"></div>
       <div class="field"><label>Hora de entrada</label><input name="hora" type="time" required value="${hora(Date.now())}"></div></div>
     <div class="field"><label>Empresa</label><input name="empresa" maxlength="50" value="${esc(ult?.empresa || c.camionEmpresa || 'SEINCO S.A.')}"></div>
-    <p class="muted small" style="margin:0 0 12px">Al guardar, a todos los vecinos les cruza el camión por la pantalla y les llega un aviso con sonido, aunque tengan el celular bloqueado (si activaron los avisos).</p>
+    <p class="muted small" style="margin:0 0 12px">Al guardar, a todos (vecinos y Administración) les cruza el camión por la pantalla y les llega un aviso con sonido, aunque tengan la app cerrada o el celular bloqueado (si activaron los avisos). El "Hoy pasa el camión" se borra solo de la pizarra.</p>
     <button class="btn btn-pri btn-block">${I('tacho')}Registrar la entrada y avisar</button></form>`);
 };
 F['camion-entra'] = d => {
@@ -130,9 +130,15 @@ F['camion-entra'] = d => {
     viaje = { id:uid(), patente, empresa:String(d.empresa || '').trim(), entra, sale:null, por:yo().id };
     s.camion.unshift(viaje); if (s.camion.length > 120) s.camion.length = 120;
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Ingreso del camión de residuos · ${patente}${viaje.empresa ? ' · ' + viaje.empresa : ''} · ${hora(entra)} h`, at:Date.now() });
-    notificar(s, { para:'rol:vecino', titulo:'Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, icon:'tacho', color:'ok', link:'recoleccion', sonido:true, push:false, camionId:viaje.id });
+    /* A TODOS: vecinos, Administración y cualquier equipo abierto
+       (teléfono, tablet o computadora). Antes iba solo a rol vecino, y
+       quien administra y además vive en el barrio no se enteraba. */
+    notificar(s, { para:'todos', titulo:'Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, icon:'tacho', color:'ok', link:'recoleccion', sonido:true, push:false, camionId:viaje.id });
   });
-  if (typeof Push !== 'undefined') Push.enviar({ para:'rol:vecino', titulo:'🚛 Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, link:'recoleccion', tag:'camion-' + viaje.id, sonido:'camion' });
+  /* El push llega aunque la app esté cerrada o la pantalla bloqueada, en
+     todos los equipos que activaron los avisos (menos el de la garita). */
+  if (typeof Push !== 'undefined') Push.enviar({ para:'todos', titulo:'🚛 Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, link:'recoleccion', tag:'camion-' + viaje.id, sonido:'camion' });
+
   cerrarHoja(); toast('Entrada registrada. Los vecinos ya fueron avisados.', 'tacho');
   Camion.revisar();
 };
@@ -281,8 +287,9 @@ A['mi-credencial'] = () => {
   const c = yo().credencial;
   hoja('Tu credencial del barrio', `<div class="ticket"><div class="tk-top"><small>Credencial · Barrio ${esc(Store.s.config.nombre)}</small><h3>${esc(u.nombre)}</h3><div style="opacity:.85;font-size:13px">${esc(u.casa)}</div></div>
     <div class="bottom"><div class="qr-box" data-qr="BHC:${esc(c)}"></div><div class="codigo-grande">${esc(c)}</div>
-    <div class="muted small">Mostralo en la garita, en los espacios comunes o al retirar un paquete.</div></div></div>
+    <div class="muted small">Mostralo en la garita o en los espacios comunes.</div></div></div>
     <p class="muted small" style="margin:12px 2px 0">Es personal. No lleva tu DNI ni ningún dato sensible: la garita solo ve tu nombre, tu lote y la foto del frente de tu casa. Si alguien lo copió, generá uno nuevo y el anterior deja de valer.</p>
+    <p class="muted small" style="margin:8px 2px 0">${I('box')} <b>Para retirar un paquete</b> no sirve esta credencial: se usa el <b>QR de retiro</b>, que cambia cada 30 segundos y solo sale de tu teléfono (Tus paquetes → Mi QR para retirar).</p>
     <button class="btn btn-sec btn-block" data-a="credencial-nueva" style="margin-top:10px">${I('refresh')}Generar una credencial nueva</button>`);
   setTimeout(() => $$('#hoja [data-qr]').forEach(x => pintarQR(x, x.dataset.qr)), 60);
 };
@@ -295,6 +302,8 @@ A['credencial-nueva'] = async () => {
 /* La garita recibe un código especial (frecuente o credencial). Devuelve
    true si lo resolvió; si no, validar() sigue con pases, patentes y DNI. */
 function validarCodigoEspecial(txt){
+  /* El QR de retiro de paquetes (firmado, cambia cada 30 s). */
+  if (/^BHR1\./.test(String(txt || '').trim())){ const pid = Retiro.paqueteId || ''; Retiro.paqueteId = ''; Retiro.alLeer(String(txt).trim(), pid); return true; }
   const t = String(txt || '').trim().toUpperCase().replace(/^BHC:/, '').replace(/\s/g, '');
   const m = t.match(/^([FV])-?([A-Z0-9]{6,})$/); if (!m) return false;
   const codigo = m[1] + '-' + m[2];
@@ -315,6 +324,7 @@ function validarCodigoEspecial(txt){
   hoja('Credencial de vecino', `${aviso('ok', 'check', 'Vecino/a del barrio', esc(u.casa))}
     <div class="card" style="display:flex;gap:12px;align-items:center">${u.fotoCasa ? fotoHTML(u.fotoCasa, 'casa-foto chica') : avatar(u)}
       <div><b style="font-size:17px">${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)}${aLista(u.vehiculos).length ? ' · ' + aLista(u.vehiculos).map(v => esc(v.patente)).join(', ') : ''}</div></div></div>
+    <p class="muted small">${I('box')} Esta credencial identifica, pero <b>no sirve para entregar paquetes</b>: para eso pedile el QR de retiro de su teléfono (cambia cada 30 segundos).</p>
     <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Listo</button>`);
   setTimeout(() => Fotos.hidratar($('#hojaCuerpo')), 30);
   return true;
@@ -471,13 +481,234 @@ A['paquete-nuevo'] = () => hoja('Llegó un paquete', `<form data-f="paquete">
 F['paquete'] = d => {
   const foto = fotoParaOtros(d.foto, 14);
   Store.cambiar(s => { s.paquetes.unshift({ id:uid(), hostId:d.hostId, empresa:d.empresa, detalle:d.detalle, foto, recibido:Date.now(), recibidoPor:yo().id, retirado:null, confirmado:null });
-    notificar(s, { para:d.hostId, titulo:'Tenés un paquete en la garita', texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''} · llegó ${hora(Date.now())} h`, icon:'box', color:'wood', link:'mis-paquetes', sonido:true });
+    notificar(s, { para:d.hostId, titulo:'Tenés un paquete en la garita', texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''} · llegó ${hora(Date.now())} h · para retirarlo mostrá tu QR de retiro`, icon:'box', color:'wood', link:'mis-paquetes', sonido:true });
+
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Paquete de ${d.empresa} para ${usuario(d.hostId)?.casa || ''}`, at:Date.now() }); });
   cerrarHoja(); toast('Paquete guardado. El vecino ya sabe.', 'box');
 };
-A['paquete-entregado'] = el => Store.cambiar(s => { const p = s.paquetes.find(x => x.id === el.dataset.id); if (!p) return;
-  p.retirado = Date.now(); p.entregadoPor = yo().id;
-  if (!p.confirmado) notificar(s, { para:p.hostId, titulo:'La garita entregó tu paquete', texto:`${p.empresa} · ${hora(p.retirado)} h. Confirmá que lo recibiste.`, icon:'box', color:'ok', link:'mis-paquetes' }); });
+/* =========================================================
+   5b. RETIRO DE PAQUETES CON QR FIRMADO (pedido de Claudio, 26-09-2026)
+   -------------------------------------------------------
+   Lo que tiene valor y es de un vecino (un paquete, un sobre, una llave)
+   se entrega SOLO contra una prueba de que quien lo retira es él:
+
+   · EL QR DE RETIRO. La primera vez, el teléfono del vecino crea un par de
+     llaves (ECDSA P-256, WebCrypto). La PRIVADA queda en ese equipo y no se
+     puede sacar de ahí (no exportable, IndexedDB "bhc-llaves"); la PÚBLICA
+     va a su ficha (users/<uid>/retiroPubs). El QR dice quién es, la hora y
+     de qué equipo, y va FIRMADO con la llave privada. Cambia cada 30
+     segundos y vale 90 (margen para relojes corridos): una captura vieja
+     no sirve, y cada firma se usa una sola vez.
+   · LA GARITA lo lee y verifica la firma con la llave pública. Ni la garita
+     ni la Administración pueden fabricar un QR de un vecino: no tienen su
+     llave privada. Ve el nombre, el lote y la foto del frente para
+     compararlos con la persona, y entrega.
+   · QUEDA ASENTADO en el paquete, en la auditoría y en la bitácora: quién
+     recibió, quién entregó (y los guardias del turno), cuándo, cómo, y un
+     sello SHA-256 de todo eso. Al vecino le llega "Retiraste tu paquete":
+     si no fue él, se entera al instante.
+   · SIN TELÉFONO: firma en la pantalla de la garita + DNI. Se compara con el
+     DNI de la cuenta; si retira otra persona, queda como "retiro por un
+     tercero" y el vecino recibe el aviso. Del DNI se guardan solo los tres
+     últimos números.
+   Es una firma electrónica (Ley 25.506, art. 5): un medio de prueba fuerte,
+   no una "firma digital" con certificado.
+   ========================================================= */
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const deB64u = s => Uint8Array.from(atob(String(s).replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((String(s).length + 3) % 4)), c => c.charCodeAt(0));
+const Retiro = {
+  VALE: 90, PASO: 30,
+  base: null,
+  abrir(){
+    return this.base = this.base || new Promise(ok => {
+      try { const r = indexedDB.open('bhc-llaves', 1); r.onupgradeneeded = () => r.result.createObjectStore('k'); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }
+      catch(e){ ok(null); }
+    });
+  },
+  async leer(id){ const db = await this.abrir(); if (!db) return null;
+    return new Promise(ok => { const q = db.transaction('k').objectStore('k').get(id); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }); },
+  async poner(id, v){ const db = await this.abrir(); if (!db) return;
+    await new Promise(ok => { const t = db.transaction('k', 'readwrite'); t.objectStore('k').put(v, id); t.oncomplete = ok; t.onerror = ok; }); },
+  /* Al cerrar sesión la llave se borra: en ese equipo ya no se puede retirar. */
+  async olvidar(){ try { const db = await this.abrir(); if (db) db.close(); } catch(e){} this.base = null; try { indexedDB.deleteDatabase('bhc-llaves'); } catch(e){} },
+  equipo(){ const ua = navigator.userAgent; return /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? (/Mobile/.test(ua) ? 'Celular Android' : 'Tablet Android') : 'Computadora'; },
+  /* La llave de este equipo para quien está adentro (la crea la primera vez)
+     y su parte pública publicada en la ficha. */
+  async llave(){
+    const u = yo(); if (!u) throw new Error('Tenés que entrar con tu cuenta');
+    if (!window.crypto || !crypto.subtle) throw new Error('Este navegador no puede firmar (hace falta https)');
+    let r = await this.leer(u.id);
+    if (!r){
+      const par = await crypto.subtle.generateKey({ name:'ECDSA', namedCurve:'P-256' }, false, ['sign', 'verify']);
+      const j = await crypto.subtle.exportKey('jwk', par.publicKey);
+      r = { id:'e' + uid().replace(/[^a-z0-9]/gi, '').slice(-7), priv:par.privateKey, pub:{ kty:j.kty, crv:j.crv, x:j.x, y:j.y }, at:Date.now() };
+      await this.poner(u.id, r);
+    }
+    const ya = (yo().retiroPubs || {})[r.id];
+    if (!ya || ya.x !== r.pub.x) Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (!x) return;
+      const pubs = Object.assign({}, x.retiroPubs || {}); pubs[r.id] = { ...r.pub, at:r.at, equipo:this.equipo() };
+      /* hasta cuatro equipos por persona: el más viejo se cae */
+      Object.keys(pubs).sort((a, b) => (pubs[b].at || 0) - (pubs[a].at || 0)).slice(4).forEach(k => delete pubs[k]);
+      x.retiroPubs = pubs; });
+    return r;
+  },
+  async codigo(){
+    const r = await this.llave(), u = yo(), ts = Math.floor(Date.now() / 1000);
+    const firma = await crypto.subtle.sign({ name:'ECDSA', hash:'SHA-256' }, r.priv, new TextEncoder().encode(`BHR1|${u.id}|${ts}|${r.id}`));
+    return `BHR1.${u.id}.${ts.toString(36)}.${r.id}.${b64u(firma)}`;
+  },
+  usados: new Set(),
+  yaUsada(firma){ return this.usados.has(firma) || Store.s.paquetes.some(p => p.entrega && p.entrega.qr && p.entrega.qr.firma === firma); },
+  async verificar(txt){
+    const m = String(txt || '').trim().match(/^BHR1\.([^.]+)\.([0-9a-z]+)\.([^.]+)\.([A-Za-z0-9_-]+)$/);
+    if (!m) return { ok:false, motivo:'No es un QR de retiro del barrio.' };
+    const [, uidV, ts36, eq, firma] = m, ts = parseInt(ts36, 36), u = Store.s.users.find(x => x.id === uidV && x.estado === 'aprobado');
+    if (!u) return { ok:false, motivo:'Ese QR no es de ningún vecino con cuenta aprobada.' };
+    const pub = (u.retiroPubs || {})[eq];
+    if (!pub) return { ok:false, u, motivo:`El teléfono que muestra el QR no está habilitado para retirar a nombre de ${u.nombre}. Si lo dio de baja o cambió de teléfono, que abra de nuevo "Mi QR para retirar" en su teléfono.` };
+    const edad = Math.abs(Date.now() / 1000 - ts);
+    if (edad > this.VALE) return { ok:false, u, motivo:'El QR está vencido (dura 30 segundos). Pedile que lo muestre de nuevo en su teléfono: se renueva solo. Una captura de pantalla no sirve.' };
+    if (this.yaUsada(firma)) return { ok:false, u, motivo:'Ese QR ya se usó para una entrega. Pedile que muestre el nuevo.' };
+    try {
+      const k = await crypto.subtle.importKey('jwk', { kty:pub.kty, crv:pub.crv, x:pub.x, y:pub.y, ext:true }, { name:'ECDSA', namedCurve:'P-256' }, false, ['verify']);
+      const bien = await crypto.subtle.verify({ name:'ECDSA', hash:'SHA-256' }, k, deB64u(firma), new TextEncoder().encode(`BHR1|${uidV}|${ts}|${eq}`));
+      if (!bien) return { ok:false, u, motivo:'La firma del QR no coincide: no salió del teléfono de ese vecino. No entregues.' };
+    } catch(e){ return { ok:false, u, motivo:'No se pudo verificar la firma: ' + e.message }; }
+    return { ok:true, u, ts, equipo:eq, equipoNombre:pub.equipo || '', firma };
+  },
+  /* Los paquetes que puede retirar esa persona: los de su lote. */
+  pendientesDe(u){ const casa = u && u.casa; return Store.s.paquetes.filter(p => !p.retirado && (p.hostId === u.id || usuario(p.hostId)?.casa === casa)).sort((a, b) => a.recibido - b.recibido); },
+  /* La garita leyó un QR de retiro. */
+  async alLeer(txt, paqueteId = ''){
+    if (!esGuardia() && !esAdmin()){ toast('Solo la garita o la Administración entregan paquetes', 'lock'); return; }
+    const v = await this.verificar(txt);
+    if (!v.ok){ hoja('QR de retiro', `${aviso('danger', 'x', 'NO ENTREGAR', esc(v.motivo))}
+      ${v.u ? `<div class="card plana small">${I('user')} El QR dice ser de <b>${esc(v.u.nombre)}</b> · ${esc(v.u.casa)}. Si es esa persona y no le anda el teléfono, usá "Sin teléfono: firma y DNI".</div>` : ''}
+      <button class="btn btn-sec btn-block" data-a="escanear" data-v="Apuntá al QR de retiro del vecino (cambia cada 30 segundos)">${I('scan')}Leer de nuevo</button>`); return; }
+    this.usados.add(v.firma);
+    const u = v.u, paq = this.pendientesDe(u);
+    this.leido = { ...v, uid:u.id };
+    hoja('Retiro de paquetes', `${aviso('ok', 'check', 'QR válido y firmado', `Salió del ${esc(v.equipoNombre || 'teléfono')} de ${esc(u.nombre)} hace ${Math.max(0, Math.round(Date.now() / 1000 - v.ts))} s.`)}
+      <div class="retiro-quien">${u.fotoCasa ? fotoHTML(u.fotoCasa, 'casa-foto chica') : avatar(u, 'lg')}
+        <div><b>${esc(u.nombre)}</b><span>${esc(u.casa)}</span><small>Compará con la persona que tenés enfrente.</small></div></div>
+      ${paq.length ? `<form data-f="retiro-qr">${sec(`Paquetes de ${esc(u.casa)} (${paq.length})`)}
+        <div class="card lista">${paq.map(p => `<label class="it ci-fila"><input type="checkbox" name="p~${esc(p.id)}" ${!paqueteId || p.id === paqueteId ? 'checked' : ''}>
+          <div class="txt"><b>${esc(p.empresa)}${p.detalle ? ' · ' + esc(p.detalle) : ''}</b><span>Para ${esc(nombreDe(p.hostId))} · llegó ${hace(p.recibido)}</span></div></label>`).join('')}</div>
+        <button class="btn btn-ok btn-block btn-grande" style="margin-top:10px">${I('check')}Entregar los tildados</button></form>`
+        : vacio('box', `${esc(u.casa)} no tiene paquetes en la garita.`)}`);
+    setTimeout(() => Fotos.hidratar($('#hojaCuerpo')), 30);
+  },
+  /* Lo que queda asentado de una entrega, con su sello. */
+  async entregar(ids, recibe, prueba){
+    const guardias = typeof turnoAbierto === 'function' && turnoAbierto() ? aLista(turnoAbierto().guardias) : [];
+    const at = Date.now(), entrega = { uid:yo().id, nombre:yo().nombre, guardias };
+    const registro = { paquetes:ids.slice().sort(), recibe, entrega, at, prueba };
+    const sello_ = await sello(registro);
+    let casa = '';
+    Store.cambiar(s => {
+      ids.forEach(id => { const p = s.paquetes.find(x => x.id === id); if (!p || p.retirado) return;
+        casa = usuario(p.hostId)?.casa || casa;
+        p.retirado = at; p.entregadoPor = yo().id; p.confirmado = at;
+        p.entrega = { metodo:prueba.metodo, recibe, entrega, at, sello:sello_, ...(prueba.metodo === 'qr' ? { qr:{ ts:prueba.ts, equipo:prueba.equipo, firma:prueba.firma } } : { firma:prueba.firma, dniFin:prueba.dniFin, dniVerificado:prueba.dniVerificado, tercero:!!prueba.tercero }) };
+        const aviso_ = prueba.tercero || (recibe.uid && recibe.uid !== p.hostId) ? `${recibe.nombre} retiró tu paquete` : 'Retiraste tu paquete';
+
+        notificar(s, { para:p.hostId, titulo:aviso_, texto:`${p.empresa} · ${hora(at)} h · lo entregó la garita${prueba.metodo === 'qr' ? ' contra tu QR' : ' con firma y DNI'}. Si no fuiste vos, avisá enseguida.`, icon:'box', color: prueba.tercero ? 'warn' : 'ok', link:'mis-paquetes', sonido:true });
+      });
+      const quien = `${recibe.nombre}${prueba.tercero ? ' (tercero)' : ''}`;
+      auditar(s, 'Entregó paquetes', `${casa} · ${plural(ids.length, 'paquete')} · recibió ${quien} · entregó ${yo().nombre}${guardias.length ? ' (' + guardias.join(', ') + ')' : ''} · ${prueba.metodo === 'qr' ? 'QR firmado' : 'firma + DNI ***' + prueba.dniFin} · sello ${sello_.slice(0, 16)}`, ids[0]);
+      s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Entrega de ${plural(ids.length, 'paquete')} a ${quien} · ${casa} · ${prueba.metodo === 'qr' ? 'QR firmado' : 'firma y DNI'}`, at });
+    });
+    return sello_;
+  },
+};
+F['retiro-qr'] = async d => {
+  const l = Retiro.leido; if (!l){ toast('Leé de nuevo el QR', 'alert'); return; }
+  const ids = Object.keys(d).filter(k => k.startsWith('p~')).map(k => k.slice(2));
+  if (!ids.length){ toast('Tildá al menos un paquete', 'alert'); return; }
+  if (Date.now() / 1000 - l.ts > 600){ toast('Pasaron más de 10 minutos desde que leíste el QR: leelo de nuevo', 'alert'); return; }
+  const u = usuario(l.uid);
+  const s_ = await Retiro.entregar(ids, { uid:u.id, nombre:u.nombre, lote:u.casa }, { metodo:'qr', ts:l.ts, equipo:l.equipo, firma:l.firma });
+  Retiro.leido = null; cerrarHoja();
+  toast(`Entregado a ${u.nombre}. Sello ${s_.slice(0, 8)}…`, 'check');
+};
+/* "Entregar" en un paquete de la lista de la garita. */
+A['paquete-entregar'] = el => {
+  const p = Store.s.paquetes.find(x => x.id === el.dataset.id); if (!p) return;
+  hoja(`Entregar · ${esc(usuario(p.hostId)?.casa || '')}`, `<div class="card plana small">${I('box')} ${esc(p.empresa)}${p.detalle ? ' · ' + esc(p.detalle) : ''} · para ${esc(nombreDe(p.hostId))}</div>
+    <button class="btn btn-pri btn-block btn-grande" data-a="retiro-escanear" data-id="${p.id}">${I('scan')}Leer el QR de retiro del vecino</button>
+    <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="retiro-manual" data-id="${p.id}">${I('edit')}Sin teléfono: firma y DNI</button>
+    <p class="muted tiny" style="margin-top:10px">El QR de retiro cambia cada 30 segundos y solo sale del teléfono del vecino: es la prueba de que se lo entregaste a él. La credencial fija NO sirve para esto.</p>`);
+};
+A['paquete-entregado'] = A['paquete-entregar'];
+A['retiro-escanear'] = el => { Retiro.paqueteId = el.dataset.id || ''; A['escanear']({ dataset:{ v:'Apuntá al QR de retiro del vecino (cambia cada 30 segundos)' } }); };
+/* Sin teléfono: firma en la pantalla de la garita + DNI. */
+A['retiro-manual'] = el => {
+  const p = Store.s.paquetes.find(x => x.id === el.dataset.id); if (!p) return;
+  const casa = usuario(p.hostId)?.casa || '', cuentas = Store.s.users.filter(u => u.estado === 'aprobado' && u.casa === casa && casa);
+  hoja('Retiro sin teléfono', `<form data-f="retiro-manual" data-id="${p.id}">
+    <div class="card plana small">${I('box')} ${esc(p.empresa)} · ${esc(casa)}</div>
+    <div class="field"><label>¿Quién lo retira?</label><select name="quien" required>${cuentas.map(u => `<option value="${esc(u.id)}" ${u.id === p.hostId ? 'selected' : ''}>${esc(u.nombre)}</option>`).join('')}<option value="tercero">Otra persona (familiar, empleado…)</option></select></div>
+    <div class="field"><label>Nombre y apellido (si es otra persona)</label><input name="nombre" maxlength="60" placeholder="Como figura en el DNI"></div>
+    <div class="field"><label>DNI de quien retira</label><input name="dni" required inputmode="numeric" maxlength="11" placeholder="Solo números"><div class="ayuda">Se compara con el de la cuenta. Se guardan solo los tres últimos números.</div></div>
+    <div class="field"><label>Firma de quien retira</label>${firmaHTML('firmaRetiro')}</div>
+    <button class="btn btn-ok btn-block btn-grande">${I('check')}Entregar</button></form>`);
+  setTimeout(() => iniciarFirma('firmaRetiro'), 60);
+};
+F['retiro-manual'] = async (d, form) => {
+  const p = Store.s.paquetes.find(x => x.id === form.dataset.id); if (!p) return;
+  const firma = leerFirma('firmaRetiro'); if (!firma){ toast('Falta la firma de quien retira', 'alert'); return; }
+  const dni = soloDigitos(d.dni); if (dni.length < 7){ toast('El DNI tiene que tener al menos 7 números', 'alert'); return; }
+  const tercero = d.quien === 'tercero', u = tercero ? null : usuario(d.quien);
+  if (tercero && String(d.nombre || '').trim().length < 4){ toast('Escribí el nombre y apellido de quien retira', 'alert'); return; }
+  let verificado = false;
+  if (u && u.dni){ if (soloDigitos(u.dni) !== dni){ toast(`El DNI no coincide con el de ${u.nombre}. No entregues.`, 'alert'); return; } verificado = true; }
+  const recibe = tercero ? { nombre:String(d.nombre).trim(), lote:usuario(p.hostId)?.casa || '' } : { uid:u.id, nombre:u.nombre, lote:u.casa };
+  const s_ = await Retiro.entregar([p.id], recibe, { metodo:'firma', firma, dniFin:dni.slice(-3), dniVerificado:verificado, tercero });
+  cerrarHoja(); toast(`Entregado a ${recibe.nombre}${tercero ? ' (tercero: el vecino recibe el aviso)' : ''}. Sello ${s_.slice(0, 8)}…`, 'check');
+};
+/* EL VECINO: su QR de retiro, que se renueva solo cada 30 segundos. Si la
+   garita le entrega mientras lo mira, se cierra solo y lo festeja. */
+A['retiro-qr'] = async () => {
+  const u = yo(); if (!u) return;
+  const antes = Retiro.pendientesDe(u).length;
+  hoja('Mi QR para retirar', `<div class="retiro-qr">
+      <div class="retiro-qr-caja" id="retiroQR"><p class="muted small center" style="margin:40px 0">Preparando tu QR…</p></div>
+      <div class="retiro-reloj"><i id="retiroBarra"></i></div>
+      <b>${esc(u.nombre)}</b><span>${esc(u.casa)}${antes ? ` · ${plural(antes, 'paquete')} en la garita` : ''}</span></div>
+    <p class="muted small" style="margin:12px 2px 0">${I('lock')} Mostralo en la garita desde tu teléfono. <b>Cambia cada 30 segundos</b> y va firmado por este equipo: una foto o una captura no sirven. No lo mandes por WhatsApp.</p>
+    <button class="link" data-a="retiro-equipos" style="margin-top:6px">Mis teléfonos habilitados</button>`, { ancho:'420px' });
+  const d = $('#hoja');
+  let vivo = true; d.addEventListener('close', () => { vivo = false; }, { once:true });
+  const pintar_ = async () => {
+    if (!vivo || !d.open) return;
+    try { const c = await Retiro.codigo(); const el = $('#retiroQR'); if (el) await pintarQR(el, c); }
+    catch(e){ const el = $('#retiroQR'); if (el) el.innerHTML = `<p class="small center" style="margin:30px 8px;color:var(--danger)">${esc(e.message)}</p>`; return; }
+    const b = $('#retiroBarra'); if (b){ b.style.transition = 'none'; b.style.width = '100%'; void b.offsetWidth; b.style.transition = `width ${Retiro.PASO}s linear`; b.style.width = '0%'; }
+    setTimeout(pintar_, Retiro.PASO * 1000);
+  };
+  pintar_();
+  const mirar = setInterval(() => {
+    if (!vivo || !d.open){ clearInterval(mirar); return; }
+    const ahora = Retiro.pendientesDe(yo()).length;
+    if (ahora < antes){ clearInterval(mirar); cerrarHoja();
+      hoja('¡Listo!', `<div class="pago-ok">${I('box')}<b>${plural(antes - ahora, 'paquete retirado', 'paquetes retirados')}</b><span>Quedó asentado con tu QR firmado</span></div>`, { ancho:'380px' });
+      setTimeout(() => { if ($('#hoja .pago-ok')) cerrarHoja(); }, 3000); }
+  }, 1500);
+};
+A['retiro-equipos'] = () => {
+  const u = yo(), pubs = Object.entries(u.retiroPubs || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+  hoja('Teléfonos habilitados para retirar', `<p class="muted small" style="margin-top:0">Cada equipo donde abriste tu QR de retiro. Si perdiste uno o lo cambiaste, sacalo: su QR deja de valer en la garita.</p>
+    <div class="card lista">${pubs.map(([k, x]) => `<div class="it"><span class="ic ic-brand" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('smartphone')}</span>
+      <div class="txt"><b>${esc(x.equipo || 'Equipo')}</b><span>Habilitado ${x.at ? fechaCorta(isoDe(new Date(x.at))) : ''}</span></div>
+      <button class="btn btn-xs btn-danger-soft" data-a="retiro-quitar" data-v="${esc(k)}">Quitar</button></div>`).join('') || '<p class="muted small" style="margin:6px 0">Todavía ninguno.</p>'}</div>`);
+};
+A['retiro-quitar'] = async el => {
+  if (!await confirmar('Quitar este equipo', 'Su QR de retiro deja de valer en la garita.', { si:'Quitar', peligro:true })) return;
+  const k = el.dataset.v, u = yo();
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (!x || !x.retiroPubs) return; const p = Object.assign({}, x.retiroPubs); delete p[k]; x.retiroPubs = p; auditar(s, 'Quitó un equipo para retirar paquetes', k); });
+  const r = await Retiro.leer(u.id); if (r && r.id === k) await Retiro.olvidar();
+  A['retiro-equipos']();
+};
 A['paquete-confirmar'] = el => {
   Store.cambiar(s => { const p = s.paquetes.find(x => x.id === el.dataset.id); if (!p) return;
     p.confirmado = Date.now(); if (!p.retirado) p.retirado = p.confirmado;
@@ -488,14 +719,18 @@ R['mis-paquetes'] = {
   titulo:'Tus paquetes', icon:'box', color:'wood', sub:'Lo que llegó a la garita a tu nombre',
   render(){
     const u = yo(), ls = Store.s.paquetes.filter(p => p.hostId === u.id).sort((a, b) => b.recibido - a.recibido).slice(0, 40);
-    const pend = ls.filter(p => !p.confirmado);
-    return `${!ls.length ? vacio('box', 'No te llegó ningún paquete todavía.') : ''}
-      ${pend.map(p => `<div class="card"><div class="row"><span class="ic ic-wood" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I('box')}</span>
-        <div class="grow"><b>${esc(p.empresa)}${p.detalle ? ' · ' + esc(p.detalle) : ''}</b><div class="muted small">Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} ${hora(p.recibido)} h${p.retirado ? ` · la garita lo entregó ${hora(p.retirado)} h` : ' · está en la garita'}</div></div></div>
-        ${fotoHTML(p.foto, 'post-foto')}
-        <div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-ok" data-a="paquete-confirmar" data-id="${p.id}">${I('check')}${p.retirado ? 'Confirmo que lo recibí' : 'Ya lo retiré'}</button>
-          <button class="btn btn-sm btn-sec" data-a="mi-credencial">${I('qr')}Mi credencial</button></div></div>`).join('')}
-      ${ls.length > pend.length ? sec('Ya retirados') + `<div class="card lista">${ls.filter(p => p.confirmado).map(p => `<div class="it"><div class="txt"><b>${esc(p.empresa)}</b><span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${hace(p.confirmado)}</span></div></div>`).join('')}</div>` : ''}`;
+    const enGarita = Retiro.pendientesDe(u), viejos = ls.filter(p => p.retirado && !p.confirmado), listos = ls.filter(p => p.confirmado);
+    const como = p => !p.entrega ? '' : p.entrega.metodo === 'qr' ? ' · con tu QR firmado' : p.entrega.tercero ? ` · lo retiró ${esc(p.entrega.recibe?.nombre || 'otra persona')}` : ' · con firma y DNI';
+    return `${enGarita.length ? `<button class="retiro-cta" data-a="retiro-qr">${I('qr')}<span><b>Mi QR para retirar</b><small>${plural(enGarita.length, 'paquete')} en la garita · mostralo desde tu teléfono</small></span>${I('right')}</button>` : ''}
+      ${!ls.length && !enGarita.length ? vacio('box', 'No te llegó ningún paquete todavía.') : ''}
+      ${enGarita.length ? sec('En la garita') : ''}
+      ${enGarita.map(p => `<div class="card"><div class="row"><span class="ic ic-wood" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I('box')}</span>
+        <div class="grow"><b>${esc(p.empresa)}${p.detalle ? ' · ' + esc(p.detalle) : ''}</b><div class="muted small">Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} ${hora(p.recibido)} h${p.hostId !== u.id ? ' · a nombre de ' + esc(nombreDe(p.hostId)) : ''}</div></div></div>
+        ${fotoHTML(p.foto, 'post-foto')}</div>`).join('')}
+      ${viejos.length ? sec('Entregados sin confirmar') + viejos.map(p => `<div class="card"><b>${esc(p.empresa)}</b><div class="muted small">La garita lo entregó ${hace(p.retirado)}</div>
+        <div class="btns" style="margin-top:8px"><button class="btn btn-sm btn-ok" data-a="paquete-confirmar" data-id="${p.id}">${I('check')}Confirmo que lo recibí</button></div></div>`).join('') : ''}
+      ${listos.length ? sec('Ya retirados') + `<div class="card lista">${listos.map(p => `<div class="it"><div class="txt"><b>${esc(p.empresa)}</b><span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${hace(p.confirmado)}${como(p)}</span></div>${p.entrega && p.entrega.sello ? `<span class="pill p-ok" title="Sello ${esc(p.entrega.sello)}">${I('lock')}sellado</span>` : ''}</div>`).join('')}</div>` : ''}
+      <p class="muted tiny" style="margin-top:12px">${I('lock')} La garita entrega tus paquetes solo contra tu QR de retiro (cambia cada 30 segundos y sale únicamente de tu teléfono) o, si no tenés el teléfono, con tu firma y tu DNI. Cada entrega queda en la auditoría con un sello.</p>`;
   },
 };
 

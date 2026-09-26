@@ -10,6 +10,11 @@
    repetirse. Con la base del barrio la marca se RECLAMA antes de actuar
    (ver marca() y Motor.reclamar): la gana un solo equipo y ese es el
    único que da el aviso, aunque haya cien apps abiertas a la vez. */
+/* Las cuentas que deben expensas: cualquier cuenta aprobada con lote cuyo
+   saldo, descontado lo "por acreditar", sigue siendo positivo. */
+function deudoresExpensas(s){
+  return s.users.filter(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || '')).filter(u => { const c = cuentaLote(u.casa); return c.saldo - c.informado > 0.5; }).map(u => u.id);
+}
 const REGLAS = [
   { id:'clima-viento', n:'Viento fuerte → aviso en el pizarrón', d:'Con ráfagas de 60 km/h o más publica un aviso para asegurar objetos sueltos.',
     run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'wind'); if (!a) return 0;
@@ -54,57 +59,70 @@ const REGLAS = [
   { id:'viaje-regreso', n:'Fin de un viaje → avisar a la guardia', d:'El día que vuelve el vecino, la guardia lo sabe.',
     run(s, hoy){ let n = 0; s.users.filter(u => u.viaje && u.viaje.hasta === hoy).forEach(u => n += marca(s, 'vj-' + u.id + hoy, () => notificar(s, { para:'rol:guardia', titulo:`Hoy vuelve ${u.casa}`, texto:'Termina el aviso de casa sola.', icon:'home', color:'ok', link:'garita' })));
       s.users.filter(u => u.viaje && u.viaje.hasta < hoy).forEach(u => { delete u.viaje; n++; }); return n; } },
-  /* ---- el calendario de las expensas, que corre solo todos los meses ---- */
+  /* ---- el calendario de las expensas, que corre solo todos los meses ----
+     Arreglado el 26-09-2026: estas reglas miraban la liquidación del mes
+     EN CURSO, cuyos vencimientos son del mes que viene, y por eso nunca
+     encontraban el día justo. Ahora miran la última liquidación emitida
+     (la que se está cobrando). Y "quién debe" es cualquier cuenta con lote
+     (también quien administra y vive en el barrio), sin contar a quien ya
+     pagó o avisó que pagó por fuera (eso queda "por acreditar"). */
   { id:'expensas-cerrar', n:'Expensas → recordarle a la Administración que cierre el mes',
-    d:'Cinco días antes del primer vencimiento, si el mes todavía está en borrador.',
+    d:'Cinco días antes del primer vencimiento, si el mes anterior todavía no se emitió.',
     run(s, hoy){
-      const per = periodoHoy(), vto = vtoDe(per, 1), faltan = Math.round((fechaDe(vto) - fechaDe(hoy)) / DIA);
+      const per = periodoAnterior(periodoHoy()), vto = vtoDe(per, 1), faltan = Math.round((fechaDe(vto) - fechaDe(hoy)) / DIA);
       if (faltan !== 5 || liquidacionDe(per)?.estado === 'emitida') return 0;
       return marca(s, 'expcerrar-' + per, () => notificar(s, { para:'rol:admin', titulo:`Falta cerrar ${nombrePeriodo(per)}`,
         texto:`El primer vencimiento es el ${fechaCorta(vto)} y todavía no se emitieron los cupones.`, icon:'zap', color:'warn', link:'contabilidad:cierre', sonido:true })); } },
 
   { id:'expensas-aviso', n:'Expensas → aviso tres días antes del primer vencimiento',
-    d:'A todos los vecinos, por aviso en la app.',
+    d:'A cada lote que todavía no pagó ni avisó que pagó.',
     run(s, hoy){
-      const per = periodoHoy(); if (liquidacionDe(per)?.estado !== 'emitida') return 0;
-      const vto = vtoDe(per, 1), faltan = Math.round((fechaDe(vto) - fechaDe(hoy)) / DIA);
-      if (faltan !== 3) return 0;
-      return marca(s, 'expaviso-' + per, () => notificar(s, { para:'todos', titulo:`Las expensas vencen el ${fechaCorta(vto)}`,
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l) return 0;
+      const vto = vtoDe(l.periodo, 1); if (hoy !== sumarDias(vto, -3)) return 0;
+      const d = deudoresExpensas(s); if (!d.length) return 0;
+      return marca(s, 'expaviso-' + l.periodo, () => notificar(s, { para:d, titulo:`Las expensas vencen el ${fechaCorta(vto)}`,
         texto:'Faltan 3 días. Podés ver tu cupón y pagar desde la app.', icon:'wallet', color:'wood', link:'expensas' })); } },
 
   { id:'expensas-vence-hoy', n:'Expensas → aviso el día del primer vencimiento',
-    d:'Solo a los lotes que todavía tienen saldo.',
+    d:'Solo a los lotes que todavía no pagaron ni avisaron.',
     run(s, hoy){
-      const per = periodoHoy(); if (liquidacionDe(per)?.estado !== 'emitida') return 0;
-      if (vtoDe(per, 1) !== hoy) return 0;
-      const deben = s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && saldoLote(u.casa) > 0.5).map(u => u.id);
-      if (!deben.length) return 0;
-      return marca(s, 'expvto1-' + per, () => notificar(s, { para:deben, titulo:'Hoy vencen las expensas',
-        texto:`Después de hoy se suma el recargo del ${cfgExp().recargo2} %.`, icon:'wallet', color:'warn', link:'expensas', sonido:true })); } },
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || vtoDe(l.periodo, 1) !== hoy) return 0;
+      const d = deudoresExpensas(s); if (!d.length) return 0;
+      return marca(s, 'expvto1-' + l.periodo, () => notificar(s, { para:d, titulo:'Hoy vencen las expensas',
+        texto:`Después de hoy se suma el recargo del ${cfgExp().recargo2} % (2º vencimiento el ${fechaCorta(vtoDe(l.periodo, 2))}).`, icon:'wallet', color:'warn', link:'expensas', sonido:true })); } },
 
-  { id:'expensas-impaga', n:'Expensas → reclamo por correo al día siguiente del segundo vencimiento',
-    d:'A cada lote con saldo, con el detalle de lo que debe. Queda asentado en la auditoría.',
+  { id:'expensas-ultimo-dia', n:'Expensas → aviso el día del segundo vencimiento',
+    d:'El último día para pagar sin el ajuste: aviso con sonido a quien todavía debe.',
     run(s, hoy){
-      const per = periodoHoy(); if (liquidacionDe(per)?.estado !== 'emitida') return 0;
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || vtoDe(l.periodo, 2) !== hoy) return 0;
+      const d = deudoresExpensas(s); if (!d.length) return 0;
+      return marca(s, 'expvto2-' + l.periodo, () => notificar(s, { para:d, titulo:'Hoy es el último día para pagar las expensas',
+        texto:`Mañana lo impago pasa a la expensa que viene con el ajuste (${textoMora()}).`, icon:'alert', color:'danger', link:'expensas', sonido:true, urgente:true })); } },
+
+  { id:'expensas-impaga', n:'Expensas → correo al día siguiente del segundo vencimiento',
+    d:'Solo a los lotes que no pagaron NI avisaron que pagaron: les recuerda que venció y que, pagado fuera de término, la expensa siguiente suma el ajuste por inflación. Queda en la auditoría.',
+    run(s, hoy){
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l) return 0;
+      const per = l.periodo;
       if (sumarDias(vtoDe(per, 2), 1) !== hoy) return 0;
       return marca(s, 'expimpaga-' + per, () => {
-        const conDeuda = (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => saldoLote('Lote ' + L.lote) > 0.5);
+        const conDeuda = (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => { const c = cuentaLote('Lote ' + L.lote); return c.saldo - c.informado > 0.5; });
         conDeuda.forEach(L => {
-          const casa = 'Lote ' + L.lote, saldo = saldoLote(casa);
+          const casa = 'Lote ' + L.lote, c = cuentaLote(casa), saldo = c.saldo - c.informado;
           const us = s.users.filter(u => u.casa === casa && u.estado === 'aprobado');
-          if (us.length) notificar(s, { para:us.map(u => u.id), titulo:`Tu cuenta de expensas quedó con saldo`,
-            texto:`${plata(saldo)} al ${fechaCorta(hoy)}. Si ya pagaste, informalo desde la app.`, icon:'alert', color:'danger', link:'expensas', sonido:true });
+          if (us.length) notificar(s, { para:us.map(u => u.id), titulo:`Venció el 2º vencimiento de las expensas`,
+            texto:`${plata(saldo)} impagos. Pagado fuera de término, la expensa que viene suma el ajuste (${textoMora()}). Si ya pagaste, avisalo con el comprobante.`, icon:'alert', color:'danger', link:'expensas', sonido:true });
           const p = s.padron.find(x => x.lote === L.lote);
-          const mail = p?.email || us.find(u => u.email)?.email;
-          if (mail) Correo.enviar({ para:mail, asunto:`Expensas impagas · ${casa}`, tipo:'reclamo-expensas',
-            html:Correo.plantilla('Tu cuenta de expensas quedó con saldo',
-              `<p>Al ${fechaCorta(hoy)}, la cuenta de <b>${esc(casa)}</b> registra un saldo de:</p>
+          const mails = [...new Set([p?.email, ...us.map(u => u.email)].filter(Boolean))];
+          mails.forEach(mail => Correo.enviar({ para:mail, asunto:`Expensas vencidas · ${casa} · ${nombrePeriodo(per)}`, tipo:'reclamo-expensas',
+            html:Correo.plantilla('Concluyó el segundo vencimiento de tus expensas',
+              `<p>Te recordamos que el <b>${fechaCorta(vtoDe(per, 2))}</b> concluyó el segundo vencimiento de las expensas de <b>${nombrePeriodo(per)}</b> de <b>${esc(casa)}</b>, y a hoy no registramos el pago ni el aviso de pago.</p>
                <p style="font-size:26px;font-weight:800;color:#b91c1c;margin:14px 0">${plata(saldo)}</p>
-               <p>Venció el segundo plazo de ${nombrePeriodo(per)} (${fechaCorta(vtoDe(per, 2))}). A partir de ahora corre un interés del ${cfgExp().interesMensual} % mensual sobre el saldo impago.</p>
-               <p>Si ya lo abonaste, informalo desde la app con el comprobante y la Administración lo confirma.</p>`,
-              { texto:'Ver mi cuenta', url:urlApp('expensas') }) });
+               <p>Si hacés el pago fuera de término, en la próxima expensa se te va a cobrar un excedente correspondiente al <b>ajuste inflacionario</b> (${esc(textoMora())}), que la app calcula sola al cerrar el mes.</p>
+               <p>Podés pagar desde la app con tarjeta, Mercado Pago o cualquier billetera. Si ya pagaste por fuera de la app, avisalo desde tu cupón con el botón <b>"Ya pagué por fuera de la app"</b> adjuntando el comprobante, y dejamos de enviarte recordatorios.</p>`,
+              { texto:'Pagar o avisar que pagué', url:urlApp('expensas') }) }));
         });
-        if (conDeuda.length) auditar(s, 'Reclamo automático de expensas', `${nombrePeriodo(per)} · ${conDeuda.length} lotes`);
+        if (conDeuda.length) auditar(s, 'Correo automático por expensas vencidas', `${nombrePeriodo(per)} · ${conDeuda.length} lotes`);
       }); } },
   { id:'temporadas', n:'Temporadas → avisar cuando empiezan o están por terminar', d:'Pesca, cubiertas con clavos, ski, cruceros: aviso al empezar y 7 días antes de terminar.',
     run(s, hoy){ let n = 0; s.temporadas.forEach(t => {
@@ -371,7 +389,8 @@ const ADMIN_TABS = {
           <div class="ayuda">Sirve para comprobar que los avisos llegan con el teléfono bloqueado. Dice a cuántos equipos llegó; un equipo cuenta solo si activó los avisos.</div></div>
         <div id="pushGrupoRes"></div></div>
       <div class="card"><h3>Aviones en vivo (opcional)</h3>${campo('vuelosProxy', 'URL del Worker que reenvía ADS-B', 'url', 'Ver CONECTAR.md. Arribos y partidas se leen solos del tablero del aeropuerto: esto es solo para ver los aviones que están en el aire.')}</div>
-      <button class="btn btn-pri btn-block">${I('check')}Guardar ajustes</button></form>`;
+      <button class="btn btn-pri btn-block">${I('check')}Guardar ajustes</button></form>
+      ${superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Versión, conexión con la base y modo: por si algo no anda y hay que revisarlo' })}`;
   },
   motor(){
     const s = Store.s;

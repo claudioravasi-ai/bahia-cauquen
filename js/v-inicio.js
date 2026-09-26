@@ -88,7 +88,8 @@ function urgentesVecino(){
     `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">${I('check')}Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)));
   const paq = s.paquetes.filter(p => p.hostId === u.id && !p.retirado);
   if (paq.length) out.push(aviso('brand', 'box', `Tenés ${plural(paq.length, 'paquete')} en la garita`, paq.map(p => esc(p.empresa)).join(', '),
-    `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="mis-paquetes">Ver y confirmar</button>`));
+    `<button class="btn btn-xs btn-pri" data-a="retiro-qr">${I('qr')}Mi QR para retirar</button><button class="btn btn-xs btn-sec" data-a="abrir" data-v="mis-paquetes">Ver</button>`));
+
   if (typeof alertasParaMi === 'function') alertasParaMi().filter(a => !respuestaDe(a)).forEach(a => out.push(aviso('danger latido', 'siren', `Aviso urgente: ${esc(a.titulo)}`, esc(a.zona),
     `<button class="btn btn-xs btn-ok" data-a="alerta-responder" data-id="${a.id}" data-v="ok">Recibido</button><button class="btn btn-xs btn-danger-soft" data-a="alerta-responder" data-id="${a.id}" data-v="ayuda">Necesito ayuda</button>`)));
   s.reservas.filter(r => r.userId === u.id && (r.fecha === hoy || r.fecha === sumarDias(hoy, 1)) && !r.cancelada).forEach(r => {
@@ -118,13 +119,16 @@ function recoleccionHoy(){
   const c = Store.s.config, dias = recoleccionDias(), h = new Date(), hoy = h.getDay(), man = (hoy + 1) % 7;
   const vol = volsProximos().find(v => v.fecha === hoyISO() || v.fecha === sumarDias(hoyISO(), 1));
   if (vol) return anuncioCamion(vol.fecha === hoyISO() ? 'Hoy' : 'Mañana', 'Voluminosos', vol.detalle);
-  /* Si la garita ya registró el camión hoy, "hoy pasa" no va más: mientras
-     está adentro se ve el aviso en vivo, y cuando sale ya pasó. */
-  if (dias[hoy] && ahoraMin() < minutosDe(c.recoleccionHora) && !camionPasoHoy()) return anuncioCamion('Hoy', dias[hoy]);
-  /* La víspera de un día con camión (desde las 17 h): "Mañana pasa el
-     camión de residuos". Si mañana no hay camión, no se dice nada. */
-  if (dias[man] && h.getHours() >= 17) return anuncioCamion('Mañana', dias[man]);
+  /* El día que pasa, TODO el día hasta que la garita registra la entrada:
+     desde ahí el "Hoy pasa…" se va de la pizarra (mientras está adentro se
+     ve el aviso en vivo, y cuando sale ya pasó). */
+  if (dias[hoy] && !camionPasoHoy()) return anuncioCamion('Hoy', dias[hoy]);
+  if (dias[hoy]) return null;
+  /* La víspera de un día con camión, todo el día: "Mañana pasa el camión
+     de basura". Si mañana no hay camión, no se dice nada. */
+  if (dias[man]) return anuncioCamion('Mañana', dias[man]);
   return null;
+
 }
 
 /* =========================================================
@@ -258,42 +262,98 @@ const SECCIONES = {
     solo:'admin',
     linea(u, s){
       const pend = s.users.filter(x => x.estado === 'pendiente').length;
-      const pagos = s.pagos.filter(x => x.estado === 'informado').length;
+      const pagos = s.pagos.filter(x => x.estado === 'informado' && !esPagoMP(x)).length;
       const recl = s.reclamos.filter(r => r.estado !== 'resuelto').length;
       return [pend && `${plural(pend, 'inscripción', 'inscripciones')}`, pagos && `${plural(pagos, 'pago informado', 'pagos informados')}`,
         recl && `${plural(recl, 'reclamo abierto', 'reclamos abiertos')}`].filter(Boolean).join(' · ') || 'Todo al día';
     },
     tejas(u, s){
       const pend = s.users.filter(x => x.estado === 'pendiente').length;
-      return `<p class="muted small" style="margin:0 0 14px">Las tres áreas están separadas a propósito: lo que es del barrio y sus vecinos, lo que es contable y lo que es de cobranza de expensas no se mezclan.</p>
+      return `<p class="muted small" style="margin:0 0 14px">Las facturas del mes se cargan y se corrigen en <b>Contabilidad</b>; al cerrar el mes se arman los cupones. <b>Expensas</b> muestra el resultado lote por lote y es donde se cobra: pagos, recibos y morosos.</p>
         <div class="mosaico">
         ${teja({ v:'admin', icon:'sliders', color:'accent', t:'Administración', s:'Inscripciones, vecinos, contenido y ajustes', badge: pend, destaca:true })}
-        ${teja({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Gastos del mes, cierre y ARCA' })}
-        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas', s:'Automáticas, cupones, pagos, morosos y recibos', badge: s.pagos.filter(x => x.estado === 'informado').length })}
+        ${teja({ v:'contabilidad', icon:'file', color:'brand', t:'Contabilidad', s:'Facturas y gastos del mes, cierre, libro y ARCA' })}
+        ${teja({ v:'cobranzas', icon:'wallet', color:'wood', t:'Expensas', s:'Cupones, cobros, por acreditar, morosos y recibos', badge: s.pagos.filter(x => x.estado === 'informado' && !esPagoMP(x)).length })}
+
         </div>
-        ${sec('Día a día')}<div class="mosaico">
-        ${teja({ v:'padron', icon:'users', color:'brand', t:'Padrón', s: s.padron.length ? `${plural(s.padron.length, 'unidad', 'unidades')} · buscá por apellido o lote` : 'Sin cargar' })}
-        ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita', s:'Ingresos de hoy', n: pasesDelDia().length })}
-        ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
-        ${teja({ a:'ver-presencia', icon:'users', color:'ok', t:'Conectados ahora', s: typeof Presencia !== 'undefined' ? `${Presencia.personas()} con la app abierta · ${Presencia.inscriptos()} vecinos con cuenta` : 'Quién tiene la app abierta' })}
-        ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos de la garita', s: turnoAbierto() ? `Ahora: ${esc(turnoAbierto().turno)} · ${esc(aLista(turnoAbierto().guardias).join(', '))}` : 'Horarios y guardias' })}
-        ${teja({ v:'privado', p:'admin', icon:'lock', color:'accent', t:'Mensajes de vecinos', s:'Conversaciones privadas con la Administración' })}
-        ${teja({ v:'privado', p:'interno', icon:'shield', color:'brand', t:'Mensajes con la garita', s:'Entre la Administración y la guardia' })}
-        ${teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s:'Abrir una, ver resultados y actas', n: s.votaciones.filter(v => v.cierra > Date.now()).length || '' })}
-        ${teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Reclamos', s:'Responder y publicar', n: s.reclamos.filter(r => r.estado !== 'resuelto').length || '' })}
-        ${teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones', s:'Firmadas a la garita', n: s.peticiones.filter(p => p.estado === 'pendiente').length || '' })}
-        ${teja({ v:'infracciones', icon:'alert', color:'danger', t:'Infracciones', s:'Graduales, con descargo', n: s.infracciones.filter(i => i.estado === 'descargo').length || '' })}
-        ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día', n: s.proveedores.filter(p => artEstado(p)[1] !== 'ok').length || '' })}
-        ${teja({ v:'frecuentes', icon:'qr', color:'brand', t:'Ingresos frecuentes', s:'Proveedores del hotel, personal doméstico… con QR fijo', n: aLista(s.frecuentes).filter(f => f && !f.baja).length || '' })}
-        ${teja({ v:'alertas', icon:'siren', color:'danger', t:'Avisos urgentes por zona', s:'Corte de luz, nieve, portón… con "Recibido" o "Necesito ayuda"', n: aLista(s.alertas).filter(alertaActiva).length || '' })}
-        ${teja({ v:'obras', p: s.obras.some(o => o.estado === 'pendiente') ? 'pendientes' : 'activas', icon:'wrench', color:'wood', t:'Obras', s:'De los vecinos y del barrio · editar, pausar o sumar una', n: s.obras.filter(o => o.estado === 'activa').length || '' })}
-        ${teja({ v:'comunicados', icon:'tack', color:'danger', t:'Comunicados importantes', s:'Ventana, sonido y acuse de recibo', n:(s.comunicados || []).filter(c => !c.archivado).length || '' })}
-        ${teja({ a:'nuevo-post', v:'aviso', icon:'muro', color:'sky', t:'Publicar en el pizarrón', s:'Para lo que no es urgente' })}
-        ${teja({ v:'proteccion', icon:'lock', color:'ok', t:'Protección de datos', s:'Registro en la AAIP, confidencialidad e incidentes', n: typeof tareasDatosPendientes === 'function' ? tareasDatosPendientes() || '' : '' })}
-        </div>`;
+        ${diaADia(u, s)}`;
     },
   },
 };
+/* =========================================================
+   EL DÍA A DÍA DE LA ADMINISTRACIÓN, POR SALAS (pedido de Claudio, 26-09)
+   Antes eran dieciséis tejas sueltas, todas iguales, y había que leerlas
+   una por una para encontrar algo. Ahora se ordenan por a quién le toca:
+     · GARITA Y SEGURIDAD: lo que pasa en la entrada y la guardia;
+     · VECINOS: las personas, sus mensajes, reclamos, votos y obras;
+     · COMUNICACIÓN: lo que la Administración le dice a todo el barrio;
+     · PROVEEDORES Y CUMPLIMIENTO: papeles al día (ART, seguros, datos).
+   Cada sala tiene su color, una línea viva de lo que está pasando y, si
+   hay algo que pide atención, el número arriba a la derecha. Adentro, cada
+   renglón es una ventana. Se sacaron "Conectados ahora" y "Peticiones"
+   (las peticiones quedan dentro de "Mensajes con la garita").
+   ========================================================= */
+function diaADia(u, s){
+  const t = turnoAbierto(), hoy = hoyISO();
+  const sinLeer = (h, yoSoy) => aLista(h && h.msgs).filter(m => m && m.from !== yoSoy && !m.leido).length;
+  const msgVecinos = aLista(s.privados).filter(h => h && h.con !== 'guardia' && h.con !== 'interno').reduce((a, h) => a + sinLeer(h, 'admin'), 0);
+  const msgGarita = aLista(s.privados).filter(h => h && h.con === 'interno').reduce((a, h) => a + sinLeer(h, 'admin'), 0);
+  const petPend = s.peticiones.filter(p => p.estado === 'pendiente').length;
+  const reclamos = s.reclamos.filter(r => r.estado !== 'resuelto').length;
+  const descargos = s.infracciones.filter(i => i.estado === 'descargo').length;
+  const provMal = s.proveedores.filter(p => artEstado(p)[1] !== 'ok').length;
+  const datosPend = typeof tareasDatosPendientes === 'function' ? tareasDatosPendientes() || 0 : 0;
+  const votAbiertas = s.votaciones.filter(v => v.cierra > Date.now()).length;
+  const obras = s.obras.filter(o => o.estado === 'activa').length;
+  const frec = aLista(s.frecuentes).filter(f => f && !f.baja).length;
+  const alertasAct = aLista(s.alertas).filter(alertaActiva).length;
+  const comAct = (s.comunicados || []).filter(c => !c.archivado).length;
+  const conCuenta = s.users.filter(x => x.estado === 'aprobado' && /^Lote\s/.test(x.casa || '')).length;
+  const ingresos = pasesDelDia().length;
+  const SALAS = [
+    { k:'garita', t:'Garita y seguridad', icon:'gate', color:'brand',
+      linea: `${t ? `Turno ${esc(t.turno)} · ${esc(aLista(t.guardias).join(', ')) || 'sin guardias anotados'}` : 'Sin turno abierto'} · ${plural(ingresos, 'ingreso', 'ingresos')} hoy`,
+      items:[
+        { v:'garita', icon:'gate', t:'Garita', s:'Ingresos de hoy, camión y paquetes', n:ingresos },
+        { v:'bitacora', icon:'book', t:'Bitácora', s:'Libro de guardia · le llega a la garita al instante' },
+        { v:'turnos', icon:'clock', t:'Turnos de la garita', s: t ? 'Abierto ahora · horarios y policías' : 'Horarios, guardias y policías' },
+        { v:'privado', p:'interno', icon:'shield', t:'Mensajes con la garita', s:'Chat con la guardia y peticiones firmadas', badge: msgGarita + petPend },
+        { v:'frecuentes', icon:'qr', t:'Ingresos frecuentes', s:'QR fijo para proveedores y personal', n: frec || '' },
+      ] },
+    { k:'vecinos', t:'Vecinos', icon:'users', color:'accent',
+      linea: `${plural(conCuenta, 'vecino con cuenta', 'vecinos con cuenta')} · ${s.padron.length ? plural(s.padron.length, 'unidad', 'unidades') + ' en el padrón' : 'padrón sin cargar'}`,
+      items:[
+        { v:'padron', icon:'users', t:'Padrón', s:'Buscá por apellido, lote, DNI o correo' },
+        { v:'privado', p:'admin', icon:'lock', t:'Mensajes de vecinos', s:'Conversaciones privadas con la Administración', badge: msgVecinos },
+        { v:'reclamos', icon:'clipboard', t:'Reclamos', s:'Responder y publicar', badge: reclamos },
+        { v:'infracciones', icon:'alert', t:'Infracciones', s:'Graduales, con descargo', badge: descargos },
+        { v:'votaciones', icon:'vote', t:'Votaciones', s:'Abrir una, resultados y actas', n: votAbiertas || '' },
+        { v:'obras', p: s.obras.some(o => o.estado === 'pendiente') ? 'pendientes' : 'activas', icon:'wrench', t:'Obras', s:'De los vecinos y del barrio', n: obras || '' },
+      ] },
+    { k:'comunicacion', t:'Comunicación', icon:'bell', color:'sky',
+      linea: comAct || alertasAct ? [comAct && plural(comAct, 'comunicado vigente', 'comunicados vigentes'), alertasAct && plural(alertasAct, 'aviso urgente activo', 'avisos urgentes activos')].filter(Boolean).join(' · ') : 'Lo que la Administración le dice a todo el barrio',
+      items:[
+        { v:'comunicados', icon:'tack', t:'Comunicados importantes', s:'Ventana, sonido y acuse de recibo', n: comAct || '' },
+        { a:'nuevo-post', v:'aviso', icon:'muro', t:'Publicar en el pizarrón', s:'Para lo que no es urgente' },
+        { v:'alertas', icon:'siren', t:'Avisos urgentes por zona', s:'Corte de luz, nieve, portón… con respuesta', n: alertasAct || '' },
+      ] },
+    { k:'cumplimiento', t:'Proveedores y cumplimiento', icon:'box', color:'wood',
+      linea: provMal || datosPend ? [provMal && plural(provMal, 'proveedor con papeles por vencer', 'proveedores con papeles por vencer'), datosPend && plural(datosPend, 'tarea de datos pendiente', 'tareas de datos pendientes')].filter(Boolean).join(' · ') : 'Todo en regla',
+      items:[
+        { v:'proveedores', icon:'box', t:'Proveedores', s:'ART y seguro al día', badge: provMal },
+        { v:'proteccion', icon:'lock', t:'Protección de datos', s:'AAIP, confidencialidad e incidentes', badge: datosPend },
+      ] },
+  ];
+  const renglon = x => `<button class="dd-item" data-a="${x.a || 'abrir'}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}">
+      <span class="dd-ic">${I(x.icon)}</span><span class="dd-txt"><b>${x.t}</b><small>${x.s}</small></span>
+      ${x.badge ? `<span class="dd-alerta">${x.badge > 99 ? '99+' : x.badge}</span>` : x.n !== undefined && x.n !== '' ? `<span class="dd-n">${x.n}</span>` : ''}${I('right')}</button>`;
+  return `<div class="dd-cab"><h2>Día a día</h2><span>Ordenado por sala: lo de la garita, lo de los vecinos, lo que se comunica y los papeles.</span></div>
+    <div class="dd-salas">${SALAS.map(g => { const pend = g.items.reduce((a, x) => a + (+x.badge || 0), 0);
+      return `<section class="dd-sala dd-${g.color}" aria-label="${esc(g.t)}">
+        <header><span class="dd-sala-ic">${I(g.icon)}</span><div><h3>${g.t}</h3><p>${g.linea}</p></div>
+          ${pend ? `<span class="dd-pend" title="Piden atención">${pend > 99 ? '99+' : pend}</span>` : `<span class="dd-ok" title="Nada pendiente">${I('check')}</span>`}</header>
+        <div class="dd-items">${g.items.map(renglon).join('')}</div></section>`; }).join('')}</div>`;
+}
 /* Cada sección es una ventana de verdad, con su lomo y su vuelta atrás.
    Arriba lleva su ilustración a lo ancho, con el título grande y la frase
    viva de lo que está pasando; abajo, las tejas. La idea es que abrir una
@@ -562,10 +622,19 @@ function avisosGenerales(){
 /* Los avisos que son tuyos y todavía no abriste. */
 function avisosPersonales(){
   const u = yo();
-  return noLeidas().filter(n => !aLista(n.para).includes('todos') && !avisoCamionViejo(n))
+  /* El reloj de TUS expensas (privado: sale de tu cuenta, nadie más lo ve).
+     Mientras está, los avisos sueltos de "vencen las expensas" no se
+     repiten en la pizarra (siguen en la campanita). */
+  const exp = typeof avisoExpensas === 'function' ? avisoExpensas() : null;
+  const reloj = exp ? [{ ...exp, nuevo: exp.siempre || Pizarra.nuevo(exp.k, exp.at) }] : [];
+  /* Dos avisos con el mismo título (el de la helada que dio el motor y una
+     copia vieja con otro texto) van una sola vez (sinRepetidos). */
+  return [...reloj, ...sinRepetidos(noLeidas().filter(n => !aLista(n.para).includes('todos') && !avisoCamionViejo(n)
+      && !(exp && String(n.link || '').split(':')[0] === 'expensas' && /vence|venci|impag|saldo/i.test(n.titulo || '')))
     .map(n => ({ k:'n-' + n.id, nuevo:true, nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell',
-      tag: aLista(n.para).includes(u.id) ? 'Para vos' : 'Para el equipo', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id }))
-    .sort((a, b) => (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || b.at - a.at);
+      tag: aLista(n.para).includes(u.id) ? 'Para vos' : 'Para el equipo', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id })))]
+
+    .sort((a, b) => (!!b.siempre - !!a.siempre) || (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || b.at - a.at);
 }
 const ventanita = x => `<button class="pz nv-${x.nivel} ${x.nuevo ? 'titila' : ''}" data-k="${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
     <span class="pz-cab"><span class="pz-ic">${I(x.icon)}</span><span class="pz-tag">${esc(x.tag)}</span>${x.fijo ? `<span class="nov-fijo">${I('tack')}</span>` : ''}${x.nuevo ? '<span class="pz-nueva">Nuevo</span>' : ''}<time>${cuandoFue(x.at)}</time></span>
@@ -593,7 +662,8 @@ function itemsPizarra(){
   const gen = avisosGenerales();
   return [...per, ...gen].sort((a, b) => (!!b.nuevo - !!a.nuevo) || (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || (!!b.fijo - !!a.fijo) || b.at - a.at);
 }
-const renglonPz = x => `<button class="pzr nv-${x.nivel} ${x.nuevo ? 'titila' : 'leido'}" data-k="${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
+const renglonPz = x => `<button class="pzr nv-${x.nivel} ${x.nuevo ? 'titila' : 'leido'}${x.siempre ? ' siempre' : ''}" data-k=
+"${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
     <span class="pzr-ic">${I(x.icon)}</span>
     <span class="pzr-txt"><small>${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</small><b>${esc(x.titulo)}</b></span>
     <time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></button>`;
@@ -709,7 +779,8 @@ R.inicio = {
        quien administra veía dos veces lo mismo. */
     const puertas = ['casa', 'comunidad', 'ciudad'].map(k => puerta(k, u, s, hoy)).join('');
     const bloqueSeguir = esAdmin()
-      ? `${sec('Gestión del barrio', puedeAdministrar() && tengoLote() ? `<button class="link" data-a="cambiar-modo">Ver como vecino</button>` : '')}${SECCIONES.gestion.tejas(u, s, hoy)}`
+      ? `${sec('Gestión del barrio')}${SECCIONES.gestion.tejas(u, s, hoy)}`
+
       : `${sec('Por dónde seguir')}<div class="puertas-arte">${puertas}</div>`;
 
     /* =========================================================
@@ -1726,9 +1797,11 @@ R.garita = {
           ${a.visto ? `<span class="estado e-autorizado">Visto</span>` : `<button class="btn btn-xs btn-ok" data-a="aviso-visto" data-id="${a.id}">Visto</button>`}</div></div>`; }).join('') : ''}
       ${sec('Ingresos de hoy', `<span class="muted small">${lista.length}</span>`)}
       ${lista.length ? lista.map(p => tarjetaPase(p, { garita:true })).join('') : vacio('users', 'Nadie anunciado para hoy.')}
-      ${paq.length ? sec('Paquetes en la garita') + paq.map(p => `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-wood">${I('box')}</span>
+      ${paq.length ? sec('Paquetes en la garita', `<button class="link" data-a="escanear" data-v="Apuntá al QR de retiro del vecino (cambia cada 30 segundos)">${I('scan')}Leer QR de retiro</button>`) + paq.map(p =>
+ `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-wood">${I('box')}</span>
         <div class="datos"><b>${esc(usuario(p.hostId)?.casa || '')} · ${esc(p.empresa)}</b><span>${esc(p.detalle || '')} · llegó ${hace(p.recibido)}</span></div>
-        <button class="btn btn-xs btn-ok" data-a="paquete-entregado" data-id="${p.id}">Entregado</button></div></div>`).join('') : ''}
+        <button class="btn btn-xs btn-ok" data-a="paquete-entregar" data-id="${p.id}">${I('qr')}Entregar</button></div></div>`).join('') : ''}
+
       ${solas.length ? sec('Casas solas') + solas.map(v => `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-wood">${I('lock')}</span>
         <div class="datos"><b>${esc(v.casa)}</b><span>Hasta el ${fechaCorta(v.viaje.hasta)}${v.viaje.contacto ? ' · ' + esc(v.viaje.contacto) : ''}${v.viaje.nota ? ' · ' + esc(v.viaje.nota) : ''}</span></div>
         <button class="btn btn-xs btn-sec" data-a="ronda-casa" data-v="${esc(v.casa)}">Ronda hecha</button></div></div>`).join('') : ''}
@@ -1827,20 +1900,41 @@ A['aviso-visto'] = el => Store.cambiar(s => { const a = s.avisos.find(x => x.id 
 A['ronda-casa'] = el => { Store.cambiar(s => s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'ronda', texto:`Ronda por ${el.dataset.v} (casa sola): sin novedades.`, at:Date.now() })); toast('Anotado en la bitácora', 'book'); };
 
 /* Escáner de QR con la cámara (Chrome en Android lo trae de fábrica). */
-A['escanear'] = async () => {
-  if (!('BarcodeDetector' in window) || !navigator.mediaDevices){ toast('Este equipo no puede leer QR. Escribí el código.', 'scan'); return; }
-  hoja('Escanear QR', `<video class="video-scan" id="scanVideo" playsinline muted></video><p class="muted small center">Apuntá al QR del pase</p>`);
+/* EL LECTOR DE QR DE LA GARITA
+   Usa el detector del navegador cuando existe (Chrome, Android). Safari
+   (iPhone, iPad) y Firefox no lo traen: ahí se baja jsQR, que lee el QR de
+   la imagen de la cámara. Antes, en un iPhone la garita no podía leer nada.
+   `el.dataset.v` = qué se espera leer (el texto de ayuda). */
+let jsQRcargando = null;
+const cargarJsQR = () => window.jsQR ? Promise.resolve(window.jsQR) : (jsQRcargando = jsQRcargando || new Promise(ok => {
+  const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+  s.onload = () => ok(window.jsQR || null); s.onerror = () => { jsQRcargando = null; ok(null); }; document.head.appendChild(s); }));
+A['escanear'] = async el => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('Este equipo no puede usar la cámara. Escribí el código.', 'scan'); return; }
+  const nativo = 'BarcodeDetector' in window;
+  const lector = nativo ? null : await cargarJsQR();
+  if (!nativo && !lector){ toast('Sin conexión para cargar el lector de QR. Escribí el código.', 'scan'); return; }
+  hoja('Escanear QR', `<video class="video-scan" id="scanVideo" playsinline muted></video><p class="muted small center">${esc(el && el.dataset && el.dataset.v || 'Apuntá al QR del pase')}</p>`);
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } }); }
   catch(e){ cerrarHoja(); toast('No se pudo usar la cámara', 'camera'); return; }
   const v = $('#scanVideo'); v.srcObject = stream; await v.play().catch(() => {});
-  const det = new BarcodeDetector({ formats:['qr_code'] });
+  const det = nativo ? new BarcodeDetector({ formats:['qr_code'] }) : null;
+  const lienzo = document.createElement('canvas'), ctx = lienzo.getContext('2d', { willReadFrequently:true });
   const d = $('#hoja');
   const parar = () => stream.getTracks().forEach(t => t.stop());
   d.addEventListener('close', parar, { once:true });
+  const leer = async () => {
+    if (det){ const r = await det.detect(v); return r[0] ? r[0].rawValue : ''; }
+    if (!v.videoWidth) return '';
+    const k = Math.min(1, 720 / v.videoWidth); lienzo.width = Math.round(v.videoWidth * k); lienzo.height = Math.round(v.videoHeight * k);
+    ctx.drawImage(v, 0, 0, lienzo.width, lienzo.height);
+    const r = lector(ctx.getImageData(0, 0, lienzo.width, lienzo.height).data, lienzo.width, lienzo.height, { inversionAttempts:'dontInvert' });
+    return r ? r.data : '';
+  };
   const ciclo = async () => {
     if (!d.open) return;
-    try { const r = await det.detect(v); if (r[0]){ parar(); cerrarHoja(); validar(r[0].rawValue); return; } } catch(e){}
+    try { const txt = await leer(); if (txt){ parar(); cerrarHoja(); validar(txt); return; } } catch(e){}
     setTimeout(ciclo, 250);
   };
   ciclo();
@@ -1858,10 +1952,11 @@ R.bitacora = {
     return `<form data-f="bitacora" class="card">
         <div class="seg" style="margin-bottom:10px">${Object.entries(TIPOS_BIT).filter(([k]) => k !== 'acceso').map(([k, t], i) => `<label><input type="radio" name="tipo" value="${k}" ${i === 1 ? 'checked' : ''}><span>${I(t[1])}${t[0]}</span></label>`).join('')}</div>
         <div class="linea-form"><input name="texto" id="bitTxt" required maxlength="300" placeholder="¿Qué pasó?"><button class="btn btn-pri">${I('send')}</button></div>
-        <label class="check" style="margin:10px 0 0"><input type="checkbox" name="avisar" ${esAdmin() ? 'checked' : ''}><span>${esAdmin() ? 'Avisarle también a la garita (le suena y le aparece en la campanita)' : 'Avisarle también a la Administración'}</span></label>
+        ${esAdmin() ? `<p class="muted small" style="margin:10px 0 0">${I('bell')} Lo que anota la Administración le llega a la garita <b>al instante</b>, con sonido y en su campanita.</p>`
+          : `<label class="check" style="margin:10px 0 0"><input type="checkbox" name="avisar"><span>Además, que le suene a la Administración (le aparece en su campanita)</span></label>`}
         <p class="muted tiny" style="margin:8px 0 0">${I('info')} Lo que se anota acá queda en el <b>libro de guardia</b>: lo leen solo la garita y la Administración, con fecha, hora y quién lo escribió. No lo ven los vecinos y no se puede borrar.</p></form>
       <div class="chips">${['todo', ...Object.keys(TIPOS_BIT)].map(k => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="bitacora" data-p="${k}">${k === 'todo' ? 'Todo' : TIPOS_BIT[k][0]}</button>`).join('')}</div>
-      <div class="btns" style="margin:0 0 10px"><button class="btn btn-sm btn-sec" data-a="hist-bitacora">${I('clock')}Ver el libro completo</button><button class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('users')}Historial histórico de visitas</button></div>
+      <div class="btns" style="margin:0 0 10px"><button class="btn btn-sm btn-sec" data-a="hist-bitacora">${I('clock')}Ver el libro completo</button><button class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('users')}Historial de visitas</button></div>
       <p class="muted tiny" style="margin:-4px 0 10px">Acá se ven los últimos ${Historial.VENTANA.bitacora[1]} días; lo anterior se trae de la base solo cuando lo pedís, así la app no se hace pesada.</p>
       <div class="card">${lista.length ? lista.map(b => {
         const d = isoDe(new Date(b.at)); const sep = d !== dia ? (dia = d, `<div class="sec" style="margin:14px 0 4px"><h2>${relDia(d)}</h2></div>`) : '';
@@ -1871,13 +1966,18 @@ R.bitacora = {
   },
 };
 F['bitacora'] = (d, form) => {
-  const texto = d.texto.trim(), para = esAdmin() ? 'rol:guardia' : 'rol:admin';
+  /* Lo que escribe la Administración en el libro es, casi siempre, una
+     indicación para la guardia: le llega siempre (antes había que tildar
+     "avisarle también a la garita", y se entendía como si el libro no lo
+     leyera la garita). La garita, en cambio, anota mucho de rutina: a la
+     Administración le suena solo si lo pide. */
+  const texto = d.texto.trim(), para = esAdmin() ? 'rol:guardia' : 'rol:admin', avisar = esAdmin() || !!d.avisar;
   Store.cambiar(s => {
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:d.tipo, texto, at:Date.now() });
-    if (d.avisar) notificar(s, { para, titulo:`Libro de guardia · ${(TIPOS_BIT[d.tipo] || TIPOS_BIT.novedad)[0]}`, texto, icon:'book', color: d.tipo === 'incidente' ? 'danger' : 'wood', link:'bitacora', sonido:true, urgente: d.tipo === 'incidente' });
+    if (avisar) notificar(s, { para, titulo:`Libro de guardia · ${(TIPOS_BIT[d.tipo] || TIPOS_BIT.novedad)[0]}`, texto, icon:'book', color: d.tipo === 'incidente' ? 'danger' : 'wood', link:'bitacora', sonido:true, urgente: d.tipo === 'incidente' });
   });
   form.reset(); const i = $('#bitTxt'); if (i) i.value = '';
-  toast(d.avisar ? `Anotado en el libro de guardia y avisado a ${esAdmin() ? 'la garita' : 'la Administración'}` : 'Anotado en el libro de guardia', 'book');
+  toast(avisar ? `Anotado en el libro de guardia y avisado a ${esAdmin() ? 'la garita' : 'la Administración'}` : 'Anotado en el libro de guardia', 'book');
 };
 
 /* ---------- Páginas públicas: la visita pide su pase / ve su QR ---------- */

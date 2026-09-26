@@ -93,7 +93,7 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 4;
+var VERSION_SCRIPT = 6;
 
 function doPost(e) {
   try {
@@ -103,7 +103,9 @@ function doPost(e) {
        frase: no hace falta, porque no se le cree nada; solo se usa como
        señal para ir a preguntarle el pago a Mercado Pago. */
     if (!datos.clave && (datos.type === 'payment' || datos.topic === 'payment' || datos.action)) {
-      registrar('MP-AVISO', String((datos.data && datos.data.id) || datos.id || '?'), datos.action || datos.type || '');
+      var idAviso = String((datos.data && datos.data.id) || datos.id || (e.parameter && (e.parameter['data.id'] || e.parameter.id)) || '');
+      registrar('MP-AVISO', idAviso || '?', datos.action || datos.type || '');
+      try { if (/^\d{5,20}$/.test(idAviso)) mpAvisoDePago(idAviso); } catch (err) { registrar('MP-AVISO-ERROR', idAviso, String(err)); }
       return responder({ok: true});
     }
 
@@ -116,6 +118,8 @@ function doPost(e) {
       case 'clave':        return responder({ok: true});
       case 'push':         return responder(mandarPush(datos));
       case 'mp-crear':     return responder(mpCrear(datos));
+      case 'mp-ref':       return responder(mpPorReferencia(datos.ref));
+
       case 'mp-verificar': return responder(mpVerificar(datos.pago));
       case 'mp-recientes': return responder(mpRecientes(datos.dias || 10));
       case 'correo':       return responder(mandarCorreo(datos));
@@ -294,6 +298,10 @@ function mpPedir(metodo, ruta, cuerpo) {
   return j;
 }
 function mpCrear(d) {
+  /* La dirección de la base del barrio: la trae la app y se guarda, para
+     que el aviso de Mercado Pago (que no la trae) sepa dónde anotar. */
+  var base = baseValida(d.base);
+  if (base && PropertiesService.getScriptProperties().getProperty('BASE_URL') !== base) PropertiesService.getScriptProperties().setProperty('BASE_URL', base);
   var monto = Math.round(Number(d.monto) * 100) / 100;
   if (!(monto >= 100) || monto > 50000000) return {ok: false, error: 'Importe fuera de rango'};
   var lote = String(d.lote || '').slice(0, 20);
@@ -323,8 +331,60 @@ function mpCrear(d) {
 function resumenPago(p) {
   return {id: String(p.id), estado: p.status, detalle: p.status_detail, monto: p.transaction_amount, neto: p.transaction_details && p.transaction_details.net_received_amount,
     ref: p.external_reference || '', fecha: p.date_approved || p.date_created, medio: p.payment_method_id, tipo: p.payment_type_id,
-    email: p.payer && p.payer.email || ''};
+    email: p.payer && p.payer.email || '', uid: (p.metadata && p.metadata.uid) || '',
+    /* Los pagos hechos con cuentas de prueba de Mercado Pago vienen con
+       live_mode = false: la app los muestra aparte y no tocan saldos,
+       recibos ni contabilidad. */
+    prueba: p.live_mode === false};
 }
+/**
+ * EL PAGO DE UNA REFERENCIA (26-09-2026)
+ * Mientras el vecino paga en la otra ventana, la app pregunta cada 4
+ * segundos "¿ya entró el pago de esta referencia?". Se le pregunta a
+ * Mercado Pago (no a la app): si hay uno aprobado, gana ese.
+ */
+function mpPorReferencia(ref) {
+  ref = String(ref || '');
+  if (!/^Lote\s+\w+\|/.test(ref)) return {ok: false, error: 'Referencia inválida'};
+  var j = mpPedir('get', '/v1/payments/search?sort=date_created&criteria=desc&limit=10&external_reference=' + encodeURIComponent(ref));
+  var pagos = (j.results || []).filter(function (p) { return p.external_reference === ref; });
+  var mejor = pagos.filter(function (p) { return p.status === 'approved'; })[0] || pagos[0];
+  return {ok: true, pago: mejor ? resumenPago(mejor) : null};
+}
+/**
+ * EL AVISO DE MERCADO PAGO ANOTA EL PAGO EN LA BASE (26-09-2026)
+ * Mercado Pago avisa acá cada pago. No se le cree al aviso: se le pregunta
+ * el pago a Mercado Pago con el token. Si está APROBADO y es de un lote, se
+ * anota en la carpeta del vecino que pagó (pv/pagos/<vecino>/mp-<número>),
+ * con el mismo id que usa la app: aunque el vecino haya cerrado todo, el
+ * saldo se descuenta en todos sus equipos y la Administración lo pasa a
+ * recibo sola. Si ya estaba anotado, no se toca (nunca se pisa un pago
+ * que la Administración ya confirmó).
+ * Necesita la cuenta de servicio (FCM_CUENTA, la misma de los avisos) y
+ * que la app haya pedido al menos un pago (así se guarda BASE_URL).
+ */
+function mpAvisoDePago(id) {
+  var props = PropertiesService.getScriptProperties();
+  var base = baseValida(props.getProperty('BASE_URL'));
+  if (!base || !props.getProperty('FCM_CUENTA')) return;
+  var p = resumenPago(mpPedir('get', '/v1/payments/' + id));
+  if (p.estado !== 'approved' || !/^Lote\s+\w+\|/.test(p.ref) || !/^[A-Za-z0-9_-]{6,64}$/.test(p.uid)) return;
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email');
+    var ruta = base + '/pv/pagos/' + p.uid + '/mp-' + p.id + '.json?access_token=' + encodeURIComponent(acceso);
+    var ya = UrlFetchApp.fetch(ruta, {muteHttpExceptions: true}).getContentText();
+    if (ya && ya !== 'null') return;
+    var lote = p.ref.split('|')[0];
+    var pago = {id: 'mp-' + p.id, lote: lote, userId: p.uid, monto: Number(p.monto), fecha: String(p.fecha || '').slice(0, 10),
+      medio: 'Mercado Pago', nota: 'Aprobado por Mercado Pago' + (p.medio ? ' · ' + p.medio : '') + ' (aviso automático)', mpId: String(p.id),
+      estado: 'informado', prueba: !!p.prueba, at: Date.now()};
+
+    var r = UrlFetchApp.fetch(ruta, {method: 'put', contentType: 'application/json', payload: JSON.stringify(pago), muteHttpExceptions: true});
+    registrar(r.getResponseCode() < 300 ? 'MP-ANOTADO' : 'MP-NO-ANOTADO', lote, String(p.id) + ' · ' + p.monto);
+  } finally { lock.releaseLock(); }
+}
+
 function mpVerificar(id) {
   if (!/^\d{5,20}$/.test(String(id || ''))) return {ok: false, error: 'Número de pago inválido'};
   return {ok: true, pago: resumenPago(mpPedir('get', '/v1/payments/' + id))};

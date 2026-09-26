@@ -661,7 +661,13 @@ function chatInterno(idP){
   const h = s.privados.find(x => x.userId === garitaId && x.con === 'interno');
   const msgs = h ? aLista(h.msgs) : [];
   if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
-  return `<div class="chat-wrap">${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
+  /* Las peticiones firmadas de los vecinos a la garita ya no tienen su teja
+     en la Administración (Claudio: "cumplen la misma función que los
+     mensajes con la garita"). Quedan a mano acá, arriba de la conversación. */
+  const pet = esAdmin() ? aLista(s.peticiones).filter(p => p && p.estado === 'pendiente').length : 0;
+  const barraPet = esAdmin() ? `<button class="chat-pet" data-a="abrir" data-v="peticiones">${I('edit')}<span><b>Peticiones firmadas de vecinos</b><small>${pet ? pet + ' sin recibir todavía · ver todas' : 'Pedidos a la garita con firma y sello · ver todas'}</small></span>${pet ? `<span class="n">${pet}</span>` : ''}${I('right')}</button>` : '';
+  return `<div class="chat-wrap">${barraPet}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
+
       <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
       : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
     <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno"><input name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
@@ -1350,7 +1356,14 @@ R.vuelos = {
   },
   alPintar(){ if (!Vuelos.d || Date.now() - Vuelos.d.t > 5 * MIN) Vuelos.pedir().then(() => { if (PILA.at(-1)?.id === 'vuelos') refrescar(); }); },
 };
-A['vuelos-actualizar'] = () => Vuelos.pedir(true).then(() => { refrescar(); toast('Vuelos actualizados', 'refresh'); });
+/* Leer el tablero del aeropuerto tarda unos segundos: el botón lo dice al
+   instante ("Actualizando…") para que no parezca que no anda. */
+A['vuelos-actualizar'] = el => {
+  if (el && el.tagName === 'BUTTON'){ el.disabled = true; el.innerHTML = `${I('refresh')}Actualizando… (lee el tablero del aeropuerto)`; el.classList.add('cargando'); }
+  toast('Leyendo el tablero del aeropuerto…', 'refresh');
+  return Vuelos.pedir(true).then(() => toast('Vuelos actualizados', 'check')).catch(() => toast('No se pudo leer el tablero del aeropuerto', 'alert')).finally(() => refrescar());
+};
+
 A['avion-aviso'] = () => { Avion.prender(!Avion.encendido()); refrescar(); toast(Avion.encendido() ? 'Te avisamos cuando pase un avión' : 'Aviso de aviones apagado', 'send'); };
 A['link'] = el => window.open(el.dataset.v, '_blank', 'noopener');
 
@@ -1635,7 +1648,8 @@ function tiraPromos(){
       ${p.descuento ? `<span class="promo-desc">${esc(p.descuento)}</span>` : `<span class="ic ic-wood">${I('star')}</span>`}
       <span class="txt"><b>${esc(p.titulo)}</b>${p.detalle ? `<small>${esc(p.detalle)}</small>` : ''}</span></button>`);
   return `<div class="tira-promos">
-    <div class="tira-cab">${I('star')}<b>Hotel Los Cauquenes · esta semana</b>
+    <div class="tira-cab"><img class="tira-logo" src="img/logo-noche.png" alt="" width="26" height="26"><b>Hotel Los Cauquenes · esta semana</b>
+
       ${ps[0] && ps[0].muestra ? `<span class="muted small">ejemplos</span>` : ps.length > 1 ? `<span class="muted small">${ps.length} propuestas</span>` : ''}</div>
     ${marquesina(chips, 'promo-tira')}
     ${aviso}

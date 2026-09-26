@@ -449,6 +449,8 @@ const FAQ_DATOS = [
   ['¿Quién puede ver cada cosa?', [
     '• Los otros vecinos: tu nombre y tu lote en el pizarrón y el chat del barrio; tu teléfono, oficio o dirección solo si vos lo autorizás. Nunca tu DNI, tu correo, tus expensas, tus reclamos, tus visitas ni tus mensajes.',
     '• La garita: lo que necesita para la seguridad: tus visitas y pases, tus paquetes, tus peticiones firmadas, los avisos que le mandás, las conversaciones con ella y la foto del frente de tu casa para ubicar el domicilio.',
+    '• Retiro de paquetes: tu teléfono crea una llave que nunca sale de él. En tu ficha queda solo su parte pública (sirve para comprobar la firma del QR, no para firmar) y el tipo de equipo (por ejemplo "iPhone"). Cada entrega queda asentada con quién recibió, quién entregó, la hora y un sello SHA-256. Si retirás sin teléfono, de tu DNI se guardan solo los tres últimos números. Al cerrar sesión, la llave se borra de ese equipo.',
+
     '• La Administración: lo que necesita para administrar: el padrón, las expensas y los pagos, los reclamos y las conversaciones con ella.',
     '• Mensajes entre vecinos: solo los ven los dos que conversan. Las reglas del servidor no dejan que nadie más los lea: ni otro vecino, ni la garita, ni la Administración.',
     '• Rondas del policía con QR: cuando escanea un punto de control, se guardan su nombre, el punto y la hora (del servidor, no del teléfono). Solo cuenta si el teléfono tiene el código de ronda que la garita le da al policía de turno esa noche: un vecino que escanee un QR no puede registrar nada. Lo ven solo la garita y la Administración, y sirve para comprobar que la ronda se hizo.',

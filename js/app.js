@@ -1217,7 +1217,7 @@ A['mi-cuenta'] = () => { const u = yo();
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
     ${esGuardia() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
-    ${puedeAdministrar() ? superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Solo para quien administra: por si algo no anda' }) : ''}
+
     ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
 
@@ -1517,8 +1517,12 @@ async function cerrarSesion(){
     Store.s.notifs = []; Store.s.motorLog = {}; Nube.ultimo = {}; Nube.arrancada = false; Nube.motorListo = false;
     Store.guardar();
   }
+  /* La llave para retirar paquetes se borra del equipo: en un equipo
+     prestado no puede quedar nada que firme a tu nombre. */
+  if (typeof Retiro !== 'undefined') await Retiro.olvidar();
   Store.sesion.userId = null; Store.sesion.modo = ''; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
 }
+
 
 /* =========================================================
    NINGÚN BOTÓN SE QUEDA MUDO

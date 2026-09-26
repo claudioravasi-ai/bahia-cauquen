@@ -21,7 +21,7 @@
       auditoría y el chat no se mudan: quedan donde están y solo se baja
       la ventana reciente.
    3. Quien quiere ver todo, lo pide con un botón ("Ver mi historial
-      completo", "Historial histórico de visitas", "Ver el libro completo",
+      completo", "Historial de visitas", "Ver el libro completo",
       "Ver mensajes anteriores"). Se baja UNA vez, en ese momento, y no
       entra al resto de la app.
 
@@ -159,12 +159,12 @@ A['hist-mis-visitas'] = async () => {
 /* La garita y la Administración: todas las visitas del barrio. */
 A['hist-visitas-todo'] = async () => {
   if (!esStaff()) return;
-  Historial.cargando('Historial histórico de visitas');
+  Historial.cargando('Historial de visitas');
   try {
     const arch = await Historial.archivo('pases') || [];
     const vivos = aLista(Store.s.pases), ids = new Set(vivos.map(p => p.id));
     histVisitas = [...vivos, ...arch.filter(p => !ids.has(p.id))].sort((a, b) => (b.fechaFin || b.fecha || '').localeCompare(a.fechaFin || a.fecha || ''));
-    pintarHistVisitas('Historial histórico de visitas', true);
+    pintarHistVisitas('Historial de visitas', true);
   } catch(e){ Historial.fallo(e); }
 };
 function pintarHistVisitas(titulo, conCasa, q = ''){

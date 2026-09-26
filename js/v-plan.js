@@ -64,6 +64,24 @@ function plantillaPlan(){
   return periodo ? { periodo, gastos: gastosDe(periodo) } : null;
 }
 /* Los gastos que se esperan en un mes a partir del molde. */
+/* =========================================================
+   PRECIO NUEVO DE UN GASTO, DESDE UN MES (pedido de Claudio, 26-09-2026)
+   "El camión de basura en agosto fueron $10 y en septiembre van a ser
+   $12": sin esto, septiembre salía de agosto más la inflación, y la única
+   forma de corregirlo era cargar la factura real mes por mes. Ahora cada
+   gasto que se repite tiene su lápiz (Automáticas → Mes a mes, o Cómo se
+   calcula) y se le pone el importe nuevo y desde qué mes:
+     · "de acá en adelante": ese mes vale el importe nuevo y los
+       siguientes se actualizan por inflación a partir de ahí;
+     · "solo ese mes": vale ese mes y después vuelve a lo de siempre;
+     · importe 0 = ya no se paga (se da de baja desde ese mes).
+   Se guarda en config.plan.precios[<clave del gasto>], una lista por
+   gasto. La factura real de un mes sigue mandando sobre todo esto.
+   ========================================================= */
+function precioVigente(clave, periodo){
+  const l = aLista((cfgPlan().precios || {})[clave]).filter(x => x && x.desde && x.desde <= periodo && (!x.hasta || x.hasta >= periodo));
+  return l.sort((a, b) => a.desde.localeCompare(b.desde) || ((a.at || 0) - (b.at || 0))).at(-1) || null;
+}
 function gastosEsperados(periodo, tpl){
   const inf = cfgPlan().inflacion / 100, k = mesesEntre(tpl.periodo, periodo), mes = +periodo.slice(5);
   return tpl.gastos.map(g => {
@@ -71,8 +89,16 @@ function gastosEsperados(periodo, tpl){
     if (r === 'fijo'){ monto = g.total * Math.pow(1 + inf, k); nota = k ? `actualizado ${((Math.pow(1 + inf, k) - 1) * 100).toFixed(1)} %` : ''; }
     else if (r === 'cuotas'){ const n = (+g.cuotaN || 1) + k; if (n <= +g.cuotaDe){ monto = g.total; nota = `cuota ${n} de ${g.cuotaDe}`; } }
     else if (r === 'invierno'){ if (cfgPlan().invierno.includes(mes)){ monto = g.total * Math.pow(1 + inf, k); nota = 'temporada de nieve'; } }
-    return { ...g, id:'p-' + claveGasto(g), monto:Math.round(monto * 100) / 100, recurrencia:r, nota, proyectado:true };
+    /* El precio nuevo que cargó la Administración, si hay uno vigente. */
+    const pr = monto > 0 ? precioVigente(claveGasto(g), periodo) : null;
+    if (pr){
+      const kk = mesesEntre(pr.desde, periodo), sube = r !== 'cuotas' && !pr.hasta && kk > 0;
+      monto = +pr.monto > 0 ? +pr.monto * (sube ? Math.pow(1 + inf, kk) : 1) : 0;
+      nota = `precio nuevo desde ${MESES_LARGO[+pr.desde.slice(5)]}${pr.hasta ? ' (solo ese mes)' : ''}${sube ? ` + ${((Math.pow(1 + inf, kk) - 1) * 100).toFixed(1)} % de inflación` : ''}`;
+    }
+    return { ...g, id:'p-' + claveGasto(g), monto:Math.round(monto * 100) / 100, recurrencia:r, nota, proyectado:true, precio:pr || null };
   }).filter(x => x.monto > 0);
+
 }
 /* Un mes: lo emitido, lo cargado y lo que falta estimado. */
 function mesPlan(periodo, tpl = plantillaPlan()){
@@ -83,7 +109,7 @@ function mesPlan(periodo, tpl = plantillaPlan()){
       porRubro:l.porRubro || {}, estimados:gs.filter(g => g.estimado).length };
   }
   if (!tpl || periodo <= tpl.periodo) return { periodo, estado:'sin-datos', items:[], total:0, cuotas:0, porRubro:{}, estimados:0 };
-  const cargados = gastosDe(periodo), claves = new Set(cargados.map(claveGasto));
+  const cargados = gastosDe(periodo), claves = new Set(cargados.flatMap(g => [claveGasto(g), g.origen]).filter(Boolean));
   const faltan = gastosEsperados(periodo, tpl).filter(p => !claves.has(claveGasto(p)));
   const items = [...cargados.map(g => ({ ...g, monto:+g.total || 0 })), ...faltan];
   const total = items.reduce((a, x) => a + x.monto, 0), porRubro = {};
@@ -243,7 +269,8 @@ const PLAN_VISTAS = {
           <div class="kpi"><b>${plataCorta(x.percibido || 0)}</b><span>Cobranza ${x.real ? 'real' : 'esperada'}</span></div></div></div>
       ${sec('Por rubro')}
       <div class="card">${barrasH(porRubro.map(([r, v]) => ({ t:`${r} · ${RUBROS[r] || 'Otros'}`, v, etiqueta:`${plataCorta(v)} · ${(v / (x.total || 1) * 100).toFixed(1)} %` })))}</div>
-      ${sec('Gasto por gasto', x.estado !== 'emitida' ? `<button class="link" data-a="abrir" data-v="contabilidad" data-p="gastos|${x.periodo}">Cargar una factura real</button>` : '')}
+      ${sec('Gasto por gasto', x.estado !== 'emitida' ? `<button class="link" data-a="abrir" data-v="contabilidad" data-p="gastos|${x.periodo}">${I('edit')}Editar en Gastos del mes</button>` : '')}
+      ${x.estado !== 'emitida' ? `<p class="muted small" style="margin:-4px 2px 8px">Los importes se cambian en <b>Contabilidad → Gastos del mes</b>: ahí aparecen los gastos del mes anterior con su lápiz.</p>` : ''}
       <div class="card lista">${items.map(g => `<div class="it"><div class="txt"><b>${esc(g.proveedor)}</b><span>${esc(String(g.detalle || '').replace(/\s*\(estimado\)/i, ''))}${g.nota ? ' · ' + esc(g.nota) : ''}</span></div>
         <span class="pill ${g.proyectado || g.estimado ? '' : 'p-ok'}">${g.proyectado || g.estimado ? 'estimado' : 'real'}</span><b class="num">${plata(g.monto)}</b></div>`).join('') || '<p class="muted small">Sin gastos.</p>'}</div>
       ${x.estado !== 'emitida' ? `<div class="btns" style="margin-top:12px"><button class="btn btn-sec" data-a="plan-completar" data-v="${x.periodo}">${I('zap')}Pasar los estimados a Gastos del mes</button>
@@ -308,7 +335,11 @@ const PLAN_VISTAS = {
         <label class="check"><input type="checkbox" name="autoEmitir" ${p.autoEmitir ? 'checked' : ''}><span>Emitir sola la liquidación y mandar los cupones (dejalo apagado mientras se lleve en paralelo con Octavo Piso)</span></label></div>
       ${tpl ? `<div class="card"><h3>Cómo se repite cada gasto <span class="muted small">(de ${nombrePeriodo(tpl.periodo)})</span></h3>
         <div class="lista">${tpl.gastos.slice().sort((a, b) => (a.rubro - b.rubro) || (b.total - a.total)).map(g => { const k = claveGasto(g), r = recurrenciaDe(g);
-          return `<div class="it"><div class="txt"><b>${esc(g.proveedor)} · ${plataCorta(g.total)}</b><span>${esc(String(g.detalle || '').replace(/\s*\(estimado\)/i, ''))}${+g.cuotaDe > 1 ? ` · cuota ${g.cuotaN} de ${g.cuotaDe}` : ''}</span></div>
+          const cambios = aLista((p.precios || {})[k]).filter(Boolean).sort((a, b) => a.desde.localeCompare(b.desde));
+          return `<div class="it"><div class="txt"><b>${esc(g.proveedor)} · ${plataCorta(g.total)}</b><span>${esc(String(g.detalle || '').replace(/\s*\(estimado\)/i, ''))}${+g.cuotaDe > 1 ? ` · cuota ${g.cuotaN} de ${g.cuotaDe}` : ''}</span>
+            ${cambios.map(x => `<span class="precio-cambio">${+x.monto > 0 ? `Desde ${nombrePeriodo(x.desde)}: ${plata(+x.monto)}` : x.hasta ? `${nombrePeriodo(x.desde)}: no va` : `De baja desde ${nombrePeriodo(x.desde)}`}
+              <button type="button" class="link" data-a="plan-precio-quitar" data-v="${esc(k)}" data-id="${x.at}">deshacer</button></span>`).join('')}</div>
+
             <select name="rec~${esc(k)}" style="max-width:170px">${Object.entries(RECURRENCIAS).map(([kk, t]) => `<option value="${kk}" ${r === kk ? 'selected' : ''}>${t.n}</option>`).join('')}</select></div>`; }).join('')}</div></div>` : ''}
       <button class="btn btn-pri btn-block">${I('check')}Guardar y recalcular</button></form>
       ${sec('Punto de partida')}
@@ -341,7 +372,7 @@ function completarConEstimados(s, periodo){
   x.items.filter(g => g.proyectado).forEach(g => {
     s.gastos.unshift({ id:uid(), periodo, fecha:periodo + '-28', proveedor:g.proveedor, cuit:g.cuit || '', rubro:+g.rubro, tipoComp:'Estimado', nroComp:'',
       neto:0, iva:0, total:g.monto, columna:g.columna || 'expensas', retGan:0, retSuss:0, cuotaN: g.recurrencia === 'cuotas' ? (+g.cuotaN || 1) + mesesEntre(plantillaPlan().periodo, periodo) : 0,
-      cuotaDe: g.recurrencia === 'cuotas' ? +g.cuotaDe : 0, lote:'', detalle:`${String(g.detalle || '').replace(/\s*\(estimado\)/i, '')} (estimado)`, estimado:true, recurrencia:g.recurrencia, por:'sistema', at:Date.now() });
+      cuotaDe: g.recurrencia === 'cuotas' ? +g.cuotaDe : 0, lote:'', detalle:`${String(g.detalle || '').replace(/\s*\(estimado\)/i, '')} (estimado)`, estimado:true, recurrencia:g.recurrencia, origen:claveGasto(g), por:'sistema', at:Date.now() });
     n++;
   });
   return n;
@@ -358,7 +389,8 @@ F['gasto'] = (d, form) => {
   guardarGastoOriginal(d, form);
   const g = form.dataset.id ? Store.s.gastos.find(x => x.id === form.dataset.id) : Store.s.gastos[0];
   if (!g || g.estimado) return;
-  const k = claveGasto(g), sobra = Store.s.gastos.filter(x => x.estimado && x.periodo === g.periodo && x.id !== g.id && claveGasto(x) === k);
+  const k = claveGasto(g), sobra = Store.s.gastos.filter(x => x.estimado && x.periodo === g.periodo && x.id !== g.id && (claveGasto(x) === k || (g.origen && (x.origen === g.origen || claveGasto(x) === g.origen))));
+
   if (sobra.length){ Store.cambiar(s => { s.gastos = s.gastos.filter(x => !sobra.some(e => e.id === x.id)); }); toast('Se reemplazó el gasto estimado por la factura real', 'check'); }
 };
 
@@ -486,4 +518,165 @@ R.tablero = {
       ${aLista(Store.s.obras).filter(o => o.estado === 'activa').length ? `<div class="card lista">${aLista(Store.s.obras).filter(o => o.estado === 'activa').map(o => `<div class="it"><div class="txt"><b>${esc(o.casa)} · ${esc(o.tipo)}</b><span>${esc(typeof ETAPAS !== 'undefined' ? ETAPAS[o.etapa] || '' : '')}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</span></div></div>`).join('')}</div>` : '<p class="muted small">No hay obras en curso.</p>'}
       ${superficie({ a:'abrir', v:'expensas', icon:'wallet', color:'wood', t:'Mi cuenta de expensas', s:'Cupones, pagos y recibos de tu lote' })}`;
   },
+};
+
+/* =========================================================
+   GASTOS DEL MES ANTERIOR EN "GASTOS DEL MES" (pedido de Claudio, 26-09)
+   Lo que se repite del último mes liquidado y todavía no está cargado en
+   este mes: se muestra en Contabilidad → Gastos del mes con su lápiz.
+   ========================================================= */
+function pendientesDelMes(periodo){
+  if (!periodo || liquidacionDe(periodo)?.estado === 'emitida') return [];
+  const tpl = plantillaPlan(); if (!tpl || periodo <= tpl.periodo) return [];
+  const claves = new Set(gastosDe(periodo).flatMap(g => [claveGasto(g), g.origen]).filter(Boolean));
+  return gastosEsperados(periodo, tpl).filter(g => !claves.has(claveGasto(g)));
+}
+const pendienteDe = el => pendientesDelMes(el.dataset.p).find(x => claveGasto(x) === el.dataset.v);
+/* El lápiz: el formulario de siempre, ya lleno con el gasto y el importe
+   estimado. Al guardar queda cargado en este mes (y, si se tilda, el
+   importe nuevo vale también para los meses siguientes). */
+A['gasto-plan-editar'] = el => {
+  const g = pendienteDe(el); if (!g){ toast('Ese gasto ya está cargado en este mes', 'check'); return refrescar(); }
+  const { id, monto, proyectado, precio, nota, recurrencia, foto, importado, ...resto } = g;
+  formGasto({ ...resto, periodo:el.dataset.p, fecha:el.dataset.p + '-28', total:monto, neto:0, iva:0, retGan:0, retSuss:0,
+    cuotaN: recurrencia === 'cuotas' ? (+g.cuotaN || 1) + mesesEntre(plantillaPlan().periodo, el.dataset.p) : +g.cuotaN || 0,
+    detalle:String(g.detalle || '').replace(/\s*\(estimado\)/i, ''), estimado:true },
+    el.dataset.p, { plan:{ clave:el.dataset.v, desde:plantillaPlan().periodo, antes:+g.total || 0, nota } });
+};
+/* El tilde: confirmarlo tal cual, como estimado de este mes. */
+A['gasto-plan-ok'] = el => {
+  const g = pendienteDe(el); if (!g) return refrescar();
+  Store.cambiar(s => {
+    s.gastos.unshift({ id:uid(), periodo:el.dataset.p, fecha:el.dataset.p + '-28', proveedor:g.proveedor, cuit:g.cuit || '', rubro:+g.rubro, tipoComp:g.tipoComp || 'Otros', nroComp:'',
+      neto:0, iva:0, total:g.monto, columna:g.columna || 'expensas', retGan:0, retSuss:0,
+      cuotaN: g.recurrencia === 'cuotas' ? (+g.cuotaN || 1) + mesesEntre(plantillaPlan().periodo, el.dataset.p) : 0, cuotaDe: g.recurrencia === 'cuotas' ? +g.cuotaDe : 0,
+      lote:'', detalle:`${String(g.detalle || '').replace(/\s*\(estimado\)/i, '')} (estimado)`, estimado:true, recurrencia:g.recurrencia, origen:el.dataset.v, por:yo().id, at:Date.now() });
+    auditar(s, 'Confirmó un gasto del mes anterior', `${g.proveedor} · ${plata(g.monto)} · ${el.dataset.p}`);
+  });
+  toast(`${g.proveedor}: cargado en ${nombrePeriodo(el.dataset.p)} (estimado hasta que llegue la factura)`, 'check');
+};
+/* La cruz: este mes no va, o ya no va más. */
+A['gasto-plan-no'] = el => {
+  const g = pendienteDe(el); if (!g) return refrescar();
+  hoja(`${esc(g.proveedor)} en ${nombrePeriodo(el.dataset.p)}`, `<p class="small" style="margin-top:0">${esc(String(g.detalle || '').replace(/\s*\(estimado\)/i, ''))} · estimado ${plata(g.monto)}</p>
+    <button class="btn btn-sec btn-block" data-a="gasto-plan-quitar" data-v="${esc(el.dataset.v)}" data-p="${el.dataset.p}" data-t="mes">${I('x')}Este mes no se paga</button>
+    <button class="btn btn-danger-soft btn-block" style="margin-top:8px" data-a="gasto-plan-quitar" data-v="${esc(el.dataset.v)}" data-p="${el.dataset.p}" data-t="baja">${I('trash')}Ya no se paga más (baja desde ${nombrePeriodo(el.dataset.p)})</button>
+    <p class="muted tiny" style="margin-top:10px">Se puede volver atrás desde Expensas → Automáticas → Cómo se calcula.</p>`);
+};
+A['gasto-plan-quitar'] = el => {
+  const clave = el.dataset.v, per = el.dataset.p, soloMes = el.dataset.t === 'mes';
+  Store.cambiar(s => {
+    const p = Object.assign({}, cfgPlan()), precios = Object.assign({}, p.precios || {});
+    precios[clave] = [...aLista(precios[clave]).filter(x => x && !(x.desde === per && (!!x.hasta) === soloMes)), { desde:per, ...(soloMes ? { hasta:per } : {}), monto:0, at:Date.now() }];
+    p.precios = precios; s.config.plan = p;
+    auditar(s, soloMes ? 'Sacó un gasto de un mes' : 'Dio de baja un gasto que se repetía', `${clave.split('|')[0]} · ${per}`);
+  });
+  cerrarHoja(); toast(soloMes ? 'Listo: este mes no va' : 'Listo: ya no se repite', 'check');
+};
+/* Deshacer un precio nuevo o una baja (desde Cómo se calcula). */
+A['plan-precio-quitar'] = el => {
+  Store.cambiar(s => {
+    const p = Object.assign({}, cfgPlan()), precios = Object.assign({}, p.precios || {});
+    precios[el.dataset.v] = aLista(precios[el.dataset.v]).filter(x => x && String(x.at) !== el.dataset.id);
+    if (!precios[el.dataset.v].length) delete precios[el.dataset.v];
+    p.precios = precios; s.config.plan = p;
+    auditar(s, 'Deshizo un cambio de precio de un gasto', el.dataset.v.split('|')[0]);
+  });
+  toast('Cambio deshecho', 'check');
+};
+
+/* =========================================================
+   EL IPC DEL INDEC, SOLO (26-09-2026)
+   Para ajustar por inflación lo que se paga fuera de término (y los
+   gastos estimados de los meses que vienen), la app de la
+   Administración trae el IPC nacional de la API oficial de series de
+   tiempo (datos.gob.ar, serie 148.3_INIVELNAL_DICI_M_26, la del INDEC)
+   cada tres días, y guarda la variación del último mes publicado. Si la
+   API no contesta, queda el último valor traído (o el cargado a mano).
+   ========================================================= */
+const IPC = {
+  URL: 'https://apis.datos.gob.ar/series/api/series/?ids=148.3_INIVELNAL_DICI_M_26&last=3&format=json',
+  async traer({ avisar = false } = {}){
+    try {
+      const j = await (await fetch(this.URL, { cache:'no-store' })).json();
+      const d = (j.data || []).filter(x => x && x[1] > 0);
+      if (d.length < 2) throw new Error('La serie vino vacía');
+      const [mes, v] = d.at(-1), prev = d.at(-2)[1];
+      const pct = Math.round((v / prev - 1) * 10000) / 100;
+      if (!(pct > -5 && pct < 50)) throw new Error('Valor fuera de rango: ' + pct);
+      Store.cambiar(s => {
+        const p = Object.assign({}, cfgPlan());
+        p.ipc = { mes: String(mes).slice(0, 7), pct, at: Date.now(), fuente:'INDEC · datos.gob.ar' };
+        if (p.inflacionAuto !== false) p.inflacion = pct;
+        s.config.plan = p;
+      });
+      if (avisar) toast(`IPC de ${nombrePeriodo(String(mes).slice(0, 7))}: ${pct.toLocaleString('es-AR')} % mensual`, 'check');
+      return pct;
+    } catch(e){ console.warn('IPC', e.message); if (avisar) toast('No se pudo traer el IPC del INDEC: ' + e.message, 'alert'); return null; }
+  },
+  revisar(){
+    if (!yo() || !esAdmin()) return;
+    if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.configLista)) return;
+    const i = cfgPlan().ipc;
+    if (i && Date.now() - (i.at || 0) < 3 * DIA) return;
+    this.traer();
+  },
+};
+A['ipc-traer'] = async () => { await IPC.traer({ avisar:true }); refrescar(); };
+setTimeout(() => IPC.revisar(), 25 * 1000);
+setInterval(() => IPC.revisar(), 6 * HORA);
+
+/* =========================================================
+   CARGA INICIAL: LOS COBROS DEL CUPÓN DE AGOSTO (pedido de Claudio, 26-09)
+   El cupón de agosto (Octavo Piso) venció el 10 y el 21 de septiembre y
+   los vecinos lo pagaron por fuera de la app. Sin esos pagos, la app ve a
+   los 152 lotes como deudores y la liquidación de septiembre les cobraría
+   el ajuste a todos. Esta carga, de una sola vez, da por cobrado el cupón
+   de cada lote SALVO los morosos (los que ya arrastraban deuda de antes o
+   están en gestión judicial), que quedan sin tildar. La Administración
+   revisa la lista, destilda a quien no pagó y confirma. Cada cobro queda
+   "Transferencia (cobrada por fuera de la app)", con id fijo (no se
+   duplica si se vuelve a hacer), sin recibo numerado ni aviso a cada
+   vecino, y entra al libro contable como cobranza del mes en que se cobró.
+   ========================================================= */
+function lotesCargaInicial(){
+  const p = cfgPlan(), l = p.base && liquidacionDe(p.base); if (!l) return [];
+  return LOTES.map(L => { const lote = 'Lote ' + L.lote, cu = cuotaDe(l, lote), saldo = saldoLote(lote);
+    return { lote, cu, saldo, moroso: !!cu && ((+cu.saldoInicial || 0) > 0.5 || !!cu.judicial), prop:propietarioDe(lote), ya: Store.s.pagos.some(x => x.id === `ci-${p.base}-${L.lote}`) }; })
+    .filter(f => f.cu && f.saldo > 0.5 && !f.ya);
+}
+A['carga-inicial'] = () => {
+  const p = cfgPlan(), filas = lotesCargaInicial();
+  if (!p.base) return toast('Primero traé la liquidación base (Expensas → Automáticas)', 'alert');
+  if (!filas.length) return toast('No queda ningún lote con el cupón de ' + nombrePeriodo(p.base) + ' sin cobrar', 'check');
+  const buenos = filas.filter(f => !f.moroso);
+  hoja(`Cobros del cupón de ${nombrePeriodo(p.base)}`, `<form data-f="carga-inicial">
+    <p class="small" style="margin-top:0">Se dan por cobrados, por fuera de la app, los cupones de <b>${nombrePeriodo(p.base)}</b> de los lotes tildados. Los <b>morosos</b> (deuda anterior o gestión judicial) vienen sin tildar. Destildá a quien no pagó.</p>
+    <div class="card plana small">${I('info')} Tildados: <b id="ciN">${buenos.length}</b> lotes · <b id="ciT">${plata(buenos.reduce((a, f) => a + f.saldo, 0))}</b></div>
+    <div class="grid2"><div class="field"><label>Fecha de cobro</label><input type="date" name="fecha" required value="${vtoDe(p.base, 1)}"></div>
+      <div class="field"><label>Medio</label><input name="medio" value="Transferencia (cobrada por fuera de la app)" maxlength="60"></div></div>
+    <div class="btns" style="margin:0 0 8px"><button type="button" class="btn btn-xs btn-sec" data-a="ci-todos" data-v="1">Tildar todos</button><button type="button" class="btn btn-xs btn-sec" data-a="ci-todos" data-v="0">Destildar todos</button></div>
+    <div class="card lista ci-lista">${filas.map(f => `<label class="it ci-fila"><input type="checkbox" name="l~${esc(f.lote)}" data-monto="${f.saldo.toFixed(2)}" ${f.moroso ? '' : 'checked'}>
+      <div class="txt"><b>${esc(f.lote)}${f.moroso ? ' <span class="pill p-danger">moroso</span>' : ''}${f.cu.judicial ? ' <span class="pill p-accent">judicial</span>' : ''}</b><span>${esc(f.prop || '')}</span></div><b class="num">${plata(f.saldo)}</b></label>`).join('')}</div>
+    <button class="btn btn-pri btn-block btn-grande" style="margin-top:10px">${I('check')}Registrar los cobros tildados</button></form>`, { ancho:'620px' });
+};
+A['ci-todos'] = el => { $$('.ci-fila input[type=checkbox]').forEach(c => { c.checked = el.dataset.v === '1'; }); cuentaCarga(); };
+function cuentaCarga(){ const m = $$('.ci-fila input[type=checkbox]').filter(c => c.checked); const n = $('#ciN'), t = $('#ciT');
+  if (n) n.textContent = m.length; if (t) t.textContent = plata(m.reduce((a, c) => a + (+c.dataset.monto || 0), 0)); }
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('.ci-fila')) cuentaCarga(); });
+F['carga-inicial'] = d => {
+  const p = cfgPlan(), lotes = Object.keys(d).filter(k => k.startsWith('l~')).map(k => k.slice(2));
+  if (!lotes.length) return toast('No tildaste ningún lote', 'alert');
+  const montos = Object.fromEntries(lotes.map(l => [l, Math.round(saldoLote(l) * 100) / 100]));
+  let n = 0, total = 0;
+  Store.cambiar(s => {
+    lotes.forEach(lote => { const m = montos[lote], id = `ci-${p.base}-${lote.replace(/^Lote\s*/i, '')}`;
+      if (!(m > 0.5) || s.pagos.some(x => x.id === id)) return;
+      s.pagos.unshift({ id, lote, userId:yo().id, monto:m, fecha:d.fecha, medio:String(d.medio || 'Transferencia').trim(), nota:`Cupón de ${nombrePeriodo(p.base)} · carga inicial (cobrado por fuera de la app)`,
+        estado:'confirmado', cargaInicial:true, confirmadoPor:yo().id, confirmadoAt:Date.now(), at:Date.now() });
+      n++; total += m; });
+    s.config.plan = Object.assign({}, cfgPlan(), { cargaInicial:{ periodo:p.base, lotes:n, total:Math.round(total * 100) / 100, at:Date.now() } });
+    auditar(s, 'Carga inicial de cobros', `Cupón de ${nombrePeriodo(p.base)} · ${n} lotes · ${plata(total)}`);
+  });
+  cerrarHoja(); toast(`Listo: ${plural(n, 'cobro registrado', 'cobros registrados')} por ${plata(total)}`, 'check');
 };

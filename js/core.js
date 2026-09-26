@@ -208,20 +208,28 @@ function recoleccionDias(){
 }
 const esVoluminoso = t => /volumin/i.test(String(t || ''));
 /* =========================================================
-   CÓMO SE ANUNCIA EL CAMIÓN (pedido de Claudio, 25-09-2026)
-   La víspera de cada día con camión: "Mañana pasa el camión de residuos";
-   si ese día son los voluminosos (los sábados), "Mañana pasa el camión de
-   residuos voluminosos". El mismo día, antes de la hora: "Hoy pasa…".
+   CÓMO SE ANUNCIA EL CAMIÓN (con las palabras de Claudio, 26-09-2026)
+   En la pizarra general, TODO el día:
+     · la víspera (lunes, miércoles y viernes): "Mañana pasa el camión de
+       basura — No saque sus bolsas hasta mañana a la mañana, evitemos que
+       animales rompan las mismas";
+     · el día que pasa (martes, jueves y sábado): "Hoy pasa el camión de
+       basura — Saque sus bolsas temprano en la mañana".
+   El sábado son los voluminosos y el título lo dice entre paréntesis.
+   Cuando la garita registra la entrada del camión, el "Hoy pasa…"
+   desaparece de la pizarra y a todos les llega el aviso push.
    Si al otro día no hay camión, no se anuncia nada.
    ========================================================= */
 function anuncioCamion(cuando, tipo, detalle = ''){
   const c = Store.s.config, vol = esVoluminoso(tipo);
-  const t = `${cuando} pasa el camión de residuos${vol ? ' voluminosos' : ''}`;
-  const que = tipo && !vol ? `Se lleva ${String(tipo).toLowerCase()}. ` : '';
-  const x = cuando === 'Hoy' ? `${que}Por la mañana, desde las ${c.recoleccionHora} h.${vol && (detalle || c.voluminososDetalle) ? ' ' + (detalle || c.voluminososDetalle) : ''}`
-    : vol ? (detalle || c.voluminososDetalle || 'Dejalos en el frente esta noche.') : `${que}Sacá la bolsa esta noche, en el canasto cerrado.`;
+  const t = `${cuando} pasa el camión de basura${vol ? ' (voluminosos)' : ''}`;
+  const extra = vol && (detalle || c.voluminososDetalle) ? ' ' + (detalle || c.voluminososDetalle) : '';
+  const x = cuando === 'Hoy'
+    ? `Saque sus bolsas temprano en la mañana.${extra}`
+    : `No saque sus bolsas hasta mañana a la mañana, evitemos que animales rompan las mismas.${extra}`;
   return { t, x, vol };
 }
+
 const CONFIG_BASE = {
   nombre: 'Bahía Cauquén',
   ciudad: 'Ushuaia, Tierra del Fuego',

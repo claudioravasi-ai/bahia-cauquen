@@ -28,6 +28,7 @@ const CUENTAS = {
   '1.1':'Caja y bancos', '1.2':'Expensas a cobrar', '1.3':'Gastos particulares a recuperar',
   '2.1':'Proveedores a pagar', '2.2':'Retenciones a depositar',
   '4.1':'Ingresos por expensas', '4.2':'Intereses por mora', '4.3':'Fondo de Infraestructura', '4.4':'Ingresos de terceros (SUM, publicidad, convenios)', '4.5':'Otros ingresos',
+  '4.6':'Ventas del barrio (calcomanías de ingreso, merchandising)',
   '5.1':'Servicios públicos', '5.2':'Abonos de servicios (vigilancia, administración, recolección)', '5.3':'Mantenimiento de partes comunes',
   '5.4':'Gastos bancarios', '5.5':'Seguros', '5.6':'Otros gastos', '5.7':'Honorarios profesionales', '5.8':'Mejoras y obras',
 };
@@ -51,6 +52,22 @@ function asientoDePago(p){
     detalle:`Cobranza de expensas · ${p.lote}${p.recibo ? ' · recibo ' + p.recibo : ''}`, lote:p.lote, importe:+p.monto || 0, medioPago:p.medio || '', fechaPago:p.fecha,
     comprobante:p.recibo ? 'Recibo ' + p.recibo : '', neto:0, iva:0, percepciones:0, retGan:0, retSuss:0 };
 }
+/* LOS COBROS DEL MES BASE (arreglado el 26-09-2026). Agosto se trajo de
+   Octavo Piso: los vecinos pagaron por fuera de la app, así que no hay
+   pagos registrados y la carpeta de agosto mostraba gastos sin ningún
+   ingreso. Los cobros reales están en el resumen del banco de esa
+   liquidación: entran al libro como asientos de ingreso (sin tocar la
+   cuenta de ningún lote, porque el saldo de cada lote ya los descuenta). */
+function asientosDelBanco(){
+  const p = typeof cfgPlan === 'function' ? cfgPlan() : {}, b = p.banco || {};
+  if (!p.base || !Object.keys(b).length) return [];
+  const fin = isoDe(new Date(+p.base.slice(0, 4), +p.base.slice(5), 0));
+  return [['termino', '4.1', 'Cobranza de expensas en término', b.cobrosTermino], ['adeudadas', '4.1', 'Cobranza de expensas atrasadas', b.cobrosAdeudadas],
+    ['intereses', '4.2', 'Intereses por mora cobrados', b.cobrosIntereses], ['acuenta', '4.1', 'Pagos a cuenta de vecinos', b.cobrosACuenta]]
+    .filter(([, , , v]) => +v > 0).map(([k, cuenta, t, v]) => ({ clave:`base:${p.base}-${k}`, a:{ tipo:'ingreso', origen:{ tipo:'base', id:`${p.base}-${k}` }, huella:JSON.stringify([p.base, k, v]),
+      periodo:p.base, fecha:fin, cuenta, detalle:`${t} · resumen del banco de ${nombrePeriodo(p.base)} (${p.importadoAt ? 'Octavo Piso' : 'liquidación base'})`, importe:Math.round(+v * 100) / 100,
+      medioPago:'Banco (resumen)', fechaPago:fin, comprobante:'Resumen bancario', neto:0, iva:0, percepciones:0, retGan:0, retSuss:0 } }));
+}
 /* Pone el libro al día con Expensas. Lo que se editó a mano no se pisa:
    se marca "cambió el origen". Devuelve cuántos cambios hizo. */
 function sincronizarLibro(s){
@@ -67,8 +84,9 @@ function sincronizarLibro(s){
   };
   s.gastos.filter(g => g && !g.anulado).forEach(g => poner('gasto:' + g.id, asientoDeGasto(g)));
   s.pagos.filter(p => p && p.estado === 'confirmado').forEach(p => poner('pago:' + p.id, asientoDePago(p)));
+  const banco = asientosDelBanco(); banco.forEach(x => poner(x.clave, x.a));
   /* Si el gasto o el pago de origen se borró, el asiento queda anulado (no se borra). */
-  const vivos = new Set([...s.gastos.filter(g => g && !g.anulado).map(g => 'gasto:' + g.id), ...s.pagos.filter(p => p && p.estado === 'confirmado').map(p => 'pago:' + p.id)]);
+  const vivos = new Set([...s.gastos.filter(g => g && !g.anulado).map(g => 'gasto:' + g.id), ...s.pagos.filter(p => p && p.estado === 'confirmado').map(p => 'pago:' + p.id), ...banco.map(x => x.clave)]);
   s.asientos.forEach(a => { if (a.origen && !vivos.has(a.origen.tipo + ':' + a.origen.id) && !a.anulado){ a.anulado = true; a.anuladoMotivo = 'Se borró o rechazó el registro de origen en Expensas'; n++; } });
   return n;
 }
@@ -145,7 +163,9 @@ CONTA.libro = per => {
     ${cerrado ? aviso('ok', 'lock', `${nombrePeriodo(p)} está cerrado para el contador`, `Cerrado el ${fechaCorta(isoDe(new Date(cfgConta().cerrados[p])))}. Para corregir algo, reabrilo en la Carpeta del contador.`) : ''}
     ${r.cambiaron ? aviso('warn', 'alert', `${plural(r.cambiaron, 'asiento tiene', 'asientos tienen')} cambios en Expensas`, 'Se corrigió el gasto o el pago de origen después de tu corrección. Abrilo para tomar el cambio o dejar tu versión.') : ''}
     <div class="garita-kpis"><div class="kpi"><b>${plataCorta(r.ingresos)}</b><span>Ingresos</span></div><div class="kpi"><b>${plataCorta(r.egresos)}</b><span>Egresos</span></div><div class="kpi"><b>${plataCorta(r.ingresos - r.egresos)}</b><span>Resultado del mes</span></div></div>
-    ${cerrado ? '' : superficie({ a:'asiento-nuevo', v:p, icon:'plus', color:'brand', t:'Asiento manual', s:'Un ajuste, un ingreso de terceros, una comisión bancaria que no pasó por Expensas' })}
+    ${cerrado ? '' : superficie({ a:'ingreso-nuevo', v:p, icon:'plus', color:'ok', t:'Cargar otro ingreso', s:'Calcomanías de ingreso, merchandising, alquiler del SUM, publicidad…' })}
+    ${cerrado ? '' : superficie({ a:'asiento-nuevo', v:p, icon:'plus', color:'brand', t:'Asiento manual', s:'Un ajuste, una comisión bancaria o un gasto que no pasó por Expensas' })}
+
     ${sec('Egresos', `<span class="muted small">${plural(r.egr.length, 'asiento')}</span>`)}<div class="card lista">${r.egr.sort((a, b) => a.cuenta.localeCompare(b.cuenta) || b.importe - a.importe).map(fila).join('') || '<p class="muted small" style="margin:6px 0">Sin egresos.</p>'}</div>
     ${sec('Ingresos', `<span class="muted small">${plural(r.ing.length, 'asiento')}</span>`)}<div class="card lista">${r.ing.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha))).map(fila).join('') || '<p class="muted small" style="margin:6px 0">Sin cobros confirmados este mes.</p>'}</div>
     ${superficie({ a:'abrir', v:'contabilidad', p:'carpeta|' + p, icon:'file', color:'accent', t:'Carpeta del contador de ' + nombrePeriodo(p), s:'PDF y planillas, con lo que hay que presentar' })}`;
@@ -174,6 +194,14 @@ A['asiento-editar'] = el => {
       <div class="btns" style="margin-top:8px"><button type="button" class="btn btn-xs btn-sec" data-a="asiento-original" data-id="${a.id}">Volver al original</button></div></div>` : ''}
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button>
     ${!a.origen ? `<button type="button" class="btn btn-danger-soft btn-block" style="margin-top:8px" data-a="asiento-anular" data-id="${a.id}">Anular este asiento</button>` : ''}</form>`, { ancho:'640px' });
+};
+/* Otro ingreso del barrio: calcomanías de ingreso, merchandising, alquiler
+   del SUM, publicidad… (pedido de Claudio, 26-09). Es un asiento manual de
+   ingreso, ya con la cuenta puesta. */
+A['ingreso-nuevo'] = el => {
+  const id = 'as' + uid();
+  Store.cambiar(s => { s.asientos = aLista(s.asientos); s.asientos.push({ id, tipo:'ingreso', periodo:el.dataset.v, fecha: el.dataset.v === periodoHoy() ? hoyISO() : el.dataset.v + '-28', cuenta:'4.6', detalle:'', importe:0, neto:0, iva:0, percepciones:0, retGan:0, retSuss:0, manual:true, borrador:true, at:Date.now() }); });
+  A['asiento-editar']({ dataset:{ id } });
 };
 A['asiento-nuevo'] = el => {
   const id = 'as' + uid();

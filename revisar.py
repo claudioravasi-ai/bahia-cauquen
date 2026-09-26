@@ -63,3 +63,8 @@ else:
         sys.exit(1)
 
 print(f'Todo en orden: {len(orden)} archivos, {len(donde)} nombres, sin choques.')
+
+# pago.html es la página a la que vuelve Mercado Pago: sin ella el pago online
+# termina en una página que no existe.
+if not (raiz / 'pago.html').exists():
+    print('FALTA pago.html (la vuelta de Mercado Pago)'); sys.exit(1)

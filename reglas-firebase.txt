@@ -199,6 +199,21 @@ PEGAR DESDE ACÁ
        cambiar) en privadosGuardia: lo necesita la mudanza desde la carpeta
        vieja. */
     "pv": {
+      /* COMPROBANTES DE PAGO (26-09-2026). El vecino que pagó por fuera de
+         la app sube acá el comprobante (PDF o imagen achicada). Lo leen solo
+         él y la Administración, y NO baja con el resto: se trae al tocar
+         "Ver comprobante". Este nombre fijo va antes que $carpeta: en
+         Firebase, un hijo con nombre propio no lo toma el comodín. */
+      "comprobantes": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$uid": {
+          ".read": "auth.uid === $uid",
+          ".write": "(auth.uid === $uid && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+          "$id": {
+            ".validate": "!newData.exists() || (newData.hasChildren(['d', 'tipo', 'at']) && newData.child('d').isString() && newData.child('d').val().length < 2200000 && newData.child('tipo').isString())"
+          }
+        }
+      },
       "$carpeta": {
         ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'))",
         "$uid": {
@@ -240,8 +255,12 @@ PEGAR DESDE ACÁ
     },
 
     "staff": {
+      /* Índice de comprobantes confirmados o rechazados: cuándo se borran de
+         la base (30 días después). Solo la Administración. */
+      "compIdx": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* Puntos de control de la ronda, con su clave: los leen la garita y la
          Administración; los edita la Administración. */
+
       "puntos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* Códigos de ronda: uno por policía y por noche (6 números, vence a
          las 14 h). Los crea la garita al registrar el ingreso; los leen
