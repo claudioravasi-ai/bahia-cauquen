@@ -128,6 +128,8 @@ El **nombre del titular** decide el resultado: **APRO** = aprobado · **OTHE** =
 "Tarjetas de prueba" de Checkout Pro.)
 
 1. Modo vecino → Expensas → **Pagar online ahora**. Se abre Mercado Pago en otra ventana.
+   Si tu lote está al día, usá **"Probar el pago con Mercado Pago"** (debajo de la tarjeta; solo
+   lo ve quien administra): cobra el importe de tu último cupón sin tocar tu saldo.
 2. Entrá con la cuenta de prueba **Comprador**. Pagá con una tarjeta de arriba y titular **APRO**.
 3. Tiene que pasar esto: la ventana de Mercado Pago dice "¡Pago aprobado!" y se cierra a los
    3 segundos. En la app aparece "¡Pago aprobado!" y el saldo ya está descontado. El cartel también

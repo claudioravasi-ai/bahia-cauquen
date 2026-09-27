@@ -413,6 +413,7 @@ function carpetaVecino(lote, { ajena = false } = {}){
       ${!alDia && !ajena && !cubierto ? `<span class="tp-pie">${I('right')}Tocá para pagar: tarjeta, Mercado Pago, billeteras, QR o transferencia</span>` : ''}
     </button>
     ${!alDia && !ajena && !cubierto ? `<button class="btn btn-sec btn-block" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagué por fuera de la app · adjuntar comprobante</button>` : ''}
+    ${puedeAdministrar() && !ajena && MercadoPago.activo() && montoDePrueba(lote) ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:0 0 12px" data-a="pago-mp" data-v="prueba">${I('wallet')}Probar el pago con Mercado Pago · <span style="white-space:nowrap">${plata(montoDePrueba(lote))}</span> (solo la Administración)</button>` : ''}
 
     ${L ? `<div class="card plana small" style="color:var(--ink-2)">${I('info')} ${esc(lote)} · UF ${L.uf} · coeficiente <b>${L.coef.toFixed(4)} %</b>. De cada $100 de gastos del barrio, a tu lote le corresponden $${L.coef.toFixed(2)}.</div>` : ''}
     ${sec('Tus cupones')}
@@ -1601,10 +1602,20 @@ const MercadoPago = {
 /* La ventana de pago se abre EN EL MISMO TOQUE (si se abre después de
    esperar al Apps Script, el navegador la bloquea), con un "Abriendo…",
    y recién después se le pone la dirección de Mercado Pago. */
+/* PROBAR EL PAGO (pedido de Claudio, 27-09-2026): con la cuenta al día no
+   aparece "Pagar online ahora" y no había cómo probar Mercado Pago. Quien
+   administra ve, en su vista de vecino, un botón que cobra el importe de su
+   último cupón SIN tocar los saldos ni inventar deuda: se paga con la cuenta
+   de prueba Comprador, Mercado Pago lo marca como de prueba y la app lo
+   guarda en "Pagos de PRUEBA", que no descuentan ni sacan recibo. */
+const montoDePrueba = lote => { const l = liquidacionesEmitidas().slice(-1)[0], c = l && cuotaDe(l, lote);
+  return c && c.total >= 100 ? Math.round(c.total * 100) / 100 : conCentavosDelLote(1000, lote).total; };
 A['pago-mp'] = async el => {
   const lote = miLote(), pagar = aPagar(lote), u = yo(), cuenta = cuentaLote(lote);
+  const prueba = el.dataset.v === 'prueba' && puedeAdministrar();
+  if (prueba && !await confirmar('Probar el pago con Mercado Pago', `Se abre Mercado Pago por ${plata(montoDePrueba(lote))} (el importe de tu último cupón). Entrá con la cuenta de prueba <b>Comprador</b>, no con la tuya, y pagá con una tarjeta de prueba con titular <b>APRO</b>. Queda en "Pagos de PRUEBA": no cambia tu saldo ni saca recibo. Si el token del Apps Script fuera el real, el cobro sería de verdad.`, { si:'Abrir Mercado Pago' })) return;
   const debe = Math.max(0, cuenta.saldo - cuenta.informado);
-  const total = Math.round((pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe) * 100) / 100;
+  const total = prueba ? montoDePrueba(lote) : Math.round((pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe) * 100) / 100;
   if (!(total >= 100)){ toast('No hay saldo para pagar', 'check'); return; }
   const iPhoneInstalada = navigator.standalone === true;
   let w = null;

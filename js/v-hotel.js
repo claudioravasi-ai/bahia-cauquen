@@ -841,23 +841,24 @@ R['hotel-cuenta'] = {
   render(q){
     if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
     const h = cuentaHotel(), qq = normTxt(q || '');
-    const cands = Store.s.users.filter(u => u.rol !== 'admin' && u.rol !== 'guardia' && u.rol !== 'hotel' && u.estado !== 'rechazado')
-      .filter(u => !qq || normTxt(`${u.nombre} ${u.email} ${u.casa}`).includes(qq)).sort((a, b) => (a.estado === 'pendiente' ? -1 : 1) - (b.estado === 'pendiente' ? -1 : 1)).slice(0, 30);
+    const cands = Store.s.users.filter(u => u.rol !== 'admin' && u.rol !== 'guardia' && u.rol !== 'hotel' && u.estado === 'pendiente')
+      .filter(u => !qq || normTxt(`${u.nombre} ${u.email}`).includes(qq)).slice(0, 30);
     return `${h ? `<div class="card"><div class="row" style="gap:12px"><span class="ic ic-wood" style="width:44px;height:44px;border-radius:14px;display:grid;place-items:center">${I('star')}</span>
         <div class="grow"><b>${esc(h.nombre)}</b><div class="muted small">${esc(h.email || '')}</div><div class="muted tiny">Cuenta del hotel desde ${h.hotelDesde ? fechaCorta(isoDe(new Date(h.hotelDesde))) : '—'}</div></div></div>
         <div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-sec" data-a="abrir" data-v="privado" data-p="admin|${esc(h.id)}">${I('chat')}Mensajes con el hotel</button><button class="btn btn-sm btn-danger-soft" data-a="hotel-quitar" data-id="${esc(h.id)}">${I('x')}Quitarle el rol de hotel</button></div></div>`
-      : aviso('info', 'star', 'Todavía no hay cuenta del hotel', 'Elegí abajo cualquier cuenta (por ejemplo, una que creaste para probar) y convertila. Después el hotel le cambia el correo y la contraseña desde Tu cuenta.')}
-      <form data-f="hotel-cuenta-buscar" class="linea-form" style="margin:14px 0 8px"><input name="q" value="${esc(q || '')}" placeholder="Buscar por nombre, correo o lote"><button class="btn btn-pri">${I('search')}</button></form>
-      ${sec('Convertir una cuenta en la del hotel')}
-      ${cands.length ? `<div class="card lista">${cands.map(u => `<div class="it"><div class="txt"><b>${esc(u.nombre)}</b><span>${esc(u.email || '')} · ${esc(u.casa || '')} · ${u.estado === 'pendiente' ? 'inscripción pendiente' : 'vecino/a'}</span></div>
-        <button class="btn btn-xs btn-pri" data-a="hotel-hacer" data-id="${esc(u.id)}">Hacerla del hotel</button></div>`).join('')}</div>` : vacio('users', 'No hay cuentas para convertir.')}
-      <p class="muted tiny" style="margin-top:12px">${I('lock')} Al convertirla, la cuenta pasa a llamarse "Recepción ${HOTEL_NOMBRE}", pierde el lote y el DNI de quien la creó, y solo ve lo del hotel y lo público de la ciudad. Nada de los vecinos.</p>`;
+      : aviso('info', 'star', 'Todavía no hay cuenta del hotel', 'Inscribí la cuenta del hotel desde "Todavía no tengo cuenta" (como cualquier usuario) y convertila abajo. Después el hotel cambia su correo y su contraseña en Tu cuenta.')}
+      ${h ? `<div class="card plana small" style="margin-top:12px">${I('user')} El hotel maneja su cuenta como cualquier usuario: en <b>Tu cuenta</b> (arriba a la derecha) → <b>Cambiar mi correo</b> y <b>Cambiar mi contraseña</b>. El nombre del responsable lo carga en la <b>Ficha del hotel</b>. La Administración no ve la contraseña.</div>`
+      : `<form data-f="hotel-cuenta-buscar" class="linea-form" style="margin:14px 0 8px"><input name="q" value="${esc(q || '')}" placeholder="Buscar por nombre o correo"><button class="btn btn-pri">${I('search')}</button></form>
+      ${sec('Convertir una inscripción en la cuenta del hotel')}
+      ${cands.length ? `<div class="card lista">${cands.map(u => `<div class="it"><div class="txt"><b>${esc(u.nombre)}</b><span>${esc(u.email || '')} · inscripción pendiente</span></div>
+        <button class="btn btn-xs btn-pri" data-a="hotel-hacer" data-id="${esc(u.id)}">Hacerla del hotel</button></div>`).join('')}</div>` : vacio('users', 'No hay inscripciones pendientes. Inscribí la cuenta del hotel desde "Todavía no tengo cuenta" y va a aparecer acá.')}
+      <p class="muted tiny" style="margin-top:12px">${I('lock')} Solo aparecen inscripciones pendientes: los vecinos ya aprobados no se listan. Al convertirla, la cuenta pasa a llamarse "Recepción ${HOTEL_NOMBRE}", pierde el lote y el DNI cargados y solo ve lo del hotel y lo público de la ciudad. Nada de los vecinos.</p>`}`;
   },
 };
 F['hotel-cuenta-buscar'] = d => abrir('hotel-cuenta', d.q || '');
 A['hotel-hacer'] = async el => {
   if (!esAdmin()) return;
-  const u = usuario(el.dataset.id); if (!u) return;
+  const u = usuario(el.dataset.id); if (!u || u.estado !== 'pendiente' || u.rol === 'admin' || u.rol === 'guardia') return;
   if (!await confirmar('Hacerla la cuenta del hotel', `${u.nombre} (${u.email}) pasa a ser la cuenta de la recepción del ${HOTEL_NOMBRE}: deja de ser vecino y solo ve lo del hotel.`, { si:'Convertir' })) return;
   Store.cambiar(s => {
     s.users.filter(x => x.rol === 'hotel' && x.id !== u.id).forEach(x => { x.rol = 'vecino'; x.estado = 'pendiente'; x.casa = ''; });
