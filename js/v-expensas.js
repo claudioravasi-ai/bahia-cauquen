@@ -1605,15 +1605,15 @@ const MercadoPago = {
 /* PROBAR EL PAGO (pedido de Claudio, 27-09-2026): con la cuenta al día no
    aparece "Pagar online ahora" y no había cómo probar Mercado Pago. Quien
    administra ve, en su vista de vecino, un botón que cobra el importe de su
-   último cupón SIN tocar los saldos ni inventar deuda: se paga con la cuenta
-   de prueba Comprador, Mercado Pago lo marca como de prueba y la app lo
+   último cupón SIN tocar los saldos ni inventar deuda: se paga con una tarjeta
+   de prueba, Mercado Pago lo marca como de prueba y la app lo
    guarda en "Pagos de PRUEBA", que no descuentan ni sacan recibo. */
 const montoDePrueba = lote => { const l = liquidacionesEmitidas().slice(-1)[0], c = l && cuotaDe(l, lote);
   return c && c.total >= 100 ? Math.round(c.total * 100) / 100 : conCentavosDelLote(1000, lote).total; };
 A['pago-mp'] = async el => {
   const lote = miLote(), pagar = aPagar(lote), u = yo(), cuenta = cuentaLote(lote);
   const prueba = el.dataset.v === 'prueba' && puedeAdministrar();
-  if (prueba && !await confirmar('Probar el pago con Mercado Pago', `Se abre Mercado Pago por ${plata(montoDePrueba(lote))} (el importe de tu último cupón). Entrá con la cuenta de prueba <b>Comprador</b>, no con la tuya, y pagá con una tarjeta de prueba con titular <b>APRO</b>. Queda en "Pagos de PRUEBA": no cambia tu saldo ni saca recibo. Si el token del Apps Script fuera el real, el cobro sería de verdad.`, { si:'Abrir Mercado Pago' })) return;
+  if (prueba && !await confirmar('Probar el pago con Mercado Pago', `Se abre Mercado Pago por ${plata(montoDePrueba(lote))} (el importe de tu último cupón). Pagá con una <b>tarjeta de prueba</b> (Visa 4509 9535 6623 3704, código 123, vencimiento 11/30, DNI 12345678) y titular <b>APRO</b>. No entres con tu cuenta real de Mercado Pago. Queda en "Pagos de PRUEBA": no cambia tu saldo ni saca recibo. Si el token del Apps Script fuera el real, el cobro sería de verdad.`, { si:'Abrir Mercado Pago' })) return;
   const debe = Math.max(0, cuenta.saldo - cuenta.informado);
   const total = prueba ? montoDePrueba(lote) : Math.round((pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe) * 100) / 100;
   if (!(total >= 100)){ toast('No hay saldo para pagar', 'check'); return; }

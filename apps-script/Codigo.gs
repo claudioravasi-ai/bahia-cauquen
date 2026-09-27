@@ -93,7 +93,7 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 6;
+var VERSION_SCRIPT = 7;
 
 function doPost(e) {
   try {
@@ -157,7 +157,8 @@ function doGet(e) {
   if (q === 'cruceros') return responder(cruceros(e.parameter.forzar === '1'));
   var props = PropertiesService.getScriptProperties();
   return responder({ok: true, estado: 'activo', version: VERSION_SCRIPT, enviadosHoy: contarHoy(), tope: TOPE_DIARIO, cruceros: true,
-    frase: !!claveDelScript(), push: !!props.getProperty('FCM_CUENTA'), mercadoPago: !!props.getProperty('MP_ACCESS_TOKEN')});
+    frase: !!claveDelScript(), push: !!props.getProperty('FCM_CUENTA'), mercadoPago: !!props.getProperty('MP_ACCESS_TOKEN'),
+    mpPrueba: /^TEST-/.test(String(props.getProperty('MP_ACCESS_TOKEN') || '').trim()) || /^s[ií]$/i.test(String(props.getProperty('MP_PRUEBA') || '').trim())});
 }
 
 /**
@@ -283,11 +284,21 @@ function mandarPush(d) {
  * (o developers.mercadopago.com → Tus integraciones) → copiar el "Access
  * Token" de PRODUCCIÓN. Acá: Propiedades del script → MP_ACCESS_TOKEN.
  * Ese token NUNCA va en la app: es la llave de la cuenta.
+ *
+ * PARA PROBAR (27-09-2026): Mercado Pago ya no deja entrar con el usuario de
+ * las cuentas de prueba, así que también sirve el token de "Credenciales de
+ * prueba" de la aplicación. En las aplicaciones nuevas ese token también
+ * empieza con APP_USR- (igual que el real), así que hay que avisarlo con la
+ * propiedad MP_PRUEBA = si. Los tokens viejos TEST- se reconocen solos.
+ * En modo prueba se abre el checkout de prueba (sandbox_init_point), no se manda el correo de quien
+ * paga (sería el mismo dueño de la cuenta y Mercado Pago lo rechaza) y los
+ * pagos llegan con live_mode = false: la app los guarda como PRUEBA.
+ * Para cobrar de verdad: borrar MP_PRUEBA y poner el token real.
  */
 function mpToken() {
   var t = PropertiesService.getScriptProperties().getProperty('MP_ACCESS_TOKEN');
   if (!t) throw new Error('Mercado Pago no está configurado (falta MP_ACCESS_TOKEN, ver PAGOS.md)');
-  return t;
+  return String(t).trim();
 }
 function mpPedir(metodo, ruta, cuerpo) {
   var op = {method: metodo, muteHttpExceptions: true, headers: {Authorization: 'Bearer ' + mpToken()}};
@@ -315,7 +326,7 @@ function mpCrear(d) {
     items: [{id: ref, title: String(d.titulo || ('Expensas ' + lote)).slice(0, 120), quantity: 1, currency_id: 'ARS', unit_price: monto}],
     external_reference: ref,
     statement_descriptor: 'EXPENSAS BHC',
-    payer: d.email ? {email: String(d.email)} : undefined,
+    payer: d.email && !mpEsPrueba() ? {email: String(d.email)} : undefined,
     metadata: {lote: lote, periodo: String(d.periodo || ''), uid: String(d.uid || '')}
   };
   if (/^https:\/\//.test(volver)) {
@@ -326,7 +337,11 @@ function mpCrear(d) {
   if (url) pref.notification_url = url;
   var j = mpPedir('post', '/checkout/preferences', pref);
   registrar('MP-ENLACE', lote, String(monto));
-  return {ok: true, url: j.init_point, id: j.id, ref: ref};
+  return {ok: true, url: mpEsPrueba() ? (j.sandbox_init_point || j.init_point) : j.init_point, id: j.id, ref: ref, prueba: mpEsPrueba()};
+}
+function mpEsPrueba() {
+  var modo = String(PropertiesService.getScriptProperties().getProperty('MP_PRUEBA') || '').trim().toLowerCase();
+  return /^TEST-/.test(mpToken()) || modo === 'si' || modo === 'sí';
 }
 function resumenPago(p) {
   return {id: String(p.id), estado: p.status, detalle: p.status_detail, monto: p.transaction_amount, neto: p.transaction_details && p.transaction_details.net_received_amount,

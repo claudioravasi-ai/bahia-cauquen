@@ -376,7 +376,7 @@ const MANUAL_CAPS = [
     ['p', 'La sala del hotel en el Día a día: el hotel en vivo (sin los nombres de sus huéspedes), sus promociones para publicar o no, sus eventos (avisar a los vecinos si lo pide), sus proveedores (revisar o suspender), los mensajes con la recepción, la <b>Cuenta del hotel</b> (el hotel se inscribe como cualquier usuario y su inscripción pendiente se convierte en la del hotel; los vecinos aprobados no aparecen en esa lista; una vez hecha, el hotel cambia su correo y su contraseña en Tu cuenta) y el <b>modelo de convenio</b>. Si el hotel declara su DEA, desde Emergencias del hotel se publica para los vecinos.'],
     ['h', 'Expensas y contabilidad'],
     ['p', 'Las facturas del mes se cargan en <b>Contabilidad</b>; al cerrar el mes se arman los cupones. En <b>Expensas</b> se ven los lotes, se confirman los pagos informados, se emiten recibos y se sigue la morosidad.'],
-    ['p', '<b>Probar Mercado Pago</b>: en tu vista de vecino, en Expensas, el botón <b>"Probar el pago con Mercado Pago"</b> (solo lo ve quien administra) cobra el importe de tu último cupón aunque estés al día. Se paga con la cuenta de prueba Comprador y queda en <b>Pagos de PRUEBA</b>: no cambia tu saldo ni saca recibo, y se borra con un toque en Expensas → Pagos.'],
+    ['p', '<b>Probar Mercado Pago</b>: en tu vista de vecino, en Expensas, el botón <b>"Probar el pago con Mercado Pago"</b> (solo lo ve quien administra) cobra el importe de tu último cupón aunque estés al día. Se paga con una tarjeta de prueba (titular APRO) y queda en <b>Pagos de PRUEBA</b>: no cambia tu saldo ni saca recibo, y se borra con un toque en Expensas → Pagos.'],
   ], ir:[['abrir', 'gestion', 'Gestión del barrio']] },
 ];
 

@@ -82,12 +82,14 @@ Lo programo cuando la fase 1 ya ande.
    **No**. Producto: **Checkout Pro**. Crear.
 3. En la aplicación → **Cuentas de prueba** → crear dos: una **Vendedor** y una **Comprador**
    (país Argentina). Anotar usuario y contraseña de cada una.
-4. Entrar a Developers **con la cuenta de prueba Vendedor**, crear ahí la misma aplicación y copiar
-   su **Access Token** (el de "Credenciales de producción" de esa cuenta de prueba, empieza con
-   `APP_USR-`). Con ese token los pagos son de mentira.
+4. En tu aplicación → **Credenciales de prueba** → copiar el **Access Token** (en las aplicaciones
+   nuevas empieza con `APP_USR-`, igual que el real: no confundirlo con el de "Credenciales de
+   producción"). En el Apps Script, además, agregar la propiedad **`MP_PRUEBA` = `si`**. Con eso el
+   script (versión 7 en adelante) abre el checkout de prueba de Mercado Pago y los pagos son de mentira. (Antes se entraba a Developers con la cuenta de prueba Vendedor, pero
+   desde septiembre de 2026 Mercado Pago no deja iniciar sesión con el usuario de prueba.)
 
 ### 3. El Apps Script (el "servidor" del barrio)
-1. script.google.com → el proyecto del correo → pegar el **`apps-script/Codigo.gs` nuevo (versión 6)**.
+1. script.google.com → el proyecto del correo → pegar el **`apps-script/Codigo.gs` nuevo (versión 7)**.
 2. Engranaje → **Propiedades del script**:
    - `MP_ACCESS_TOKEN` = el token del paso 2.4.
    - `FCM_CUENTA` = la cuenta de servicio de Firebase (la misma de los avisos, ver AVISOS.md). Con
@@ -130,7 +132,8 @@ El **nombre del titular** decide el resultado: **APRO** = aprobado · **OTHE** =
 1. Modo vecino → Expensas → **Pagar online ahora**. Se abre Mercado Pago en otra ventana.
    Si tu lote está al día, usá **"Probar el pago con Mercado Pago"** (debajo de la tarjeta; solo
    lo ve quien administra): cobra el importe de tu último cupón sin tocar tu saldo.
-2. Entrá con la cuenta de prueba **Comprador**. Pagá con una tarjeta de arriba y titular **APRO**.
+2. Pagá con una tarjeta de arriba y titular **APRO** (si Mercado Pago ofrece pagar sin cuenta o como
+   invitado, elegí eso; no entres con tu cuenta real).
 3. Tiene que pasar esto: la ventana de Mercado Pago dice "¡Pago aprobado!" y se cierra a los
    3 segundos. En la app aparece "¡Pago aprobado!" y el saldo ya está descontado. El cartel también
    se va solo a los 3 segundos.
@@ -143,7 +146,7 @@ El **nombre del titular** decide el resultado: **APRO** = aprobado · **OTHE** =
 ### 8. Pasar a pagos reales
 1. En la aplicación de Mercado Pago (con la cuenta **real** del barrio) → **Credenciales de
    producción** → activarlas (datos del negocio; sitio web: la dirección de GitHub Pages de la app).
-2. Cambiar `MP_ACCESS_TOKEN` por el **Access Token de producción** real → **Nueva versión**.
+2. Cambiar `MP_ACCESS_TOKEN` por el **Access Token de producción** real y **borrar la propiedad `MP_PRUEBA`** → **Nueva versión**.
 3. Hacer un pago real chico con tu tarjeta y devolverlo desde Mercado Pago (Actividad → el pago →
    Devolver). Si aparece y se acredita, está listo.
 
