@@ -37,12 +37,20 @@ function sincronizarHistorial(){
    Y antes de trabajar, cada turno se anota: hasta que no dice quiénes
    están de guardia, la única ventana es la de abrir el turno.
    ========================================================= */
-const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron', 'chat',
-  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda']);
-const ventanaPermitida = id => !esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo()));
+/* Sin el chat vecinal (26-09, pedido de Claudio): el vecino se comunica con
+   la garita por mensaje privado o por peticiones; el chat es entre vecinos. */
+const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron',
+  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda', 'manual']);
+/* El hotel ve solo lo suyo y lo público de la ciudad (ver js/v-hotel.js).
+   Emergencias (la de los vecinos) no: tiene el pedido del DEA y los SOS del
+   día; el hotel tiene la suya. */
+const VENTANAS_HOTEL = new Set(['hotel', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-promos', 'hotel-emergencias',
+  'hotel-ficha', 'hotel-convenio', 'privado', 'agenda', 'cruceros', 'vuelos', 'ushuaia', 'municipio', 'sismos', 'documentos', 'legal', 'manual', 'recoleccion']);
+['hotel-vivo', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
+const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
-  if (!ventanaPermitida(id)){ toast(VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
+  if (!ventanaPermitida(id)){ toast(esHotel() ? 'Esa sección no es del hotel' : VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
   /* Una ventana nunca se abre DEBAJO de una hoja: antes, tocar un aviso en
      la pizarra abría la ventana detrás y la hoja la seguía tapando. Si la
      hoja era la pizarra, se anota para volver a ella al cerrar la ventana.
@@ -250,15 +258,73 @@ document.addEventListener('wheel', e => {
   Estirar.ruedaFin = setTimeout(() => { Estirar.rueda = 0; Estirar.d = 0; Estirar.ruedaVale = false; Estirar.terminar(); }, 300);
 }, { passive:true });
 
-const inicioId = () => esGuardia() ? 'garita' : 'inicio';
+const inicioId = () => esGuardia() ? 'garita' : esHotel() ? 'hotel' : 'inicio';
 const titulo = (def, p) => typeof def.titulo === 'function' ? def.titulo(p) : def.titulo;
+
+/* =========================================================
+   EL SALUDO DEL ESCUDO (pedido de Claudio, 26-09-2026)
+   Tocar el escudo del barrio, arriba a la izquierda, además de volver a la
+   portada, saluda en voz alta con una voz femenina de España, de corrido:
+     "Hola, Mónica, que tengas un buen día. ¿En qué te puedo ayudar hoy?
+      Ahora son las 19 y 8, y hace 4 grados."
+   Hora en formato de 24 h. Mañana (hasta las 12): buen día; tarde (hasta
+   las 20): buena tarde; después: buena noche. Usa la voz del propio equipo
+   (speechSynthesis): no manda nada a ningún servidor (ni el nombre). Suena
+   más real con una voz "mejorada" o "natural" instalada en el equipo, que
+   se elige primero. Tocar de nuevo mientras habla, lo calla.
+   ========================================================= */
+const Saludo = {
+  /* Voces femeninas de España, de las más naturales a las demás. Las
+     "mejoradas", "premium", "naturales" u "online" son grabaciones de voz
+     real (neuronales): suenan de corrido, no a robot. Si el equipo no tiene
+     ninguna de España, sirve una femenina en castellano de otro país. */
+  FEMENINAS: /(m[oó]nica|marisol|elvira|helena|laura|lucia|luc[ií]a|paloma|ximena|sabina|paulina|dalia|elena|isabela|camila|valeria|renata|google espa|female|mujer)/i,
+  MASCULINAS: /(jorge|diego|juan|carlos|pablo|enrique|[aá]lvaro|alvaro|tom[aá]s|ra[uú]l|male\b|hombre|eddy|reed|rocko|grandpa|grandma|bells|bubbles|jester|organ|trinoids|whisper|zarvox|bad news|good news|boing|cellos|superstar|wobble|bahh|albert|fred|junior|ralph|kathy|flo\b|sandy|shelley)/i,
+  NATURAL: /(mejorad|enhanced|premium|natural|neural|online|siri)/i,
+  voz(){
+    if (!('speechSynthesis' in window)) return null;
+    const vs = speechSynthesis.getVoices().filter(v => /^es/i.test(v.lang));
+    const puntaje = v => (/es[-_]ES/i.test(v.lang) ? 40 : /es[-_](AR|US|MX|419)/i.test(v.lang) ? 20 : 10)
+      + (this.FEMENINAS.test(v.name) ? 60 : 0) - (this.MASCULINAS.test(v.name) ? 100 : 0) + (this.NATURAL.test(v.name) ? 30 : 0);
+    return vs.sort((a, b) => puntaje(b) - puntaje(a))[0] || null;
+  },
+  /* La frase, pensada para decirse de corrido: puntos y comas donde una
+     persona respira, y la hora en formato de 24 h ("son las 19 y 8"). */
+  texto(){
+    const u = yo() || {}, d = new Date(), h = d.getHours(), m = d.getMinutes();
+    const nombre = u.rol === 'guardia' ? 'equipo de la garita' : u.rol === 'hotel' ? 'equipo del hotel' : String(u.nombre || '').trim().split(/\s+/)[0] || '';
+    const parte = h < 12 ? 'que tengas un buen día' : h < 20 ? 'que tengas una buena tarde' : 'que tengas una buena noche';
+    const hora_ = `${h === 1 ? 'es la 1' : 'son las ' + h}${m === 0 ? ' en punto' : ' y ' + m}`;
+    const t = typeof Clima !== 'undefined' && Clima.d && Clima.d.c ? Math.round(Clima.d.c.temperature_2m) : null;
+    const temp = t == null ? '' : `, y hace ${Math.abs(t)} ${Math.abs(t) === 1 ? 'grado' : 'grados'}${t < 0 ? ' bajo cero' : ''}`;
+    return `Hola${nombre ? ', ' + nombre : ''}, ${parte}. ¿En qué te puedo ayudar hoy? Ahora ${hora_}${temp}.`;
+  },
+  decir(){
+    if (!('speechSynthesis' in window)) return;
+    try {
+      if (speechSynthesis.speaking){ speechSynthesis.cancel(); return; }
+      const d = new SpeechSynthesisUtterance(this.texto()), v = this.voz();
+      if (v){ d.voice = v; d.lang = v.lang; } else d.lang = 'es-ES';
+      /* Velocidad y tono naturales: cambiarlos es lo que la hacía sonar a robot. */
+      d.rate = 1; d.pitch = 1; d.volume = 1;
+      /* Al terminar el saludo, el asistente por voz abre el micrófono
+         (solo para vecinos y con su permiso: ver js/asistente.js). */
+      let listo = false; const despues = () => { if (listo) return; listo = true; if (typeof Asistente !== 'undefined') Asistente.alSaludar(); };
+      d.onend = despues; setTimeout(despues, 12000);
+      speechSynthesis.speak(d);
+    } catch(e){}
+  },
+};
+/* Algunos navegadores cargan las voces un rato después de abrir. */
+try { if ('speechSynthesis' in window){ speechSynthesis.getVoices(); speechSynthesis.addEventListener?.('voiceschanged', () => speechSynthesis.getVoices()); } } catch(e){}
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.top .logo')) Saludo.decir(); });
 
 /* ---------------- dibujo ---------------- */
 function pintarTop(){
   const u = yo(); if (!u) return;
   const nl = noLeidas().length + sosEnCampanita().length;
   const modo = modoActivo();
-  const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[modo] || '';
+  const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia', hotel:'Hotel' }[modo] || '';
   $('#top').classList.toggle('con-modo', puedeAdministrar());
   $('#top').innerHTML = `
     <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
@@ -267,11 +333,12 @@ function pintarTop(){
         <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
           : `<span class="rol-chip">${rol}</span><span class="casa"> · ${esc(u.casa)}</span>`}</small></span>
     </button>
-    ${Presencia.chip()}
+    ${esHotel() ? '' : Presencia.chip()}
     ${puedeAdministrar() ? `<button class="modo-btn ${modo}" data-a="cambiar-modo" aria-label="Cambiar de modo">${I(modo === 'admin' ? 'sliders' : 'home')}<span>${modo === 'admin' ? 'Admin' : 'Vecino'}</span></button>` : ''}
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
     <button class="icon-btn" data-a="mi-cuenta" aria-label="Mi cuenta">${avatar(u, 'sm')}</button>
-    <button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`;
+    ${esHotel() ? `<button class="sos-btn" data-a="hotel-urgente" aria-label="Urgencia: avisar a la garita">${I('siren')}<span>Garita</span></button>`
+      : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
 }
 
 function pintar(){
@@ -655,11 +722,14 @@ function sosPanelStaff(s0, t, cuantas){
     <div class="sos-botones">
       <a class="btn btn-block sos-b-claro" href="${mapa}" target="_blank" rel="noopener">${I('pin')}Cómo llegar${s0.coords ? ' (GPS de la alerta)' : u.ubicacion ? ' (ubicación del lote)' : ''}</a>
       ${u.tel ? `<a class="btn btn-block sos-b-tenue" href="${telLink(u.tel)}">${I('phone')}Llamar a ${esc((u.nombre || '').split(' ')[0])}</a>` : ''}
-      <div class="btns">
+      ${esGuardia() ? `<div class="btns">
         ${s0.estado === 'activa' ? `<button class="btn btn-ok" data-a="sos-voy" data-id="${s0.id}">${I('check')}Voy en camino</button>` : ''}
         <button class="btn btn-sec" data-a="sos-atendida" data-id="${s0.id}">Ya la atendimos</button>
         <button class="btn btn-sec" data-a="sos-repetir" data-id="${s0.id}">${I('volume')}Repetir sonido</button>
       </div>
+      ${s0.tipo === 'medica' && typeof cuentaHotel === 'function' && cuentaHotel() && typeof hotelInfo === 'function' && (hotelInfo().dea || hotelInfo().auxilios) ? `<button class="btn btn-block sos-b-tenue" data-a="sos-pedir-hotel" data-id="${s0.id}">${I('heart')}Pedir ayuda al hotel (${hotelInfo().dea ? 'DEA' : ''}${hotelInfo().dea && hotelInfo().auxilios ? ' y ' : ''}${hotelInfo().auxilios ? 'primeros auxilios' : ''})</button>` : ''}` : `<div class="btns"><button class="btn btn-sec grow" data-a="sos-entendido" data-id="${s0.id}">${I('check')}Entendido</button>
+        <button class="btn btn-sec" data-a="sos-repetir" data-id="${s0.id}">${I('volume')}Repetir sonido</button></div>
+      <p class="sos-nota">La atiende la garita. La Administración la sigue en vivo.</p>`}
       <a class="btn btn-block sos-b-oscuro" href="tel:${t.llamar}">${I('siren')}Llamar al ${t.llamar}</a>
     </div>`;
 }
@@ -711,7 +781,7 @@ function sosEnLista(x){
       <div class="btns">
         ${mia ? `<button class="btn btn-xs btn-ok" data-a="sos-cancelar" data-id="${x.id}">${I('check')}Ya está solucionado</button>` : ''}
         <button class="btn btn-xs btn-sec" data-a="sos-ver" data-id="${x.id}">Ver la alerta</button>
-        ${!mia && esStaff() ? `<button class="btn btn-xs btn-danger-soft" data-a="sos-cerrar" data-id="${x.id}">Cerrarla</button>` : ''}
+        ${!mia && esGuardia() ? `<button class="btn btn-xs btn-danger-soft" data-a="sos-cerrar" data-id="${x.id}">Cerrarla</button>` : ''}
       </div></div></div>`;
 }
 A['sos-repetir'] = () => { Sonido.tocar([[988, 0, .35], [988, .28, .35], [988, .56, .5]], 'square', .16); Sonido.vibrar([400, 160, 400]); };
@@ -896,7 +966,7 @@ function pintarBienvenida(modo = 'inicio'){
         'Al correo te llega el estado de tu inscripción.')}
       ${grupo('Tu profesión u oficio (opcional)',
         campo('A qué te dedicás', `<input name="profesion" maxlength="60" placeholder="Médico, electricista, abogada, clases de inglés…">`) +
-        `<label class="check"><input type="checkbox" name="publicar"><span>Publicarlo en <b>Ushuaia y servicios → Profesionales y oficios</b>, con mi teléfono, para que los vecinos me puedan contactar.</span></label>`,
+        `<label class="check"><input type="checkbox" name="publicar"><span>Publicarlo en <b>El barrio → Profesionales y oficios</b>, con mi teléfono, para que los vecinos me puedan contactar.</span></label>`,
         'Lo podés cambiar cuando quieras desde Mi casa.')}
       ${nube ? grupo('Tu contraseña', campo('Elegila', `<input name="clave" type="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres">`), 'Es personal. Si en tu casa hay más de un vecino, cada uno tiene la suya.') : ''}
       ${grupo('Privacidad',
@@ -1203,7 +1273,7 @@ A['bienvenida'] = el => { pintarBienvenida(el.dataset.v); window.scrollTo({ top:
 A['mi-cuenta'] = () => { const u = yo();
   hoja('Tu cuenta', `<div class="row" style="margin-bottom:14px">${avatar(u, 'lg')}<div class="grow"><b style="font-size:16px">${esc(u.nombre)}</b>
       <div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
-      <div class="muted tiny">${{ vecino:'Vecino/a', admin:'Administración', guardia:'Garita' + (turnoAbierto() ? ' · turno ' + esc(turnoAbierto().turno) + ': ' + esc(aLista(turnoAbierto().guardias).join(', ')) : '') }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
+      <div class="muted tiny">${{ vecino:'Vecino/a', hotel:'Cuenta institucional del hotel · la usa la recepción', admin:'Administración', guardia:'Garita' + (turnoAbierto() ? ' · turno ' + esc(turnoAbierto().turno) + ': ' + esc(aLista(turnoAbierto().guardias).join(', ')) : '') }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
     ${puedeAdministrar() ? superficie({ a:'cambiar-modo', icon: modoActivo() === 'admin' ? 'sliders' : 'home', color: modoActivo() === 'admin' ? 'accent' : 'ok',
       t: modoActivo() === 'admin' ? 'Estás como Administración' : 'Estás como vecino/a',
       s: modoActivo() === 'admin' ? 'Tocá para pasar a tu vista de vecino/a' : 'Tocá para volver al panel de administración', cls:'acento' }) : ''}
@@ -1216,7 +1286,9 @@ A['mi-cuenta'] = () => { const u = yo();
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
-    ${esGuardia() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
+    ${superficie({ a:'abrir-manual', icon:'book', color:'accent', t:'Manual de uso', s:'Paso a paso, por capítulos' })}
+    ${typeof Asistente !== 'undefined' && Asistente.paraMi() && Asistente.soportado() ? superficie({ a:'asistente-ajuste', icon:'volume', color:'sky', t: Asistente.permiso() === 'si' ? 'Asistente por voz: activado' : 'Asistente por voz: apagado', s: Asistente.permiso() === 'si' ? 'Tocá el escudo y pedile algo. Tocá acá para apagarlo en este equipo.' : 'Pedirle cosas a la app con la voz. Tocá para activarlo en este equipo.' }) : ''}
+    ${esGuardia() || esHotel() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
 
     ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
@@ -1513,7 +1585,7 @@ async function cerrarSesion(){
     /* En un equipo compartido no puede quedar nada del barrio después de
        salir: se borra lo que vino de la nube y queda solo la preferencia de
        pantalla. Al volver a entrar se baja todo de nuevo. */
-    [...Nube.ZONAS.barrio, ...Nube.ZONAS.privado, ...Nube.ZONAS.staff].forEach(col => { if (Array.isArray(Store.s[col])) Store.s[col] = []; });
+    [...Nube.ZONAS.barrio, ...Nube.ZONAS.privado, ...Nube.ZONAS.staff, ...Nube.ZONAS.hotel].forEach(col => { if (Array.isArray(Store.s[col])) Store.s[col] = []; });
     Store.s.notifs = []; Store.s.motorLog = {}; Nube.ultimo = {}; Nube.arrancada = false; Nube.motorListo = false;
     Store.guardar();
   }
@@ -1558,12 +1630,23 @@ window.addEventListener('unhandledrejection', e => {
 });
 
 /* ---------------- delegación de eventos ---------------- */
+/* Los deberes de la garita (ver soloGarita en core.js). Aunque un botón
+   quedara a la vista por error, desde otra cuenta no hacen nada. */
+const SOLO_GARITA = {
+  acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
+    'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
+    'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno',
+    'hvan-mov', 'hprov-mov', 'hhuesped-ingreso', 'sos-pedir-hotel', 'pase-vencido']),
+  formularios: new Set(['validar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra',
+    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno']),
+};
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]');
   if (!el) return;
   const f = A[el.dataset.a];
   if (!el.dataset.a) return;   /* data-a vacío: no es un botón */
   if (!f){ console.warn('Acción sin código:', el.dataset.a); toast(`Esa acción no está en esta versión ("${el.dataset.a}")`, 'alert'); return; }
+  if (SOLO_GARITA.acciones.has(el.dataset.a) && !soloGarita()){ e.preventDefault(); return; }
   /* Los tildes y opciones tienen que poder marcarse: a ellos no se les frena el clic. */
   if (el.tagName !== 'INPUT') e.preventDefault();
   try { const r = f(el, e); if (r && r.catch) r.catch(err => avisarFalla(err, el.dataset.a)); }
@@ -1610,6 +1693,7 @@ document.addEventListener('submit', e => {
   }
   const f = F[form.dataset.f];
   if (!f){ toast(`Ese formulario no está en esta versión ("${form.dataset.f}")`, 'alert'); return; }
+  if (SOLO_GARITA.formularios.has(form.dataset.f) && !soloGarita()) return;
   const fd = new FormData(form), d = {};
   for (const [k, v] of fd.entries()){ if (v instanceof File) continue; if (k in d){ d[k] = [].concat(d[k], v); } else d[k] = v; }
   try { const r = f(d, form, e); if (r && r.catch) r.catch(err => avisarFalla(err, form.dataset.f)); }
@@ -1712,6 +1796,9 @@ const PIEZAS = [
   ['js/v-contable.js', () => typeof Libro],
   ['js/v-servicio.js', () => typeof Servicio],
   ['js/v-legal.js',   () => typeof LEGAL],
+  ['js/v-manual.js',   () => typeof MANUAL_CAPS],
+  ['js/v-hotel.js',    () => typeof HotelMotor],
+  ['js/asistente.js',  () => typeof Asistente],
   ['js/push.js',       () => typeof Push],
   ['js/sismos.js',     () => typeof Sismos],
   ['js/nube.js',       () => typeof Nube],
@@ -1869,6 +1956,7 @@ async function arrancar(){
   Avion.arrancar();
   Sismos.arrancar();
   Servicio.arrancar();
+  if (typeof HotelMotor !== 'undefined') HotelMotor.arrancar();
   Push.arrancar();
   registrarServiceWorker();
 }

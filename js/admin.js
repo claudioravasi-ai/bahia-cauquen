@@ -54,8 +54,8 @@ const REGLAS = [
     run(s){ let n = 0; s.compras.filter(c => c.cierra <= Date.now()).forEach(c => n += marca(s, 'cmp-' + c.id, () => {
       const tot = c.anotados.reduce((a, x) => a + (+x.cant || 0), 0);
       notificar(s, { para:[c.creadaPor, ...c.anotados.map(x => x.userId)], titulo:`Cerró: ${c.titulo}`, texto:`${tot} de ${c.meta} ${c.unidad}${tot >= c.meta ? ' · ¡se llegó a la meta!' : ''}`, icon:'cart', color:'brand', link:'compras' }); })); return n; } },
-  { id:'paquete-24h', n:'Paquete sin retirar 24 h → recordar al vecino', d:'',
-    run(s){ let n = 0; s.paquetes.filter(p => !p.retirado && Date.now() - p.recibido > DIA).forEach(p => n += marca(s, 'paq-' + p.id, () => notificar(s, { para:p.hostId, titulo:'Tu paquete sigue en la garita', texto:p.empresa, icon:'box', color:'wood' }))); return n; } },
+  /* 'paquete-24h' (un solo aviso, a una persona y sin push) se reemplazó el 26-09-2026 por
+     'paquetes-24h' en js/v-servicio.js: push a todo el lote, repetido hasta que lo ven. */
   { id:'viaje-regreso', n:'Fin de un viaje → avisar a la guardia', d:'El día que vuelve el vecino, la guardia lo sabe.',
     run(s, hoy){ let n = 0; s.users.filter(u => u.viaje && u.viaje.hasta === hoy).forEach(u => n += marca(s, 'vj-' + u.id + hoy, () => notificar(s, { para:'rol:guardia', titulo:`Hoy vuelve ${u.casa}`, texto:'Termina el aviso de casa sola.', icon:'home', color:'ok', link:'garita' })));
       s.users.filter(u => u.viaje && u.viaje.hasta < hoy).forEach(u => { delete u.viaje; n++; }); return n; } },
@@ -200,6 +200,9 @@ const Motor = {
   conMarca(clave, fn){ Automatico.clave = clave; Automatico.n = 0; try { fn(); } finally { Automatico.clave = null; } },
   correr(){
     if (this.corriendo || !Store.s || !yo()) return;
+    /* El hotel no corre el motor del barrio: no ve los datos de los vecinos
+       (tiene el suyo, HotelMotor en js/v-hotel.js). */
+    if (esHotel()) return;
     /* Con la base: hasta que no bajaron las marcas, la configuración y los
        datos del barrio, el motor no corre. Antes corría al abrir la app, con
        las marcas vacías, y repetía todos los avisos del día en cada equipo

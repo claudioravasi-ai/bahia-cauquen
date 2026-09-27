@@ -205,7 +205,7 @@ R.frecuentes = {
             <span>${esc(t.n)} → ${esc(f.destino || 'Barrio')}${f.patente ? ' · ' + esc(f.patente) : ''}${aLista(f.dias).length ? ' · ' + aLista(f.dias).map(d => DIAS[d]).join(' ') : ''}${f.desde ? ` · ${f.desde}–${f.hasta}` : ''}</span>
             <span class="tiny muted">${esc(f.codigo)}${f.vence ? ' · vence ' + fechaCorta(f.vence) : ''}${ult ? ' · último movimiento ' + hace(ult.at) : ''}${v.motivo ? ' · ' + esc(v.motivo) : ''}</span></div></div>
           <div class="btns" style="margin-top:10px">
-            ${!f.baja ? `<button class="btn btn-xs btn-ok" data-a="frec-mov" data-id="${f.id}" data-v="in">${I('login')}Entra</button><button class="btn btn-xs btn-sec" data-a="frec-mov" data-id="${f.id}" data-v="out">${I('logout')}Sale</button>` : ''}
+            ${!f.baja && esGuardia() ? `<button class="btn btn-xs btn-ok" data-a="frec-mov" data-id="${f.id}" data-v="in">${I('login')}Entra</button><button class="btn btn-xs btn-sec" data-a="frec-mov" data-id="${f.id}" data-v="out">${I('logout')}Sale</button>` : ''}
             <button class="btn btn-xs btn-sec" data-a="frec-qr" data-id="${f.id}">${I('qr')}QR</button>
             ${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="frec-editar" data-id="${f.id}">${I('edit')}Editar</button>` : ''}</div></div>`; }).join('')
         : vacio('qr', q ? 'Nadie coincide con esa búsqueda.' : 'Todavía no hay ingresos frecuentes cargados.')}`;
@@ -305,8 +305,9 @@ function validarCodigoEspecial(txt){
   /* El QR de retiro de paquetes (firmado, cambia cada 30 s). */
   if (/^BHR1\./.test(String(txt || '').trim())){ const pid = Retiro.paqueteId || ''; Retiro.paqueteId = ''; Retiro.alLeer(String(txt).trim(), pid); return true; }
   const t = String(txt || '').trim().toUpperCase().replace(/^BHC:/, '').replace(/\s/g, '');
-  const m = t.match(/^([FV])-?([A-Z0-9]{6,})$/); if (!m) return false;
+  const m = t.match(/^([FVH])-?([A-Z0-9]{6,})$/); if (!m) return false;
   const codigo = m[1] + '-' + m[2];
+  if (m[1] === 'H') return typeof hotelCodigo === 'function' ? hotelCodigo(codigo) : false;
   if (m[1] === 'F'){
     const f = frecuentes().find(x => String(x.codigo).toUpperCase() === codigo);
     if (!f){ hoja('Código desconocido', aviso('danger', 'x', 'Ese pase fijo no existe', 'Puede ser uno viejo que se reemplazó. Consultá con la Administración.')); return true; }
@@ -414,6 +415,11 @@ F['alerta'] = d => {
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'novedad', texto:`Aviso urgente (${TIPOS_ALERTA[a.tipo]?.n || ''}) a ${zona}: ${a.titulo}`, at:Date.now() });
   });
   if (typeof Push !== 'undefined' && dest.length) Push.enviar({ para:dest, titulo:'⚠ ' + a.titulo, texto:a.texto || (TIPOS_ALERTA[a.tipo]?.n + ' · ' + zona), link:'alertas', tag:'alerta-' + a.id, urgente:true });
+  /* Un aviso para todo el barrio (corte de luz, nieve, portón) también le
+     llega al hotel, como aviso personal: el hotel no lee los avisos por
+     zona porque tienen las respuestas de los vecinos. */
+  const hot = !lotes.length && typeof cuentaHotel === 'function' && cuentaHotel();
+  if (hot) Store.cambiar(s => notificar(s, { para:[hot.id], titulo:'⚠ ' + a.titulo, texto:a.texto || TIPOS_ALERTA[a.tipo]?.n || '', icon:(TIPOS_ALERTA[a.tipo] || {}).icon || 'siren', color:'danger', link:'hotel', urgente:true }));
   cerrarHoja(); toast(`Aviso enviado a ${plural(dest.length, 'cuenta')}`, 'siren'); refrescar();
 };
 A['alerta-responder'] = async el => {
@@ -478,13 +484,23 @@ A['paquete-nuevo'] = () => hoja('Llegó un paquete', `<form data-f="paquete">
   <datalist id="empresas"><option>Mercado Libre</option><option>Correo Argentino</option><option>Andreani</option><option>OCA</option><option>DHL</option><option>Via Cargo</option><option>Farmacia</option><option>Supermercado</option></datalist>
   ${campoFoto('fotoPaq', 'Foto del paquete o de la etiqueta')}
   <button class="btn btn-pri btn-block">${I('box')}Guardar y avisar</button></form>`);
+/* EL AVISO VA A TODO EL LOTE (pedido de Claudio, 26-09-2026): si el paquete
+   es para Mónica, del Lote 148, el aviso le llega a ella y a Claudio, que
+   vive con ella: push al celular, campanita y "Para vos" en la Pizarra del
+   día hasta que lo retiran. El paquete queda en la carpeta privada de cada
+   cuenta del lote (Nube.duenos), no en la de una sola persona.
+   LA FOTO VIAJA CHICA: en el registro va solo una vista previa de 96 px
+   (unos 3 KB). La foto buena (hasta 1280 px) queda aparte "para bajar",
+   no baja con los datos: el vecino la trae recién si toca la foto, y ahí
+   la puede guardar en su teléfono. Esa copia se borra de la base cuando
+   el paquete se entrega (o a los 7 días, lo que llegue primero). */
 F['paquete'] = d => {
-  const foto = fotoParaOtros(d.foto, 14);
-  Store.cambiar(s => { s.paquetes.unshift({ id:uid(), hostId:d.hostId, empresa:d.empresa, detalle:d.detalle, foto, recibido:Date.now(), recibidoPor:yo().id, retirado:null, confirmado:null });
-    notificar(s, { para:d.hostId, titulo:'Tenés un paquete en la garita', texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''} · llegó ${hora(Date.now())} h · para retirarlo mostrá tu QR de retiro`, icon:'box', color:'wood', link:'mis-paquetes', sonido:true });
-
-    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Paquete de ${d.empresa} para ${usuario(d.hostId)?.casa || ''}`, at:Date.now() }); });
-  cerrarHoja(); toast('Paquete guardado. El vecino ya sabe.', 'box');
+  const foto = fotoParaOtros(d.foto, 7), host = usuario(d.hostId) || {}, lote = host.casa || '';
+  const para = [...new Set([d.hostId, ...cuentasDelLote(lote).map(u => u.id)])].filter(Boolean);
+  Store.cambiar(s => { s.paquetes.unshift({ id:uid(), hostId:d.hostId, lote, empresa:d.empresa, detalle:d.detalle, foto, recibido:Date.now(), recibidoPor:yo().id, retirado:null, confirmado:null });
+    notificar(s, { para, titulo:`Llegó un paquete para ${lote || 'tu lote'}`, texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''} · a nombre de ${(host.nombre || '').split(' ')[0] || 'tu lote'} · llegó ${hora(Date.now())} h · se retira en la garita con el QR de retiro`, icon:'box', color:'wood', link:'mis-paquetes', sonido:true });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Paquete de ${d.empresa} para ${lote}`, at:Date.now() }); });
+  cerrarHoja(); toast(para.length > 1 ? `Paquete guardado. Se avisó a las ${para.length} cuentas de ${lote}.` : 'Paquete guardado. El vecino ya sabe.', 'box');
 };
 /* =========================================================
    5b. RETIRO DE PAQUETES CON QR FIRMADO (pedido de Claudio, 26-09-2026)
@@ -577,10 +593,10 @@ const Retiro = {
     return { ok:true, u, ts, equipo:eq, equipoNombre:pub.equipo || '', firma };
   },
   /* Los paquetes que puede retirar esa persona: los de su lote. */
-  pendientesDe(u){ const casa = u && u.casa; return Store.s.paquetes.filter(p => !p.retirado && (p.hostId === u.id || usuario(p.hostId)?.casa === casa)).sort((a, b) => a.recibido - b.recibido); },
+  pendientesDe(u){ return paquetesDelLote(u).filter(p => !p.retirado).sort((a, b) => a.recibido - b.recibido); },
   /* La garita leyó un QR de retiro. */
   async alLeer(txt, paqueteId = ''){
-    if (!esGuardia() && !esAdmin()){ toast('Solo la garita o la Administración entregan paquetes', 'lock'); return; }
+    if (!esGuardia()){ toast('Los paquetes los entrega solo la garita', 'lock'); return; }
     const v = await this.verificar(txt);
     if (!v.ok){ hoja('QR de retiro', `${aviso('danger', 'x', 'NO ENTREGAR', esc(v.motivo))}
       ${v.u ? `<div class="card plana small">${I('user')} El QR dice ser de <b>${esc(v.u.nombre)}</b> · ${esc(v.u.casa)}. Si es esa persona y no le anda el teléfono, usá "Sin teléfono: firma y DNI".</div>` : ''}
@@ -605,19 +621,26 @@ const Retiro = {
     const registro = { paquetes:ids.slice().sort(), recibe, entrega, at, prueba };
     const sello_ = await sello(registro);
     let casa = '';
+    const fotos = [];
     Store.cambiar(s => {
       ids.forEach(id => { const p = s.paquetes.find(x => x.id === id); if (!p || p.retirado) return;
-        casa = usuario(p.hostId)?.casa || casa;
+        casa = loteDelPaquete(p) || casa;
+        if (p.foto && p.foto.fotoId) fotos.push(p.foto.fotoId);
         p.retirado = at; p.entregadoPor = yo().id; p.confirmado = at;
         p.entrega = { metodo:prueba.metodo, recibe, entrega, at, sello:sello_, ...(prueba.metodo === 'qr' ? { qr:{ ts:prueba.ts, equipo:prueba.equipo, firma:prueba.firma } } : { firma:prueba.firma, dniFin:prueba.dniFin, dniVerificado:prueba.dniVerificado, tercero:!!prueba.tercero }) };
         const aviso_ = prueba.tercero || (recibe.uid && recibe.uid !== p.hostId) ? `${recibe.nombre} retiró tu paquete` : 'Retiraste tu paquete';
 
         notificar(s, { para:p.hostId, titulo:aviso_, texto:`${p.empresa} · ${hora(at)} h · lo entregó la garita${prueba.metodo === 'qr' ? ' contra tu QR' : ' con firma y DNI'}. Si no fuiste vos, avisá enseguida.`, icon:'box', color: prueba.tercero ? 'warn' : 'ok', link:'mis-paquetes', sonido:true });
+        /* Los demás del lote también se enteran (sin sonido): así nadie lo va a buscar de nuevo. */
+        const otros = cuentasDelLote(loteDelPaquete(p)).map(u => u.id).filter(x => x !== p.hostId);
+        if (otros.length) notificar(s, { para:otros, titulo:`Ya retiraron el paquete de ${loteDelPaquete(p)}`, texto:`${p.empresa} · lo retiró ${recibe.nombre}${prueba.tercero ? ' (tercero)' : ''} · ${hora(at)} h`, icon:'box', color:'ok', link:'mis-paquetes' });
       });
       const quien = `${recibe.nombre}${prueba.tercero ? ' (tercero)' : ''}`;
       auditar(s, 'Entregó paquetes', `${casa} · ${plural(ids.length, 'paquete')} · recibió ${quien} · entregó ${yo().nombre}${guardias.length ? ' (' + guardias.join(', ') + ')' : ''} · ${prueba.metodo === 'qr' ? 'QR firmado' : 'firma + DNI ***' + prueba.dniFin} · sello ${sello_.slice(0, 16)}`, ids[0]);
       s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Entrega de ${plural(ids.length, 'paquete')} a ${quien} · ${casa} · ${prueba.metodo === 'qr' ? 'QR firmado' : 'firma y DNI'}`, at });
     });
+    /* Entregado el paquete, su foto buena ya no hace falta en ningún lado. */
+    fotos.forEach(id => { try { if (typeof Nube !== 'undefined' && Nube.activa()) Nube.borrarDescarga(id); } catch(e){} Fotos.borrar(id); });
     return sello_;
   },
 };
@@ -715,10 +738,33 @@ A['paquete-confirmar'] = el => {
     notificar(s, { para:'rol:guardia', titulo:`${yo().casa} confirmó que retiró su paquete`, texto:p.empresa, icon:'box', color:'ok' }); });
   toast('Gracias: quedó confirmado', 'check');
 };
+/* =========================================================
+   PAQUETE SIN RETIRAR MÁS DE 24 HORAS (pedido de Claudio, 26-09-2026)
+   Aviso push a todas las cuentas del lote, y se repite (cada 8 h, de 9 a
+   21 h, hasta 6 veces) HASTA QUE ALGUIEN DEL LOTE LO VE: abrir "Mis
+   paquetes" (desde el aviso, la pizarra o la campanita) lo da por visto
+   (avisoVisto en el paquete). La regla va acá y no en admin.js porque
+   REGLAS se define allá y este archivo carga después.
+   ========================================================= */
+REGLAS.push({ id:'paquetes-24h', n:'Paquetes → aviso si pasan 24 h sin retirar', d:'Push al lote cada 8 h (de 9 a 21 h) hasta que alguien del lote abre Mis paquetes o lo retira.',
+  run(s){ let n = 0; const ahora = Date.now(), h = new Date().getHours();
+    if (h < 9 || h >= 21) return 0;
+    aLista(s.paquetes).filter(p => p && !p.retirado && !p.avisoVisto && p.recibido && ahora - p.recibido >= DIA).forEach(p => {
+      const k = 1 + Math.floor((ahora - p.recibido - DIA) / (8 * HORA)); if (k > 6) return;
+      const para = [...new Set([p.hostId, ...cuentasDelLote(loteDelPaquete(p)).map(u => u.id)])].filter(Boolean);
+      const dias = Math.floor((ahora - p.recibido) / DIA);
+      n += marca(s, `paq24-${p.id}-${k}`, () => notificar(s, { para, titulo:`Tu paquete sigue en la garita (${dias === 1 ? '1 día' : dias + ' días'})`,
+        texto:`${p.empresa}${p.detalle ? ' · ' + p.detalle : ''} · retiralo con tu QR de retiro`, icon:'box', color:'warn', link:'mis-paquetes', sonido:true }));
+    }); return n; } });
 R['mis-paquetes'] = {
-  titulo:'Tus paquetes', icon:'box', color:'wood', sub:'Lo que llegó a la garita a tu nombre',
+  titulo:'Tus paquetes', icon:'box', color:'wood', sub:'Lo que llegó a la garita para tu lote',
+  /* Abrir la ventana = el vecino vio el aviso de los paquetes de más de
+     24 h: dejan de sonar los recordatorios. */
+  alPintar(){ const u = yo(); if (!u || esStaff()) return; const lim = Date.now() - DIA;
+    const ids = paquetesDelLote(u).filter(p => !p.retirado && p.recibido <= lim && !p.avisoVisto).map(p => p.id);
+    if (ids.length) Store.cambiar(s => ids.forEach(id => { const p = s.paquetes.find(x => x.id === id); if (p){ p.avisoVisto = Date.now(); p.avisoVistoPor = u.id; } })); },
   render(){
-    const u = yo(), ls = Store.s.paquetes.filter(p => p.hostId === u.id).sort((a, b) => b.recibido - a.recibido).slice(0, 40);
+    const u = yo(), ls = paquetesDelLote(u).sort((a, b) => b.recibido - a.recibido).slice(0, 40);
     const enGarita = Retiro.pendientesDe(u), viejos = ls.filter(p => p.retirado && !p.confirmado), listos = ls.filter(p => p.confirmado);
     const como = p => !p.entrega ? '' : p.entrega.metodo === 'qr' ? ' · con tu QR firmado' : p.entrega.tercero ? ` · lo retiró ${esc(p.entrega.recibe?.nombre || 'otra persona')}` : ' · con firma y DNI';
     return `${enGarita.length ? `<button class="retiro-cta" data-a="retiro-qr">${I('qr')}<span><b>Mi QR para retirar</b><small>${plural(enGarita.length, 'paquete')} en la garita · mostralo desde tu teléfono</small></span>${I('right')}</button>` : ''}
@@ -726,11 +772,12 @@ R['mis-paquetes'] = {
       ${enGarita.length ? sec('En la garita') : ''}
       ${enGarita.map(p => `<div class="card"><div class="row"><span class="ic ic-wood" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I('box')}</span>
         <div class="grow"><b>${esc(p.empresa)}${p.detalle ? ' · ' + esc(p.detalle) : ''}</b><div class="muted small">Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} ${hora(p.recibido)} h${p.hostId !== u.id ? ' · a nombre de ' + esc(nombreDe(p.hostId)) : ''}</div></div></div>
-        ${fotoHTML(p.foto, 'post-foto')}</div>`).join('')}
+        ${p.foto && p.foto.fotoId ? `<div class="paq-foto">${fotoHTML(p.foto, 'post-foto', { aPedido:true })}<span class="muted tiny">${I('image')} Vista previa liviana. Tocala para ver la foto buena y guardarla en tu teléfono.</span></div>` : ''}</div>`).join('')}
       ${viejos.length ? sec('Entregados sin confirmar') + viejos.map(p => `<div class="card"><b>${esc(p.empresa)}</b><div class="muted small">La garita lo entregó ${hace(p.retirado)}</div>
-        <div class="btns" style="margin-top:8px"><button class="btn btn-sm btn-ok" data-a="paquete-confirmar" data-id="${p.id}">${I('check')}Confirmo que lo recibí</button></div></div>`).join('') : ''}
-      ${listos.length ? sec('Ya retirados') + `<div class="card lista">${listos.map(p => `<div class="it"><div class="txt"><b>${esc(p.empresa)}</b><span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${hace(p.confirmado)}${como(p)}</span></div>${p.entrega && p.entrega.sello ? `<span class="pill p-ok" title="Sello ${esc(p.entrega.sello)}">${I('lock')}sellado</span>` : ''}</div>`).join('')}</div>` : ''}
-      <p class="muted tiny" style="margin-top:12px">${I('lock')} La garita entrega tus paquetes solo contra tu QR de retiro (cambia cada 30 segundos y sale únicamente de tu teléfono) o, si no tenés el teléfono, con tu firma y tu DNI. Cada entrega queda en la auditoría con un sello.</p>`;
+        ${p.hostId === u.id ? `<div class="btns" style="margin-top:8px"><button class="btn btn-sm btn-ok" data-a="paquete-confirmar" data-id="${p.id}">${I('check')}Confirmo que lo recibí</button></div>` : ''}</div>`).join('') : ''}
+      ${listos.length ? sec('Ya retirados') + `<div class="card lista">${listos.map(p => `<div class="it"><div class="txt"><b>${esc(p.empresa)}</b><span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${hace(p.confirmado)}${p.hostId !== u.id ? ' · era para ' + esc(nombreDe(p.hostId).split(' ')[0]) : ''}${como(p)}</span></div>${p.entrega && p.entrega.sello ? `<span class="pill p-ok" title="Sello ${esc(p.entrega.sello)}">${I('lock')}sellado</span>` : ''}</div>`).join('')}</div>` : ''}
+      <p class="muted tiny" style="margin-top:12px">${I('users')} Acá ves los paquetes de todo ${esc(u.casa || 'tu lote')}: cuando llega uno, el aviso les llega a todas las cuentas del lote (con los avisos al celular activados, aunque el teléfono esté bloqueado).</p>
+      <p class="muted tiny" style="margin-top:6px">${I('lock')} La garita entrega tus paquetes solo contra tu QR de retiro (cambia cada 30 segundos y sale únicamente de tu teléfono) o, si no tenés el teléfono, con tu firma y tu DNI. Cada entrega queda en la auditoría con un sello.</p>`;
   },
 };
 

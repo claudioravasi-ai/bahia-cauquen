@@ -59,6 +59,7 @@ R.peticiones = {
     if (filtro !== 'todas') lista = lista.filter(p => p.estado === filtro);
     const n = e => (staff ? s.peticiones : s.peticiones.filter(p => p.userId === u.id)).filter(p => p.estado === e).length;
     return `${!staff ? superficie({ a:'nueva-peticion', icon:'edit', t:'Nueva petición a la garita', s:'Queda firmada por vos y por el guardia que la recibe', cls:'acento' }) : ''}
+      ${esAdmin() ? `<p class="muted small" style="margin:0 0 10px">${I('eye')} Son los pedidos que los vecinos le hacen <b>por escrito y firmados</b> a la garita: no dejar pasar a alguien, que se van de viaje, dejar una llave, recibir paquetes. <b>Los recibe y los firma la garita</b>; desde la Administración solo se miran.</p>` : ''}
       <div class="chips">${[['pendiente','Pendientes'],['en_funciones','En funciones'],['cerrada','Cerradas'],['todas','Todas']].map(([k, t]) =>
         `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="peticiones" data-p="${k}">${t}${k !== 'todas' && n(k) ? `<span class="n">${n(k)}</span>` : ''}</button>`).join('')}</div>
       ${lista.length ? lista.map(p => { const t = TIPOS_PET[p.tipo] || TIPOS_PET.otro, e = ESTADO_PET[p.estado], v = usuario(p.userId) || {};
@@ -101,12 +102,13 @@ A['ver-peticion'] = el => {
     <p class="small muted" style="margin:0 0 12px">Vigencia: desde ${fechaCorta(p.desde)}${p.hasta ? ' hasta ' + fechaCorta(p.hasta) : ''}</p>
     <div class="firmas"><div><div class="lbl">Firma del vecino</div><img src="${p.firmaVecino}" alt="Firma del vecino" class="firma-img"><div class="tiny muted">${fechaHora(p.at)}</div><div class="tiny mono muted">Sello ${esc((p.selloVecino || '').slice(0, 16))}…</div></div>
       <div><div class="lbl">Recepción de la guardia</div>${p.firmaGuardia ? `<img src="${p.firmaGuardia}" alt="Firma de la guardia" class="firma-img"><div class="tiny muted">${esc(g.nombre || '')} · ${fechaHora(p.recibidaAt)}</div><div class="tiny mono muted">Sello ${esc((p.selloGuardia || '').slice(0, 16))}…</div>` : `<div class="firma-img vacia">Sin recibir</div>`}</div></div>
-    ${p.estado === 'pendiente' && esStaff() ? `<form data-f="recibir-peticion" data-id="${p.id}" style="margin-top:14px"><div class="field"><label>Tu firma de recepción</label>${firmaHTML('firmaGuardia')}</div>
+    ${p.estado === 'pendiente' && esGuardia() ? `<form data-f="recibir-peticion" data-id="${p.id}" style="margin-top:14px"><div class="field"><label>Tu firma de recepción</label>${firmaHTML('firmaGuardia')}</div>
       <div class="field"><label>Observación (opcional)</label><input name="obs" maxlength="200"></div><button class="btn btn-ok btn-block">${I('check')}Recibir y poner en funciones</button></form>` : ''}
     ${p.obs ? `<p class="small" style="margin:12px 0 0"><b>Observación de la guardia:</b> ${esc(p.obs)}</p>` : ''}
-    ${p.estado === 'en_funciones' && (p.userId === yo().id || esStaff()) ? `<button class="btn btn-sec btn-block" style="margin-top:14px" data-a="cerrar-peticion" data-id="${p.id}">Dar por cumplida / cerrar</button>` : ''}
+    ${p.estado === 'pendiente' && esAdmin() ? `<div class="card plana small" style="margin-top:14px">${I('eye')} La recibe y la firma la garita. Desde la Administración se ve, sin firmar.</div>` : ''}
+    ${p.estado === 'en_funciones' && (p.userId === yo().id || esGuardia()) ? `<button class="btn btn-sec btn-block" style="margin-top:14px" data-a="cerrar-peticion" data-id="${p.id}">Dar por cumplida / cerrar</button>` : ''}
     <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="verificar-peticion" data-id="${p.id}">${I('shield')}Verificar sellos</button>`);
-  if (p.estado === 'pendiente' && esStaff()) iniciarFirma('firmaGuardia');
+  if (p.estado === 'pendiente' && esGuardia()) iniciarFirma('firmaGuardia');
 };
 F['recibir-peticion'] = async (d, form) => {
   const firma = leerFirma('firmaGuardia');
@@ -124,6 +126,9 @@ F['recibir-peticion'] = async (d, form) => {
   cerrarHoja(); toast('Recibida y en funciones', 'check');
 };
 A['cerrar-peticion'] = el => {
+  /* La cierra el vecino que la pidió o la garita; la Administración no. */
+  const p0 = Store.s.peticiones.find(x => x.id === el.dataset.id);
+  if (p0 && p0.userId !== yo().id && !soloGarita()) return;
   Store.cambiar(s => { const p = s.peticiones.find(x => x.id === el.dataset.id); if (!p) return; p.estado = 'cerrada'; p.cerradaAt = Date.now(); p.cierra = yo().id;
     auditar(s, 'Petición cerrada', `${TIPOS_PET[p.tipo].n} · ${p.casa}`, p.id); });
   cerrarHoja(); toast('Petición cerrada', 'check');
@@ -663,9 +668,11 @@ function chatInterno(idP){
   if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
   /* Las peticiones firmadas de los vecinos a la garita ya no tienen su teja
      en la Administración (Claudio: "cumplen la misma función que los
-     mensajes con la garita"). Quedan a mano acá, arriba de la conversación. */
+     mensajes con la garita"). Quedan a mano acá, arriba de la conversación,
+     con un nombre que dice qué son (26-09, tarde: "no sé bien qué es"). Las
+     recibe y las firma la garita; la Administración solo las mira. */
   const pet = esAdmin() ? aLista(s.peticiones).filter(p => p && p.estado === 'pendiente').length : 0;
-  const barraPet = esAdmin() ? `<button class="chat-pet" data-a="abrir" data-v="peticiones">${I('edit')}<span><b>Peticiones firmadas de vecinos</b><small>${pet ? pet + ' sin recibir todavía · ver todas' : 'Pedidos a la garita con firma y sello · ver todas'}</small></span>${pet ? `<span class="n">${pet}</span>` : ''}${I('right')}</button>` : '';
+  const barraPet = esAdmin() ? `<button class="chat-pet" data-a="abrir" data-v="peticiones">${I('edit')}<span><b>Pedidos por escrito de los vecinos a la garita</b><small>${pet ? `${plural(pet, 'pedido', 'pedidos')} que la garita todavía no recibió · ` : ''}No dejar pasar a alguien, aviso de viaje, llaves, paquetes… Los firma la garita; acá solo se miran.</small></span>${pet ? `<span class="n">${pet}</span>` : ''}${I('right')}</button>` : '';
   return `<div class="chat-wrap">${barraPet}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
 
       <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
@@ -688,11 +695,11 @@ R.privado = {
     const miCanal = esGuardia() ? 'guardia' : esAdmin() ? 'admin' : con;
     if (esStaff() && !idP){
       const hilos = s.privados.filter(h => (h.con || 'admin') === miCanal).sort((a, b) => (b.msgs.at(-1)?.createdAt || 0) - (a.msgs.at(-1)?.createdAt || 0));
-      const interno = s.privados.find(h => h.con === 'interno' && (esGuardia() ? h.userId === u.id : true));
-      const sinLeerInt = interno ? aLista(interno.msgs).filter(m => m.from !== (esGuardia() ? 'guardia' : 'admin') && !m.leido).length : 0;
-      return `${superficie({ v:'privado', p:'interno', icon: esGuardia() ? 'sliders' : 'shield', color:'accent', t: esGuardia() ? 'Administración' : 'Garita',
-          s: (sinLeerInt ? plural(sinLeerInt, 'mensaje sin leer', 'mensajes sin leer') + ' · ' : '') + 'Conversación interna, no la ve ningún vecino' })}
-        ${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote', s:'Elegí el lote en "¿Para quién?"' })}
+      /* La conversación garita ↔ Administración ya no se repite acá (26-09,
+         tarde): tiene su lugar propio ("Mensajes con la garita" en el Día a
+         día de la Administración; "Administración" en las tejas de la
+         garita). Esta lista es solo de conversaciones con vecinos. */
+      return `${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote', s:'Elegí el lote en "¿Para quién?"' })}
         ${hilos.length ? hilos.map(h => { const v = usuario(h.userId) || {}, ult = h.msgs.at(-1), nl = h.msgs.filter(m => m.from === 'vecino' && !m.leido).length;
           return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${miCanal}|${h.userId}">${v.fotoCasa ? fotoHTML(v.fotoCasa, 'casa-foto chica') : avatar(v)}<span class="txt"><b>${esc(v.nombre || '')} · ${esc(v.casa || '')}</b><small>${ult ? esc(ult.text.slice(0, 70)) + ' · ' + hace(ult.createdAt) : 'Sin mensajes'}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')
           : vacio('lock', 'No hay conversaciones.')}`;
@@ -742,9 +749,17 @@ F['privado'] = (d, form) => {
   const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
 };
 
-/* ---------- DOCUMENTOS Y NORMAS, con buscador ---------- */
+/* ---------- NORMAS Y REGLAMENTOS, con buscador ----------
+   Es EL lugar de las normas (pedido de Claudio, 26-09-2026): antes también
+   aparecían en Descargas y se duplicaban. Desde acá se leen, se buscan y se
+   descargan: cada norma sola o todas juntas en un PDF, y el original
+   oficial cuando lo hay. Si la Administración cargó en Descargas un
+   documento que es una norma (reglamento, estatuto, convivencia…), se
+   muestra acá y no allá (esNormaDescarga). */
+const esNormaDescarga = d => !!d && (d.tipo === 'doc' || !d.tipo) && /reglament|norma|estatut|convivencia|protocolo|ordenanza/i.test(`${d.titulo || ''} ${d.detalle || ''}`);
+const PIE_NORMAS = 'Copia informativa generada por la app del barrio. Ante cualquier diferencia vale el texto original aprobado u oficial.';
 R.documentos = {
-  titulo: 'Normas y documentos', icon: 'file', color: 'brand', sub: 'Reglamento, convivencia y protocolos',
+  titulo: 'Normas y reglamentos', icon: 'file', color: 'brand', sub: 'Reglamento, convivencia y protocolos · para leer y descargar',
   render(q){
     const docs = Store.s.documentos;
     const qq = (q || '').trim().toLowerCase();
@@ -757,14 +772,27 @@ R.documentos = {
       resultados = sec(`Respuestas para "${esc(q)}"`) + (hits.length ? hits.slice(0, 6).map(h => `<div class="card" style="padding:12px 14px"><div class="muted tiny">${esc(h.d.titulo)}</div><div class="small">${esc(h.par).replace(new RegExp(`(${pal.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi'), '<mark>$1</mark>')}</div></div>`).join('')
         : vacio('search', 'No encontramos eso en las normas. Preguntale a la Administración.'));
     }
+    const bajables = descargasVisibles().filter(d => esNormaDescarga(d) && (d.url || d.texto));
     return `<form data-f="buscar-norma" class="linea-form" style="margin-bottom:12px"><input name="q" id="qNorma" value="${esc(q || '')}" placeholder="Preguntá: ¿hasta qué hora puedo hacer obra?"><button class="btn btn-pri">${I('search')}</button></form>
-      ${resultados}${sec('Documentos')}
-      ${docs.map(d => superficie({ a:'ver-doc', id:d.id, icon:'file', color: d.tipo === 'Convivencia' ? 'accent' : 'brand', t:esc(d.titulo), s:`${esc(d.tipo || 'Documento')} · actualizado ${hace(d.updatedAt || d.createdAt)}` })).join('')}
-      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido', icon:'edit', color:'accent', t:'Editar documentos', s:'Desde Administración → Contenido' }) : ''}`;
+      ${resultados}${sec('Normas del barrio')}
+      ${docs.map(d => superficie({ a:'ver-doc', id:d.id, icon:'file', color: d.tipo === 'Convivencia' ? 'accent' : 'brand', t:esc(d.titulo), s:`${esc(d.tipo || 'Documento')} · actualizado ${hace(d.updatedAt || d.createdAt)}` })).join('') || vacio('file', 'Todavía no hay normas cargadas.')}
+      ${bajables.length ? sec('Para descargar') + bajables.map(d => `<button class="superficie" data-a="descargar" data-id="${esc(d.id)}"><span class="ic ic-${d.color || 'brand'}">${I(d.icon || 'file')}</span><span class="txt"><b>${esc(d.titulo)}</b>${d.detalle ? `<small>${esc(d.detalle)}</small>` : ''}</span>${I('download')}</button>`).join('') : ''}
+      <p class="muted tiny" style="margin-top:10px">${I('file')} Tocá una norma para leerla. Al final del texto está el botón para descargarla o imprimirla (y el original oficial, cuando lo hay).</p>
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido', icon:'edit', color:'accent', t:'Editar normas y documentos', s:'Desde Administración → Contenido' }) : ''}`;
   },
 };
 F['buscar-norma'] = d => abrir('documentos', d.q || '');
-A['ver-doc'] = el => { const d = Store.s.documentos.find(x => x.id === el.dataset.id); if (d) hoja(d.titulo, `<div style="white-space:pre-wrap;font-size:14.5px;line-height:1.6">${esc(d.texto)}</div>${d.link ? `<a class="btn btn-sec btn-block" style="margin-top:14px" href="${esc(d.link)}" target="_blank" rel="noopener">${I('file')}Abrir el documento completo</a>` : ''}`, { ancho:'720px' }); };
+/* La descarga está SOLO adentro, al final del texto (pedido de Claudio,
+   26-09): primero se lee, después se baja. */
+A['ver-doc'] = el => { const d = Store.s.documentos.find(x => x.id === el.dataset.id); if (d) hoja(d.titulo, `<div style="white-space:pre-wrap;font-size:14.5px;line-height:1.6">${esc(d.texto)}</div>
+  <div class="doc-final"><span class="muted small">${I('check')} Fin del documento</span></div>
+  <div class="btns" style="margin-top:10px"><button class="btn btn-pri grow" data-a="doc-imprimir" data-id="${esc(d.id)}">${I('download')}Descargar o imprimir</button>
+  ${d.link ? `<a class="btn btn-sec grow" href="${esc(d.link)}" target="_blank" rel="noopener">${I('file')}Original oficial (PDF)</a>` : ''}</div>`, { ancho:'720px' }); };
+const normaParaImprimir = d => `<h2>${esc(d.titulo)}</h2><p style="color:#555;margin:-4px 0 10px">${esc(d.tipo || 'Documento')}${d.updatedAt || d.createdAt ? ' · actualizado el ' + fechaCorta(isoDe(new Date(d.updatedAt || d.createdAt))) : ''}${d.link ? ` · original: <a href="${esc(d.link)}">${esc(d.link)}</a>` : ''}</p>
+  <div style="white-space:pre-wrap;font-size:13px;line-height:1.55">${esc(d.texto || '')}</div>`;
+A['doc-imprimir'] = el => { const d = Store.s.documentos.find(x => x.id === el.dataset.id); if (d) imprimir(d.titulo, normaParaImprimir(d), { pie:PIE_NORMAS }); };
+A['docs-imprimir'] = () => { const ds = Store.s.documentos; if (!ds.length) return toast('No hay normas cargadas', 'file');
+  imprimir('Normas y reglamentos', `<p><b>Normas y reglamentos del barrio</b> · ${plural(ds.length, 'documento')} · ${fechaLarga(hoyISO())}</p>${ds.map(normaParaImprimir).join('<div style="page-break-after:always"></div>')}`, { pie:PIE_NORMAS }); };
 
 /* Las expensas viven en js/v-expensas.js: el módulo contable completo. */
 
@@ -777,7 +805,7 @@ R.recoleccion = {
        la Administración anota todas las del año y la app avisa la víspera. */
     const vols = volsProximos();
     const viajes = typeof Camion !== 'undefined' ? Camion.lista().slice(0, 6) : [];
-    return `${typeof bandaCamion === 'function' ? bandaCamion(esStaff()) : ''}
+    return `${typeof bandaCamion === 'function' ? bandaCamion(esGuardia()) : ''}
       <div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${recoleccionDias()[d] ? I('truck') + esc(recoleccionDias()[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
       <p class="muted small">Pasa por la mañana, desde las ${c.recoleccionHora} h. Si ese día es feriado, puede cambiar: la app avisa.</p>
       ${(() => { const man = diaInfo(sumarDias(hoyIso, 1));
@@ -883,10 +911,10 @@ R.emergencias = {
         ${mio ? `<div style="margin-top:12px">${aviso(mio.estado === 'en_camino' ? 'ok' : 'danger latido', 'heart', mio.estado === 'en_camino' ? 'El DEA va en camino' : 'Tu pedido del DEA está en la garita',
             mio.estado === 'en_camino' ? `Salió ${hace(mio.enCaminoAt || mio.at)}.` : 'Esperando que salgan con el DEA. Llamá al 911.', `<button class="btn btn-xs btn-sec" data-a="dea-listo" data-id="${mio.id}">Ya no hace falta</button>`)}</div>`
         : esGuardia() ? '' : `<p class="muted tiny" style="margin:10px 0 0">En una emergencia (alguien se desmayó y no respira), <b>mantené apretado SOLICITARLO 2 segundos</b> y confirmá: a la garita le salta la alarma con tu lote y tu apellido. Llamá también al 911.</p>`}</div>
+      ${c.deaHotel ? `<div class="card plana small" style="margin:-4px 0 12px">${I('heart')} <b>Otro DEA en el barrio:</b> ${esc(HOTEL_NOMBRE)} · ${esc(c.deaHotel.lugar || 'recepción')}${c.deaHotel.tel ? ` · <a href="${telLink(c.deaHotel.tel)}">${esc(c.deaHotel.tel)}</a>` : ''}. Ante una emergencia, la garita se lo pide al hotel.</div>` : ''}
       ${sosDelDia()}
       ${sec('Del barrio')}<div class="card lista">${s.contactos.map(k => renglonAgenda({ nombre:k.nombre, detalle:k.detalle, tel:telContacto(k), wa: k.wa !== false })).join('')}</div>
-      ${cats.map(c => `${sec(esc(c))}<div class="card lista">${s.agenda.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('')}
-      ${superficie({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, supermercados, oficios del barrio' })}`;
+      ${cats.map(c => `${sec(esc(c))}<div class="card lista">${s.agenda.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('')}`;
   },
 };
 /* Los vecinos que eligieron compartir su profesión u oficio con el barrio
@@ -1513,7 +1541,7 @@ const TIPOS_DESCARGA = {
 R.descargas = {
   titulo: 'Descargas', icon: 'download', color: 'sky', sub: 'Apps, documentos y planillas del barrio',
   render(){
-    const s = Store.s, ds = descargasVisibles().filter(d => d.url || d.texto);
+    const s = Store.s, ds = descargasVisibles().filter(d => (d.url || d.texto) && !esNormaDescarga(d));
     const porTipo = {};
     ds.forEach(d => { const t = TIPOS_DESCARGA[d.tipo] ? d.tipo : 'doc'; (porTipo[t] = porTipo[t] || []).push(d); });
     const bloque = (t) => {
@@ -1525,8 +1553,8 @@ R.descargas = {
     };
     return `${ds.length ? Object.keys(TIPOS_DESCARGA).filter(t => porTipo[t]).map(bloque).join('')
       : vacio('download', 'Todavía no hay nada para descargar.')}
-      ${sec('Del barrio')}
-      ${superficie({ v:'documentos', icon:'file', color:'brand', t:'Reglamento y normas', s:'Convivencia, obras, actas · se pueden imprimir o guardar en PDF' })}
+      <p class="muted small" style="margin:10px 2px 6px">${I('file')} El reglamento y las normas del barrio se leen y se descargan en <button class="link" data-a="abrir" data-v="documentos">El barrio → Normas y reglamentos</button>.</p>
+      ${esAdmin() ? sec('Del barrio') : ''}
       ${esAdmin() ? superficie({ a:'exportar-padron', icon:'users', color:'wood', t:'Padrón de propietarios (CSV)', s:'Para abrirlo en Excel' }) : ''}
       ${esAdmin() ? superficie({ a:'exportar', icon:'download', color:'sky', t:'Copia de seguridad de los datos', s:'Todo el barrio en un archivo' }) : ''}
       ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido|descargas', icon:'plus', color:'accent', t:'Agregar algo a esta ventana', s:'Apps, instructivos, planillas o enlaces', cls:'acento' }) : ''}

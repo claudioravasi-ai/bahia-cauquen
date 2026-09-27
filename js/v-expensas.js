@@ -223,7 +223,7 @@ function calcularLiquidacion(periodo){
 }
 
 /* ---------- impresión (cupón, liquidación, recibo, certificado) ---------- */
-function imprimir(titulo, cuerpo){
+function imprimir(titulo, cuerpo, { pie = 'Documento generado por la app del barrio. Los importes están expresados en pesos.' } = {}){
   const c = Store.s.config;
   const w = window.open('', '_blank');
   if (!w){ toast('El navegador bloqueó la ventana de impresión', 'alert'); return; }
@@ -248,7 +248,7 @@ function imprimir(titulo, cuerpo){
       <div style="font-size:12px;color:#555">${esc(c.domicilio || '')} · CUIT ${esc(c.cuit || '')}<br>${esc(c.adminEmail || '')} ${c.adminTel ? '· ' + esc(c.adminTel) : ''}</div></div>
       <div class="der"><b>${esc(titulo)}</b><br>Emitido ${fechaHora(Date.now())}</div></div>
     ${cuerpo}
-    <div class="pie">Documento generado por la app del barrio. Los importes están expresados en pesos.</div>
+    <div class="pie">${pie}</div>
     <div class="noimp" style="text-align:center;margin-top:18px"><button onclick="window.print()" style="padding:10px 20px;border:0;border-radius:8px;background:#0d6b66;color:#fff;font-weight:700;cursor:pointer">Imprimir o guardar como PDF</button></div>
     </div></body></html>`);
   w.document.close();

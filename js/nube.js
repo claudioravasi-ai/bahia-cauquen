@@ -49,6 +49,19 @@ const Nube = {
              'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos'],
+    /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
+       Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
+       los huéspedes, solo el hotel y la garita; las promociones propuestas,
+       el hotel y la Administración; el resto, los tres. */
+    hotel: ['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos'],
+  },
+  /* Qué baja cada rol. El hotel NO baja nada de los vecinos: solo lo
+     público de la ciudad y lo suyo. La garita no baja el chat vecinal. */
+  HOTEL_LEE: {
+    hotel:   { barrio:['agenda','temporadas','feriados','contactos','documentos','cruceros','eventosCiudad','promos','camion'],
+               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos'] },
+    admin:   { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv','hotelPromos'] },
+    guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv'] },
   },
 
   /* =========================================================
@@ -93,6 +106,8 @@ const Nube = {
     descargas:       { listas:[] },
     alertas:         { listas:['lotes'], objetos:['respuestas'] },
     frecuentes:      { listas:['dias'] },
+    hotelViajes:     { listas:['huespedes'] },
+    hotelProv:       { listas:['dias'] },
     camion:          { listas:[] },
   },
   comoLaGuardamos(col, x){
@@ -109,7 +124,16 @@ const Nube = {
       case 'privados': return [x.userId];
       case 'dms': return [x.a, x.b];
       case 'reclamos': case 'peticiones': return [x.userId];
-      case 'pases': case 'solicitudesPase': case 'llegadas': case 'paquetes': return [x.hostId];
+      case 'pases': case 'solicitudesPase': case 'llegadas': return [x.hostId];
+      /* PAQUETES POR LOTE (26-09-2026): el paquete de Mónica también le llega
+         a Claudio, que vive en el mismo lote. Van a todas las cuentas
+         aprobadas del lote, más la persona a cuyo nombre vino. */
+      case 'paquetes': {
+        const lote = x.lote || usuario(x.hostId)?.casa;
+        const us = lote ? Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').map(u => u.id) : [];
+        if (x.hostId && !us.includes(x.hostId)) us.push(x.hostId);
+        return us;
+      }
       case 'infracciones':
         return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
       /* PAGOS Y RECIBOS VAN POR LOTE (arreglado el 26-09-2026). Antes se
@@ -155,7 +179,7 @@ const Nube = {
     const s = Store.s;
     /* Se vacía todo lo que maneja la nube: si quedaron datos de la demo o de
        otra sesión en este equipo, no tienen que subir a la base del barrio. */
-    [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff].forEach(col => { if (Array.isArray(s[col])) s[col] = []; });
+    [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff, ...this.ZONAS.hotel].forEach(col => { if (Array.isArray(s[col])) s[col] = []; });
     s.notifs = []; s.motorLog = {}; this.ultimo = {}; this.configLista = false; this.motorListo = false;
     this.listos = new Set(); this.esperados = new Set(); this.arranqueAt = Date.now();
     /* Leer la ficha propia. Si la base falla (conexión lenta, un corte),
@@ -218,15 +242,19 @@ const Nube = {
     Store.sesion.visitaAnterior = Store.sesion.ultimaVisita || 0;
     Store.sesion.ultimaVisita = Date.now();
     Store.guardarSesion();
-    const staff = mio.rol === 'admin' || mio.rol === 'guardia';
-    this.escucharColeccion('barrio', this.ZONAS.barrio);
+    const staff = mio.rol === 'admin' || mio.rol === 'guardia', hotel = mio.rol === 'hotel';
+    const lee = this.HOTEL_LEE[mio.rol] || {};
+    /* La garita no baja el chat vecinal: es entre vecinos (26-09). El hotel,
+       solo lo público de la ciudad. */
+    this.escucharColeccion('barrio', lee.barrio || (mio.rol === 'guardia' ? this.ZONAS.barrio.filter(c => c !== 'msgs') : this.ZONAS.barrio));
     this.escucharConfig();
     if (staff) this.escucharColeccion('staff', this.ZONAS.staff);
-    else this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
+    else if (!hotel) this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
+    if (lee.hotel) this.escucharColeccion('hotel', lee.hotel);
     this.escucharPv(mio.rol);
     if (mio.rol === 'admin') setTimeout(() => this.mudarPrivado(), 3000);
     this.arrancada = true;
-    this.anotarPresencia();
+    if (!hotel) this.anotarPresencia();
     /* Si administra el barrio, elige desde qué brazo entra. */
     if (mio.rol === 'admin' && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
     /* Las alertas que ya estaban abiertas antes de entrar no saltan ni
@@ -472,13 +500,16 @@ const Nube = {
     if (!this.db || yo()?.rol !== 'admin' || !this.listoParaMotor || !this.listoParaMotor()) return 0;
     if (!Store.s.users.some(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || ''))) return 0;
     const cambios = {};
-    ['pagos', 'recibos'].forEach(f => {
+    /* Los paquetes también: uno que llegó antes de que el otro vecino del
+       lote tuviera cuenta pasa a su carpeta cuando se inscribe. */
+    ['pagos', 'recibos', 'paquetes'].forEach(f => {
       const donde = this.pvDonde[f] || {};
       aLista(Store.s[f]).forEach(x => {
         if (!x || !x.id) return;
         const quiero = this.duenos(f, x), hay = donde[x.id] || [];
+        const lote = f === 'paquetes' ? (x.lote || usuario(x.hostId)?.casa) : (x.lote || x.casa);
         quiero.filter(d => !hay.includes(d)).forEach(d => { cambios[`pv/${f}/${d}/${x.id}`] = x; });
-        hay.filter(d => !quiero.includes(d) && (d.startsWith('lote-') || (usuario(d) && usuario(d).casa !== (x.lote || x.casa)) || !usuario(d)))
+        hay.filter(d => !quiero.includes(d) && d !== x.hostId && (d.startsWith('lote-') || (usuario(d) && usuario(d).casa !== lote) || !usuario(d)))
           .forEach(d => { cambios[`pv/${f}/${d}/${x.id}`] = null; });
       });
     });
@@ -511,7 +542,8 @@ const Nube = {
     /* El mismo registro puede estar en la carpeta de varios vecinos del
        lote. Si alguna copia quedó vieja (un pago "informado" que en otra
        carpeta ya figura "confirmado"), gana la más avanzada. */
-    const peso = x => col === 'pagos' ? (x.estado === 'confirmado' || x.estado === 'rechazado' ? 2 : 1) * 1e13 + (x.confirmadoAt || x.at || 0) : 0;
+    const peso = x => col === 'pagos' ? (x.estado === 'confirmado' || x.estado === 'rechazado' ? 2 : 1) * 1e13 + (x.confirmadoAt || x.at || 0)
+      : col === 'paquetes' ? (x.retirado ? 2 : 1) * 1e13 + (x.retirado || x.recibido || 0) : 0;
     Object.entries(this.PV).filter(([, d]) => d.col === col).forEach(([f]) => (this.pvDatos[f] || []).forEach(x => {
       if (!x.id) return;
       if (!vistos.has(x.id)){ vistos.set(x.id, arr.length); arr.push(x); }
@@ -629,10 +661,11 @@ const Nube = {
     const rutasDe = (col, x) => {
       if (this.ZONAS.barrio.includes(col)) return [`barrio/${col}/${x.id}`];
       if (this.ZONAS.staff.includes(col)) return [`staff/${col}/${x.id}`];
+      if (this.ZONAS.hotel.includes(col)) return [`hotel/${col}/${x.id}`];
       if (col === 'notifs') return this.esNotifGeneral(x) ? [`barrio/notifsTodos/${x.id}`] : this.duenos(col, x).map(u => `pv/notifs/${u}/${x.id}`);
       return this.duenos(col, x).filter(Boolean).map(u => `pv/${this.carpetaDe(col, x)}/${u}/${x.id}`);
     };
-    [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff].forEach(col => {
+    [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff, ...this.ZONAS.hotel].forEach(col => {
       if (col === 'notifsTodos') return;
       const arr = s[col]; if (!Array.isArray(arr)) return;
       const antes = this.ultimo[col] || {}, ahora = {};
@@ -789,6 +822,13 @@ const Nube = {
       await this.db.ref('barrio/fotosIdx/' + fotoId).set({ at, vence, de:this.uid }).catch(() => {});
       return true;
     } catch(e){ console.warn('No se pudo dejar la foto para bajar (¿faltan publicar las reglas?)', e.message); return false; }
+  },
+  /* La copia para bajar de una foto que ya no hace falta (un paquete
+     entregado): se borra de la base enseguida, sin esperar a que venza. */
+  async borrarDescarga(fotoId){
+    if (!this.db || !fotoId) return;
+    try { await this.db.ref().update({ ['barrio/fotosDescarga/' + fotoId]:null, ['barrio/fotosIdx/' + fotoId]:null }); }
+    catch(e){ console.warn('No se pudo borrar la foto para bajar', e.message); }
   },
   async bajarDescarga(fotoId){
     if (!this.db || !this.uid) return null;

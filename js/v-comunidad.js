@@ -383,7 +383,7 @@ const FAQ = [
   ['¿Cómo hago un reclamo a la Administración?', 'En Tu casa → Mis reclamos. Es privado: lo ven solo vos y la Administración, que te contesta por ahí. Si otros vecinos tienen el mismo problema, la Administración puede publicarlo en el pizarrón.', 'abrir', 'reclamos', 'Mis reclamos'],
   ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el pizarrón y el chat. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Tus mensajes privados y tus reclamos no los ve ningún otro vecino. Más abajo, en "Tus datos: privacidad y seguridad", está todo el detalle.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Cómo aparezco en la agenda como profesional u oficio?', 'En Mi casa cargá tu profesión u oficio y tu celular, y marcá que se muestre al barrio. Aparecés solo en Profesionales y oficios y en la Agenda, con botón de WhatsApp.', 'abrir', 'perfil', 'Mi casa'],
-  ['¿Dónde están las normas del barrio?', 'En El barrio → Normas y reglamento, con un buscador ("¿hasta qué hora puedo hacer obra?"). Ahí también están la ordenanza municipal de barrios cerrados y lo que dice el Código Civil.', 'abrir', 'documentos', 'Normas'],
+  ['¿Dónde están las normas del barrio?', 'En El barrio → Normas y reglamentos, con un buscador ("¿hasta qué hora puedo hacer obra?"). Ahí también están la ordenanza municipal de barrios cerrados y lo que dice el Código Civil, y cada una se puede descargar (o todas juntas) para imprimir o guardar en PDF.', 'abrir', 'documentos', 'Normas y reglamentos'],
   ['¿Qué significan los colores de la Pizarra del día?', 'Rojo: importante. Amarillo: para tener en cuenta. Verde: para saber. Lo que todavía no leíste titila en su color; al tocarlo se queda quieto.', '', '', ''],
   ['¿Quién responde por la app y por mis datos?', 'La app la hizo un vecino, Claudio A. Ravasi, en forma gratuita. La maneja la Administración del barrio, que es la responsable de los datos (Ley 25.326 de Protección de Datos Personales). Cada uno responde por lo que publica. No reemplaza al 911, al 107 ni a los bomberos. Todo el detalle legal está en los términos de uso; también se abren tocando "by Claudio A. Ravasi" al pie de la portada.', 'abrir', 'legal', 'Términos de uso y responsabilidad'],
   ['La app quedó rara o no abre una ventana', 'Tu cuenta (tu foto arriba a la derecha) → Actualizar la app. Baja todo de nuevo sin borrar tus datos.', 'actualizar-app', '', 'Actualizar la app'],
@@ -400,7 +400,7 @@ const FAQ = [
    ========================================================= */
 const FAQ_DATOS = [
   ['En pocas palabras: ¿mis datos están seguros?', [
-    'Sí. La app pide solo lo necesario; cada persona ve únicamente lo que le corresponde según su función, y eso lo controla el servidor, no la pantalla; todo viaja cifrado y queda guardado cifrado; las contraseñas no las puede ver nadie; los datos de las visitas se borran solos; y nada se vende, se publica ni se entrega a terceros ajenos al barrio sin tu consentimiento.',
+    'Sí. La app pide solo lo necesario; cada persona ve únicamente lo que le corresponde según su función, y eso lo controla el servidor, no la pantalla; todo viaja cifrado y queda guardado cifrado; las contraseñas no las puede ver nadie; los datos de las visitas se borran solos; y nada se vende, se publica ni se entrega a terceros ajenos al barrio sin tu consentimiento. El Hotel Los Cauquenes, que está dentro del barrio, tiene una cuenta propia y separada, y no puede ver ningún dato de los vecinos: lo impide el servidor, no la pantalla.',
     'Está hecha conforme a la Ley 25.326 de Protección de los Datos Personales, a las garantías de privacidad de la Constitución Nacional y a los tratados internacionales de derechos humanos que tienen su misma jerarquía. En cada punto de abajo está primero la explicación en simple y después el fundamento jurídico, para que cualquier vecino (también quien sea abogado) lo pueda controlar.',
   ]],
   ['¿Qué normas la rigen?', [
@@ -433,7 +433,7 @@ const FAQ_DATOS = [
     '• Exactitud (art. 4 inc. 4 y 5): cada vecino corrige sus propios datos en Mi casa, en cualquier momento.',
     '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran. Pasado ese plazo, la visita queda solo en el archivo histórico del barrio (quién vino, a qué lote y cuándo), sin DNI ni patente, con las mismas reglas de acceso que el resto: cada vecino ve solo las suyas.',
     '• Privacidad por defecto: lo optativo nace oculto. Tu teléfono, tu oficio o tu dirección se muestran a otros vecinos solo si vos lo marcás, y lo podés quitar cuando quieras.',
-    '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, la garita no puede leer expensas, pagos, reclamos ni las conversaciones de los vecinos con la Administración, y la Administración no puede leer las conversaciones de un vecino con la garita.',
+    '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, el hotel no puede leer ninguna carpeta ni lista de vecinos, la garita no puede leer expensas, pagos, reclamos, el chat vecinal ni las conversaciones de los vecinos con la Administración, y la Administración no puede leer las conversaciones de un vecino con la garita.',
   ]],
   ['¿Está todo cifrado (encriptado)? ¿Qué medidas de seguridad hay?', [
     'En simple: sí, en el viaje y en el guardado. Y además el servidor decide quién puede leer cada cosa.',
@@ -448,6 +448,9 @@ const FAQ_DATOS = [
   ]],
   ['¿Quién puede ver cada cosa?', [
     '• Los otros vecinos: tu nombre y tu lote en el pizarrón y el chat del barrio; tu teléfono, oficio o dirección solo si vos lo autorizás. Nunca tu DNI, tu correo, tus expensas, tus reclamos, tus visitas ni tus mensajes.',
+    '• Las otras cuentas de tu mismo lote (por ejemplo, tu pareja): las expensas y los paquetes del lote, porque son de todos los que viven ahí. Tus mensajes, reclamos y visitas siguen siendo solo tuyos.',
+    '• El chat del barrio: lo leen los vecinos y la Administración. La garita no lo lee: con ella te comunicás por mensaje privado o con una petición.',
+    '• El Hotel Los Cauquenes: nada tuyo. Tiene una cuenta institucional separada que solo ve lo suyo (sus vans, traslados, huéspedes, eventos, proveedores y promociones) y lo público de la ciudad (vuelos, cruceros, agenda, normas del barrio). No puede leer el padrón, las fichas de los vecinos, el chat, el pizarrón, tus visitas, la bitácora de la garita ni los SOS.',
     '• La garita: lo que necesita para la seguridad: tus visitas y pases, tus paquetes, tus peticiones firmadas, los avisos que le mandás, las conversaciones con ella y la foto del frente de tu casa para ubicar el domicilio.',
     '• Retiro de paquetes: tu teléfono crea una llave que nunca sale de él. En tu ficha queda solo su parte pública (sirve para comprobar la firma del QR, no para firmar) y el tipo de equipo (por ejemplo "iPhone"). Cada entrega queda asentada con quién recibió, quién entregó, la hora y un sello SHA-256. Si retirás sin teléfono, de tu DNI se guardan solo los tres últimos números. Al cerrar sesión, la llave se borra de ese equipo.',
 
@@ -456,6 +459,14 @@ const FAQ_DATOS = [
     '• Rondas del policía con QR: cuando escanea un punto de control, se guardan su nombre, el punto y la hora (del servidor, no del teléfono). Solo cuenta si el teléfono tiene el código de ronda que la garita le da al policía de turno esa noche: un vecino que escanee un QR no puede registrar nada. Lo ven solo la garita y la Administración, y sirve para comprobar que la ronda se hizo.',
     '• Si pedís un SOS: la alerta salta en la pantalla de todos, con el tipo de emergencia, tu nombre, tu lote y la ubicación GPS de ese momento, para que cualquiera sepa dónde está pasando y pueda ayudar. La ubicación se toma solo cuando vos apretás el SOS, nunca antes ni después. Tu teléfono lo ven solo la garita y la Administración. Es un uso consentido por el propio titular al pedir ayuda y limitado a la emergencia (arts. 4 y 5 de la Ley 25.326).',
     '• La lista de equipos anotados para recibir avisos en el celular: no la puede leer ninguna persona desde la app; solo el programa que envía los avisos.',
+  ]],
+  ['¿Y el Hotel Los Cauquenes? ¿Ve mis datos?', [
+    'En simple: no. El hotel ve lo suyo y lo público de la ciudad; tus datos no los puede leer, y eso lo controla el servidor, no la pantalla.',
+    '• El hotel es un propietario del barrio (6 unidades) con actividad comercial. Por eso tiene una cuenta institucional con un rol propio ("hotel"), distinta de la de un vecino y de la del personal del barrio, bajo la responsabilidad de la persona que designe.',
+    '• Las reglas de la base de datos le niegan al hotel toda la información de los vecinos (padrón, fichas, chat, pizarrón, visitas, pagos, mensajes, bitácora y SOS). Se comprobó ruta por ruta con un evaluador de reglas: para vecinos, garita y Administración los permisos quedaron exactamente iguales a los de antes, y el hotel no accede a ningún dato de vecinos.',
+    '• Los datos de sus huéspedes (nombre, fechas, patente y, si el hotel los carga, los vuelos) los carga el hotel, que es el responsable de esos datos frente a sus huéspedes. Los ven solo el hotel y la garita, que los necesita para dejarlos pasar; la Administración ve únicamente la cantidad, sin nombres. Se borran solos al día siguiente del check-out (principios de finalidad y conservación limitada, art. 4 de la Ley 25.326).',
+    '• Si hay una emergencia médica en el barrio, la garita puede pedirle al hotel su desfibrilador o su personal con primeros auxilios: al hotel le llega solo el lote al que tiene que ir.',
+    '• Lo demás que tiene que ver con el hotel (acceso, eventos, ruidos, estacionamiento) se ordena con un convenio de convivencia y servicios a aprobar en asamblea.',
   ]],
   ['¿Qué pasa con los datos sensibles, como la salud?', [
     'En simple: la app no arma fichas de salud de nadie. Si pedís ayuda por una emergencia médica, ese dato se usa solo para atenderte.',
@@ -508,7 +519,8 @@ R.ayuda = {
   titulo: 'Preguntas frecuentes', icon: 'info', color: 'ok', sub: 'Cómo se hace cada cosa',
   render(){
     const item = (p, cuerpo) => `<details class="faq card"><summary><b>${esc(p)}</b>${I('right')}</summary>${cuerpo}</details>`;
-    return `${FAQ.map(([p, r, a, v, b]) => item(p, `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.55">${faqTexto(r)}</p>
+    return `<button class="superficie acento" data-a="abrir" data-v="manual"><span class="ic ic-accent">${I('book')}</span><span class="txt"><b>Manual de uso completo</b><small>Paso a paso, por capítulos, con buscador</small></span>${I('right')}</button>
+      ${FAQ.map(([p, r, a, v, b]) => item(p, `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.55">${faqTexto(r)}</p>
       ${a ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="${a}" data-v="${v}">${esc(b)}${I('right')}</button>` : ''}`)).join('')}
       <div class="sec" id="faqDatos"><h2>${I('lock')} Tus datos: privacidad y seguridad</h2></div>
       ${FAQ_DATOS.map(([p, ps]) => item(p, ps.map(t => `<p class="small" style="color:var(--ink-2);margin:10px 0 0;line-height:1.6">${faqTexto(t)}</p>`).join(''))).join('')}

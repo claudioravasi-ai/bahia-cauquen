@@ -140,7 +140,8 @@ const Store = {
 function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
     bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
-    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[] };
+    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
+    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
   if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
@@ -177,6 +178,8 @@ function migrar(s){
   /* Padrón con nombres de propietarios: se importa desde Administración. */
   if (!Array.isArray(s.padron)) s.padron = [];
   if (!s.motorLog || typeof s.motorLog !== 'object') s.motorLog = {};
+  /* En la demo (?local) hay un hotel de muestra para probar su portal. */
+  if (typeof hotelDemo === 'function' && !(typeof Nube !== 'undefined' && Nube.activa())) hotelDemo(s);
   s.config = Object.assign({}, CONFIG_BASE, s.config || {});
 }
 
@@ -480,6 +483,34 @@ const esGuardia = () => yo()?.rol === 'guardia';
 const correoGarita = () => String(Store.s.config.garitaEmail || CONFIG_BASE.garitaEmail).trim().toLowerCase();
 const esCorreoGarita = e => !!e && String(e).trim().toLowerCase() === correoGarita();
 const esStaff = () => esAdmin() || esGuardia();
+/* EL HOTEL LOS CAUQUENES (26-09-2026): una cuenta institucional con rol
+   propio. No es vecino ni personal del barrio: ve y maneja solo lo suyo
+   (vans, traslados, eventos, huéspedes, proveedores, promociones) y lo
+   público de la ciudad. Ver js/v-hotel.js. */
+const HOTEL_NOMBRE = 'Hotel Los Cauquenes';
+const esHotel = () => yo()?.rol === 'hotel';
+const cuentaHotel = () => Store.s.users.find(x => x.rol === 'hotel' && x.estado === 'aprobado') || null;
+/* =========================================================
+   LA GARITA OPERA, LA ADMINISTRACIÓN MIRA (pedido de Claudio, 26-09-2026)
+   Lo que es deber de la guardia (validar códigos, registrar ingresos y
+   egresos, paquetes, camión, policía y rondas, bitácora, peticiones, SOS)
+   lo hace SOLO la cuenta de la garita. La Administración lo ve todo en vivo
+   pero no lo toca: así no se pisan datos ni se cruzan responsabilidades.
+   Lo que sí es de la Administración es la configuración: horarios de los
+   turnos, puntos de la ronda, zonas, proveedores e ingresos frecuentes.
+   Para pedirle algo a la garita está "Mensajes con la garita".
+   ========================================================= */
+const soloGarita = () => {
+  if (esGuardia()) return true;
+  toast('Eso lo hace solo la garita. Desde la Administración se ve en vivo; para pedirle algo, escribile en "Mensajes con la garita".', 'lock');
+  return false;
+};
+/* Las cuentas aprobadas de un lote (en el 148 viven Mónica y Claudio: los
+   dos tienen que enterarse de lo que llega al lote). */
+const cuentasDelLote = casa => casa ? Store.s.users.filter(u => u.estado === 'aprobado' && u.casa === casa) : [];
+/* Los paquetes de todo el lote, no solo los que llegaron a mi nombre. */
+const loteDelPaquete = p => (p && (p.lote || usuario(p.hostId)?.casa)) || '';
+const paquetesDelLote = (u = yo()) => !u ? [] : aLista(Store.s.paquetes).filter(p => p && (p.hostId === u.id || (u.casa && loteDelPaquete(p) === u.casa)));
 const vecinosAprobados = () => Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino');
 const casasRegistradas = () => new Set(Store.s.users.filter(u => u.estado === 'aprobado' && u.casa && u.rol === 'vecino').map(u => u.casa)).size;
 const totalLotes = () => (typeof LOTES !== 'undefined' ? lotesVecinos().length : Store.s.config.casas);

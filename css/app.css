@@ -1913,3 +1913,153 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 .retiro-qr b{font-size:17px} .retiro-qr span{color:var(--muted);font-size:13px}
 .retiro-quien{display:flex;align-items:center;gap:14px;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--surface);margin:10px 0}
 .retiro-quien b{display:block;font-size:18px} .retiro-quien span{display:block;color:var(--ink-2);font-size:14px} .retiro-quien small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+
+/* Logo un poco más grande (26-09, tarde, pedido de Claudio): el escudo tiene
+   letras y un dibujo fino, y a 36 px no se apreciaba el diseño. Va después
+   de las reglas anteriores del encabezado para ganarles. */
+.logo{width:44px;height:44px}
+.logo img{transform:scale(1.04)}
+.top .logo{width:48px;height:48px;border-radius:50%}
+.portal-marca .logo,.bienvenida .marca .logo{width:64px;height:64px}
+@media (max-width:430px){ .top .logo{width:44px;height:44px} }
+@media (max-width:380px){ .top .logo{width:40px;height:40px} }
+@media (max-width:340px){ .top .logo{width:36px;height:36px} }
+
+/* La garita en vivo, para la Administración: se mira, no se toca. */
+.garita-vivo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;margin:0 0 12px;border-radius:16px;
+  border:1px dashed color-mix(in srgb,var(--brand) 45%,transparent);background:color-mix(in srgb,var(--brand) 7%,var(--surface))}
+.garita-vivo>svg{width:26px;height:26px;flex:none;color:var(--brand)}
+.garita-vivo .grow{min-width:0;flex:1 1 220px}
+.garita-vivo b{display:block;font-size:14.5px}
+.garita-vivo span{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.45;margin-top:2px}
+
+/* Paquetes: la vista previa liviana y cómo se ve la foto buena. */
+.paq-foto{margin-top:10px;display:grid;gap:6px}
+.paq-foto .post-foto{max-width:220px;aspect-ratio:4/3;cursor:zoom-in}
+
+/* Normas y reglamentos: cada norma con su botón de descarga al costado. */
+.doc-fila{display:flex;align-items:stretch;gap:8px}
+.doc-fila>.superficie{flex:1;min-width:0;margin-bottom:0}
+.doc-fila{margin-bottom:10px}
+.doc-bajar{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:78px;padding:8px 10px;border:1px solid var(--line);border-radius:16px;
+  background:var(--surface);color:var(--brand);font:inherit;font-size:11.5px;font-weight:700;cursor:pointer}
+.doc-bajar svg{width:20px;height:20px}
+.doc-bajar:hover{background:var(--surface-3)}
+@media (max-width:380px){ .doc-bajar{min-width:52px;padding:8px} .doc-bajar span{display:none} }
+
+/* Manual de uso por solapas (26-09): cada capítulo se abre y se cierra,
+   con su número, su ícono y una línea de qué trata. */
+.man-intro{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;margin:0 0 12px;border-radius:18px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),var(--surface));border:1px solid var(--line)}
+.man-intro-ic{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--accent);color:#fff}
+.man-intro-ic svg{width:22px;height:22px}
+.man-intro b{display:block;font-size:15.5px}
+.man-intro span{display:block;font-size:13px;color:var(--ink-2);line-height:1.45;margin-top:2px}
+details.man-cap{padding:0;margin:0 0 10px;overflow:hidden}
+details.man-cap>summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;list-style:none}
+details.man-cap>summary::-webkit-details-marker{display:none}
+details.man-cap>summary>svg:last-child{width:18px;height:18px;flex:none;color:var(--muted);transition:transform .2s}
+details.man-cap[open]>summary>svg:last-child{transform:rotate(90deg)}
+details.man-cap[open]>summary{border-bottom:1px solid var(--line);background:var(--surface-3)}
+.man-n{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:12px;font-weight:800;background:var(--surface-3);color:var(--ink-2)}
+details.man-cap[open] .man-n{background:var(--accent);color:#fff}
+.man-ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none}
+.man-ic svg{width:19px;height:19px}
+.man-tit{flex:1;min-width:0}
+.man-tit b{display:block;font-size:15px;line-height:1.25}
+.man-tit small{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.man-cuerpo{padding:6px 16px 14px;font-size:14.5px;line-height:1.6;color:var(--ink)}
+.man-p{margin:10px 0}
+.man-h{margin:16px 0 6px;font-size:14.5px;font-weight:800;color:var(--brand)}
+.man-pasos,.man-lista{margin:6px 0 10px;padding-left:22px}
+.man-pasos li,.man-lista li{margin:0 0 7px;padding-left:2px}
+.man-pasos li::marker{font-weight:800;color:var(--accent)}
+.man-ojo{margin:12px 0}
+.man-ojo .txt b{margin-bottom:2px}
+.man-ir{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.man-cuerpo mark,.man-tit mark{background:color-mix(in srgb,var(--warn) 35%,transparent);color:inherit;border-radius:3px;padding:0 1px}
+.man-bajar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.man-bajar>div{flex:1 1 220px;min-width:0}
+.man-bajar b{display:flex;align-items:center;gap:6px;font-size:14.5px}
+.man-bajar b svg{width:18px;height:18px}
+.man-bajar span{display:block;margin-top:2px}
+@media (max-width:380px){ .man-cuerpo{padding:4px 12px 12px;font-size:14px} details.man-cap>summary{padding:11px 10px;gap:8px} .man-ic{width:32px;height:32px} }
+
+/* Fin de una norma: la descarga va recién acá, después de leerla. */
+.doc-final{margin:18px 0 0;padding-top:12px;border-top:1px dashed var(--line);text-align:center}
+.doc-final span{display:inline-flex;align-items:center;gap:6px}
+
+/* ===== Hotel Los Cauquenes (26-09) ===== */
+.hotel-hero{display:flex;align-items:center;gap:14px;padding:18px 18px;margin:12px 0 4px;border-radius:22px;color:#fff;
+  background:linear-gradient(135deg,#3b2a1c,#6b4a2b 55%,#0b3c47);box-shadow:0 10px 28px rgba(0,0,0,.18)}
+.hotel-hero img{width:54px;height:54px;border-radius:16px;object-fit:cover;flex:none;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.hotel-hero .grow{min-width:0}
+.hotel-hero small{display:block;opacity:.8;font-size:12px;font-weight:700;text-transform:capitalize}
+.hotel-hero h1{margin:2px 0;font-size:clamp(20px,5vw,28px);letter-spacing:-.6px;line-height:1.1}
+.hotel-hero span{display:block;opacity:.85;font-size:13px}
+.hotel-temp{text-align:right;flex:none}
+.hotel-temp b{display:block;font-size:30px;line-height:1;letter-spacing:-1px}
+.hotel-temp small{display:block;opacity:.85;font-size:11.5px}
+.hv-dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:760px){ .hv-dos{grid-template-columns:minmax(0,1fr)} }
+.hv-vans{display:grid;gap:8px}
+.hv-vans.compacta{margin-top:8px}
+.hv-van{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.hv-van.afuera{border-color:color-mix(in srgb,var(--warn) 45%,var(--line));background:color-mix(in srgb,var(--warn) 6%,var(--surface))}
+.hv-van-ic{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--wood-soft);color:var(--wood)}
+.hv-van .grow{min-width:0}
+.hv-van b{font-size:14.5px;margin-right:6px}
+.hv-van .mono{font-size:12.5px;color:var(--ink-2)}
+.hv-van small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+.hv-van-acc{margin:-2px 0 6px 46px}
+.hv-viaje{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.hv-viaje:last-child{border-bottom:0}
+.hv-viaje .grow{min-width:0}
+.hv-viaje .grow>b{display:flex;align-items:center;gap:6px;font-size:14px}
+.hv-viaje .grow>b svg{width:16px;height:16px;flex:none}
+.hv-viaje small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.hv-hora{flex:none;min-width:52px;text-align:center}
+.hv-hora b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+.hv-hora small{display:block;color:var(--muted);font-size:11px}
+.hv-alerta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;padding:6px 8px;border-radius:10px;font-size:12.5px;font-weight:600;
+  background:color-mix(in srgb,var(--warn) 14%,var(--surface));color:var(--ink)}
+.hv-alerta svg{width:15px;height:15px}
+.hv-hoy{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:1024px){ .hv-hoy{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:640px){ .hv-hoy{grid-template-columns:minmax(0,1fr)} }
+.hv-hoy .card{margin:0}
+.hv-cab{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.hv-cab svg{width:18px;height:18px;color:var(--brand);flex:none}
+.hv-cab b{flex:1;font-size:14.5px}
+.hv-mini{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.hv-mini:last-of-type{border-bottom:0}
+.hv-mini .grow{min-width:0;flex:1 1 140px}
+.hv-mini small{display:block;color:var(--muted);font-size:11.5px}
+.hv-mini .mono{min-width:42px}
+.hv-banda{margin:0 0 12px}
+
+/* La sala del hotel en el Día a día, con su propio color (cobre). */
+.dd-cobre{--c:#9a6230;--cs:color-mix(in srgb,#9a6230 14%,var(--surface))}
+
+/* Asistente por voz (26-09): una tarjeta abajo, con el micrófono que late
+   mientras escucha y lo que va entendiendo. */
+.asistente{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:120;width:min(520px,calc(100vw - 24px))}
+.asis-caja{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px;border-radius:22px;background:var(--surface);border:1px solid var(--line);box-shadow:0 18px 50px rgba(0,0,0,.28)}
+.asis-mic{width:52px;height:52px;border-radius:50%;border:0;display:grid;place-items:center;flex:none;background:var(--brand);color:#fff;cursor:pointer}
+.asis-mic svg{width:24px;height:24px}
+.asis-caja.oye .asis-mic{background:#d23b3b;animation:asisLatir 1.1s ease-in-out infinite}
+@keyframes asisLatir{0%,100%{box-shadow:0 0 0 0 rgba(210,59,59,.45)}50%{box-shadow:0 0 0 12px rgba(210,59,59,0)}}
+@media (prefers-reduced-motion:reduce){ .asis-caja.oye .asis-mic{animation:none} }
+.asis-txt{flex:1;min-width:0}
+.asis-txt small{display:block;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.asis-txt b{display:block;font-size:15.5px;line-height:1.35;margin-top:2px;overflow-wrap:anywhere}
+.asis-btns{display:flex;gap:8px;flex-wrap:wrap;width:100%;justify-content:flex-end}
+.asis-intro{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.asis-intro>svg{width:30px;height:30px;flex:none;color:var(--brand)}
+.asis-intro b{display:block;font-size:16px;margin-bottom:4px}
+.asis-intro span{display:block;font-size:14px;color:var(--ink-2);line-height:1.5}
+
+/* Etiquetas que en 320 px bajan de renglón en vez de salirse (26-09). */
+.hv-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.hv-pills .pill{white-space:normal;max-width:100%}
+.btn.btn-envuelve{white-space:normal;height:auto;min-height:44px;line-height:1.25;padding-top:10px;padding-bottom:10px}
+.btn.btn-envuelve svg{flex:none}

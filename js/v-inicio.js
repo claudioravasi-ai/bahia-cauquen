@@ -61,7 +61,14 @@ function tarjetaPase(p, { garita = false } = {}){
       ${garita ? `<span class="autoriza">${I('check')}Autorizó: <b>${esc(p.autoriza || host.nombre || 'vecino')}</b>${host.casa ? ' · ' + esc(host.casa) : ''}</span>` : ''}</div>
     <span class="estado e-${est}">${ESTADO_TXT[est]}</span></div>
     <div class="btns" style="margin-top:10px">
-      ${garita ? (est === 'esperado' || est === 'vencido' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>` : est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="pase-out" data-id="${p.id}">${I('logout')}Salió</button>` : '')
+      ${garita ? (!esGuardia() ? '' : est === 'esperado' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>`
+        /* PASE VENCIDO (pedido de Claudio, 26-09): pasada la hora, "Ingresó"
+           queda deshabilitado y la garita tiene "Pase vencido", que le avisa
+           al vecino que lo autorizó (y, si la persona está en la garita, le
+           pregunta si la deja pasar). */
+        : est === 'vencido' ? `<button class="btn btn-sm btn-sec" disabled title="El pase venció: no se puede registrar el ingreso">${I('login')}Ingresó</button>
+          <button class="btn btn-sm btn-danger-soft" data-a="pase-vencido" data-id="${p.id}">${I('clock')}Pase vencido</button>
+          ${p.vencidoAviso && p.vencidoAviso.fecha === hoyISO() ? `<span class="pill p-warn">Avisado al vecino ${hora(p.vencidoAviso.at)} h</span>` : ''}` : est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="pase-out" data-id="${p.id}">${I('logout')}Salió</button>` : '')
         : `${est === 'esperado' || est === 'futuro' || est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>
            <button class="btn btn-sm btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar</button>` : ''}
            <button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>
@@ -86,8 +93,8 @@ function urgentesVecino(){
   s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente').forEach(r => out.push(aviso('info', 'qr',
     `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}${r.patente ? ' · ' + esc(r.patente) : ''}`,
     `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">${I('check')}Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)));
-  const paq = s.paquetes.filter(p => p.hostId === u.id && !p.retirado);
-  if (paq.length) out.push(aviso('brand', 'box', `Tenés ${plural(paq.length, 'paquete')} en la garita`, paq.map(p => esc(p.empresa)).join(', '),
+  const paq = paquetesDelLote(u).filter(p => !p.retirado);
+  if (paq.length) out.push(aviso('brand', 'box', `${paq.length > 1 ? 'Hay ' + paq.length + ' paquetes' : 'Hay un paquete'} de ${esc(u.casa)} en la garita`, paq.map(p => esc(p.empresa) + (p.hostId !== u.id ? ' (para ' + esc(nombreDe(p.hostId).split(' ')[0]) + ')' : '')).join(', '),
     `<button class="btn btn-xs btn-pri" data-a="retiro-qr">${I('qr')}Mi QR para retirar</button><button class="btn btn-xs btn-sec" data-a="abrir" data-v="mis-paquetes">Ver</button>`));
 
   if (typeof alertasParaMi === 'function') alertasParaMi().filter(a => !respuestaDe(a)).forEach(a => out.push(aviso('danger latido', 'siren', `Aviso urgente: ${esc(a.titulo)}`, esc(a.zona),
@@ -193,7 +200,7 @@ const SECCIONES = {
         teja({ v:'expensas', icon:'wallet', color:'wood', t:'Mis expensas', s:`Tu cuenta, cupones y pagos` }),
         teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Mis reclamos', s:'Privados con la Administración', n: s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length || '' }),
         teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Familia, autos, mascotas' }),
-        teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = s.paquetes.filter(p => p.hostId === u.id && !p.confirmado).length; return n ? `${plural(n, 'por retirar o confirmar')}` : 'Lo que llega a la garita'; })(), badge: s.paquetes.filter(p => p.hostId === u.id && !p.retirado).length }),
+        teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = paquetesDelLote(u).filter(p => !p.retirado).length; return n ? `${plural(n, 'paquete')} de tu lote en la garita` : 'Lo que llega a la garita para tu lote'; })(), badge: paquetesDelLote(u).filter(p => !p.retirado).length }),
         teja({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial', s:'Tu QR para la garita y los espacios comunes' }),
         teja({ v:'ayuda', icon:'info', color:'sky', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa' }),
         ...(s.infracciones.some(i => i.casa === u.casa && i.estado === 'notificada')
@@ -218,6 +225,7 @@ const SECCIONES = {
       const compras = s.compras.filter(x => x.cierra > Date.now()).length;
       return [
         teja({ v:'pizarron', icon:'muro', t:'Pizarrón', s:'Guardia, Administración y vecinos', badge: pizNuevas, destaca:true }),
+        teja({ v:'manual', icon:'book', color:'accent', t:'Manual de uso', s:'Cómo usar la app, paso a paso' }),
         teja({ v:'vecinos', icon:'users', color:'sky', t:'Vecinos', s:'Buscá por nombre, oficio o dirección' }),
         teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#general · #seguridad · #mascotas', badge: chatNuevos }),
         teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votAbiertas ? `${plural(votAbiertas, 'abierta')}` : 'Sin votaciones abiertas', n: votAbiertas || '' }),
@@ -226,10 +234,10 @@ const SECCIONES = {
         teja({ v:'servicios', icon:'star', color:'wood', t:'Profesionales y oficios', s:'Vecinos que se pueden contactar' }),
         teja({ v:'mascotas', icon:'paw', color:'ok', t:'Mascotas', s:'Perdidas, encontradas y del barrio' }),
         teja({ v:'compras', icon:'cart', color:'brand', t:'Compras conjuntas', s: compras ? `${plural(compras, 'abierta')}` : 'Leña, gas, lo que sea', n: compras || '' }),
-        teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamento', s:'Convivencia, obras, actas' }),
+        teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamentos', s:'Reglamento, convivencia y protocolos' }),
         teja({ v:'tablero', icon:'wallet', color:'wood', t:'Las cuentas del barrio', s:'En qué se gasta, mes a mes, y la morosidad (sin nombres)' }),
         teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
-        teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:descargasVisibles().filter(d => d.url || d.texto).length || '' }),
+        teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:descargasVisibles().filter(d => (d.url || d.texto) && !esNormaDescarga(d)).length || '' }),
       ].join('');
     },
   },
@@ -314,10 +322,10 @@ function diaADia(u, s){
     { k:'garita', t:'Garita y seguridad', icon:'gate', color:'brand',
       linea: `${t ? `Turno ${esc(t.turno)} · ${esc(aLista(t.guardias).join(', ')) || 'sin guardias anotados'}` : 'Sin turno abierto'} · ${plural(ingresos, 'ingreso', 'ingresos')} hoy`,
       items:[
-        { v:'garita', icon:'gate', t:'Garita', s:'Ingresos de hoy, camión y paquetes', n:ingresos },
-        { v:'bitacora', icon:'book', t:'Bitácora', s:'Libro de guardia · le llega a la garita al instante' },
+        { v:'garita', icon:'eye', t:'Garita en vivo', s:'Ingresos, camión y paquetes · solo para mirar', n:ingresos },
+        { v:'bitacora', icon:'book', t:'Bitácora', s:'Libro de guardia · lo escribe la garita, acá se lee' },
         { v:'turnos', icon:'clock', t:'Turnos de la garita', s: t ? 'Abierto ahora · horarios y policías' : 'Horarios, guardias y policías' },
-        { v:'privado', p:'interno', icon:'shield', t:'Mensajes con la garita', s:'Chat con la guardia y peticiones firmadas', badge: msgGarita + petPend },
+        { v:'privado', p:'interno', icon:'shield', t:'Mensajes con la garita', s:'Chat con la garita y los pedidos firmados de los vecinos', badge: msgGarita + petPend },
         { v:'frecuentes', icon:'qr', t:'Ingresos frecuentes', s:'QR fijo para proveedores y personal', n: frec || '' },
       ] },
     { k:'vecinos', t:'Vecinos', icon:'users', color:'accent',
@@ -335,6 +343,7 @@ function diaADia(u, s){
       items:[
         { v:'comunicados', icon:'tack', t:'Comunicados importantes', s:'Ventana, sonido y acuse de recibo', n: comAct || '' },
         { a:'nuevo-post', v:'aviso', icon:'muro', t:'Publicar en el pizarrón', s:'Para lo que no es urgente' },
+        { v:'manual', icon:'book', t:'Manual de uso', s:'El que leen los vecinos, con los capítulos de garita y Administración' },
         { v:'alertas', icon:'siren', t:'Avisos urgentes por zona', s:'Corte de luz, nieve, portón… con respuesta', n: alertasAct || '' },
       ] },
     { k:'cumplimiento', t:'Proveedores y cumplimiento', icon:'box', color:'wood',
@@ -344,6 +353,8 @@ function diaADia(u, s){
         { v:'proteccion', icon:'lock', t:'Protección de datos', s:'AAIP, confidencialidad e incidentes', badge: datosPend },
       ] },
   ];
+  /* El Hotel Los Cauquenes tiene su propia sala (js/v-hotel.js). */
+  if (typeof salaHotel === 'function') SALAS.splice(3, 0, salaHotel());
   const renglon = x => `<button class="dd-item" data-a="${x.a || 'abrir'}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}">
       <span class="dd-ic">${I(x.icon)}</span><span class="dd-txt"><b>${x.t}</b><small>${x.s}</small></span>
       ${x.badge ? `<span class="dd-alerta">${x.badge > 99 ? '99+' : x.badge}</span>` : x.n !== undefined && x.n !== '' ? `<span class="dd-n">${x.n}</span>` : ''}${I('right')}</button>`;
@@ -627,9 +638,14 @@ function avisosPersonales(){
      repiten en la pizarra (siguen en la campanita). */
   const exp = typeof avisoExpensas === 'function' ? avisoExpensas() : null;
   const reloj = exp ? [{ ...exp, nuevo: exp.siempre || Pizarra.nuevo(exp.k, exp.at) }] : [];
+  /* Un paquete del lote en la garita queda en "Para vos" hasta que alguien
+     del lote lo retira, aunque ya se haya leído el aviso (26-09-2026). */
+  const paqs = esStaff() ? [] : paquetesDelLote(u).filter(p => !p.retirado).map(p => ({ k:'paq-' + p.id, nuevo:Pizarra.nuevo('paq-' + p.id, p.recibido), nivel:'amarillo', icon:'box', tag:'Para vos · paquete', at:p.recibido,
+    titulo:`Paquete en la garita${p.hostId !== u.id ? ' para ' + nombreDe(p.hostId).split(' ')[0] : ''}`, texto:`${p.empresa}${p.detalle ? ' · ' + p.detalle : ''} · se retira con el QR de retiro`, a:'abrir', v:'mis-paquetes' }));
+  const ids = new Set(paqs.map(x => x.k));
   /* Dos avisos con el mismo título (el de la helada que dio el motor y una
      copia vieja con otro texto) van una sola vez (sinRepetidos). */
-  return [...reloj, ...sinRepetidos(noLeidas().filter(n => !aLista(n.para).includes('todos') && !avisoCamionViejo(n)
+  return [...reloj, ...paqs, ...sinRepetidos(noLeidas().filter(n => !aLista(n.para).includes('todos') && !avisoCamionViejo(n) && !(ids.size && n.link === 'mis-paquetes' && /paquete/i.test(n.titulo || '') && !/retir/i.test(n.titulo || ''))
       && !(exp && String(n.link || '').split(':')[0] === 'expensas' && /vence|venci|impag|saldo/i.test(n.titulo || '')))
     .map(n => ({ k:'n-' + n.id, nuevo:true, nivel: n.urgente ? 'rojo' : nivelDeColor(n.color), icon:n.icon || 'bell',
       tag: aLista(n.para).includes(u.id) ? 'Para vos' : 'Para el equipo', at:n.at, titulo:n.titulo, texto:n.texto, a:'notif', id:n.id })))]
@@ -726,12 +742,15 @@ A['novedad-al-pizarron'] = () => { cerrarHoja(); abrir('pizarron'); };
 /* El DEA de la garita, sobre la foto: es lo que alguien tiene que saber
    sin buscarlo el día que hace falta. */
 const deaHero = () => `<div class="dea-hero">${I('heart')}<span><b>DEA operativo</b>${esc(/garita/i.test(Store.s.config.dea || '') || !Store.s.config.dea ? 'en la garita' : Store.s.config.dea)}</span></div>`;
-/* El pie de la app: chico y en gris, para que esté pero no moleste. */
+/* El pie de la app: chico y en gris, para que esté pero no moleste.
+   "by Claudio A. Ravasi" abre los términos de uso, los datos personales y
+   el deslinde de responsabilidad. Hasta el 26-09 había además un renglón
+   "Términos de uso · Datos personales · Responsabilidad" que abría
+   exactamente lo mismo: se sacó para no repetir (pedido de Claudio). */
 const pieApp = () => `<footer class="pie-app">
     <span>Barrio ${esc(Store.s.config.nombre)} · versión ${esc(window.VERSION || 'sin sellar')}</span>
     <span>Ushuaia · Tierra del Fuego, Antártida e Islas del Atlántico Sur</span>
-    <button class="pie-autor" data-a="abrir" data-v="legal" title="Términos de uso, datos personales y deslinde de responsabilidad">by Claudio A. Ravasi</button>
-    <button class="pie-legal" data-a="abrir" data-v="legal">Términos de uso · Datos personales · Responsabilidad</button></footer>`;
+    <button class="pie-autor" data-a="abrir" data-v="legal" title="Términos de uso, datos personales y deslinde de responsabilidad" aria-label="by Claudio A. Ravasi: términos de uso, datos personales y responsabilidad">by Claudio A. Ravasi</button></footer>`;
 
 R.inicio = {
   titulo: 'Inicio', icon: 'home', ancha: true,
@@ -1320,7 +1339,8 @@ function cambiarPolicia(pid, fn, renglon){
 function bandaPolicia(){
   const t = turnoAbierto(); if (!t) return '';
   const ps = policiasDe(t), ahora = Date.now();
-  const guardia = esGuardia() || esAdmin();
+  /* Solo la garita registra al policía y sus rondas; la Administración lo ve. */
+  const guardia = esGuardia();
   return `<div class="card policia-card">
     <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="row" style="gap:8px">${I('shield')}Policía contratada · turno ${esc(t.turno)}</b>
       ${guardia ? `<button class="btn btn-xs btn-sec" data-a="policia-nuevo">${I('plus')}Registrar ingreso</button>` : ''}</div>
@@ -1765,16 +1785,21 @@ R.garita = {
     const avisos = s.avisos.filter(a => Date.now() - a.at < 6 * HORA);
     const vol = s.avistamientos.filter(a => Date.now() - a.at < DIA);
     const u = yo();
+    /* La Administración mira la garita en vivo, sin tocarla (soloGarita). */
+    const opera = esGuardia();
     return `
       ${PILA.length === 1 ? `<div class="titulo-vista" style="margin-top:16px"><h1>Garita</h1><p>${fechaLarga(hoy)}</p></div>` : ''}
+      ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos, paquetes, el camión, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
+        <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="interno">${I('chat')}Escribirle a la garita</button></div>`}
       ${bandaTurno()}
       ${bandaPolicia()}
-      ${bandaCamion(true)}
+      ${bandaCamion(opera)}
+      ${typeof bandaHotel === 'function' ? bandaHotel(opera) : ''}
       ${alertas().filter(alertaActiva).map(a => { const ay = destinatariosAlerta(a).filter(v => a.respuestas?.[v.id]?.r === 'ayuda').length;
         return aviso(ay ? 'danger latido' : 'warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, `${esc(a.zona)} · ${ay ? plural(ay, 'casa pide', 'casas piden') + ' ayuda' : 'nadie pidió ayuda'}`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`); }).join('')}
       ${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
       <div class="garita-kpis"><div class="kpi"><b>${esperados}</b><span>Esperados</span></div><div class="kpi"><b>${adentro}</b><span>Adentro</span></div><div class="kpi"><b>${paq.length}</b><span>Paquetes</span></div></div>
-      <form data-f="validar" class="card">
+      ${opera ? `<form data-f="validar" class="card">
         <div class="lbl">Código, patente o DNI</div>
         <div class="validador"><input name="q" id="qValidar" autocomplete="off" placeholder="482913" maxlength="12" inputmode="text">
           <button class="btn btn-pri">${I('search')}</button></div>
@@ -1784,27 +1809,29 @@ R.garita = {
           <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('clock')}Historial de visitas</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="alerta-nueva">${I('siren')}Aviso urgente</button></div>
-      </form>
-      ${s.peticiones.filter(p => p.estado === 'pendiente').map(p => aviso('warn latido', 'edit', `Petición de ${esc(p.casa)} sin recibir`, esc(TIPOS_PET[p.tipo]?.n || ''), `<button class="btn btn-xs btn-sec" data-a="ver-peticion" data-id="${p.id}">Leer y firmar</button>`)).join('')}
+      </form>` : `<div class="btns" style="margin:0 0 12px"><button type="button" class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('clock')}Historial de visitas</button>
+          <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="bitacora">${I('book')}Bitácora</button>
+          <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button></div>`}
+      ${s.peticiones.filter(p => p.estado === 'pendiente').map(p => aviso('warn latido', 'edit', `Petición de ${esc(p.casa)} sin recibir`, esc(TIPOS_PET[p.tipo]?.n || '') + (opera ? '' : ' · la recibe y la firma la garita'), `<button class="btn btn-xs btn-sec" data-a="ver-peticion" data-id="${p.id}">${opera ? 'Leer y firmar' : 'Ver'}</button>`)).join('')}
       ${s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => aviso('info', 'truck', `Obra en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h · ${esc(o.empresa || '')}` : esc(o.empresa || ''))).join('')}
       ${(() => { const rs = s.peticiones.filter(p => p.tipo === 'nopasar' && p.estado === 'en_funciones' && (!p.hasta || p.hasta >= hoy)); return rs.length ? sec('Restricciones de ingreso vigentes') + rs.map(p => `<button class="superficie peligro" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-danger">${I('x')}</span><span class="txt"><b>${esc(p.casa)}</b><small>${esc(p.texto.slice(0, 90))}</small></span>${I('right')}</button>`).join('') : ''; })()}
       ${llegadas.length ? sec('Consultando al vecino') + llegadas.map(l => { const h = usuario(l.hostId) || {}; const min = Math.floor((Date.now() - l.at) / MIN);
         return `<div class="card" style="padding:13px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span><div class="datos"><b>${esc(l.nombre)} → ${esc(h.casa || '')}</b><span>${esc(l.motivo || '')}${l.patente ? ' · ' + esc(l.patente) : ''} · hace ${min} min</span></div>
           <span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Puede pasar', rechazado:'No autorizado' }[l.estado]}</span></div>
-          ${l.estado === 'consultando' && min >= 2 && h.tel ? `<div class="btns" style="margin-top:10px"><a class="btn btn-sm btn-sec" href="${telLink(h.tel)}">${I('phone')}Llamar a ${esc(h.nombre.split(' ')[0])}</a></div>` : ''}</div>`; }).join('') : ''}
+          ${opera && l.estado === 'consultando' && min >= 2 && h.tel ? `<div class="btns" style="margin-top:10px"><a class="btn btn-sm btn-sec" href="${telLink(h.tel)}">${I('phone')}Llamar a ${esc(h.nombre.split(' ')[0])}</a></div>` : ''}</div>`; }).join('') : ''}
       ${avisos.length ? sec('Avisos de vecinos') + avisos.map(a => { const v = usuario(a.userId) || {}, t = AVISOS_GUARDIA[a.tipo] || AVISOS_GUARDIA.otro;
         return `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-warn">${I(t.icon)}</span><div class="datos"><b>${esc(v.casa || '')}: ${t.t}</b><span>${esc(a.texto || t.x)} · ${hace(a.at)}</span></div>
-          ${a.visto ? `<span class="estado e-autorizado">Visto</span>` : `<button class="btn btn-xs btn-ok" data-a="aviso-visto" data-id="${a.id}">Visto</button>`}</div></div>`; }).join('') : ''}
+          ${a.visto ? `<span class="estado e-autorizado">Visto</span>` : opera ? `<button class="btn btn-xs btn-ok" data-a="aviso-visto" data-id="${a.id}">Visto</button>` : `<span class="estado e-consultando">Sin ver</span>`}</div></div>`; }).join('') : ''}
       ${sec('Ingresos de hoy', `<span class="muted small">${lista.length}</span>`)}
       ${lista.length ? lista.map(p => tarjetaPase(p, { garita:true })).join('') : vacio('users', 'Nadie anunciado para hoy.')}
-      ${paq.length ? sec('Paquetes en la garita', `<button class="link" data-a="escanear" data-v="Apuntá al QR de retiro del vecino (cambia cada 30 segundos)">${I('scan')}Leer QR de retiro</button>`) + paq.map(p =>
+      ${paq.length ? sec('Paquetes en la garita', opera ? `<button class="link" data-a="escanear" data-v="Apuntá al QR de retiro del vecino (cambia cada 30 segundos)">${I('scan')}Leer QR de retiro</button>` : '') + paq.map(p =>
  `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-wood">${I('box')}</span>
-        <div class="datos"><b>${esc(usuario(p.hostId)?.casa || '')} · ${esc(p.empresa)}</b><span>${esc(p.detalle || '')} · llegó ${hace(p.recibido)}</span></div>
-        <button class="btn btn-xs btn-ok" data-a="paquete-entregar" data-id="${p.id}">${I('qr')}Entregar</button></div></div>`).join('') : ''}
+        <div class="datos"><b>${esc(loteDelPaquete(p))} · ${esc(p.empresa)}</b><span>${esc(p.detalle || '')} · llegó ${hace(p.recibido)}</span></div>
+        ${opera ? `<button class="btn btn-xs btn-ok" data-a="paquete-entregar" data-id="${p.id}">${I('qr')}Entregar</button>` : `<span class="estado e-esperado">En la garita</span>`}</div></div>`).join('') : ''}
 
       ${solas.length ? sec('Casas solas') + solas.map(v => `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-wood">${I('lock')}</span>
         <div class="datos"><b>${esc(v.casa)}</b><span>Hasta el ${fechaCorta(v.viaje.hasta)}${v.viaje.contacto ? ' · ' + esc(v.viaje.contacto) : ''}${v.viaje.nota ? ' · ' + esc(v.viaje.nota) : ''}</span></div>
-        <button class="btn btn-xs btn-sec" data-a="ronda-casa" data-v="${esc(v.casa)}">Ronda hecha</button></div></div>`).join('') : ''}
+        ${opera ? `<button class="btn btn-xs btn-sec" data-a="ronda-casa" data-v="${esc(v.casa)}">Ronda hecha</button>` : ''}</div></div>`).join('') : ''}
       ${vol.length ? sec('Avistamientos de hoy') + vol.map(a => `<div class="card plana" style="padding:10px 14px"><b>${esc(ESPECIES[a.especie]?.n || a.especie)}</b> · ${esc(a.lugar || '')} <span class="muted small">· ${hace(a.at)}</span></div>`).join('') : ''}
       ${PILA.length === 1 ? sec('Más') + `<div class="mosaico">
         ${teja({ v:'peticiones', icon:'edit', color:'warn', t:'Peticiones', s:'Recibir y firmar', badge: s.peticiones.filter(p => p.estado === 'pendiente').length })}
@@ -1816,10 +1843,11 @@ R.garita = {
         ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos', s:'Horarios y quién trabajó' })}
         ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'Controlar ART', n: s.proveedores.filter(p => artEstado(p)[1] === 'danger').length || '' })}
         ${teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:'Avisos del día' })}
-        ${teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#seguridad y más' })}
         ${teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas' })}
         ${teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'Teléfonos útiles y DEA' })}
         ${teja({ v:'documentos', icon:'file', color:'brand', t:'Reglamento', s:'Normas y protocolos' })}
+        ${teja({ v:'hotel-vivo', icon:'star', color:'wood', t:HOTEL_NOMBRE, s:'Vans, traslados, huéspedes y eventos' })}
+        ${teja({ v:'manual', icon:'book', color:'accent', t:'Manual de uso', s:'El capítulo de la garita, paso a paso' })}
         ${esGuardia() ? teja({ a:'cerrar-turno', icon:'clock', color:'warn', t:'Cerrar el turno', s:'Cambio de guardia, sin salir' }) : ''}</div>` : ''}`;
   },
 };
@@ -1838,8 +1866,11 @@ function validar(q){
   const txt = String(q || '').trim().replace(/^BHC:/i, '');
   const dig = soloDigitos(txt), pat = normPatente(txt);
   if (!txt){ toast('Escribí un código, una patente o un DNI', 'search'); return; }
-  /* Pase fijo de un ingreso frecuente (F-…) o credencial de vecino (V-…). */
+  /* Pase fijo de un ingreso frecuente (F-…), credencial de vecino (V-…) o
+     QR del hotel (H-…: sus vans y proveedores). */
   if (typeof validarCodigoEspecial === 'function' && validarCodigoEspecial(txt)) return;
+  /* Una patente de una van, un proveedor o un huésped del hotel. */
+  if (typeof hotelValidar === 'function' && pat.length >= 6 && !s.pases.some(p => !p.cancelado && normPatente(p.patente) === pat) && hotelValidar(pat)) return;
   const pases = s.pases.filter(p => !p.cancelado && ((dig.length === 6 && p.codigo === dig) || (pat.length >= 6 && normPatente(p.patente) === pat) || (dig.length >= 7 && p.dni === dig)));
   const vecino = pat.length >= 6 ? s.users.find(u => (u.vehiculos || []).some(v => normPatente(v.patente) === pat)) : null;
   if (!pases.length && !vecino){
@@ -1857,7 +1888,33 @@ function validar(q){
         ${tarjetaPase(p, { garita:true })}${p.nota ? `<p class="small" style="margin:-4px 4px 12px"><b>Nota:</b> ${esc(p.nota)}</p>` : ''}`;
     }).join('')}`);
 }
-A['pase-in'] = el => movimiento(el.dataset.id, 'in');
+A['pase-in'] = el => { const p = Store.s.pases.find(x => x.id === el.dataset.id);
+  if (p && estadoPase(p) === 'vencido'){ toast('El pase venció: usá "Pase vencido" para avisarle al vecino', 'clock'); return; }
+  movimiento(el.dataset.id, 'in'); };
+A['pase-vencido'] = el => {
+  const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
+  const v = usuario(p.hostId) || {};
+  hoja('Pase vencido', `${aviso('warn', 'clock', `${esc(p.nombre)} · ${esc(TIPOS_PASE[p.tipo]?.n || '')}`, `Autorizó ${esc(p.autoriza || v.nombre || 'el vecino')} · ${esc(v.casa || '')} · era de ${esc(p.desde)} a ${esc(p.hasta)} h`)}
+    <button class="btn btn-pri btn-block btn-grande" data-a="pase-vencido-avisar" data-id="${p.id}" data-v="garita">${I('gate')}Está en la garita: preguntarle al vecino</button>
+    <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="pase-vencido-avisar" data-id="${p.id}" data-v="aviso">${I('bell')}No vino: solo avisarle que venció</button>
+    <p class="muted tiny" style="margin-top:10px">Al vecino le llega al celular. Si está en la garita, le aparece "Que pase" / "No lo conozco", como una llegada sin aviso.</p>`);
+};
+A['pase-vencido-avisar'] = el => {
+  if (!soloGarita()) return;
+  const p0 = Store.s.pases.find(x => x.id === el.dataset.id); if (!p0) return;
+  const enGarita = el.dataset.v === 'garita', at = Date.now();
+  Store.cambiar(s => {
+    const p = s.pases.find(x => x.id === p0.id); if (!p) return;
+    p.vencidoAviso = { at, fecha:hoyISO(), tipo: enGarita ? 'garita' : 'aviso', por:yo().id };
+    const casa = usuario(p.hostId)?.casa || '';
+    if (enGarita){
+      s.llegadas.unshift({ id:uid(), hostId:p.hostId, nombre:p.nombre, patente:p.patente || '', motivo:`Pase vencido (era de ${p.desde} a ${p.hasta} h)`, at, estado:'consultando', paseId:p.id });
+      notificar(s, { para:p.hostId, titulo:`En la garita: ${p.nombre} (pase vencido)`, texto:`Tu pase era de ${p.desde} a ${p.hasta} h · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'inicio' });
+    } else notificar(s, { para:p.hostId, titulo:`Venció el pase de ${p.nombre}`, texto:`Era de ${p.desde} a ${p.hasta} h y no ingresó. Si todavía viene, cambiale el horario o hacé uno nuevo.`, icon:'clock', color:'warn', link:'visitas', sonido:true });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Pase vencido: ${p.nombre} → ${casa} · ${enGarita ? 'se presentó; se consultó al vecino' : 'no ingresó; se avisó al vecino'}`, at });
+  });
+  cerrarHoja(); toast(enGarita ? 'Consultando al vecino…' : 'Le avisamos al vecino que el pase venció', 'send');
+};
 A['pase-out'] = el => movimiento(el.dataset.id, 'out');
 function movimiento(id, tipo){
   const hoy = hoyISO();
@@ -1949,12 +2006,12 @@ R.bitacora = {
     const filtro = p || 'todo';
     const lista = aLista(Store.s.bitacora).filter(b => b && (filtro === 'todo' || b.tipo === filtro)).sort((a, b) => b.at - a.at).slice(0, 120);
     let dia = '';
-    return `<form data-f="bitacora" class="card">
+    return `${!esGuardia() ? `<div class="garita-vivo">${I('eye')}<div class="grow"><b>El libro de guardia lo escribe la garita</b><span>La Administración lo lee en vivo pero no anota ni corrige: es el registro de la guardia. Para pedirle o avisarle algo a la garita, escribile por el canal interno: le llega al instante, con sonido.</span></div>
+        <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="interno">${I('chat')}Escribirle a la garita</button></div>` : `<form data-f="bitacora" class="card">
         <div class="seg" style="margin-bottom:10px">${Object.entries(TIPOS_BIT).filter(([k]) => k !== 'acceso').map(([k, t], i) => `<label><input type="radio" name="tipo" value="${k}" ${i === 1 ? 'checked' : ''}><span>${I(t[1])}${t[0]}</span></label>`).join('')}</div>
         <div class="linea-form"><input name="texto" id="bitTxt" required maxlength="300" placeholder="¿Qué pasó?"><button class="btn btn-pri">${I('send')}</button></div>
-        ${esAdmin() ? `<p class="muted small" style="margin:10px 0 0">${I('bell')} Lo que anota la Administración le llega a la garita <b>al instante</b>, con sonido y en su campanita.</p>`
-          : `<label class="check" style="margin:10px 0 0"><input type="checkbox" name="avisar"><span>Además, que le suene a la Administración (le aparece en su campanita)</span></label>`}
-        <p class="muted tiny" style="margin:8px 0 0">${I('info')} Lo que se anota acá queda en el <b>libro de guardia</b>: lo leen solo la garita y la Administración, con fecha, hora y quién lo escribió. No lo ven los vecinos y no se puede borrar.</p></form>
+        <label class="check" style="margin:10px 0 0"><input type="checkbox" name="avisar"><span>Además, que le suene a la Administración (le aparece en su campanita)</span></label>
+        <p class="muted tiny" style="margin:8px 0 0">${I('info')} Lo que se anota acá queda en el <b>libro de guardia</b>: lo leen solo la garita y la Administración, con fecha, hora y quién lo escribió. No lo ven los vecinos y no se puede borrar.</p></form>`}
       <div class="chips">${['todo', ...Object.keys(TIPOS_BIT)].map(k => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="bitacora" data-p="${k}">${k === 'todo' ? 'Todo' : TIPOS_BIT[k][0]}</button>`).join('')}</div>
       <div class="btns" style="margin:0 0 10px"><button class="btn btn-sm btn-sec" data-a="hist-bitacora">${I('clock')}Ver el libro completo</button><button class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('users')}Historial de visitas</button></div>
       <p class="muted tiny" style="margin:-4px 0 10px">Acá se ven los últimos ${Historial.VENTANA.bitacora[1]} días; lo anterior se trae de la base solo cuando lo pedís, así la app no se hace pesada.</p>
@@ -1966,18 +2023,16 @@ R.bitacora = {
   },
 };
 F['bitacora'] = (d, form) => {
-  /* Lo que escribe la Administración en el libro es, casi siempre, una
-     indicación para la guardia: le llega siempre (antes había que tildar
-     "avisarle también a la garita", y se entendía como si el libro no lo
-     leyera la garita). La garita, en cambio, anota mucho de rutina: a la
-     Administración le suena solo si lo pide. */
-  const texto = d.texto.trim(), para = esAdmin() ? 'rol:guardia' : 'rol:admin', avisar = esAdmin() || !!d.avisar;
+  /* El libro lo escribe solo la garita (26-09-2026: la Administración lo
+     lee y le escribe por "Mensajes con la garita"). Anota mucho de rutina:
+     a la Administración le suena solo si la garita lo pide. */
+  const texto = d.texto.trim(), para = 'rol:admin', avisar = !!d.avisar;
   Store.cambiar(s => {
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:d.tipo, texto, at:Date.now() });
     if (avisar) notificar(s, { para, titulo:`Libro de guardia · ${(TIPOS_BIT[d.tipo] || TIPOS_BIT.novedad)[0]}`, texto, icon:'book', color: d.tipo === 'incidente' ? 'danger' : 'wood', link:'bitacora', sonido:true, urgente: d.tipo === 'incidente' });
   });
   form.reset(); const i = $('#bitTxt'); if (i) i.value = '';
-  toast(avisar ? `Anotado en el libro de guardia y avisado a ${esAdmin() ? 'la garita' : 'la Administración'}` : 'Anotado en el libro de guardia', 'book');
+  toast(avisar ? 'Anotado en el libro de guardia y avisado a la Administración' : 'Anotado en el libro de guardia', 'book');
 };
 
 /* ---------- Páginas públicas: la visita pide su pase / ve su QR ---------- */
