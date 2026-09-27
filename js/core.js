@@ -34,7 +34,12 @@ function hace(ts){
   if (m < 1) return 'recién';
   if (m < 60) return `hace ${m} min`;
   const h = Math.floor(m / 60); if (h < 24) return `hace ${h} h`;
-  const d = Math.floor(h / 24); if (d < 7) return `hace ${d} d`;
+  // Pasadas las 24 h se cuentan días de calendario, no bloques de 24 h:
+  // algo del 25 a las 9:37 visto el 27 a las 8:00 fue "hace 2 días", no 1.
+  const a = new Date(ts), b = new Date(); a.setHours(0, 0, 0, 0); b.setHours(0, 0, 0, 0);
+  const d = Math.round((b - a) / DIA);
+  if (d === 1) return 'ayer';
+  if (d < 7) return `hace ${d} días`;
   const f = new Date(ts); return `${f.getDate()} ${MESES[f.getMonth()]}`;
 }
 const plural = (n, s, p) => `${n} ${n === 1 ? s : (p || s + 's')}`;

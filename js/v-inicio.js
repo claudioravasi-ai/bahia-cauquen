@@ -353,8 +353,9 @@ function diaADia(u, s){
         { v:'proteccion', icon:'lock', t:'Protección de datos', s:'AAIP, confidencialidad e incidentes', badge: datosPend },
       ] },
   ];
-  /* El Hotel Los Cauquenes tiene su propia sala (js/v-hotel.js). */
-  if (typeof salaHotel === 'function') SALAS.splice(3, 0, salaHotel());
+  /* El Hotel Los Cauquenes tiene su propia sala (js/v-hotel.js), la última,
+     después de Proveedores y cumplimiento (pedido de Claudio, 27-09-2026). */
+  if (typeof salaHotel === 'function') SALAS.push(salaHotel());
   const renglon = x => `<button class="dd-item" data-a="${x.a || 'abrir'}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}">
       <span class="dd-ic">${I(x.icon)}</span><span class="dd-txt"><b>${x.t}</b><small>${x.s}</small></span>
       ${x.badge ? `<span class="dd-alerta">${x.badge > 99 ? '99+' : x.badge}</span>` : x.n !== undefined && x.n !== '' ? `<span class="dd-n">${x.n}</span>` : ''}${I('right')}</button>`;

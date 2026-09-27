@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20260927-084330';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260927-084330',
-  './js/firebase-config.js?v=20260927-084330', './js/icons.js?v=20260927-084330', './js/agenda.js?v=20260927-084330', './js/padron.js?v=20260927-084330', './js/core.js?v=20260927-084330', './js/seed.js?v=20260927-084330', './js/clima.js?v=20260927-084330', './js/calendario.js?v=20260927-084330',
-  './js/v-inicio.js?v=20260927-084330', './js/v-comunidad.js?v=20260927-084330', './js/v-gestion.js?v=20260927-084330', './js/admin.js?v=20260927-084330', './js/v-vecinos.js?v=20260927-084330', './js/v-expensas.js?v=20260927-084330', './js/v-plan.js?v=20260927-084330', './js/v-contable.js?v=20260927-084330', './js/v-servicio.js?v=20260927-084330', './js/v-legal.js?v=20260927-084330', './js/v-hotel.js?v=20260927-084330', './js/asistente.js?v=20260927-084330', './js/v-manual.js?v=20260927-084330', './js/push.js?v=20260927-084330', './js/sismos.js?v=20260927-084330', './js/nube.js?v=20260927-084330', './js/historial.js?v=20260927-084330', './js/app.js?v=20260927-084330',
+const CACHE = 'bhc-20260927-095127';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20260927-095127',
+  './js/firebase-config.js?v=20260927-095127', './js/icons.js?v=20260927-095127', './js/agenda.js?v=20260927-095127', './js/padron.js?v=20260927-095127', './js/core.js?v=20260927-095127', './js/seed.js?v=20260927-095127', './js/clima.js?v=20260927-095127', './js/calendario.js?v=20260927-095127',
+  './js/v-inicio.js?v=20260927-095127', './js/v-comunidad.js?v=20260927-095127', './js/v-gestion.js?v=20260927-095127', './js/admin.js?v=20260927-095127', './js/v-vecinos.js?v=20260927-095127', './js/v-expensas.js?v=20260927-095127', './js/v-plan.js?v=20260927-095127', './js/v-contable.js?v=20260927-095127', './js/v-servicio.js?v=20260927-095127', './js/v-legal.js?v=20260927-095127', './js/v-hotel.js?v=20260927-095127', './js/asistente.js?v=20260927-095127', './js/v-manual.js?v=20260927-095127', './js/push.js?v=20260927-095127', './js/sismos.js?v=20260927-095127', './js/nube.js?v=20260927-095127', './js/historial.js?v=20260927-095127', './js/app.js?v=20260927-095127',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
