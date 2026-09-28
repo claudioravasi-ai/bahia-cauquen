@@ -407,8 +407,10 @@ elegidos; otro vecino no, y no puede anotarse solo como familiar).
 
 ✔ ARCHIVO HISTÓRICO Y OBRAS (25-09-2026, tarde)
 - hist/…: lo viejo de la carpeta privada (visitas de más de 90 días, sin
-  DNI ni patente; mensajes privados de más de 120 días) se muda acá una vez
-  por día. Mismas reglas que pv. Si estas reglas NO se publican, la app no
+  DNI ni patente; mensajes privados de más de 120 días; desde el 28-09,
+  paquetes retirados hace más de 30 días, sin foto, firma ni DNI) se muda
+  acá una vez por día. Mismas reglas que pv (hist/paquetes ya estaba
+  cubierto: no hizo falta una regla nueva). Si estas reglas NO se publican, la app no
   borra nada: la mudanza falla y todo queda donde estaba.
 - Índices (".indexOn") en staff/bitacora, staff/auditoria y barrio/msgs:
   así cada equipo baja solo lo reciente (60/90/60 días) y lo anterior se

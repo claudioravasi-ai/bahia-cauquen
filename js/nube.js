@@ -117,6 +117,7 @@ const Nube = {
     camion:          { listas:[] },
     sos:             { objetos:['responden'] },
     ausencias:       { objetos:['revisiones'] },
+    casaTareas:      { listas:['sugerencias','cambioQue'] },
   },
   comoLaGuardamos(col, x){
     const f = this.FORMAS[col];

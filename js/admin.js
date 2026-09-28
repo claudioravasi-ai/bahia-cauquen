@@ -473,7 +473,7 @@ A['probar-push'] = async () => {
     const j = await fetch(d.url).then(r => r.json());
     const ok = j.push && j.version >= 3;
     caja.innerHTML = `<div style="margin-top:10px">${aviso(ok ? 'ok' : 'warn', ok ? 'check' : 'alert', ok ? 'El Apps Script puede mandar avisos' : 'Al Apps Script le falta un paso',
-      ok ? (Store.s.config.pushVapid ? 'Ahora cada vecino activa los avisos en su equipo (Mi casa → Avisos).' : 'Falta pegar acá la clave pública y Guardar.') + (j.version < 4 ? ' Conviene pegar el Codigo.gs nuevo (versión 4) y hacer "Nueva versión": manda los avisos con prioridad alta, para que Android no los demore con la pantalla apagada.' : '') : j.version >= 3 ? 'Falta la propiedad FCM_CUENTA (ver AVISOS.md).' : 'Tiene la versión vieja del código: pegá el Codigo.gs nuevo y hacé "Nueva versión".')}</div>`;
+      ok ? (Store.s.config.pushVapid ? 'Ahora cada vecino activa los avisos en su equipo (Tu cuenta → Avisos en este equipo).' : 'Falta pegar acá la clave pública y Guardar.') + (j.version < 4 ? ' Conviene pegar el Codigo.gs nuevo (versión 4) y hacer "Nueva versión": manda los avisos con prioridad alta, para que Android no los demore con la pantalla apagada.' : '') : j.version >= 3 ? 'Falta la propiedad FCM_CUENTA (ver AVISOS.md).' : 'Tiene la versión vieja del código: pegá el Codigo.gs nuevo y hacé "Nueva versión".')}</div>`;
   } catch(e){ caja.innerHTML = `<div style="margin-top:10px">${aviso('danger', 'alert', 'No se pudo consultar', esc(Correo.motivo(e)))}</div>`; }
 };
 A['frase-ver'] = el => { const i = el.closest('form')?.correoClave; if (i) i.classList.toggle('frase-oculta', !el.checked); };

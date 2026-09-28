@@ -65,6 +65,16 @@ const Historial = {
     } catch(e){ console.warn('Archivo histórico: no se completó (¿faltan publicar las reglas?)', e.message); }
   },
   sinDatos(x){ const c = JSON.parse(JSON.stringify(x)); ['dni', 'patente'].forEach(k => { if (k in c) c[k] = ''; }); c.archivadoAt = Date.now(); return c; },
+  /* Un paquete archivado guarda qué llegó, para quién, cuándo y quién lo
+     retiró, con el sello de la entrega; sin la foto, sin la firma dibujada,
+     sin la firma del QR y sin los dígitos del DNI. */
+  PAQUETES_DIAS: 30,
+  paqueteSinDatos(p){
+    const c = { id:p.id, empresa:p.empresa || '', detalle:p.detalle || '', hostId:p.hostId || '', lote:p.lote || '', recibido:p.recibido || 0, retirado:p.retirado || 0, confirmado:p.confirmado || p.retirado || 0, archivadoAt:Date.now() };
+    const e = p.entrega;
+    if (e && typeof e === 'object') c.entrega = { metodo:e.metodo || '', at:e.at || 0, sello:e.sello || '', tercero:!!e.tercero, recibe:{ nombre:(e.recibe && e.recibe.nombre) || '' }, entrega:{ nombre:(e.entrega && e.entrega.nombre) || '' } };
+    return c;
+  },
   async subir(cambios){
     const rutas = Object.keys(cambios);
     for (let i = 0; i < rutas.length; i += 300){ const t = {}; rutas.slice(i, i + 300).forEach(r => { t[r] = cambios[r]; }); await Nube.db.ref().update(t); }
@@ -75,12 +85,15 @@ const Historial = {
       pases: aLista(s.pases).filter(p => p && p.id && (p.fechaFin || p.fecha || '9999') < lim && (p.createdAt || 0) < limMs),
       llegadas: aLista(s.llegadas).filter(l => l && l.id && (l.at || Date.now()) < limMs),
       solicitudesPase: aLista(s.solicitudesPase).filter(r => r && r.id && (r.at || r.createdAt || Date.now()) < limMs && r.estado !== 'pendiente'),
+      /* Los paquetes ya retirados "duermen" 30 días en la app y después
+         pasan al archivo (pedido de Claudio, 28-09-2026). */
+      paquetes: aLista(s.paquetes).filter(p => p && p.id && p.retirado && p.retirado < Date.now() - this.PAQUETES_DIAS * DIA),
     };
     let n = 0;
     for (const col in viejo){
       const lista = viejo[col]; if (!lista.length) continue;
       const cambios = {};
-      lista.forEach(x => Nube.duenos(col, x).filter(Boolean).forEach(d => { cambios[`hist/${col}/${d}/${x.id}`] = this.sinDatos(x); }));
+      lista.forEach(x => Nube.duenos(col, x).filter(Boolean).forEach(d => { cambios[`hist/${col}/${d}/${x.id}`] = col === 'paquetes' ? this.paqueteSinDatos(x) : this.sinDatos(x); }));
       if (!Object.keys(cambios).length) continue;
       await this.subir(cambios);                     /* si falla, sale por el catch y no se borra nada */
       const ids = new Set(lista.map(x => x.id));
@@ -146,6 +159,25 @@ const filasCSVVisitas = ls => [['fecha','lote','visita','tipo','autorizó','movi
 
 /* ---------- Mis visitas: todo, lo reciente y lo del archivo ---------- */
 let histVisitas = [];
+/* Mis paquetes: los retirados hace más de 30 días, a pedido (los del
+   archivo y los que todavía no se mudaron). */
+A['hist-paquetes'] = async () => {
+  const u = yo(); Historial.cargando('Paquetes anteriores');
+  try {
+    const arch = await Historial.archivo('paquetes', u.id) || [];
+    const lim = Date.now() - Historial.PAQUETES_DIAS * DIA;
+    const vivos = paquetesDelLote(u).filter(p => p.retirado && p.retirado < lim), ids = new Set(vivos.map(p => p.id));
+    const todos = [...vivos, ...arch.filter(p => p && p.id && !ids.has(p.id))].sort((a, b) => (b.retirado || 0) - (a.retirado || 0));
+    const quien = p => !p.entrega ? '' : p.entrega.metodo === 'qr' ? ' · con QR firmado' : p.entrega.tercero ? ` · lo retiró ${esc(p.entrega.recibe?.nombre || 'otra persona')}` : ' · con firma y DNI';
+    let mes = '';
+    hoja('Paquetes anteriores', todos.length ? `<p class="muted small" style="margin:0 0 10px">${plural(todos.length, 'paquete retirado', 'paquetes retirados')} de ${esc(u.casa)} de hace más de ${Historial.PAQUETES_DIAS} días. Se trajeron de la base solo ahora.</p>
+      <div class="card lista">${todos.map(p => { const m = isoDe(new Date(p.retirado || p.recibido)).slice(0, 7), cab = m !== mes ? (mes = m, `<div class="lbl" style="margin:10px 0 4px">${esc(typeof nombrePeriodo === 'function' ? nombrePeriodo(m) : m)}</div>`) : '';
+        return `${cab}<div class="it"><span class="ic ic-wood" style="width:30px;height:30px;border-radius:10px;display:grid;place-items:center">${I('box')}</span><div class="txt"><b>${esc(p.empresa || 'Paquete')}${p.detalle ? ' · ' + esc(p.detalle) : ''}</b>
+          <span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${fechaCorta(isoDe(new Date(p.retirado)))}${p.hostId && p.hostId !== u.id ? ' · era para ' + esc(primerNombre(nombreDe(p.hostId))) : ''}${quien(p)}</span></div>
+          ${p.entrega && p.entrega.sello ? `<span class="pill p-ok" title="Sello ${esc(p.entrega.sello)}">${I('lock')}sellado</span>` : ''}</div>`; }).join('')}</div>`
+      : vacio('box', `No hay paquetes de hace más de ${Historial.PAQUETES_DIAS} días.`));
+  } catch(e){ Historial.fallo(e); }
+};
 A['hist-mis-visitas'] = async () => {
   const u = yo(); Historial.cargando('Mi historial de visitas');
   try {

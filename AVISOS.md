@@ -57,7 +57,7 @@ garita está abierta; la garita, que está abierta las 24 horas, lo cubre si el 
 
 ## Paso 3 — Cada vecino, en cada equipo
 
-**Mi casa → Este equipo → Activar avisos.** El navegador pide permiso: *Permitir*.
+**Tu cuenta (tu inicial, arriba a la derecha) → Avisos en este equipo → Activar avisos.** El navegador pide permiso: *Permitir*.
 En la portada también aparece una tarjeta que lo propone (se puede cerrar con "Ahora no").
 
 - **Android, Windows, Mac:** anda en Chrome, Edge, Firefox y Safari.

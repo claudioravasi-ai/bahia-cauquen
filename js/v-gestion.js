@@ -679,18 +679,25 @@ function chatInterno(idP){
       : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
     <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno"><input name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
 }
+/* LA CONSULTA DE EXPENSAS VA SOLO A LA ADMINISTRACIÓN (pedido de Claudio,
+   28-09): "Consultar a la Administración" desde Expensas abre la charla con
+   la Administración SIN los botones Administración / Guardia, para que nadie
+   le pregunte por su deuda a la garita por error. Llega con el parámetro
+   'admin|expensas'; lo de después de la barra no es una cuenta. */
+const privadoParam = p => { const [con, id] = String(p || '').split('|'); return id === 'expensas' ? [con, '', true] : [con, id, false]; };
 R.privado = {
-  titulo: p => { const [con, id] = String(p || '').split('|'); if (con === 'interno') return esGuardia() ? 'Administración' : 'Garita';
+  titulo: p => { const [con, id, exp] = privadoParam(p); if (exp) return 'Consulta de expensas'; if (con === 'interno') return esGuardia() ? 'Administración' : 'Garita';
     if (esHotel()) return 'Comunicación interna';
     return esStaff() && id ? (usuario(id)?.nombre || 'Conversación') : con === 'guardia' ? 'Guardia' : 'Administración'; },
   icon: 'lock', color: 'accent',
-  sub: p => { const [con, id] = String(p || '').split('|');
+  sub: p => { const [con, id, exp] = privadoParam(p);
+    if (exp) return 'Privado: solo lo ven vos y la Administración';
     if (con === 'interno') return 'Entre la garita y la Administración · no lo ve ningún vecino';
     if (esHotel()) return con === 'guardia' ? 'Con la garita · solo la ven el hotel y la garita' : con === 'admin' ? 'Con la Administración · solo la ven el hotel y la Administración' : 'Privada · elegí con quién hablar';
     return esStaff() && id ? (usuario(id)?.casa || '') : con === 'guardia' ? 'Privado: solo lo ven vos y la guardia' : 'Privado: solo lo ven vos y la Administración'; },
   render(p){
     const u = yo(), s = Store.s;
-    const [conP, idP] = String(p || '').split('|');
+    const [conP, idP, deExpensas] = privadoParam(p);
     if (conP === 'interno') return chatInterno(idP);
     /* El hotel entra por "Comunicación interna" y elige con quién (v-hotel.js). */
     if (esHotel() && conP !== 'guardia' && conP !== 'admin') return comunicacionHotel();
@@ -714,7 +721,7 @@ R.privado = {
     const mio = m => esStaff() ? m.from !== 'vecino' : m.from === 'vecino';
     if (h && h.msgs.some(m => !mio(m) && !m.leido)){ h.msgs.forEach(m => { if (!mio(m)) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
     const msgs = h ? h.msgs : [];
-    const chips = esStaff() ? '' : esHotel() ? chipsHotel(con) : `<div class="chips">
+    const chips = esStaff() ? '' : esHotel() ? chipsHotel(con) : deExpensas ? `<p class="muted small" style="margin:0 0 10px">${I('wallet')} Consulta sobre tus expensas: planes de pago, diferencias o dudas. La responde la Administración; la garita no la ve.</p>` : `<div class="chips">
       <button class="chip ${con === 'admin' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="admin">${I('sliders')}Administración</button>
       <button class="chip ${con === 'guardia' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="guardia">${I('shield')}Guardia</button></div>`;
     return `<div class="chat-wrap">${chips}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
@@ -763,7 +770,7 @@ F['privado'] = (d, form) => {
 const esNormaDescarga = d => !!d && (d.tipo === 'doc' || !d.tipo) && /reglament|norma|estatut|convivencia|protocolo|ordenanza/i.test(`${d.titulo || ''} ${d.detalle || ''}`);
 const PIE_NORMAS = 'Copia informativa generada por la app del barrio. Ante cualquier diferencia vale el texto original aprobado u oficial.';
 R.documentos = {
-  titulo: 'Normas y reglamentos', icon: 'file', color: 'brand', sub: 'Reglamento, convivencia y protocolos · para leer y descargar',
+  titulo: 'Normas y reglamentos', icon: 'file', color: 'brand', sub: 'Manual y normas · reglamento, convivencia y protocolos',
   render(q){
     const docs = Store.s.documentos;
     const qq = (q || '').trim().toLowerCase();
@@ -777,7 +784,7 @@ R.documentos = {
         : vacio('search', 'No encontramos eso en las normas. Preguntale a la Administración.'));
     }
     const bajables = descargasVisibles().filter(d => esNormaDescarga(d) && (d.url || d.texto));
-    return `<form data-f="buscar-norma" class="linea-form" style="margin-bottom:12px"><input name="q" id="qNorma" value="${esc(q || '')}" placeholder="Preguntá: ¿hasta qué hora puedo hacer obra?"><button class="btn btn-pri">${I('search')}</button></form>
+    return `${typeof guiaSolapas === 'function' ? guiaSolapas('normas') : ''}<form data-f="buscar-norma" class="linea-form" style="margin-bottom:12px"><input name="q" id="qNorma" value="${esc(q || '')}" placeholder="Preguntá: ¿hasta qué hora puedo hacer obra?"><button class="btn btn-pri">${I('search')}</button></form>
       ${resultados}${sec('Normas del barrio')}
       ${docs.map(d => superficie({ a:'ver-doc', id:d.id, icon:'file', color: d.tipo === 'Convivencia' ? 'accent' : 'brand', t:esc(d.titulo), s:`${esc(d.tipo || 'Documento')} · actualizado ${hace(d.updatedAt || d.createdAt)}` })).join('') || vacio('file', 'Todavía no hay normas cargadas.')}
       ${bajables.length ? sec('Para descargar') + bajables.map(d => `<button class="superficie" data-a="descargar" data-id="${esc(d.id)}"><span class="ic ic-${d.color || 'brand'}">${I(d.icon || 'file')}</span><span class="txt"><b>${esc(d.titulo)}</b>${d.detalle ? `<small>${esc(d.detalle)}</small>` : ''}</span>${I('download')}</button>`).join('') : ''}
@@ -1444,20 +1451,46 @@ R.perfil = {
       <div class="card lista">${(u.mascotas || []).length ? u.mascotas.map(m => `<div class="it">${m.foto ? fotoHTML(m.foto, 'mini-foto') : I('paw')}<div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.desc || '')}${m.foto ? '' : ' · sin foto'}</span></div><button class="icon-btn" data-a="editar-mascota" data-v="${m.id}" aria-label="Editar o sumar foto">${I(m.foto ? 'edit' : 'camera')}</button><button class="icon-btn" data-a="borrar-mascota" data-v="${m.id}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">Si se pierde, la avisás a todo el barrio con un toque.</p>'}</div>
       ${Store.s.infracciones.some(i => i.casa === u.casa) ? superficie({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones de la Administración', s:'Infracciones y descargos de tu casa' }) : ''}
       ${sec('Guardia')}
-      ${superficie({ a:'abrir', v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas y con historial' })}
       ${(() => { const au = typeof ausenciaDe === 'function' ? ausenciaDe(u) : null; return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t:'Me voy de viaje', s: au ? `Casa sola hasta el ${fechaCorta(au.hasta)} · la revisan cada día` : 'La revisan cada día y te avisan que está en orden' }); })()}
-      ${sec('Este equipo')}
-      <div class="card"><div class="lbl">Modo de pantalla · ahora está en ${modoActual()}</div>
-        <div class="seg">${[['auto','Automático','sunrise'],['light','Día','sun'],['dark','Noche','moon']].map(([k, t, ic]) => `<label><input type="radio" name="tema" ${tema === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
-        <div class="ayuda">En automático sigue el sol de Ushuaia: hoy amanece ${Clima.sol().sale} y anochece ${Clima.sol().pone}.</div>
-        <div class="lbl" style="margin-top:14px">Avisos en este equipo</div>
-        ${typeof Push !== 'undefined' && Push.estado() !== 'demo' ? tarjetaPush(false) : notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
-        <label class="check" style="margin-top:10px"><input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span>Sonido cuando escribe la guardia o la Administración</span></label></div>
-      ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras' })}
-      ${esGuardia() ? '' : superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
-      ${superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Descargarlos o pedir que se borren (Ley 25.326)' })}
-      ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', cls:'peligro' })}`;
+      ${tengoLote() ? familiaDelLote(u) : ''}
+      <p class="muted small" style="margin:14px 2px 0">${I('user')} La contraseña, el correo, el modo de pantalla, los avisos del celular, tus datos personales y cerrar sesión están en <button class="link" data-a="mi-cuenta">Tu cuenta</button> (tu inicial, arriba a la derecha).</p>`;
   },
+};
+/* =========================================================
+   QUIÉNES ESTÁN EN TU LOTE (pedido de Claudio, 28-09-2026)
+   En "Mi casa" ya no se repite lo de "Tu cuenta" (contraseña, correo,
+   modo de pantalla, cerrar sesión): en su lugar, las cuentas anotadas en
+   el mismo lote. Así se ve a toda la familia y, si alguien se anotó en un
+   lote que no es el suyo (o alguien que no conocen pide entrar), se avisa
+   con un toque. Se muestra solo lo necesario: nombre, relación con el
+   lote y si tiene la app abierta ahora; ni DNI ni correo ni teléfono. El
+   aviso va a la carpeta privada de cada cuenta de la Administración (no
+   al pizarrón general) y, sin nombres, a la persona en cuestión.
+   ========================================================= */
+const cuentasDeMiLote = u => Store.s.users.filter(x => x && x.casa === u.casa && (x.estado === 'aprobado' || x.estado === 'pendiente') && x.rol !== 'hotel' && x.rol !== 'guardia')
+  .sort((a, b) => (b.id === u.id) - (a.id === u.id) || (a.estado === 'pendiente') - (b.estado === 'pendiente') || String(a.nombre).localeCompare(String(b.nombre)));
+const conAppAbierta = id => typeof Presencia !== 'undefined' && Presencia.d ? !!Presencia.d[id] : id === yo()?.id;
+function familiaDelLote(u){
+  const ls = cuentasDeMiLote(u), otros = ls.filter(x => x.id !== u.id);
+  return `${sec(`Quiénes están en ${esc(u.casa)}`, `<span class="muted small">${plural(ls.length, 'cuenta')}</span>`)}
+    <div class="card lista familia-lote">${ls.map(x => `<div class="it">${avatar(x)}<div class="txt"><b>${esc(x.nombre)}${x.id === u.id ? ' <span class="muted small">(vos)</span>' : ''}</b>
+        <span>${esc(RELACIONES[x.relacion] || 'Relación con el lote sin indicar')}${x.representante ? ' · representante del lote' : ''}</span></div>
+      ${x.estado === 'pendiente' ? '<span class="pill p-warn">Esperando aprobación</span>' : conAppAbierta(x.id) ? `<span class="pill p-ok">${I('check')}App abierta</span>` : ''}
+      ${x.id !== u.id ? `<button class="btn btn-xs btn-sec" data-a="lote-ajeno" data-id="${esc(x.id)}" title="Avisar que no es de ${esc(u.casa)}">No es de mi lote</button>` : ''}</div>`).join('')}</div>
+    <p class="muted tiny" style="margin:6px 2px 0">${otros.length ? `Todas estas cuentas son un solo lote: comparten los paquetes, las expensas, el plan ante un sismo y los cuidados de la casa, y votan como un lote.` : `Por ahora sos la única cuenta de ${esc(u.casa)}. Cuando alguien más de tu casa se inscriba, aparece acá.`}
+      Si ves a alguien que no vive en tu casa, tocá <b>No es de mi lote</b>: le avisamos a la Administración para que lo revise.</p>`;
+}
+A['lote-ajeno'] = async el => {
+  const u = yo(), x = usuario(el.dataset.id); if (!u || !x || x.id === u.id || x.casa !== u.casa) return;
+  if (!await confirmar('No es de mi lote', `Le avisamos a la Administración que ${esc(x.nombre)} no vive en ${esc(u.casa)}, para que lo revise. A esa persona le llega un aviso, sin tu nombre, para que confirme su lote.`, { si:'Avisar' })) return;
+  const marca = 'bhc.loteAjeno.' + x.id + '.' + hoyISO();
+  try { if (localStorage.getItem(marca)){ toast('Ya lo avisaste hoy: la Administración lo está viendo', 'check'); return; } localStorage.setItem(marca, '1'); } catch(e){}
+  const admins = typeof cuentasAdministracion === 'function' ? cuentasAdministracion() : Store.s.users.filter(z => z.rol === 'admin' && z.estado === 'aprobado').map(z => z.id);
+  Store.cambiar(s => {
+    if (admins.length) notificar(s, { para:admins, titulo:`Revisar una cuenta de ${u.casa}`, texto:`${primerNombre(u.nombre)} avisa que ${x.nombre} no vive en ese lote${x.estado === 'pendiente' ? ' (está esperando aprobación)' : ''}. Revisalo en Administración → ${x.estado === 'pendiente' ? 'Inscripciones' : 'Vecinos'}.`, icon:'users', color:'warn', link:'admin', sonido:true });
+    notificar(s, { para:x.id, titulo:'¿Te anotaste en el lote correcto?', texto:`Desde ${u.casa} avisaron que no vivís ahí. Si te equivocaste de lote, escribile a la Administración para que lo corrija.`, icon:'users', color:'warn', link:'privado:admin' });
+  });
+  toast('Listo: la Administración lo va a revisar', 'send');
 };
 F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { ...('relacion' in d ? { relacion:d.relacion } : {}), tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, saludProf:d.respondedor && typeof PROF_SALUD !== 'undefined' && PROF_SALUD[d.saludProf] ? d.saludProf : '', integrantes:d.integrantes.trim(),
   profesion:(d.profesion || '').trim(), direccion:(d.direccion || '').trim(), ubicacion:(d.ubicacion || '').trim(), enDirectorio:!!d.enDirectorio })); toast('Guardado', 'check'); };

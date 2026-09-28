@@ -166,7 +166,7 @@ function empujarAviso(n){
   Push.enviar({ para:n.para, titulo:n.titulo, texto:n.texto, link:n.link, tag:'n-' + n.id, urgente:n.urgente });
 }
 
-/* La tarjeta para activar los avisos, que va en "Mi casa" y en la portada. */
+/* La tarjeta para activar los avisos, que va en "Tu cuenta" y en la portada. */
 function tarjetaPush(compacta = false){
   const est = Push.estado();
   if (est === 'demo' || (compacta && ['activo', 'no-soportado', 'sin-config'].includes(est))) return '';
@@ -192,7 +192,7 @@ A['push-grupo'] = async el => {
   try {
     const j = await Push.enviarYContar({ para, titulo:'Aviso de prueba del barrio', texto:`Prueba mandada por la Administración (${nombre.toLowerCase()}). Si lo ves con el teléfono bloqueado, los avisos andan.`, link:'inicio' });
     caja.innerHTML = `<div style="margin-top:8px">${aviso(j.enviados ? 'ok' : 'warn', 'bell', j.enviados ? `Llegó a ${plural(j.enviados, 'equipo')}` : 'No había equipos anotados en ese grupo',
-      j.enviados ? (j.borrados ? `${plural(j.borrados, 'equipo viejo se sacó', 'equipos viejos se sacaron')} de la lista.` : 'Fijate en los teléfonos: tiene que haber sonado.') : 'Cada persona tiene que tocar "Activar avisos" en Mi casa, en cada equipo.')}</div>`;
+      j.enviados ? (j.borrados ? `${plural(j.borrados, 'equipo viejo se sacó', 'equipos viejos se sacaron')} de la lista.` : 'Fijate en los teléfonos: tiene que haber sonado.') : 'Cada persona tiene que tocar "Activar avisos" en Tu cuenta (su inicial, arriba a la derecha), en cada equipo.')}</div>`;
     auditar(Store.s, 'Mandó un aviso de prueba', nombre + ' · ' + (j.enviados || 0) + ' equipos'); Store.guardar();
   } catch(e){ caja.innerHTML = `<div style="margin-top:8px">${aviso('danger', 'alert', 'No salió', esc(e.message))}</div>`; }
   el.disabled = false;

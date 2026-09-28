@@ -83,7 +83,7 @@ Es el "servidor" del barrio: manda los correos, los avisos push, lee los crucero
 
 ## 6. Cómo probar cada cosa nueva
 
-Conviene tener abiertos: **tu cuenta** (vecino y Administración), **la garita** (otro equipo) y, para lo de lote, **la de Mónica**. Para los avisos al celular, en cada equipo: **Mi casa → Activar avisos** (en iPhone, con la app instalada en la pantalla de inicio).
+Conviene tener abiertos: **tu cuenta** (vecino y Administración), **la garita** (otro equipo) y, para lo de lote, **la de Mónica**. Para los avisos al celular, en cada equipo: **Tu cuenta (tu inicial, arriba a la derecha) → Avisos en este equipo → Activar avisos** (en iPhone, con la app instalada en la pantalla de inicio).
 
 ### Saludo y asistente por voz
 1. Tocá el **escudo** de arriba a la izquierda → tiene que decir "Hola, Claudio, que tengas una buena tarde… son las 19 y 40, y hace 4 grados".
@@ -114,8 +114,9 @@ Conviene tener abiertos: **tu cuenta** (vecino y Administración), **la garita**
 3. **"Está en la garita: preguntarle al vecino"** → al vecino le salta "Que pase / No lo conozco". **"No vino: solo avisarle"** → le llega que venció.
 
 ### Normas, manual, logo y pie
-- **El barrio → Normas y reglamentos** → abrí una → al final: **"Descargar o imprimir"**. En **Descargas** ya no están las normas.
-- **El barrio → Manual de uso** → capítulos que se abren y cierran, buscador, y al final **"Descargar o imprimir"**.
+- **El barrio → Manual y normas** (una sola teja, con dos solapas arriba):
+  - solapa **Normas y reglamentos** → abrí una → al final: **"Descargar o imprimir"**. En **Descargas** ya no están las normas.
+  - solapa **Manual de uso** → capítulos que se abren y cierran, buscador, y al final **"Descargar o imprimir"**.
 - **Emergencias** ya no tiene la Agenda al pie. El pie dice solo **"by Claudio A. Ravasi"** (abre los términos). El escudo se ve más grande.
 
 ### Hotel Los Cauquenes (con la cuenta del hotel de prueba)
@@ -137,7 +138,7 @@ Conviene tener abiertos: **tu cuenta** (vecino y Administración), **la garita**
 - **Policía contratada**: Registrar ingreso → día, turno, hora, nombre y **correo** (poné uno tuyo para ver la constancia). Anotá una ronda a mano y registrá la **Salida**: desaparece de la portada, queda en **Turnos → Servicios del policía** y te llega el correo "Constancia de servicio".
 - **Turnos**: arriba, quién hace cada turno con sus nombres; los puntos QR plegados; "Ver servicios anteriores".
 - **Vans del hotel · hoy**: con un traslado programado por el hotel, tocá "Salió" y después "Volvió".
-- **Uber/DiDi**: como vecino, Tu casa → "Viene un Uber o DiDi" con una patente; en la garita escribí la patente en el validador.
+- **Uber/DiDi**: como vecino, Tu casa → Autorizar una visita → "¿Quién viene?": **Uber, DiDi o taxi** (se abre el aviso corto) con una patente; en la garita escribí la patente en el validador.
 - "Cerrar el turno" está solo en su teja; Emergencias de la garita ya no muestra su propio teléfono.
 
 ### Asistente por voz en el iPad

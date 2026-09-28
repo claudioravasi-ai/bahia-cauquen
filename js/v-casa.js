@@ -207,6 +207,10 @@ function enEpoca(t, mes = new Date().getMonth() + 1){
 }
 function estadoTarea(t, x){
   const ahora = Date.now();
+  /* Los que se repiten cada tantos días (el pasto, la vereda): tocan de
+     nuevo un día antes de cumplirse el plazo. */
+  if (t.dias){ if (x && x.hecho && x.hecho + (t.dias - 1) * DIA > ahora) return { toca:false, prox:x.hecho + t.dias * DIA, hecho:x.hecho };
+    return { toca:true, hecho:x && x.hecho, pospuesto: x && x.pospuesto > ahora ? x.pospuesto : 0 }; }
   if (x && x.hecho){ const prox = new Date(x.hecho); prox.setMonth(prox.getMonth() + t.cada);
     if (prox.getTime() - 20 * DIA > ahora) return { toca:false, prox:prox.getTime(), hecho:x.hecho }; }
   return { toca:true, hecho:x && x.hecho, pospuesto: x && x.pospuesto > ahora ? x.pospuesto : 0 };
@@ -243,6 +247,94 @@ A['tarea-hecha'] = el => { cambiarTarea(el.dataset.v, x => { x.hecho = Date.now(
 A['tarea-despues'] = el => { cambiarTarea(el.dataset.v, x => { x.pospuesto = Date.now() + 7 * DIA; }); toast('Te lo recordamos en una semana', 'clock'); };
 A['tarea-deshacer'] = el => { cambiarTarea(el.dataset.v, x => { x.hecho = 0; }); };
 
+/* =========================================================
+   TU CASA EN VERANO (pedido de Claudio, 28-09-2026)
+   La otra mitad del año, pensada para un barrio privado en Ushuaia: pasto
+   y vereda, el cesto con tapa (perros, zorros y aves rompen las bolsas),
+   las bolsas recién la mañana del camión, nada suelto con el viento
+   fueguino, el fuego con cuidado (bosque seco), el sol con el agujero de
+   ozono, las mascotas dentro del lote, la leña del invierno que viene,
+   los arreglos de afuera, el riego y las vacaciones.
+   Tres clases de cosas:
+     · `dias`: se repite cada tantos días en temporada (pasto, vereda);
+     · `cada`: una vez por año, en los meses que convienen (poda, leña…);
+     · sin ninguno de los dos: un hábito de todo el verano (sin anotar).
+   Como el invierno, es del LOTE (pv/casaTareas): lo ven y lo marcan todas
+   las cuentas del lote y nadie más.
+   ========================================================= */
+const MESES_VERANO = [11, 12, 1, 2, 3];
+const TAREAS_VERANO = [
+  { id:'ver-pasto', t:'Pasto corto y frente prolijo', icon:'tree', dias:15, meses:MESES_VERANO,
+    por:'El pasto alto junta humedad y roedores, hace que la casa parezca sola y, en un verano seco, es lo primero que se prende.',
+    como:'Cortalo cada 10 a 15 días en temporada, en un horario razonable (respetá el horario de descanso del reglamento), y juntá lo cortado: no va a la vereda ni a la calle. Los restos de poda, embolsados, para el día de voluminosos.' },
+  { id:'ver-vereda', t:'Vereda y cordón limpios', icon:'home', dias:7, meses:MESES_VERANO,
+    por:'Hojas, ramas y la tierra que trae el viento tapan los desagües y hacen resbalar; la vereda es de los que caminan, andan en bici o empujan un cochecito.',
+    como:'Barrela una vez por semana, destapá la rejilla o el desagüe del frente y no dejes autos, leña ni materiales de obra sobre la vereda.' },
+  { id:'ver-cesto', t:'Cesto de residuos alto y con tapa', icon:'tacho', cada:12, meses:[10, 11],
+    por:'Perros sueltos, zorros y aves (gaviotas, caranchos) rompen las bolsas y desparraman la basura por el barrio. En verano, además, hay más olor y moscas.',
+    como:'Un cesto elevado del piso, con tapa que cierre y trabe (el viento la abre). Si está roto o sin tapa, arreglalo antes del verano.' },
+  { id:'ver-bolsas', t:'Las bolsas, recién la mañana que pasa el camión', icon:'truck',
+    por:'Una bolsa que pasa la noche afuera termina rota por los perros, los zorros o las aves.',
+    como:'Sacalas temprano el día que pasa el camión (lo ves en El barrio → Residuos; la app te avisa la víspera), nunca la noche anterior, y bien cerradas.', ir:['abrir', 'recoleccion', 'Días del camión'] },
+  { id:'ver-viento', t:'Nada suelto con el viento', icon:'wind',
+    por:'En Ushuaia las ráfagas pasan los 80 km/h: una cama elástica, una reposera, una sombrilla, una chapa o el nylon del invernadero pueden volar y romper la casa de un vecino o lastimar a alguien.',
+    como:'Anclá la cama elástica al piso; guardá reposeras, sombrillas, juguetes y tachos vacíos; asegurá el invernadero, el cerco y las tapas. Si anuncian viento fuerte (sale en la pizarra), repasá el patio antes de irte.' },
+  { id:'ver-fuego', t:'Asado sí, fuego descuidado no', icon:'flame',
+    por:'En verano el bosque de lengas y ñires y el pasto están secos, y el viento lleva las chispas lejos. La mayoría de los incendios forestales empiezan por un fuego mal apagado.',
+    como:'Solo en parrilla o fogonero, lejos de cercos, leñeros y árboles, con un balde de agua o la manguera a mano. Las brasas se apagan con agua hasta que no humeen. No quemes pasto, hojas ni ramas. Si hay alerta de incendio, nada de fuego al aire libre. Humo o fuego en el bosque: 100 (bomberos) y avisá a la garita.' },
+  { id:'ver-sol', t:'Sol: protector aunque esté fresco', icon:'sun',
+    por:'En primavera el agujero de ozono puede pasar sobre Ushuaia y el índice ultravioleta llega a muy alto aun con frío o nublado; en verano, además, hay luz casi todo el día.',
+    como:'Protector solar, anteojos y gorro para chicos y grandes, también para trabajar en el jardín y en las salidas al agua o a la montaña.' },
+  { id:'ver-mascotas', t:'Mascotas dentro del lote', icon:'paw',
+    por:'Los perros sueltos rompen bolsas, persiguen la fauna y asustan a los chicos y a los que salen a caminar o en bici.',
+    como:'Que no salgan solos del lote; a pasear, con correa, y juntá lo que dejan en la vereda. En la chapita del collar, tu teléfono.' },
+  { id:'ver-agua', t:'Riego con cabeza', icon:'drop',
+    por:'Los días de calor sube mucho el consumo de agua y puede bajar la presión en todo el barrio.',
+    como:'Regá temprano o al atardecer, nunca al mediodía, y no dejes la manguera corriendo.' },
+  { id:'ver-poda', t:'Ramas y cerco vivo', icon:'tree', cada:12, meses:[11, 12],
+    por:'Las ramas que tocan cables o el techo son un riesgo con el viento y, en invierno, con el peso de la nieve; las que invaden la vereda molestan al que camina.',
+    como:'Podá lo que toca el techo o invade la vereda. Si toca los cables de luz, no lo hagas vos: llamá a la distribuidora o a un profesional.' },
+  { id:'ver-lena', t:'Leña para el invierno que viene', icon:'tree', cada:12, meses:[12, 1, 2],
+    por:'La leña necesita meses para secarse: la que se compra en verano llega seca al invierno, calienta más y hace menos humo y hollín.',
+    como:'Comprala ahora y estibala tapada arriba, ventilada a los costados y lejos de la casa y de la parrilla.' },
+  { id:'ver-afuera', t:'Pintura, techo y arreglos de afuera', icon:'wrench', cada:12, meses:[12, 1, 2],
+    por:'El verano es la época buena para trabajar afuera: después vienen la lluvia del otoño y la nieve.',
+    como:'Pintura, sellado de ventanas, chapas, canaletas y cerco. Si hay obra, cargala en El barrio → Obras y respetá los horarios del reglamento.', ir:['abrir', 'obras', 'Obras'] },
+  { id:'ver-viaje', t:'Si te vas de vacaciones', icon:'lock',
+    por:'Una casa con el pasto alto, folletos en la puerta y la basura sin sacar se ve sola de lejos.',
+    como:'Avisá con "Me voy de viaje": la garita o el policía la revisa cada día y te avisa que está en orden. Pedile a alguien que corte el pasto y saque la basura, y que no se junten paquetes ni folletos en la puerta.', ir:['modo-viaje', '', 'Me voy de viaje'] },
+  { id:'ver-salidas', t:'Kayak, trekking o navegación', icon:'pin',
+    por:'El agua del Canal está fría todo el año y en la montaña el tiempo cambia en minutos.',
+    como:'Antes de salir, dejá el Aviso de salida (a dónde vas, con quién y a qué hora volvés) y al regresar tocá "Volví".', ir:['abrir', 'salidas', 'Salidas seguras'] },
+];
+const esVerano = (mes = new Date().getMonth() + 1) => mes >= 10 || mes <= 3;
+const tareasVeranoQueTocan = (soloDelAnio = false) => { if (!tengoLote()) return []; const mes = new Date().getMonth() + 1;
+  return TAREAS_VERANO.filter(t => (t.dias || t.cada) && (!soloDelAnio || t.cada) && t.meses.includes(mes)).filter(t => { const e = estadoTarea(t, registroTarea(t)); return e.toca && !e.pospuesto; }); };
+R.verano = {
+  titulo:'Tu casa en verano', icon:'sun', color:'ok', sub:'Pasto, vereda, basura, viento, fuego y sol',
+  render(){
+    if (!tengoLote()) return vacio('home', 'Esta sección es para los vecinos con lote.');
+    const u = yo(), tocan = new Set(tareasVeranoQueTocan().map(t => t.id)), mes = new Date().getMonth() + 1;
+    const conFecha = TAREAS_VERANO.filter(t => t.dias || t.cada).sort((a, b) => tocan.has(b.id) - tocan.has(a.id)), habitos = TAREAS_VERANO.filter(t => !t.dias && !t.cada);
+    const ir = t => t.ir ? `<button class="btn btn-sm btn-sec" data-a="${t.ir[0]}" data-v="${esc(t.ir[1])}">${esc(t.ir[2])}${I('right')}</button>` : '';
+    const tarjeta = t => { const x = registroTarea(t), e = estadoTarea(t, x), toca = tocan.has(t.id), epoca = t.meses.includes(mes);
+      return `<details class="card eb-guia tarea${toca ? ' toca' : ''}"><summary>${I(t.icon)}<b>${esc(t.t)}</b>
+          <span class="pill ${e.toca ? (toca ? 'p-warn' : '') : 'p-ok'}">${!e.toca ? `Hecho ${fechaCorta(isoDe(new Date(e.hecho)))}` : e.pospuesto ? `Te lo recuerdo el ${fechaCorta(isoDe(new Date(e.pospuesto)))}` : toca ? 'Toca ahora' : !epoca ? 'Fuera de temporada' : e.hecho ? `Último: ${fechaCorta(isoDe(new Date(e.hecho)))}` : 'Sin anotar'}</span></summary>
+        <p><b>Por qué:</b> ${esc(t.por)}</p><p><b>Cómo:</b> ${esc(t.como)}</p>
+        <p class="muted small">${t.dias ? `En temporada, cada ${t.dias === 7 ? 'semana' : t.dias + ' días'}` : 'Una vez por año'}${!e.toca && e.prox ? ` · la próxima, ${t.dias ? 'el ' + fechaCorta(isoDe(new Date(e.prox))) : `en ${MESES[new Date(e.prox).getMonth()]}`}` : ''}.${x && x.por && x.hecho ? ` Lo anotó ${esc(primerNombre(nombreDe(x.por)))}.` : ''}</p>
+        <div class="btns"><button class="btn btn-sm btn-ok" data-a="tarea-hecha" data-v="${t.id}">${I('check')}Lo hice${e.toca ? '' : ' otra vez'}</button>
+          ${e.toca && !e.pospuesto && epoca ? `<button class="btn btn-sm btn-sec" data-a="tarea-despues" data-v="${t.id}">Recordame en una semana</button>` : ''}
+          ${x && x.hecho ? `<button class="btn btn-sm btn-sec" data-a="tarea-deshacer" data-v="${t.id}">Deshacer</button>` : ''}${ir(t)}</div></details>`; };
+    return `<p class="muted small" style="margin:0 0 12px">Lo que hace falta para que la casa y el barrio estén lindos y seguros en el verano fueguino. Anotá cuándo lo hiciste y la app te lo recuerda cuando vuelva a tocar. Lo ven solo las cuentas de ${esc(u.casa)}.</p>
+      ${!esVerano() ? aviso('info', 'sun', 'Todavía no es temporada', 'El verano en Ushuaia va de noviembre a marzo. Mientras tanto, mirá "Tu casa en invierno".', `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="invierno">Tu casa en invierno</button>`)
+        : tocan.size ? aviso('warn', 'sun', `${plural(tocan.size, 'cosa para hacer', 'cosas para hacer')} ahora`, 'Tocá cada una, hacela y marcá "Lo hice".') : aviso('ok', 'check', 'Todo al día por ahora', 'Te avisamos cuando vuelva a tocar algo.')}
+      ${sec('Para anotar')}${conFecha.map(tarjeta).join('')}
+      ${sec('Todo el verano')}
+      ${habitos.map(t => `<details class="card eb-guia"><summary>${I(t.icon)}<b>${esc(t.t)}</b></summary><p><b>Por qué:</b> ${esc(t.por)}</p><p><b>Cómo:</b> ${esc(t.como)}</p>${ir(t) ? `<div class="btns">${ir(t)}</div>` : ''}</details>`).join('')}
+      <p class="muted tiny">Consejos generales. Ante humo o fuego en el bosque: 100 (bomberos) y la garita. Emergencias: 911. Para lo que es norma del barrio (horarios de obra y de ruidos, animales, residuos) vale el reglamento interno, en El barrio → Manual y normas.</p>`;
+  },
+};
+
 /* ---------- "Para vos" de la pizarra ---------- */
 function pizarraCasa(){
   const u = yo(); if (!u || esStaff() || esHotel()) return [];
@@ -250,6 +342,10 @@ function pizarraCasa(){
   if (tocan.length){ const mes = hoyISO().slice(0, 7);
     out.push({ k:`invierno-${mes}-${tocan.length}`, nuevo:Pizarra.nuevo(`invierno-${mes}-${tocan.length}`, fechaDe(mes + '-01').getTime()), nivel:'amarillo', icon:'flame', tag:'Para vos · tu casa', at:fechaDe(mes + '-01').getTime(),
       titulo:`Tu casa en invierno: ${plural(tocan.length, 'cosa para revisar', 'cosas para revisar')}`, texto:tocan.slice(0, 3).map(t => t.t).join(' · '), a:'abrir', v:'invierno' }); }
+  const ver = tareasVeranoQueTocan(true);
+  if (ver.length){ const mes = hoyISO().slice(0, 7);
+    out.push({ k:`verano-${mes}-${ver.length}`, nuevo:Pizarra.nuevo(`verano-${mes}-${ver.length}`, fechaDe(mes + '-01').getTime()), nivel:'verde', icon:'sun', tag:'Para vos · tu casa', at:fechaDe(mes + '-01').getTime(),
+      titulo:`Tu casa en verano: ${plural(ver.length, 'cosa para hacer', 'cosas para hacer')}`, texto:ver.slice(0, 3).map(t => t.t).join(' · '), a:'abrir', v:'verano' }); }
   /* Lo que prestaste y ya tendría que haber vuelto. */
   cosasDe().filter(x => cosaMia(x) && x.estado === 'prestada' && x.prestada?.hasta && x.prestada.hasta < hoyISO()).forEach(x => out.push({ k:'cosa-' + x.id + '-' + x.prestada.hasta,
     nuevo:Pizarra.nuevo('cosa-' + x.id + '-' + x.prestada.hasta, fechaDe(x.prestada.hasta).getTime()), nivel:'verde', icon:'box', tag:'Para vos · préstamo', at:fechaDe(x.prestada.hasta).getTime(),
@@ -267,6 +363,16 @@ REGLAS.push({ id:'invierno-casa', n:'Otoño e invierno → recordatorio de los c
       7:['Mitad del invierno', 'Probá el detector de monóxido y fijate la leña y el matafuego.'],
       8:['Último tramo del invierno', 'Ojo con el hielo en la entrada: sal gruesa o arena en escalones y subidas.'] }[m];
     return marca(s, 'invierno-' + hoy, () => notificar(s, { para:'todos', titulo:T[0], texto:T[1], icon:'flame', color:'warn', link:'invierno', vence:finDelDia(hoy) }));
+  } });
+
+REGLAS.push({ id:'verano-casa', n:'Primavera y verano → recordatorio de los cuidados de la casa', d:'El 15 de noviembre, diciembre, enero y febrero recuerda el pasto, la vereda, el cesto con tapa, el viento, el fuego y la leña del invierno que viene. Cada lote ve en "Para vos" lo que le toca.',
+  run(s, hoy){
+    const [, m, d] = hoy.split('-').map(Number); if (d !== 15 || ![11, 12, 1, 2].includes(m) || new Date().getHours() < 10) return 0;
+    const T = { 11:['Se viene el verano: tu casa y el barrio', 'Cesto alto y con tapa, pasto corto y nada suelto con el viento.'],
+      12:['Fuego con cuidado', 'Asado solo en parrilla, con agua a mano; las brasas se apagan con agua. Nada de quemar pasto ni ramas.'],
+      1:['Leña para el invierno que viene', 'La que se compra ahora llega seca al invierno. Y las bolsas, recién la mañana del camión.'],
+      2:['Último tramo del verano', 'Aprovechá para pintar y arreglar afuera; ramas lejos de cables y techo.'] }[m];
+    return marca(s, 'verano-' + hoy, () => notificar(s, { para:'todos', titulo:T[0], texto:T[1], icon:'sun', color:'ok', link:'verano', vence:finDelDia(hoy) }));
   } });
 
 /* =========================================================
@@ -361,6 +467,7 @@ function estadoMochila(m, x){
 const mochilaQueFalta = () => MOCHILA.filter(m => { const e = estadoMochila(m, regLote('moch-' + m.id)); return (e.falta && m.id !== 'mascotas') || e.renovar; });
 R.sismo = {
   titulo:'Preparados para un sismo', icon:'sismo', color:'warn', sub:'Mochila de emergencia, plan familiar y qué hacer',
+  alPintar(){ const k = claveCambioPlan(); if (k) Pizarra.marcar(k); },
   render(){
     if (!tengoLote()) return vacio('home', 'Esta sección es para los vecinos con lote.');
     const u = yo(), plan = regLote('sismo-plan') || {}, sem = regLote('sismo-semana'), falta = mochilaQueFalta();
@@ -377,13 +484,14 @@ R.sismo = {
       <div class="card lista">${MOCHILA.map(fila).join('')}</div>
       ${falta.length ? `<p class="muted small" style="margin:-4px 2px 12px">Tocá el círculo de cada cosa cuando la tengas o la renueves. Es del lote: lo ven y lo marcan todas las cuentas de ${esc(u.casa)}.</p>` : ''}
       ${sec('Tu plan familiar', `<button class="link" data-a="sismo-plan">${plan.encuentro ? 'Cambiar' : 'Armarlo'}</button>`)}
-      <div class="card">${plan.encuentro || plan.cortes ? `<div class="plan-sismo">
+      <div class="card">${planIntegrantes(u, plan)}${plan.encuentro || plan.cortes ? `<div class="plan-sismo">
           ${[['Punto de encuentro', plan.encuentro], ['Contacto fuera de Tierra del Fuego', plan.contacto], ['Llaves de corte (gas, luz, agua)', plan.cortes], ['Lugares seguros de la casa', plan.seguros], ['Quién se ocupa de qué', plan.roles]].filter(([, v]) => v)
             .map(([t, v]) => `<div><small>${esc(t)}</small><b>${esc(v)}</b></div>`).join('')}</div>
           <div class="btns" style="margin-top:12px"><button class="btn btn-sm btn-sec" data-a="sismo-plan-imprimir">${I('download')}Imprimirlo para la heladera</button><button class="btn btn-sm btn-sec" data-a="sismo-simulacro">${I('clock')}Hacer un simulacro</button></div>`
         : `<p class="small" style="margin:0 0 10px">Defensa Civil recomienda que cada casa tenga su plan: dónde se encuentran, a quién llaman, dónde se corta el gas y quién hace cada cosa.</p>
           <div class="btns"><button class="btn btn-pri" data-a="sismo-plan">${I('edit')}Armar el plan</button><button class="btn btn-sec" data-a="sismo-simulacro">${I('clock')}Hacer un simulacro</button></div>`}
-        ${plan.simulacro ? `<p class="muted tiny" style="margin:10px 0 0">Último simulacro: ${fechaCorta(isoDe(new Date(plan.simulacro)))}. Conviene uno cada 6 meses.</p>` : ''}</div>
+        ${plan.simulacro ? `<p class="muted tiny" style="margin:10px 0 0">Último simulacro: ${fechaCorta(isoDe(new Date(plan.simulacro)))}. Conviene uno cada 6 meses.</p>` : ''}
+        ${plan.encuentro || plan.cortes ? planSugerencias(u, plan) : ''}</div>
       ${sec('Qué hacer')}
       ${PROTOCOLO_SISMO.map((g, i) => `<details class="card eb-guia" ${i === 0 ? 'open' : ''}><summary>${I(g.icon)}<b>${esc(g.t)}</b></summary><ul>${g.items.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>`).join('')}
       ${sec('Teléfonos')}<div class="eb-tels">${[['103', 'Defensa Civil'], ['911', 'Emergencias'], ['100', 'Bomberos'], ['107', 'Emergencias médicas']].map(([n, q]) => `<a class="eb-tel" href="tel:${n}"><b>${n}</b><span>${esc(q)}</span></a>`).join('')}</div>
@@ -412,8 +520,67 @@ A['sismo-plan'] = () => { const p = regLote('sismo-plan') || {};
     <div class="field"><label>Quién se ocupa de qué</label><input name="roles" maxlength="140" value="${esc(p.roles || '')}" placeholder="Ej: mamá busca a los chicos, papá corta el gas"></div>
     <p class="muted small" style="margin:0 0 12px">Lo ven solo las cuentas de tu lote. No pongas contraseñas ni datos de salud.</p>
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`); };
-F['sismo-plan'] = d => { cambiarLote('sismo-plan', x => { ['encuentro', 'contacto', 'cortes', 'seguros', 'roles'].forEach(k => { x[k] = String(d[k] || '').trim().slice(0, 140); }); x.hecho = Date.now(); });
-  cerrarHoja(); toast('Plan guardado', 'check'); refrescar(); };
+F['sismo-plan'] = d => {
+  const u = yo(), antes = regLote('sismo-plan') || {}, primero = !(antes.encuentro || antes.cortes);
+  const campos = ['encuentro', 'contacto', 'cortes', 'seguros', 'roles'], nuevo = {};
+  campos.forEach(k => { nuevo[k] = String(d[k] || '').trim().slice(0, 140); });
+  const cambio = campos.filter(k => nuevo[k] !== (antes[k] || ''));
+  if (!primero && !cambio.length){ cerrarHoja(); toast('No cambiaste nada', 'check'); return; }
+  cambiarLote('sismo-plan', x => { Object.assign(x, nuevo); x.hecho = Date.now(); x.cambio = Date.now(); x.cambioPor = u.id; x.cambioQue = cambio; x.cambioArmo = primero; });
+  const otros = familiaParaAvisar(u);
+  if (otros.length) Store.cambiar(s => notificar(s, { para:otros, titulo: primero ? `${primerNombre(u.nombre)} armó el plan ante un sismo de ${u.casa}` : `${primerNombre(u.nombre)} cambió el plan ante un sismo`,
+    texto: primero ? 'Miralo: es de toda la casa. Si algo no te cierra, sugerí un cambio o cambialo vos.' : `Cambió: ${cambio.map(k => CAMPOS_PLAN[k].toLowerCase()).join(', ')}. Miralo y, si querés, sugerí algo.`, icon:'sismo', color:'warn', link:'sismo', sonido:true }));
+  cerrarHoja(); toast(otros.length ? `Plan guardado. Les avisamos a ${plural(otros.length, 'cuenta', 'cuentas')} de ${u.casa}` : 'Plan guardado', 'check'); refrescar(); };
+/* =========================================================
+   EL PLAN ES DE TODA LA CASA (pedido de Claudio, 28-09-2026)
+   Todas las cuentas del lote quedan dentro del plan solas, sin invitar a
+   nadie: el plan vive en pv/casaTareas (copiado a cada cuenta del lote,
+   ver Nube.duenos) y cualquiera de ellas lo ve y lo cambia. Cuando uno lo
+   arma o lo cambia, a los demás les llega el aviso (campanita, celular y
+   "Para vos" en la pizarra) para que lo miren. Y entre ellos se pueden
+   SUGERIR cambios: una lista corta de sugerencias dentro del mismo plan,
+   que cualquiera del lote marca como "Hecho" cuando la pasa al plan. Nadie
+   de afuera del lote lo ve (ni la garita ni la Administración).
+   ========================================================= */
+const CAMPOS_PLAN = { encuentro:'Punto de encuentro', contacto:'Contacto fuera de Tierra del Fuego', cortes:'Llaves de corte', seguros:'Lugares seguros', roles:'Quién se ocupa de qué' };
+const familiaParaAvisar = u => Store.s.users.filter(x => x && x.casa === u.casa && x.estado === 'aprobado' && x.id !== u.id && x.rol !== 'hotel' && x.rol !== 'guardia').map(x => x.id);
+/* La clave de la pizarra para "tu familia cambió el plan": una por cambio. */
+const claveCambioPlan = () => { const p = regLote('sismo-plan'); return p && p.cambio && p.cambioPor && p.cambioPor !== yo()?.id ? 'sismo-plan-' + p.cambio : ''; };
+function planIntegrantes(u, plan){
+  const fam = Store.s.users.filter(x => x && x.casa === u.casa && x.estado === 'aprobado' && x.rol !== 'hotel' && x.rol !== 'guardia');
+  const quien = plan.cambioPor ? usuario(plan.cambioPor) : null;
+  return `<div class="plan-fam">${I('users')}<div><b>En este plan: ${fam.map(x => esc(primerNombre(x.nombre)) + (x.id === u.id ? ' (vos)' : '')).join(', ')}</b>
+    <span>Todas las cuentas de ${esc(u.casa)} entran solas: lo ven, lo cambian y se enteran de cada cambio.${quien && plan.cambio ? ` Último cambio: ${esc(primerNombre(quien.nombre))}, ${fechaCorta(isoDe(new Date(plan.cambio)))}.` : ''}</span></div></div>`;
+}
+function planSugerencias(u, plan){
+  const ls = aLista(plan.sugerencias).filter(x => x && x.id).sort((a, b) => (!!a.hecha - !!b.hecha) || b.at - a.at);
+  return `<div class="plan-sug">
+    <div class="lbl" style="margin:14px 0 6px">Sugerencias de la familia${ls.filter(x => !x.hecha).length ? ` · ${ls.filter(x => !x.hecha).length} sin pasar al plan` : ''}</div>
+    ${ls.length ? `<div class="lista">${ls.slice(0, 12).map(x => `<div class="it${x.hecha ? ' hecha' : ''}"><span class="ic ic-${x.hecha ? 'ok' : 'warn'}" style="width:30px;height:30px;border-radius:10px;display:grid;place-items:center">${I(x.hecha ? 'check' : 'chat')}</span>
+        <div class="txt"><b>${esc(x.texto)}</b><span>${esc(primerNombre(nombreDe(x.de)))} · ${fechaCorta(isoDe(new Date(x.at)))}${x.hecha ? ` · pasada al plan${x.hechaPor ? ' por ' + esc(primerNombre(nombreDe(x.hechaPor))) : ''}` : ''}</span></div>
+        ${x.hecha ? '' : `<button class="btn btn-xs btn-ok" data-a="sismo-sug-hecha" data-id="${esc(x.id)}" title="Ya la pasé al plan">${I('check')}Hecho</button>`}
+        ${x.de === u.id ? `<button class="icon-btn" data-a="sismo-sug-borrar" data-id="${esc(x.id)}" aria-label="Borrar mi sugerencia">${I('trash')}</button>` : ''}</div>`).join('')}</div>`
+      : '<p class="muted small" style="margin:0 0 8px">¿Algo para cambiar o agregar? Sugerilo y les llega a los demás de la casa.</p>'}
+    <button class="btn btn-sm btn-sec" data-a="sismo-sugerir">${I('chat')}Sugerir un cambio</button></div>`;
+}
+A['sismo-sugerir'] = () => hoja('Sugerir un cambio en el plan', `<form data-f="sismo-sugerir">
+  <div class="field"><label>¿Qué cambiarías o agregarías?</label><textarea name="texto" rows="3" maxlength="200" required placeholder="Ej: que el punto de encuentro sea la plaza, no la vereda · falta anotar la llave del agua"></textarea></div>
+  <p class="muted small" style="margin:0 0 12px">Les llega a las demás cuentas de ${esc(yo().casa)}. Quien la pase al plan la marca como "Hecho". No escribas contraseñas ni datos de salud.</p>
+  <button class="btn btn-pri btn-block">${I('send')}Mandar la sugerencia</button></form>`);
+F['sismo-sugerir'] = d => {
+  const u = yo(), texto = String(d.texto || '').trim().slice(0, 200); if (!texto) return;
+  cambiarLote('sismo-plan', x => { x.sugerencias = [...aLista(x.sugerencias), { id:'sg' + uid(), de:u.id, texto, at:Date.now() }].slice(-20); });
+  const otros = familiaParaAvisar(u);
+  if (otros.length) Store.cambiar(s => notificar(s, { para:otros, titulo:`${primerNombre(u.nombre)} sugiere un cambio en el plan ante un sismo`, texto:texto.slice(0, 90), icon:'sismo', color:'warn', link:'sismo', sonido:true }));
+  cerrarHoja(); toast(otros.length ? 'Listo: les llegó a los de tu casa' : 'Sugerencia guardada', 'send'); refrescar();
+};
+A['sismo-sug-hecha'] = el => { const u = yo();
+  cambiarLote('sismo-plan', x => { const sg = aLista(x.sugerencias).find(z => z && z.id === el.dataset.id); if (sg){ sg.hecha = Date.now(); sg.hechaPor = u.id; } x.sugerencias = aLista(x.sugerencias); });
+  refrescar(); toast('Marcada como hecha', 'check'); };
+A['sismo-sug-borrar'] = async el => {
+  if (!await confirmar('Borrar la sugerencia', 'Deja de verse en el plan.', { si:'Borrar', peligro:true })) return;
+  cambiarLote('sismo-plan', x => { x.sugerencias = aLista(x.sugerencias).filter(z => !(z && z.id === el.dataset.id && z.de === yo().id)); });
+  refrescar(); };
 A['sismo-plan-imprimir'] = () => { const p = regLote('sismo-plan') || {}, u = yo();
   imprimir(`Plan ante un sismo · ${u.casa}`, `<div class="cab"><div><h1>Plan ante un sismo</h1><div>${esc(u.casa)} · Barrio ${esc(Store.s.config.nombre)}</div></div><div class="der">Agachate · cubrite · sujetate</div></div>
     ${[['Punto de encuentro', p.encuentro], ['Contacto fuera de Tierra del Fuego', p.contacto], ['Llaves de corte', p.cortes], ['Lugares seguros', p.seguros], ['Quién se ocupa de qué', p.roles]].filter(([, v]) => v).map(([t, v]) => `<div class="caja"><b>${esc(t)}</b><br>${esc(v)}</div>`).join('')}
@@ -443,6 +610,11 @@ A['sismo-simulacro'] = () => {
 function pizarraSismo(){
   const u = yo(); if (!u || esStaff() || esHotel() || !tengoLote()) return [];
   const out = [], dom = ultimoDomingo();
+  /* Otro de la casa armó o cambió el plan: queda en "Para vos" hasta que se abre (3 días como mucho). */
+  const pl = regLote('sismo-plan'), kc = claveCambioPlan();
+  if (kc && !Pizarra.vistos()[kc] && pl.cambio > Date.now() - 3 * DIA){ const q = primerNombre(nombreDe(pl.cambioPor));
+    out.push({ k:kc, nuevo:Pizarra.nuevo(kc, pl.cambio), nivel:'amarillo', icon:'sismo', tag:'Para vos · sismo', at:pl.cambio,
+      titulo:`${q} ${pl.cambioArmo ? 'armó' : 'cambió'} el plan ante un sismo`, texto:'Miralo: es de toda la casa. Podés sugerir cambios.', a:'abrir', v:'sismo' }); }
   if (!revisionSemanalHecha()) out.push({ k:'sismo-sem-' + isoDe(new Date(dom)), nuevo:Pizarra.nuevo('sismo-sem-' + isoDe(new Date(dom)), dom + 10 * HORA), nivel:'amarillo', icon:'sismo', tag:'Para vos · sismo', at:dom + 10 * HORA,
     titulo:'Revisión semanal de la mochila de emergencia', texto:'Agua, linterna, pilas, abrigo y botiquín', a:'abrir', v:'sismo' });
   return out;

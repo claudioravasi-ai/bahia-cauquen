@@ -431,8 +431,8 @@ const casaInicio = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía �
   `<div class="ap-hola"><small>Buenas tardes,</small><b>Lucía</b><span class="ap-muted">Lote 42 · 7 °C · ráfagas 42 km/h</span></div>`, extra,
   `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
     <button class="ap-teja destaca" data-go><span class="e">🔳</span><b>Autorizar una visita</b></button>
-    <div class="ap-teja"><span class="e">🚕</span><b>Viene un Uber o DiDi</b></div><div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div>
-    <div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div><div class="ap-teja"><span class="e">💳</span><b>Mis expensas</b></div></div>`);
+    <div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div><div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div>
+    <div class="ap-teja"><span class="e">💳</span><b>Mis expensas</b></div><div class="ap-teja"><span class="e">🌋</span><b>Preparados para un sismo</b></div></div>`);
 const casaSimple = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía · Lote 42', { campana }) + ap(
   `<div class="ap-hola"><small>Hola,</small><b>Lucía</b><span class="ap-muted">Lote 42</span></div>`, extra,
   `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟢', 'Asado de primavera el sábado', 'Quincho · 13 h')}${it('🟡', 'Corte de agua mañana de 9 a 14', 'Administración')}</div>`);
@@ -491,13 +491,13 @@ const ESC = [
     b:() => garita('Turno tarde · Guardia Pereyra') + ap(aviso('ok', '📦', 'Entregado a Lucía Fernández', 'Lote 42 · 18:05 · anotado en la bitácora')) },
   ], fin:'Nadie puede retirar tu paquete con una foto de tu QR: cambia cada 30 segundos.' },
 
-{ id:'uber', grupo:'Tu casa', e:'🚕', t:'Viene un Uber o DiDi', s:'Avisás en 10 segundos y la garita lo reconoce por la patente',
+{ id:'uber', grupo:'Tu casa', e:'🚕', t:'Viene un Uber o DiDi', s:'Desde Autorizar una visita, en 10 segundos, y la garita lo reconoce por la patente',
   a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'19:40',
   pasos:[
-  { lado:'a', txt:'Pediste un Uber para ir al centro. En <b>Tu casa</b> tocá <b>Viene un Uber o DiDi</b>.', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
+  { lado:'a', txt:'Pediste un Uber para ir al centro. En <b>Tu casa</b> tocá <b>Autorizar una visita</b> y, en "¿Quién viene?", <b>Uber, DiDi o taxi</b>: se abre el aviso corto.', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
       `<div class="ap-hola"><small>Buenas tardes,</small><b>Lucía</b></div>`, `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
-      <div class="ap-teja destaca"><span class="e">🔳</span><b>Autorizar una visita</b></div>
-      <button class="ap-teja" data-go><span class="e">🚕</span><b>Viene un Uber o DiDi</b></button><div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div></div>`),
+      <button class="ap-teja destaca" data-go><span class="e">🔳</span><b>Autorizar una visita</b></button>
+      <div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div><div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div></div>`),
     b:() => garitaInicio() },
   { lado:'a', txt:'Elegí la app, si te viene a <b>buscar</b> o <b>trae</b> algo, en cuánto llega y la <b>patente</b> (Uber la muestra apenas el chofer acepta; si todavía no la sabés, la agregás después). Tocá <b>Avisar a la garita</b>.', a:() => vec('Viene un Uber, DiDi o taxi', 'Aviso a la garita') + ap(
       `<div><div class="ap-muted">¿De qué app?</div><div class="seg"><span class="on">Uber</span><span>DiDi</span><span>Cabify</span><span>Taxi</span></div></div>`,

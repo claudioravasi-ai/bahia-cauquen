@@ -764,7 +764,9 @@ R['mis-paquetes'] = {
     const ids = paquetesDelLote(u).filter(p => !p.retirado && p.recibido <= lim && !p.avisoVisto).map(p => p.id);
     if (ids.length) Store.cambiar(s => ids.forEach(id => { const p = s.paquetes.find(x => x.id === id); if (p){ p.avisoVisto = Date.now(); p.avisoVistoPor = u.id; } })); },
   render(){
-    const u = yo(), ls = paquetesDelLote(u).sort((a, b) => b.recibido - a.recibido).slice(0, 40);
+    /* Los retirados se ven 30 días; los anteriores, con el botón del historial (pedido de Claudio, 28-09). */
+    const u = yo(), dias = typeof Historial !== 'undefined' ? Historial.PAQUETES_DIAS : 30, lim = Date.now() - dias * DIA;
+    const ls = paquetesDelLote(u).sort((a, b) => b.recibido - a.recibido).filter(p => !p.retirado || p.retirado >= lim).slice(0, 40);
     const enGarita = Retiro.pendientesDe(u), viejos = ls.filter(p => p.retirado && !p.confirmado), listos = ls.filter(p => p.confirmado);
     const como = p => !p.entrega ? '' : p.entrega.metodo === 'qr' ? ' · con tu QR firmado' : p.entrega.tercero ? ` · lo retiró ${esc(p.entrega.recibe?.nombre || 'otra persona')}` : ' · con firma y DNI';
     return `${enGarita.length ? `<button class="retiro-cta" data-a="retiro-qr">${I('qr')}<span><b>Mi QR para retirar</b><small>${plural(enGarita.length, 'paquete')} en la garita · mostralo desde tu teléfono</small></span>${I('right')}</button>` : ''}
@@ -775,7 +777,8 @@ R['mis-paquetes'] = {
         ${p.foto && p.foto.fotoId ? `<div class="paq-foto">${fotoHTML(p.foto, 'post-foto', { aPedido:true })}<span class="muted tiny">${I('image')} Vista previa liviana. Tocala para ver la foto buena y guardarla en tu teléfono.</span></div>` : ''}</div>`).join('')}
       ${viejos.length ? sec('Entregados sin confirmar') + viejos.map(p => `<div class="card"><b>${esc(p.empresa)}</b><div class="muted small">La garita lo entregó ${hace(p.retirado)}</div>
         ${p.hostId === u.id ? `<div class="btns" style="margin-top:8px"><button class="btn btn-sm btn-ok" data-a="paquete-confirmar" data-id="${p.id}">${I('check')}Confirmo que lo recibí</button></div>` : ''}</div>`).join('') : ''}
-      ${listos.length ? sec('Ya retirados') + `<div class="card lista">${listos.map(p => `<div class="it"><div class="txt"><b>${esc(p.empresa)}</b><span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${hace(p.confirmado)}${p.hostId !== u.id ? ' · era para ' + esc(nombreDe(p.hostId).split(' ')[0]) : ''}${como(p)}</span></div>${p.entrega && p.entrega.sello ? `<span class="pill p-ok" title="Sello ${esc(p.entrega.sello)}">${I('lock')}sellado</span>` : ''}</div>`).join('')}</div>` : ''}
+      ${listos.length ? sec('Ya retirados', `<span class="muted small">últimos ${dias} días</span>`) + `<div class="card lista">${listos.map(p => `<div class="it"><div class="txt"><b>${esc(p.empresa)}</b><span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${hace(p.confirmado)}${p.hostId !== u.id ? ' · era para ' + esc(nombreDe(p.hostId).split(' ')[0]) : ''}${como(p)}</span></div>${p.entrega && p.entrega.sello ? `<span class="pill p-ok" title="Sello ${esc(p.entrega.sello)}">${I('lock')}sellado</span>` : ''}</div>`).join('')}</div>` : ''}
+      ${superficie({ a:'hist-paquetes', icon:'clock', color:'sky', t:'Paquetes anteriores', s:`Los retirados hace más de ${dias} días. Se traen de la base solo cuando lo pedís.` })}
       <p class="muted tiny" style="margin-top:12px">${I('users')} Acá ves los paquetes de todo ${esc(u.casa || 'tu lote')}: cuando llega uno, el aviso les llega a todas las cuentas del lote (con los avisos al celular activados, aunque el teléfono esté bloqueado).</p>
       <p class="muted tiny" style="margin-top:6px">${I('lock')} La garita entrega tus paquetes solo contra tu QR de retiro (cambia cada 30 segundos y sale únicamente de tu teléfono) o, si no tenés el teléfono, con tu firma y tu DNI. Cada entrega queda en la auditoría con un sello.</p>`;
   },

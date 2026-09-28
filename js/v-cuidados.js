@@ -459,7 +459,7 @@ R['estoy-bien'] = {
           : d.estado === 'resuelto' ? `<div class="eb-hecho">${I('check')}<div><b>Hoy un contacto confirmó que estás bien</b><span>Igual podés tocar el botón mañana</span></div></div>`
           : d.estado === 'pausa' ? aviso('info', 'clock', `En pausa hasta el ${fechaLarga(x.pausaHasta)}`, 'Mientras tanto no se avisa a nadie.', `<button class="btn btn-xs btn-pri" data-a="bien-reanudar">Volver a activarlo</button>`)
           : aviso('info', 'clock', 'Empieza mañana', `Mañana tocá el botón verde antes de las ${esc(x.hora || BIEN_HORA)}.`)}
-        <div class="card"><div class="lbl">Tu hora</div><p style="margin:0 0 4px"><b>Hasta las ${esc(x.hora || BIEN_HORA)}</b> todos los días. Una hora antes te llega un recordatorio al celular${typeof Push !== 'undefined' && Push.estado() !== 'activo' && Push.estado() !== 'demo' ? ' (activá los avisos en este equipo, en Mi casa)' : ''}.</p>
+        <div class="card"><div class="lbl">Tu hora</div><p style="margin:0 0 4px"><b>Hasta las ${esc(x.hora || BIEN_HORA)}</b> todos los días. Una hora antes te llega un recordatorio al celular${typeof Push !== 'undefined' && Push.estado() !== 'activo' && Push.estado() !== 'demo' ? ' (activá los avisos en este equipo, en Tu cuenta)' : ''}.</p>
           <div class="lbl" style="margin-top:14px">A quién se avisa</div><div class="lista">${contactos.join('') || '<p class="small muted">Sin contactos.</p>'}</div>
           <div class="btns" style="margin-top:12px"><button class="btn btn-sm btn-sec" data-a="bien-config">${I('edit')}Cambiar hora o familiares</button>
             ${d.estado === 'pausa' ? '' : `<button class="btn btn-sm btn-sec" data-a="bien-pausa">${I('clock')}Pausar unos días</button>`}</div>
@@ -661,7 +661,7 @@ R.salidas = {
           <span>${esc(sa.donde || '')}${sa.con ? ' · con ' + esc(sa.con) : ''}</span>
           <span>Volvés a las <b>${hora(sa.vuelta)}</b>. ${e.estado === 'alerta' ? 'Ya avisamos a la garita y a tu familia: tocá Volví.' : `Si a las ${hora(e.lim)} no tocaste "Volví", avisamos a ${esc(nombresContactos(x))}.`}</span></div></div>
         <div class="btns"><button class="btn btn-ok btn-grande grow" data-a="salida-volvi">${I('check')}Volví</button><button class="btn btn-sec" data-a="salida-nueva">${I('edit')}Cambiar</button></div>`
-      : `<p class="small" style="margin:0 0 12px">Antes de salir al agua o a la montaña, dejá dicho a dónde vas, con quién y a qué hora volvés. Si no tocás <b>Volví</b> a tiempo, la app avisa a la garita, a la Administración y a tus familiares.</p>
+      : `<p class="small" style="margin:0 0 12px">Antes de salir al agua o a la montaña, dejá dicho a dónde vas, con quién y a qué hora volvés. Si no tocás <b>Volví</b> a tiempo, la app avisa a la garita, a la Administración y a tus familiares. Mientras estés afuera, el botón verde <b>Volví</b> te espera arriba de todo en la portada, en Tu casa y acá.</p>
         ${hayContactos ? `<p class="muted small" style="margin:0 0 12px">Se avisa a ${esc(nombresContactos(x))}. <button class="link" data-a="bien-config" data-v="salidas">Cambiar mis familiares</button></p>` : ''}
         <button class="btn btn-pri btn-block btn-grande" data-a="${hayContactos ? 'salida-nueva' : 'bien-config'}" data-v="salidas">${I('pin')}${hayContactos ? 'Voy a salir' : 'Anotar a mis familiares y salir'}</button>`;
     /* Las salidas de otros: la garita y la Administración ven todas; cada
@@ -687,7 +687,7 @@ A['salida-nueva'] = () => {
     <div class="field"><label>¿Con quién?</label><input name="con" maxlength="80" value="${esc(sa?.con || '')}" placeholder="Nombres, o solo/a"></div>
     <div class="grid2"><div class="field"><label>Vuelvo a las</label><input type="datetime-local" name="vuelta" required value="${local}"></div>
       <div class="field"><label>Avisar si no vuelvo</label><select name="margen">${SALIDA_MARGENES.map(m => `<option value="${m}" ${(sa?.margen || 60) === m ? 'selected' : ''}>${m < 60 ? m + ' min' : m / 60 + (m === 60 ? ' hora' : ' horas')} después</option>`).join('')}</select></div></div>
-    <p class="muted small" style="margin:0 0 12px">Se avisa a ${esc(nombresContactos(x || {}))}. Al volver, tocá <b>Volví</b> en la portada.</p>
+    <p class="muted small" style="margin:0 0 12px">Se avisa a ${esc(nombresContactos(x || {}))}. Al volver, tocá el botón verde <b>Volví</b>: mientras estés de salida aparece arriba de todo en la portada, en Tu casa y en esta ventana, y si se pasa la hora te llega un aviso al celular para tocarlo.</p>
     <button class="btn btn-pri btn-block">${I('pin')}${sa ? 'Guardar' : 'Salgo'}</button></form>`);
 };
 F['salida'] = async d => {

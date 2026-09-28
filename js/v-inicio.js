@@ -181,6 +181,9 @@ const SECCIONES = {
   casa: {
     titulo:'Tu casa', icon:'home', color:'ok', ancha:true, lema:'Tu lote, tus visitas y tus cosas',
     sub:'Visitas, reservas, mensajes y los datos de tu lote',
+    /* Si está de salida (Salidas seguras), el "Volví" va arriba de todo
+       también acá, además de la portada y de la ventana de la salida. */
+    arriba(u){ const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null; return x && x.salida && !x.salida.volvio && typeof tarjetaSalidaMia === 'function' ? tarjetaSalidaMia(x) : ''; },
     linea(u, s, hoy){
       const v = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy)).length;
       const m = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(x => x.from !== 'vecino' && !x.leido).length, 0) + dmNoLeidos();
@@ -193,25 +196,27 @@ const SECCIONES = {
       const proxRes = s.reservas.filter(r => r.userId === u.id && r.fecha >= hoy && !r.cancelada).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
       const privNoLeidos = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(m => m.from !== 'vecino' && !m.leido).length, 0);
       return [
-        teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Código y QR para la garita', destaca:true }),
-        teja({ a:'pase-app', icon:'car', color:'warn', t:'Viene un Uber o DiDi', s:'Aviso a la garita con la patente' }),
+        teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Visita, delivery, obra, personal o Uber/DiDi', destaca:true }),
         teja({ v:'visitas', icon:'users', color:'sky', t:'Mis visitas', s: misHoy.length ? `${plural(misHoy.length, 'esperada')} hoy` : 'Nadie anunciado hoy', n: misHoy.length || '' }),
-        teja({ v:'reservas', icon:'calendar', color:'wood', t:'Reservas', s: proxRes ? `${amenity(proxRes.amenity)?.nombre} · ${relDia(proxRes.fecha)}` : 'Quincho, SUM y cancha' }),
+        teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = paquetesDelLote(u).filter(p => !p.retirado).length; return n ? `${plural(n, 'paquete')} de tu lote en la garita` : 'Lo que llega a la garita para tu lote'; })(), badge: paquetesDelLote(u).filter(p => !p.retirado).length }),
         teja({ v:'mensajes', icon:'chat', color:'accent', t:'Mensajes', s:'Privados con vecinos y la Administración', badge: privNoLeidos + dmNoLeidos() }),
-        teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas por vos y la guardia', n: s.peticiones.filter(p => p.userId === u.id && p.estado !== 'cerrada').length || '' }),
         teja({ v:'expensas', icon:'wallet', color:'wood', t:'Mis expensas', s:`Tu cuenta, cupones y pagos` }),
-        teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Mis reclamos', s:'Privados con la Administración', n: s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length || '' }),
-        teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Familia, autos, mascotas' }),
+        teja({ v:'sismo', icon:'sismo', color:'warn', t:'Preparados para un sismo', s:(() => { const ok = typeof revisionSemanalHecha === 'function' && tengoLote() ? revisionSemanalHecha() : true; return ok ? 'Mochila, plan familiar y qué hacer' : 'Falta la revisión de esta semana'; })() }),
+        teja({ v:'salidas', icon:'pin', color:'sky', t:'Salidas seguras', s:(() => { const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, sa = x && x.salida && !x.salida.volvio ? x.salida : null;
+          return sa ? `Estás de salida · al volver, tocá "Volví"` : 'Kayak, montaña y navegación: aviso de salida'; })(), badge:(() => { const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null; return x && x.salida && !x.salida.volvio ? 1 : 0; })() }),
         teja({ v:'estoy-bien', icon:'heart', color:'ok', t:'Estoy bien', s:(() => { const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, d = x && x.activo ? Cuidado.estadoDiario(x) : null;
           return !d ? 'Un toque por día, para quien vive solo' : d.estado === 'ok' ? `Hoy avisaste a las ${hora(x.ultimo)}` : d.estado === 'pausa' ? 'En pausa' : 'Todavía no avisaste hoy'; })(),
           badge:(typeof Cuidado !== 'undefined' ? Cuidado.personas().filter(p => Cuidado.enAlerta(p) || (p.contactos[u.id] && !p.contactos[u.id].acepta)).length : 0) }),
-        teja({ v:'sismo', icon:'sismo', color:'warn', t:'Preparados para un sismo', s:(() => { const ok = typeof revisionSemanalHecha === 'function' && tengoLote() ? revisionSemanalHecha() : true; return ok ? 'Mochila, plan familiar y qué hacer' : 'Falta la revisión de esta semana'; })() }),
-        teja({ v:'invierno', icon:'flame', color:'warn', t:'Tu casa en invierno', s:(() => { const n = typeof tareasQueTocan === 'function' ? tareasQueTocan().length : 0; return n ? `${plural(n, 'cosa para revisar', 'cosas para revisar')}` : 'Gas, monóxido, chimenea y caños'; })() }),
-        teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = paquetesDelLote(u).filter(p => !p.retirado).length; return n ? `${plural(n, 'paquete')} de tu lote en la garita` : 'Lo que llega a la garita para tu lote'; })(), badge: paquetesDelLote(u).filter(p => !p.retirado).length }),
+        ...((m => m >= 10 || m <= 3)(new Date().getMonth() + 1) ? [teja({ v:'verano', icon:'sun', color:'ok', t:'Tu casa en verano', s:(() => { const n = typeof tareasVeranoQueTocan === 'function' ? tareasVeranoQueTocan().length : 0; return n ? `${plural(n, 'cosa para hacer', 'cosas para hacer')}` : 'Pasto, vereda, basura, viento y fuego'; })() }), teja({ v:'invierno', icon:'flame', color:'warn', t:'Tu casa en invierno', s:(() => { const n = typeof tareasQueTocan === 'function' ? tareasQueTocan().length : 0; return n ? `${plural(n, 'cosa para revisar', 'cosas para revisar')}` : 'Gas, monóxido, chimenea y caños'; })() })] : [teja({ v:'invierno', icon:'flame', color:'warn', t:'Tu casa en invierno', s:(() => { const n = typeof tareasQueTocan === 'function' ? tareasQueTocan().length : 0; return n ? `${plural(n, 'cosa para revisar', 'cosas para revisar')}` : 'Gas, monóxido, chimenea y caños'; })() }), teja({ v:'verano', icon:'sun', color:'ok', t:'Tu casa en verano', s:(() => { const n = typeof tareasVeranoQueTocan === 'function' ? tareasVeranoQueTocan().length : 0; return n ? `${plural(n, 'cosa para hacer', 'cosas para hacer')}` : 'Pasto, vereda, basura, viento y fuego'; })() })]),
+        teja({ v:'reservas', icon:'calendar', color:'wood', t:'Reservas', s: proxRes ? `${amenity(proxRes.amenity)?.nombre} · ${relDia(proxRes.fecha)}` : 'Quincho, SUM y cancha' }),
+        teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas por vos y la guardia', n: s.peticiones.filter(p => p.userId === u.id && p.estado !== 'cerrada').length || '' }),
+        teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Mis reclamos', s:'Privados con la Administración', n: s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length || '' }),
+        teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Quiénes están en tu lote, autos y mascotas' }),
         teja({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial', s:'Tu QR para la garita y los espacios comunes' }),
         teja({ v:'ayuda', icon:'info', color:'sky', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa' }),
         ...(s.infracciones.some(i => i.casa === u.casa && i.estado === 'notificada')
           ? [teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificación', s:'Podés presentar tu descargo', badge: s.infracciones.filter(i => i.casa === u.casa && i.estado === 'notificada').length })] : []),
+
       ].join('');
     },
   },
@@ -232,7 +237,7 @@ const SECCIONES = {
       const compras = s.compras.filter(x => x.cierra > Date.now()).length;
       return [
         teja({ v:'pizarron', icon:'muro', t:'Pizarrón', s:'Guardia, Administración y vecinos', badge: pizNuevas, destaca:true }),
-        teja({ v:'manual', icon:'book', color:'accent', t:'Manual de uso', s:'Cómo usar la app, paso a paso' }),
+        teja({ v:'manual', icon:'book', color:'accent', t:'Manual y normas', s:'Cómo usar la app · reglamento, convivencia y protocolos' }),
         teja({ v:'vecinos', icon:'users', color:'sky', t:'Vecinos', s:'Buscá por nombre, oficio o dirección' }),
         teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#general · #seguridad · #mascotas', badge: chatNuevos }),
         teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votAbiertas ? `${plural(votAbiertas, 'abierta')}` : 'Sin votaciones abiertas', n: votAbiertas || '' }),
@@ -243,7 +248,6 @@ const SECCIONES = {
         teja({ v:'compras', icon:'cart', color:'brand', t:'Compras conjuntas', s: compras ? `${plural(compras, 'abierta')}` : 'Leña, gas, lo que sea', n: compras || '' }),
         teja({ v:'cosas', icon:'box', color:'wood', t:'Cosas para prestar', s:(() => { const n = aLista(s.cosas).filter(x => x.userId !== u.id && x.estado === 'disponible').length; return n ? `${plural(n, 'cosa disponible', 'cosas disponibles')}` : 'Escalera, hidrolavadora, generador…'; })() }),
         teja({ v:'nieve', icon:'snow', color:'sky', t:'Ángeles de la nieve', s:(() => { const n = aLista(s.nieve).filter(x => x.tipo === 'ayuda' && x.activo !== false && !x.angel).length; return n ? `${plural(n, 'casa espera', 'casas esperan')} un ángel` : 'Despejar la entrada de quien no puede'; })() }),
-        teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamentos', s:'Reglamento, convivencia y protocolos' }),
         teja({ v:'tablero', icon:'wallet', color:'wood', t:'Las cuentas del barrio', s:'En qué se gasta, mes a mes, y la morosidad (sin nombres)' }),
         teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
         teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:descargasVisibles().filter(d => (d.url || d.texto) && !esNormaDescarga(d)).length || '' }),
@@ -264,7 +268,6 @@ const SECCIONES = {
       const prox = proximoFeriado();
       return [
         teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · hospitales · farmacias', destaca:true }),
-        teja({ v:'salidas', icon:'pin', color:'sky', t:'Salidas seguras', s:'Kayak, montaña y navegación: guía y aviso de salida' }),
         teja({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, súper y más' }),
         teja({ v:'cruceros', icon:'send', color:'brand', t:'Cruceros', s: Cruceros.linea(), n: Cruceros.hoy().length || '' }),
         teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia hoy', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
@@ -397,6 +400,7 @@ for (const k in SECCIONES){
       const u = yo(), s = Store.s, hoy = hoyISO();
       const c = S.tejas(u, s, hoy);
       return `<div class="seccion-vista">${bannerSeccion(k, u, s, hoy)}
+        ${S.arriba ? S.arriba(u, s, hoy) : ''}
         ${c.trim().startsWith('<p') ? c : `<div class="mosaico">${c}</div>`}</div>`;
     } };
 }
@@ -918,7 +922,6 @@ R.visitas = {
     const pedidos = s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente');
     const mes = hoy.slice(0, 7);
     return `
-      ${superficie({ a:'pase-app', icon:'car', color:'warn', t:'Viene un Uber, DiDi o taxi', s:'Avisale a la garita en 10 segundos: app, patente y en cuánto llega' })}
       ${superficie({ a:'link-pedir', icon:'share', color:'accent', t:'Pasale un enlace a tu visita', s:'Completa sus datos desde su celular y vos lo aprobás con un toque' })}
       ${pedidos.map(r => aviso('info', 'qr', `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}`, `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)).join('')}
       ${sec('Hoy')}${deHoy.length ? deHoy.map(p => tarjetaPase(p)).join('') : vacio('users', 'No anunciaste a nadie para hoy.')}
@@ -965,6 +968,10 @@ A['nuevo-pase'] = (el) => {
 };
 document.addEventListener('change', e => {
   if (e.target.name === 'fijo'){ const b = $('#fijoBox'); if (b) b.hidden = !e.target.checked; }
+  /* UBER, DIDI O TAXI SE AVISA DESDE ACÁ (pedido de Claudio, 28-09): ya no
+     hay una teja aparte en Tu casa ni en Mis visitas. Al elegirlo, la hoja
+     pasa al aviso corto de siempre (app, patente, en cuánto llega). */
+  if (e.target.name === 'tipo' && e.target.value === 'remis' && e.target.closest('form[data-f="nuevo-pase"]')){ A['pase-app'](); return; }
   /* Personal fijo o de obra: casi siempre viene varias veces. */
   if (e.target.name === 'tipo' && e.target.closest('form[data-f="nuevo-pase"]') && ['personal', 'proveedor'].includes(e.target.value)){
     const f = e.target.form.querySelector('[name=fijo]'); if (f && !f.checked){ f.checked = true; const b = $('#fijoBox'); if (b) b.hidden = false; } }
@@ -1009,6 +1016,7 @@ A['ver-pase'] = el => verPase(el.dataset.id);
    ========================================================= */
 const APPS_VIAJE = { uber:'Uber', didi:'DiDi', cabify:'Cabify', taxi:'Taxi / remís' };
 A['pase-app'] = () => hoja('Viene un Uber, DiDi o taxi', `<form data-f="pase-app">
+  <p class="small" style="margin:0 0 12px"><button type="button" class="link" data-a="nuevo-pase">${I('left')}Es otro tipo de visita</button></p>
   <div class="field"><label>¿De qué app?</label><div class="seg">${Object.entries(APPS_VIAJE).map(([k, n], i) => `<label><input type="radio" name="app" value="${k}" ${i === 0 ? 'checked' : ''}><span>${esc(n)}</span></label>`).join('')}</div></div>
   <div class="field"><label>¿Para qué viene?</label><div class="seg">
     <label><input type="radio" name="para" value="buscar" checked><span>${I('logout')}Me viene a buscar</span></label>
@@ -2041,52 +2049,116 @@ F['turnos'] = d => {
    solas) no aparece.
    ========================================================= */
 const turnoEsNoche = nombre => { const c = turnosConfig().find(x => x.nombre === nombre); return /noche|madrug/i.test(nombre || '') || (c ? enFranja(c, 23 * 60) || enFranja(c, 2 * 60) : false); };
+/* =========================================================
+   HOY LA GARITA NO PUEDE OLVIDAR (rehecho a pedido de Claudio, 28-09-2026)
+   Antes era una lista fija: salían tachadas cosas que hoy no tocaban
+   ("Nadie anunciado", "Ningún paquete") mezcladas con cosas que sí había
+   que hacer, y el control de la ART aparecía aunque no viniera nadie.
+   Ahora la lista se ARMA SOLA con lo que de verdad hay hoy:
+     · lo pedido a la garita (peticiones sin recibir y las vigentes, avisos
+       de vecinos, consultas de "llegó sin aviso");
+     · lo programado para hoy (visitas y viajes anunciados, ingresos
+       frecuentes de este día, obras y proveedores que vienen, el camión,
+       los traslados del hotel, el policía del turno de noche, las casas
+       solas para revisar);
+     · lo pendiente (quién está adentro sin salida, paquetes por entregar,
+       alertas de "Estoy bien");
+     · y lo de todo turno (la bitácora y el cierre del turno).
+   Lo que no está pedido, programado ni pendiente NO sale. Lo ya hecho no
+   se lista tachado: queda resumido en un renglón ("Hecho hoy: …").
+   ========================================================= */
 function tareasGarita(){
-  const s = Store.s, hoy = hoyISO(), t = turnoAbierto(), ahora = Date.now(), L = [];
-  const add = (estado, icon, titulo, det, ir = {}) => L.push({ estado, icon, titulo, det, ir });
-  add(t ? 'hecho' : 'pend', 'shield', 'Anotar el turno y quiénes están', t ? esc(aLista(t.guardias).join(', ')) : 'Todavía no se abrió el turno', {});
-  /* El camión: el día que pasa, entrada (avisa sola a todos) y salida. */
+  const s = Store.s, hoy = hoyISO(), t = turnoAbierto(), ahora = Date.now(), inicioDia = fechaDe(hoy).getTime(), L = [], hechas = [];
+  /* prioridad: 0 urgente · 1 con hora · 2 del día · 3 de todo turno */
+  const add = (prio, icon, titulo, det, ir = {}, extra = {}) => L.push({ prio, icon, titulo, det, ir, ...extra });
+  const hecho = txt => hechas.push(txt);
+  const nombreCasa = id => esc(usuario(id)?.casa || '');
+  const lista3 = (xs, f) => xs.slice(0, 3).map(f).join(' · ') + (xs.length > 3 ? ` y ${xs.length - 3} más` : '');
+
+  if (!t) add(0, 'shield', 'Anotar el turno y quiénes están', 'Todavía no se abrió el turno de hoy');
+  else hecho(`turno ${esc(t.turno)} abierto (${esc(aLista(t.guardias).join(', '))})`);
+
+  /* Lo urgente: gente esperando en la entrada, alertas y pedidos sin leer. */
+  const cons = s.llegadas.filter(l => l.estado === 'consultando');
+  if (cons.length) add(0, 'gate', 'Llegó sin aviso: esperando la respuesta del vecino', lista3(cons, l => `${esc(l.nombre)} → ${esc(l.casa || usuario(l.hostId)?.casa || '')}`), { ir:'#garLlegadas' });
+  if (typeof Cuidado !== 'undefined' && typeof veListaCuidados === 'function' && veListaCuidados()){ const mal = Cuidado.personas().filter(p => Cuidado.enAlerta(p));
+    if (mal.length) add(0, 'heart', '"Estoy bien" o salida sin regreso: llamar o pasar', lista3(mal, p => `${esc(p.casa || '')} · ${esc(primerNombre(p.nombre))}`), { v:'estoy-bien' }); }
+  const av = s.avisos.filter(a => !a.visto && ahora - a.at < 6 * HORA);
+  if (av.length) add(0, 'bell', 'Avisos de vecinos: leer y marcar "Visto"', plural(av.length, 'sin ver', 'sin ver'), { ir:'#garAvisos' });
+  const petP = s.peticiones.filter(p => p.estado === 'pendiente');
+  if (petP.length) add(0, 'edit', 'Peticiones de vecinos: recibir y firmar', lista3(petP, p => `${esc(p.casa || '')} · ${esc((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n.toLowerCase())}`), { v:'peticiones' });
+
+  /* El camión, solo el día que pasa. */
   const dias = recoleccionDias(), dh = dias[new Date().getDay()], vol = typeof volsProximos === 'function' && volsProximos().find(v => v.fecha === hoy);
   if (dh || vol){ const ad = Camion.adentro(), paso = camionPasoHoy();
-    add(paso && !ad ? 'hecho' : 'pend', 'tacho', 'Camión de residuos: registrar entrada y salida',
-      ad ? `Adentro desde las ${hora(ad.entra)} h: falta registrar la salida` : paso ? `Pasó a las ${hora(paso.entra)} h` : `Hoy pasa (${esc(vol ? 'voluminosos' : String(dh).toLowerCase())}). Al registrar la entrada, se avisa solo a todo el barrio.`,
-      ad ? { a:'camion-sale' } : paso ? {} : { a:'camion-entra' }); }
-  const lista = pasesDelDia(hoy), esp = lista.filter(p => estadoPase(p) === 'esperado').length, adn = lista.filter(p => estadoPase(p) === 'adentro').length;
-  add(esp || adn ? 'pend' : 'hecho', 'users', 'Ingreso y egreso de quien no es del barrio',
-    esp || adn ? [esp && plural(esp, 'anunciado sin llegar', 'anunciados sin llegar'), adn && `${adn} adentro: falta la salida`].filter(Boolean).join(' · ') : lista.length ? 'Todos registrados' : 'Nadie anunciado por ahora', { ir:'#garIngresos' });
-  const cons = s.llegadas.filter(l => l.estado === 'consultando').length;
-  if (cons) add('pend', 'gate', 'Llegó sin aviso: esperar la respuesta del vecino', plural(cons, 'persona esperando', 'personas esperando'), { ir:'#garLlegadas' });
-  const paq = s.paquetes.filter(p => !p.retirado).length;
-  add(paq ? 'pend' : 'hecho', 'box', 'Paquetes: anotar al llegar y entregar con el QR', paq ? plural(paq, 'paquete en la garita', 'paquetes en la garita') : 'Ninguno esperando', { ir:'#garPaquetes' });
-  if (typeof viajesDelDia === 'function' && viajesDelDia(hoy).length){ const vp = viajesDelDia(hoy).filter(x => x.estado !== 'hecho');
-    add(vp.length ? 'pend' : 'hecho', 'car', 'Vans del hotel: marcar cada salida y regreso', vp.length ? `${plural(vp.length, 'traslado pendiente', 'traslados pendientes')}${vp[0].sale ? ' · el próximo a las ' + esc(vp[0].sale) : ''}` : 'Todos hechos', { ir:'.vans-garita' }); }
+    if (ad) add(0, 'tacho', 'Camión de residuos adentro: registrar la salida', `Entró a las ${hora(ad.entra)} h`, { a:'camion-sale' });
+    else if (paso) hecho(`camión (entró ${hora(paso.entra)} h)`);
+    else add(1, 'tacho', 'Camión de residuos: registrar la entrada y la salida', `Hoy pasa (${esc(vol ? 'voluminosos' : String(dh).toLowerCase())}). Al registrar la entrada, se avisa solo a todo el barrio.`, { a:'camion-entra' }); }
+
+  /* Quién viene hoy y quién está adentro. */
+  const lista = pasesDelDia(hoy), esp = lista.filter(p => estadoPase(p) === 'esperado').sort((a, b) => String(a.desde).localeCompare(String(b.desde))), adn = lista.filter(p => estadoPase(p) === 'adentro');
+  if (esp.length) add(1, 'users', `Vienen hoy: ${plural(esp.length, 'visita anunciada', 'visitas anunciadas')}`, lista3(esp, p => `${esc(p.desde || '')} ${esc(p.nombre)} → ${nombreCasa(p.hostId)}${p.patente ? ' · ' + esc(p.patente) : ''}`), { ir:'#garIngresos' }, { hora:esp[0].desde || '' });
+  if (adn.length) add(2, 'logout', `Adentro: falta registrar la salida de ${adn.length}`, lista3(adn, p => `${esc(p.nombre)} → ${nombreCasa(p.hostId)}`), { ir:'#garIngresos' });
+  const fueron = lista.filter(p => estadoPase(p) === 'salio').length;
+  if (fueron) hecho(plural(fueron, 'visita con entrada y salida', 'visitas con entrada y salida'));
+
+  /* Ingresos frecuentes que tienen HOY entre sus días (los de "cualquier día" no son programados). */
+  const movsHoy = aLista(s.bitacora).filter(b => b && b.frecId && b.at >= inicioDia);
+  const frecHoy = (typeof frecuentes === 'function' ? frecuentes() : []).filter(f => aLista(f.dias).length && frecuenteVigente(f).ok && !frecuenteVigente(f).aviso);
+  const frecEntro = f => movsHoy.some(b => b.frecId === f.id && /^Ingreso/.test(b.texto || ''));
+  const frecFalta = frecHoy.filter(f => !frecEntro(f));
+  if (frecFalta.length) add(1, 'user', `Ingresos frecuentes de hoy: ${plural(frecFalta.length, 'falta llegar', 'faltan llegar')}`, lista3(frecFalta.sort((a, b) => String(a.desde).localeCompare(String(b.desde))), f => `${f.desde ? esc(f.desde) + ' ' : ''}${esc(f.nombre)}${f.empresa ? ' (' + esc(f.empresa) + ')' : ''} → ${esc(f.destino || 'Barrio')}`), { v:'frecuentes' }, { hora:frecFalta[0].desde || '' });
+
+  /* ART: solo si hoy viene alguien de una obra o un proveedor. */
+  const deObra = [...esp.filter(p => p.tipo === 'proveedor').map(p => esc(p.nombre)),
+    ...frecFalta.filter(f => ['obra', 'proveedor'].includes(f.tipo)).map(f => esc(f.empresa || f.nombre)),
+    ...s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => `${esc(o.empresa || 'Obra')}${o.casa ? ' (' + esc(o.casa) + ')' : ''}`)];
+  const provVencida = aLista(s.proveedores).filter(p => p && p.empresa && (!p.artVence || p.artVence < hoy) && deObra.some(n => normTxt(n).includes(normTxt(p.empresa || '').slice(0, 12))));
+  if (deObra.length) add(1, 'wrench', 'Obras y proveedores de hoy: controlar la ART al entrar', `${lista3([...new Set(deObra)], x => x)}${provVencida.length ? ` · <b style="color:var(--danger)">ART vencida: ${provVencida.map(p => esc(p.empresa)).join(', ')} (no entra)</b>` : ''}`, { v:'proveedores' });
+
+  /* Paquetes por entregar y los entregados hoy. */
+  const paq = s.paquetes.filter(p => !p.retirado), entregados = s.paquetes.filter(p => p.retirado && p.retirado >= inicioDia).length;
+  if (paq.length) add(2, 'box', `Paquetes para entregar: ${paq.length}`, `${lista3([...new Set(paq.map(p => loteDelPaquete(p) || '—'))], l => esc(l))} · se entregan con el QR del vecino`, { ir:'#garPaquetes' });
+  if (entregados) hecho(plural(entregados, 'paquete entregado', 'paquetes entregados'));
+
+  /* Vans del hotel. */
+  if (typeof viajesDelDia === 'function' && viajesDelDia(hoy).length){ const vp = viajesDelDia(hoy).filter(x => x.estado !== 'hecho'), vh = viajesDelDia(hoy).length - vp.length;
+    if (vp.length) add(1, 'car', `Vans del hotel: ${plural(vp.length, 'traslado', 'traslados')} por marcar`, `${vp[0].sale ? 'El próximo sale a las ' + esc(vp[0].sale) + ' · ' : ''}marcá cada salida y regreso`, { ir:'.vans-garita' }, { hora:vp[0].sale || '' });
+    if (vh) hecho(plural(vh, 'traslado del hotel', 'traslados del hotel')); }
+
+  /* Casas solas. */
   const solas = typeof casasSolas === 'function' ? casasSolas(hoy) : [];
-  if (solas.length){ const rev = solas.filter(a => revisionDeHoy(a)).length;
-    add(rev >= solas.length ? 'hecho' : 'pend', 'lock', 'Casas solas: revisar cada una y tocar "Revisada"', `${rev} de ${solas.length} revisadas hoy (al vecino le llega el aviso)`, { ir:'#garCasas' }); }
-  if (typeof Cuidado !== 'undefined' && typeof veListaCuidados === 'function' && veListaCuidados()){ const ps = Cuidado.personas(), mal = ps.filter(p => Cuidado.enAlerta(p));
-    if (ps.length) add(mal.length ? 'pend' : 'hecho', 'heart', '"Estoy bien": si alguien no avisó, llamar o pasar', mal.length ? plural(mal.length, 'vecino en alerta', 'vecinos en alerta') : 'Sin alertas', { v:'estoy-bien' }); }
-  const pet = s.peticiones.filter(p => p.estado === 'pendiente').length;
-  add(pet ? 'pend' : 'hecho', 'edit', 'Peticiones de vecinos: recibir y firmar', pet ? plural(pet, 'sin recibir', 'sin recibir') : 'Todas recibidas', { v:'peticiones' });
-  const av = s.avisos.filter(a => !a.visto && ahora - a.at < 6 * HORA).length;
-  if (av) add('pend', 'bell', 'Avisos de vecinos: leer y marcar "Visto"', plural(av, 'sin ver', 'sin ver'), { ir:'#garAvisos' });
-  const pols = t ? policiasDe(t) : [];
-  if ((t && turnoEsNoche(t.turno)) || pols.length){ const adentro = t ? policiasAdentro(t) : [], rondas = pols.reduce((n, p) => n + p.rondas.length, 0);
-    add(pols.length ? 'hecho' : 'pend', 'shield', 'Policía contratado: ingreso, rondas y salida', adentro.length ? `${adentro.map(p => esc(p.nombre)).join(', ')} de servicio · ${plural(rondas, 'ronda')}` : pols.length ? 'Ya salió: su servicio quedó en Turnos' : 'Todavía no se registró su ingreso',
-      pols.length ? { ir:'.policia-card' } : { a:'policia-nuevo' }); }
-  const obras = s.obras.filter(o => o.avisoHoy?.fecha === hoy).length;
-  add('siempre', 'wrench', 'Proveedores y obras: controlar la ART al entrar', obras ? plural(obras, 'obra con aviso hoy', 'obras con aviso hoy') : 'Si no figura o está vencida, no entra', { v:'proveedores' });
+  if (solas.length){ const falta = solas.filter(a => !revisionDeHoy(a));
+    if (falta.length) add(2, 'lock', `Casas solas: revisar ${falta.length}`, `${lista3(falta, a => esc(a.casa))} · tocá "Revisada" en cada una (al vecino le llega el aviso)`, { ir:'#garCasas' });
+    if (solas.length - falta.length) hecho(plural(solas.length - falta.length, 'casa sola revisada', 'casas solas revisadas')); }
+
+  /* Lo que los vecinos pidieron por escrito y sigue vigente hoy (no dejar pasar, llaves, permisos, paquetes a guardar). */
+  const vig = s.peticiones.filter(p => p.estado === 'en_funciones' && p.tipo !== 'viaje' && (!p.desde || p.desde <= hoy) && (!p.hasta || p.hasta >= hoy));
+  if (vig.length) add(2, 'edit', `Pedidos vigentes de vecinos: ${vig.length}`, lista3(vig.sort((a, b) => (b.tipo === 'nopasar') - (a.tipo === 'nopasar')), p => `${p.tipo === 'nopasar' ? '<b>' : ''}${esc(p.casa || '')} · ${esc((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n.toLowerCase())}${p.tipo === 'nopasar' ? '</b>' : ''}`), { v:'peticiones', p:'en_funciones' }, { info:true });
+
+  /* El policía contratado: en el turno de noche, o si ya está registrado. */
+  const pols = t ? policiasDe(t) : [], adentroP = t ? policiasAdentro(t) : [];
+  if (adentroP.length){ const rondas = pols.reduce((n, p) => n + p.rondas.length, 0), enCurso = adentroP.map(rondaEnCurso).find(Boolean);
+    add(1, 'shield', 'Policía contratado: rondas y, al irse, su salida', `${adentroP.map(p => esc(p.nombre)).join(', ')} de servicio · ${enCurso ? `ronda en curso desde las ${hora(enCurso.inicio)} h` : plural(rondas, 'ronda') + ' hechas'}`, { ir:'.policia-card' }); }
+  else if (t && turnoEsNoche(t.turno) && !pols.length) add(1, 'shield', 'Policía contratado: registrar su ingreso', 'Turno de noche: cuando llegue, anotalo y mandale su código de ronda', { a:'policia-nuevo' });
+  else if (pols.length) hecho(`servicio del policía (${plural(pols.reduce((n, p) => n + p.rondas.length, 0), 'ronda')})`);
+
+  /* De todo turno: la bitácora y el cierre. */
   const manual = t && aLista(s.bitacora).some(b => b && b.at >= t.at && b.autor && b.autor !== 'sistema' && ['novedad', 'incidente', 'ronda'].includes(b.tipo));
-  add(manual ? 'hecho' : 'pend', 'book', 'Bitácora: anotar las novedades del turno', manual ? 'Hay novedades anotadas en este turno' : 'Todavía no se anotó ninguna novedad', { v:'bitacora' });
-  const fin = t ? (turnosConfig().find(x => x.nombre === t.turno) || {}).hasta : '';
-  add('siempre', 'clock', 'Al terminar: cerrar el turno con las novedades', fin ? `El turno ${esc(t.turno)} termina a las ${fin} h` : 'Deja todo anotado para el que entra', { a:'cerrar-turno' });
-  const pend = L.filter(x => x.estado === 'pend'), orden = [...pend, ...L.filter(x => x.estado === 'siempre'), ...L.filter(x => x.estado === 'hecho')];
+  if (t && !manual) add(3, 'book', 'Bitácora: anotar las novedades del turno', 'Todavía no se anotó ninguna en este turno', { v:'bitacora' });
+  else if (manual) hecho('novedades en la bitácora');
+  if (t){ const fin = (turnosConfig().find(x => x.nombre === t.turno) || {}).hasta || '';
+    add(3, 'clock', 'Al terminar: cerrar el turno con las novedades', fin ? `El turno ${esc(t.turno)} termina a las ${fin} h` : 'Deja todo anotado para el que entra', { a:'cerrar-turno' }); }
+
+  const orden = L.sort((a, b) => a.prio - b.prio || String(a.hora || '99').localeCompare(String(b.hora || '99')));
+  const pend = orden.filter(x => !x.info && x.prio < 3).length;
   const opera = esGuardia();
-  const attrs = x => x.ir.a && opera ? `data-a="${x.ir.a}"` : x.ir.v ? `data-a="abrir" data-v="${x.ir.v}"` : x.ir.ir ? `data-a="garita-ir" data-v="${esc(x.ir.ir)}"` : 'disabled';
-  return `<details class="tareas-dia card" data-k="tareas-dia" ${pend.length ? 'open' : ''}>
-    <summary><b>${I('clipboard')}Hoy la garita no puede olvidar</b><span class="pill ${pend.length ? 'p-warn' : 'p-ok'}">${pend.length ? plural(pend.length, 'pendiente', 'pendientes') : 'todo al día'}</span></summary>
-    <div class="td-lista">${orden.map(x => `<button type="button" class="td-item td-${x.estado}" ${attrs(x)}>${x.estado === 'hecho' ? `<span class="td-ic">${I('check')}</span>` : `<span class="td-ic">${I(x.icon)}</span>`}<span class="td-txt"><b>${x.titulo}</b><small>${x.det}</small></span></button>`).join('')}</div>
-    ${(() => { const h = L.filter(x => x.estado === 'hecho'); return h.length ? `<p class="td-hechas-movil">${I('check')} ${plural(h.length, 'ya hecha', 'ya hechas')}: ${h.map(x => x.titulo.split(':')[0]).join(' · ')}</p>` : ''; })()}
-    <p class="muted tiny" style="margin:8px 2px 0">Se tilda sola cuando la app ve que está hecho.</p></details>`;
+  const attrs = x => x.ir.a && opera ? `data-a="${x.ir.a}"` : x.ir.v ? `data-a="abrir" data-v="${x.ir.v}"${x.ir.p ? ` data-p="${esc(x.ir.p)}"` : ''}` : x.ir.ir ? `data-a="garita-ir" data-v="${esc(x.ir.ir)}"` : 'disabled';
+  return `<details class="tareas-dia card" data-k="tareas-dia" open>
+    <summary><b>${I('clipboard')}Hoy la garita no puede olvidar</b><span class="pill ${pend ? 'p-warn' : 'p-ok'}">${pend ? plural(pend, 'para hacer', 'para hacer') : 'todo al día'}</span></summary>
+    <div class="td-lista">${orden.map(x => `<button type="button" class="td-item td-${x.prio === 0 ? 'urge' : x.prio === 3 ? 'turno' : x.info ? 'info' : 'pend'}" ${attrs(x)}><span class="td-ic">${I(x.icon)}</span><span class="td-txt"><b>${x.titulo}</b><small>${x.det}</small></span></button>`).join('')}</div>
+    ${hechas.length ? `<p class="td-hecho-hoy">${I('check')} <b>Hecho hoy:</b> ${hechas.join(' · ')}</p>` : ''}
+    <p class="muted tiny" style="margin:8px 2px 0">Se arma sola con lo pedido, lo programado y lo pendiente de hoy; lo que no hay, no aparece. Cada cosa sale de la lista cuando la app ve que está hecha.</p></details>`;
 }
 A['garita-ir'] = el => { const d = document.querySelector(el.dataset.v); if (d) d.scrollIntoView({ behavior:'smooth', block:'start' }); else toast('Ahora no hay nada de eso en la garita', 'check'); };
 
