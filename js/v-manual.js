@@ -421,7 +421,7 @@ const MANUAL_CAPS = [
       '<b>Avisos en este equipo</b>: activar, probar o desactivar los avisos al celular, y el sonido cuando escribe la guardia o la Administración.',
       '<b>Cambiar mi contraseña</b> y <b>cambiar mi correo</b>. La cuenta de la garita cambia solo la contraseña: su correo es fijo.',
       '<b>Preguntas frecuentes</b> y este manual.',
-      '<b>Mis datos personales</b>: descargar una copia o pedir que se borren (Ley 25.326).',
+      '<b>Mis datos personales</b> (vecinos): un informe con <b>todo lo que la app guarda de vos</b>, sección por sección, con quién ve cada cosa y cuánto se guarda, para imprimir o guardar en PDF; también "Corregir mis datos" y "Pedir la baja". La garita y el hotel no lo tienen: son cuentas institucionales.',
       '<b>Actualizar la app</b>: si algo quedó raro o no abre una ventana. Baja todo de nuevo; tus datos no se pierden.',
       '<b>Cerrar sesión</b>: salís de la app en ese equipo. Por seguridad, también se borra la llave de tu QR de retiro en ese equipo.',
     ]],
@@ -441,7 +441,7 @@ const MANUAL_CAPS = [
       '<b>Cosas para prestar</b> y <b>Ángeles de la nieve</b> los ven los vecinos de la app (tu nombre de pila y tu lote). Los pedidos de préstamo van por mensaje privado. En Ángeles de la nieve no pongas datos de salud.',
       'Si sos del equipo de salud y tocás VOY ante un pedido del DEA, la garita y el vecino ven tu nombre, tu profesión y tu teléfono.',
     ]],
-    ['p', 'Por la <b>Ley 25.326</b> podés pedir ver, corregir o borrar tus datos: en <b>Tu cuenta → Mis datos personales</b> descargás una copia o pedís la baja.'],
+    ['p', 'Por la <b>Ley 25.326</b> podés pedir ver, corregir o borrar tus datos: en <b>Tu cuenta → Mis datos personales</b> tocá <b>"Ver mi informe"</b>: se abre un documento con todo lo que la app guarda de vos (tu cuenta, visitas, paquetes, pagos, mensajes, reclamos, votos, lo que publicaste, "Estoy bien", lo de tu casa y el archivo histórico), que imprimís o guardás como PDF. Ahí mismo pedís la baja. No incluye contraseñas ni códigos para entrar, y el DNI de tus visitas va tapado. Para llevar tus datos a otro sistema hay además una "Copia técnica (JSON)".'],
     ['p', 'Los <b>términos de uso</b>, lo que dice la ley sobre tus datos y el deslinde de responsabilidad se abren tocando <b>"by Claudio A. Ravasi"</b> al pie de la portada, y en Preguntas frecuentes → "Tus datos: privacidad y seguridad".'],
   ], ir:[['abrir', 'ayuda', 'Preguntas frecuentes'], ['abrir', 'legal', 'Términos de uso']] },
 

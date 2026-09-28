@@ -1315,7 +1315,7 @@ A['mi-cuenta'] = () => { const u = yo();
     ${superficie({ a:'abrir-manual', icon:'book', color:'accent', t:'Manual de uso', s:'Paso a paso, por capítulos' })}
     ${typeof Asistente !== 'undefined' && Asistente.paraMi() && Asistente.soportado() ? superficie({ a:'asistente-ajuste', icon:'volume', color:'sky', t: Asistente.permiso() === 'si' ? 'Asistente por voz: activado' : 'Asistente por voz: apagado', s: Asistente.permiso() === 'si' ? 'Tocá el escudo y pedile algo. Tocá acá para apagarlo en este equipo.' : 'Pedirle cosas a la app con la voz. Tocá para activarlo en este equipo.' }) : ''}
     ${esGuardia() || esHotel() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
-    ${superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Descargarlos o pedir que se borren (Ley 25.326)' })}
+    ${esGuardia() || esHotel() ? '' : superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Ver todo lo que la app guarda de vos, en PDF, o pedir que se borre (Ley 25.326)' })}
 
     ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
@@ -1709,18 +1709,37 @@ document.addEventListener('click', e => {
    Ahora la ventana es de 0,8 s (lo que tarda un toque de verdad), el
    envío automático se ignora SIEMPRE y se avisa "tocá Entrar", y al tocar
    Entrar aparece al instante "Entrando…" (ver F['entrar']).
+   28-09 (Claudio: "sigue abriéndose sola la app"): LA CAUSA DE FONDO. Cuando
+   el navegador envía el formulario solo (Enter o el administrador de
+   contraseñas), antes "aprieta" él mismo el botón Entrar: dispara un click
+   que el navegador marca como confiable (isTrusted) pero que no viene de un
+   dedo ni de un mouse (detail 0, sin tipo de puntero). La app lo contaba
+   como un toque y entraba. Comprobado en el navegador de prueba: Enter con
+   la clave completada → "click trusted detail=0" → entraba. Ahora solo
+   cuenta un toque de verdad: pointerdown de dedo, mouse o lápiz, o un click
+   con detail ≥ 1. Para quien entra con teclado o lector de pantalla: si un
+   envío se frenó, el siguiente pedido a propósito (1 s después o más, dentro
+   de los 30 s) se acepta; el navegador no envía dos veces solo.
    ========================================================= */
 const Ingreso = {
-  toque:0, tecleo:false,
+  toque:0, tecleo:false, frenado:0,
   valido(form){
     if (form.dataset.f !== 'entrar') return true;
-    if (Date.now() - this.toque < 800) return true;
-    return this.tecleo && Date.now() - (this.enter || 0) < 1500;
+    const ahora = Date.now();
+    if (ahora - this.toque < 800) return true;
+    if (this.tecleo && ahora - (this.enter || 0) < 1500) return true;
+    if (this.frenado && ahora - this.frenado >= 1000 && ahora - this.frenado < 30000){ this.frenado = 0; return true; }
+    this.frenado = ahora;
+    return false;
   },
+  /* Un toque de una persona, no el "click" que arma el navegador al enviar solo. */
+  deVerdad(e){ if (!e.isTrusted) return false;
+    if (e.type === 'pointerdown') return ['touch', 'mouse', 'pen'].includes(e.pointerType);
+    return e.detail > 0 && (e.pointerType === undefined || e.pointerType !== ''); },
 };
 ['pointerdown', 'click'].forEach(ev => document.addEventListener(ev, e => {
   const b = e.target.closest && e.target.closest('form[data-f="entrar"] button:not([type="button"])');
-  if (b && e.isTrusted) Ingreso.toque = Date.now();
+  if (b && Ingreso.deVerdad(e)) Ingreso.toque = Date.now();
 }, true));
 document.addEventListener('input', e => {
   const i = e.target; if (!i.form || i.form.dataset.f !== 'entrar' || i.name !== 'clave') return;

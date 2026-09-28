@@ -1554,17 +1554,165 @@ A['editar-mascota'] = el => {
 A['borrar-mascota'] = el => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.mascotas = x.mascotas.filter(m => m.id !== el.dataset.v); }); };
 A['pedir-notifs'] = async () => { try { const r = await Notification.requestPermission(); toast(r === 'granted' ? 'Avisos activados' : 'No se activaron', 'bell'); refrescar(); } catch(e){} };
 A['sonido'] = el => { setTimeout(() => { Store.sesion.sinSonido = !el.checked; Store.guardarSesion(); }, 0); return true; };
-A['mis-datos'] = () => {
-  const u = yo(), s = Store.s;
-  const datos = { usuario:u, pases:s.pases.filter(p => p.hostId === u.id), reservas:s.reservas.filter(r => r.userId === u.id), reclamos:s.reclamos.filter(r => r.userId === u.id), peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
-    /* 27-09: "Estoy bien" y salidas, lo que presta, la nieve y los cuidados de su casa. */
-    estoyBien: typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, cosas:aLista(s.cosas).filter(x => x.userId === u.id),
-    nieve:aLista(s.nieve).filter(x => x.userId === u.id), casaEnInvierno:aLista(s.casaTareas).filter(x => x.lote === u.casa) };
-  const blob = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type:'application/json' }));
-  hoja('Mis datos personales', `<p class="small" style="margin:0 0 12px;color:var(--ink-2)">Por la Ley 25.326 podés ver, corregir y pedir que se borren tus datos. Descargá una copia o pedile la baja a la Administración.</p>
-    <div class="btns"><a class="btn btn-sec" href="${blob}" download="mis-datos-bahia-cauquen.json">${I('download')}Descargar</a><button class="btn btn-danger-soft" data-a="pedir-baja">Pedir la baja</button></div>`);
+/* =========================================================
+   MIS DATOS PERSONALES, EN UN INFORME QUE SE LEE (pedido de Claudio, 28-09-2026)
+   Antes "Descargar" bajaba un archivo técnico (JSON, "código") y además
+   incompleto: faltaban los mensajes, los pagos, los paquetes, los votos, lo
+   publicado, lo de la casa y el archivo histórico. La Ley 25.326 (art. 15)
+   pide que la información se dé "en forma clara, exenta de codificaciones"
+   y sobre la TOTALIDAD de lo que hay del titular. Ahora el botón principal
+   arma un informe legible, sección por sección, con quién ve cada cosa y
+   cuánto se guarda, listo para imprimir o guardar como PDF. La copia
+   técnica (JSON) queda aparte, para llevar los datos a otro sistema.
+   Se arma en el equipo del propio vecino con lo que ese equipo ya tiene
+   (y el archivo histórico, que se trae al abrir la hoja): no se manda a
+   ningún lado. Nunca incluye contraseñas, claves ni códigos que sirvan
+   para entrar (credencial, QR de retiro, token de la cuenta); de las
+   visitas, el DNI va tapado.
+   ========================================================= */
+const MisDatos = {
+  hist:null,
+  async traerHist(u){
+    this.hist = null;
+    if (typeof Historial === 'undefined' || !Historial.hayNube()){ this.hist = { pases:[], paquetes:[], local:true }; this.pintarEstado(); return; }
+    try { const [pases, paquetes] = await Promise.all([Historial.archivo('pases', u.id), Historial.archivo('paquetes', u.id)]); this.hist = { pases:pases || [], paquetes:paquetes || [] }; }
+    catch(e){ this.hist = { pases:[], paquetes:[], error:e.message || 'sin conexión' }; }
+    this.pintarEstado();
+  },
+  estado(){ const h = this.hist; return !h ? `${I('refresh')} Trayendo también tu archivo histórico (visitas y paquetes viejos)…`
+    : h.error ? `${I('alert')} No se pudo traer el archivo histórico (${esc(h.error)}): el informe sale con lo que hay en este equipo.`
+    : h.local ? `${I('info')} Modo de prueba: el informe sale con lo que hay en este equipo.`
+    : `${I('check')} Incluye tu archivo histórico: ${plural(h.pases.length, 'visita archivada', 'visitas archivadas')} y ${plural(h.paquetes.length, 'paquete archivado', 'paquetes archivados')}.`; },
+  pintarEstado(){ const el = $('#mdHist'); if (el) el.innerHTML = this.estado(); },
+  /* Lo técnico que nunca sale en una copia: sirve para entrar o para firmar. */
+  sinSecretos(u){ const c = JSON.parse(JSON.stringify(u || {})); ['clave', 'token', 'credencial', 'retiroPubs'].forEach(k => delete c[k]); if (c.fotoCasa) c.fotoCasa = '[foto cargada]'; if (c.poderFoto) c.poderFoto = '[foto cargada]';
+    aLista(c.mascotas).forEach(m => { if (m && m.foto) m.foto = '[foto cargada]'; }); return c; },
 };
-A['pedir-baja'] = () => { const u = yo(); Store.cambiar(s => { notificar(s, { para:'rol:admin', titulo:'Pedido de baja de datos', texto:`${u.nombre} · ${u.casa}`, icon:'trash', color:'danger', link:'admin:vecinos' }); auditar(s, 'Pedido de baja de datos personales', u.casa, u.id); }); cerrarHoja(); toast('Pedido enviado a la Administración', 'send'); };
+A['mis-datos'] = () => {
+  /* La garita y el hotel son cuentas institucionales: no guardan datos de
+     una persona como los de un vecino, así que no tienen este informe (28-09). */
+  if (esGuardia() || esHotel()){ toast('Es una cuenta institucional: no tiene datos personales de vecino', 'info'); return; }
+  const u = yo(), s = Store.s;
+  const tecnico = { emitido:new Date().toISOString(), usuario:MisDatos.sinSecretos(u), pases:s.pases.filter(p => p.hostId === u.id).map(p => ({ ...p, dni:p.dni ? '***' + String(p.dni).slice(-3) : '' })),
+    reservas:s.reservas.filter(r => r.userId === u.id), reclamos:s.reclamos.filter(r => r.userId === u.id).map(r => ({ ...r, foto:r.foto ? '[foto]' : null })),
+    peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
+    mensajes:s.privados.filter(h => h.userId === u.id), conversacionesConVecinos:aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)),
+    pagos:s.pagos.filter(x => x.userId === u.id || x.lote === u.casa).map(x => ({ ...x, comprobante:x.comprobante ? '[comprobante]' : undefined })), recibos:s.recibos.filter(x => x.lote === u.casa),
+    paquetes:(typeof paquetesDelLote === 'function' ? paquetesDelLote(u) : []).map(p => ({ id:p.id, empresa:p.empresa, detalle:p.detalle, recibido:p.recibido, retirado:p.retirado, hostId:p.hostId })),
+    estoyBien: typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, ausencias:aLista(s.ausencias).filter(x => x && (x.userId === u.id || x.casa === u.casa)),
+    cosas:aLista(s.cosas).filter(x => x.userId === u.id), nieve:aLista(s.nieve).filter(x => x.userId === u.id), laCasa:aLista(s.casaTareas).filter(x => x.lote === u.casa) };
+  const blob = URL.createObjectURL(new Blob([JSON.stringify(tecnico, null, 2)], { type:'application/json' }));
+  hoja('Mis datos personales', `<p class="small" style="margin:0 0 12px;color:var(--ink-2)">Por la Ley 25.326 podés ver todo lo que la app guarda de vos, corregirlo y pedir que se borre. El informe se arma en tu equipo, sección por sección, con quién ve cada cosa y cuánto se guarda.</p>
+    <button class="btn btn-pri btn-block" data-a="mis-datos-pdf">${I('download')}Ver mi informe (imprimir o guardar en PDF)</button>
+    <p class="muted tiny" id="mdHist" style="margin:8px 2px 12px">${MisDatos.estado()}</p>
+    <div class="btns"><button class="btn btn-sec" data-a="abrir" data-v="perfil">${I('edit')}Corregir mis datos</button><button class="btn btn-danger-soft" data-a="pedir-baja">Pedir la baja</button></div>
+    <p class="muted tiny" style="margin:12px 2px 0">¿Querés llevar tus datos a otro sistema? <a href="${blob}" download="mis-datos-bahia-cauquen.json">Copia técnica (JSON)</a>: es un archivo para programas, no para leer.</p>`);
+  MisDatos.traerHist(u);
+};
+A['mis-datos-pdf'] = () => esGuardia() || esHotel() ? null : imprimir(`Mis datos personales · ${yo().nombre}`, informeMisDatos(), { pie:`Informe de acceso a los datos personales (arts. 14 y 15 de la Ley 25.326), armado por la app en tu equipo el ${fechaHora(Date.now())} con lo que hay en la base del barrio. Contiene datos personales: guardalo en un lugar seguro y no lo compartas. No es un certificado de la Administración.` });
+function informeMisDatos(){
+  const u = yo(), s = Store.s, c = s.config, L = loteDe(u), H = MisDatos.hist || { pases:[], paquetes:[] };
+  const fh = ts => ts ? fechaHora(ts) : '—', fc = iso => iso ? fechaCorta(iso) : '—', si = v => v ? 'Sí' : 'No', x = v => esc(v == null ? '' : String(v));
+  const tabla = (cols, filas) => filas.length ? `<table><thead><tr>${cols.map(k => `<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${filas.map(r => `<tr>${r.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p style="color:#666;margin:4px 0">No hay registros.</p>';
+  const kv = pares => `<table>${pares.filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => `<tr><th style="width:36%;text-transform:none;letter-spacing:0;font-size:12px">${esc(k)}</th><td>${v}</td></tr>`).join('')}</table>`;
+  const bloque = (t, quien, cuerpo) => `<h2>${esc(t)}</h2>${quien ? `<p style="font-size:11px;color:#555;margin:-2px 0 8px">${quien}</p>` : ''}${cuerpo}`;
+  const nom = id => id === u.id ? 'Vos' : esc(primerNombre(nombreDe(id)));
+  const cu = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null;
+  const out = [];
+  out.push(`<p>Este informe junta <b>todo lo que la app del barrio guarda de ${x(u.nombre)}</b> (${x(u.casa)}), con quién puede verlo y cuánto se conserva. Lo que figura como "del lote" lo comparten todas las cuentas de ${x(u.casa)}.</p>`);
+  /* 1 · la cuenta */
+  out.push(bloque('1. Tu cuenta', 'Lo ven vos y la Administración. Los demás vecinos ven tu nombre y tu lote; tu teléfono, profesión y dirección, solo si elegiste compartirlos. Se guarda mientras tengas cuenta.', kv([
+    ['Nombre', x(u.nombre)], ['Lote', x(u.casa)], ['Unidad funcional y coeficiente', L ? `UF ${x(L.uf)} · ${L.coef.toLocaleString('es-AR', { minimumFractionDigits:3, maximumFractionDigits:3 })} %` : ''], ['Correo', x(u.email)], ['Teléfono', x(u.tel)], ['DNI', x(u.dni)],
+    ['Relación con el lote', x(RELACIONES[u.relacion] || 'Sin indicar')], ['Representante del lote para votar', u.representante ? 'Sí' : ''], ['Carta poder para votar', u.poderFoto ? (u.poderOk ? 'Aprobada' + (u.poderHasta ? ' hasta el ' + fc(u.poderHasta) : '') : 'Enviada, sin aprobar') : ''],
+    ['Rol y estado de la cuenta', `${x({ vecino:'Vecino/a', admin:'Administración', guardia:'Garita', hotel:'Hotel' }[u.rol] || u.rol)} · ${x(u.estado)}`], ['Alta', u.createdAt ? fh(u.createdAt) : ''], ['Aceptó los términos', u.consentimiento ? fh(u.consentimiento) : ''],
+    ['Profesión', x(u.profesion)], ['Oficios o servicios', x(u.skills)], ['Dirección en el barrio', x(u.direccion)], ['Ubicación para "Cómo llegar"', x(u.ubicacion)], ['Quiénes viven en la casa', x(u.integrantes)],
+    ['Publicar mi oficio con WhatsApp', si(u.mostrarTel)], ['Aparecer en el directorio', si(u.enDirectorio)], ['Equipo de salud / RCP', u.respondedor ? 'Sí' + (u.saludProf && typeof PROF_SALUD !== 'undefined' ? ' · ' + x(PROF_SALUD[u.saludProf]) : '') : 'No'],
+    ['Foto del frente de la casa', u.fotoCasa ? 'Cargada (la garita la usa para ubicar tu domicilio)' : 'No'], ['Credencial del barrio', u.credencial ? 'Generada (el código no se muestra acá por seguridad)' : 'No'],
+    ['Teléfonos habilitados para retirar paquetes', Object.values(u.retiroPubs || {}).filter(Boolean).map(e => `${x(e.equipo || 'Equipo')}${e.at ? ' · desde ' + fh(e.at) : ''}`).join('<br>') || 'Ninguno'],
+  ])));
+  out.push(bloque('Vehículos y mascotas', 'Los ve la garita (para reconocer tus patentes) y, las mascotas, los vecinos si las publicás como perdidas.',
+    tabla(['Patente', 'Modelo'], aLista(u.vehiculos).map(v => [x(v.patente), x(v.modelo)])) + tabla(['Mascota', 'Especie', 'Cómo es'], aLista(u.mascotas).map(m => [x(m.nombre), x(m.especie), x(m.desc)]))));
+  /* 2 · visitas */
+  const vivos = s.pases.filter(p => p.hostId === u.id), idsV = new Set(vivos.map(p => p.id));
+  const pases = [...vivos, ...aLista(H.pases).filter(p => p && !idsV.has(p.id))].sort((a, b) => String(b.fechaFin || b.fecha).localeCompare(String(a.fechaFin || a.fecha)));
+  const mov = p => { const l = p.log || {}, d = Object.keys(l).sort(); return d.length ? d.slice(-3).map(k => `${fc(k)}${l[k].in ? ' entró ' + hora(l[k].in) : ''}${l[k].out ? ', salió ' + hora(l[k].out) : ''}`).join('<br>') + (d.length > 3 ? `<br>(+${d.length - 3} días)` : '') : (p.cancelado ? 'Cancelado' : 'No vino'); };
+  out.push(bloque('2. Visitas que autorizaste', `Las ven vos, la garita y la Administración. Los datos de la visita (DNI y patente) se borran a los ${typeof Historial !== 'undefined' ? Historial.diasVisitas() : 90} días; después queda solo en el archivo histórico (quién vino y cuándo). El DNI de las visitas va tapado en este informe.`,
+    tabla(['Fecha', 'Tipo', 'Quién', 'Patente', 'DNI', 'Movimientos'], pases.map(p => [p.dias?.length ? `${aLista(p.dias).map(d => DIAS[d]).join(' ')} hasta ${fc(p.fechaFin)}` : fc(p.fecha) + (p.desde ? ' ' + x(p.desde) + '–' + x(p.hasta) : ''),
+      x((TIPOS_PASE[p.tipo] || TIPOS_PASE.visita).n), x(p.nombre), x(p.patente), p.dni ? '***' + x(String(p.dni).slice(-3)) : '', mov(p) + (p.archivadoAt ? '<br><i>archivo histórico</i>' : '')]))
+    + tabla(['Llegó sin aviso', 'Motivo', 'Cuándo', 'Tu respuesta'], s.llegadas.filter(l => l.hostId === u.id).map(l => [x(l.nombre), x(l.motivo), fh(l.at), x({ consultando:'Sin responder', autorizado:'Que pase', rechazado:'No lo conozco' }[l.estado] || l.estado)]))));
+  /* 3 · paquetes */
+  const paqV = typeof paquetesDelLote === 'function' ? paquetesDelLote(u) : [], idsP = new Set(paqV.map(p => p.id));
+  const paqs = [...paqV, ...aLista(H.paquetes).filter(p => p && !idsP.has(p.id))].sort((a, b) => (b.recibido || 0) - (a.recibido || 0));
+  out.push(bloque('3. Paquetes del lote', 'Los ven las cuentas de tu lote, la garita y la Administración. Los retirados quedan 30 días en la app y después pasan al archivo histórico sin foto, firma ni DNI.',
+    tabla(['Empresa', 'A nombre de', 'Llegó', 'Retirado', 'Cómo'], paqs.map(p => [x(p.empresa) + (p.detalle ? ' · ' + x(p.detalle) : ''), nom(p.hostId), fh(p.recibido), p.retirado ? fh(p.retirado) : 'En la garita',
+      !p.entrega ? '' : p.entrega.metodo === 'qr' ? 'QR firmado' : p.entrega.tercero ? 'Lo retiró ' + x(p.entrega.recibe?.nombre || 'otra persona') : 'Firma y DNI']))));
+  /* 4 · expensas */
+  const pagos = s.pagos.filter(p => p.userId === u.id || p.lote === u.casa).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  out.push(bloque('4. Expensas del lote: pagos y recibos', 'Los ven las cuentas de tu lote y la Administración. Se conservan 10 años (art. 328 del Código Civil y Comercial). Los comprobantes que subiste se borran 30 días después de confirmados.',
+    tabla(['Fecha', 'Importe', 'Medio', 'Estado', 'Informó'], pagos.map(p => [fc(p.fecha), typeof plata === 'function' ? plata(p.monto) : x(p.monto), x(p.medio), x(p.estado), nom(p.userId)]))
+    + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))));
+  out.push(bloque('Reservas', 'Las ven vos, la garita y la Administración.', tabla(['Espacio', 'Fecha', 'Invitados', 'Estado'], s.reservas.filter(r => r.userId === u.id).map(r => [x(amenity(r.amenity)?.nombre || r.amenity), fc(r.fecha), x(r.invitados || 0), r.cancelada ? 'Cancelada' : 'Confirmada']))));
+  /* 5 · mensajes */
+  const hilo = (titulo, msgs, quien) => `<div class="caja"><b>${titulo}</b>${msgs.length ? `<table style="margin-top:6px">${msgs.map(m => `<tr><td style="width:120px;white-space:nowrap">${fh(m.createdAt || m.at)}</td><td style="width:90px">${quien(m)}</td><td>${x(m.text)}</td></tr>`).join('')}</table>` : '<br><span style="color:#666">Sin mensajes.</span>'}</div>`;
+  const privs = s.privados.filter(h => h.userId === u.id);
+  out.push(bloque('5. Mensajes privados', 'Con la Administración: solo vos y la Administración. Con la garita: solo vos y la garita. Con otro vecino: solo ustedes dos. Los mensajes de más de 120 días pasan al archivo histórico (quedan siempre los 30 últimos).',
+    privs.map(h => hilo(h.con === 'guardia' ? 'Con la garita' : 'Con la Administración', aLista(h.msgs), m => m.from === 'vecino' ? 'Vos' : h.con === 'guardia' ? 'Garita' : 'Administración') + (h.archivados ? `<p style="font-size:11px;color:#666">${plural(h.archivados, 'mensaje anterior en el archivo', 'mensajes anteriores en el archivo')}.</p>` : '')).join('')
+    + aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)).map(h => { const otro = h.a === u.id ? h.b : h.a; return hilo(`Con ${esc(primerNombre(nombreDe(otro)))} (${x(usuario(otro)?.casa || '')})`, aLista(h.msgs), m => m.de === u.id ? 'Vos' : esc(primerNombre(nombreDe(m.de)))); }).join('')
+    || '<p style="color:#666">No hay conversaciones.</p>'));
+  /* 6 · reclamos y peticiones */
+  out.push(bloque('6. Reclamos y peticiones a la garita', 'Los reclamos: vos y la Administración. Las peticiones: vos, la garita y la Administración; guardan las dos firmas y un sello digital (las firmas no se reproducen acá).',
+    tabla(['Reclamo', 'Categoría', 'Fecha', 'Estado'], s.reclamos.filter(r => r.userId === u.id).map(r => [x(r.titulo) + (r.detalle ? '<br><span style="color:#555">' + x(r.detalle) + '</span>' : ''), x(r.categoria), fh(r.createdAt), x(r.estado)]))
+    + tabla(['Petición', 'Pedido', 'Vigencia', 'Estado'], s.peticiones.filter(p => p.userId === u.id).map(p => [x((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n), x(p.texto), `${fc(p.desde)}${p.hasta ? ' al ' + fc(p.hasta) : ''}`, x((ESTADO_PET[p.estado] || [p.estado])[0])]))));
+  /* 7 · votaciones */
+  const votos = s.votaciones.map(v => { const vv = (v.votos || {})[u.casa]; const mio = vv && vv.personas ? vv.personas[u.id] : (vv && vv.por === u.id ? vv.i : undefined);
+    return mio === undefined || mio === null ? null : [x(v.titulo), x(aLista(v.opciones)[mio] ?? mio), vv.at ? fh(vv.at) : '—']; }).filter(Boolean);
+  out.push(bloque('7. Tus votos', 'Cada voto queda en el registro de auditoría con fecha y hora; el resultado se cuenta por lote.', tabla(['Votación', 'Tu opción', 'Cuándo'], votos)));
+  /* 8 · lo que publicaste */
+  const posts = s.posts.filter(p => p.autor === u.id), coms = s.posts.flatMap(p => aLista(p.comments).filter(k => k && k.autor === u.id).map(k => [x(p.title), x(k.text), fh(k.createdAt)]));
+  out.push(bloque('8. Lo que publicaste', 'Lo del pizarrón y el chat lo ven los vecinos aprobados y la Administración (el chat, no la garita). El chat baja 60 días; lo anterior queda en la base.',
+    tabla(['Pizarrón', 'Tipo', 'Fecha'], posts.map(p => [x(p.title), x(p.type), fh(p.createdAt)])) + tabla(['Comentaste en', 'Comentario', 'Fecha'], coms)
+    + tabla(['Chat', 'Mensaje', 'Fecha'], aLista(s.msgs).filter(m => m && m.autor === u.id).map(m => ['#' + x(m.channel), x(m.text), fh(m.createdAt)]))
+    + tabla(['Obras', 'Empresa', 'Inicio', 'Estado'], s.obras.filter(o => o.userId === u.id).map(o => [x(o.tipo), x(o.empresa), fc(o.inicio), x(o.estado)]))
+    + tabla(['Viajes compartidos', 'Destino', 'Fecha'], s.viajes.filter(v => v.userId === u.id).map(v => [x(v.tipo), x(v.destino), fc(v.fecha) + ' ' + x(v.hora || '')]))
+    + tabla(['Cosas para prestar', 'Estado'], aLista(s.cosas).filter(k => k && k.userId === u.id).map(k => [x(k.nombre), x(k.estado)]))
+    + tabla(['Ángeles de la nieve', 'Nota'], aLista(s.nieve).filter(k => k && k.userId === u.id).map(k => [x(k.tipo === 'ayuda' ? 'Pedís ayuda' : 'Sos ángel'), x(k.nota)]))));
+  /* 9 · cuidados */
+  const fam = cu && typeof familiaresDe === 'function' ? familiaresDe(cu) : [];
+  out.push(bloque('9. "Estoy bien", salidas y casa sola', 'Los ven vos, la garita, la Administración y las personas del barrio que elegiste; tus familiares reciben el aviso por correo. Los avisos de cada día se borran a los 30 días; la casa sola, dos días después de volver.',
+    (cu ? kv([['Estoy bien', cu.activo ? `Activo · hasta las ${x(cu.hora || '')}` : 'No lo usás'], ['Tu teléfono para el aviso', x(cu.tel)], ['Último aviso', cu.ultimo ? fh(cu.ultimo) : ''], ['En pausa hasta', cu.pausaHasta ? fc(cu.pausaHasta) : ''],
+        ['Familiares (por correo)', fam.map(f => `${x(f.nombre)}${f.email ? ' · ' + x(f.email) : ''}${f.tel ? ' · ' + x(f.tel) : ''}`).join('<br>')], ['Personas del barrio elegidas', Object.entries(cu.contactos || {}).map(([id, k]) => `${esc(nombreDe(id))}${k && k.acepta ? ' (aceptó)' : ' (sin aceptar)'}`).join('<br>')],
+        ['Aceptaste la privacidad', cu.consentimiento ? fh(cu.consentimiento) : ''], ['Salida en curso', cu.salida && !cu.salida.volvio ? `${x(cu.salida.donde)} · vuelve ${fh(cu.salida.vuelta)}` : '']]) : '<p style="color:#666">No usás "Estoy bien" ni el aviso de salida.</p>')
+    + tabla(['Casa sola desde', 'Hasta', 'Revisiones de la guardia'], aLista(s.ausencias).filter(a => a && (a.userId === u.id || a.casa === u.casa)).map(a => [fc(a.desde), fc(a.hasta), Object.keys(a.revisiones || {}).length + ' días revisada']))));
+  /* 10 · la casa */
+  const plan = aLista(s.casaTareas).find(t => t && t.id === `ct-${String(u.casa).replace(/\D/g, '') || 'x'}-sismo-plan`) || {};
+  const nombreTarea = id => { const t = [...(typeof TAREAS_INVIERNO !== 'undefined' ? TAREAS_INVIERNO : []), ...(typeof TAREAS_VERANO !== 'undefined' ? TAREAS_VERANO : [])].find(z => z.id === id); if (t) return t.t;
+    const m = typeof MOCHILA !== 'undefined' && MOCHILA.find(z => 'moch-' + z.id === id); return m ? 'Mochila: ' + m.t : id === 'sismo-semana' ? 'Revisión semanal de la mochila' : id === 'sismo-plan' ? 'Plan familiar ante un sismo' : id; };
+  out.push(bloque('10. Tu casa (del lote)', 'Lo ven y lo cambian solo las cuentas de tu lote. Ni la garita ni la Administración.',
+    tabla(['Qué', 'Hecho', 'Anotó'], aLista(s.casaTareas).filter(t => t && t.lote === u.casa && t.tarea !== 'sismo-plan').map(t => [x(nombreTarea(t.tarea)), t.hecho ? fh(t.hecho) : '—', t.por ? nom(t.por) : '']))
+    + (plan.encuentro || plan.cortes ? kv([['Plan ante un sismo · punto de encuentro', x(plan.encuentro)], ['Contacto fuera de Tierra del Fuego', x(plan.contacto)], ['Llaves de corte', x(plan.cortes)], ['Lugares seguros', x(plan.seguros)], ['Quién se ocupa de qué', x(plan.roles)],
+        ['Sugerencias', aLista(plan.sugerencias).map(g => `${x(g.texto)} (${nom(g.de)}, ${fh(g.at)}${g.hecha ? ', hecha' : ''})`).join('<br>')]]) : '')));
+  /* 11 · notificaciones, SOS y avisos */
+  out.push(bloque('11. Notificaciones de la Administración, SOS y avisos', 'Las notificaciones (infracciones) y su descargo: las cuentas de tu lote y la Administración. Un SOS lo ven todos los vecinos en el momento (tipo, nombre, lote y ubicación), y queda en el registro de la guardia.',
+    tabla(['Notificación', 'Detalle', 'Fecha', 'Estado'], s.infracciones.filter(i => i.casa === u.casa).map(i => [x(i.tipo), x(i.detalle) + (i.descargo ? '<br><i>Descargo: ' + x(typeof i.descargo === 'string' ? i.descargo : i.descargo.texto || '') + '</i>' : ''), fh(i.at), x(i.estado)]))
+    + tabla(['SOS / DEA que pediste', 'Cuándo', 'Estado'], aLista(s.sos).filter(k => k && k.userId === u.id).map(k => [x(k.tipo), fh(k.at), x(k.estado)]))
+    + `<p style="font-size:12px;margin:6px 0 0">Avisos personales guardados para vos (campanita): <b>${aLista(s.notifs).filter(n => aLista(n.para).includes(u.id)).length}</b>.</p>`));
+  /* 12 · lo que no está */
+  out.push(bloque('12. Lo que la app NO guarda o no está en este informe', '', `<ul style="margin:0;padding-left:18px">
+    <li>Tu contraseña: no se guarda; el sistema de cuentas (Google Firebase) conserva solo una huella irreversible.</li>
+    <li>Las fotos grandes (la de tu casa, tus mascotas): quedan en tu equipo; a la base va una miniatura.</li>
+    <li>Los códigos que sirven para entrar o identificarte (credencial, QR de retiro, llave de tu teléfono): no se reproducen por seguridad.</li>
+    <li>El libro de guardia (bitácora) y el registro de auditoría: los llevan la garita y la Administración. Si querés lo que diga de vos, pedíselo a la Administración.</li></ul>`));
+  out.push(bloque('Tus derechos', '', `<p style="margin:0">Podés pedir gratis, a la Administración del Barrio ${x(c.nombre)} (${x(c.adminEmail || '')}${typeof cfgDatos === 'function' && cfgDatos().responsableArco ? ', responsable: ' + x(cfgDatos().responsableArco) : ''}), el acceso a tus datos (respuesta en 10 días corridos), que se corrijan o se borren (5 días hábiles), según los arts. 14 a 16 de la Ley 25.326. Muchos datos los corregís vos en Mi casa. La Agencia de Acceso a la Información Pública (AAIP) es el órgano de control y recibe denuncias.</p>`));
+  return out.join('');
+}
+/* El pedido de baja va a la carpeta privada de cada cuenta de la
+   Administración. Antes iba a "rol:admin", que se guarda en el pizarrón de
+   avisos del barrio: cualquier vecino podía ver quién había pedido la baja. */
+A['pedir-baja'] = async () => { const u = yo();
+  if (!await confirmar('Pedir la baja', 'Le llega a la Administración, que tiene 5 días hábiles para borrar tus datos (salvo lo que la ley obliga a conservar, como los pagos de expensas). Te avisa cuando esté hecho.', { si:'Pedir la baja', peligro:true })) return;
+  const admins = typeof cuentasAdministracion === 'function' ? cuentasAdministracion() : Store.s.users.filter(z => z.rol === 'admin' && z.estado === 'aprobado').map(z => z.id);
+  Store.cambiar(s => { if (admins.length) notificar(s, { para:admins, titulo:'Pedido de baja de datos', texto:`${u.nombre} · ${u.casa}`, icon:'trash', color:'danger', link:'admin:vecinos', sonido:true }); auditar(s, 'Pedido de baja de datos personales', u.casa, u.id); });
+  cerrarHoja(); toast('Pedido enviado a la Administración', 'send'); };
 
 /* =========================================================
    DESCARGAS
