@@ -681,6 +681,7 @@ function hoja(titulo, html, { ancho } = {}){
   const d = $('#hoja');
   $('#hojaTitulo').textContent = titulo;
   $('#hojaCuerpo').innerHTML = html;
+  d.dataset.origen = '';   /* "Tu cuenta" lo vuelve a marcar (ver Cuenta en app.js) */
   d.style.maxWidth = ancho || '';
   if (!d.open) d.showModal();
   const f = $('#hojaCuerpo input:not([type=hidden]):not([type=checkbox]):not([type=radio]), #hojaCuerpo textarea');

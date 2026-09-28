@@ -14,6 +14,12 @@
    deslizamiento desde el borde izquierdo.
    ========================================================= */
 const PILA = [];
+/* Volver a "Tu cuenta" al cerrar lo que se abrió desde ahí (ver más abajo, junto a volverALaPizarra). */
+const Cuenta = {
+  volver:false, enSub:false,
+  VENTANAS:new Set(['abrir', 'abrir-manual', 'abrir-ayuda']),
+  HOJAS:new Set(['mis-datos', 'cambiar-clave', 'cambiar-email']),
+};
 let ventanaNueva = false;
 
 /* La profundidad de la pila se refleja en el historial del navegador para que
@@ -59,12 +65,14 @@ function abrir(id, param = ''){
      Va antes de mirar si la ventana ya estaba abierta: si no, un aviso que
      lleva a una ventana de atrás (la portada) cerraba la pizarra, la volvía
      a abrir y parecía que "destellaba" sin hacer nada. */
-  const alVolver = typeof Pizarra !== 'undefined' && Pizarra.volver ? 'pizarra' : '';
+  const alVolver = (typeof Pizarra !== 'undefined' && Pizarra.volver ? 'pizarra' : '') || (Cuenta.volver ? 'cuenta' : '');
   if (typeof Pizarra !== 'undefined') Pizarra.volver = false;
+  Cuenta.volver = false; Cuenta.enSub = false;   /* antes de cerrar la hoja: si no, la hoja de Tu cuenta volvería a abrirse ya */
   if (hojaAbierta()) cerrarHoja();
   const ya = PILA.findIndex(v => v.id === id);
   if (ya >= 0){
     PILA[ya].param = param;
+    if (alVolver === 'cuenta' && ya > 0) PILA[ya].alVolver = 'cuenta';
     const cerrar = PILA.length - 1 - ya;
     PILA.length = ya + 1;
     if (cerrar > 0){ saltando = true; history.go(-cerrar); }
@@ -92,7 +100,33 @@ function volverA(i){
    pizarra abierta, para seguir leyendo donde se estaba. */
 function volverALaPizarra(cerrada){
   if (cerrada && cerrada.alVolver === 'pizarra' && typeof A['pizarra-toda'] === 'function') setTimeout(() => A['pizarra-toda'](), 60);
+  if (cerrada && cerrada.alVolver === 'cuenta') setTimeout(() => { if (yo()) A['mi-cuenta'](); }, 60);
 }
+/* =========================================================
+   VOLVER A "TU CUENTA" (pedido de Claudio, 28-09-2026)
+   Desde Tu cuenta se abren otras cosas: ventanas (Manual, Preguntas
+   frecuentes, Mi casa) u otras hojas (Mis datos personales, Cambiar mi
+   contraseña, Cambiar mi correo). Antes, al cerrarlas, la persona caía en la
+   portada. Ahora vuelve a Tu cuenta:
+     · una VENTANA abierta desde Tu cuenta lleva alVolver:'cuenta' en la pila
+       y, al cerrarla, se reabre Tu cuenta (como hace la pizarra);
+     · una HOJA abierta desde Tu cuenta, al cerrarse (con la X, tocando
+       afuera, con Atrás o al terminar lo que se hizo), reabre Tu cuenta.
+   Lo que se resuelve adentro de Tu cuenta (modo de pantalla, avisos,
+   sonido, asistente) no se toca; cambiar de modo, actualizar la app y
+   cerrar sesión salen de ahí a propósito.
+   ========================================================= */
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('#hojaCuerpo [data-a]'); if (!b) return;
+  const d = $('#hoja'), a = b.dataset.a, desdeCuenta = d && d.dataset.origen === 'cuenta';
+  if (!desdeCuenta && !Cuenta.enSub) return;
+  if (Cuenta.VENTANAS.has(a)) Cuenta.volver = true;
+  else if (desdeCuenta && Cuenta.HOJAS.has(a)) Cuenta.enSub = true;
+}, true);
+/* La hoja (<dialog id="hoja">) ya está en index.html antes de los scripts. */
+(() => { const engancha = () => { const d = document.getElementById('hoja'); if (!d || d.dataset.cuentaOk) return; d.dataset.cuentaOk = '1';
+  d.addEventListener('close', () => { if (!Cuenta.enSub) return; Cuenta.enSub = false; setTimeout(() => { if (yo() && !hojaAbierta()) A['mi-cuenta'](); }, 60); }); };
+  engancha(); document.addEventListener('DOMContentLoaded', engancha); })();
 /* =========================================================
    VOLVER AL MISMO LUGAR
    Al abrir una ventana se anota por dónde iba la de atrás; al volver, la
@@ -1292,7 +1326,8 @@ A['volver'] = el => { const i = +el.dataset.i; if (i === 0 && PILA.length === 1)
 A['cerrar-ventana'] = () => cerrarVentana();
 A['cerrar-hoja'] = () => cerrarHoja();
 A['bienvenida'] = el => { pintarBienvenida(el.dataset.v); window.scrollTo({ top:0 }); };
-A['mi-cuenta'] = () => { const u = yo();
+A['mi-cuenta'] = () => { const u = yo(); Cuenta.enSub = false;
+  setTimeout(() => { const d = $('#hoja'); if (d && $('#hojaTitulo')?.textContent === 'Tu cuenta') d.dataset.origen = 'cuenta'; }, 0);
   hoja('Tu cuenta', `<div class="row" style="margin-bottom:14px">${avatar(u, 'lg')}<div class="grow"><b style="font-size:16px">${esc(u.nombre)}</b>
       <div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
       <div class="muted tiny">${{ vecino:'Vecino/a', hotel:'Cuenta institucional del hotel · la usa la recepción', admin:'Administración', guardia:'Garita' + (turnoAbierto() ? ' · turno ' + esc(turnoAbierto().turno) + ': ' + esc(aLista(turnoAbierto().guardias).join(', ')) : '') }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>

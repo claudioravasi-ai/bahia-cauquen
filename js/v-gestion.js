@@ -1597,7 +1597,7 @@ A['mis-datos'] = () => {
     reservas:s.reservas.filter(r => r.userId === u.id), reclamos:s.reclamos.filter(r => r.userId === u.id).map(r => ({ ...r, foto:r.foto ? '[foto]' : null })),
     peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
     mensajes:s.privados.filter(h => h.userId === u.id), conversacionesConVecinos:aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)),
-    pagos:s.pagos.filter(x => x.userId === u.id || x.lote === u.casa).map(x => ({ ...x, comprobante:x.comprobante ? '[comprobante]' : undefined })), recibos:s.recibos.filter(x => x.lote === u.casa),
+    pagos:s.pagos.filter(x => x.lote === u.casa).map(x => ({ ...x, comprobante:x.comprobante ? '[comprobante]' : undefined })), recibos:s.recibos.filter(x => x.lote === u.casa),
     paquetes:(typeof paquetesDelLote === 'function' ? paquetesDelLote(u) : []).map(p => ({ id:p.id, empresa:p.empresa, detalle:p.detalle, recibido:p.recibido, retirado:p.retirado, hostId:p.hostId })),
     estoyBien: typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, ausencias:aLista(s.ausencias).filter(x => x && (x.userId === u.id || x.casa === u.casa)),
     cosas:aLista(s.cosas).filter(x => x.userId === u.id), nieve:aLista(s.nieve).filter(x => x.userId === u.id), laCasa:aLista(s.casaTareas).filter(x => x.lote === u.casa) };
@@ -1647,10 +1647,18 @@ function informeMisDatos(){
     tabla(['Empresa', 'A nombre de', 'Llegó', 'Retirado', 'Cómo'], paqs.map(p => [x(p.empresa) + (p.detalle ? ' · ' + x(p.detalle) : ''), nom(p.hostId), fh(p.recibido), p.retirado ? fh(p.retirado) : 'En la garita',
       !p.entrega ? '' : p.entrega.metodo === 'qr' ? 'QR firmado' : p.entrega.tercero ? 'Lo retiró ' + x(p.entrega.recibe?.nombre || 'otra persona') : 'Firma y DNI']))));
   /* 4 · expensas */
-  const pagos = s.pagos.filter(p => p.userId === u.id || p.lote === u.casa).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
-  out.push(bloque('4. Expensas del lote: pagos y recibos', 'Los ven las cuentas de tu lote y la Administración. Se conservan 10 años (art. 328 del Código Civil y Comercial). Los comprobantes que subiste se borran 30 días después de confirmados.',
-    tabla(['Fecha', 'Importe', 'Medio', 'Estado', 'Informó'], pagos.map(p => [fc(p.fecha), typeof plata === 'function' ? plata(p.monto) : x(p.monto), x(p.medio), x(p.estado), nom(p.userId)]))
-    + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))));
+  /* SOLO LOS PAGOS DEL LOTE, DEL AÑO EN CURSO (pedido de Claudio, 28-09):
+     antes entraba también todo pago que hubiera cargado esta cuenta, y quien
+     administra hizo la carga inicial de agosto de TODOS los lotes con su
+     usuario: le salían los de los 140 lotes. Ahora cuenta solo el lote, y
+     solo lo pagado de verdad (sin rechazados ni pagos de prueba). */
+  const anio = hoyISO().slice(0, 4), delAnio = f => String(f || '').slice(0, 4) === anio;
+  const cuentasLote = new Set(s.users.filter(z => z.casa === u.casa).map(z => z.id));
+  const pagos = s.pagos.filter(p => p.lote === u.casa && delAnio(p.fecha) && p.estado !== 'rechazado' && !(typeof esPrueba === 'function' && esPrueba(p))).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const estadoPago = p => p.estado === 'informado' && typeof esPagoMP === 'function' && esPagoMP(p) ? 'Acreditado (Mercado Pago)' : ({ confirmado:'Acreditado', informado:'Por acreditar', aprobado:'Acreditado' }[p.estado] || x(p.estado));
+  out.push(bloque(`4. Expensas del lote: pagos y recibos de ${anio}`, `Los pagos de ${x(u.casa)} de este año y sus recibos. Los ven las cuentas de tu lote y la Administración; se conservan 10 años (art. 328 del Código Civil y Comercial). Los de años anteriores están en Mis expensas. Los comprobantes que subiste se borran 30 días después de confirmados.`,
+    tabla(['Fecha', 'Importe', 'Medio', 'Estado', 'Informó'], pagos.map(p => [fc(p.fecha), typeof plata === 'function' ? plata(p.monto) : x(p.monto), x(p.medio), estadoPago(p), cuentasLote.has(p.userId) ? nom(p.userId) : 'La Administración']))
+    + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa && delAnio(r.fecha)).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))));
   out.push(bloque('Reservas', 'Las ven vos, la garita y la Administración.', tabla(['Espacio', 'Fecha', 'Invitados', 'Estado'], s.reservas.filter(r => r.userId === u.id).map(r => [x(amenity(r.amenity)?.nombre || r.amenity), fc(r.fecha), x(r.invitados || 0), r.cancelada ? 'Cancelada' : 'Confirmada']))));
   /* 5 · mensajes */
   const hilo = (titulo, msgs, quien) => `<div class="caja"><b>${titulo}</b>${msgs.length ? `<table style="margin-top:6px">${msgs.map(m => `<tr><td style="width:120px;white-space:nowrap">${fh(m.createdAt || m.at)}</td><td style="width:90px">${quien(m)}</td><td>${x(m.text)}</td></tr>`).join('')}</table>` : '<br><span style="color:#666">Sin mensajes.</span>'}</div>`;
@@ -1702,7 +1710,7 @@ function informeMisDatos(){
     <li>Las fotos grandes (la de tu casa, tus mascotas): quedan en tu equipo; a la base va una miniatura.</li>
     <li>Los códigos que sirven para entrar o identificarte (credencial, QR de retiro, llave de tu teléfono): no se reproducen por seguridad.</li>
     <li>El libro de guardia (bitácora) y el registro de auditoría: los llevan la garita y la Administración. Si querés lo que diga de vos, pedíselo a la Administración.</li></ul>`));
-  out.push(bloque('Tus derechos', '', `<p style="margin:0">Podés pedir gratis, a la Administración del Barrio ${x(c.nombre)} (${x(c.adminEmail || '')}${typeof cfgDatos === 'function' && cfgDatos().responsableArco ? ', responsable: ' + x(cfgDatos().responsableArco) : ''}), el acceso a tus datos (respuesta en 10 días corridos), que se corrijan o se borren (5 días hábiles), según los arts. 14 a 16 de la Ley 25.326. Muchos datos los corregís vos en Mi casa. La Agencia de Acceso a la Información Pública (AAIP) es el órgano de control y recibe denuncias.</p>`));
+  out.push(bloque('Tus derechos', '', `<p style="margin:0">Podés solicitarle a la Administración del Barrio ${x(c.nombre)} (${x(c.adminEmail || '')}${typeof cfgDatos === 'function' && cfgDatos().responsableArco ? ', responsable: ' + x(cfgDatos().responsableArco) : ''}) ver tus datos (te responde en 10 días corridos), que se corrijan o que se retiren (en 5 días hábiles), según los arts. 14 a 16 de la Ley 25.326. Muchos datos los corregís vos en Mi casa. La Agencia de Acceso a la Información Pública (AAIP) es el órgano de control y recibe denuncias.</p>`));
   return out.join('');
 }
 /* El pedido de baja va a la carpeta privada de cada cuenta de la
