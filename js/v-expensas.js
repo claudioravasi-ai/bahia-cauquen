@@ -61,10 +61,40 @@ function conCentavosDelLote(monto, lote){
 
 /* ---------- cálculo ---------- */
 const gastosDe = p => Store.s.gastos.filter(g => g.periodo === p && !g.anulado);
-const liquidacionDe = p => Store.s.liquidaciones.find(l => l.periodo === p);
-const liquidacionesEmitidas = () => Store.s.liquidaciones.filter(l => l.estado === 'emitida').sort((a, b) => a.periodo.localeCompare(b.periodo));
-const cuotaDe = (l, lote) => (l.cuotas || []).find(c => c.lote === lote);
-const pagosDe = lote => Store.s.pagos.filter(p => p.lote === lote && p.estado === 'confirmado');
+/* =========================================================
+   EL HOTEL LOS CAUQUENES PAGA SUS 6 UF (pedido de Claudio, 28-09-2026)
+   El hotel es dueño de las UF 000 a 005 (lotes 0 a 5): paga expensas como
+   cualquier propietario. Su cuenta no está "en" un lote (figura como el
+   hotel) y, por la protección de datos, no lee la liquidación del barrio
+   (que tiene los montos de todos). Por eso:
+     · cada mes la app de la Administración le deja al hotel una copia
+       privada con SOLO sus 6 cuotas (hotel/hotelLiqs, ver HotelExp); con eso
+       el hotel ve sus 6 cupones por separado, su cuenta y los vencimientos,
+       con el mismo motor que un vecino (liqsFuente);
+     · paga el TOTAL de las 6 UF en un solo pago; el pago lleva adentro el
+       reparto entre las UF (`reparto`: primero lo que debe cada una, en
+       orden; si sobra, queda a favor de la primera), y al confirmarlo salen
+       6 recibos, uno por UF;
+     · los cupones le llegan solos por correo (uno por UF) y los avisos de
+       vencimiento también, sin que la Administración tenga que mandarlos.
+   ========================================================= */
+const lotesDelHotel = () => (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => L.grupo === 'hotel').map(L => 'Lote ' + L.lote);
+const esLoteHotel = lote => !!lote && lotesDelHotel().includes(lote);
+const loteCobroHotel = () => lotesDelHotel()[0] || 'Lote 0';
+/* Las cuentas que se enteran de lo que pasa con un lote (el hotel, en sus UF). */
+const cuentasDelCobro = lote => { const us = Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').map(u => u.id);
+  const h = esLoteHotel(lote) ? cuentaHotel() : null; if (h && !us.includes(h.id)) us.push(h.id); return us; };
+/* Un pago repartido entre varias UF cuenta, en cada una, solo su parte. */
+const repartoDe = p => aLista(p && p.reparto).filter(r => r && r.lote);
+const pagoDelLote = (p, lote) => repartoDe(p).length ? repartoDe(p).some(r => r.lote === lote) : p.lote === lote;
+const parteDelLote = (p, lote) => { const r = repartoDe(p); if (r.length){ const x = r.find(z => z.lote === lote); return x ? +x.monto || 0 : 0; } return p.lote === lote ? +p.monto || 0 : 0; };
+/* De dónde salen las liquidaciones: el hotel usa su copia privada (en la
+   demo, sin nube, se arma en el momento con las del barrio). */
+const liqsFuente = () => !esHotel() ? Store.s.liquidaciones : typeof Nube !== 'undefined' && Nube.activa() ? aLista(Store.s.hotelLiqs) : HotelExp.armar();
+const liquidacionDe = p => liqsFuente().find(l => l.periodo === p);
+const liquidacionesEmitidas = () => liqsFuente().filter(l => l.estado === 'emitida').sort((a, b) => a.periodo.localeCompare(b.periodo));
+const cuotaDe = (l, lote) => aLista(l && l.cuotas).find(c => c.lote === lote);
+const pagosDe = lote => Store.s.pagos.filter(p => pagoDelLote(p, lote) && p.estado === 'confirmado');
 /* =========================================================
    CUÁNDO UN PAGO DESCUENTA DEL SALDO (26-09-2026)
      · Confirmado por la Administración (con recibo): descuenta.
@@ -100,16 +130,16 @@ function cuentaLote(lote){
     movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:`Expensas ${nombrePeriodo(l.periodo)}`, debe:c.total, tipo:'cuota' });
     if (c.interes) movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:'Intereses por saldo impago', debe:c.interes, tipo:'interes' });
   });
-  Store.s.pagos.filter(p => p.lote === lote && p.estado !== 'rechazado' && !esPrueba(p)).forEach(p => {
-    const acred = pagoAcreditado(p);
+  Store.s.pagos.filter(p => pagoDelLote(p, lote) && p.estado !== 'rechazado' && !esPrueba(p)).forEach(p => {
+    const acred = pagoAcreditado(p), grupo = repartoDe(p).length > 1;
     movs.push({ fecha:p.fecha ? fechaDe(p.fecha).getTime() : p.at,
-      detalle: p.estado === 'confirmado' ? `Pago recibido (${p.medio})` : acred ? 'Pago con Mercado Pago · aprobado, recibo en camino' : `Pago informado, por acreditar (${p.medio})`,
-      haber:p.monto, tipo:'pago', pendiente:!acred, id:p.id });
+      detalle: (p.estado === 'confirmado' ? `Pago recibido (${p.medio})` : acred ? 'Pago con Mercado Pago · aprobado, recibo en camino' : `Pago informado, por acreditar (${p.medio})`) + (grupo ? ` · parte del pago de ${plata(p.monto)} por ${repartoDe(p).length} UF` : ''),
+      haber:parteDelLote(p, lote), tipo:'pago', pendiente:!acred, id:p.id });
   });
   movs.sort((a, b) => a.fecha - b.fecha);
   let saldo = 0;
   movs.forEach(m => { saldo += (m.debe || 0) - (m.pendiente ? 0 : (m.haber || 0)); m.saldo = saldo; });
-  const informado = Store.s.pagos.filter(p => p.lote === lote && porAcreditar(p)).reduce((a, p) => a + (+p.monto || 0), 0);
+  const informado = Store.s.pagos.filter(p => pagoDelLote(p, lote) && porAcreditar(p)).reduce((a, p) => a + parteDelLote(p, lote), 0);
   return { movs, saldo, informado, porAcreditar:informado };
 }
 const saldoLote = lote => cuentaLote(lote).saldo;
@@ -127,6 +157,36 @@ function aPagar(lote){
   /* Con recargo, el total se lleva a los centavos del lote. */
   if (recargo) recargo = conCentavosDelLote(cuenta.saldo + recargo, lote).total - cuenta.saldo;
   return { saldo:cuenta.saldo, total:cuenta.saldo + recargo, recargo, periodo:l.periodo, vto1:v1, vto2:v2, vencido:hoy > v2, informado:cuenta.informado };
+}
+/* Lo que debe cada UF (sin lo que ya está por acreditar), con el recargo si
+   ya pasó el 1º vencimiento. Para el hotel: el total de sus 6 UF. */
+function deudaGrupo(lotes){
+  const c = cfgExp();
+  return lotes.map(l => { const cu = cuentaLote(l), debe = Math.max(0, cu.saldo - cu.informado), rec = aPagar(l).recargo;
+    return { lote:l, debe:Math.round((rec && debe ? conCentavosDelLote(debe * (1 + c.recargo2 / 100), l).total : debe) * 100) / 100, saldo:cu.saldo, informado:cu.informado }; });
+}
+const totalDeuda = d => Math.round(d.reduce((a, x) => a + x.debe, 0) * 100) / 100;
+/* El pago único del hotel, repartido: primero lo que debe cada UF, en
+   orden; si sobra, queda a favor de la primera; si falta, las últimas
+   quedan con saldo. Se calcula UNA vez, al anotar el pago, y se guarda. */
+function repartoHotel(monto, sinPago = ''){
+  const antes = Store.s.pagos; if (sinPago) Store.s.pagos = antes.filter(x => x.id !== sinPago);
+  let deudas; try { deudas = deudaGrupo(lotesDelHotel()); } finally { Store.s.pagos = antes; }
+  let resto = Math.round((+monto || 0) * 100);
+  const out = deudas.map(d => { const c = Math.min(resto, Math.round(d.debe * 100)); resto -= c; return { lote:d.lote, monto:c / 100 }; });
+  if (resto > 0 && out.length) out[0].monto = (Math.round(out[0].monto * 100) + resto) / 100;
+  return out.filter(r => r.monto > 0);
+}
+/* Un pago de Mercado Pago del hotel que anotó el aviso automático (sin
+   reparto): se completa al verlo, una sola vez. */
+function completarRepartos(){
+  if (typeof cuentaHotel !== 'function') return 0;
+  const h = cuentaHotel(); if (!h || !(esHotel() || esAdmin())) return 0;
+  const sin = Store.s.pagos.filter(p => p && p.lote === loteCobroHotel() && p.userId === h.id && !repartoDe(p).length && p.estado !== 'rechazado' && !esPrueba(p));
+  if (!sin.length) return 0;
+  const reps = sin.map(p => [p.id, repartoHotel(p.monto, p.id)]);
+  Store.cambiar(s => reps.forEach(([id, r]) => { const x = s.pagos.find(z => z.id === id); if (x && !repartoDe(x).length) x.reparto = r; }));
+  return reps.length;
 }
 /* =========================================================
    EL RELOJ DE LOS VENCIMIENTOS DE UN LOTE (26-09-2026)
@@ -256,7 +316,7 @@ function imprimir(titulo, cuerpo, { pie = 'Documento generado por la app del bar
 
 function cuponHTML(lote, periodo){
   const l = liquidacionDe(periodo), c = cuotaDe(l || {}, lote), cf = cfgExp();
-  const prop = propietarioDe(lote), cuenta = cuentaLote(lote);
+  const prop = propietarioDe(lote) || (esLoteHotel(lote) ? HOTEL_NOMBRE : ''), cuenta = cuentaLote(lote);
   const hasta = new Date(l.emitidaAt).getTime();
   const previos = cuenta.movs.filter(m => m.fecha < hasta);
   const saldoAnterior = previos.length ? previos[previos.length - 1].saldo : 0;
@@ -316,7 +376,7 @@ function liquidacionHTML(periodo){
 
 function reciboHTML(r){
   return `<h2>Recibo de expensas Nº ${esc(r.numero)}</h2>
-    <div class="caja"><b>${esc(propietarioDe(r.lote) || r.lote)}</b><br>${esc(r.lote)}</div>
+    <div class="caja"><b>${esc(propietarioDe(r.lote) || (esLoteHotel(r.lote) ? HOTEL_NOMBRE : r.lote))}</b><br>${esc(r.lote)}${r.grupo ? ' · parte del pago único por las UF del hotel' : ''}</div>
     <table>
       <tr><td>Fecha del pago</td><td class="n">${fechaCorta(r.fecha)}</td></tr>
       <tr><td>Medio</td><td class="n">${esc(r.medio)}</td></tr>
@@ -370,9 +430,10 @@ function certificadoHTML(lote){
    VENTANA DEL VECINO: su carpeta
    ========================================================= */
 R.expensas = {
-  icon: 'wallet', color: 'wood', sub: 'Tu cuenta, tus cupones y tus pagos',
-  titulo: p => p && esAdmin() ? `Cuenta del ${p}` : 'Expensas',
+  icon: 'wallet', color: 'wood', sub: p => esHotel() ? 'Las 6 UF del hotel: cupones, pagos y recibos' : 'Tu cuenta, tus cupones y tus pagos',
+  titulo: p => esHotel() ? 'Expensas del hotel' : p && esAdmin() ? `Cuenta del ${p}` : 'Expensas',
   render(p){
+    if (esHotel()) return expensasHotel();
     const u = yo(), lote = miLote(), L = loteDe(u);
     /* La Administración mira la cuenta de un lote (desde el padrón o morosos). */
     if (esAdmin() && p && /^Lote\s/i.test(p)) return `<div class="card plana small">${I('eye')} Estás viendo la cuenta del <b>${esc(p)}</b>${propietarioDe(p) ? ' · ' + esc(propietarioDe(p)) : ''}, como la ve el vecino.
@@ -391,7 +452,7 @@ function carpetaVecino(lote, { ajena = false } = {}){
   const cuenta = cuentaLote(lote), pagar = aPagar(lote), c = cfgExp();
   const L = lote && typeof LOTES !== 'undefined' ? LOTES.find(x => 'Lote ' + x.lote === lote) : null;
   const emitidas = liquidacionesEmitidas().slice().reverse();
-  const misPagos = Store.s.pagos.filter(p => p.lote === lote).sort((a, b) => b.at - a.at);
+  const misPagos = Store.s.pagos.filter(p => pagoDelLote(p, lote)).sort((a, b) => b.at - a.at);
   const misRecibos = Store.s.recibos.filter(r => r.lote === lote).sort((a, b) => b.at - a.at);
   const alDia = cuenta.saldo <= 0.5;
   /* Pagó por fuera y lo informó: la deuda queda cubierta "por acreditar". */
@@ -412,7 +473,7 @@ function carpetaVecino(lote, { ajena = false } = {}){
       ${cuenta.informado ? `<span class="tp-detalle">${I('clock')} ${plata(cuenta.informado)} por acreditar: la Administración está corroborando tu comprobante${cubierto ? '' : ` · te quedarían ${plata(cuenta.saldo - cuenta.informado)}`}</span>` : ''}
       ${!alDia && !ajena && !cubierto ? `<span class="tp-pie">${I('right')}Tocá para pagar: tarjeta, Mercado Pago, billeteras, QR o transferencia</span>` : ''}
     </button>
-    ${!alDia && !ajena && !cubierto ? `<button class="btn btn-sec btn-block" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagué por fuera de la app · adjuntar comprobante</button>` : ''}
+    ${!alDia && !ajena && !cubierto ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagué por fuera de la app · adjuntar comprobante</button>` : ''}
     ${puedeAdministrar() && !ajena && MercadoPago.activo() && montoDePrueba(lote) ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:0 0 12px" data-a="pago-mp" data-v="prueba">${I('wallet')}Probar el pago con Mercado Pago · <span style="white-space:nowrap">${plata(montoDePrueba(lote))}</span> (solo la Administración)</button>` : ''}
 
     ${L ? `<div class="card plana small" style="color:var(--ink-2)">${I('info')} ${esc(lote)} · UF ${L.uf} · coeficiente <b>${L.coef.toFixed(4)} %</b>. De cada $100 de gastos del barrio, a tu lote le corresponden $${L.coef.toFixed(2)}.</div>` : ''}
@@ -445,7 +506,67 @@ function carpetaVecino(lote, { ajena = false } = {}){
     ${superficie({ a:'abrir', v:'privado', p:'admin|expensas', icon:'lock', color:'accent', t:'Consultar a la Administración', s:'Planes de pago, diferencias, dudas' })}
     <p class="muted tiny">El vencimiento se te recuerda solo: tres días antes, el día del primer vencimiento y si queda saldo impago.</p>`;
 }
-A['ver-cupon'] = el => { const lote = esAdmin() && el.dataset.p ? el.dataset.p : miLote(); imprimir(`Cupón ${nombrePeriodo(el.dataset.v)} · ${lote}`, cuponHTML(lote, el.dataset.v)); };
+/* =========================================================
+   LA VENTANA "EXPENSAS DEL HOTEL" (28-09-2026)
+   Arriba, el total de las 6 UF para pagar en un solo pago (o avisar que se
+   pagó por fuera). Abajo, cada UF por separado con su cupón, los cupones
+   de los meses anteriores, los pagos en camino y los recibos (uno por UF).
+   ========================================================= */
+function expensasHotel(){
+  const lotes = lotesDelHotel(); if (!lotes.length) return vacio('wallet', 'No hay unidades del hotel en el padrón.');
+  const d = deudaGrupo(lotes), total = totalDeuda(d), c = cfgExp();
+  const uf = lotes.map(l => ({ lote:l, L:LOTES.find(x => 'Lote ' + x.lote === l), cu:cuentaLote(l) }));
+  const saldo = Math.round(uf.reduce((a, x) => a + x.cu.saldo, 0) * 100) / 100, informado = Math.round(uf.reduce((a, x) => a + x.cu.informado, 0) * 100) / 100;
+  const alDia = saldo <= .5, cubierto = !alDia && total <= .5;
+  const emitidas = liquidacionesEmitidas().slice().reverse(), ult = emitidas[0];
+  const v1 = ult ? vtoDe(ult.periodo, 1) : '', v2 = ult ? vtoDe(ult.periodo, 2) : '', hoy = hoyISO(), dias = f => Math.round((fechaDe(f) - fechaDe(hoy)) / DIA);
+  const base = uf.map(x => Math.max(0, x.cu.saldo - x.cu.informado));
+  const total1 = Math.round(base.reduce((a, b) => a + b, 0) * 100) / 100;
+  const total2 = Math.round(uf.reduce((a, x, i) => a + (base[i] ? conCentavosDelLote(base[i] * (1 + (c.recargo2 || 0) / 100), x.lote).total : 0), 0) * 100) / 100;
+  const vencido = v2 && hoy > v2, fase = !v1 ? '' : hoy < v1 ? 'antes' : hoy === v1 ? 'vto1' : hoy < v2 ? 'entre' : hoy === v2 ? 'ultimo' : 'vencido';
+  const reloj = ult && !alDia && !cubierto ? `<span class="tp-reloj f-${fase}">
+      <span><small>1º vto · ${fechaCorta(v1)}</small><b>${plata(total1)}</b>${dias(v1) > 0 ? `<em>faltan ${plural(dias(v1), 'día', 'días')}</em>` : dias(v1) === 0 ? '<em>hoy</em>' : '<em>vencido</em>'}</span>
+      <span><small>2º vto · ${fechaCorta(v2)}</small><b>${plata(total2)}</b>${dias(v2) > 0 ? `<em>faltan ${plural(dias(v2), 'día', 'días')}</em>` : dias(v2) === 0 ? '<em>¡hoy es el último día!</em>' : '<em>vencido</em>'}</span></span>` : '';
+  const coef = uf.reduce((a, x) => a + (x.L ? x.L.coef : 0), 0);
+  const misPagos = Store.s.pagos.filter(p => lotes.some(l => pagoDelLote(p, l))).sort((a, b) => b.at - a.at);
+  const misRecibos = Store.s.recibos.filter(r => lotes.includes(r.lote)).sort((a, b) => b.at - a.at);
+  const estadoUF = x => { const debe = x.cu.saldo - x.cu.informado; return x.cu.saldo <= .5 ? ['p-ok', 'Al día'] : debe <= .5 ? ['p-warn', 'Por acreditar'] : ['p-danger', 'Debe ' + plata(debe)]; };
+  return `
+    <button class="tarjeta-pago ${alDia ? 'al-dia' : cubierto ? 'por-acreditar' : vencido ? 'vencida' : fase === 'ultimo' ? 'ultimo-dia' : ''}" ${alDia || cubierto ? 'disabled' : 'data-a="pagar-expensas"'}>
+      <span class="tp-arriba"><span class="tp-rotulo">${alDia ? 'Las 6 UF están al día' : cubierto ? 'Pago informado · por acreditar' : vencido ? 'Hay saldo vencido' : `Expensas de ${ult ? nombrePeriodo(ult.periodo) : 'este mes'} · ${lotes.length} UF`}</span>
+        ${alDia ? `<span class="tp-chip">${I('check')}Sin deuda</span>` : cubierto ? `<span class="tp-chip">${I('clock')}Por acreditar</span>` : `<span class="tp-chip">${I('wallet')}Pagar el total</span>`}</span>
+      <span class="tp-monto">${plata(Math.max(0, alDia || cubierto ? saldo : total))}</span>
+      ${ult && !reloj ? `<span class="tp-detalle">${nombrePeriodo(ult.periodo)} · vence el ${fechaCorta(v1)}</span>` : ''}
+      ${reloj}
+      ${informado ? `<span class="tp-detalle">${I('clock')} ${plata(informado)} por acreditar: la Administración lo está corroborando</span>` : ''}
+      ${!alDia && !cubierto ? `<span class="tp-pie">${I('right')}Un solo pago por las ${lotes.length} UF: la app lo reparte y emite un recibo por cada una</span>` : ''}
+    </button>
+    ${!alDia && !cubierto ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagamos por fuera de la app · adjuntar comprobante</button>` : ''}
+    <div class="card plana small" style="color:var(--ink-2)">${I('info')} ${esc(HOTEL_NOMBRE)}: ${lotes.length} unidades (UF ${uf.map(x => x.L ? x.L.uf : '').join(', ')}), coeficiente total <b>${coef.toLocaleString('es-AR', { minimumFractionDigits:4, maximumFractionDigits:4 })} %</b>. Acá se ven solo las cuentas del hotel.</div>
+    ${sec('Las unidades del hotel')}
+    ${uf.map(x => { const cu = ult ? cuotaDe(ult, x.lote) : null, e = estadoUF(x);
+      return `<div class="card hx-uf"><div class="row"><span class="ic ic-wood" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center">${I('file')}</span>
+        <div class="grow"><b>${esc(x.lote)} · UF ${esc(x.L ? x.L.uf : '')}</b><div class="muted small">Coeficiente ${x.L ? x.L.coef.toLocaleString('es-AR', { minimumFractionDigits:4, maximumFractionDigits:4 }) : '—'} %${cu ? ` · cupón de ${nombrePeriodo(ult.periodo)}: ${plata(cu.total + (cu.interes || 0))}` : ''}</div></div>
+        <span class="pill ${e[0]}">${e[1]}</span></div>
+        ${cu ? `<div class="btns" style="margin-top:8px"><button class="btn btn-xs btn-sec" data-a="ver-cupon" data-v="${ult.periodo}" data-p="${esc(x.lote)}">${I('file')}Ver el cupón</button></div>` : ''}</div>`; }).join('')}
+    ${emitidas.length > 1 ? sec('Cupones anteriores') + `<div class="card lista">${emitidas.slice(1, 13).map(l => `<div class="it hx-mes"><div class="txt"><b>${nombrePeriodo(l.periodo)}</b><span>${plata(lotes.reduce((a, lo) => { const q = cuotaDe(l, lo); return a + (q ? q.total + (q.interes || 0) : 0); }, 0))} entre las ${lotes.length} UF</span></div>
+        <div class="hx-ufs">${lotes.map(lo => cuotaDe(l, lo) ? `<button class="chip" data-a="ver-cupon" data-v="${l.periodo}" data-p="${esc(lo)}">UF ${esc((LOTES.find(z => 'Lote ' + z.lote === lo) || {}).uf || lo)}</button>` : '').join('')}</div></div>`).join('')}</div>` : ''}
+    ${!emitidas.length ? vacio('file', 'Todavía no hay cupones: aparecen solos cuando la Administración cierra el mes.') : ''}
+    ${misPagos.length ? sec('Pagos') + misPagos.slice(0, 12).map(p => { const r = repartoDe(p);
+      return `<div class="card" style="padding:12px 14px"><div class="row"><span class="ic ic-${p.estado === 'confirmado' ? 'ok' : p.estado === 'rechazado' ? 'danger' : esPagoMP(p) ? 'sky' : 'warn'}" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center">${I(p.estado === 'confirmado' ? 'check' : 'wallet')}</span>
+        <div class="grow"><b>${plata(p.monto)}</b> <span class="pill ${p.estado === 'confirmado' ? 'p-ok' : p.estado === 'rechazado' ? 'p-danger' : esPrueba(p) ? 'p-accent' : esPagoMP(p) ? 'p-sky' : 'p-warn'}">${p.estado === 'confirmado' ? 'acreditado' : p.estado === 'rechazado' ? 'rechazado' : esPrueba(p) ? 'prueba' : esPagoMP(p) ? 'aprobado' : 'por acreditar'}</span>
+          <div class="muted small">${fechaCorta(p.fecha)} · ${esc(p.medio)}${r.length ? ` · repartido: ${r.map(z => `${esc(z.lote)} ${plata(z.monto)}`).join(' · ')}` : ` · ${esc(p.lote)}`}</div></div></div></div>`; }).join('') : ''}
+    ${misRecibos.length ? sec('Recibos') + misRecibos.slice(0, 24).map(r => `<button class="superficie" data-a="ver-recibo" data-id="${r.id}"><span class="ic ic-ok">${I('check')}</span>
+      <span class="txt"><b>Recibo Nº ${esc(r.numero)} · ${esc(r.lote)}</b><small>${plata(r.monto)} · ${fechaCorta(r.fecha)}</small></span>${I('right')}</button>`).join('') : ''}
+    ${sec('Datos para transferir')}
+    <div class="card lista">
+      <div class="it"><div class="txt"><b>Alias</b><span>${esc(Store.s.config.alias || '—')}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(Store.s.config.alias || '')}">${I('copy')}</button></div>
+      <div class="it"><div class="txt"><b>CBU</b><span class="mono">${esc(Store.s.config.cbu || '—')}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(Store.s.config.cbu || '')}">${I('copy')}</button></div>
+      <div class="it"><div class="txt"><b>Titular</b><span>Barrio ${esc(Store.s.config.nombre)} · CUIT ${esc(Store.s.config.cuit || '')}</span></div></div></div>
+    ${superficie({ a:'abrir', v:'privado', p:'admin|expensas', icon:'lock', color:'accent', t:'Consultar a la Administración', s:'Diferencias, planes de pago, dudas sobre las expensas' })}
+    <p class="muted tiny">Los cupones llegan solos cada mes al correo del hotel, uno por UF, y los vencimientos se avisan en la app. Si se paga el total, la app lo reparte entre las ${lotes.length} UF y cada una recibe su recibo.</p>`;
+}
+A['ver-cupon'] = el => { const lote = (esAdmin() || (esHotel() && esLoteHotel(el.dataset.p))) && el.dataset.p ? el.dataset.p : miLote(); imprimir(`Cupón ${nombrePeriodo(el.dataset.v)} · ${lote}`, cuponHTML(lote, el.dataset.v)); };
 A['ver-recibo'] = el => { const r = Store.s.recibos.find(x => x.id === el.dataset.id); if (r) imprimir(`Recibo ${r.numero}`, reciboHTML(r)); };
 /* =========================================================
    PAGAR LAS EXPENSAS
@@ -469,9 +590,20 @@ A['ver-recibo'] = el => { const r = Store.s.recibos.find(x => x.id === el.datase
    es lo de arriba: el vecino toca "Mercado Pago" y paga con la tarjeta,
    la billetera o el NFC DENTRO de esa app, que es donde está permitido.
    ========================================================= */
+/* Cómo se nombra un pago en las listas de la Administración: el del hotel
+   dice que es por sus UF y cómo se repartió. */
+const etiquetaPago = p => repartoDe(p).length ? `${HOTEL_NOMBRE} · ${repartoDe(p).length} UF` : p.lote;
+const detalleReparto = p => repartoDe(p).length ? `<div class="muted small">Se reparte: ${repartoDe(p).map(r => `${esc(r.lote)} ${plata(r.monto)}`).join(' · ')}. Al confirmarlo salen ${plural(repartoDe(p).length, 'recibo')}, uno por UF.</div>` : '';
+/* Lo que paga ESTA cuenta: su lote, o el total de las 6 UF si es el hotel. */
+function cobroHotel(){
+  const lotes = lotesDelHotel(), d = deudaGrupo(lotes), l = liquidacionesEmitidas().slice(-1)[0];
+  const recargo = l && hoyISO() > vtoDe(l.periodo, 1) && d.some(x => x.debe > 0);
+  return { lotes, lote:loteCobroHotel(), total:totalDeuda(d), periodo:l ? l.periodo : '', recargo, etiqueta:`${HOTEL_NOMBRE} · ${lotes.length} UF` };
+}
 A['pagar-expensas'] = () => {
-  const c = cfgExp(), lote = miLote(), pagar = aPagar(lote), cfg = Store.s.config;
-  const total = pagar.total || Math.max(0, saldoLote(lote));
+  const c = cfgExp(), cfg = Store.s.config, H = esHotel() ? cobroHotel() : null;
+  const lote = H ? H.etiqueta : miLote(), pagar = H ? { total:H.total, periodo:H.periodo, recargo:H.recargo } : aPagar(lote);
+  const total = H ? H.total : pagar.total || Math.max(0, saldoLote(lote));
   const ref = `Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} · ${lote}`;
   const medio = (icon, color, t, sub, attrs) => `<button class="medio-pago" ${attrs}>
     <span class="ic ic-${color}">${I(icon)}</span><span class="txt"><b>${t}</b><small>${sub}</small></span>${I('right')}</button>`;
@@ -508,8 +640,8 @@ A['pago-link'] = el => {
     <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="cerrar-hoja">Más tarde</button>`), 900);
 };
 A['pago-transferencia'] = () => {
-  const cfg = Store.s.config, lote = miLote(), pagar = aPagar(lote);
-  const total = pagar.total || Math.max(0, saldoLote(lote));
+  const cfg = Store.s.config, H = esHotel() ? cobroHotel() : null, lote = H ? H.etiqueta : miLote(), pagar = H ? { periodo:H.periodo } : aPagar(lote);
+  const total = H ? H.total : pagar.total || Math.max(0, saldoLote(lote));
   const ref = `Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} ${lote}`;
   const fila = (t, v, copiar) => `<div class="it"><div class="txt"><b>${t}</b><span class="${t === 'CBU' ? 'mono' : ''}">${esc(v || '—')}</span></div>
     ${v ? `<button class="btn btn-xs btn-pri" data-a="copiar" data-v="${esc(v)}">${I('copy')}Copiar</button>` : ''}</div>`;
@@ -532,10 +664,10 @@ A['pago-qr'] = el => {
   setTimeout(() => { const el2 = $('[data-qr]'); if (el2) pintarQR(el2, el2.dataset.qr); }, 60);
 };
 A['pago-efectivo'] = () => {
-  const cfg = Store.s.config, lote = miLote(), pagar = aPagar(lote);
+  const cfg = Store.s.config, H = esHotel() ? cobroHotel() : null, lote = H ? H.etiqueta : miLote(), pagar = H ? { total:H.total } : aPagar(lote);
   hoja('Efectivo en la Administración', `
     <div class="card plana center"><div class="muted small">Llevá</div>
-      <div style="font-size:28px;font-weight:800;color:var(--wood)">${plata(pagar.total || Math.max(0, saldoLote(lote)))}</div>
+      <div style="font-size:28px;font-weight:800;color:var(--wood)">${plata(H ? H.total : pagar.total || Math.max(0, saldoLote(lote)))}</div>
       <div class="muted small">${esc(lote)}</div></div>
     <div class="card lista">
       <div class="it"><div class="txt"><b>Dónde</b><span>${esc(cfg.domicilio || '')}</span></div></div>
@@ -640,9 +772,9 @@ document.addEventListener('change', async e => {
   } catch(err){ inp.value = ''; toast(err.message || 'No se pudo leer el archivo', 'alert'); }
 });
 A['informar-pago'] = () => {
-  const lote = miLote(), cuenta = cuentaLote(lote), pagar = aPagar(lote);
-  const debe = Math.max(0, cuenta.saldo - cuenta.informado);
-  const monto = pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe;
+  const H = esHotel() ? cobroHotel() : null, lote = H ? H.etiqueta : miLote(), cuenta = H ? null : cuentaLote(lote), pagar = H ? { periodo:H.periodo } : aPagar(lote);
+  const debe = H ? H.total : Math.max(0, cuenta.saldo - cuenta.informado);
+  const monto = H ? H.total : pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe;
   hoja('Ya pagué por fuera de la app', `<form data-f="informar-pago">
     <p class="muted small" style="margin-top:0">Avisale a la Administración que pagaste por transferencia, en el banco, en efectivo o con otra billetera. Queda <b>por acreditar</b> hasta que lo corroboren con el comprobante; después te llega el recibo.</p>
     <div class="card plana small" style="margin-bottom:12px">${I('home')} <b>${esc(lote)}</b> · ${esc(yo().nombre)}${pagar.periodo ? ` · expensas de ${nombrePeriodo(pagar.periodo)}` : ''}</div>
@@ -654,7 +786,7 @@ A['informar-pago'] = () => {
     <button class="btn btn-pri btn-block btn-grande">${I('send')}Enviar a la Administración</button></form>`);
 };
 F['informar-pago'] = async d => {
-  const u = yo(), lote = miLote(), monto = Math.round(+d.monto * 100) / 100;
+  const u = yo(), H = esHotel() ? cobroHotel() : null, lote = H ? H.lote : miLote(), monto = Math.round(+d.monto * 100) / 100;
   let comp = null; try { comp = d.comp ? JSON.parse(d.comp) : null; } catch(e){}
   if (!comp && !/efectivo/i.test(d.medio)){ toast('Adjuntá el comprobante: es lo que la Administración necesita para acreditarlo', 'alert'); return; }
   if (!(monto > 0)){ toast('Poné el importe que pagaste', 'alert'); return; }
@@ -664,8 +796,8 @@ F['informar-pago'] = async d => {
   Store.cambiar(s => {
     s.pagos.unshift({ id, lote, userId:u.id, monto, fecha:d.fecha, medio:d.medio, nota:(d.nota || '').trim(),
       comp: comp ? { id:comp.id, tipo:comp.tipo, nombre:comp.nombre, kb:comp.kb, de:u.id, subido } : null, foto: comp && comp.mini ? { mini:comp.mini } : null,
-      estado:'informado', at:Date.now() });
-    notificar(s, { para:'rol:admin', titulo:`Pago por fuera de la app · ${lote}`, texto:`${plata(monto)} · ${d.medio} · ya figura por acreditar: corroboralo con el comprobante`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas', sonido:true });
+      ...(H ? { reparto:repartoHotel(monto), hotel:true } : {}), estado:'informado', at:Date.now() });
+    notificar(s, { para:'rol:admin', titulo:`Pago por fuera de la app · ${H ? H.etiqueta : lote}`, texto:`${plata(monto)} · ${d.medio} · ya figura por acreditar: corroboralo con el comprobante`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas', sonido:true });
     auditar(s, 'Informó un pago por fuera de la app', `${lote} · ${plata(monto)} · ${d.medio}${comp ? ' · con comprobante' : ''}`);
   });
   cerrarHoja();
@@ -977,7 +1109,7 @@ const COBRO = {
  `${sec(`Mercado Pago aprobados (${mpAprob.length})`, `<button class="link" data-a="mp-conciliar">${I('refresh')}Pasar a recibo ahora</button>`)}
         <p class="muted small" style="margin:-4px 2px 8px">Ya descontaron del saldo: los aprobó Mercado Pago. La app los pasa a recibo sola en unos minutos (no hace falta tocar nada).</p>
         <div class="card lista">${mpAprob.map(p => `<div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('wallet')}</span>
-          <div class="txt"><b>${esc(p.lote)} · ${plata(p.monto)}</b><span>${fechaCorta(p.fecha)} · operación ${esc(p.mpId)}</span></div></div>`).join('')}</div>` : ''}
+          <div class="txt"><b>${esc(etiquetaPago(p))} · ${plata(p.monto)}</b><span>${fechaCorta(p.fecha)} · operación ${esc(p.mpId)}</span>${detalleReparto(p)}</div></div>`).join('')}</div>` : ''}
       ${pruebas.length ? `${sec(`Pagos de PRUEBA (${pruebas.length})`, `<button class="link" data-a="pagos-prueba-borrar">${I('trash')}Borrarlos</button>`)}
         <p class="muted small" style="margin:-4px 2px 8px">Hechos con cuentas de prueba de Mercado Pago: sirven para ver que el circuito anda. No descuentan saldos, no sacan recibo ni entran a la contabilidad.</p>
         <div class="card lista">${pruebas.map(p => `<div class="it"><span class="ic ic-accent" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('zap')}</span>
@@ -987,9 +1119,9 @@ const COBRO = {
       ${informados.length ? informados.map(p => `<div class="card"><div class="row" style="align-items:flex-start">
         ${p.comp ? `<button class="comp-mini" data-a="ver-comprobante" data-id="${p.id}" ${p.foto && p.foto.mini ? `style="background-image:url('${p.foto.mini}')"` : ''} aria-label="Ver el comprobante">${p.foto && p.foto.mini ? '' : I('file')}</button>`
           : p.foto ? fotoHTML(p.foto, 'mini-foto') : `<span class="ic ic-warn" style="width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none">${I('clock')}</span>`}
-        <div class="grow"><b>${esc(p.lote)} · ${plata(p.monto)}</b> <span class="pill p-warn">por acreditar</span><div class="muted small">${fechaCorta(p.fecha)} · ${esc(p.medio)} · informó ${esc(nombreDe(p.userId))}</div>
+        <div class="grow"><b>${esc(etiquetaPago(p))} · ${plata(p.monto)}</b> <span class="pill p-warn">por acreditar</span><div class="muted small">${fechaCorta(p.fecha)} · ${esc(p.medio)} · informó ${esc(nombreDe(p.userId))}</div>
           ${p.nota ? `<div class="small" style="color:var(--ink-2)">${esc(p.nota)}</div>` : ''}
-          <div class="muted small">Saldo del lote: ${plata(saldoLote(p.lote))} · si se confirma: ${plata(saldoLote(p.lote) - p.monto)}</div>
+          ${repartoDe(p).length ? detalleReparto(p) : `<div class="muted small">Saldo del lote: ${plata(saldoLote(p.lote))} · si se confirma: ${plata(saldoLote(p.lote) - p.monto)}</div>`}
           ${p.comp && p.comp.subido === false ? `<div class="small" style="color:var(--warn)">${I('alert')} El comprobante no se pudo subir: quedó en el equipo del vecino.</div>` : ''}</div></div>
         <div class="btns" style="margin-top:10px">${p.comp ? `<button class="btn btn-sm btn-sec" data-a="ver-comprobante" data-id="${p.id}">${I('eye')}Ver comprobante</button>` : ''}
           <button class="btn btn-sm btn-ok" data-a="confirmar-pago" data-id="${p.id}">${I('check')}Confirmar y emitir recibo</button>
@@ -997,7 +1129,7 @@ const COBRO = {
         : vacio('check', 'No hay pagos esperando que los corroboren.')}
       ${sec('Últimos pagos confirmados')}
       <div class="card lista">${confirmados.map(p => `<div class="it"><span class="ic ic-ok" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('check')}</span>
-        <div class="txt"><b>${esc(p.lote)}</b><span>${fechaCorta(p.fecha)} · ${esc(p.medio)}${p.recibo ? ' · recibo ' + esc(p.recibo) : ''}</span></div><b class="num">${plata(p.monto)}</b></div>`).join('') || '<p class="muted small" style="margin:6px 0">Todavía no hay pagos confirmados.</p>'}</div>`;
+        <div class="txt"><b>${esc(etiquetaPago(p))}</b><span>${fechaCorta(p.fecha)} · ${esc(p.medio)}${p.recibo ? ' · recibo ' + esc(p.recibo) : ''}</span></div><b class="num">${plata(p.monto)}</b></div>`).join('') || '<p class="muted small" style="margin:6px 0">Todavía no hay pagos confirmados.</p>'}</div>`;
   },
 
   morosos(){
@@ -1123,15 +1255,19 @@ function emitirLiquidacion(periodo, { auto = false } = {}){
     if (i >= 0) s.liquidaciones[i] = l; else s.liquidaciones.push(l);
     s.infracciones.forEach(x => { if (x.estado === 'firme' && !x.liquidada && x.monto) x.liquidada = periodo; });
     notificar(s, { para:'todos', titulo:`Expensas de ${nombrePeriodo(periodo)}`, texto:`Ya podés ver tu cupón. Primer vencimiento: ${fechaCorta(vtoDe(periodo, 1))}.`, icon:'wallet', color:'wood', link:'expensas', sonido:true });
+    const h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
+    if (h && lotesDelHotel().length) notificar(s, { para:[h.id], titulo:`Expensas de ${nombrePeriodo(periodo)}: los ${lotesDelHotel().length} cupones del hotel`, texto:`Ya están en la app, uno por UF. Primer vencimiento: ${fechaCorta(vtoDe(periodo, 1))}.`, icon:'wallet', color:'wood', link:'expensas', sonido:true });
     auditar(s, auto ? 'Emitió sola la liquidación (cierre automático)' : 'Emitió la liquidación', `${nombrePeriodo(periodo)} · ${plata(calc.totalCuotas)} · ${calc.cuotas.length} cupones`);
   });
   toast('Liquidación emitida', 'check');
+  HotelExp.publicar();
   mandarCupones(periodo);
 }
 A['reabrir-liquidacion'] = async el => {
   if (!await confirmar('Reabrir el período', 'Los cupones dejan de estar emitidos hasta que lo vuelvas a cerrar. Los pagos ya registrados no se tocan.', { si:'Reabrir', peligro:true })) return;
   Store.cambiar(s => { const l = s.liquidaciones.find(x => x.periodo === el.dataset.v); if (l) l.estado = 'borrador';
     auditar(s, 'Reabrió un período', el.dataset.v); });
+  HotelExp.publicar();
 };
 A['ver-liquidacion'] = el => imprimir(`Liquidación ${nombrePeriodo(el.dataset.v)}`, liquidacionHTML(el.dataset.v));
 /* REENVIAR CUPONES: a todos, a un lote (eligiendo a cuál de sus correos)
@@ -1262,6 +1398,9 @@ function destinatariosDeCupon(){
        que el propietario sea otra dirección distinta. */
     if (!out.has(p.email.toLowerCase())) out.set(p.email.toLowerCase(), { email:p.email, nombre:p.propietario || 'Propietario/a', casa });
   });
+  /* El hotel recibe el cupón de CADA una de sus UF, por separado (28-09). */
+  const h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
+  if (h && h.email) lotesDelHotel().forEach(casa => out.set(h.email.toLowerCase() + '|' + casa, { email:h.email, nombre:HOTEL_NOMBRE, casa, hotel:true }));
   return [...out.values()];
 }
 async function mandarCupones(periodo, { silencioso = false, detalle = false, solo = null } = {}){
@@ -1302,8 +1441,9 @@ async function mandarCupones(periodo, { silencioso = false, detalle = false, sol
              Alias <b>${esc(Store.s.config.alias || '—')}</b><br>
              CBU <span style="font-family:monospace">${esc(Store.s.config.cbu || '—')}</span><br>
              ${esc(Store.s.config.cuenta || '')}</p>
-           <p>Después de pagar, informá el pago desde la app y te llega el recibo.</p>`,
-          { texto:'Ver mi cupón en la app', url:urlApp('expensas') }) });
+           <p>Después de pagar, informá el pago desde la app y te llega el recibo.</p>
+           ${x.hotel ? `<p style="background:#f4f7f7;border-radius:10px;padding:10px 12px">Este es uno de los ${lotesDelHotel().length} cupones del ${esc(HOTEL_NOMBRE)}. Desde la app del hotel (Expensas) se pueden pagar las ${lotesDelHotel().length} UF juntas en un solo pago: la app lo reparte y emite un recibo por cada UF.</p>` : ''}`,
+          { texto: x.hotel ? 'Ver las expensas del hotel' : 'Ver mi cupón en la app', url:urlApp('expensas') }) });
       resultados.push({ ...x, ok:envio.ok, error:envio.error });
       return envio.ok;
     }));
@@ -1391,11 +1531,18 @@ function confirmarPago(id, { auto = false } = {}){
     const c = cfgExp();
     numero = 'R-' + String((c.reciboNro || 0) + 1).padStart(5, '0');
     s.config.exp = Object.assign({}, c, { reciboNro: (c.reciboNro || 0) + 1 });
-    pago.estado = 'confirmado'; pago.recibo = numero; pago.confirmadoPor = auto ? 'sistema' : yo().id; pago.confirmadoAt = Date.now();
-    s.recibos.unshift({ id:uid(), numero, lote:pago.lote, monto:pago.monto, fecha:pago.fecha, medio:pago.medio,
-      concepto:`Expensas${pago.nota ? ' · ' + pago.nota : ''}`, pagoId:pago.id, at:Date.now(), por: auto ? 'sistema' : yo().id });
-    notificar(s, { para:s.users.filter(u => u.casa === pago.lote).map(u => u.id), titulo:'Recibimos tu pago', texto:`${plata(pago.monto)} · recibo ${numero}`, icon:'check', color:'ok', link:'expensas', sonido:true });
-    auditar(s, auto ? 'Acreditó solo un pago de Mercado Pago' : 'Confirmó un pago', `${pago.lote} · ${plata(pago.monto)} · recibo ${numero}${pago.mpId ? ' · MP ' + pago.mpId : ''}`);
+    pago.estado = 'confirmado'; pago.confirmadoPor = auto ? 'sistema' : yo().id; pago.confirmadoAt = Date.now();
+    /* El pago único del hotel: un recibo por cada UF, con su parte. */
+    const partes = repartoDe(pago);
+    const nums = (partes.length ? partes : [{ lote:pago.lote, monto:pago.monto }]).map((r, i) => {
+      const n = i === 0 ? numero : 'R-' + String((c.reciboNro || 0) + 1 + i).padStart(5, '0');
+      s.recibos.unshift({ id:uid(), numero:n, lote:r.lote, monto:+r.monto, fecha:pago.fecha, medio:pago.medio,
+        concepto:`Expensas${partes.length ? ` · parte del pago único de ${plata(pago.monto)} del ${HOTEL_NOMBRE} por ${partes.length} UF` : ''}${pago.nota ? ' · ' + pago.nota : ''}`, pagoId:pago.id, ...(partes.length ? { grupo:true } : {}), at:Date.now(), por: auto ? 'sistema' : yo().id });
+      return n; });
+    if (nums.length > 1) s.config.exp = Object.assign({}, s.config.exp, { reciboNro: (c.reciboNro || 0) + nums.length });
+    pago.recibo = nums.join(', ');
+    notificar(s, { para:cuentasDelCobro(pago.lote), titulo:'Recibimos tu pago', texto: nums.length > 1 ? `${plata(pago.monto)} · ${nums.length} recibos, uno por UF (${nums[0]} a ${nums.at(-1)})` : `${plata(pago.monto)} · recibo ${numero}`, icon:'check', color:'ok', link:'expensas', sonido:true });
+    auditar(s, auto ? 'Acreditó solo un pago de Mercado Pago' : 'Confirmó un pago', `${partes.length ? HOTEL_NOMBRE + ' (' + partes.length + ' UF)' : pago.lote} · ${plata(pago.monto)} · recibo${nums.length > 1 ? 's ' + nums[0] + ' a ' + nums.at(-1) : ' ' + numero}${pago.mpId ? ' · MP ' + pago.mpId : ''}`);
   });
   if (numero) Comprobantes.vencer(Store.s.pagos.find(x => x.id === id));
   return numero;
@@ -1404,7 +1551,7 @@ A['confirmar-pago'] = el => { if (confirmarPago(el.dataset.id)) toast('Pago conf
 A['rechazar-pago'] = async el => {
   if (!await confirmar('Rechazar el pago', 'El vecino recibe el aviso para que lo revise.', { si:'Rechazar', peligro:true })) return;
   Store.cambiar(s => { const p = s.pagos.find(x => x.id === el.dataset.id); if (!p) return; p.estado = 'rechazado';
-    notificar(s, { para:s.users.filter(u => u.casa === p.lote).map(u => u.id), titulo:'No pudimos confirmar tu pago', texto:`${plata(p.monto)} · revisá el comprobante o escribinos`, icon:'alert', color:'danger', link:'expensas' });
+    notificar(s, { para:cuentasDelCobro(p.lote), titulo:'No pudimos confirmar tu pago', texto:`${plata(p.monto)} · revisá el comprobante o escribinos`, icon:'alert', color:'danger', link:'expensas' });
     auditar(s, 'Rechazó un pago informado', `${p.lote} · ${plata(p.monto)}`); });
   Comprobantes.vencer(Store.s.pagos.find(x => x.id === el.dataset.id));
 
@@ -1451,12 +1598,15 @@ const MercadoPago = {
      solo. Antes cada uno inventaba su id y podía quedar anotado dos veces. */
   idDe: mpId => 'mp-' + String(mpId),
   anotar(pago, { lote, userId } = {}){
-    lote = lote || this.loteDeRef(pago.ref) || miLote();
+    lote = lote || this.loteDeRef(pago.ref) || (esHotel() ? loteCobroHotel() : miLote());
     const id = this.idDe(pago.id);
     if (Store.s.pagos.some(p => p.id === id || String(p.mpId) === String(pago.id))) return false;
+    const h = cuentaHotel(), quien = userId && userId !== 'sistema' ? userId : (pago.uid || yo()?.id || 'sistema');
+    const delHotel = esLoteHotel(lote) && (/~hotel/.test(pago.ref || '') || (h && quien === h.id));
+    const reparto = delHotel && !pago.prueba ? repartoHotel(+pago.monto) : null;
     Store.cambiar(s => {
-      s.pagos.unshift({ id, lote, userId: userId || yo()?.id || 'sistema', monto:+pago.monto, fecha:(pago.fecha || '').slice(0, 10) || hoyISO(), medio:'Mercado Pago',
-        nota:`${pago.prueba ? 'PRUEBA · ' : ''}Aprobado por Mercado Pago${pago.medio ? ' · ' + pago.medio : ''}`, mpId:String(pago.id), estado:'informado', ...(pago.prueba ? { prueba:true } : {}), at:Date.now() });
+      s.pagos.unshift({ id, lote, userId: delHotel && h ? h.id : userId || yo()?.id || 'sistema', monto:+pago.monto, fecha:(pago.fecha || '').slice(0, 10) || hoyISO(), medio:'Mercado Pago',
+        nota:`${pago.prueba ? 'PRUEBA · ' : ''}Aprobado por Mercado Pago${pago.medio ? ' · ' + pago.medio : ''}${delHotel ? ' · pago único de las UF del hotel' : ''}`, mpId:String(pago.id), estado:'informado', ...(pago.prueba ? { prueba:true } : {}), ...(reparto ? { reparto, hotel:true } : {}), at:Date.now() });
       notificar(s, { para:'rol:admin', titulo:`${pago.prueba ? 'Pago de PRUEBA' : 'Pago con Mercado Pago'} · ${lote}`, texto: pago.prueba ? `${plata(+pago.monto)} · cuenta de prueba: no cuenta para el saldo` : `${plata(+pago.monto)} · aprobado y descontado del saldo`, icon:'wallet', color:'ok', link:'cobranzas:cobranzas' });
     });
     return true;
@@ -1519,7 +1669,7 @@ const MercadoPago = {
      vecino exactamente donde estaba. */
   festejar(pago){
     const lote = this.loteDeRef(pago.ref) || miLote();
-    const saldo = saldoLote(lote);
+    const saldo = esHotel() ? lotesDelHotel().reduce((a, l) => a + saldoLote(l), 0) : saldoLote(lote);
     hoja('¡Pago aprobado!', `<div class="pago-ok">${I('check')}<b>${plata(+pago.monto)}</b><span>${esc(lote)} · operación ${esc(pago.id)}</span></div>
       <p class="small center" style="margin:10px 0 0">${pago.prueba ? '<b>Pago de PRUEBA</b> (cuenta de prueba de Mercado Pago): el circuito anduvo, pero no descuenta tu saldo ni genera recibo.'
         : `Ya se descontó de tu saldo${saldo > .5 ? ` (te quedan ${plata(saldo)})` : ': tu cuenta está al día'}. El recibo te llega solo.`}</p>
@@ -1542,7 +1692,7 @@ const MercadoPago = {
     try { const pila = JSON.parse(sessionStorage.getItem('bhc.antesDelPago') || '[]'); sessionStorage.removeItem('bhc.antesDelPago');
       pila.filter(v => v && v.id && v.id !== 'inicio' && R[v.id]).forEach(v => abrir(v.id, v.param || '')); } catch(e){}
     if (!id || id === 'null'){ const st = q.get('status') || q.get('collection_status'); if (st && st !== 'null') toast('El pago no se completó', 'info'); return; }
-    this.esperando = { ref:q.get('external_reference') || '', lote:miLote(), desde:Date.now() };
+    this.esperando = { ref:q.get('external_reference') || '', lote:esHotel() ? loteCobroHotel() : miLote(), desde:Date.now() };
     await this.verificar(id);
   },
   limpiarDireccion(){
@@ -1595,7 +1745,7 @@ const MercadoPago = {
   },
   rechazarFalso(p, motivo){
     Store.cambiar(s => { const x = s.pagos.find(y => y.id === p.id); if (!x || x.estado !== 'informado') return; x.estado = 'rechazado'; x.rechazo = `Mercado Pago no lo tiene como aprobado (${motivo})`;
-      notificar(s, { para:s.users.filter(u => u.casa === x.lote).map(u => u.id), titulo:'Un pago no se pudo acreditar', texto:`${plata(x.monto)} · Mercado Pago no lo tiene como aprobado. Si pagaste, escribinos con el comprobante.`, icon:'alert', color:'danger', link:'expensas' });
+      notificar(s, { para:cuentasDelCobro(x.lote), titulo:'Un pago no se pudo acreditar', texto:`${plata(x.monto)} · Mercado Pago no lo tiene como aprobado. Si pagaste, escribinos con el comprobante.`, icon:'alert', color:'danger', link:'expensas' });
       auditar(s, 'Rechazó solo un pago de Mercado Pago no aprobado', `${x.lote} · ${plata(x.monto)} · MP ${x.mpId} · ${motivo}`); });
   },
 };
@@ -1611,11 +1761,12 @@ const MercadoPago = {
 const montoDePrueba = lote => { const l = liquidacionesEmitidas().slice(-1)[0], c = l && cuotaDe(l, lote);
   return c && c.total >= 100 ? Math.round(c.total * 100) / 100 : conCentavosDelLote(1000, lote).total; };
 A['pago-mp'] = async el => {
-  const lote = miLote(), pagar = aPagar(lote), u = yo(), cuenta = cuentaLote(lote);
+  const H = esHotel() ? cobroHotel() : null;
+  const lote = H ? H.lote : miLote(), pagar = H ? { periodo:H.periodo, recargo:H.recargo } : aPagar(lote), u = yo(), cuenta = H ? { saldo:H.total, informado:0 } : cuentaLote(lote);
   const prueba = el.dataset.v === 'prueba' && puedeAdministrar();
   if (prueba && !await confirmar('Probar el pago con Mercado Pago', `Se abre Mercado Pago por ${plata(montoDePrueba(lote))} (el importe de tu último cupón). Pagá con una <b>tarjeta de prueba</b> (Visa 4509 9535 6623 3704, código 123, vencimiento 11/30, DNI 12345678) y titular <b>APRO</b>. No entres con tu cuenta real de Mercado Pago. Queda en "Pagos de PRUEBA": no cambia tu saldo ni saca recibo. Si el token del Apps Script fuera el real, el cobro sería de verdad.`, { si:'Abrir Mercado Pago' })) return;
   const debe = Math.max(0, cuenta.saldo - cuenta.informado);
-  const total = prueba ? montoDePrueba(lote) : Math.round((pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe) * 100) / 100;
+  const total = prueba ? montoDePrueba(lote) : H ? H.total : Math.round((pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe) * 100) / 100;
   if (!(total >= 100)){ toast('No hay saldo para pagar', 'check'); return; }
   const iPhoneInstalada = navigator.standalone === true;
   let w = null;
@@ -1624,8 +1775,9 @@ A['pago-mp'] = async el => {
   toast('Abriendo Mercado Pago…', 'wallet');
   try {
     sessionStorage.setItem('bhc.antesDelPago', JSON.stringify(PILA.map(v => ({ id:v.id, param:v.param || '' }))));
-    const j = await MercadoPago.pedir({ accion:'mp-crear', lote, periodo:pagar.periodo || periodoHoy(), monto:total, uid:u.id, email:u.email,
-      titulo:`Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} · ${lote} · Barrio ${Store.s.config.nombre}`,
+    /* El hotel paga sus 6 UF juntas: la referencia lleva "~hotel" y el pago se reparte al anotarlo. */
+    const j = await MercadoPago.pedir({ accion:'mp-crear', lote, periodo:(pagar.periodo || periodoHoy()) + (H ? '~hotel' : ''), monto:total, uid:u.id, email:u.email,
+      titulo:`Expensas ${nombrePeriodo(pagar.periodo || periodoHoy())} · ${H ? H.etiqueta : lote} · Barrio ${Store.s.config.nombre}`,
       volver: new URL('pago.html', location.href).href, base:(configFirebase() || {}).databaseURL || '' });
     if (w && !w.closed){
       w.location.href = j.url;
@@ -1654,3 +1806,33 @@ A['pagos-prueba-borrar'] = async () => {
 A['ver-cuenta'] = el => { cerrarHoja(); abrir('expensas', el.dataset.v); };
 /* Una vez por sesión, la Administración borra los comprobantes vencidos. */
 setTimeout(() => { if (yo() && esAdmin()) Comprobantes.limpiar(); }, 60 * 1000);
+
+/* =========================================================
+   LA COPIA PRIVADA DEL HOTEL (28-09-2026)
+   La app de la Administración arma, de cada liquidación emitida, una copia
+   con SOLO las cuotas de las UF del hotel y la deja en hotel/hotelLiqs (la
+   leen el hotel y la Administración; nadie más). Así el hotel ve sus
+   cupones sin poder leer lo que paga cada vecino. Se actualiza sola al
+   emitir o reabrir un mes y cada 10 minutos (junto con el reparto de pagos);
+   solo se escribe si cambió algo.
+   ========================================================= */
+const HotelExp = {
+  armar(){
+    const lotes = new Set(lotesDelHotel()); if (!lotes.size) return [];
+    return aLista(Store.s.liquidaciones).filter(l => l && l.estado === 'emitida' && aLista(l.cuotas).some(c => lotes.has(c.lote)))
+      .sort((a, b) => a.periodo.localeCompare(b.periodo)).slice(-24)
+      .map(l => ({ id:'hl-' + l.periodo, periodo:l.periodo, estado:'emitida', emitidaAt:l.emitidaAt || 0, cuotas:aLista(l.cuotas).filter(c => lotes.has(c.lote)).map(c => JSON.parse(JSON.stringify(c))) }));
+  },
+  huella: arr => JSON.stringify(aLista(arr).map(l => [l.id, l.emitidaAt, aLista(l.cuotas).map(c => [c.lote, +c.total || 0, +c.interes || 0, +c.saldoInicial || 0, +c.expensas || 0, +c.fondo || 0, +c.redondeo || 0])]).sort()),
+  publicar(){
+    if (yo()?.rol !== 'admin' || typeof cuentaHotel !== 'function' || !cuentaHotel()) return 0;
+    if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listoParaMotor && Nube.listoParaMotor())) return 0;
+    const arr = this.armar();
+    if (this.huella(arr) === this.huella(Store.s.hotelLiqs)) return 0;
+    Store.cambiar(s => { s.hotelLiqs = arr; });
+    return arr.length;
+  },
+};
+/* El hotel (y la Administración) completan el reparto de un pago del hotel
+   que anotó el aviso automático de Mercado Pago, apenas lo ven. */
+setInterval(() => { try { if (yo() && (esHotel() || esAdmin())) completarRepartos(); } catch(e){} }, 30 * 1000);

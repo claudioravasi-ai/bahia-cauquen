@@ -1204,7 +1204,30 @@ const turnosConfig = () => { const t = aLista(Store.s.config.turnosGarita).filte
 const enFranja = (t, min) => { const d = minutosDe(t.desde), h = minutosDe(t.hasta); return d < h ? min >= d && min < h : (min >= d || min < h); };
 const turnoDeAhora = () => turnosConfig().find(t => enFranja(t, ahoraMin())) || turnosConfig()[0];
 const registrosTurno = () => aLista(Store.s.bitacora).filter(b => b && b.tipo === 'turno' && b.abre).sort((a, b) => b.at - a.at);
-const turnoAbierto = () => registrosTurno().find(b => !b.cerradoAt) || null;
+/* =========================================================
+   EL TURNO ABIERTO ES SOLO EL ÚLTIMO (pedido de Claudio, 28-09-2026)
+   Antes se buscaba CUALQUIER turno sin cerrar: si uno viejo había quedado
+   abierto (por ejemplo, el siguiente se empezó desde otro equipo), al cerrar
+   el turno de ahora aparecía "El turno Mañana sigue abierto · Soy de ese
+   turno: seguir", aunque ya estaba todo cerrado. Ahora cuenta solo el
+   último turno anotado: si está cerrado, no hay turno abierto. Y al empezar
+   o cerrar un turno se cierran también los viejos que hubieran quedado
+   abiertos, con un renglón en la bitácora.
+   "Soy de ese turno: seguir" se ofrece solo si ese último turno sigue
+   abierto y empezó hace menos de TURNO_RETOMAR (16 h): es para retomar
+   cuando la app se cerró en pleno turno o se entra desde otro equipo. En
+   el mismo equipo que lo abrió no se pregunta nada: sigue solo.
+   ========================================================= */
+const TURNO_RETOMAR = 16 * HORA;
+const turnoAbierto = () => { const r = registrosTurno()[0]; return r && !r.cerradoAt ? r : null; };
+const turnoParaRetomar = () => { const t = turnoAbierto(); return t && Date.now() - t.at < TURNO_RETOMAR ? t : null; };
+/* Cierra los turnos que quedaron abiertos (menos `salvo`). Devuelve cuántos. */
+function cerrarTurnosOlvidados(s, ahora, salvo = ''){
+  const viejos = aLista(s.bitacora).filter(b => b && b.tipo === 'turno' && b.abre && !b.cerradoAt && b.id !== salvo);
+  viejos.forEach(b => { b.cerradoAt = ahora; b.cierreAuto = true; });
+  if (viejos.length) s.bitacora.unshift({ id:uid(), autor:yo()?.id || 'sistema', tipo:'turno', texto:`${viejos.length === 1 ? 'Se cerró el turno ' + viejos[0].turno + ' (' + aLista(viejos[0].guardias).join(', ') + '), que había quedado abierto' : 'Se cerraron ' + viejos.length + ' turnos que habían quedado abiertos (' + viejos.map(b => b.turno + ' del ' + fechaCorta(isoDe(new Date(b.at)))).join(', ') + ')'}.`, at:ahora - 3 });
+  return viejos.length;
+}
 /* ¿Esta sesión ya anotó (o retomó) su turno? Mientras la bitácora todavía
    está bajando de la nube se le cree a la sesión, para que no parpadee. */
 function turnoListo(){
@@ -1224,16 +1247,16 @@ function guardiasConocidos(){
   return m;
 }
 function formularioTurno(){
-  const u = yo(), t = turnoDeAhora(), abierto = turnoAbierto(), conocidos = [...guardiasConocidos().values()];
+  const u = yo(), t = turnoDeAhora(), abierto = turnoParaRetomar(), conocidos = [...guardiasConocidos().values()];
   const fila = i => `<div class="turno-fila"><span class="turno-n">${i + 1}</span><input name="g" list="guardiasLista" autocomplete="off" maxlength="50" ${i === 0 ? 'required' : ''} placeholder="${i === 0 ? 'Nombre y apellido' : 'Otro guardia (opcional)'}"></div>`;
   return `<div class="turno-portada">
     <span class="turno-ic">${I('shield')}</span>
     <h1>Nuevo turno en la garita</h1>
     <p>${fechaLarga(hoyISO())} · ${hora(Date.now())} h</p></div>
-    ${abierto ? `<div class="card turno-previo"><b>${I('clock')} El turno ${esc(abierto.turno)} sigue abierto</b>
+    ${abierto ? `<div class="card turno-previo"><b>${I('clock')} El turno ${esc(abierto.turno)} no se cerró</b>
       <span>${esc(aLista(abierto.guardias).join(', '))} · desde las ${hora(abierto.at)} h${isoDe(new Date(abierto.at)) !== hoyISO() ? ' del ' + fechaCorta(isoDe(new Date(abierto.at))) : ''}</span>
       <div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-sec" data-a="seguir-turno">Soy de ese turno: seguir</button></div>
-      <p class="muted tiny" style="margin:8px 0 0">Si abrís uno nuevo, ese se cierra solo y queda anotado en la bitácora.</p></div>` : ''}
+      <p class="muted tiny" style="margin:8px 0 0">Pasa si la app se cerró en pleno turno o se entra desde otro equipo. Si sos de ese turno, seguí; si no, empezá el nuevo y ese se cierra solo (queda anotado en la bitácora).</p></div>` : ''}
     <form data-f="abrir-turno" class="card">
       <div class="field"><label>¿Qué turno es?</label><select name="turno">${turnosConfig().map(x => `<option value="${esc(x.nombre)}" ${x.nombre === t.nombre ? 'selected' : ''}>${esc(x.nombre)} · ${x.desde} a ${x.hasta} h</option>`).join('')}</select></div>
       <div class="field"><label>¿Quiénes trabajan hoy?</label>${[0, 1, 2].map(fila).join('')}<div id="turnoMas"></div>
@@ -1251,7 +1274,7 @@ A['turno-otro'] = () => {
   box.insertAdjacentHTML('beforeend', `<div class="turno-fila"><span class="turno-n">${n + 1}</span><input name="g" list="guardiasLista" autocomplete="off" maxlength="50" placeholder="Otro guardia"></div>`);
   box.lastElementChild.querySelector('input').focus();
 };
-A['seguir-turno'] = () => { const t = turnoAbierto(); if (!t) return; Store.sesion.turnoId = t.id; Store.guardarSesion(); toast(`Seguís en el turno ${t.turno}`, 'shield'); pintar(); };
+A['seguir-turno'] = () => { const t = turnoParaRetomar(); if (!t) return; Store.sesion.turnoId = t.id; Store.guardarSesion(); toast(`Seguís en el turno ${t.turno}`, 'shield'); pintar(); };
 F['abrir-turno'] = d => {
   const u = yo(), conocidos = guardiasConocidos(), vistos = new Set(), guardias = [];
   [].concat(d.g || []).forEach(n => {
@@ -1263,12 +1286,13 @@ F['abrir-turno'] = d => {
   const id = uid(), ahora = Date.now();
   let previoId = '';
   Store.cambiar(s => {
-    const previo = aLista(s.bitacora).find(b => b.tipo === 'turno' && b.abre && !b.cerradoAt);
+    const previo = turnoAbierto();
     if (previo){
       previoId = previo.id;
       previo.cerradoAt = ahora; previo.cierreAuto = true;
       s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'turno', texto:`Se cerró el turno ${previo.turno} (${aLista(previo.guardias).join(', ')}) al empezar el siguiente.`, at:ahora - 1 });
     }
+    cerrarTurnosOlvidados(s, ahora);
     /* El policía que sigue de servicio pasa al turno que entra, con la
        ronda que tenga en curso. */
     const ultimo = aLista(s.bitacora).filter(b => b.tipo === 'turno' && b.abre).sort((a, b) => b.at - a.at)[0];
@@ -1317,6 +1341,7 @@ F['cerrar-turno'] = d => {
       x.policias.filter(p => salen.has(p.id)).forEach(p => s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'acceso', texto:`Salida del policía ${p.nombre}${p.matricula ? ' (' + p.matricula + ')' : ''} · ${hora(ahora)} h · ${plural(p.rondas.length, 'ronda')}.`, at:ahora - 2 }));
     }
     s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'turno', texto:`Termina el turno ${t ? t.turno + ' (' + aLista(t.guardias).join(', ') + ')' : ''}.${x ? resumenPolicia(x) : ''}${nota ? ' Novedades: ' + nota : ''}`, at:ahora });
+    cerrarTurnosOlvidados(s, ahora);
   });
   Store.sesion.turnoId = ''; Store.guardarSesion();
   cerrarHoja();

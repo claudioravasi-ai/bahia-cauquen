@@ -146,7 +146,7 @@ function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
     bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
-    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[],
+    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
@@ -666,8 +666,18 @@ function avisosDelSistema(){
 /* =========================================================
    TOASTS Y HOJAS
    ========================================================= */
+/* LOS CARTELITOS, SIEMPRE ARRIBA (pedido de Claudio, 28-09-2026)
+   Una hoja abierta (Tu cuenta, un formulario) es un <dialog> modal: va en la
+   "capa superior" del navegador, por encima de todo lo demás, y tapaba los
+   cartelitos ("Pedido enviado…", "Guardado"…): se veía que algo salía por
+   debajo pero no se leía. Se probó hacerlos "popover" y tampoco pasan por
+   encima de un modal abierto. Lo que sí anda: mientras hay una hoja abierta,
+   el contenedor de cartelitos se muda ADENTRO de la hoja (queda en su misma
+   capa, fijo arriba de la pantalla); al cerrarse la hoja vuelve al cuerpo de
+   la página (ver el 'close' de la hoja en app.js). */
 function toast(msg, icon = 'check'){
-  const box = $('#toasts');
+  const box = $('#toasts'), d = $('#hoja');
+  if (box && d){ if (d.open){ if (box.parentNode !== d) d.appendChild(box); } else if (box.parentNode !== document.body) document.body.appendChild(box); }
   const el = document.createElement('div');
   el.className = 'toast';
   el.innerHTML = `${I(icon)}<span>${esc(msg)}</span>`;

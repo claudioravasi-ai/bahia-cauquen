@@ -13,7 +13,11 @@
 /* Las cuentas que deben expensas: cualquier cuenta aprobada con lote cuyo
    saldo, descontado lo "por acreditar", sigue siendo positivo. */
 function deudoresExpensas(s){
-  return s.users.filter(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || '')).filter(u => { const c = cuentaLote(u.casa); return c.saldo - c.informado > 0.5; }).map(u => u.id);
+  const ids = s.users.filter(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || '')).filter(u => { const c = cuentaLote(u.casa); return c.saldo - c.informado > 0.5; }).map(u => u.id);
+  /* El hotel (28-09): un solo aviso si alguna de sus UF debe. */
+  const h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
+  if (h && typeof lotesDelHotel === 'function' && lotesDelHotel().some(l => { const c = cuentaLote(l); return c.saldo - c.informado > 0.5; }) && !ids.includes(h.id)) ids.push(h.id);
+  return ids;
 }
 const REGLAS = [
   { id:'clima-viento', n:'Viento fuerte → aviso en el pizarrón', d:'Con ráfagas de 60 km/h o más publica un aviso para asegurar objetos sueltos.',
@@ -112,7 +116,14 @@ const REGLAS = [
       if (sumarDias(vtoDe(per, 2), 1) !== hoy) return 0;
       return marca(s, 'expimpaga-' + per, () => {
         const conDeuda = (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => { const c = cuentaLote('Lote ' + L.lote); return c.saldo - c.informado > 0.5; });
-        conDeuda.forEach(L => {
+        /* Las UF del hotel no reciben seis avisos: le llega UNO al hotel con el total (28-09). */
+        const hotelUF = conDeuda.filter(L => L.grupo === 'hotel'), h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
+        if (hotelUF.length && h){ const tot = hotelUF.reduce((a, L) => { const c = cuentaLote('Lote ' + L.lote); return a + c.saldo - c.informado; }, 0);
+          notificar(s, { para:[h.id], titulo:'Venció el 2º vencimiento de las expensas del hotel', texto:`${plata(tot)} impagos entre ${plural(hotelUF.length, 'UF')}. Pagado fuera de término, la expensa que viene suma el ajuste (${textoMora()}).`, icon:'alert', color:'danger', link:'expensas', sonido:true });
+          if (h.email) Correo.enviar({ para:h.email, asunto:`Expensas vencidas · ${HOTEL_NOMBRE} · ${nombrePeriodo(per)}`, tipo:'reclamo-expensas',
+            html:Correo.plantilla('Concluyó el segundo vencimiento de las expensas del hotel', `<p>El <b>${fechaCorta(vtoDe(per, 2))}</b> concluyó el segundo vencimiento de las expensas de <b>${nombrePeriodo(per)}</b> y a hoy no registramos el pago de ${plural(hotelUF.length, 'UF', 'UF')} del ${esc(HOTEL_NOMBRE)} (${hotelUF.map(L => 'UF ' + L.uf).join(', ')}).</p>
+              <p style="font-size:26px;font-weight:800;color:#b91c1c;margin:14px 0">${plata(tot)}</p><p>Pagado fuera de término, la próxima expensa suma el ajuste (${esc(textoMora())}). Si ya pagaron, avísenlo desde la app con el comprobante.</p>`, { texto:'Ver las expensas del hotel', url:urlApp('expensas') }) }); }
+        conDeuda.filter(L => L.grupo !== 'hotel').forEach(L => {
           const casa = 'Lote ' + L.lote, c = cuentaLote(casa), saldo = c.saldo - c.informado;
           const us = s.users.filter(u => u.casa === casa && u.estado === 'aprobado');
           if (us.length) notificar(s, { para:us.map(u => u.id), titulo:`Venció el 2º vencimiento de las expensas`,

@@ -280,6 +280,9 @@ R.hotel = {
           ${tejaHotel('hotel-proveedores', 'box', 'brand', 'Proveedores', 'ART, seguro y su QR de ingreso')}
           ${tejaHotel('hotel-promos', 'sparkle', 'wood', 'Promociones', 'Agregar, editar o borrar · salen en la tira de todas las apps', { n: promosPend || '' })}
           ${tejaHotel('hotel-emergencias', 'siren', 'danger', 'Emergencias', 'Llamar, avisar a la garita, DEA y primeros auxilios')}
+          ${(() => { const lotes = typeof lotesDelHotel === 'function' ? lotesDelHotel() : []; if (!lotes.length) return '';
+            const d = deudaGrupo(lotes), tot = totalDeuda(d), l = liquidacionesEmitidas().slice(-1)[0];
+            return tejaHotel('expensas', 'wallet', 'wood', 'Expensas del hotel', tot > .5 ? `${plata(tot)} entre las ${lotes.length} UF${l ? ' · vence el ' + fechaCorta(vtoDe(l.periodo, 1)) : ''}` : `Las ${lotes.length} UF al día · cupones y recibos`, { n: tot > .5 ? '!' : '' }); })()}
           ${teja({ v:'privado', p:'hotel', icon:'chat', color:'accent', t:'Comunicación interna', s:'Mensajes privados con la garita o la Administración', badge: sinLeer })}
           ${tejaHotel('hotel-ficha', 'sliders', 'sky', 'Ficha del hotel', 'Responsable, tiempos de traslado, DEA')}
           ${tejaHotel('documentos', 'file', 'brand', 'Normas y reglamentos', 'Reglamento del barrio y convivencia')}

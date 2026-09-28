@@ -53,7 +53,9 @@ const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', '
    Emergencias (la de los vecinos) no: tiene el pedido del DEA y los SOS del
    día; el hotel tiene la suya. */
 const VENTANAS_HOTEL = new Set(['hotel', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-promos', 'hotel-emergencias',
-  'hotel-ficha', 'hotel-convenio', 'privado', 'agenda', 'cruceros', 'vuelos', 'ushuaia', 'municipio', 'sismos', 'documentos', 'legal', 'manual', 'recoleccion']);
+  'hotel-ficha', 'hotel-convenio', 'privado', 'agenda', 'cruceros', 'vuelos', 'ushuaia', 'municipio', 'sismos', 'documentos', 'legal', 'manual', 'recoleccion',
+  /* 28-09: las expensas de las 6 UF del hotel (js/v-expensas.js, expensasHotel) */
+  'expensas']);
 ['hotel-vivo', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
 const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
@@ -125,6 +127,7 @@ document.addEventListener('click', e => {
 }, true);
 /* La hoja (<dialog id="hoja">) ya está en index.html antes de los scripts. */
 (() => { const engancha = () => { const d = document.getElementById('hoja'); if (!d || d.dataset.cuentaOk) return; d.dataset.cuentaOk = '1';
+  d.addEventListener('close', () => { const box = document.getElementById('toasts'); if (box && box.parentNode === d) document.body.appendChild(box); });
   d.addEventListener('close', () => { if (!Cuenta.enSub) return; Cuenta.enSub = false; setTimeout(() => { if (yo() && !hojaAbierta()) A['mi-cuenta'](); }, 60); }); };
   engancha(); document.addEventListener('DOMContentLoaded', engancha); })();
 /* =========================================================

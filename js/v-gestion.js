@@ -721,7 +721,7 @@ R.privado = {
     const mio = m => esStaff() ? m.from !== 'vecino' : m.from === 'vecino';
     if (h && h.msgs.some(m => !mio(m) && !m.leido)){ h.msgs.forEach(m => { if (!mio(m)) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
     const msgs = h ? h.msgs : [];
-    const chips = esStaff() ? '' : esHotel() ? chipsHotel(con) : deExpensas ? `<p class="muted small" style="margin:0 0 10px">${I('wallet')} Consulta sobre tus expensas: planes de pago, diferencias o dudas. La responde la Administración; la garita no la ve.</p>` : `<div class="chips">
+    const chips = esStaff() ? '' : deExpensas ? `<p class="muted small" style="margin:0 0 10px">${I('wallet')} Consulta sobre ${esHotel() ? 'las expensas del hotel' : 'tus expensas'}: planes de pago, diferencias o dudas. La responde la Administración; la garita no la ve.</p>` : esHotel() ? chipsHotel(con) : `<div class="chips">
       <button class="chip ${con === 'admin' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="admin">${I('sliders')}Administración</button>
       <button class="chip ${con === 'guardia' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="guardia">${I('shield')}Guardia</button></div>`;
     return `<div class="chat-wrap">${chips}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">

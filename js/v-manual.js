@@ -472,7 +472,7 @@ const MANUAL_CAPS = [
     ]],
     ['p', 'Tocar un renglón te lleva a donde se hace. Cuando la app ve que algo está hecho, sale de la lista y pasa al renglón verde <b>"Hecho hoy"</b> (sin tachados).'],
     ['h', 'Empezar y cerrar el turno'],
-    ['pasos', ['Al abrir, anotá <b>quiénes están de guardia</b> en este turno. Hasta que no lo hacés, la única ventana es la del turno.', 'Al terminar, tocá la teja <b>"Cerrar el turno"</b> (está solo ahí): dejás las novedades para el que entra. La sesión no se cierra: queda lista para el turno siguiente.']],
+    ['pasos', ['Al abrir, anotá <b>quiénes están de guardia</b> en este turno. Hasta que no lo hacés, la única ventana es la del turno. Si la app se cerró en pleno turno (o entrás desde otro equipo) y ese turno no se cerró, arriba aparece <b>"El turno … no se cerró · Soy de ese turno: seguir"</b>; si ya se cerró, no aparece. Al empezar un turno nuevo, cualquier turno que haya quedado abierto se cierra solo y queda en la bitácora.', 'Al terminar, tocá la teja <b>"Cerrar el turno"</b> (está solo ahí): dejás las novedades para el que entra. La sesión no se cierra: queda lista para el turno siguiente.']],
     ['p', 'En <b>Turnos</b> se ve quién hace cada turno (mañana, tarde, noche) con los nombres de sus guardias, los últimos turnos, los <b>servicios del policía contratado</b> y, plegados, los puntos de control de la ronda.'],
     ['h', 'Validar un ingreso'],
     ['pasos', ['Escribí el <b>código de 6 números</b>, la <b>patente</b> o el <b>DNI</b>, o tocá <b>"Escanear QR"</b>.', 'La app dice si el pase es para hoy y para este horario, quién lo autorizó y si hay una restricción firmada ("no dejar pasar").', 'Tocá <b>"Ingresó"</b>; cuando se va, <b>"Salió"</b>. Al vecino le llega el aviso.']],
@@ -510,7 +510,7 @@ const MANUAL_CAPS = [
   ], ir:[['abrir', 'garita', 'Ir a la Garita'], ['abrir', 'bitacora', 'Bitácora']] },
 
   /* ---------- Para el hotel ---------- */
-  { id:'hotel', icon:'star', color:'wood', para:'hotel', t:'Para el Hotel Los Cauquenes', s:'Vans, traslados, huéspedes, eventos y más', b:[
+  { id:'hotel', icon:'star', color:'wood', para:'hotel', t:'Para el Hotel Los Cauquenes', s:'Vans, traslados, huéspedes, eventos, expensas y más', b:[
     ['h', 'Cómo entra el hotel'],
     ['p', 'El hotel tiene <b>una sola cuenta</b>, que usa la recepción en la computadora y en el celular de turno. La crea la Administración del barrio. La primera vez, entrá con el correo y la contraseña que te pasaron y cambialos en <b>Tu cuenta</b> (tu ícono arriba a la derecha): "Cambiar mi correo" y "Cambiar mi contraseña". Si la persona responsable deja el hotel, cambiá la contraseña.'],
     ['ojo', 'info', 'Qué ve el hotel y qué no', 'Ve lo suyo (vans, traslados, huéspedes, eventos, proveedores, promociones) y lo público de la ciudad (vuelos, cruceros, eventos, agenda, normas del barrio). No ve nada de los vecinos: ni el padrón, ni el chat, ni el pizarrón, ni sus visitas, ni los SOS.'],
@@ -532,11 +532,21 @@ const MANUAL_CAPS = [
       '<b>Proveedores</b>: empresa, personal, patentes, días, horario, ART y seguro. Cada uno tiene su QR. Con la ART vencida, la garita no lo deja pasar.',
       '<b>Promociones</b>: las cargás, cambiás o borrás vos directamente ("Nueva promoción", "Editar", "Borrar") y salen enseguida en la tira del hotel, en la app de todos los vecinos. La Administración también puede cargarlas, cambiarlas o borrarlas: cada vez que uno toca algo, al otro le llega el aviso y queda registrado quién fue. Las vencidas dejan de verse solas. El enlace para reservar tiene que empezar con https://.',
     ]],
+    ['h', 'Expensas del hotel'],
+    ['p', 'El hotel es dueño de 6 unidades del barrio (UF 000 a 005, lotes 0 a 5) y paga expensas como cualquier propietario. En la teja <b>Expensas del hotel</b>:'],
+    ['lista', [
+      'Arriba, el <b>total de las 6 UF</b> con el 1º y el 2º vencimiento y cuántos días faltan.',
+      '<b>Un solo pago</b>: tocá el total y elegí cómo (online con Mercado Pago, transferencia o efectivo). La app lo <b>reparte sola</b> entre las 6 UF (primero lo que debe cada una) y, cuando se acredita, sale <b>un recibo por cada UF</b>.',
+      'Si pagaron por fuera de la app, <b>"Ya pagamos por fuera de la app"</b> con el comprobante: queda por acreditar hasta que la Administración lo confirma.',
+      'Abajo, cada UF por separado con su cupón del mes ("Ver el cupón"), los cupones de los meses anteriores, los pagos y los recibos.',
+      'Cada mes los cupones llegan <b>solos</b> al correo del hotel, uno por UF, y los vencimientos se avisan en la app. "Consultar a la Administración" abre la charla solo con la Administración.',
+    ]],
+    ['ojo', 'info', 'Solo lo del hotel', 'El hotel ve únicamente las cuentas de sus 6 UF: la Administración le arma cada mes una copia con solo esas cuotas. No ve lo que paga ningún vecino.'],
     ['h', 'Emergencias'],
     ['p', 'El botón rojo <b>"Garita"</b> de arriba a la derecha avisa a la garita al instante (médica, seguridad, incendio). En <b>Emergencias</b> están los teléfonos y el plan del hotel: su DEA, el personal con primeros auxilios y el punto de encuentro. Si hay una emergencia médica en el barrio, la garita puede pedirte el DEA: te llega el aviso con el lote.'],
     ['h', 'Mensajes, hoja del día y convenio'],
     ['lista', ['<b>Comunicación interna</b>: tocala y elegí con quién hablar, <b>Garita</b> o <b>Administración</b>. Arriba de la conversación están las dos para pasar de una a la otra, con el número de mensajes sin leer. Cada conversación es privada: la de la garita no la ve la Administración, y al revés.','<b>Hoja del día</b>: vuelos, cruceros, eventos y traslados listos para imprimir y dejar en el mostrador.', '<b>Convenio con el barrio</b>: el modelo de convivencia y servicios, para revisar con un abogado y aprobar en asamblea.']],
-  ], ir:[['abrir', 'hotel-traslados', 'Vans y traslados'], ['abrir', 'hotel-huespedes', 'Huéspedes'], ['abrir', 'hotel-ficha', 'Ficha del hotel']] },
+  ], ir:[['abrir', 'hotel-traslados', 'Vans y traslados'], ['abrir', 'hotel-huespedes', 'Huéspedes'], ['abrir', 'expensas', 'Expensas del hotel'], ['abrir', 'hotel-ficha', 'Ficha del hotel']] },
 
   /* ---------- Para la Administración ---------- */
   { id:'admin', icon:'sliders', color:'accent', para:'admin', t:'Para la Administración', s:'Dos brazos, el día a día y el alcance con la garita', b:[
@@ -553,6 +563,7 @@ const MANUAL_CAPS = [
     ['p', 'La Administración y la garita reciben siempre el aviso cuando un vecino anotado no toca "Estoy bien" a su hora (o no vuelve de una salida), y ven la lista en <b>Gestión → Estoy bien</b> con los teléfonos de su familia. El resto del barrio no. Para que las alarmas salgan aunque todos los teléfonos estén bloqueados, el Apps Script tiene un reloj que revisa cada 10 minutos (una vez: ejecutar <b>instalarRelojCuidados</b>; ver AVISOS.md).'],
     ['h', 'Expensas y contabilidad'],
     ['p', 'Las facturas del mes se cargan en <b>Contabilidad</b>; al cerrar el mes se arman los cupones. En <b>Expensas</b> se ven los lotes, se confirman los pagos informados, se emiten recibos y se sigue la morosidad.'],
+    ['p', '<b>El hotel (6 UF)</b>: sus cupones salen solos al emitir el mes, uno por UF, a su correo y a su ventana "Expensas del hotel". Paga el total de sus 6 UF en un solo pago: en "Por acreditar" aparece como <b>"Hotel Los Cauquenes · 6 UF"</b>, con cómo se reparte; al confirmarlo salen <b>6 recibos</b>, uno por UF. Los pagos con Mercado Pago del hotel se reparten y se pasan a recibo solos, como los de los vecinos. Para eso la app le deja al hotel una copia con solo sus cuotas: no ve las de nadie más.'],
     ['p', '<b>Probar Mercado Pago</b>: en tu vista de vecino, en Expensas, el botón <b>"Probar el pago con Mercado Pago"</b> (solo lo ve quien administra) cobra el importe de tu último cupón aunque estés al día. Se paga con una tarjeta de prueba (titular APRO) y queda en <b>Pagos de PRUEBA</b>: no cambia tu saldo ni saca recibo, y se borra con un toque en Expensas → Pagos.'],
   ], ir:[['abrir', 'gestion', 'Gestión del barrio']] },
 ];

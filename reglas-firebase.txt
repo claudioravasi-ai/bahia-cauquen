@@ -266,7 +266,7 @@ PEGAR DESDE ACÁ
         ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
         "$uid": {
           ".read": "auth.uid === $uid",
-          ".write": "(auth.uid === $uid && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')) || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+          ".write": "(auth.uid === $uid && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
           "$id": {
             ".validate": "!newData.exists() || (newData.hasChildren(['d', 'tipo', 'at']) && newData.child('d').isString() && newData.child('d').val().length < 2200000 && newData.child('tipo').isString())"
           }
@@ -370,12 +370,25 @@ PEGAR DESDE ACÁ
       "hotelEventos":   { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "hotelHuespedes": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
       "hotelProv":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
-      "hotelPromos":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" }
+      "hotelPromos":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 28-09: la copia de las cuotas de las 6 UF del hotel (solo sus UF). La escribe la Administración; la leen el hotel y la Administración. */
+      "hotelLiqs":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" }
     }
   }
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 28-09-2026 (hay que volver a publicar): LAS EXPENSAS DEL HOTEL.
+- hotel/hotelLiqs: la copia de las cuotas de las 6 UF del hotel (UF 000 a 005),
+  que arma sola la app de la Administración. La leen el hotel y la
+  Administración; la escribe solo la Administración. El hotel sigue sin leer la
+  liquidación del barrio (los montos de los vecinos).
+- pv/comprobantes/<cuenta>: el hotel también puede subir SU comprobante de pago
+  (antes solo vecinos aprobados). Cada uno escribe solo en su propia carpeta.
+- Los pagos y recibos de las UF del hotel van a pv/pagos y pv/recibos de la
+  cuenta del hotel, que ya podía leer y escribir su propia carpeta: sin cambio.
+-----------------------------------------------------------
 
 ✔ NUEVO 27-09-2026 (hay que volver a publicar): "Estoy bien" y aviso de
 salida (cuidado, cuidadoDe), cosas para prestar (barrio/cosas), ángeles de

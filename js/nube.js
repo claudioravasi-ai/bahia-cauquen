@@ -59,14 +59,16 @@ const Nube = {
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
        los huéspedes, solo el hotel y la garita; las promociones propuestas,
        el hotel y la Administración; el resto, los tres. */
-    hotel: ['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos'],
+    hotel: ['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos',
+            /* 28-09: la copia privada de las cuotas de las 6 UF del hotel (js/v-expensas.js, HotelExp) */
+            'hotelLiqs'],
   },
   /* Qué baja cada rol. El hotel NO baja nada de los vecinos: solo lo
      público de la ciudad y lo suyo. La garita no baja el chat vecinal. */
   HOTEL_LEE: {
     hotel:   { barrio:['agenda','temporadas','feriados','contactos','documentos','cruceros','eventosCiudad','promos','camion'],
-               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos'] },
-    admin:   { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv','hotelPromos'] },
+               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs'] },
+    admin:   { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv','hotelPromos','hotelLiqs'] },
     guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv'] },
   },
 
@@ -118,6 +120,8 @@ const Nube = {
     sos:             { objetos:['responden'] },
     ausencias:       { objetos:['revisiones'] },
     casaTareas:      { listas:['sugerencias','cambioQue'] },
+    pagos:           { listas:['reparto'] },
+    hotelLiqs:       { listas:['cuotas'] },
   },
   comoLaGuardamos(col, x){
     const f = this.FORMAS[col];
@@ -166,6 +170,8 @@ const Nube = {
         const lote = x.lote || x.casa;
         const us = Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').map(u => u.id);
         if (x.userId && usuario(x.userId)?.casa === lote && !us.includes(x.userId)) us.push(x.userId);
+        /* Las UF del hotel (28-09): sus pagos y recibos van a la cuenta del hotel. */
+        if (typeof esLoteHotel === 'function' && (esLoteHotel(lote) || aLista(x.reparto).some(r => r && esLoteHotel(r.lote)))){ const h = cuentaHotel(); if (h && !us.includes(h.id)) us.push(h.id); }
         return us.length ? us : lote ? ['lote-' + String(lote).replace(/^Lote\s*/i, '').replace(/[.#$/\[\]\s]/g, '')] : [];
       }
       case 'notifs': return aLista(x.para).filter(p => p && !String(p).startsWith('rol:') && p !== 'todos' && p !== 'staff');
@@ -525,6 +531,7 @@ const Nube = {
      ========================================================= */
   repartirPagos(){
     if (!this.db || yo()?.rol !== 'admin' || !this.listoParaMotor || !this.listoParaMotor()) return 0;
+    try { if (typeof HotelExp !== 'undefined') HotelExp.publicar(); } catch(e){ console.warn('Copia de expensas del hotel', e.message); }
     if (!Store.s.users.some(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || ''))) return 0;
     const cambios = {};
     /* Los paquetes también: uno que llegó antes de que el otro vecino del

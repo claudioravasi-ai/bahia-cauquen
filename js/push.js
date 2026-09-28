@@ -175,12 +175,34 @@ function tarjetaPush(compacta = false){
   const boton = est === 'apagado' ? `<button class="btn btn-sm btn-pri" data-a="push-activar">${I('bell')}Activar avisos</button>`
     : est === 'activo' ? `<button class="btn btn-sm btn-sec" data-a="push-desactivar">Desactivar en este equipo</button><button class="btn btn-sm btn-sec" data-a="push-probar">${I('send')}Probar</button>` : '';
   return aviso(est === 'activo' ? 'ok' : est === 'apagado' ? 'info' : 'warn', 'bell', t, x,
-    `${boton}${compacta ? `<button class="btn btn-sm btn-sec" data-a="push-nomolestar">Ahora no</button>` : ''}`);
+    `${boton}${compacta ? `<button class="btn btn-sm btn-sec" data-a="push-nomolestar">Ahora no</button>` : ''}`) + (est === 'activo' && !compacta ? '<div id="pushProbarRes"></div>' : '');
 }
 A['push-activar'] = () => Push.activar();
 A['push-desactivar'] = () => Push.desactivar();
 A['push-nomolestar'] = () => { try { localStorage.setItem('bhc.push.nomolestar', '1'); } catch(e){} refrescar(); };
-A['push-probar'] = () => { Push.enviar({ para:[yo().id], titulo:'Prueba de aviso', texto:'Si ves esto con la pantalla bloqueada, los avisos funcionan.', link:'perfil', incluirme:true }); toast('Pedido enviado. Bloqueá el teléfono: llega en unos segundos.', 'send'); };
+/* PROBAR, CON EL RESULTADO A LA VISTA (28-09): antes mandaba el pedido sin
+   esperar respuesta y lo único que decía era un cartelito que quedaba tapado
+   por Tu cuenta: no se veía ni se oía nada. Ahora suena un tono al tocarlo
+   (el botón anda), espera la respuesta del servidor y dice ahí mismo a
+   cuántos equipos de tu cuenta salió, o por qué no salió. Con la app en
+   pantalla (fuera de iPhone) el aviso llega a la bandeja sin sonido, para no
+   sonar dos veces: se aclara para que nadie crea que no anduvo. */
+A['push-probar'] = async el => {
+  const caja = $('#pushProbarRes'), decir = h => { if (caja) caja.innerHTML = `<div style="margin-top:8px">${h}</div>`; };
+  const b = el && el.tagName === 'BUTTON' ? el : null; if (b) b.disabled = true;
+  if (typeof Sonido !== 'undefined'){ Sonido.tocar([[880, 0, .14], [1175, .14, .28]], 'sine', .16); Sonido.vibrar(120); }
+  decir(`<div class="card plana small">${I('refresh')} Mandando la prueba a los equipos de tu cuenta…</div>`);
+  if (!caja) toast('Mandando la prueba…', 'send');
+  try {
+    const j = await Push.enviarYContar({ para:[yo().id], titulo:'Prueba de aviso', texto:'Si ves esto, los avisos al celular funcionan.', link:'inicio', incluirme:true });
+    const n = +j.enviados || 0, ios = Push.esIOS && Push.esIOS();
+    const txt = n ? `Salió a ${plural(n, 'equipo')} de tu cuenta. Aparece en unos segundos en la bandeja de avisos del teléfono.${ios ? '' : ' Si la app está abierta en pantalla, llega sin sonido (para no sonar dos veces). Para oírlo: tocá Probar y bloqueá el teléfono enseguida; en unos segundos suena.'}`
+      : 'Tu cuenta no tiene ningún equipo anotado todavía. Tocá "Desactivar en este equipo" y después "Activar avisos" otra vez.';
+    decir(aviso(n ? 'ok' : 'warn', 'bell', n ? 'Prueba enviada' : 'No había a quién mandarla', esc(txt)));
+    if (!caja) toast(n ? `Prueba enviada a ${plural(n, 'equipo')}` : 'Tu cuenta no tiene equipos anotados', 'bell');
+  } catch(e){ decir(aviso('danger', 'alert', 'La prueba no salió', esc(e.message || 'sin respuesta del servidor'))); if (!caja) toast('La prueba no salió: ' + (e.message || ''), 'alert'); }
+  if (b) b.disabled = false;
+};
 
 /* Aviso de prueba a un grupo (Ajustes → Avisos al celular). */
 A['push-grupo'] = async el => {

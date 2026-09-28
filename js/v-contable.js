@@ -49,7 +49,7 @@ function asientoDeGasto(g){
 }
 function asientoDePago(p){
   return { tipo:'ingreso', origen:{ tipo:'pago', id:p.id }, huella:huellaPago(p), periodo:String(p.fecha || '').slice(0, 7), fecha:p.fecha, cuenta:'4.1',
-    detalle:`Cobranza de expensas · ${p.lote}${p.recibo ? ' · recibo ' + p.recibo : ''}`, lote:p.lote, importe:+p.monto || 0, medioPago:p.medio || '', fechaPago:p.fecha,
+    detalle:`Cobranza de expensas · ${aLista(p.reparto).length > 1 ? HOTEL_NOMBRE + ' (' + aLista(p.reparto).map(r => r.lote).join(', ') + ')' : p.lote}${p.recibo ? ' · recibo ' + p.recibo : ''}`, lote:p.lote, importe:+p.monto || 0, medioPago:p.medio || '', fechaPago:p.fecha,
     comprobante:p.recibo ? 'Recibo ' + p.recibo : '', neto:0, iva:0, percepciones:0, retGan:0, retSuss:0 };
 }
 /* LOS COBROS DEL MES BASE (arreglado el 26-09-2026). Agosto se trajo de
