@@ -57,8 +57,13 @@ const REGLAS = [
   /* 'paquete-24h' (un solo aviso, a una persona y sin push) se reemplazó el 26-09-2026 por
      'paquetes-24h' en js/v-servicio.js: push a todo el lote, repetido hasta que lo ven. */
   { id:'viaje-regreso', n:'Fin de un viaje → avisar a la guardia', d:'El día que vuelve el vecino, la guardia lo sabe.',
-    run(s, hoy){ let n = 0; s.users.filter(u => u.viaje && u.viaje.hasta === hoy).forEach(u => n += marca(s, 'vj-' + u.id + hoy, () => notificar(s, { para:'rol:guardia', titulo:`Hoy vuelve ${u.casa}`, texto:'Termina el aviso de casa sola.', icon:'home', color:'ok', link:'garita' })));
-      s.users.filter(u => u.viaje && u.viaje.hasta < hoy).forEach(u => { delete u.viaje; n++; }); return n; } },
+    /* 27-09: las casas solas viven en la carpeta privada (pv/ausencias, js/v-casa.js)
+       y el aviso va a cada cuenta de la garita en privado, no al canal general. */
+    run(s, hoy){ if (typeof casasSolas !== 'function' || !(esGuardia() || esAdmin())) return 0; let n = 0;
+      casasSolas(hoy).filter(a => a.hasta === hoy).forEach(a => n += marca(s, 'vj-' + String(a.casa).replace(/\D/g, '') + '-' + hoy, () => notificar(s, { para:cuentasGarita(), titulo:`Hoy vuelve ${a.casa}`, texto:'Termina el aviso de casa sola.', icon:'home', color:'ok', link:'garita' })));
+      const viejas = aLista(s.ausencias).filter(a => a && a.hasta < sumarDias(hoy, -2)).map(a => a.id);
+      if (viejas.length){ s.ausencias = s.ausencias.filter(a => !viejas.includes(a.id)); n += viejas.length; }
+      return n; } },
   /* ---- el calendario de las expensas, que corre solo todos los meses ----
      Arreglado el 26-09-2026: estas reglas miraban la liquidación del mes
      EN CURSO, cuyos vencimientos son del mes que viene, y por eso nunca

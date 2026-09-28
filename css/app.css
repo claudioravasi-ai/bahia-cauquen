@@ -2063,3 +2063,211 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 .hv-pills .pill{white-space:normal;max-width:100%}
 .btn.btn-envuelve{white-space:normal;height:auto;min-height:44px;line-height:1.25;padding-top:10px;padding-bottom:10px}
 .btn.btn-envuelve svg{flex:none}
+
+/* =========================================================
+   CUIDARNOS ENTRE VECINOS (27-09-2026): "Estoy bien", aviso de
+   salida, ángeles de la nieve, cosas para prestar, casa en invierno
+   ========================================================= */
+.eb-bloque{display:flex;flex-direction:column;gap:10px}
+.eb-bloque .aviso{margin:0}
+/* El botón verde: titila (late) hasta que se toca, una vez por día. */
+.eb-boton{display:flex;align-items:center;gap:16px;width:100%;min-height:92px;padding:16px 20px;border:0;border-radius:24px;cursor:pointer;font:inherit;text-align:left;color:#fff;
+  background:linear-gradient(145deg,#22a866,#15784a);box-shadow:0 12px 30px rgba(21,120,74,.35);animation:ebLate 1.6s ease-in-out infinite;-webkit-tap-highlight-color:transparent}
+.eb-boton:active{transform:scale(.985)}
+.eb-boton.alerta{background:linear-gradient(145deg,#22a866,#15784a);box-shadow:0 0 0 4px rgba(211,58,58,.55),0 12px 30px rgba(21,120,74,.35)}
+.eb-corazon{flex:none;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18)}
+.eb-corazon svg.i{width:32px;height:32px;fill:currentColor}
+.eb-txt{flex:1;min-width:0}
+.eb-txt b{display:block;font-size:26px;font-weight:800;letter-spacing:1.5px;line-height:1.1}
+.eb-txt small{display:block;font-size:13.5px;opacity:.92;margin-top:4px;line-height:1.35}
+@keyframes ebLate{0%,100%{box-shadow:0 0 0 0 rgba(34,168,102,.55),0 12px 30px rgba(21,120,74,.3)}50%{box-shadow:0 0 0 12px rgba(34,168,102,0),0 12px 30px rgba(21,120,74,.3);filter:brightness(1.08)}}
+.eb-boton.alerta{animation-name:ebLateRojo}
+@keyframes ebLateRojo{0%,100%{box-shadow:0 0 0 3px rgba(211,58,58,.7),0 12px 30px rgba(21,120,74,.3)}50%{box-shadow:0 0 0 12px rgba(211,58,58,0),0 12px 30px rgba(21,120,74,.3);filter:brightness(1.08)}}
+.eb-listo{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 16px;border-radius:18px;cursor:pointer;font:inherit;
+  background:var(--ok-soft);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 28%,transparent)}
+.eb-listo > svg.i{width:24px;height:24px;flex:none}
+.eb-listo span{min-width:0}
+.eb-listo b{display:block;font-size:14.5px}
+.eb-listo small{display:block;font-size:12.5px;color:var(--ink-2);overflow-wrap:anywhere}
+.eb-hecho{display:flex;align-items:center;gap:14px;padding:18px;border-radius:22px;margin-bottom:12px;background:var(--ok-soft);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 28%,transparent)}
+.eb-hecho > svg.i{width:34px;height:34px;flex:none}
+.eb-hecho b{display:block;font-size:17px}
+.eb-hecho span{color:var(--ink-2);font-size:13px}
+.eb-salida{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border-radius:18px;background:var(--sky-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--sky) 30%,transparent)}
+.eb-salida > svg.i{width:24px;height:24px;color:var(--sky);flex:none}
+.eb-salida b{display:block;font-size:14.5px}
+.eb-salida span{display:block;font-size:12.5px;color:var(--ink-2)}
+.eb-salida.tarde{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.eb-salida .grow{min-width:160px}
+.eb-salida-grande{display:flex;gap:12px;align-items:flex-start;padding:0;margin:0 0 12px;box-shadow:none;border:0;background:none}
+.eb-salida-grande > svg.i{width:28px;height:28px;color:var(--sky);flex:none}
+.eb-salida-grande b{display:block;font-size:16px}
+.eb-salida-grande span{display:block;font-size:13px;color:var(--ink-2);margin-top:2px}
+.eb-intro{display:flex;gap:14px;align-items:flex-start}
+.eb-intro > svg.i{width:30px;height:30px;color:var(--ok);flex:none;margin-top:2px}
+.eb-intro > div > b{display:block;font-size:16px;margin-bottom:4px}
+.eb-intro p{margin:0 0 8px;font-size:14px;line-height:1.5}
+.eb-pasos{margin:0 0 16px;padding-left:22px;font-size:14px;line-height:1.5}
+.eb-pasos li{margin-bottom:6px}
+.eb-persona.mal{border-color:color-mix(in srgb,var(--danger) 45%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--danger) 25%,transparent)}
+.eb-persona-cab{display:flex;align-items:center;gap:12px}
+.eb-persona-cab > svg.i{width:22px;height:22px;color:var(--brand);flex:none}
+.eb-persona-cab b{display:block;font-size:15px;overflow-wrap:anywhere}
+.eb-persona-cab small{display:block;color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.eb-lineas{display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:13.5px;color:var(--ink-2)}
+.eb-lineas span{display:flex;gap:6px;align-items:flex-start}
+.eb-lineas svg.i{width:16px;height:16px;flex:none;margin-top:2px}
+.eb-lineas:empty{display:none}
+.eb-ok{color:var(--ok);font-weight:700}
+.eb-mal{color:var(--danger);font-weight:800}
+.eb-tels{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-bottom:6px}
+.eb-tel{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);text-decoration:none;color:var(--ink)}
+.eb-tel b{font-size:22px;font-weight:800;color:var(--danger)}
+.eb-tel span{font-size:12px;color:var(--ink-2);line-height:1.3}
+.eb-guia{padding:0;overflow:hidden}
+.eb-guia summary{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;list-style:none;flex-wrap:wrap}
+.eb-guia summary::-webkit-details-marker{display:none}
+.eb-guia summary > svg.i{width:20px;height:20px;color:var(--sky);flex:none}
+.eb-guia summary b{flex:1;min-width:0;font-size:14.5px}
+.eb-guia ul{margin:0;padding:0 16px 14px 36px;font-size:13.5px;line-height:1.55;color:var(--ink-2)}
+.eb-guia ul li{margin-bottom:6px}
+.eb-guia > p,.eb-guia > .btns{margin:0 16px 10px;font-size:13.5px;line-height:1.5}
+.eb-guia > .btns{margin-bottom:14px}
+.eb-guia.tarea summary > svg.i{color:var(--warn)}
+.eb-guia.tarea.toca{border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.garita-bien{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;margin:0 0 12px;border-radius:16px;cursor:pointer;font:inherit;background:var(--ok-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--ok) 28%,transparent)}
+.garita-bien > svg.i:first-child{width:22px;height:22px;color:var(--ok);flex:none}
+.garita-bien span{flex:1;min-width:0}
+.garita-bien b{display:block;font-size:14px}
+.garita-bien small{display:block;font-size:12.5px;color:var(--ink-2)}
+.eb-fams{display:flex;flex-direction:column;gap:3px;margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.eb-fams span{display:flex;gap:6px;align-items:flex-start;overflow-wrap:anywhere}
+.eb-fams svg.i{width:14px;height:14px;flex:none;margin-top:2px}
+.eb-fam-form{border:1px solid var(--line);border-radius:14px;padding:12px 12px 0;margin-bottom:10px}
+.cosa-acc{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none;max-width:48%}
+.cosa-acc .pill{white-space:normal;text-align:right}
+.cosa-sug{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.cosa-sug .chip{min-height:32px;padding:6px 11px;font-size:12.5px}
+@media (max-width:380px){
+  .eb-boton{gap:12px;padding:14px 16px;min-height:84px}
+  .eb-corazon{width:48px;height:48px}
+  .eb-txt b{font-size:22px;letter-spacing:1px}
+}
+@media (prefers-reduced-motion:reduce){
+  .eb-boton,.eb-boton.alerta{animation:none}
+}
+
+/* Preparados para un sismo */
+.sismo-boton{background:linear-gradient(145deg,#d9901a,#a4640a);box-shadow:0 12px 30px rgba(164,100,10,.35);animation-name:sismoLate;margin-bottom:12px}
+@keyframes sismoLate{0%,100%{box-shadow:0 0 0 0 rgba(217,144,26,.55),0 12px 30px rgba(164,100,10,.3)}50%{box-shadow:0 0 0 12px rgba(217,144,26,0),0 12px 30px rgba(164,100,10,.3);filter:brightness(1.08)}}
+.sismo-boton .eb-txt b{font-size:22px;letter-spacing:1px}
+.mochila-it .txt span{white-space:normal}
+.mochila-tilde{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--line-2);background:var(--surface);color:var(--muted);cursor:pointer}
+.mochila-tilde svg.i{width:18px;height:18px}
+.mochila-it.ok .mochila-tilde{background:var(--ok);border-color:var(--ok);color:#fff}
+.plan-sismo{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.plan-sismo small{display:block;font-size:11.5px;color:var(--muted);font-weight:700}
+.plan-sismo b{display:block;font-size:14px;overflow-wrap:anywhere}
+.simulacro{text-align:center;padding:10px 0 16px}
+.sim-num{font-size:72px;font-weight:800;line-height:1;color:var(--warn);font-variant-numeric:tabular-nums}
+.simulacro p{font-size:16px;margin:12px 0 0;line-height:1.45}
+@media (prefers-reduced-motion:reduce){ .sismo-boton{animation:none} }
+.eb-listo.novedad{background:var(--danger-soft);color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,transparent)}
+.casa-sola.falta{border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.casa-sola .datos span.eb-ok,.casa-sola .datos span.eb-mal{display:block;font-size:12.5px;margin-top:2px}
+.garita-bien.salida{background:var(--sky-soft);border-color:color-mix(in srgb,var(--sky) 30%,transparent)}
+.garita-bien.salida > svg.i:first-child{color:var(--sky)}
+/* El bloque de "Estoy bien" / casa sola, separado de la foto de la portada (pedido de Claudio, 27-09) */
+.inicio-lienzo > .eb-bloque{margin-top:18px;margin-bottom:8px}
+@media (min-width:700px){ .inicio-lienzo > .eb-bloque{margin-top:24px} }
+@media (min-width:1000px){ .inicio-lienzo > .eb-bloque{margin-top:28px;max-width:760px;width:100%;align-self:center} }
+
+/* ===== Garita (27-09): tareas del día, vans del hotel, policía, turnos ===== */
+.garita-grid{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"titulo" "lado" "main";gap:0;margin-top:16px}
+.garita-grid.sin-titulo{grid-template-areas:"lado" "main";margin-top:0}
+.garita-titulo{grid-area:titulo;margin:0 2px 12px}
+.garita-lado{grid-area:lado;min-width:0;margin-bottom:12px}
+.garita-main{grid-area:main;min-width:0}
+.garita-lado .tareas-dia{margin:0}
+@media (min-width:1000px){
+  .garita-grid{grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto 1fr;grid-template-areas:"titulo lado" "main lado";column-gap:18px}
+  .garita-grid.sin-titulo{grid-template-rows:1fr;grid-template-areas:"main lado"}
+  .garita-lado{align-self:start;position:sticky;top:8px;margin-bottom:0}
+}
+.tareas-dia{padding:12px 14px}
+.tareas-dia summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.tareas-dia summary::-webkit-details-marker{display:none}
+.tareas-dia summary b{display:flex;align-items:center;gap:8px;font-size:14.5px}
+.tareas-dia summary b svg{width:18px;height:18px;color:var(--brand)}
+.td-lista{display:grid;gap:2px;margin-top:10px}
+.td-item{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;background:transparent;color:inherit;font:inherit;padding:7px 6px;border-radius:10px;cursor:pointer}
+.td-item:hover:not([disabled]),.td-item:focus-visible{background:var(--surface-2)}
+.td-item[disabled]{cursor:default}
+.td-ic{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex:none;background:var(--warn-soft);color:var(--warn)}
+.td-ic svg{width:16px;height:16px}
+.td-siempre .td-ic{background:var(--sky-soft);color:var(--sky)}
+.td-hecho .td-ic{background:var(--ok-soft);color:var(--ok)}
+.td-hecho .td-txt b{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line-2)}
+.td-txt{min-width:0;flex:1}
+.td-txt b{display:block;font-size:13.5px;line-height:1.3}
+.td-txt small{display:block;font-size:12px;color:var(--muted);line-height:1.35;margin-top:1px}
+.ancla{display:block;position:relative;top:-8px;height:0}
+.td-hechas-movil{display:none;margin:6px 4px 0;font-size:12px;color:var(--ok);font-weight:700;line-height:1.4}
+.td-hechas-movil svg{width:13px;height:13px;vertical-align:-2px}
+/* En el celular, lo ya hecho se resume en un renglón: lo pendiente queda a la vista sin tapar la garita. */
+@media (max-width:760px){ .td-lista .td-hecho{display:none} .td-hechas-movil{display:block} .td-item{padding:6px 4px} }
+
+.vans-garita{padding:13px 14px}
+.vans-garita > .row b svg{width:18px;height:18px;color:var(--wood)}
+.vg-lista{display:grid;gap:8px;margin-top:10px}
+.vg-fila{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2)}
+.vg-fila.curso{border-color:var(--warn);background:var(--warn-soft)}
+.vg-fila.tarde{border-color:var(--danger)}
+.vg-fila .grow{min-width:0}
+.vg-fila .grow > b{display:flex;align-items:center;gap:6px;font-size:14px;line-height:1.3}
+.vg-fila .grow > b svg{width:15px;height:15px;flex:none}
+.vg-fila .grow > small{display:block;font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.vg-fila .btn{flex:none;min-width:96px}
+.vg-hora{flex:none;width:56px;text-align:center}
+.vg-hora b{display:block;font-size:18px;font-weight:800;letter-spacing:-.4px;line-height:1.1}
+.vg-hora small{font-size:11px;color:var(--muted);font-weight:700}
+.vg-hechos{margin-top:8px}
+.vg-hechos summary{cursor:pointer}
+.vg-vans{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:13px}
+.vg-van{display:inline-flex;align-items:center;gap:6px}
+@media (max-width:520px){
+  .vg-fila{flex-wrap:wrap}
+  .vg-fila .grow{flex:1 1 calc(100% - 70px)}
+  .vg-fila .btn{flex:1 1 100%}
+}
+
+.policia-solapa{padding:12px 14px}
+.dia-turno-hora{margin-bottom:4px}
+/* En el celular, uno debajo del otro para que se lea el orden: día, turno, hora. */
+@media (max-width:520px){ .grid3.dia-turno-hora{grid-template-columns:1fr;gap:0} }
+
+.turnos-quien{padding:6px 14px 12px}
+.tq-fila{padding:10px 0;border-bottom:1px solid var(--line)}
+.tq-fila:last-of-type{border-bottom:0}
+.tq-fila.ahora .tq-cab b{color:var(--brand)}
+.tq-cab{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tq-cab b{font-size:15px}
+.tq-cab .pill{margin-left:auto}
+.tq-nombres{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.chip-nombre{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:var(--brand-soft);color:var(--ink);font-size:13px;font-weight:700}
+.chip-nombre svg{width:13px;height:13px;color:var(--brand)}
+
+.plegable{padding:12px 14px}
+.plegable > summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.plegable > summary::-webkit-details-marker{display:none}
+.plegable > summary b{display:flex;align-items:center;gap:8px;font-size:14.5px}
+.plegable > summary b svg{width:17px;height:17px;color:var(--brand)}
+
+.servicios-lista{display:grid;gap:8px}
+.servicio-pol{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--sky);border-radius:14px;box-shadow:var(--sh-1);overflow:hidden}
+.servicio-pol[open]{box-shadow:var(--sh-2)}
+.servicio-pol summary{list-style:none;display:flex;align-items:center;gap:10px;padding:10px 11px;cursor:pointer}
+.servicio-pol summary::-webkit-details-marker{display:none}
+.servicio-pol summary .ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none}
+.servicio-pol .pill{font-size:10.5px;white-space:nowrap}
+@media (max-width:420px){ .servicio-pol summary{flex-wrap:wrap} .servicio-pol .pill{margin-left:42px} }

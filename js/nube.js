@@ -46,8 +46,14 @@ const Nube = {
   ZONAS: {
     barrio: ['users','padron','amenities','agenda','temporadas','feriados','eventosCiudad','contactos','documentos',
              'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
-             'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas'],
-    privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos'],
+             'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas',
+             /* 27-09: cosas para prestar y ángeles de la nieve (js/v-casa.js, js/v-cuidados.js) */
+             'cosas','nieve'],
+    privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
+              /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
+              'casaTareas',
+              /* 27-09: "Me voy de viaje" (casa sola), antes en la ficha pública */
+              'ausencias'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos'],
     /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
@@ -109,6 +115,8 @@ const Nube = {
     hotelViajes:     { listas:['huespedes'] },
     hotelProv:       { listas:['dias'] },
     camion:          { listas:[] },
+    sos:             { objetos:['responden'] },
+    ausencias:       { objetos:['revisiones'] },
   },
   comoLaGuardamos(col, x){
     const f = this.FORMAS[col];
@@ -136,6 +144,15 @@ const Nube = {
       }
       case 'infracciones':
         return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
+      /* Los cuidados de la casa en invierno son del LOTE: van a todas sus cuentas. */
+      case 'casaTareas':
+        return x.lote ? Store.s.users.filter(u => u.casa === x.lote && u.estado === 'aprobado').map(u => u.id) : [];
+      /* La casa sola: a las cuentas del lote y a quien la avisó. */
+      case 'ausencias': {
+        const us = x.casa ? Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id) : [];
+        if (x.userId && !us.includes(x.userId)) us.push(x.userId);
+        return us;
+      }
       /* PAGOS Y RECIBOS VAN POR LOTE (arreglado el 26-09-2026). Antes se
          buscaba `x.casa`, pero un pago guarda `lote`: no coincidía con
          nadie y el pago informado por un vecino NO llegaba a la base (o
@@ -242,6 +259,12 @@ const Nube = {
     Store.sesion.visitaAnterior = Store.sesion.ultimaVisita || 0;
     Store.sesion.ultimaVisita = Date.now();
     Store.guardarSesion();
+    /* Si quedó la pantalla de "Entrando…" o de espera, la app se dibuja ya,
+       con la ficha propia: lo demás va llegando y se completa solo. La
+       garita no: sin la bitácora todavía, vería un momento "Nuevo turno"
+       aunque haya uno abierto; se dibuja con el primer dato que llega. */
+    const esperando = () => typeof $ === 'function' && $('.portal-caja.esperando');
+    if (mio.rol !== 'guardia' && esperando()) setTimeout(() => { if (esperando() && yo() && typeof pintar === 'function') pintar(); }, 0);
     const staff = mio.rol === 'admin' || mio.rol === 'guardia', hotel = mio.rol === 'hotel';
     const lee = this.HOTEL_LEE[mio.rol] || {};
     /* La garita no baja el chat vecinal: es entre vecinos (26-09). El hotel,
@@ -254,6 +277,8 @@ const Nube = {
     this.escucharPv(mio.rol);
     if (mio.rol === 'admin') setTimeout(() => this.mudarPrivado(), 3000);
     this.arrancada = true;
+    /* "Estoy bien": lo mío y lo de quienes cuido (js/v-cuidados.js). */
+    if (!hotel && typeof Cuidado !== 'undefined') Cuidado.escuchar(mio.rol);
     if (!hotel) this.anotarPresencia();
     /* Si administra el barrio, elige desde qué brazo entra. */
     if (mio.rol === 'admin' && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
@@ -335,12 +360,11 @@ const Nube = {
       eventosCiudad: eventosCiudadIniciales(),
       contactos: JSON.parse(JSON.stringify(CONTACTOS)),
       documentos: base.documentos,
-      /* Promociones de ejemplo, para que la tira del hotel se vea desde el
-         primer día y se entienda para qué sirve. Son de muestra: la
-         Administración las edita o las borra en Contenido → Promociones, y
-         si pone la dirección del lector en Ajustes, las reemplazan las que
-         publica el hotel. */
-      promos: base.promos,
+      /* Las promociones YA NO se siembran (27-09): desde que el hotel y la
+         Administración las borran directo, sembrarlas volvía a subir a la
+         base real cuatro ofertas inventadas cada vez que alguien dejaba la
+         lista vacía. Con la lista vacía la tira muestra Promos.MUESTRA,
+         marcadas como ejemplos, sin guardarlas en la base. */
       descargas: JSON.parse(JSON.stringify(DESCARGAS)),
     };
     let puestos = 0;
@@ -480,6 +504,8 @@ const Nube = {
     solicitudesPase: { col:'solicitudesPase', leen:['admin', 'guardia'] },
     llegadas:        { col:'llegadas',        leen:['admin', 'guardia'] },
     paquetes:        { col:'paquetes',        leen:['admin', 'guardia'] },
+    casaTareas:      { col:'casaTareas',      leen:[] },
+    ausencias:       { col:'ausencias',       leen:['admin', 'guardia'] },
   },
   carpetaDe(col, x){
     if (col !== 'privados') return col;
@@ -543,7 +569,8 @@ const Nube = {
        lote. Si alguna copia quedó vieja (un pago "informado" que en otra
        carpeta ya figura "confirmado"), gana la más avanzada. */
     const peso = x => col === 'pagos' ? (x.estado === 'confirmado' || x.estado === 'rechazado' ? 2 : 1) * 1e13 + (x.confirmadoAt || x.at || 0)
-      : col === 'paquetes' ? (x.retirado ? 2 : 1) * 1e13 + (x.retirado || x.recibido || 0) : 0;
+      : col === 'paquetes' ? (x.retirado ? 2 : 1) * 1e13 + (x.retirado || x.recibido || 0)
+      : col === 'casaTareas' || col === 'ausencias' ? (x.at || 0) : 0;
     Object.entries(this.PV).filter(([, d]) => d.col === col).forEach(([f]) => (this.pvDatos[f] || []).forEach(x => {
       if (!x.id) return;
       if (!vistos.has(x.id)){ vistos.set(x.id, arr.length); arr.push(x); }
@@ -627,20 +654,29 @@ const Nube = {
        'hijos' → cada clave del objeto por separado (votos[lote], respuestas[uid])
        'campo' → el campo entero (la lista de vistos, la de recomendaciones)
      ========================================================= */
+  /* `dueno`: el campo que dice de quién es el registro; su dueño lo escribe
+     entero (el SOS que pidió, su pedido de ayuda con la nieve). */
   PARCIALES: {
     votaciones:  { quien:'admin', campos:{ votos:'hijos' } },
     comunicados: { quien:'admin', campos:{ vistos:'campo', respuestas:'hijos' } },
     alertas:     { quien:'staff', campos:{ respuestas:'hijos' } },
     users:       { quien:'admin', propio:true, campos:{ recomiendan:'campo' } },
+    /* 27-09: el vecino del equipo de salud contesta "Voy" o "No puedo" al
+       pedido del DEA de otro: solo su respuesta (staff/sos/<id>/responden/<uid>). */
+    sos:         { quien:'staff', dueno:'userId', campos:{ responden:'hijos' } },
+    /* 27-09: el ángel de la nieve adopta una casa (angel) y marca el pedido del día. */
+    nieve:       { quien:'admin', dueno:'userId', campos:{ angel:'campo', pedido:'hijos' } },
   },
   soloSuParte(col, x){
     const P = this.PARCIALES[col], u = yo(); if (!P || !u) return null;
     if (P.quien === 'staff' ? (u.rol === 'admin' || u.rol === 'guardia') : u.rol === 'admin') return null;
     if (P.propio && x && x.id === u.id) return null;
+    if (P.dueno && x && x[P.dueno] === u.id) return null;
     return P;
   },
   cambiosSueltos(col, P, viejo, nuevo){
-    const base = `barrio/${col}/${nuevo.id}`, out = [];
+    const zona = this.ZONAS.staff.includes(col) ? 'staff' : 'barrio';
+    const base = `${zona}/${col}/${nuevo.id}`, out = [];
     Object.entries(P.campos).forEach(([f, modo]) => {
       const a = viejo && viejo[f], b = nuevo[f];
       if (JSON.stringify(a ?? null) === JSON.stringify(b ?? null)) return;
@@ -677,10 +713,12 @@ const Nube = {
         if (P){ if (antes[x.id]) this.cambiosSueltos(col, P, JSON.parse(antes[x.id]), JSON.parse(txt)).forEach(([r, v]) => poner(r, v)); return; }
         rutasDe(col, x).forEach(r => poner(r, JSON.parse(txt)));
       });
-      Object.keys(antes).forEach(id => { if (!(id in ahora) && !this.soloSuParte(col, { id })){
+      Object.keys(antes).forEach(id => { if (id in ahora) return;
+        /* Se mira el registro viejo entero: su dueño sí puede borrarlo. */
         const viejo = JSON.parse(antes[id]);
+        if (this.soloSuParte(col, viejo)) return;
         rutasDe(col, viejo).forEach(r => poner(r, null));
-      }});
+      });
       this.ultimo[col] = ahora;
     });
     /* =========================================================
@@ -871,7 +909,7 @@ const Nube = {
     if (this.libre) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
     return u;
   },
-  async salir(){ await this.borrarPresencia(); try { await this.auth.signOut(); } catch(e){} },
+  async salir(){ await this.borrarPresencia(); if (typeof Cuidado !== 'undefined') Cuidado.soltar(); try { await this.auth.signOut(); } catch(e){} },
   async cambiarClave(nueva){ return this.auth.currentUser.updatePassword(nueva); },
   /* Cambio de correo: Firebase manda un aviso a la dirección nueva y el
      cambio se hace efectivo cuando la persona lo confirma desde ahí. */

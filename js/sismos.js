@@ -187,7 +187,8 @@ R.sismos = {
       return `<a class="it sismo-fila" href="${esc(x.url)}" target="_blank" rel="noopener">
         <span class="sismo-mag nv-${n}">${x.mag.toFixed(1)}</span>
         <div class="txt"><b>${esc(x.lugar)}</b><span>${fechaHora(x.at)} h · a ${x.km.toLocaleString('es-AR')} km al ${x.rumbo} · ${x.prof} km de profundidad${x.tsunami ? ' · marca de tsunami' : ''}</span></div></a>`; };
-    return `${!Sismos.d ? `<div class="vacio">${I('refresh')}Buscando los sismos de la región…</div>` : ''}
+    return `${R.sismo && tengoLote() && !esStaff() ? superficie({ v:'sismo', icon:'check', color:'warn', t:'Preparados para un sismo', s:'Mochila de emergencia, plan familiar y qué hacer' }) : ''}
+      ${!Sismos.d ? `<div class="vacio">${I('refresh')}Buscando los sismos de la región…</div>` : ''}
       ${dest ? `<div class="card sismo-dest nv-${Sismos.nivel(dest)}"><span class="sismo-mag grande nv-${Sismos.nivel(dest)}">${dest.mag.toFixed(1)}</span>
         <div class="grow"><small class="muted">El que más importa de los últimos 3 días</small><b>${esc(dest.lugar)}</b>
         <span class="small">${fechaHora(dest.at)} h · a ${dest.km.toLocaleString('es-AR')} km del barrio (${dest.rumbo}) · ${dest.prof} km de profundidad</span></div></div>` : ''}

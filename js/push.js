@@ -48,8 +48,8 @@ const Push = {
     'no-soportado': ['Este navegador no recibe avisos', 'Probá con Chrome, Edge, Firefox o Safari actualizados.'],
     'sin-config':   ['Falta un paso de la Administración', 'Los avisos push todavía no están configurados (Ajustes → Avisos al celular).'],
     'bloqueado':    ['Los avisos están bloqueados en este equipo', 'Se habilitan desde la configuración del navegador o del teléfono (permisos del sitio → Notificaciones → Permitir).'],
-    'activo':       ['Avisos activados en este equipo', 'Te llegan aunque tengas el celular bloqueado: camión de la basura, SOS, avisos urgentes, paquetes y lo que escriba la guardia.'],
-    'apagado':      ['Activá los avisos en este equipo', 'Para enterarte con el celular bloqueado: camión de la basura, SOS, avisos urgentes, paquetes y lo que escriba la guardia.'],
+    'activo':       ['Avisos activados en este equipo', 'Te llegan aunque tengas el celular bloqueado: camión de la basura, SOS, avisos urgentes, paquetes, "Estoy bien" y lo que escriba la guardia.'],
+    'apagado':      ['Activá los avisos en este equipo', 'Para enterarte con el celular bloqueado: camión de la basura, SOS, avisos urgentes, paquetes, "Estoy bien" y lo que escriba la guardia.'],
   },
   cargarSDK(){
     if (firebase.messaging) return Promise.resolve();
@@ -134,6 +134,9 @@ const Push = {
   /* Tocar el aviso abre la app en la ventana que corresponde. */
   abrirEnlace(link){
     if (!link || !yo()) return;
+    /* El recordatorio de "Estoy bien": tocarlo ya cuenta como aviso. Se
+       espera a que baje lo propio de la base antes de marcar. */
+    if (link === 'estoy-bien:ok' && typeof Cuidado !== 'undefined'){ abrir('estoy-bien'); Cuidado.cuandoListo(() => A['bien-ok']()); return; }
     const [id, p] = String(link).split(':');
     if (R[id]) abrir(id, p || '');
   },

@@ -5,7 +5,9 @@ no corre nada: lo único que lo despierta es una **notificación push**, que man
 (Firebase Cloud Messaging). Sirve para:
 
 - el **camión de la basura** (cuando la garita registra la entrada),
-- el **SOS** de un vecino,
+- el **SOS** de un vecino, y el aviso del **DEA** a los vecinos del equipo de salud,
+- **"Estoy bien"**: el recordatorio de la mañana y el aviso a la garita, la Administración y las personas elegidas,
+- **casa sola**: "Tu casa está en orden" cuando la garita o el policía la revisa, y el recordatorio de los domingos de la **mochila para sismos**,
 - los **avisos urgentes por zona** (corte de luz, nieve, portón…),
 - los **paquetes** que llegan a la garita,
 - todo lo que ya sonaba en la app (lo que escribe la guardia, comunicados, expensas).
@@ -35,6 +37,23 @@ Son **dos pasos de una sola vez**, más uno que hace cada vecino en su equipo.
 
 La misma cuenta de servicio le permite al Apps Script leer la lista de equipos anotados
 (`barrio/pushTokens`), que ninguna persona puede leer desde la app.
+
+## Paso 2 bis — El reloj de "Estoy bien" (una sola vez, 27-09-2026)
+
+"Estoy bien" (para quien vive solo) y el aviso de salida tienen que avisar a los contactos
+**aunque todos los teléfonos estén bloqueados**. Lo hace un reloj del Apps Script que
+revisa cada 10 minutos.
+
+1. Pegá el `apps-script/Codigo.gs` nuevo (**versión 8**) → **Guardar** →
+   **Implementar → Gestionar implementaciones → editar → Nueva versión → Implementar**.
+2. Arriba, en el menú de funciones, elegí **`instalarRelojCuidados`** y tocá **Ejecutar**.
+   Google pide permiso ("activadores" y "servicio externo"): aceptalo.
+3. Listo: en **Activadores** (el relojito de la izquierda) aparece `revisarCuidados` cada 10 minutos.
+
+Usa la misma `FCM_CUENTA` del paso 2 y la dirección de la base (`BASE_URL`), que se guarda
+sola la primera vez que la app manda un aviso push (por ejemplo, **Ajustes → Avisos al celular → Probar**).
+Sin el reloj, "Estoy bien" igual avisa, pero recién cuando alguna app de un contacto o de la
+garita está abierta; la garita, que está abierta las 24 horas, lo cubre si el vecino la eligió.
 
 ## Paso 3 — Cada vecino, en cada equipo
 

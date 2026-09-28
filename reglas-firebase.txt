@@ -54,6 +54,14 @@ QUÉ HACEN, EN CASTELLANO
 
 6. LA AUDITORÍA NO SE BORRA NI SE EDITA: solo se agrega.
 
+8. "ESTOY BIEN" (27-09-2026). Que alguien vive solo no es un dato para
+   todo el barrio: /cuidado lo leen solo la garita, la Administración, el
+   propio vecino y los familiares que viven en el barrio y eligió. Los demás
+   vecinos no. Un familiar solo puede aceptar, salir, o dar y resolver la
+   alarma del día. Los cuidados de la casa en invierno son del
+   lote (pv/casaTareas). Las cosas para prestar y los ángeles de la nieve
+   los ven todos los vecinos aprobados; cada uno escribe solo lo suyo.
+
 7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
    ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
    escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
@@ -163,11 +171,15 @@ PEGAR DESDE ACÁ
       "notifsTodos":   { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
                          "$id": { ".write": "!data.exists() && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" } },
 
-      /* Las promociones del hotel las publica la Administración; las ven todos
-         los vecinos aprobados. Sin esta regla, Firebase NIEGA la rama entera y
-         la tira de ofertas de la portada no aparece nunca (falla muda). */
+      /* Las promociones del hotel (barrio/promos, más arriba) las cargan,
+         cambian y borran el hotel o la Administración (27-09); las ven todos
+         los vecinos aprobados. Lo que escribe el hotel tiene que venir marcado
+         hotel:true y con un título de hasta 60 letras. Sin la regla de promos,
+         Firebase NIEGA la rama entera y la tira de ofertas de la portada no
+         aparece nunca (falla muda). */
       "descargas":     { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
-      "promos":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "promos":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')",
+                         "$id": { ".validate": "root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' || (newData.child('hotel').val() === true && newData.child('titulo').isString() && newData.child('titulo').val().length > 0 && newData.child('titulo').val().length <= 60)" } },
 
       /* Los comunicados importantes: los escribe la Administración, los ve
          todo el barrio, y cada lote deja su respuesta y su acuse de recibo. */
@@ -179,6 +191,18 @@ PEGAR DESDE ACÁ
           "respuestas": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')" }
         }
       },
+      /* COSAS PARA PRESTAR (27-09-2026): las ven los vecinos aprobados; cada
+         cosa la crea, cambia y borra solo su dueño (o la Administración). */
+      "cosas": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+                 "$id": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.child('userId').val() === auth.uid && (!newData.exists() || newData.child('userId').val() === auth.uid)) || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')" } },
+      /* ÁNGELES DE LA NIEVE (27-09-2026): un registro por vecino (n-<uid>),
+         lo ven los vecinos aprobados. Lo escribe su dueño. Un vecino anotado
+         como ángel puede además adoptar o soltar una casa (solo el campo
+         "angel", y solo con su propio uid) y marcar el pedido del día. */
+      "nieve": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+                 "$id": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.child('userId').val() === auth.uid && (!newData.exists() || newData.child('userId').val() === auth.uid)) || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')",
+                          "angel":  { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/nieve').child('n-' + auth.uid).child('tipo').val() === 'angel' && (!data.exists() || data.val() === auth.uid) && (!newData.exists() || newData.val() === auth.uid)" },
+                          "pedido": { "$k": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/nieve').child('n-' + auth.uid).child('tipo').val() === 'angel'" } } } },
       "motorLog":      { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
                          "$marca": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".validate": "newData.isNumber()" } }
     },
@@ -199,6 +223,34 @@ PEGAR DESDE ACÁ
        una visita sin cuenta). La Administración puede CREAR (no leer ni
        cambiar) en privadosGuardia: lo necesita la mudanza desde la carpeta
        vieja. */
+    /* "ESTOY BIEN" Y AVISO DE SALIDA (27-09-2026). Decisión de Claudio: el
+       aviso lo reciben SOLO la garita, la Administración y los familiares
+       del vecino; el resto del barrio no. cuidado/ entero lo leen la garita
+       y la Administración; cuidado/<vecino>, además, él y los familiares que
+       viven en el barrio y eligió (contactos/<uid>). Lo escribe solo él; un
+       familiar puede aceptar (contactos/<su uid>/acepta) o salir; la
+       garita, la Administración y los familiares pueden dar o resolver la
+       alarma del día (aviso/<clave>). El reloj del Apps Script entra con la
+       cuenta de servicio.
+       cuidadoDe/<familiar>/<vecino>: a quién cuida cada familiar. Lo lee
+       solo él; lo escribe el vecino que lo eligió o el propio familiar. */
+    "cuidado": {
+      ".read": "auth != null && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')",
+      "$persona": {
+        ".read": "auth != null && (auth.uid === $persona || data.child('contactos').child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $persona && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        "contactos": { "$c": { ".write": "auth != null && auth.uid === $c && !newData.exists()",
+                                "acepta": { ".write": "auth != null && auth.uid === $c && newData.isNumber() && root.child('cuidado').child($persona).child('contactos').child($c).exists()" } } },
+        "aviso": { "$k": { ".write": "auth != null && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && (root.child('cuidado').child($persona).child('contactos').child(auth.uid).exists() || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')" } }
+      }
+    },
+    "cuidadoDe": {
+      "$c": {
+        ".read": "auth != null && auth.uid === $c",
+        "$persona": { ".write": "auth != null && ((auth.uid === $persona && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')) || auth.uid === $c)" }
+      }
+    },
+
     "pv": {
       /* PAQUETES POR LOTE (26-09-2026, tarde): un paquete va a la carpeta de
          TODAS las cuentas del lote (en el 148, Mónica y Claudio). Por eso un
@@ -221,10 +273,10 @@ PEGAR DESDE ACÁ
         }
       },
       "$carpeta": {
-        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'))",
+        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'))",
         "$uid": {
-          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs')",
-          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs') && (auth.uid === $uid || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')) || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
+          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas')",
+          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas') && (auth.uid === $uid || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')) || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones' || $carpeta === 'paquetes' || $carpeta === 'casaTareas' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
           "$id": {
             ".write": "!data.exists() && ($carpeta === 'solicitudesPase' || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'))"
           }
@@ -240,10 +292,10 @@ PEGAR DESDE ACÁ
        el DNI y la patente antes de archivarlas. */
     "hist": {
       "$carpeta": {
-        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'))",
+        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'))",
         "$uid": {
-          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs')",
-          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs') && (auth.uid === $uid || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')) || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones' || $carpeta === 'paquetes') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
+          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas')",
+          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas') && (auth.uid === $uid || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')) || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones' || $carpeta === 'paquetes' || $carpeta === 'casaTareas' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
           "$id": {
             ".write": "!data.exists() && ($carpeta === 'solicitudesPase' || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'))"
           }
@@ -324,6 +376,18 @@ PEGAR DESDE ACÁ
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 27-09-2026 (hay que volver a publicar): "Estoy bien" y aviso de
+salida (cuidado, cuidadoDe), cosas para prestar (barrio/cosas), ángeles de
+la nieve (barrio/nieve), la casa en invierno y la mochila para sismos
+(pv/casaTareas) y la casa sola revisada cada día (pv/ausencias: "Me voy de
+viaje" deja de estar en la ficha que leen todos los vecinos; la leen solo el
+lote, la garita y la Administración). Sin publicar, esas funciones no guardan
+nada en el barrio de verdad (en Firebase lo
+que no está nombrado se niega en silencio). Comparación vieja/nueva: 3.310
+casos, sin ningún cambio en lo que ya existía; casos nuevos probados (el aviso
+de "Estoy bien" lo leen solo la garita, la Administración y los familiares
+elegidos; otro vecino no, y no puede anotarse solo como familiar).
 -----------------------------------------------------------
 
 ✔ EL HOTEL LOS CAUQUENES Y EL CHAT SIN LA GARITA (26-09-2026, noche)

@@ -146,7 +146,8 @@ function migrar(s){
   const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
     bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
-    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[] };
+    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[],
+    cosas:[], nieve:[], casaTareas:[], ausencias:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
   if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
@@ -916,9 +917,12 @@ const Correo = {
   /* Registra el correo y, si se puede, lo manda. Devuelve true si salió. */
   async enviar(x){ return (await this.enviarDetalle(x)).ok; },
   /* Lo mismo, pero dice el motivo si no salió: para mostrarlo en pantalla. */
-  async enviarDetalle({ para, asunto, html, tipo }){
+  /* `privado`: no queda en la bandeja de salida de la Administración (el
+     aviso de "Estoy bien" a un familiar: que alguien vive solo no tiene
+     por qué verlo nadie más). */
+  async enviarDetalle({ para, asunto, html, tipo, privado = false }){
     if (!para) return { ok:false, error:'Sin dirección de correo' };
-    const anota = this.anota();
+    const anota = !privado && this.anota();
     const reg = { id:uid(), para, asunto, html, tipo, at:Date.now(), estado:'pendiente', intentos:0 };
     if (anota) Store.cambiar(s => { s.correos.unshift(reg); if (s.correos.length > 300) s.correos.length = 300; });
     if (!this.configurado()) await this.traerPublico();

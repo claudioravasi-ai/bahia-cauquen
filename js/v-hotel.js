@@ -21,10 +21,12 @@
      · eventos del hotel (la garita se entera; la Administración decide si
        se avisa a los vecinos);
      · proveedores con ART y seguro, cada uno con su QR;
-     · promociones, que publica la Administración;
+     · promociones: las cargan, cambian y borran el hotel o la
+       Administración, y salen en la tira de todas las apps;
      · emergencias: llamar, avisar a la garita, su DEA y su personal con
        primeros auxilios;
-     · mensajes privados con la Administración y con la garita;
+     · comunicación interna: una sola teja y, adentro, se elige con quién
+       (la garita o la Administración); cada conversación sigue privada;
      · agenda, vuelos, cruceros, Ushuaia hoy, normas, municipio.
    QUÉ NO VE (Ley 25.326, mínimo acceso): el padrón, las fichas de los
    vecinos, el chat, el pizarrón, las visitas de los vecinos, la bitácora ni
@@ -32,8 +34,8 @@
 
    LA GARITA opera los pasos de las vans y los proveedores del hotel (un
    toque o su QR) y ve los huéspedes que llegan. LA ADMINISTRACIÓN mira todo
-   en vivo (sin los nombres de los huéspedes), aprueba promociones y avisos
-   de eventos, revisa proveedores, publica el DEA del hotel y maneja la
+   en vivo (sin los nombres de los huéspedes), edita promociones, aprueba
+   avisos de eventos, revisa proveedores, publica el DEA del hotel y maneja la
    cuenta y el convenio.
    ========================================================= */
 
@@ -182,6 +184,29 @@ function guardarInfo(s, cambios){
    LA PORTADA DEL HOTEL
    ========================================================= */
 const tejaHotel = (v, icon, color, t, s, extra = {}) => teja({ v, icon, color, t, s, ...extra });
+
+/* COMUNICACIÓN INTERNA (pedido de Claudio, 27-09): antes eran dos tejas,
+   "Administración" y "Garita"; ahora es una sola y adentro se elige con
+   quién. Por debajo siguen siendo las dos conversaciones de siempre
+   (privados con:'guardia' y con:'admin'), cada una en su carpeta: la de la
+   garita no la ve la Administración y al revés. Lo usa R.privado. */
+const CANALES_HOTEL = [
+  { con:'guardia', icon:'shield', color:'brand', t:'Garita', s:'Ingresos, vans, proveedores, huéspedes que llegan' },
+  { con:'admin', icon:'sliders', color:'accent', t:'Administración', s:'Expensas, convenio, promociones, eventos, reclamos' },
+];
+const hiloHotel = con => aLista(Store.s.privados).find(h => h.userId === yo()?.id && (h.con || 'admin') === con);
+const sinLeerHotel = con => { const h = hiloHotel(con); return h ? aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length : 0; };
+function comunicacionHotel(){
+  return `${sec('¿Con quién querés hablar?')}
+    ${CANALES_HOTEL.map(c => { const h = hiloHotel(c.con), ult = h ? aLista(h.msgs).at(-1) : null, nl = sinLeerHotel(c.con);
+      return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${c.con}"><span class="ic ic-${c.color}">${I(c.icon)}</span>
+        <span class="txt"><b>${c.t}</b><small>${ult ? `${ult.from === 'vecino' ? 'Vos: ' : ''}${esc(ult.text.slice(0, 70))} · ${hace(ult.createdAt)}` : c.s}</small></span>
+        ${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')}
+    <p class="muted tiny" style="margin-top:12px">${I('lock')} Cada conversación es privada: la de la garita la ven solo el hotel y la garita; la de la Administración, solo el hotel y la Administración. Para una urgencia, el botón rojo <b>Garita</b> de arriba.</p>`;
+}
+/* Arriba de la conversación, para pasar de una a la otra sin volver. */
+const chipsHotel = con => `<div class="chips">${CANALES_HOTEL.map(c => { const nl = c.con !== con ? sinLeerHotel(c.con) : 0;
+  return `<button class="chip ${con === c.con ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="${c.con}">${I(c.icon)}${c.t}${nl ? `<span class="n">${nl}</span>` : ''}</button>`; }).join('')}</div>`;
 function tarjetaVan(v, { garita = false } = {}){
   const e = estadoVan(v), prox = viajesDelDia().find(x => x.vanId === v.id && x.estado === 'programado');
   return `<div class="hv-van ${e.adentro ? 'adentro' : 'afuera'}"><span class="hv-van-ic">${I('car')}</span>
@@ -232,7 +257,7 @@ R.hotel = {
     const ajustes = vs.filter(x => ajusteViaje(x));
     const evHoy = hotelEventos().filter(e => e.fecha === hoy);
     const hsHoy = hotelHuespedes().filter(h => h.desde === hoy), hsSalen = hotelHuespedes().filter(h => h.hasta === hoy);
-    const promosPend = aLista(Store.s.hotelPromos).filter(p => p.estado === 'propuesta').length;
+    const promosPend = promosViejasPend().length;
     const sinLeer = aLista(Store.s.privados).reduce((a, h) => a + aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length, 0);
     return `<div class="hotel-hero"><img src="img/logo-noche.png" alt="" width="54" height="54">
         <div class="grow"><small>${fechaLarga(hoy)}</small><h1>${HOTEL_NOMBRE}</h1><span>Recepción${info.responsable ? ' · responsable: ' + esc(info.responsable) : ''}</span></div>
@@ -253,10 +278,9 @@ R.hotel = {
           ${tejaHotel('hotel-huespedes', 'users', 'sky', 'Huéspedes', 'Lista del día para la garita · se borran solos')}
           ${tejaHotel('hotel-eventos', 'star', 'accent', 'Eventos del hotel', 'La garita se entera; a los vecinos, si hace falta')}
           ${tejaHotel('hotel-proveedores', 'box', 'brand', 'Proveedores', 'ART, seguro y su QR de ingreso')}
-          ${tejaHotel('hotel-promos', 'sparkle', 'wood', 'Promociones', 'Las propone el hotel, las publica la Administración', { n: promosPend || '' })}
+          ${tejaHotel('hotel-promos', 'sparkle', 'wood', 'Promociones', 'Agregar, editar o borrar · salen en la tira de todas las apps', { n: promosPend || '' })}
           ${tejaHotel('hotel-emergencias', 'siren', 'danger', 'Emergencias', 'Llamar, avisar a la garita, DEA y primeros auxilios')}
-          ${teja({ v:'privado', p:'admin', icon:'lock', color:'accent', t:'Administración', s:'Mensajes privados con la Administración', badge: sinLeer })}
-          ${teja({ v:'privado', p:'guardia', icon:'shield', color:'brand', t:'Garita', s:'Mensajes privados con la garita' })}
+          ${teja({ v:'privado', p:'hotel', icon:'chat', color:'accent', t:'Comunicación interna', s:'Mensajes privados con la garita o la Administración', badge: sinLeer })}
           ${tejaHotel('hotel-ficha', 'sliders', 'sky', 'Ficha del hotel', 'Responsable, tiempos de traslado, DEA')}
           ${tejaHotel('documentos', 'file', 'brand', 'Normas y reglamentos', 'Reglamento del barrio y convivencia')}
           ${tejaHotel('hotel-convenio', 'clipboard', 'wood', 'Convenio con el barrio', 'Modelo de convivencia y servicios')}
@@ -338,20 +362,23 @@ A['hqr-imprimir'] = async el => {
     <p style="color:#555">Mostrar en la garita del Barrio ${esc(Store.s.config.nombre)} al entrar y al salir.</p></div>`, { pie:'QR fijo del hotel. Si se pierde, dar de baja y cargar de nuevo.' });
 };
 /* La garita registra el paso de una van: el traslado que le tocaba se
-   actualiza solo. */
-A['hvan-mov'] = el => {
+   actualiza solo. Si viene de la solapa de las vans, trae el traslado
+   exacto (`data-p`); si no, se busca el más cercano en hora. */
+A['hvan-mov'] = el => moverVan(el.dataset.id, el.dataset.v === 'in' ? 'in' : 'out', el.dataset.p || '');
+function moverVan(vanId, tipo, viajeId = ''){
   if (!soloGarita()) return;
-  const v = hotelVans().find(x => x.id === el.dataset.id); if (!v) return;
-  const tipo = el.dataset.v === 'in' ? 'in' : 'out', at = Date.now(), ahora = ahoraMin(), hoy = hoyISO();
+  const v = hotelVans().find(x => x.id === vanId); if (!v) return;
+  const at = Date.now(), ahora = ahoraMin(), hoy = hoyISO();
   let viaje = null;
   Store.cambiar(s => {
     const vs = aLista(s.hotelViajes).filter(x => x.fecha === hoy);
+    const elegido = viajeId ? vs.find(x => x.id === viajeId && x.estado === (tipo === 'out' ? 'programado' : 'en_curso')) : null;
     if (tipo === 'out'){
-      viaje = vs.filter(x => x.estado === 'programado' && (!x.vanId || x.vanId === v.id) && (!x.sale || Math.abs(minutosDe(x.sale) - ahora) <= 90))
+      viaje = elegido || vs.filter(x => x.estado === 'programado' && (!x.vanId || x.vanId === v.id) && (!x.sale || Math.abs(minutosDe(x.sale) - ahora) <= 90))
         .sort((a, b) => (!!b.vanId - !!a.vanId) || Math.abs(minutosDe(a.sale || '12:00') - ahora) - Math.abs(minutosDe(b.sale || '12:00') - ahora))[0] || null;
       if (viaje){ viaje.estado = 'en_curso'; viaje.salioAt = at; viaje.vanId = viaje.vanId || v.id; }
     } else {
-      viaje = vs.find(x => x.estado === 'en_curso' && x.vanId === v.id) || null;
+      viaje = elegido || vs.find(x => x.estado === 'en_curso' && x.vanId === v.id) || null;
       if (viaje){ viaje.estado = 'hecho'; viaje.volvioAt = at; }
     }
     s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:'hm' + uid(), vanId:v.id, tipo, at, por:yo().id, viaje: viaje ? textoViaje(viaje) : '' });
@@ -359,7 +386,48 @@ A['hvan-mov'] = el => {
     const h = hotelId(); if (h) notificar(s, { para:[h], titulo:`${v.nombre} ${tipo === 'in' ? 'entró al barrio' : 'salió del barrio'}`, texto:`${hora(at)} h${viaje ? ' · ' + textoViaje(viaje) : ''}`, icon:'car', color:'wood', link:'hotel-traslados', push:false });
   });
   cerrarHoja(); toast(`${v.nombre}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada`, tipo === 'in' ? 'login' : 'logout');
+}
+/* Desde la solapa: el traslado sin van asignada pregunta cuál sale. */
+A['hviaje-mov'] = el => {
+  if (!soloGarita()) return;
+  const x = hotelViajes().find(v => v.id === el.dataset.id); if (!x) return;
+  const tipo = el.dataset.v === 'in' ? 'in' : 'out', vans = hotelVans();
+  if (x.vanId || vans.length === 1) return moverVan(x.vanId || vans[0].id, tipo, x.id);
+  if (!vans.length) return toast('El hotel todavía no cargó sus vans', 'car');
+  hoja('¿Qué van sale?', `<p class="muted small" style="margin:0 0 10px">${esc(x.sale || '')} h · ${esc(textoViaje(x))}</p>
+    ${vans.map(v => `<button class="superficie" data-a="hvan-mov" data-id="${esc(v.id)}" data-v="${tipo}" data-p="${esc(x.id)}"><span class="ic ic-wood">${I('car')}</span><span class="txt"><b>${esc(v.nombre)}</b><small class="mono">${esc(v.patente || '')}${v.chofer ? ' · ' + esc(v.chofer) : ''}</small></span>${I('right')}</button>`).join('')}`);
 };
+
+/* =========================================================
+   LAS VANS DEL HOTEL EN LA GARITA, A UN TOQUE (pedido de Claudio, 27-09)
+   "Tan fácil y accesible como la solapa del camión": los traslados
+   programados para HOY, por hora, cada uno con su botón grande "Salió" y,
+   cuando vuelve, "Volvió". Un toque anota todo: la bitácora, el traslado
+   ("En viaje" → "Hecho") y el aviso a la recepción del hotel. Abajo, las
+   vans con un botón para las salidas que no estaban programadas.
+   ========================================================= */
+function bandaVansGarita(opera){
+  const vans = hotelVans(), vs = viajesDelDia(hoyISO());
+  if (!vans.length && !vs.length) return '';
+  const pend = vs.filter(x => x.estado !== 'hecho'), hechos = vs.filter(x => x.estado === 'hecho');
+  const vanDe = x => vans.find(v => v.id === x.vanId);
+  const fila = x => { const v = vanDe(x), d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro, aj = ajusteViaje(x), curso = x.estado === 'en_curso';
+    const tarde = x.estado === 'programado' && x.sale && ahoraMin() > minutosDe(x.sale) + 15;
+    return `<div class="vg-fila ${curso ? 'curso' : ''} ${tarde ? 'tarde' : ''}"><div class="vg-hora"><b>${esc(x.sale || '—')}</b><small>${curso ? 'en viaje' : 'sale'}</small></div>
+      <div class="grow"><b>${I(d[1])} ${esc(textoViaje(x))}</b>
+        <small>${v ? `${esc(v.nombre)} · <span class="mono">${esc(v.patente || '')}</span>` : 'van sin asignar'} · ${plural(+x.pax || 0, 'pasajero')}${curso && x.salioAt ? ` · salió ${hora(x.salioAt)} h` : ''}${tarde ? ' · <b>se atrasó</b>' : ''}</small>
+        ${aj ? `<small class="hv-alerta">${I(aj.cancelado ? 'alert' : 'clock')} ${aj.cancelado ? 'El vuelo figura CANCELADO' : `El vuelo cambió: conviene salir ${esc(aj.sale)}`}</small>` : ''}</div>
+      ${opera ? `<button class="btn btn-sm ${curso ? 'btn-ok' : 'btn-pri'}" data-a="hviaje-mov" data-id="${esc(x.id)}" data-v="${curso ? 'in' : 'out'}">${I(curso ? 'login' : 'logout')}${curso ? 'Volvió' : 'Salió'}</button>`
+        : `<span class="pill ${curso ? 'p-warn' : 'p-sky'}">${curso ? 'En viaje' : 'Programado'}</span>`}</div>`; };
+  return `<div class="card vans-garita">
+    <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="row" style="gap:8px">${I('car')}Vans del hotel · hoy</b>
+      <span class="muted small">${pend.length ? plural(pend.length, 'salida pendiente', 'salidas pendientes') : vs.length ? 'todas hechas' : 'sin traslados programados'}${hechos.length ? ` · ${plural(hechos.length, 'hecha', 'hechas')}` : ''}</span></div>
+    ${pend.length ? `<div class="vg-lista">${pend.map(fila).join('')}</div>` : ''}
+    ${hechos.length ? `<details class="vg-hechos" data-k="vans-hechas"><summary class="muted small">Hechas hoy (${hechos.length})</summary>${hechos.map(x => { const v = vanDe(x); return `<div class="small" style="margin:4px 0">${I('check')} ${esc(x.sale || '—')} · ${esc(textoViaje(x))}${v ? ' · ' + esc(v.nombre) : ''} · salió ${x.salioAt ? hora(x.salioAt) : '—'} · volvió ${x.volvioAt ? hora(x.volvioAt) : '—'}</div>`; }).join('')}</details>` : ''}
+    ${vans.length ? `<div class="vg-vans"><span class="muted tiny">Salida o entrada sin traslado programado:</span>${vans.map(v => { const e = estadoVan(v);
+      return `<span class="vg-van">${esc(v.nombre)} <span class="mono muted">${esc(v.patente || '')}</span> · ${e.adentro ? 'en el barrio' : 'afuera'}${opera ? ` <button class="btn btn-xs btn-sec" data-a="hvan-mov" data-id="${esc(v.id)}" data-v="${e.adentro ? 'out' : 'in'}">${e.adentro ? 'Salió' : 'Entró'}</button>` : ''}</span>`; }).join('')}</div>` : ''}
+  </div>`;
+}
 
 /* Programar un traslado. `data-v` trae lo que ya se sabe:
    "vuelo|AR1881|D|15:40|13:30", "crucero|<barco>|buscar|<fecha>|<sale>",
@@ -634,67 +702,110 @@ function hotelValidar(pat){
 }
 
 /* =========================================================
-   PROMOCIONES: las propone el hotel, las publica la Administración
+   PROMOCIONES: las cargan el hotel o la Administración
+   Pedido de Claudio (27-09): antes el hotel las proponía y la
+   Administración las publicaba. Ahora los dos agregan, editan y borran
+   directo en barrio/promos, que es lo que muestra la tira del hotel en la
+   app de todos. Resguardos: cada cambio queda en la auditoría con quién
+   lo hizo y le avisa al otro (si cambia el hotel, a la Administración; si
+   cambia la Administración, al hotel); el enlace solo puede ser http(s).
+   Las propuestas del circuito viejo que quedaron sin resolver (hotelPromos
+   en 'propuesta' o 'baja') se muestran aparte para publicarlas o
+   descartarlas.
    ========================================================= */
+const puedePromos = () => esHotel() || esAdmin();
+const promosCargadas = () => aLista(Store.s.promos).filter(p => p && p.id);
+const promosViejasPend = () => aLista(Store.s.hotelPromos).filter(p => p && (p.estado === 'propuesta' || p.estado === 'baja'));
+/* Un enlace que se abre desde la app de todos: nada de "javascript:" ni
+   otros esquemas, solo páginas web. */
+const enlaceWeb = u => /^https?:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+const estadoPromo = p => { const hoy = hoyISO();
+  if (p.hasta && p.hasta < hoy) return ['', 'Vencida · no se ve'];
+  if (p.desde && p.desde > hoy) return ['warn', 'Sale el ' + fechaCorta(p.desde)];
+  return ['ok', 'En la tira']; };
+/* El descuento como en la tira (o una estrella), para reconocerla de un vistazo. */
+const marcaPromo = p => p.descuento ? `<span class="promo-desc">${esc(p.descuento)}</span>` : `<span class="ic ic-wood">${I('star')}</span>`;
+const quienPromo = x => x === 'hotel' ? 'el hotel' : 'la Administración';
+const autorPromo = p => p.autor || (p.hotel ? 'hotel' : 'admin');
+/* Deja rastro y le avisa al otro lado. que = 'Publicó' | 'Cambió' | 'Sacó'. */
+function avisarPromo(s, que, p){
+  auditar(s, `${que} una promoción del hotel`, p.titulo);
+  const aviso = { titulo:`${esHotel() ? 'El hotel' : 'La Administración'} ${que.toLowerCase()} una promoción`, texto:p.titulo, icon:'sparkle', color:'wood', link:'hotel-promos' };
+  if (esHotel()) notificar(s, { para:'rol:admin', ...aviso });
+  else { const h = hotelId(); if (h) notificar(s, { para:[h], ...aviso }); }
+}
 R['hotel-promos'] = {
-  titulo:'Promociones del hotel', icon:'sparkle', color:'wood', sub:'Las propone el hotel · las publica la Administración',
+  titulo:'Promociones del hotel', icon:'sparkle', color:'wood', sub:'Las cargan el hotel o la Administración · salen en la tira de todas las apps',
   render(){
-    const ps = aLista(Store.s.hotelPromos).filter(Boolean).sort((a, b) => b.at - a.at);
-    const est = { propuesta:['warn', 'Esperando aprobación'], publicada:['ok', 'Publicada en la app'], rechazada:['danger', 'No aprobada'], baja:['warn', 'Pidió sacarla'], retirada:['', 'Retirada'] };
-    return `${esHotel() ? superficie({ a:'hpromo-editar', icon:'plus', t:'Proponer una promoción', s:'Para los vecinos: aparece en la tira del hotel', cls:'acento' }) : ''}
-      ${ps.length ? ps.map(p => { const e = est[p.estado] || est.propuesta;
-        return `<div class="card"><div class="row" style="justify-content:space-between;gap:8px;align-items:flex-start"><div class="grow"><b>${esc(p.titulo)}</b>${p.descuento ? ` <span class="promo-desc">${esc(p.descuento)}</span>` : ''}
-          <div class="muted small">${esc(p.detalle || '')}${p.desde || p.hasta ? ` · ${p.desde ? 'desde ' + fechaCorta(p.desde) : ''}${p.hasta ? ' hasta ' + fechaCorta(p.hasta) : ''}` : ''}</div>${p.motivo ? `<div class="small" style="margin-top:4px"><b>Motivo:</b> ${esc(p.motivo)}</div>` : ''}</div>
-          <span class="pill ${e[0] ? 'p-' + e[0] : ''}">${e[1]}</span></div>
-          <div class="btns" style="margin-top:8px">${esAdmin() && p.estado === 'propuesta' ? `<button class="btn btn-xs btn-ok" data-a="hpromo-aprobar" data-id="${esc(p.id)}">${I('check')}Publicar</button><button class="btn btn-xs btn-danger-soft" data-a="hpromo-rechazar" data-id="${esc(p.id)}">No aprobar</button>` : ''}
-            ${esAdmin() && p.estado === 'baja' ? `<button class="btn btn-xs btn-pri" data-a="hpromo-retirar" data-id="${esc(p.id)}">Sacarla de la app</button>` : ''}
-            ${esHotel() && p.estado === 'publicada' ? `<button class="btn btn-xs btn-sec" data-a="hpromo-baja" data-id="${esc(p.id)}">Pedir que la saquen</button>` : ''}
-            ${esHotel() && p.estado !== 'publicada' ? `<button class="btn btn-xs btn-sec" data-a="hpromo-editar" data-id="${esc(p.id)}">${I('edit')}Editar</button>` : ''}</div></div>`; }).join('')
-        : vacio('sparkle', 'No hay promociones propuestas.')}`;
+    if (!puedePromos()) return vacio('lock', 'Las promociones las manejan el hotel y la Administración.');
+    const peso = p => ({ ok:0, warn:1 })[estadoPromo(p)[0]] ?? 2;
+    const ps = promosCargadas().sort((a, b) => peso(a) - peso(b) || String(b.desde || '').localeCompare(String(a.desde || '')));
+    const viejas = promosViejasPend(), enTira = ps.filter(p => estadoPromo(p)[0] === 'ok').length;
+    return `${superficie({ a:'hpromo-editar', icon:'plus', t:'Nueva promoción', s:'Sale enseguida en la tira del hotel, en la app de todos', cls:'acento' })}
+      ${viejas.length ? sec(`Propuestas que quedaron pendientes (${viejas.length})`) + viejas.map(p => `<div class="card"><div class="row" style="gap:10px;align-items:flex-start">${marcaPromo(p)}
+          <div class="grow" style="min-width:0"><b>${esc(p.titulo)}</b><div class="muted small">${esc(p.detalle || '')}${p.estado === 'baja' ? ' · el hotel había pedido sacarla' : ''}</div></div></div>
+          <div class="btns" style="margin-top:8px">${p.estado === 'baja' ? `<button class="btn btn-xs btn-pri" data-a="hpromo-retirar" data-id="${esc(p.id)}">${I('trash')}Sacarla de la tira</button>` : `<button class="btn btn-xs btn-ok" data-a="hpromo-aprobar" data-id="${esc(p.id)}">${I('check')}Publicarla</button>`}
+            <button class="btn btn-xs btn-sec" data-a="hpromo-descartar" data-id="${esc(p.id)}">Descartar</button></div></div>`).join('') : ''}
+      ${sec(`En la tira ahora (${enTira})`)}
+      ${ps.length ? ps.map(p => { const e = estadoPromo(p);
+        return `<div class="card"><div class="row" style="gap:10px;align-items:flex-start">${marcaPromo(p)}
+          <div class="grow" style="min-width:0"><b>${esc(p.titulo)}</b>
+          <div class="muted small">${esc(p.detalle || '')}${p.desde || p.hasta ? `${p.detalle ? ' · ' : ''}${p.desde ? 'desde ' + fechaCorta(p.desde) : ''}${p.hasta ? ' hasta ' + fechaCorta(p.hasta) : ''}` : ''}</div>
+          <div class="muted tiny" style="margin-top:6px"><span class="pill ${e[0] ? 'p-' + e[0] : ''}">${e[1]}</span> Cargada por ${quienPromo(autorPromo(p))}${p.editadoAt ? ` · último cambio: ${quienPromo(p.editadoPor)}, ${hace(p.editadoAt)}` : ''}</div></div></div>
+          <div class="btns" style="margin-top:8px"><button class="btn btn-xs btn-sec" data-a="hpromo-editar" data-id="${esc(p.id)}">${I('edit')}Editar</button>
+            <button class="btn btn-xs btn-danger-soft" data-a="hpromo-borrar" data-id="${esc(p.id)}">${I('trash')}Borrar</button></div></div>`; }).join('')
+        : vacio('sparkle', 'Todavía no hay promociones cargadas. Mientras tanto, la tira muestra ejemplos marcados como tales.')}
+      <p class="muted tiny" style="margin-top:12px">${I('info')} Lo que cargan el hotel o la Administración sale en la tira del hotel, en la app de todos los vecinos. Cada cambio queda registrado con quién lo hizo y al otro le llega el aviso. Las vencidas dejan de verse solas.</p>`;
   },
 };
 A['hpromo-editar'] = el => {
-  if (!soloHotel()) return;
-  const p = aLista(Store.s.hotelPromos).find(x => x.id === el?.dataset?.id) || {};
-  hoja(p.id ? 'Editar promoción' : 'Proponer una promoción', `<form data-f="hpromo" data-id="${esc(p.id || '')}">
+  if (!puedePromos()) return;
+  const p = promosCargadas().find(x => x.id === el?.dataset?.id) || {};
+  hoja(p.id ? 'Editar promoción' : 'Nueva promoción', `<form data-f="hpromo" data-id="${esc(p.id || '')}">
     <div class="field"><label>Título</label><input name="titulo" required maxlength="60" value="${esc(p.titulo || '')}" placeholder="Cena de los viernes"></div>
     <div class="field"><label>Detalle</label><input name="detalle" maxlength="120" value="${esc(p.detalle || '')}"></div>
     <div class="grid3"><div class="field"><label>Descuento</label><input name="descuento" maxlength="12" value="${esc(p.descuento || '')}" placeholder="20 %"></div>
       <div class="field"><label>Desde</label><input type="date" name="desde" value="${esc(p.desde || hoyISO())}"></div>
       <div class="field"><label>Hasta</label><input type="date" name="hasta" value="${esc(p.hasta || '')}"></div></div>
-    <div class="field"><label>Enlace para reservar (opcional)</label><input name="url" type="url" maxlength="200" value="${esc(p.url || '')}"></div>
-    <button class="btn btn-pri btn-block">${I('send')}Mandar a la Administración</button></form>`);
+    <div class="field"><label>Enlace para reservar (opcional)</label><input name="url" type="url" maxlength="200" value="${esc(p.url || '')}" placeholder="https://…"></div>
+    <p class="muted tiny" style="margin:0 0 10px">${p.id ? 'Los cambios se ven enseguida en la app de todos.' : 'Sale enseguida en la tira del hotel, en la app de todos.'} ${esHotel() ? 'La Administración recibe el aviso.' : 'El hotel recibe el aviso.'}</p>
+    <button class="btn btn-pri btn-block">${I('check')}${p.id ? 'Guardar los cambios' : 'Publicar en la tira'}</button></form>`);
 };
 F['hpromo'] = (d, form) => {
-  if (!soloHotel()) return;
-  const id = form.dataset.id;
-  Store.cambiar(s => { s.hotelPromos = aLista(s.hotelPromos);
-    const datos = { titulo:d.titulo.trim(), detalle:(d.detalle || '').trim(), descuento:(d.descuento || '').trim(), desde:d.desde || '', hasta:d.hasta || '', url:(d.url || '').trim(), estado:'propuesta', motivo:'' };
-    const x = id && s.hotelPromos.find(p => p.id === id);
-    if (x) Object.assign(x, datos); else s.hotelPromos.push({ id:'hpr' + uid(), at:Date.now(), ...datos });
-    notificar(s, { para:'rol:admin', titulo:'El hotel propone una promoción', texto:datos.titulo, icon:'sparkle', color:'wood', link:'hotel-promos' }); });
-  cerrarHoja(); toast('Enviada. La Administración la revisa y la publica.', 'send');
+  if (!puedePromos()) return;
+  if (d.desde && d.hasta && d.hasta < d.desde){ toast('"Hasta" no puede ser antes de "Desde"', 'calendar'); return; }
+  const url = (d.url || '').trim();
+  if (url && !enlaceWeb(url)){ toast('El enlace tiene que empezar con https://', 'link'); return; }
+  const id = form.dataset.id, quien = esHotel() ? 'hotel' : 'admin';
+  Store.cambiar(s => { s.promos = aLista(s.promos);
+    const datos = { titulo:d.titulo.trim().slice(0, 60), detalle:(d.detalle || '').trim().slice(0, 120), descuento:(d.descuento || '').trim().slice(0, 12), desde:d.desde || '', hasta:d.hasta || '', url, hotel:true };
+    const x = id && s.promos.find(p => p.id === id);
+    if (x){ Object.assign(x, datos, { editadoAt:Date.now(), editadoPor:quien }); avisarPromo(s, 'Cambió', x); }
+    else { const n = { id:'hp' + uid(), ...datos, autor:quien, createdAt:Date.now() }; s.promos.unshift(n); avisarPromo(s, 'Publicó', n); } });
+  cerrarHoja(); toast(id ? 'Promoción actualizada' : 'Publicada en la tira del hotel', 'check');
 };
+A['hpromo-borrar'] = async el => {
+  if (!puedePromos()) return;
+  const p = promosCargadas().find(x => x.id === el.dataset.id); if (!p) return;
+  if (!await confirmar('Borrar la promoción', `"${esc(p.titulo)}" deja de verse en la app de todos.`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { s.promos = aLista(s.promos).filter(x => x.id !== p.id);
+    aLista(s.hotelPromos).forEach(v => { if (v && v.promoId === p.id) v.estado = 'retirada'; });
+    avisarPromo(s, 'Sacó', p); });
+  toast('Promoción borrada', 'trash');
+};
+/* Las que quedaron del circuito viejo. */
 A['hpromo-aprobar'] = el => {
-  if (!esAdmin()) return;
+  if (!puedePromos()) return;
   Store.cambiar(s => { const p = aLista(s.hotelPromos).find(x => x.id === el.dataset.id); if (!p) return;
     const promoId = 'hp-' + p.id; s.promos = aLista(s.promos).filter(x => x.id !== promoId);
-    s.promos.unshift({ id:promoId, titulo:p.titulo, detalle:p.detalle, descuento:p.descuento, desde:p.desde, hasta:p.hasta, url:p.url, hotel:true, createdAt:Date.now() });
-    p.estado = 'publicada'; p.promoId = promoId; p.motivo = '';
-    const h = hotelId(); if (h) notificar(s, { para:[h], titulo:'Se publicó tu promoción', texto:p.titulo, icon:'sparkle', color:'ok', link:'hotel-promos' });
-    auditar(s, 'Publicó una promoción del hotel', p.titulo); });
+    const n = { id:promoId, titulo:p.titulo, detalle:p.detalle || '', descuento:p.descuento || '', desde:p.desde || '', hasta:p.hasta || '', url:enlaceWeb(p.url), hotel:true, autor:'hotel', createdAt:Date.now() };
+    s.promos.unshift(n); p.estado = 'publicada'; p.promoId = promoId; p.motivo = '';
+    avisarPromo(s, 'Publicó', n); });
   toast('Publicada en la tira del hotel', 'check');
 };
-A['hpromo-rechazar'] = el => {
-  if (!esAdmin()) return;
-  const motivo = prompt('¿Por qué no se aprueba? (lo lee el hotel)') || '';
-  Store.cambiar(s => { const p = aLista(s.hotelPromos).find(x => x.id === el.dataset.id); if (!p) return; p.estado = 'rechazada'; p.motivo = motivo.trim().slice(0, 200);
-    const h = hotelId(); if (h) notificar(s, { para:[h], titulo:'La Administración no aprobó una promoción', texto:`${p.titulo}${p.motivo ? ' · ' + p.motivo : ''}`, icon:'sparkle', color:'warn', link:'hotel-promos' }); });
-};
-A['hpromo-baja'] = el => { if (!soloHotel()) return; Store.cambiar(s => { const p = aLista(s.hotelPromos).find(x => x.id === el.dataset.id); if (p) p.estado = 'baja';
-  notificar(s, { para:'rol:admin', titulo:'El hotel pide sacar una promoción', texto:p ? p.titulo : '', icon:'sparkle', color:'wood', link:'hotel-promos' }); }); toast('Pedido enviado a la Administración', 'send'); };
-A['hpromo-retirar'] = el => { if (!esAdmin()) return; Store.cambiar(s => { const p = aLista(s.hotelPromos).find(x => x.id === el.dataset.id); if (!p) return;
-  s.promos = aLista(s.promos).filter(x => x.id !== p.promoId); p.estado = 'retirada'; auditar(s, 'Sacó una promoción del hotel', p.titulo); }); toast('Promoción retirada', 'check'); };
+A['hpromo-retirar'] = el => { if (!puedePromos()) return; Store.cambiar(s => { const p = aLista(s.hotelPromos).find(x => x.id === el.dataset.id); if (!p) return;
+  s.promos = aLista(s.promos).filter(x => x.id !== p.promoId); p.estado = 'retirada'; avisarPromo(s, 'Sacó', p); }); toast('Promoción retirada', 'check'); };
+A['hpromo-descartar'] = el => { if (!puedePromos()) return; Store.cambiar(s => { const p = aLista(s.hotelPromos).find(x => x.id === el.dataset.id); if (p) p.estado = 'descartada'; }); toast('Descartada', 'check'); };
 
 /* =========================================================
    EMERGENCIAS DEL HOTEL, SU DEA Y LA FICHA
@@ -882,7 +993,7 @@ R['hotel-vivo'] = {
   render(){
     const hoy = hoyISO(), vans = hotelVans(), vs = viajesDelDia(hoy), ev = hotelEventos().filter(e => e.fecha === hoy), h = cuentaHotel(), info = hotelInfo();
     const hs = esGuardia() ? hotelHuespedes().filter(x => x.desde <= hoy && x.hasta >= hoy) : [];
-    const promosPend = aLista(Store.s.hotelPromos).filter(p => p.estado === 'propuesta' || p.estado === 'baja').length;
+    const promosPend = promosViejasPend().length;
     const evPend = hotelEventos().filter(e => e.avisarVecinos && !e.publicado && e.fecha >= hoy).length;
     const provMal = hotelProvs().filter(p => estadoProv(p)[0] !== 'ok').length;
     return `${!h ? aviso('info', 'star', 'El hotel todavía no tiene su cuenta', esAdmin() ? 'Se crea en "Cuenta del hotel".' : 'La crea la Administración.', esAdmin() ? `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="hotel-cuenta">Cuenta del hotel</button>` : '') : ''}
@@ -898,7 +1009,7 @@ R['hotel-vivo'] = {
         ${teja({ v:'hotel-proveedores', icon:'box', color:'brand', t:'Proveedores del hotel', s:'ART, seguro y QR', badge: esAdmin() ? provMal : 0 })}
         ${teja({ v:'hotel-eventos', icon:'star', color:'accent', t:'Eventos del hotel', s: esAdmin() ? 'Publicar para los vecinos' : 'Lo que anunció el hotel', badge: esAdmin() ? evPend : 0 })}
         ${esGuardia() ? teja({ v:'hotel-huespedes', icon:'users', color:'sky', t:'Huéspedes', s:'Los de hoy y los que están' }) : teja({ v:'hotel-huespedes', icon:'users', color:'sky', t:'Huéspedes', s:'Solo la cantidad (sin nombres)' })}
-        ${esAdmin() ? teja({ v:'hotel-promos', icon:'sparkle', color:'wood', t:'Promociones', s:'Publicar o no', badge: promosPend }) : ''}
+        ${esAdmin() ? teja({ v:'hotel-promos', icon:'sparkle', color:'wood', t:'Promociones', s:'Agregar, editar o borrar', badge: promosPend }) : ''}
         ${teja({ v:'hotel-emergencias', icon:'siren', color:'danger', t:'Emergencias del hotel', s:'DEA y primeros auxilios' })}
         ${h ? teja({ v:'privado', p:(esGuardia() ? 'guardia' : 'admin') + '|' + h.id, icon:'chat', color:'accent', t:'Mensajes con el hotel', s:'Privado, con la recepción' }) : ''}
         ${esAdmin() ? teja({ v:'hotel-cuenta', icon:'key', color:'accent', t:'Cuenta del hotel', s: h ? 'Activa' : 'Crearla' }) : ''}
@@ -907,21 +1018,21 @@ R['hotel-vivo'] = {
       </div>`;
   },
 };
-/* La banda del hotel en la portada de la garita. */
+/* La banda del hotel en la portada de la garita: eventos y huéspedes que
+   llegan hoy. Las vans y sus traslados tienen su propia solapa
+   (bandaVansGarita), para marcar salidas y regresos a un toque. */
 function bandaHotel(opera){
-  const vans = hotelVans(), vs = viajesDelDia().filter(x => x.estado === 'programado' || x.estado === 'en_curso'), ev = hotelEventos().filter(e => e.fecha === hoyISO());
+  const ev = hotelEventos().filter(e => e.fecha === hoyISO());
   const hs = hotelHuespedes().filter(x => x.desde === hoyISO() && !x.ingreso);
-  if (!vans.length && !vs.length && !ev.length && !hs.length) return '';
+  if (!ev.length && !hs.length) return '';
   return `<div class="card hv-banda"><div class="hv-cab">${I('star')}<b>${HOTEL_NOMBRE}</b><button class="link" data-a="abrir" data-v="hotel-vivo">Ver todo</button></div>
     ${ev.map(e => `<div class="small" style="margin:4px 0">${I('star')} <b>Evento hoy:</b> ${esc(e.titulo)} · ${esc(e.desde || '')}${e.hasta ? '–' + esc(e.hasta) : ''} h · ${plural(+e.asistentes || 0, 'invitado')}</div>`).join('')}
-    ${vans.length ? `<div class="hv-vans compacta">${vans.map(v => tarjetaVan(v, { garita:opera })).join('')}</div>` : ''}
-    ${vs.length ? `<div class="small muted" style="margin-top:6px">${I('clock')} Próximos traslados: ${vs.slice(0, 3).map(x => `${esc(x.sale || '—')} ${esc((DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro)[0].toLowerCase())}`).join(' · ')}</div>` : ''}
     ${hs.length ? `<div class="small" style="margin-top:6px">${I('users')} ${plural(hs.length, 'huésped llega', 'huéspedes llegan')} hoy · <button class="link" data-a="abrir" data-v="hotel-huespedes">ver la lista</button></div>` : ''}</div>`;
 }
 /* La sala del hotel en el Día a día de la Administración. */
 function salaHotel(){
   const h = cuentaHotel(), hoy = hoyISO();
-  const promos = aLista(Store.s.hotelPromos).filter(p => p.estado === 'propuesta' || p.estado === 'baja').length;
+  const promos = promosViejasPend().length;
   const evs = hotelEventos().filter(e => e.avisarVecinos && !e.publicado && e.fecha >= hoy).length;
   const prov = hotelProvs().filter(p => !p.revisado || estadoProv(p)[0] === 'danger').length;
   const vs = viajesDelDia(hoy).length;
@@ -929,7 +1040,7 @@ function salaHotel(){
     linea: h ? `${plural(hotelVans().length, 'van', 'vans')} · ${plural(vs, 'traslado', 'traslados')} hoy · ${plural(hotelInfo().huespedesHoy || 0, 'huésped', 'huéspedes')}` : 'Sin cuenta del hotel todavía',
     items:[
       { v:'hotel-vivo', icon:'eye', t:'El hotel en vivo', s:'Vans, traslados, eventos · sin nombres de huéspedes' },
-      { v:'hotel-promos', icon:'sparkle', t:'Promociones del hotel', s:'Publicar o no las que propone', badge:promos },
+      { v:'hotel-promos', icon:'sparkle', t:'Promociones del hotel', s:'Agregar, editar o borrar · salen en la tira', badge:promos },
       { v:'hotel-eventos', icon:'star', t:'Eventos del hotel', s:'Avisar a los vecinos si lo pide', badge:evs },
       { v:'hotel-proveedores', icon:'box', t:'Proveedores del hotel', s:'Revisar ART y seguro', badge:prov },
       ...(h ? [{ v:'privado', p:'admin|' + h.id, icon:'chat', t:'Mensajes con el hotel', s:'Privado, con la recepción' }] : []),

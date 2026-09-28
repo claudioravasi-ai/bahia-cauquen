@@ -93,7 +93,7 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 7;
+var VERSION_SCRIPT = 8;
 
 function doPost(e) {
   try {
@@ -148,9 +148,12 @@ function mandarCorreo(datos) {
   };
   if (RESPONDER_A) envio.replyTo = RESPONDER_A;
   MailApp.sendEmail(envio);
-  registrar('ENVIADO', datos.para, datos.tipo || '');
+  /* El aviso de "Estoy bien" a un familiar no deja la dirección completa en
+     el registro: que alguien vive solo no tiene por qué quedar anotado. */
+  registrar('ENVIADO', datos.tipo === 'estoy-bien' ? taparCorreo(datos.para) : datos.para, datos.tipo || '');
   return {ok: true};
 }
+function taparCorreo(c) { c = String(c || ''); var i = c.indexOf('@'); return i > 1 ? c.charAt(0) + '***' + c.slice(i) : '***'; }
 
 function doGet(e) {
   var q = e && e.parameter && e.parameter.q;
@@ -158,6 +161,7 @@ function doGet(e) {
   var props = PropertiesService.getScriptProperties();
   return responder({ok: true, estado: 'activo', version: VERSION_SCRIPT, enviadosHoy: contarHoy(), tope: TOPE_DIARIO, cruceros: true,
     frase: !!claveDelScript(), push: !!props.getProperty('FCM_CUENTA'), mercadoPago: !!props.getProperty('MP_ACCESS_TOKEN'),
+    relojCuidados: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'revisarCuidados'; }),
     mpPrueba: /^TEST-/.test(String(props.getProperty('MP_ACCESS_TOKEN') || '').trim()) || /^s[ií]$/i.test(String(props.getProperty('MP_PRUEBA') || '').trim())});
 }
 
@@ -232,6 +236,8 @@ function mandarPush(d) {
   var db = baseValida(d.db);
   if (!db) return {ok: false, error: 'Falta la dirección de la base'};
   if (contarHoy('PUSH') >= 400) return {ok: false, error: 'tope diario de avisos push alcanzado'};
+  /* La dirección de la base queda guardada: la usa el reloj de "Estoy bien". */
+  if (props.getProperty('BASE_URL') !== db) props.setProperty('BASE_URL', db);
   var destino = tokensDe(db, d.para, d.excluir);
   if (!destino.equipos.length) return {ok: true, enviados: 0};
   var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.messaging');
@@ -264,9 +270,177 @@ function mandarPush(d) {
     UrlFetchApp.fetch(db + '/barrio/pushTokens.json?access_token=' + encodeURIComponent(destino.acceso),
       {method: 'patch', contentType: 'application/json', payload: JSON.stringify(borrar), muteHttpExceptions: true});
   }
-  registrar('PUSH', enviados + ' equipos', datos.titulo);
+  /* Los avisos de "Estoy bien" y del DEA no dejan nombres en el registro. */
+  registrar('PUSH', enviados + ' equipos', /^(bien-|dear-)/.test(datos.tag) ? 'aviso privado (Estoy bien / DEA)' : datos.titulo);
   return {ok: true, enviados: enviados, borrados: Object.keys(borrar).length};
 }
+
+/**
+ * "ESTOY BIEN" Y AVISO DE SALIDA: EL RELOJ DEL BARRIO (27-09-2026)
+ * ---------------------------------------------------------------------------
+ * Quien vive solo toca "Estoy bien" una vez por día en la app. Si a su hora
+ * no lo tocó, hay que avisarles a sus contactos, AUNQUE TODOS LOS TELÉFONOS
+ * ESTÉN BLOQUEADOS. Eso lo hace este reloj: cada 10 minutos lee
+ * cuidado/<vecino> en la base y
+ *   · una hora antes de su hora, le manda al vecino un recordatorio
+ *     ("¿Estás bien?"); tocarlo ya cuenta como aviso;
+ *   · pasada su hora sin aviso, avisa a sus contactos (push y campanita), a
+ *     la garita si la eligió, y un correo al familiar;
+ *   · si una hora después nadie lo resolvió, insiste una vez;
+ *   · lo mismo con el aviso de salida (kayak, montaña) que no marcó "Volví".
+ * Cada aviso se RECLAMA con una escritura condicional (ETag): si un equipo
+ * de la app ya lo dio, acá no se repite, y al revés.
+ *
+ * INSTALARLO (una sola vez, después de pegar esta versión):
+ *   en el menú de funciones de arriba elegir instalarRelojCuidados y tocar
+ *   "Ejecutar". Google pide permiso (aceptar). Listo: queda andando solo.
+ *   Necesita FCM_CUENTA (la misma de los avisos push) y la dirección de la
+ *   base (BASE_URL), que se guarda sola la primera vez que la app manda un
+ *   aviso push.
+ */
+var ZONA_BARRIO = 'America/Argentina/Ushuaia';
+var SALIDA_TIPOS = {kayak: ['Kayak, remo o SUP', '106'], navegacion: ['Navegación', '106'], trekking: ['Trekking o caminata', '911'],
+  montana: ['Montaña o escalada', '911'], pesca: ['Pesca', '911'], bici: ['Bici o MTB', '911'], nieve: ['Esquí o travesía con nieve', '911'], otra: ['Otra salida', '911']};
+
+function instalarRelojCuidados() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'revisarCuidados') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('revisarCuidados').timeBased().everyMinutes(10).create();
+  var base = baseValida(PropertiesService.getScriptProperties().getProperty('BASE_URL'));
+  Logger.log('Reloj instalado: revisarCuidados corre cada 10 minutos. ' + (base ? 'Base: ' + base
+    : 'Todavía no se conoce la dirección de la base (BASE_URL): se guarda sola la primera vez que la app manda un aviso push (por ejemplo, Ajustes → Avisos al celular → Probar).'));
+}
+
+function horaBarrio(ts) { return Utilities.formatDate(new Date(ts), ZONA_BARRIO, 'HH:mm'); }
+function minutosDelDia(hhmm) { var p = String(hhmm || '10:00').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); }
+/* Ushuaia está siempre en UTC-3 (sin horario de verano). */
+function inicioDelDia(iso) { return new Date(iso + 'T00:00:00-03:00').getTime(); }
+function primerNombreDe(n) { return String(n || '').trim().split(/\s+/)[0] || 'Vecino/a'; }
+
+function leerBase(base, acceso, ruta) {
+  var r = UrlFetchApp.fetch(base + '/' + ruta + '.json?access_token=' + encodeURIComponent(acceso), {muteHttpExceptions: true});
+  if (r.getResponseCode() !== 200) throw new Error('No se pudo leer ' + ruta + ': ' + r.getContentText().slice(0, 160));
+  return JSON.parse(r.getContentText() || 'null');
+}
+/* Escribe SOLO si ahí no había nada (y nadie escribió en el medio). */
+function reclamarEnBase(base, acceso, ruta, valor) {
+  var url = base + '/' + ruta + '.json?access_token=' + encodeURIComponent(acceso);
+  var r = UrlFetchApp.fetch(url, {headers: {'X-Firebase-ETag': 'true'}, muteHttpExceptions: true});
+  if (r.getResponseCode() !== 200 || r.getContentText() !== 'null') return false;
+  var h = r.getAllHeaders(), etag = h.ETag || h.Etag || h.etag || h['ETAG'];
+  if (!etag) return false;
+  var w = UrlFetchApp.fetch(url, {method: 'put', contentType: 'application/json', payload: JSON.stringify(valor), headers: {'if-match': etag}, muteHttpExceptions: true});
+  return w.getResponseCode() === 200;
+}
+
+function revisarCuidados() {
+  var props = PropertiesService.getScriptProperties();
+  var base = baseValida(props.getProperty('BASE_URL'));
+  if (!base || !props.getProperty('FCM_CUENTA')) return;
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email');
+    var todos = leerBase(base, acceso, 'cuidado') || {};
+    var ahora = Date.now(), hoy = Utilities.formatDate(new Date(), ZONA_BARRIO, 'yyyy-MM-dd'), ini = inicioDelDia(hoy);
+    /* La garita y la Administración reciben SIEMPRE el aviso (decisión de
+       Claudio, 27-09); se leen una vez por vuelta y solo si hace falta. */
+    var staff = null;
+    var cuentasDeGarita = function () {
+      if (staff) return staff;
+      var us = leerBase(base, acceso, 'barrio/users') || {};
+      staff = Object.keys(us).filter(function (k) { return us[k] && (us[k].rol === 'guardia' || us[k].rol === 'admin') && us[k].estado === 'aprobado'; });
+      return staff;
+    };
+    Object.keys(todos).forEach(function (id) {
+      var x = todos[id];
+      if (!x || typeof x !== 'object') return;
+      x.id = id; x.contactos = x.contactos || {}; x.aviso = x.aviso || {}; x.recordado = x.recordado || {};
+      try {
+        /* El aviso diario. */
+        if (x.activo && !(x.pausaHasta && x.pausaHasta >= hoy) && (x.ultimo || 0) < ini) {
+          var limite = ini + minutosDelDia(x.hora) * 60000;
+          var desdeManana = (x.creado || 0) >= ini && (x.creado || 0) > limite - 3600000;
+          var av = x.aviso[hoy];
+          if (!desdeManana && !av) {
+            if (ahora >= limite) {
+              if (reclamarEnBase(base, acceso, 'cuidado/' + id + '/aviso/' + hoy, {at: ahora, tipo: 'diario', quien: 'reloj', por: 'servidor'}))
+                alarmaCuidado(base, acceso, x, 'diario', hoy, false, cuentasDeGarita);
+            } else if (ahora >= limite - 3600000 && !x.recordado[hoy]) {
+              if (reclamarEnBase(base, acceso, 'cuidado/' + id + '/recordado/' + hoy, ahora))
+                mandarPush({db: base, para: [id], titulo: '¿Estás bien?', texto: 'Tocá acá para avisar que estás bien.',
+                  link: 'estoy-bien:ok', tag: 'bien-rec-' + hoy, urgente: true, sonido: 'bien'});
+            }
+          } else if (av && !av.resuelto && !av.insiste && ahora - (av.at || 0) >= 3600000) {
+            if (reclamarEnBase(base, acceso, 'cuidado/' + id + '/aviso/' + hoy + '/insiste', {at: ahora, quien: 'reloj'}))
+              alarmaCuidado(base, acceso, x, 'diario', hoy, true, cuentasDeGarita);
+          }
+        }
+        /* El aviso de salida. */
+        var sa = x.salida;
+        if (sa && sa.vuelta && sa.creada && !sa.volvio) {
+          var ks = 's-' + sa.creada, lim = sa.vuelta + (sa.margen || 60) * 60000, avs = x.aviso[ks];
+          if (!avs && ahora >= lim) {
+            if (reclamarEnBase(base, acceso, 'cuidado/' + id + '/aviso/' + ks, {at: ahora, tipo: 'salida', quien: 'reloj', por: 'servidor'}))
+              alarmaCuidado(base, acceso, x, 'salida', ks, false, cuentasDeGarita);
+          } else if (avs && !avs.resuelto && !avs.insiste && ahora - (avs.at || 0) >= 3600000) {
+            if (reclamarEnBase(base, acceso, 'cuidado/' + id + '/aviso/' + ks + '/insiste', {at: ahora, quien: 'reloj'}))
+              alarmaCuidado(base, acceso, x, 'salida', ks, true, cuentasDeGarita);
+          }
+        }
+      } catch (err) { registrar('CUIDADO-ERROR', 'vecino', String(err).slice(0, 200)); }
+    });
+  } finally { lock.releaseLock(); }
+}
+
+/* Lo mismo que Cuidado.avisar() de la app: mismos textos y mismos ids de
+   aviso, así, si la app y el reloj lo escriben, queda uno solo. */
+function alarmaCuidado(base, acceso, x, tipo, k, otraVez, cuentasDeGarita) {
+  var pila = primerNombreDe(x.nombre), titulo, texto;
+  if (tipo === 'diario') {
+    titulo = (otraVez ? 'Sigue sin avisar: ' : '') + pila + ' no avisó hoy que está bien';
+    texto = (x.casa || '') + ' · tenía hasta las ' + (x.hora || '10:00') + '. Llamalo/a o pasá a ver. Si ya sabés que está bien, avisalo en la app.';
+  } else {
+    var sa = x.salida || {}, t = SALIDA_TIPOS[sa.tipo] || SALIDA_TIPOS.otra;
+    titulo = (otraVez ? 'Sigue sin volver: ' : '') + pila + ' no volvió de su salida';
+    texto = t[0] + (sa.donde ? ' · ' + sa.donde : '') + ' · volvía a las ' + horaBarrio(sa.vuelta) + (sa.con ? ' · con ' + sa.con : '') +
+      '. Probá llamarlo/a; si no contesta, ' + (t[1] === '106' ? 'Prefectura: 106' : 'emergencias: 911') + '.';
+  }
+  var para = Object.keys(x.contactos);
+  cuentasDeGarita().forEach(function (g) { if (para.indexOf(g) < 0) para.push(g); });
+  para = para.filter(function (p) { return p && p !== x.id; });
+  var clave = ('bien-' + x.id + '-' + k + (otraVez ? '-otra' : '')).replace(/[.#$\[\]\/\s]/g, '_'), ahora = Date.now(), cambios = {};
+  if (para.length) {
+    var n1 = {id: 'm-' + clave + '-1', para: para, titulo: titulo, texto: texto, icon: tipo === 'diario' ? 'heart' : 'pin', color: 'danger', link: tipo === 'diario' ? 'estoy-bien' : 'salidas', urgente: true, sonido: true, de: 'sistema', at: ahora};
+    para.forEach(function (p) { cambios['pv/notifs/' + p + '/' + n1.id] = n1; });
+  }
+  if (!otraVez) {
+    var n2 = {id: 'm-' + clave + '-2', para: [x.id], titulo: tipo === 'diario' ? 'Hoy no avisaste que estás bien' : 'No marcaste que volviste',
+      texto: tipo === 'diario' ? 'Avisamos a la garita, a la Administración y a tus familiares. Si estás bien, tocá "Estoy bien" para tranquilizarlos.' : 'Avisamos a la garita, a la Administración y a tus familiares. Si ya volviste, tocá "Volví" para tranquilizarlos.',
+      icon: 'heart', color: 'warn', link: tipo === 'diario' ? 'estoy-bien' : 'salidas', sonido: true, de: 'sistema', at: ahora};
+    cambios['pv/notifs/' + x.id + '/' + n2.id] = n2;
+  }
+  if (Object.keys(cambios).length)
+    UrlFetchApp.fetch(base + '/.json?access_token=' + encodeURIComponent(acceso), {method: 'patch', contentType: 'application/json', payload: JSON.stringify(cambios), muteHttpExceptions: true});
+  if (para.length) mandarPush({db: base, para: para, titulo: titulo, texto: texto, link: tipo === 'diario' ? 'estoy-bien' : 'salidas', tag: 'bien-' + x.id + '-' + tipo, urgente: true, sonido: 'sos'});
+  if (!otraVez) mandarPush(tipo === 'diario'
+    ? {db: base, para: [x.id], titulo: '¿Estás bien?', texto: 'Tocá acá para avisar que estás bien.', link: 'estoy-bien:ok', tag: 'bien-yo', urgente: true, sonido: 'bien'}
+    : {db: base, para: [x.id], titulo: '¿Ya volviste?', texto: 'Tocá acá y después "Volví" para que se queden tranquilos.', link: 'salidas', tag: 'bien-salida', urgente: true, sonido: 'bien'});
+  /* Los familiares (hasta 3) por correo. Acepta el formato viejo de uno solo. */
+  var fams = [].concat(x.familiares ? (Array.isArray(x.familiares) ? x.familiares : Object.keys(x.familiares).map(function (k) { return x.familiares[k]; })) : [], x.familiar ? [x.familiar] : []);
+  if (!otraVez) fams.forEach(function (f) {
+    if (!f || !f.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email) || contarHoy() >= TOPE_DIARIO) return;
+    var cuerpo = '<p>Hola' + (f.nombre ? ' ' + escHtml(f.nombre) : '') + ':</p>' +
+      '<p><b>' + escHtml(x.nombre || pila) + '</b> (' + escHtml(x.casa || '') + ', barrio Bahía Cauquén) te eligió para avisarte ' +
+      (tipo === 'diario' ? 'si algún día no confirmaba en la app del barrio que está bien' : 'si no volvía a tiempo de una salida') + '.</p>' +
+      '<p>' + escHtml(texto) + '</p>' + (x.tel ? '<p>Su teléfono: <b>' + escHtml(x.tel) + '</b></p>' : '') +
+      '<p>La garita y la Administración del barrio ya fueron avisadas.</p>' +
+      '<p style="font-size:12.5px;color:#6c7d7a">Lo mandó la app del barrio en forma automática. Puede ser un olvido: probá comunicarte antes de alarmarte.</p>';
+    MailApp.sendEmail({to: f.email, subject: titulo, htmlBody: cuerpo, name: NOMBRE_REMITENTE});
+    registrar('ENVIADO', taparCorreo(f.email), 'estoy-bien');
+  });
+  registrar('CUIDADO', tipo + (otraVez ? ' (insiste)' : ''), para.length + ' contactos avisados');
+}
+function escHtml(s) { return String(s || '').replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
 
 /**
  * COBRO DE EXPENSAS CON MERCADO PAGO

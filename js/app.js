@@ -40,7 +40,9 @@ function sincronizarHistorial(){
 /* Sin el chat vecinal (26-09, pedido de Claudio): el vecino se comunica con
    la garita por mensaje privado o por peticiones; el chat es entre vecinos. */
 const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron',
-  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda', 'manual']);
+  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda', 'manual',
+  /* "Estoy bien": la garita ve solo a los vecinos que la eligieron como contacto (27-09). */
+  'estoy-bien', 'salidas']);
 /* El hotel ve solo lo suyo y lo público de la ciudad (ver js/v-hotel.js).
    Emergencias (la de los vecinos) no: tiene el pedido del DEA y los SOS del
    día; el hotel tiene la suya. */
@@ -338,7 +340,10 @@ function pintarTop(){
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
     <button class="icon-btn" data-a="mi-cuenta" aria-label="Mi cuenta">${avatar(u, 'sm')}</button>
     ${esHotel() ? `<button class="sos-btn" data-a="hotel-urgente" aria-label="Urgencia: avisar a la garita">${I('siren')}<span>Garita</span></button>`
-      : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
+      /* La garita no lleva SOS (pedido de Claudio, 27-09): es la que RECIBE
+         los SOS. Si la garita misma está en peligro, usa "Aviso urgente"
+         (le llega a todo el barrio) y llama al 911/101. */
+      : esGuardia() ? '' : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
 }
 
 function pintar(){
@@ -415,7 +420,11 @@ function refrescar(){
      nodo, el navegador vuelve a pintar la imagen y se ve un parpadeo cada
      vez que llega un dato (el clima, un aviso, el motor). */
   const fotoVieja = cuerpo.querySelector('.hero .foto');
+  /* Los desplegables con nombre (data-k) quedan como los dejó la persona:
+     antes, cada dato que llegaba los volvía a cerrar o a abrir. */
+  const plegados = {}; $$('details[data-k]', cuerpo).forEach(d => { plegados[d.dataset.k] = d.open; });
   try { cuerpo.innerHTML = def.render(activa.param); } catch(err){ console.error(err); cuerpo.innerHTML = panelDeError(err); }
+  $$('details[data-k]', cuerpo).forEach(d => { if (d.dataset.k in plegados) d.open = plegados[d.dataset.k]; });
   const fotoNueva = cuerpo.querySelector('.hero .foto');
   if (fotoVieja && fotoNueva && fotoVieja.style.backgroundImage === fotoNueva.style.backgroundImage)
     fotoNueva.replaceWith(fotoVieja);
@@ -676,6 +685,9 @@ function pintarAlarmas(){
   if (!u){ box.innerHTML = ''; Dea.silencio(); return; }
   /* La garita: un pedido del DEA tapa todo hasta que alguien sale con él. */
   if (Dea.pintarEnGarita(box)) return;
+  /* Los vecinos del equipo de salud: la garita salió con el DEA y los
+     necesita (js/v-cuidados.js, Respondedores). */
+  if (typeof Respondedores !== 'undefined' && Respondedores.pintar(box)) return;
   /* Las que llegan en vivo y este equipo todavía no mostró: saltan y suenan una vez. */
   const recien = sosAbiertas().filter(x => x.userId !== u.id && x.estado !== 'atendida' && !sosAvisadas.has(x.id) && Date.now() - x.at < SOS_EN_VIVO);
   recien.forEach(x => { sosAvisadas.add(x.id); sosEnPantalla.add(x.id); sosOcultas.delete(x.id); });
@@ -895,16 +907,25 @@ A['dea-si'] = () => {
       ${g ? `<a class="btn btn-sec" href="${telLink(g)}">${I('gate')}Llamar a la garita</a>` : ''}</div>
     <p class="muted small" style="margin:14px 0 0">Cuando alguien de la garita salga con el DEA, te llega un aviso.</p>`);
 };
+/* "Voy en camino con el DEA" hace dos cosas (pedido de Claudio, 27-09):
+   le avisa al vecino que pidió el DEA y, con el mismo toque, a los vecinos
+   del equipo de salud o con RCP (Respondedores, en js/v-cuidados.js). */
 A['dea-voy'] = el => {
   Dea.silencio();
+  let x = null, quienes = [];
   Store.cambiar(s => {
-    const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
+    x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
     x.estado = 'en_camino'; x.atiende = yo().id; x.enCaminoAt = Date.now();
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`Sale el DEA hacia ${usuario(x.userId)?.casa || ''}.`, at:Date.now() });
     notificar(s, { para:x.userId, titulo:'El DEA va en camino', texto:'La garita salió con el desfibrilador.', icon:'heart', color:'ok', urgente:true, sonido:true });
     notificar(s, { para:'rol:admin', titulo:'El DEA va en camino', texto:usuario(x.userId)?.casa || '', icon:'heart', color:'ok' });
+    if (typeof Respondedores !== 'undefined'){
+      quienes = Respondedores.alertar(s, x);
+      if (quienes.length) s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`Aviso a ${plural(quienes.length, 'vecino del equipo de salud', 'vecinos del equipo de salud')} por el DEA a ${usuario(x.userId)?.casa || ''}.`, at:Date.now() });
+    }
   });
-  toast('Avisamos al vecino: el DEA va en camino', 'heart');
+  if (x && quienes.length) Respondedores.empujar(x, quienes);
+  toast(quienes.length ? `Avisamos al vecino y a ${plural(quienes.length, 'vecino del equipo de salud', 'vecinos del equipo de salud')}` : 'Avisamos al vecino: el DEA va en camino', 'heart');
 };
 A['dea-listo'] = el => {
   Store.cambiar(s => { const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return; x.estado = 'resuelta'; x.resueltaAt = Date.now(); x.resuelve = yo().id; });
@@ -1001,7 +1022,7 @@ function pintarBienvenida(modo = 'inicio'){
 
   else {
     titulo = 'Bienvenido al barrio';
-    bajada = 'Visitas con QR, reservas, avisos de la guardia, clima y vuelos de Ushuaia, votaciones y todo lo que pasa entre vecinos.';
+    bajada = 'Tus visitas pasan con un QR, la guardia te avisa al instante y el resto está a un toque: reservas, votaciones, el clima y los vuelos de Ushuaia, y todo lo que pasa entre vecinos.';
     cuerpo = `
       ${pend && pend.estado === 'pendiente' ? `<div class="aviso a-warn">${I('clock')}<div class="txt"><b>Tu inscripción está en revisión</b>Cuando la aprueben te llega un correo.${pend.token ? `<div class="acciones"><button class="btn btn-xs btn-sec" data-a="ver-inscripcion" data-v="${pend.token}">Ver mi inscripción</button></div>` : ''}</div></div>` : ''}
       ${pend && pend.estado === 'rechazado' ? `<div class="aviso a-danger">${I('x')}<div class="txt"><b>Tu pedido no fue aprobado</b>Comunicate con la Administración.</div></div>` : ''}
@@ -1024,7 +1045,7 @@ function pintarBienvenida(modo = 'inicio'){
       <div class="portal-contenido">
         <header class="portal-marca"><span class="logo">${LOGO}</span>
           <div><b>Barrio ${esc(c.nombre)}</b><small>${esc(c.ciudad)}</small></div></header>
-        <div class="portal-lema"><h1>La vida del barrio,<br>en un solo lugar.</h1>
+        <div class="portal-lema"><h1>El barrio inteligente<br>del fin del mundo</h1>
           ${(() => { const cl = Clima.d?.c; if (!cl) return '';
             const [desc, ico] = Clima.cod(cl.weather_code);
             return `<div class="portal-clima">${I(ico)}<b>${Math.round(cl.temperature_2m)}°</b><span>${esc(desc)} · ráfagas ${Math.round(cl.wind_gusts_10m)} km/h</span></div>`; })()}</div>
@@ -1196,6 +1217,7 @@ function elegirSOS(){
     <p class="muted tiny" style="margin:14px 0 0">La alerta les muestra a todos tu nombre, tu lote y, si el teléfono lo permite, tu ubicación en este momento, para que sepan dónde está pasando. Si te equivocaste, cerrá esta ventana: todavía no se mandó nada.</p>`);
 }
 A['sos-enviar'] = el => {
+  if (esGuardia()) return;
   const u = yo(), tipo = el.dataset.v, t = TIPOS_SOS[tipo];
   const idSos = uid();
   /* Se pide la ubicación en el momento: si el vecino la da, la guardia ve
@@ -1281,11 +1303,10 @@ A['mi-cuenta'] = () => { const u = yo();
       <div class="seg">${[['auto', 'Automático', 'sunrise'], ['light', 'Día', 'sun'], ['dark', 'Noche', 'moon']].map(([k, t, ic]) =>
         `<label><input type="radio" name="temaRapido" ${(Store.sesion.tema || 'auto') === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
       <div class="ayuda">En automático sigue la salida y la puesta del sol en Ushuaia (hoy: ${Clima.sol().sale} a ${Clima.sol().pone}).</div></div>
-    ${esGuardia() ? superficie({ a:'cerrar-turno', icon:'clock', color:'warn', t:'Cerrar el turno', s:'Deja las novedades y abre el turno siguiente, sin salir' }) : ''}
     ${(() => { const otros = esGuardia() ? [] : Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa.</div>` : ''; })()}
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
-    ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
+    ${esGuardia() ? '' : superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
     ${superficie({ a:'abrir-manual', icon:'book', color:'accent', t:'Manual de uso', s:'Paso a paso, por capítulos' })}
     ${typeof Asistente !== 'undefined' && Asistente.paraMi() && Asistente.soportado() ? superficie({ a:'asistente-ajuste', icon:'volume', color:'sky', t: Asistente.permiso() === 'si' ? 'Asistente por voz: activado' : 'Asistente por voz: apagado', s: Asistente.permiso() === 'si' ? 'Tocá el escudo y pedile algo. Tocá acá para apagarlo en este equipo.' : 'Pedirle cosas a la app con la voz. Tocá para activarlo en este equipo.' }) : ''}
     ${esGuardia() || esHotel() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
@@ -1360,7 +1381,12 @@ F['cambiar-clave'] = async d => {
   Store.cambiar(s => { s.users.find(x => x.id === u.id).clave = String(d.nueva).trim().toUpperCase(); });
   cerrarHoja(); toast('Clave cambiada', 'check');
 };
+/* La cuenta de la garita NO cambia su correo (pedido de Claudio, 27-09):
+   con ese correo exacto la garita se habilita sola (esCorreoGarita) y lo
+   conoce todo el barrio. La contraseña sí la puede cambiar. */
+const garitaSinCorreo = () => { if (!esGuardia()) return false; toast('La cuenta de la garita no cambia su correo. La contraseña sí.', 'lock'); return true; };
 A['cambiar-email'] = () => {
+  if (garitaSinCorreo()) return;
   const u = yo(), nube = Nube.activa();
   hoja('Cambiar mi correo', `<form data-f="cambiar-email">
     <p class="muted small" style="margin:0 0 12px">Ahora entrás con <b>${esc(u.email)}</b>.</p>
@@ -1370,6 +1396,7 @@ A['cambiar-email'] = () => {
     ${nube ? `<p class="muted tiny" style="margin:10px 0 0">Te llega un aviso a la dirección nueva: hay que confirmarlo desde ahí. Hasta entonces seguís entrando con la vieja.</p>` : ''}</form>`);
 };
 F['cambiar-email'] = async d => {
+  if (garitaSinCorreo()) return;
   const u = yo(), email = (d.email || '').trim().toLowerCase();
   if (email === u.email){ toast('Es el mismo correo', 'info'); return; }
   if (Store.s.users.some(x => x.id !== u.id && (x.email || '').toLowerCase() === email)){ toast('Ese correo ya está en uso en el barrio', 'alert'); return; }
@@ -1503,12 +1530,19 @@ function entrarComo(id){
   Motor.correr();
   if (puedeAdministrar()) setTimeout(() => elegirModo({ alEntrar:true }), 250);
 }
-F['entrar'] = async d => {
+F['entrar'] = async (d, form) => {
   const email = (d.email || '').trim().toLowerCase();
   if (Nube.activa()){
-    try { await Nube.entrar(email, d.clave); toast('¡Bienvenido/a!', 'home'); }
-    catch(e){ toast({ 'auth/invalid-credential':'El email o la contraseña no coinciden', 'auth/user-not-found':'No encontramos ese email',
-      'auth/wrong-password':'La contraseña no coincide', 'auth/too-many-requests':'Demasiados intentos: esperá unos minutos' }[e.code] || e.message, 'alert'); }
+    /* Respuesta al instante: con la conexión de un celular, entre el toque
+       y la app abierta pueden pasar varios segundos (se valida la clave y se
+       lee la ficha). Sin esto parecía que no había entrado. */
+    const b = form && form.querySelector('button:not([type="button"])'), antes = b ? b.innerHTML : '';
+    if (b){ if (b.disabled) return; b.disabled = true; b.innerHTML = `${I('refresh')}Entrando…`; }
+    try { await Nube.entrar(email, d.clave); pintarEntrando(); }
+    catch(e){ if (b){ b.disabled = false; b.innerHTML = antes; }
+      toast({ 'auth/invalid-credential':'El email o la contraseña no coinciden', 'auth/user-not-found':'No encontramos ese email',
+      'auth/wrong-password':'La contraseña no coincide', 'auth/too-many-requests':'Demasiados intentos: esperá unos minutos',
+      'auth/network-request-failed':'Sin conexión: revisá internet y probá de nuevo' }[e.code] || e.message, 'alert'); }
     return;
   }
   const clave = (d.clave || '').trim().toUpperCase();
@@ -1636,9 +1670,9 @@ const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
     'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
     'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno',
-    'hvan-mov', 'hprov-mov', 'hhuesped-ingreso', 'sos-pedir-hotel', 'pase-vencido']),
+    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hhuesped-ingreso', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar']),
   formularios: new Set(['validar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra',
-    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno']),
+    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada']),
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]');
@@ -1661,12 +1695,20 @@ document.addEventListener('click', e => {
    Entrar, o se apretó Enter después de escribir la contraseña a mano.
    Un envío que llega justo después del autocompletado se ignora, y el
    botón titila para indicar que falta tocarlo.
+   27-09 (Claudio: "a veces pongo mis credenciales y no ingreso, y otras
+   me ingresa solo"): la ventana del toque era de 2,5 s. Si se tocaba
+   Entrar con los campos vacíos, Chrome ofrecía la contraseña guardada y,
+   si se elegía rápido, su envío automático caía dentro de esos 2,5 s y la
+   app entraba sola; si se tardaba un poco más, se ignoraba sin decir nada.
+   Ahora la ventana es de 0,8 s (lo que tarda un toque de verdad), el
+   envío automático se ignora SIEMPRE y se avisa "tocá Entrar", y al tocar
+   Entrar aparece al instante "Entrando…" (ver F['entrar']).
    ========================================================= */
 const Ingreso = {
   toque:0, tecleo:false,
   valido(form){
     if (form.dataset.f !== 'entrar') return true;
-    if (Date.now() - this.toque < 2500) return true;
+    if (Date.now() - this.toque < 800) return true;
     return this.tecleo && Date.now() - (this.enter || 0) < 1500;
   },
 };
@@ -1689,6 +1731,7 @@ document.addEventListener('submit', e => {
   if (!Ingreso.valido(form)){
     const b = form.querySelector('button:not([type="button"])');
     if (b){ b.classList.remove('titila'); void b.offsetWidth; b.classList.add('titila'); }
+    toast('Tus datos ya están completos: tocá Entrar para ingresar', 'login');
     return;
   }
   const f = F[form.dataset.f];
@@ -1798,6 +1841,8 @@ const PIEZAS = [
   ['js/v-legal.js',   () => typeof LEGAL],
   ['js/v-manual.js',   () => typeof MANUAL_CAPS],
   ['js/v-hotel.js',    () => typeof HotelMotor],
+  ['js/v-cuidados.js', () => typeof Cuidado],
+  ['js/v-casa.js',     () => typeof TAREAS_INVIERNO],
   ['js/asistente.js',  () => typeof Asistente],
   ['js/push.js',       () => typeof Push],
   ['js/sismos.js',     () => typeof Sismos],
@@ -1863,7 +1908,18 @@ function salirDeLaEspera(){
 }
 A['salir-espera-ya'] = () => salirDeLaEspera();
 
-function pintarEspera(){
+/* Después de validar la contraseña: la ficha y los datos del barrio están
+   bajando. Nube.cargar() dibuja la app apenas tiene la ficha; si la
+   conexión está muy lenta, a los 20 s se ofrece probar de nuevo. */
+function pintarEntrando(){
+  if (yo() && Nube.arrancada){ pintar(); return; }
+  pintarEspera('Entraste. Estamos abriendo tu cuenta…', 'Bajando los datos del barrio. Con la conexión del celular puede tardar unos segundos.');
+  setTimeout(() => {
+    const caja = $('.portal-caja.esperando'); if (!caja) return;
+    caja.insertAdjacentHTML('beforeend', `<small style="margin-top:6px">La conexión está lenta.</small><button class="btn btn-pri" onclick="location.reload()">Probar de nuevo</button>`);
+  }, 20000);
+}
+function pintarEspera(titulo = 'Conectando con el barrio…', texto = 'Un segundo: estamos viendo si tu sesión sigue abierta.'){
   $('#app').innerHTML = `<div class="portal">
     <div class="portal-foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="portal-contenido">
@@ -1871,8 +1927,8 @@ function pintarEspera(){
         <div><b>Barrio ${esc(Store.s.config.nombre)}</b><small>${esc(Store.s.config.ciudad)}</small></div></header>
       <div class="portal-caja esperando">
         <div class="cargando"><span></span><span></span><span></span></div>
-        <b>Conectando con el barrio…</b>
-        <small>Un segundo: estamos viendo si tu sesión sigue abierta.</small>
+        <b>${esc(titulo)}</b>
+        <small>${esc(texto)}</small>
         <button class="btn btn-sec" data-a="salir-espera-ya">Entrar igual</button>
         <small class="version">Versión ${esc(window.VERSION || 'sin sellar')}</small>
       </div></div></div>`;

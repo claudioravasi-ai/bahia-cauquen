@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probá la app Bahía Cauquén</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#edf2f1; --surf:#ffffff; --surf-2:#f5f8f7; --surf-3:#e6eeec;
+  --ink:#0f1f1e; --ink-2:#3d4f4d; --muted:#667775; --line:#dce5e3; --line-2:#c9d6d3;
+  --brand:#0d6b66; --brand-2:#14968c; --brand-soft:#d8eeea; --deep:#0b3c47;
+  --ok:#1b8f5a; --ok-soft:#dcf3e7; --danger:#d33a3a; --danger-soft:#fde5e5;
+  --warn:#b7790a; --warn-soft:#fcf0d2; --sky:#2b6fb3; --sky-soft:#e1edf9; --wood:#b85f24; --wood-soft:#fbe9dc;
+  --marco:#1b2629; --marco-2:#2c393c; --sombra:0 24px 60px rgba(11,60,71,.22);
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+    --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+    --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --deep:#0b3c47;
+    --ok:#4fd08f; --ok-soft:#133526; --danger:#f07171; --danger-soft:#3d1c1d;
+    --warn:#f0b54a; --warn-soft:#3a2c10; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --wood-soft:#3a2415;
+    --marco:#000000; --marco-2:#1f2a2d; --sombra:0 24px 60px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+  --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+  --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --deep:#0b3c47;
+  --ok:#4fd08f; --ok-soft:#133526; --danger:#f07171; --danger-soft:#3d1c1d;
+  --warn:#f0b54a; --warn-soft:#3a2c10; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --wood-soft:#3a2415;
+  --marco:#000000; --marco-2:#1f2a2d; --sombra:0 24px 60px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-inline:16px;padding-block:0 40px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.02em}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2.5px solid var(--brand-2);outline-offset:2px;border-radius:8px}
+.envol{max-width:1240px;margin:0 auto}
+
+/* ---------- portada ---------- */
+.cabeza{position:relative;margin:16px 0 22px;border-radius:26px;overflow:hidden;color:#fff;background:var(--deep)}
+.cabeza-foto{position:absolute;inset:0;background:url("img/portada-dia.jpg") center 58%/cover no-repeat;opacity:.55}
+.cabeza::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,rgba(7,40,47,.94) 0%,rgba(7,40,47,.78) 45%,rgba(7,40,47,.2) 100%)}
+.cabeza-in{position:relative;z-index:1;padding:26px 26px 24px;display:grid;gap:14px;max-width:720px}
+.marca{display:flex;align-items:center;gap:12px}
+.marca img{width:52px;height:52px;border-radius:50%;background:#fff;object-fit:cover;box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+.marca b{display:block;font-size:15px;font-weight:800}
+.marca small{display:block;font-size:12.5px;opacity:.85}
+.cabeza h1{font-size:clamp(30px,5vw,50px);font-weight:800;line-height:1.02}
+.cabeza p{font-size:16.5px;max-width:58ch;opacity:.94}
+.sellos{display:flex;flex-wrap:wrap;gap:8px}
+.sello{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2)}
+.sonido{justify-self:start;display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px;padding:9px 14px;border-radius:12px;background:#fff;color:var(--deep)}
+.sonido[aria-pressed="true"]{background:#ffd97a}
+
+/* ---------- título "pronto" y cifras ---------- */
+.pronto{justify-self:start;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border-radius:999px;background:#ffd97a;color:#3a2a00}
+.pronto::before{content:"";width:8px;height:8px;border-radius:50%;background:#d33a3a;animation:vivo 1.6s infinite}
+.cifras{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 22px}
+.cifra{background:var(--surf);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.cifra b{display:block;font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.03em;color:var(--brand)}
+.cifra span{display:block;font-size:13px;color:var(--ink-2);line-height:1.35}
+@media (max-width:760px){ .cifras{grid-template-columns:1fr 1fr} }
+
+/* ---------- el banco de pruebas ---------- */
+.banco{display:grid;grid-template-columns:260px minmax(0,1fr);gap:22px;align-items:start}
+.menu{position:sticky;top:12px;display:flex;flex-direction:column;gap:14px}
+.menu h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:800;margin:0 4px 6px}
+.menu-grupo{display:flex;flex-direction:column;gap:4px}
+.opc{display:flex;align-items:center;gap:10px;text-align:left;padding:9px 10px;border-radius:14px;color:var(--ink-2);font-weight:600;font-size:14.5px;line-height:1.25}
+.opc .ic{flex:none;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--surf);border:1px solid var(--line);font-size:16px}
+.opc:hover{background:var(--surf)}
+.opc.on{background:var(--surf);color:var(--ink);box-shadow:0 1px 2px rgba(15,31,30,.06),0 6px 18px rgba(15,31,30,.06)}
+.opc.on .ic{background:var(--brand);border-color:var(--brand);color:#fff}
+.opc.hecha .ic::after{content:"✓";position:absolute;font-size:10px}
+.opc small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
+
+.escena{display:grid;gap:18px}
+.escena-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+.escena-cab h2{font-size:clamp(22px,3vw,30px);font-weight:800}
+.escena-cab p{color:var(--ink-2);max-width:60ch}
+.mesa{display:grid;grid-template-columns:repeat(2,minmax(0,300px)) minmax(0,1fr);gap:22px;align-items:start}
+.mesa.uno{grid-template-columns:minmax(0,300px) minmax(0,1fr)}
+.col-tel{display:grid;gap:10px;justify-items:center}
+.col-tel[hidden]{display:none!important}
+.rol{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--ink);min-height:30px;transition:color .3s}
+.rol span{font-weight:600;color:var(--muted)}
+.rol.le-toca{color:var(--brand)}
+.rol.le-toca::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--brand-2);box-shadow:0 0 0 0 var(--brand-2);animation:vivo 1.6s infinite}
+@keyframes vivo{70%{box-shadow:0 0 0 8px rgba(20,150,140,0)}100%{box-shadow:0 0 0 0 rgba(20,150,140,0)}}
+
+/* el teléfono */
+.tel{position:relative;width:min(300px,100%);height:620px;border-radius:44px;background:var(--marco);padding:11px;box-shadow:var(--sombra),inset 0 0 0 2px var(--marco-2)}
+.tel-pantalla{position:relative;height:100%;border-radius:34px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column}
+.tel-isla{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:92px;height:26px;border-radius:14px;background:#000;z-index:5}
+.tel-estado{flex:none;display:flex;justify-content:space-between;align-items:center;padding:12px 24px 4px;font-size:12.5px;font-weight:800;color:var(--ink);font-family:var(--mono)}
+.tel-estado i{font-style:normal;letter-spacing:1px;font-size:10px}
+.tel-app{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;position:relative}
+.tel-app::-webkit-scrollbar{display:none}
+.tel-push{position:absolute;top:44px;left:10px;right:10px;z-index:8;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.push{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:18px;background:color-mix(in srgb,var(--surf) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,.2);border:1px solid var(--line);animation:baja .45s cubic-bezier(.2,.9,.3,1.2) both;font-size:12.5px;line-height:1.35}
+.push.sale{animation:sube .35s ease-in both}
+.push .pi{flex:none;width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
+.push b{display:block;font-size:12.5px}
+.push small{display:block;color:var(--muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+@keyframes baja{from{transform:translateY(-120%);opacity:0}}
+@keyframes sube{to{transform:translateY(-120%);opacity:0}}
+
+/* ---------- la app, dentro del teléfono ---------- */
+.ap{padding:0 12px 18px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.ap-top{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;padding:6px 12px 8px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.ap-top img{width:30px;height:30px;border-radius:50%;background:#fff;object-fit:cover}
+.ap-top .t{flex:1;min-width:0}
+.ap-top b{display:block;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ap-top small{display:block;font-size:10.5px;color:var(--muted)}
+.ap-campana{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--surf);border:1px solid var(--line);font-size:13px;position:relative}
+.ap-campana[data-n]::after{content:attr(data-n);position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;border-radius:8px;background:var(--danger);color:#fff;font-size:9px;font-weight:800;display:grid;place-items:center;padding:0 3px}
+.ap-sos{font-size:11px;font-weight:800;color:#fff;background:#d33a3a;padding:6px 9px;border-radius:999px;position:relative;overflow:hidden}
+.ap-top.staff{background:color-mix(in srgb,var(--deep) 94%,transparent);color:#fff;border-bottom:0}
+.ap-top.staff small{color:rgba(255,255,255,.75)}
+.ap-top.rojo{background:#8f1d1d;color:#fff}
+.ap-hola{padding:14px 12px 4px}
+.ap-hola small{color:var(--muted);font-weight:700}
+.ap-hola b{display:block;font-size:20px;font-weight:800;letter-spacing:-.02em}
+.ap-card{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:12px}
+.ap-card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.ap-lbl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:4px 2px -2px}
+.ap-tejas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ap-teja{text-align:left;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:10px;min-height:74px;display:flex;flex-direction:column;justify-content:space-between;gap:4px}
+.ap-teja .e{font-size:18px}
+.ap-teja b{font-size:12px;line-height:1.2}
+.ap-teja.destaca{grid-column:span 2;background:var(--brand);color:#fff;border-color:var(--brand);min-height:62px}
+.ap-it{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.ap-it:last-child{border:0}
+.ap-it .e{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--surf-3);font-size:15px}
+.ap-it .x{flex:1;min-width:0}
+.ap-it b{display:block;font-size:12.5px}
+.ap-it span{display:block;font-size:11.5px;color:var(--muted)}
+.ap-pill{flex:none;font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--surf-3);color:var(--ink-2)}
+.ap-pill.ok{background:var(--ok-soft);color:var(--ok)} .ap-pill.warn{background:var(--warn-soft);color:var(--warn)} .ap-pill.mal{background:var(--danger-soft);color:var(--danger)}
+.ap-campo{display:grid;gap:3px}
+.ap-campo label{font-size:11px;font-weight:800;color:var(--ink-2)}
+.ap-campo .v{border:1.5px solid var(--line-2);background:var(--surf);border-radius:11px;padding:8px 10px;font-size:12.5px;min-height:34px}
+.ap-dos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ap-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 12px;border-radius:13px;background:var(--brand);color:#fff;font-weight:800;font-size:13px;position:relative;overflow:hidden}
+.ap-btn.sec{background:var(--surf-3);color:var(--ink)}
+.ap-btn.ok{background:var(--ok)} .ap-btn.rojo{background:#d33a3a} .ap-btn.claro{background:#fff;color:#8f1d1d}
+.ap-btn.chico{width:auto;padding:7px 10px;font-size:11.5px;border-radius:10px}
+.ap-btns{display:flex;gap:8px}
+.ap-btns > *{flex:1}
+.ap-aviso{display:flex;gap:9px;align-items:flex-start;padding:10px;border-radius:13px;font-size:12px;line-height:1.4}
+.ap-aviso b{display:block;font-size:12.5px}
+.ap-aviso.ok{background:var(--ok-soft);color:var(--ok)} .ap-aviso.ok span{color:var(--ink-2)}
+.ap-aviso.mal{background:var(--danger-soft);color:var(--danger)} .ap-aviso.mal span{color:var(--ink-2)}
+.ap-aviso.info{background:var(--sky-soft);color:var(--sky)} .ap-aviso.info span{color:var(--ink-2)}
+.ap-aviso.warn{background:var(--warn-soft);color:var(--warn)} .ap-aviso.warn span{color:var(--ink-2)}
+.ap-mono{font-family:var(--mono);letter-spacing:.06em}
+.ap-qr{display:grid;place-items:center;background:#fff;border-radius:14px;padding:10px;margin:0 auto;width:170px;height:170px}
+.ap-qr svg{width:150px;height:150px}
+.ap-codigo{font-family:var(--mono);font-size:26px;font-weight:600;text-align:center;letter-spacing:.14em}
+.ap-centro{text-align:center}
+.ap-muted{color:var(--muted);font-size:11.5px}
+.ap-hoja{position:absolute;inset:0;z-index:6;background:rgba(0,0,0,.35);display:flex;align-items:flex-end}
+.ap-hoja > div{width:100%;background:var(--surf);border-radius:22px 22px 0 0;padding:16px 14px 20px;display:grid;gap:10px;animation:baja .01s}
+.ap-roja{min-height:100%;background:#b91c1c;color:#fff;padding:16px 14px 20px;display:flex;flex-direction:column;gap:12px;animation:titila 1.1s ease-in-out infinite}
+.ap-roja .grande{font-size:28px;font-weight:800;letter-spacing:.02em;line-height:1.05}
+.ap-roja .medio{font-size:14px;font-weight:700;opacity:.95}
+@keyframes titila{50%{background:#d62828}}
+.ap-chat{display:flex;flex-direction:column;gap:6px;padding:8px 0}
+.msg{max-width:84%;padding:8px 10px;border-radius:14px;font-size:12.5px;line-height:1.4;background:var(--surf);border:1px solid var(--line)}
+.msg.mia{align-self:flex-end;background:var(--brand);color:#fff;border-color:var(--brand)}
+.msg time{display:block;font-size:10px;opacity:.7;text-align:right;margin-top:2px}
+.ap-escribir{display:flex;gap:6px;align-items:flex-end;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:6px}
+.ap-escribir .v{flex:1;font-size:12.5px;padding:4px 6px}
+.ap-escribir .ap-btn{width:auto}
+.firma{width:100%;height:110px;border:1.5px dashed var(--line-2);border-radius:12px;background:var(--surf-2);touch-action:none;display:block}
+.firma-img{height:54px;background:#fff;border-radius:8px;border:1px solid var(--line)}
+.bien-boton{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px;border-radius:20px;color:#fff;background:linear-gradient(145deg,#22a866,#15784a);animation:late 1.6s ease-in-out infinite}
+.bien-boton .c{flex:none;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.2);display:grid;place-items:center;font-size:22px}
+.bien-boton b{display:block;font-size:21px;letter-spacing:1.2px}
+.bien-boton small{display:block;font-size:11.5px;opacity:.92}
+.bien-boton.alerta{box-shadow:0 0 0 3px rgba(211,58,58,.7)}
+@keyframes late{50%{box-shadow:0 0 0 10px rgba(34,168,102,0);filter:brightness(1.08)}0%,100%{box-shadow:0 0 0 0 rgba(34,168,102,.5)}}
+.dea-fila{display:flex;gap:12px;align-items:center}
+.dea-corazon{font-size:30px;animation:latido 1s ease-in-out infinite}
+@keyframes latido{50%{transform:scale(1.15)}}
+.ap-btn[data-hold]::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.25);transform-origin:left;transform:scaleX(var(--carga,0))}
+.ap-btn[data-hold] > *{position:relative}
+/* El mismo camión de la app, con la cabina adelante (el emoji 🚛 mira para el otro lado y parecía ir marcha atrás). */
+.camion{position:absolute;top:96px;left:-120px;width:110px;animation:cruza 5.5s linear infinite;z-index:4;pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
+.camion svg{display:block;width:100%;height:auto;animation:rebota .5s ease-in-out infinite alternate}
+.camion .rueda{transform-box:fill-box;transform-origin:center;animation:gira .6s linear infinite}
+@keyframes rebota{to{transform:translateY(-2px)}}
+@keyframes gira{to{transform:rotate(360deg)}}
+@keyframes cruza{to{left:110%}}
+.plano{background:var(--surf);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.plano svg{display:block;width:100%;height:auto}
+.plano .pt{cursor:pointer}
+.plano .pt circle.aro{fill:var(--danger);opacity:.18}
+.plano .pt.ok circle.aro{fill:var(--ok);opacity:.25}
+.plano text{font-family:var(--body);font-size:9px;font-weight:800;fill:var(--ink-2)}
+.chk{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);width:100%;text-align:left;font-size:12.5px;font-weight:600}
+.chk .o{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--line-2);display:grid;place-items:center;font-size:12px;color:#fff}
+.chk.on .o{background:var(--ok);border-color:var(--ok)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg span{padding:7px 10px;border-radius:10px;border:1.5px solid var(--line-2);font-size:12px;font-weight:700}
+.seg span.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.nota-sim{font-size:10.5px;font-weight:800;color:var(--warn);text-transform:uppercase;letter-spacing:.06em;text-align:center}
+.toca{box-shadow:0 0 0 3px var(--surf),0 0 0 6px var(--brand-2);animation:tocame 1.3s ease-in-out infinite}
+@keyframes tocame{50%{box-shadow:0 0 0 3px var(--surf),0 0 0 10px rgba(20,150,140,.25)}}
+.ap-voz{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 12px;text-align:center}
+.ap-voz .mic{width:74px;height:74px;border-radius:50%;display:grid;place-items:center;font-size:30px;background:#d23b3b;color:#fff;animation:late 1.3s ease-in-out infinite}
+.ap-voz .dice{font-size:15px;font-weight:800;line-height:1.35}
+.escudo-grande{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px;border-radius:18px;background:var(--surf);border:1px solid var(--line)}
+.escudo-grande img{width:48px;height:48px;border-radius:50%;background:#fff}
+.ap-barra{height:22px;border-radius:8px;background:var(--surf-3);position:relative;overflow:hidden;margin:4px 0}
+.ap-barra i{position:absolute;inset:0 auto 0 0;background:var(--brand-soft)}
+.ap-barra span{position:relative;display:flex;justify-content:space-between;padding:2px 8px;font-size:11.5px;font-weight:800}
+.ap-slots{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ap-slot{border-radius:10px;padding:7px 8px;font-size:11.5px;font-weight:800;text-align:left;border:1.5px solid var(--line-2);background:var(--surf)}
+.ap-slot small{display:block;font-weight:600;color:var(--muted);font-size:10.5px}
+.ap-slot.libre{border-color:var(--ok);background:var(--ok-soft)}
+.ap-slot.ocup{opacity:.6}
+.ap-toast{position:absolute;left:12px;right:12px;bottom:14px;z-index:9;background:var(--ink);color:var(--bg);padding:9px 12px;border-radius:12px;font-size:12px;font-weight:700;text-align:center;animation:baja .3s both}
+
+/* ---------- lo que está pasando ---------- */
+.relato{background:var(--surf);border:1px solid var(--line);border-radius:22px;padding:18px;display:grid;gap:14px;align-self:start;position:sticky;top:12px}
+.relato .paso-n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.06em}
+.relato ol{margin:0;padding:0;list-style:none;display:grid;gap:4px;counter-reset:p}
+.relato li{counter-increment:p;display:grid;grid-template-columns:26px 1fr;gap:8px;padding:8px;border-radius:12px;color:var(--muted);font-size:14px;line-height:1.45}
+.relato li::before{content:counter(p);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--surf-3);color:var(--muted)}
+.relato li.hecho{color:var(--ink-2)}
+.relato li.hecho::before{content:"✓";background:var(--ok-soft);color:var(--ok)}
+.relato li.ahora{background:var(--brand-soft);color:var(--ink)}
+.relato li.ahora::before{background:var(--brand);color:#fff}
+.relato li b{color:var(--ink)}
+.relato .fin{padding:12px;border-radius:14px;background:var(--ok-soft);color:var(--ink);font-size:14px}
+.relato .fin b{color:var(--ok)}
+.relato-btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;font-weight:800;font-size:13.5px;background:var(--surf-3);color:var(--ink)}
+.btn.pri{background:var(--brand);color:#fff}
+.mirar{display:none}
+
+/* ---------- el pie ---------- */
+.mas{margin-top:34px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:22px}
+.mas h2{font-size:22px;font-weight:800;margin-bottom:10px}
+.mas ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.mas li{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:13.5px;color:var(--ink-2)}
+.mas li b{display:block;color:var(--ink);font-size:14px}
+.consulta{background:var(--deep);color:#fff;border-radius:22px;padding:20px;display:grid;gap:12px;align-content:start}
+.consulta b{font-size:18px}
+.consulta p{opacity:.9;font-size:14.5px}
+.consulta .num{font-family:var(--mono);font-size:18px;font-weight:600;user-select:all}
+.wa{justify-self:start;display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--deep);font-weight:800;padding:11px 16px;border-radius:12px;text-decoration:none}
+.aclara{margin-top:18px;font-size:12.5px;color:var(--muted);max-width:90ch}
+
+@media (max-width:1180px){
+  .mesa{grid-template-columns:repeat(2,minmax(0,300px));justify-content:center}
+  .mesa.uno{grid-template-columns:minmax(0,300px)}
+  .relato{grid-column:1/-1;position:static}
+}
+@media (max-width:900px){
+  .banco{grid-template-columns:1fr}
+  .menu{position:static;flex-direction:row;overflow-x:auto;gap:18px;padding-bottom:6px;scrollbar-width:thin}
+  .menu-grupo{flex:none}
+  .menu-grupo .lista{display:flex;gap:6px}
+  .opc{white-space:nowrap}
+  .opc small{display:none}
+  .mas{grid-template-columns:1fr}
+}
+@media (max-width:680px){
+  .mesa,.mesa.uno{grid-template-columns:minmax(0,300px);justify-content:center}
+  .mirar{display:flex;justify-content:center}
+  .mirar .seg-m{display:inline-flex;background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:3px}
+  .mirar button{padding:8px 12px;border-radius:9px;font-size:13px;font-weight:800;color:var(--muted)}
+  .mirar button[aria-pressed="true"]{background:var(--brand);color:#fff}
+  .col-tel.oculto{display:none}
+  .tel{height:590px}
+  .cabeza-in{padding:20px 18px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important}
+  .camion{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="envol">
+  <header class="cabeza">
+    <div class="cabeza-foto" aria-hidden="true"></div>
+    <div class="cabeza-in">
+      <div class="marca"><img src="icons/logo.png" alt="Escudo del barrio"><div><b>Barrio Bahía Cauquén</b><small>Ushuaia · Tierra del Fuego</small></div></div>
+      <span class="pronto">Muy pronto en tu teléfono</span>
+      <h1>Pronto estaremos ahí para hacerte la vida más fácil</h1>
+      <p>La app del Barrio Bahía Cauquén conecta a los vecinos, la garita y la Administración en un solo lugar. Probala acá, en vivo: veintidós situaciones de todos los días con vecinos inventados. Tocá los botones de los dos teléfonos y mirá cómo le llega a cada uno.</p>
+      <div class="sellos"><span class="sello">📱 Dos teléfonos a la vez</span><span class="sello">🔒 No se guarda ni se envía nada</span><span class="sello">⏱ Un par de minutos cada una</span></div>
+      <button class="sonido" id="sonido" aria-pressed="false">🔇 Activar el sonido de los avisos</button>
+    </div>
+  </header>
+
+  <div class="cifras" aria-label="La app en números">
+    <div class="cifra"><b>152 lotes</b><span>conectados con la garita y la Administración</span></div>
+    <div class="cifra"><b>24 h</b><span>la garita en tu bolsillo: visitas, paquetes y rondas</span></div>
+    <div class="cifra"><b>3 segundos</b><span>para pedir ayuda con el SOS, aunque el teléfono esté bloqueado</span></div>
+    <div class="cifra"><b>0 papeles</b><span>expensas, recibos, peticiones y votos, todo en la app</span></div>
+  </div>
+
+  <div class="banco">
+    <nav class="menu" id="menu" aria-label="Simulaciones"></nav>
+    <main class="escena">
+      <div class="escena-cab"><div><h2 id="escTit"></h2><p id="escSub"></p></div></div>
+      <div class="mirar" id="mirar"><div class="seg-m" role="group" aria-label="Qué teléfono mirar"><button id="verA" aria-pressed="true"></button><button id="verB" aria-pressed="false"></button></div></div>
+      <div class="mesa" id="mesa">
+        <div class="col-tel" id="colA"><div class="rol" id="rolA"></div>
+          <div class="tel"><div class="tel-pantalla"><div class="tel-isla"></div><div class="tel-estado"><span class="hora"></span><i>●●● 4G ▮</i></div><div class="tel-app" id="appA"></div><div class="tel-push" id="pushA"></div></div></div></div>
+        <div class="col-tel" id="colB"><div class="rol" id="rolB"></div>
+          <div class="tel"><div class="tel-pantalla"><div class="tel-isla"></div><div class="tel-estado"><span class="hora"></span><i>●●● 4G ▮</i></div><div class="tel-app" id="appB"></div><div class="tel-push" id="pushB"></div></div></div></div>
+        <aside class="relato" aria-live="polite">
+          <div class="paso-n" id="pasoN"></div>
+          <ol id="pasos"></ol>
+          <div class="relato-btns"><button class="btn" id="reiniciar">↺ Empezar de nuevo</button><button class="btn pri" id="siguiente" hidden>Probar la siguiente →</button></div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <section class="mas">
+    <div>
+      <h2>Todo lo que trae la app</h2>
+      <ul>
+        <li><b>Expensas claras</b>Tu cuenta, el cupón y el recibo, al día y sin planillas.</li>
+        <li><b>Reservas</b>Quincho, SUM y cancha, sin llamar a nadie.</li>
+        <li><b>Votaciones</b>Un voto por lote, desde casa, con el acta lista.</li>
+        <li><b>Pizarra del día</b>Lo importante primero, por colores, y se renueva sola.</li>
+        <li><b>Paquetes con foto</b>Te avisa apenas llega y lo retirás con tu QR.</li>
+        <li><b>Reclamos con seguimiento</b>Sabés en qué está cada pedido.</li>
+        <li><b>Obras del barrio</b>Quién construye y el aviso del día del mixer.</li>
+        <li><b>Chat vecinal</b>Entre vecinos, con normas de convivencia.</li>
+        <li><b>Agenda de Ushuaia</b>Farmacias, taxis, comidas y los oficios del barrio.</li>
+        <li><b>Ushuaia en vivo</b>Clima con alertas de viento, vuelos, cruceros y sismos.</li>
+        <li><b>Estoy bien y Salidas seguras</b>Para quien vive solo o sale al agua o la montaña.</li>
+        <li><b>Preparados para un sismo</b>Mochila, plan familiar y simulacro guiado.</li>
+        <li><b>Tu casa en invierno</b>Gas, monóxido, chimenea y caños, a tiempo.</li>
+        <li><b>Asistente por voz</b>Pedile cosas a la app con la voz.</li>
+        <li><b>La garita al día</b>Su lista de tareas se tilda sola, turno por turno.</li>
+        <li><b>Hotel Los Cauquenes</b>Vans, huéspedes y eventos, sin ver datos de vecinos.</li>
+        <li><b>Modo noche automático</b>Sigue la salida y la puesta del sol en Ushuaia.</li>
+        <li><b>Tus datos, protegidos</b>Cada uno ve solo lo suyo (Ley 25.326).</li>
+      </ul>
+    </div>
+    <div class="consulta">
+      <b>¿Dudas o ideas?</b>
+      <p>Escribile a Claudio Ravasi, vecino del Lote 148 y autor de la app.</p>
+      <span class="num">+54 9 2901 494953</span>
+      <a class="wa" href="https://wa.me/5492901494953?text=Hola%20Claudio%2C%20prob%C3%A9%20la%20app%20del%20barrio%20y%20te%20quer%C3%ADa%20comentar%3A%20" target="_blank" rel="noopener">💬 Escribirle por WhatsApp</a>
+    </div>
+  </section>
+  <p class="aclara">Es una simulación: los nombres, lotes, teléfonos y montos son inventados y esta página no se conecta con la app ni con la base del barrio. En la app real, cada persona ve solo lo que le corresponde (por ejemplo, "Estoy bien" lo ven la garita, la Administración y las personas que elige el vecino), y el pago en línea lo procesa Mercado Pago.</p>
+</div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const LOGO = 'icons/logo.png';
+
+/* ---------- estado ---------- */
+const S = { esc:0, paso:0, d:{}, sonido:false, ver:'a', hechas:new Set(), timers:[] };
+const tiempo = (f, ms) => { const t = setTimeout(f, ms); S.timers.push(() => clearTimeout(t)); return t; };
+const cada = (f, ms) => { const t = setInterval(f, ms); S.timers.push(() => clearInterval(t)); return t; };
+const limpiar = () => { S.timers.forEach(f => f()); S.timers = []; };
+
+/* ---------- sonido (solo después de tocar "Activar el sonido") ---------- */
+let ac = null;
+function tono(notas, tipo = 'sine', vol = .14){
+  if (!S.sonido) return;
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t0 = ac.currentTime;
+    notas.forEach(([f, t, d]) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = tipo; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0 + t); g.gain.linearRampToValueAtTime(vol, t0 + t + .02); g.gain.exponentialRampToValueAtTime(.001, t0 + t + d);
+      o.connect(g).connect(ac.destination); o.start(t0 + t); o.stop(t0 + t + d + .05); }); } catch(e){}
+}
+const ding = () => tono([[880, 0, .4], [660, .2, .45]]);
+const alarma = () => tono([[1175, 0, .28], [880, .3, .28], [1175, .6, .28], [880, .9, .35]], 'square', .09);
+$('#sonido').addEventListener('click', e => { S.sonido = !S.sonido; e.currentTarget.setAttribute('aria-pressed', S.sonido);
+  e.currentTarget.textContent = S.sonido ? '🔊 Sonido de los avisos: activado' : '🔇 Activar el sonido de los avisos'; if (S.sonido) ding(); });
+
+/* ---------- piezas de la app ---------- */
+const barra = (tit, sub = '', { campana = 0, sos = true, clase = '' } = {}) => `<div class="ap-top ${clase}"><img src="${LOGO}" alt=""><div class="t"><b>${tit}</b>${sub ? `<small>${sub}</small>` : ''}</div>
+  ${clase ? '' : `<span class="ap-campana" ${campana ? `data-n="${campana}"` : ''}>🔔</span>`}${sos && !clase ? '<span class="ap-sos">SOS</span>' : ''}</div>`;
+const vec = (tit = 'Bahía Cauquén', sub = 'Lucía · Lote 42', o = {}) => barra(tit, sub, o);
+const garita = (sub = 'Turno tarde · Guardia Pereyra') => barra('Garita', sub, { clase:'staff' });
+const admin = (sub = 'Administración del barrio') => barra('Administración', sub, { clase:'staff' });
+const btn = (txt, { go = true, cl = '', act = '', hold = 0, set = '' } = {}) => `<button class="ap-btn ${cl}" ${go ? 'data-go' : ''} ${act ? `data-act="${act}"` : ''} ${hold ? `data-hold="${hold}"` : ''} ${set ? `data-set="${esc(set)}"` : ''}><span>${txt}</span></button>`;
+const campo = (l, v) => `<div class="ap-campo"><label>${l}</label><div class="v">${v}</div></div>`;
+const it = (e, b, s, pill = '', cl = '') => `<div class="ap-it"><span class="e">${e}</span><div class="x"><b>${b}</b>${s ? `<span>${s}</span>` : ''}</div>${pill ? `<span class="ap-pill ${cl}">${pill}</span>` : ''}</div>`;
+const aviso = (cl, e, b, s = '') => `<div class="ap-aviso ${cl}"><span>${e}</span><div><b>${b}</b><span>${s}</span></div></div>`;
+const qr = (txt, extra = '') => `<div class="ap-qr" data-qr="${esc(txt)}" ${extra}></div>`;
+const firma = id => `<canvas class="firma" data-firma="${id}" aria-label="Firmá con el dedo o el mouse"></canvas><div class="ap-muted ap-centro">Firmá con el dedo (o el mouse)</div>`;
+const ap = (...partes) => `<div class="ap">${partes.join('')}</div>`;
+
+function push(l, e, titulo, texto, de = 'Bahía Cauquén'){
+  const box = $('#push' + l.toUpperCase()); if (!box) return;
+  const p = document.createElement('div'); p.className = 'push';
+  p.innerHTML = `<span class="pi">${e}</span><div><small>${esc(de)} · ahora</small><b>${esc(titulo)}</b>${texto ? esc(texto) : ''}</div>`;
+  box.appendChild(p); ding();
+  const quita = setTimeout(() => { p.classList.add('sale'); setTimeout(() => p.remove(), 400); }, 5200);
+  S.timers.push(() => { clearTimeout(quita); p.remove(); });
+}
+/* La voz del asistente, solo si se activó el sonido. */
+function hablar(t){ if (!S.sonido || !('speechSynthesis' in window)) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'es-AR'; const v = speechSynthesis.getVoices().find(x => /^es/i.test(x.lang)); if (v) u.voice = v; speechSynthesis.speak(u);
+    S.timers.push(() => { try { speechSynthesis.cancel(); } catch(e){} }); } catch(e){} }
+function toastTel(l, txt){
+  const app = $('#app' + l.toUpperCase()); const t = document.createElement('div'); t.className = 'ap-toast'; t.textContent = txt;
+  app.parentElement.appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+
+/* ---------- pantallas que se repiten ---------- */
+const casaInicio = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía · Lote 42', { campana }) + ap(
+  `<div class="ap-hola"><small>Buenas tardes,</small><b>Lucía</b><span class="ap-muted">Lote 42 · 7 °C · ráfagas 42 km/h</span></div>`, extra,
+  `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
+    <button class="ap-teja destaca" data-go><span class="e">🔳</span><b>Autorizar una visita</b></button>
+    <div class="ap-teja"><span class="e">🚕</span><b>Viene un Uber o DiDi</b></div><div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div>
+    <div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div><div class="ap-teja"><span class="e">💳</span><b>Mis expensas</b></div></div>`);
+const casaSimple = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía · Lote 42', { campana }) + ap(
+  `<div class="ap-hola"><small>Hola,</small><b>Lucía</b><span class="ap-muted">Lote 42</span></div>`, extra,
+  `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟢', 'Asado de primavera el sábado', 'Quincho · 13 h')}${it('🟡', 'Corte de agua mañana de 9 a 14', 'Administración')}</div>`);
+const garitaInicio = (extra = '', ingresos = []) => garita() + ap(
+  `<div class="ap-card"><h4>Validar un ingreso</h4><div class="ap-dos">${campo('Código, patente o DNI', '<span class="ap-muted">______</span>')}<div style="display:grid;align-content:end"><span class="ap-btn chico sec">📷 Escanear QR</span></div></div></div>`,
+  extra, `<div class="ap-card"><h4>Ingresos de hoy</h4>${ingresos.join('') || it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok') + it('👤', 'Carla Méndez', 'Visita · Lote 18', 'Salió')}</div>`);
+const lot = n => `Lote ${n}`;
+const CAMION = `<svg viewBox="0 0 150 80"><rect x="4" y="16" width="86" height="42" rx="6" fill="#2f8f4e"/><rect x="4" y="16" width="86" height="10" rx="5" fill="#27793f"/>
+  <g stroke="#27793f" stroke-width="3"><path d="M22 30v22M40 30v22M58 30v22M76 30v22"/></g><path d="M90 26h24l16 16v16H90z" fill="#f2f2ec"/><path d="M96 31h16l11 11H96z" fill="#9fd3e8"/>
+  <rect x="88" y="54" width="44" height="6" rx="2" fill="#5b5f63"/><rect x="2" y="56" width="92" height="5" rx="2" fill="#5b5f63"/><rect x="126" y="46" width="6" height="5" rx="1" fill="#ffd166"/>
+  <g class="rueda"><circle cx="26" cy="63" r="10" fill="#23272b"/><circle cx="26" cy="63" r="4" fill="#bfc5ca"/></g><g class="rueda"><circle cx="110" cy="63" r="10" fill="#23272b"/><circle cx="110" cy="63" r="4" fill="#bfc5ca"/></g>
+  <text x="47" y="46" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="10" font-weight="800" fill="#fff">RESIDUOS</text></svg>`;
+
+/* ---------- las veintidós simulaciones ---------- */
+const ESC = [
+{ id:'visita', grupo:'Tu casa', e:'🔳', t:'Autorizar una visita', s:'Creás el pase y la garita lo valida',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'16:05',
+  pasos:[
+  { lado:'a', txt:'En <b>Tu casa</b> tocá <b>Autorizar una visita</b>.', a:() => casaInicio(), b:() => garitaInicio() },
+  { lado:'a', txt:'Completá quién viene y cuándo. La app arma el pase.', a:() => vec('Autorizar una visita', 'Código y QR para la garita') + ap(
+      campo('Nombre y apellido', 'Marcos Díaz'), `<div class="ap-dos">${campo('Tipo', 'Visita')}${campo('Patente (opcional)', 'AB 123 CD')}</div>`,
+      `<div class="ap-dos">${campo('Día', 'Hoy')}${campo('Horario', '16:00 a 20:00')}</div>`, btn('Crear el pase')) },
+  { lado:'a', txt:'Listo: un <b>código de 6 números y un QR</b>, que le mandás por WhatsApp. Después tocá <b>La visita llega a la garita</b>.', a:() => vec('Pase de ingreso', 'Marcos Díaz') + ap(
+      qr('BHC:P-482915'), `<div class="ap-codigo">482 915</div><div class="ap-muted ap-centro">Válido hoy de 16:00 a 20:00 · AB 123 CD</div>`,
+      `<button class="ap-btn sec" data-act="compartir"><span>Compartir por WhatsApp</span></button>`, `<div class="nota-sim">Simulación</div>`, btn('La visita llega a la garita →', { cl:'ok' })),
+    b:() => garitaInicio('', [it('👤', 'Marcos Díaz', 'Visita de Lucía · Lote 42 · 16–20 h', 'Esperado', 'warn'), it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok')]) },
+  { lado:'b', hora:'16:32', txt:'En la garita, el guardia <b>escanea el QR</b> (o escribe el código). La app dice si vale hoy y a esta hora, y quién lo autorizó. Tocá <b>Ingresó</b>.', b:() => garita() + ap(
+      aviso('ok', '✅', 'PASE VÁLIDO', 'Leído con el QR · 16:32'),
+      `<div class="ap-card">${it('👤', 'Marcos Díaz', 'Visita · AB 123 CD')}${it('🏠', 'Autorizó Lucía Fernández', 'Lote 42 · Calle 3 N.º 42')}${it('🕓', 'Hoy de 16:00 a 20:00', 'Está dentro del horario')}</div>`, btn('Ingresó', { cl:'ok' })) },
+  { lado:'a', txt:'A vos te llega el aviso al instante, aunque tengas el teléfono bloqueado. Cuando se vaya, la garita toca <b>Salió</b> y también te enterás.',
+    al(){ push('a', '🛡️', 'Marcos Díaz ingresó al barrio', 'Pasó por la garita a las 16:32'); },
+    a:() => vec('Mis visitas', 'Lote 42', { campana:1 }) + ap(`<div class="ap-card">${it('👤', 'Marcos Díaz', 'Ingresó 16:32 · válido hasta las 20:00', 'Adentro', 'ok')}</div>`, aviso('info', 'ℹ️', 'Pases para toda la semana', 'Para la persona que limpia o una obra: "Viene varias veces", un solo QR.')),
+    b:() => garitaInicio('', [it('👤', 'Marcos Díaz', 'Visita · Lote 42', 'Adentro', 'ok'), it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok')]) },
+  ], fin:'Así de simple: la visita pasa con el QR y vos te enterás.' },
+
+{ id:'paquete', grupo:'Tu casa', e:'📦', t:'Retirar un paquete', s:'Llega a la garita y lo retirás con tu QR',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno mañana'], hora:'11:10',
+  pasos:[
+  { lado:'b', txt:'Llega un paquete. El guardia toca <b>Llegó un paquete</b>, elige el lote y le saca una foto a la etiqueta.', a:() => casaSimple(), b:() => garita('Turno mañana · Guardia Ruiz') + ap(
+      `<div class="ap-card"><h4>Llegó un paquete</h4><div style="display:grid;gap:8px">${campo('Para', 'Lote 42 · Lucía Fernández')}<div class="ap-dos">${campo('Empresa', 'Correo')}${campo('Detalle', 'Caja mediana')}</div>
+      <div style="height:70px;border-radius:12px;background:repeating-linear-gradient(45deg,var(--surf-3),var(--surf-3) 8px,var(--surf-2) 8px,var(--surf-2) 16px);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">📷 Foto de la etiqueta</div></div></div>`,
+      btn('Guardar y avisar al lote')) },
+  { lado:'a', txt:'A todas las cuentas del lote les llega el aviso. En <b>Mis paquetes</b>, tocá <b>Mi QR para retirar</b>.',
+    al(){ push('a', '📦', 'Paquete en la garita', 'Correo · Caja mediana'); },
+    a:() => vec('Tus paquetes', 'Lote 42', { campana:1 }) + ap(btn('🔳 Mi QR para retirar'), `<div class="ap-card">${it('📦', 'Correo · Caja mediana', 'Llegó hoy 11:10 · en la garita', 'Para retirar', 'warn')}</div>`),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(`<div class="ap-card"><h4>Paquetes en la garita</h4>${it('📦', 'Lote 42 · Correo', 'Caja mediana · llegó 11:10', 'En la garita', 'warn')}</div>`) },
+  { lado:'a', txt:'Tu teléfono arma un <b>QR firmado que cambia cada 30 segundos</b>: una captura vieja no sirve y nadie más lo puede fabricar. Mostralo en la garita.', a:() => vec('Mi QR para retirar', '1 paquete en la garita') + ap(
+      qr('BHR1.lucia.' + Date.now().toString(36), 'id="qrRetiro"'), `<div class="ap-centro"><b id="qrSeg">30</b> <span class="ap-muted">segundos para que cambie</span></div>`,
+      `<div class="nota-sim">Simulación</div>`, btn('La garita lo lee →', { cl:'ok' })),
+    al(){ let n = 30; cada(() => { n = n <= 1 ? 30 : n - 1; const s = $('#qrSeg'); if (s) s.textContent = n; if (n === 30){ const q = $('#qrRetiro'); if (q){ q.dataset.qr = 'BHR1.lucia.' + Date.now().toString(36); dibujarQR(q); } } }, 1000); } },
+  { lado:'b', hora:'18:05', txt:'El guardia lee el QR: la app comprueba la firma y muestra de quién es y qué paquetes tiene. Tocá <b>Entregar</b>.', b:() => garita('Turno tarde · Guardia Pereyra') + ap(
+      aviso('ok', '🔐', 'FIRMA VÁLIDA', 'QR de retiro de Lucía Fernández · Lote 42'), `<div class="ap-card">${it('📦', 'Correo · Caja mediana', 'Llegó hoy 11:10')}</div>`, btn('Entregar', { cl:'ok' })) },
+  { lado:'a', txt:'Queda asentado con un <b>sello digital</b>, en la bitácora de la garita y en tu teléfono.',
+    al(){ push('a', '✅', 'Retiraste tu paquete', 'Correo · 18:05 · con tu QR firmado'); },
+    a:() => vec('Tus paquetes', 'Lote 42') + ap(`<div class="ap-card">${it('📦', 'Correo · Caja mediana', 'Retirado 18:05 con tu QR firmado', 'Retirado', 'ok')}</div>`, `<div class="ap-muted ap-centro ap-mono">sello 9f3c·a1e0·77b2</div>`),
+    b:() => garita('Turno tarde · Guardia Pereyra') + ap(aviso('ok', '📦', 'Entregado a Lucía Fernández', 'Lote 42 · 18:05 · anotado en la bitácora')) },
+  ], fin:'Nadie puede retirar tu paquete con una foto de tu QR: cambia cada 30 segundos.' },
+
+{ id:'uber', grupo:'Tu casa', e:'🚕', t:'Viene un Uber o DiDi', s:'Avisás en 10 segundos y la garita lo reconoce por la patente',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'19:40',
+  pasos:[
+  { lado:'a', txt:'Pediste un Uber para ir al centro. En <b>Tu casa</b> tocá <b>Viene un Uber o DiDi</b>.', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
+      `<div class="ap-hola"><small>Buenas tardes,</small><b>Lucía</b></div>`, `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
+      <div class="ap-teja destaca"><span class="e">🔳</span><b>Autorizar una visita</b></div>
+      <button class="ap-teja" data-go><span class="e">🚕</span><b>Viene un Uber o DiDi</b></button><div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div></div>`),
+    b:() => garitaInicio() },
+  { lado:'a', txt:'Elegí la app, si te viene a <b>buscar</b> o <b>trae</b> algo, en cuánto llega y la <b>patente</b> (Uber la muestra apenas el chofer acepta; si todavía no la sabés, la agregás después). Tocá <b>Avisar a la garita</b>.', a:() => vec('Viene un Uber, DiDi o taxi', 'Aviso a la garita') + ap(
+      `<div><div class="ap-muted">¿De qué app?</div><div class="seg"><span class="on">Uber</span><span>DiDi</span><span>Cabify</span><span>Taxi</span></div></div>`,
+      `<div><div class="ap-muted">¿Para qué viene?</div><div class="seg"><span class="on">Me viene a buscar</span><span>Trae a alguien o algo</span></div></div>`,
+      `<div class="ap-dos">${campo('Patente', 'AE 555 KT')}${campo('Llega en', '10 minutos')}</div>`, campo('Chofer (opcional)', 'Carlos'), btn('Avisar a la garita')) },
+  { lado:'b', hora:'19:49', txt:'A la garita le llega el aviso y el viaje aparece en <b>Ingresos de hoy</b>. Cuando llega el auto, el guardia escribe la patente y la app lo reconoce. Tocá <b>Ingresó</b>.',
+    al(){ push('b', '🚕', 'Viene un Uber a Lote 42', 'Patente AE555KT · llega en ~10 min · viene a buscar a la vecina'); },
+    a:() => vec('Mis visitas', 'Lote 42') + ap(aviso('ok', '✅', 'Uber a Lote 42 · vence a las 20:50', 'Patente AE555KT. Cuando entre y cuando salga te llega el aviso.')),
+    b:() => garita() + ap(aviso('ok', '🚕', 'AE555KT · Uber · Carlos', 'Lote 42 · Lucía Fernández · viene a buscar a la vecina · válido hasta las 20:50'), btn('Ingresó', { cl:'ok' })) },
+  { lado:'a', txt:'Te avisa que el Uber ya entró: salí tranquila. Cuando se va con vos, la garita toca <b>Salió</b> y queda anotado. El aviso vence solo.',
+    al(){ push('a', '🚕', 'Uber · Carlos entró al barrio', '19:49 · va para tu casa'); },
+    a:() => vec('Mis visitas', 'Lote 42', { campana:1 }) + ap(`<div class="ap-card">${it('🚕', 'Uber · Carlos', 'Entró 19:49 · AE555KT', 'Adentro', 'ok')}</div>`),
+    b:() => garitaInicio('', [it('🚕', 'Uber · Carlos', 'Lote 42 · AE555KT · viene a buscar a la vecina', 'Adentro', 'ok'), it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Salió')]) },
+  ], fin:'El chofer no necesita ninguna app: la garita lo reconoce por la patente.' },
+
+{ id:'voz', grupo:'Tu casa', e:'🎙️', t:'Hablale a la app', s:'Le pedís algo en voz alta y lo hace',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno noche'], hora:'22:40',
+  pasos:[
+  { lado:'a', txt:'Tocá el <b>escudo del barrio</b>: la app te saluda con la hora y el clima y te pregunta en qué te ayuda. (Activá el sonido arriba para escucharla.)', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
+      `<button class="escudo-grande" data-go><img src="${LOGO}" alt=""><span><b>Tocá el escudo</b><div class="ap-muted">La app te saluda y te escucha</div></span></button>`, `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟢', 'Todo en orden en tu lote', '')}</div>`),
+    b:() => garitaInicio() },
+  { lado:'a', txt:'Decile lo que necesitás, como a una persona. Por ejemplo: <b>"avisale a la garita que llego tarde, a las 23"</b>. Tocá <b>Eso es</b>.',
+    al(){ hablar('Hola, Lucía, que tengas una buena noche. ¿En qué te puedo ayudar hoy? Ahora son las 22 y 40, y hace 4 grados.'); },
+    a:() => vec('Bahía Cauquén', 'Te escucho…') + ap(`<div class="ap-voz"><span class="mic">🎙️</span><div class="ap-muted">Te escucho…</div><div class="dice">"Avisale a la garita que llego tarde, a las 23"</div></div>`, btn('Eso es')) },
+  { lado:'a', txt:'<b>Nada se manda sin tu sí</b>: la app te repite lo que entendió y te pregunta. Tocá <b>Mandar a la garita</b>.',
+    al(){ hablar('Le mando a la garita: llego tarde, a las 23. ¿Lo mando?'); },
+    a:() => vec('Bahía Cauquén', 'Asistente') + ap(`<div class="ap-voz"><span class="mic" style="animation:none;background:var(--brand)">🎙️</span><div class="ap-muted">¿Lo hago?</div><div class="dice">Le mando a la garita: "Llego tarde, a las 23". ¿Lo mando?</div></div>`,
+      `<div class="ap-btns">${btn('Mandar a la garita', { cl:'ok' })}<span class="ap-btn sec">No</span></div>`) },
+  { lado:'b', txt:'A la garita le llega al instante, en privado. También podés preguntarle <b>"¿tengo paquetes?"</b>, <b>"¿cuánto debo de expensas?"</b> o <b>"¿cuándo pasa el camión?"</b>.',
+    al(){ push('b', '💬', 'Lote 42 · Lucía', 'Llego tarde, a las 23'); hablar('Listo, la garita ya lo tiene.'); },
+    a:() => vec('Bahía Cauquén', 'Asistente') + ap(aviso('ok', '✅', 'Listo, la garita ya lo tiene', 'Lo mandaste con la voz')),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Mensajes con vecinos</h4><div class="ap-chat"><div class="msg">Llego tarde, a las 23.<time>22:41 · Lote 42</time></div></div></div>`) },
+  ], fin:'Para quien maneja, cocina o no ve bien la pantalla: la app también escucha.' },
+
+{ id:'dea', grupo:'Emergencias', e:'❤️', t:'Pedir el DEA', s:'La garita sale con el desfibrilador y avisa al equipo de salud',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno noche'], hora:'20:40',
+  pasos:[
+  { lado:'a', txt:'En <b>Emergencias</b>, al lado del corazón, <b>mantené apretado 2 segundos</b> el botón verde SOLICITARLO (así no sale sin querer).', a:() => vec('Emergencias', 'Tocá un teléfono para llamar') + ap(
+      `<div class="ap-btns"><span class="ap-btn rojo">911</span><span class="ap-btn sec">107</span><span class="ap-btn sec">100</span></div>`,
+      `<div class="ap-card"><div class="dea-fila"><span class="dea-corazon">❤️</span><div style="flex:1"><b>DEA del barrio · operativo</b><div class="ap-muted">En la garita</div></div></div>
+      <div style="margin-top:10px">${btn('SOLICITARLO', { cl:'ok', hold:2000 })}</div><div class="ap-muted" style="margin-top:6px">Mantenelo apretado 2 segundos.</div></div>`),
+    b:() => garitaInicio() },
+  { lado:'a', txt:'La app pregunta una vez más, grande. Tocá <b>SÍ</b>.', a:() => vec('Emergencias', 'Tocá un teléfono para llamar') + ap(`<div class="ap-card"><div class="dea-fila"><span class="dea-corazon">❤️</span><b>DEA del barrio</b></div></div>`) +
+      `<div class="ap-hoja"><div><div class="ap-centro" style="font-size:40px">❤️</div><b class="ap-centro" style="font-size:17px">ESTÁ POR SOLICITAR EL DEA,<br>¿ES UNA EMERGENCIA?</b>
+       <div class="ap-btns">${btn('SÍ', { cl:'rojo' })}<button class="ap-btn sec" data-act="no"><span>NO</span></button></div></div></div>` },
+  { lado:'b', rolB:['Garita', 'Turno noche'], txt:'A la garita le salta una <b>alarma roja que suena sin parar</b>, con tu apellido y tu lote, hasta que alguien sale con el DEA. Tocá <b>Voy en camino con el DEA</b>.',
+    al(){ alarma(); cada(alarma, 2600); },
+    a:() => vec('Emergencias', 'Pedido enviado') + ap(aviso('mal', '❤️', 'La garita ya recibió tu pedido del DEA', 'Mientras llega, llamá al 911 y, si sabés, empezá la reanimación (RCP).'), `<span class="ap-btn rojo">Llamar al 911</span>`),
+    b:() => `<div class="ap-roja"><div class="medio">🚨 EMERGENCIA · PIDEN EL DEA</div><div class="grande">FERNÁNDEZ</div><div class="medio">Lucía Fernández · Lote 42<br>Calle 3 N.º 42</div>
+      <span class="ap-btn claro">LLAMAR AL 911</span>${btn('❤️ VOY EN CAMINO CON EL DEA', { cl:'ok' })}<div style="font-size:11px;opacity:.85">Suena hasta que alguien de la garita toca "Voy en camino".</div></div>` },
+  { lado:'b', rolB:['Diego', 'enfermero · Lote 18'], txt:'Con ese mismo toque, a los vecinos que marcaron que son del <b>equipo de salud o saben RCP</b> les salta esta pantalla. Diego es enfermero: tocá <b>VOY</b>.',
+    al(){ push('a', '❤️', 'El DEA va en camino', 'La garita salió con el desfibrilador'); tono([[1175, 0, .3], [880, .32, .3], [1175, .64, .4]], 'square', .09); },
+    a:() => vec('Emergencias', 'Pedido del DEA', { campana:1 }) + ap(aviso('ok', '❤️', 'El DEA va en camino', 'Salió recién.')),
+    b:() => `<div class="ap-roja"><div class="medio">❤️ EMERGENCIA MÉDICA</div><div class="grande">LOTE 42</div><div class="medio">Lucía Fernández · Calle 3 N.º 42<br>La garita salió con el DEA</div>
+      <div style="font-size:12.5px">Marcaste que sos del equipo de salud o sabés RCP. Si podés, acercate.</div>${btn('VOY', { cl:'ok' })}<span class="ap-btn claro">📍 Cómo llegar</span><span class="ap-btn claro">No puedo ir</span></div>` },
+  { lado:'a', rolB:['Garita', 'Turno noche'], txt:'Vos lo ves: el DEA va en camino <b>y también va Diego</b>. La garita ve quién va, con su profesión y su teléfono.',
+    al(){ push('a', '🩺', 'Va en camino: Diego Pérez', 'Enfermero · Lote 18'); },
+    a:() => vec('Emergencias', 'Pedido del DEA', { campana:2 }) + ap(aviso('ok', '❤️', 'El DEA va en camino', 'Salió hace 1 minuto. También va Diego, del equipo de salud.')),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('mal', '❤️', 'El DEA va hacia Lote 42 · Lucía Fernández', 'Avisamos a 4 vecinos del equipo de salud. Van en camino: Diego Pérez (Enfermero, Lote 18) · 2901 15 000002'), `<span class="ap-btn sec">Terminó: cerrar el pedido</span>`) },
+  ], fin:'Un toque de la garita, y los vecinos que saben ayudar ya van en camino.' },
+
+{ id:'bien', grupo:'Emergencias', e:'💚', t:'Estoy bien (vivo solo)', s:'Un toque por día; si falta, se entera la garita',
+  a:['Teléfono de Martín', 'vive solo · Lote 23'], b:['Garita', 'y la Administración'], hora:'08:12',
+  pasos:[
+  { lado:'a', txt:'Martín vive solo y usa <b>Estoy bien</b>. Cada mañana, arriba de todo, el botón verde late hasta que lo toca. Tocalo.', a:() => vec('Bahía Cauquén', 'Martín · Lote 23') + ap(
+      `<div class="ap-hola"><small>Buen día,</small><b>Martín</b></div>`, `<button class="bien-boton" data-go><span class="c">💚</span><span><b>ESTOY BIEN</b><small>Tocalo una vez por día, antes de las 10:00</small></span></button>`,
+      `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟡', 'Helada: cuidado en las subidas', 'Automático')}</div>`),
+    b:() => garitaInicio(`<div class="ap-card">${it('💚', 'Estoy bien', '3 vecinos anotados · 2 ya avisaron hoy')}</div>`) },
+  { lado:'a', txt:'Un toque y listo. ¿Y si un día no lo toca? Tocá <b>Al día siguiente no lo toca</b>.', a:() => vec('Bahía Cauquén', 'Martín · Lote 23') + ap(
+      `<div class="ap-hola"><small>Buen día,</small><b>Martín</b></div>`, aviso('ok', '✅', 'Hoy ya avisaste que estás bien', 'a las 08:12 · lo saben la garita, la Administración, Lucía y Ana'),
+      `<div class="nota-sim">Simulación</div>`, btn('Al día siguiente no lo toca →', { cl:'sec' })),
+    b:() => garitaInicio(`<div class="ap-card">${it('💚', 'Estoy bien', '3 vecinos anotados · 3 ya avisaron hoy')}</div>`) },
+  { lado:'b', hora:'10:01', txt:'Pasaron las 10 (la hora que eligió) y no avisó. Le llega a la <b>garita</b>, a la <b>Administración</b>, a quienes eligió del barrio y un <b>correo a su hermana</b>. El resto del barrio no se entera. Tocá <b>Fuimos: está bien</b>.',
+    al(){ push('b', '💚', 'Martín no avisó hoy que está bien', 'Lote 23 · tenía hasta las 10:00'); push('a', '💚', '¿Estás bien?', 'Tocá acá para avisar que estás bien'); },
+    a:() => vec('Bahía Cauquén', 'Martín · Lote 23', { campana:1 }) + ap(`<div class="ap-hola"><small>Buen día,</small><b>Martín</b></div>`,
+      `<div class="bien-boton alerta"><span class="c">💚</span><span><b>ESTOY BIEN</b><small>Ya avisamos a la garita, a la Administración y a tus familiares</small></span></div>`),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(aviso('mal', '💚', 'Lote 23 · Martín Sosa no avisó hoy que está bien', 'Tenía hasta las 10:00. Llamalo o pasá a ver.'),
+      `<div class="ap-card">${it('📞', 'Martín · 2901 15 000004', 'Llamar')}${it('👥', 'Ana (hermana) · 2901 15 000099', 'Le llegó un correo')}</div>`, btn('Fuimos: está bien', { cl:'ok' })) },
+  { lado:'b', hora:'10:14', txt:'La garita lo llama o pasa a ver. Al confirmar, a todos les llega que está bien (si Martín toca el botón, pasa lo mismo). Todo se borra a los 30 días.',
+    al(){ push('b', '✅', 'Martín está bien', 'Lo confirmó la garita: se había dormido'); },
+    a:() => vec('Bahía Cauquén', 'Martín · Lote 23') + ap(`<div class="ap-hola"><small>Buen día,</small><b>Martín</b></div>`, aviso('ok', '✅', 'Hoy un contacto confirmó que estás bien', 'Mañana, un toque en el botón verde.')),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(aviso('ok', '✅', 'Resuelto: Martín está bien', 'Lo confirmó la garita a las 10:14 · se había dormido'), `<div class="ap-card">${it('💚', 'Estoy bien', '3 vecinos anotados · todos bien')}</div>`) },
+  ], fin:'Tranquilidad para quien vive solo y para su familia, con un toque por día.' },
+
+{ id:'urgente', grupo:'Emergencias', e:'📣', t:'Aviso urgente a una zona', s:'La garita avisa y ve quién necesita ayuda',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'17:20',
+  pasos:[
+  { lado:'b', txt:'Hay olor a gas en la calle 3. La garita manda un <b>aviso urgente</b> solo a esa zona. Tocá <b>Mandar el aviso</b>.', a:() => casaSimple(),
+    b:() => garita() + ap(`<div class="ap-card" style="display:grid;gap:8px"><h4>Aviso urgente</h4>${campo('Zona', 'Calles 3 y 4 · 18 casas')}${campo('Qué pasa', 'Olor a gas. No prendan fuego, abran las ventanas. Ya llamamos a Camuzzi.')}</div>`, btn('Mandar el aviso', { cl:'rojo' })) },
+  { lado:'a', txt:'A esas casas les salta, con sonido y aunque tengan el teléfono bloqueado. Cada una contesta con un toque. Tocá <b>Necesito ayuda</b>.',
+    al(){ alarma(); push('a', '⚠️', 'AVISO URGENTE · Calles 3 y 4', 'Olor a gas. No prendan fuego…'); },
+    a:() => `<div class="ap-roja"><div class="medio">⚠️ AVISO URGENTE</div><div class="grande">OLOR A GAS</div><div class="medio">Calles 3 y 4 · No prendan fuego, abran las ventanas. Ya llamamos a Camuzzi.</div>
+      <span class="ap-btn claro">Recibido</span>${btn('Necesito ayuda', { cl:'claro' })}<div style="font-size:11px;opacity:.85">Lo mandó la garita · 17:20</div></div>`,
+    b:() => garita() + ap(aviso('warn', '📣', 'Aviso urgente activo · Calles 3 y 4', '18 casas · 9 recibieron · nadie pidió ayuda')) },
+  { lado:'b', txt:'La garita ve en vivo quién recibió y <b>quién pide ayuda</b>, con su lote. Tocá <b>Voy en camino</b>.',
+    al(){ push('b', '🆘', 'Lote 42 pide ayuda', 'Aviso urgente · olor a gas'); },
+    a:() => vec('Aviso urgente', 'Lote 42') + ap(aviso('mal', '🆘', 'Pediste ayuda', 'La garita ya lo sabe. Si podés, salí de la casa.')),
+    b:() => garita() + ap(aviso('mal', '📣', 'Aviso urgente · 1 casa pide ayuda', 'Lote 42 · Lucía Fernández · 2901 15 000042'), `<div class="ap-card">${it('✅', '12 recibieron', 'Calles 3 y 4')}${it('🆘', 'Lote 42 · necesita ayuda', 'Calle 3 N.º 42', 'Ayuda', 'mal')}</div>`, btn('Voy en camino', { cl:'ok' })) },
+  { lado:'a', txt:'Te llega que la guardia va en camino. Todo queda en la bitácora de la garita.',
+    al(){ push('a', '🛡️', 'La guardia va en camino', 'Guardia Pereyra · aviso de olor a gas'); },
+    a:() => vec('Aviso urgente', 'Lote 42', { campana:1 }) + ap(aviso('info', '🛡️', 'La guardia va en camino', 'Salí de la casa y esperala afuera.')),
+    b:() => garita() + ap(aviso('ok', '🛡️', 'Vas en camino a Lote 42', 'Aviso urgente · olor a gas · 17:24')) },
+  ], fin:'Un aviso a la zona justa, y la garita sabe en segundos quién necesita ayuda.' },
+
+{ id:'expensas', grupo:'Pagos y mensajes', e:'💳', t:'Pagar la expensa', s:'Pago en línea y recibo automático',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Administración', 'Cobros'], hora:'09:30',
+  pasos:[
+  { lado:'a', txt:'En <b>Mis expensas</b> está el cupón del mes. Los centavos son tu número de lote (<b>,42</b>): así el banco sabe de quién es cada pago. Tocá <b>Pagar online ahora</b>.', a:() => vec('Mis expensas', 'Lote 42') + ap(
+      `<div class="ap-card"><h4>Octubre 2026</h4><div style="font-size:26px;font-weight:800;letter-spacing:-.02em" class="ap-mono">$ 289.638,42</div>
+       <div class="ap-muted">1.º vencimiento: viernes 10 · 2.º: martes 20</div><div style="margin-top:8px">${aviso('warn', '⏱', 'Faltan 5 días para el 1.º vencimiento', '')}</div></div>`,
+      btn('Pagar online ahora'), `<span class="ap-btn sec">Ya pagué por fuera de la app</span>`),
+    b:() => admin('Cobros') + ap(`<div class="ap-card"><h4>Octubre 2026</h4>${it('✅', '87 lotes pagaron', '$ 25,1 millones')}${it('⏳', '65 lotes por pagar', 'vencen el viernes 10')}</div>`) },
+  { lado:'a', txt:'Se abre el pago en línea (en la app real, <b>Mercado Pago</b>: tarjeta, dinero en cuenta, transferencia o QR). Acá es una simulación: no se cobra nada.', a:() => barra('Pago en línea', 'Simulación · no se cobra nada', { sos:false }) + ap(
+      `<div class="ap-card"><div class="ap-muted">Barrio Bahía Cauquén</div><b>Expensas octubre 2026 · Lote 42</b><div style="font-size:24px;font-weight:800;margin-top:6px" class="ap-mono">$ 289.638,42</div></div>`,
+      `<div class="ap-card">${it('💳', 'Tarjeta de débito', '•••• 4242', 'Elegida', 'ok')}${it('🏦', 'Transferencia', '')}${it('🔳', 'Pagar con QR', '')}</div>`,
+      btn('Pagar $ 289.638,42', { cl:'ok' }), `<div class="nota-sim">Simulación</div>`) },
+  { lado:'a', txt:'Aprobado. En 3 segundos vuelve sola a la app.', a:() => barra('Pago en línea', 'Simulación', { sos:false }) + ap(`<div class="ap-centro" style="padding:40px 0 10px;font-size:54px">✅</div><b class="ap-centro" style="font-size:18px">Pago aprobado</b><div class="ap-centro ap-muted">Volviendo a la app en <b id="vuelta">3</b>…</div>`),
+    al(){ let n = 3; cada(() => { n--; const v = $('#vuelta'); if (v) v.textContent = Math.max(n, 0); if (n <= 0) avanzar(); }, 1000); } },
+  { lado:'b', txt:'La Administración no tiene que confirmar nada: el pago se verifica, se acredita solo y sale el recibo, que te llega a la app y al correo.',
+    al(){ push('a', '✅', 'Pago acreditado', 'Recibo 0001-00042 · $ 289.638,42'); push('b', '💳', 'Lote 42 pagó en línea', '$ 289.638,42 · acreditado automáticamente'); },
+    a:() => vec('Mis expensas', 'Lote 42', { campana:1 }) + ap(aviso('ok', '✅', 'Octubre 2026: pagado', '$ 289.638,42 · 09:31 · pago en línea'), `<div class="ap-card">${it('🧾', 'Recibo 0001-00042', 'Descargar o imprimir')}</div>`),
+    b:() => admin('Cobros') + ap(`<div class="ap-card"><h4>Recién</h4>${it('💳', 'Lote 42 · $ 289.638,42', 'Pago en línea · 09:31 · recibo emitido', 'Acreditado', 'ok')}</div>`, `<div class="ap-card"><h4>Octubre 2026</h4>${it('✅', '88 lotes pagaron', '$ 25,4 millones')}${it('⏳', '64 lotes por pagar', '')}</div>`) },
+  ], fin:'Sin comprobantes por WhatsApp ni planillas: el pago y el recibo van solos.' },
+
+{ id:'mensaje', grupo:'Pagos y mensajes', e:'💬', t:'Escribirle a la Administración', s:'En privado, y te contesta en la app',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Administración', 'Mensajes'], hora:'18:20',
+  pasos:[
+  { lado:'a', txt:'En <b>Mensajes → Administración</b> escribís en privado: lo ven solo vos y la Administración. Tocá <b>Enviar</b>.', a:() => vec('Administración', 'Conversación privada') + ap(
+      `<div class="ap-chat"><div class="ap-muted ap-centro">Solo lo ven vos y la Administración</div></div>`,
+      `<div class="ap-escribir"><div class="v">Hola, la luz de la calle 3, frente al 42, está quemada desde el sábado.</div>${btn('Enviar', { cl:'chico' })}</div>`),
+    b:() => admin('Mensajes de vecinos') + ap(`<div class="ap-card">${it('💬', 'Lote 18 · Diego', '¿Cuándo sale la liquidación?', 'Leído')}${it('💬', 'Lote 7 · Carla', 'Gracias por la respuesta', 'Leído')}</div>`) },
+  { lado:'b', txt:'A la Administración le llega en su bandeja, con tu nombre y tu lote. Tocá <b>Responder</b>.',
+    al(){ push('b', '💬', 'Lucía · Lote 42', 'La luz de la calle 3, frente al 42…'); },
+    a:() => vec('Administración', 'Conversación privada') + ap(`<div class="ap-chat"><div class="msg mia">Hola, la luz de la calle 3, frente al 42, está quemada desde el sábado.<time>18:20 ✓</time></div></div>`),
+    b:() => admin('Lucía Fernández · Lote 42') + ap(`<div class="ap-chat"><div class="msg">Hola, la luz de la calle 3, frente al 42, está quemada desde el sábado.<time>18:20</time></div></div>`,
+      `<div class="ap-escribir"><div class="v">Hola Lucía, gracias por avisar. Ya se lo pedimos al electricista: pasa el jueves a la mañana.</div>${btn('Responder', { cl:'chico' })}</div>`) },
+  { lado:'a', hora:'18:27', txt:'Te llega la respuesta al instante, con aviso al celular. La conversación queda guardada.',
+    al(){ push('a', '💬', 'Administración', 'Hola Lucía, gracias por avisar. Ya se lo pedimos al electricista…'); },
+    a:() => vec('Administración', 'Conversación privada', { campana:1 }) + ap(`<div class="ap-chat"><div class="msg mia">Hola, la luz de la calle 3, frente al 42, está quemada desde el sábado.<time>18:20 ✓✓</time></div>
+      <div class="msg">Hola Lucía, gracias por avisar. Ya se lo pedimos al electricista: pasa el jueves a la mañana.<time>18:27</time></div></div>`),
+    b:() => admin('Lucía Fernández · Lote 42') + ap(`<div class="ap-chat"><div class="msg">Hola, la luz de la calle 3, frente al 42, está quemada desde el sábado.<time>18:20</time></div><div class="msg mia">Hola Lucía, gracias por avisar. Ya se lo pedimos al electricista: pasa el jueves a la mañana.<time>18:27 ✓</time></div></div>`) },
+  ], fin:'Todo por escrito y en un solo lugar, sin perderse en un grupo de WhatsApp.' },
+
+{ id:'reserva', grupo:'Vida en el barrio', e:'🔥', t:'Reservar el quincho', s:'Elegís el día y el turno libre, y listo',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Administración', 'Reservas'], hora:'11:00',
+  pasos:[
+  { lado:'a', txt:'En <b>Reservas</b> ves la semana del quincho, del SUM y de la cancha, con lo libre en verde. Tocá <b>sábado 3 · 12 a 17</b>.', a:() => vec('Reservas', 'Espacios comunes') + ap(
+      `<div class="seg"><span class="on">🔥 Quincho</span><span>🛋️ SUM</span><span>⚽ Cancha</span></div>`,
+      `<div class="ap-card"><h4>Esta semana</h4><div class="ap-slots"><div class="ap-slot ocup">Vie 2 · 19:30–01<small>Lote 7</small></div><button class="ap-slot libre" data-go>Sáb 3 · 12–17<small>Libre</small></button>
+       <div class="ap-slot ocup">Sáb 3 · 19:30–01<small>Lote 18</small></div><div class="ap-slot libre">Dom 4 · 12–17<small>Libre</small></div></div></div>`, `<div class="ap-muted">Hasta 40 invitados. Se entrega limpio y con la parrilla fría.</div>`),
+    b:() => admin('Reservas') + ap(`<div class="ap-card"><h4>Próximas</h4>${it('🔥', 'Quincho · vie 2 · 19:30', 'Lote 7')}${it('🔥', 'Quincho · sáb 3 · 19:30', 'Lote 18')}</div>`) },
+  { lado:'a', txt:'Contás cuántos vienen y aceptás las normas. Tocá <b>Reservar</b>.', a:() => vec('Quincho', 'Sábado 3 · 12:00 a 17:00') + ap(campo('Invitados', '25'), `<div class="seg"><span class="on">✓ Leí las normas del quincho</span></div>`, btn('Reservar')) },
+  { lado:'a', txt:'<b>Reservado.</b> Nadie más puede tomar ese turno y la Administración lo ve al instante, sin llamadas ni planillas.',
+    al(){ push('b', '🔥', 'Nueva reserva: Quincho', 'Sábado 3 · 12 a 17 · Lote 42 · 25 invitados'); },
+    a:() => vec('Reservas', 'Lote 42') + ap(aviso('ok', '✅', 'Quincho reservado', 'Sábado 3 · 12:00 a 17:00 · 25 invitados'), `<span class="ap-btn sec">📅 Agregar a mi calendario</span>`),
+    b:() => admin('Reservas') + ap(`<div class="ap-card"><h4>Próximas</h4>${it('🔥', 'Quincho · vie 2 · 19:30', 'Lote 7')}${it('🔥', 'Quincho · sáb 3 · 12:00', 'Lote 42 · 25 invitados', 'Nueva', 'ok')}${it('🔥', 'Quincho · sáb 3 · 19:30', 'Lote 18')}</div>`) },
+  ], fin:'El asado del sábado, reservado en diez segundos.' },
+
+{ id:'votacion', grupo:'Vida en el barrio', e:'🗳️', t:'Votar desde casa', s:'Un voto por lote, con el resultado en vivo',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Administración', 'Votaciones'], hora:'20:10',
+  pasos:[
+  { lado:'b', txt:'La Administración abre una votación: pregunta, opciones, cuándo cierra y el quórum. Tocá <b>Abrir la votación</b>.', a:() => casaSimple(),
+    b:() => admin('Votaciones') + ap(`<div class="ap-card" style="display:grid;gap:8px">${campo('Pregunta', '¿Instalamos cámaras en el acceso de servicio?')}<div class="ap-dos">${campo('Opciones', 'Sí · No')}${campo('Cierra', 'Viernes 10 · 22 h')}</div>${campo('Quórum', '30 % de los lotes')}</div>`, btn('Abrir la votación')) },
+  { lado:'a', txt:'A todos les llega el aviso. Votás con un toque: <b>un voto por lote</b>, aunque en la casa haya varias cuentas. Tocá <b>Sí</b>.',
+    al(){ push('a', '🗳️', 'Nueva votación', '¿Instalamos cámaras en el acceso de servicio?'); },
+    a:() => vec('Votaciones', 'Un voto por lote', { campana:1 }) + ap(`<div class="ap-card"><b>¿Instalamos cámaras en el acceso de servicio?</b><div class="ap-muted" style="margin:4px 0 8px">Cierra el viernes 10 · votaron 58 lotes de 152</div>${btn('Sí')}<div style="height:6px"></div><span class="ap-btn sec">No</span></div>`),
+    b:() => admin('Votaciones') + ap(`<div class="ap-card"><b>Cámaras en el acceso de servicio</b><div class="ap-muted">Abierta · votaron 58 lotes</div></div>`) },
+  { lado:'a', txt:'Ves el resultado en vivo y la participación. Al cerrar, el <b>acta</b> sale sola para el libro, y todo queda en la auditoría.',
+    al(){ push('b', '🗳️', 'Votó Lote 42', '59 lotes · quórum alcanzado'); },
+    a:() => vec('Votaciones', 'Tu lote ya votó') + ap(`<div class="ap-card"><b>¿Instalamos cámaras en el acceso de servicio?</b><div class="ap-muted" style="margin:4px 0 8px">Votaron 59 lotes de 152 · participación 38,8 % · quórum alcanzado</div>
+      <div class="ap-barra"><i style="width:66%"></i><span><span>✓ Sí</span><span>66 %</span></span></div><div class="ap-barra"><i style="width:34%"></i><span><span>No</span><span>34 %</span></span></div><div class="ap-muted" style="margin-top:6px">Tu lote ya votó · lo podés cambiar hasta el cierre</div></div>`),
+    b:() => admin('Votaciones') + ap(`<div class="ap-card"><b>Cámaras en el acceso de servicio</b><div class="ap-barra"><i style="width:66%"></i><span><span>Sí</span><span>39 lotes</span></span></div><div class="ap-barra"><i style="width:34%"></i><span><span>No</span><span>20 lotes</span></span></div></div>`, `<span class="ap-btn sec">📄 Acta para el libro</span>`) },
+  ], fin:'Sin asambleas eternas: cada lote vota desde su casa y el acta sale sola.' },
+
+{ id:'pizarron', grupo:'Vida en el barrio', e:'📌', t:'Un aviso para todo el barrio', s:'Lo publicás y les llega a todos',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Otro vecino', 'Diego · Lote 18'], hora:'08:15',
+  pasos:[
+  { lado:'a', txt:'Viste dos zorros cerca de la plaza. En el <b>Pizarrón</b> escribís el aviso. Tocá <b>Publicar</b>.', a:() => vec('Pizarrón del barrio', 'Lo ven todos los vecinos') + ap(
+      `<div class="seg"><span class="on">⚠️ Aviso</span><span>🐾 Mascota perdida</span><span>🎉 Evento</span><span>🛒 Vendo</span></div>`, campo('Título', 'Dos zorros sueltos cerca de la plaza'), campo('Detalle', 'Guarden la basura y las mascotas adentro.'), btn('Publicar')),
+    b:() => vec('Bahía Cauquén', 'Diego · Lote 18') + ap(`<div class="ap-hola"><small>Buen día,</small><b>Diego</b></div>`, `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟡', 'Hoy pasa el camión', 'Sacá las bolsas temprano')}</div>`) },
+  { lado:'b', txt:'A cada vecino le llega el aviso y queda en la <b>Pizarra del día</b>, con el avistamiento del día. Mañana a las 0 h se renueva sola.',
+    al(){ push('b', '📌', 'Dos zorros sueltos cerca de la plaza', 'Lote 42 · Guarden la basura y las mascotas'); },
+    a:() => vec('Pizarrón del barrio', 'Publicado') + ap(aviso('ok', '✅', 'Publicado en el pizarrón', 'Les llegó a los vecinos del barrio')),
+    b:() => vec('Bahía Cauquén', 'Diego · Lote 18', { campana:1 }) + ap(`<div class="ap-hola"><small>Buen día,</small><b>Diego</b></div>`, `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟠', 'Dos zorros sueltos cerca de la plaza', 'Aviso de Lote 42 · 08:15')}${it('🦊', 'Avistamiento de hoy', 'Zorro · Plaza')}${it('🟡', 'Hoy pasa el camión', 'Sacá las bolsas temprano')}</div>`) },
+  ], fin:'Lo que pasa en el barrio, todos lo saben en el momento.' },
+
+{ id:'prestar', grupo:'Vida en el barrio', e:'🪜', t:'Pedir algo prestado', s:'La biblioteca de cosas del barrio',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['El vecino que la presta', 'Diego · Lote 18'], hora:'10:30',
+  pasos:[
+  { lado:'a', txt:'¿Para qué comprar una escalera que usás una vez al año? En <b>Cosas para prestar</b> está lo que ofrecen los vecinos. Tocá <b>Pedirla</b>.', a:() => vec('Cosas para prestar', 'Entre vecinos') + ap(
+      `<div class="ap-card">${it('🪜', 'Escalera de 3 metros', 'Diego · Lote 18', 'Disponible', 'ok')}<div style="margin:6px 0 4px">${btn('Pedirla', { cl:'chico' })}</div>${it('💦', 'Hidrolavadora', 'Carla · Lote 7', 'Disponible', 'ok')}${it('⚡', 'Generador', 'Martín · Lote 23', 'Prestado', 'warn')}</div>`),
+    b:() => vec('Bahía Cauquén', 'Diego · Lote 18') + ap(`<div class="ap-hola"><small>Hola,</small><b>Diego</b></div>`) },
+  { lado:'b', txt:'A Diego le llega el pedido por mensaje privado. Tocá <b>Prestar hasta el domingo</b>.',
+    al(){ push('b', '🪜', 'Lucía te pide la escalera', 'Lote 42 · ¿me la prestás el sábado?'); },
+    a:() => vec('Cosas para prestar', 'Pedido enviado') + ap(aviso('info', '⏳', 'Le pediste la escalera a Diego', 'Te avisamos cuando conteste')),
+    b:() => vec('Lucía · Lote 42', 'Mensaje privado', { campana:1 }) + ap(`<div class="ap-chat"><div class="msg">Hola Diego, ¿me prestás la escalera el sábado? Te la devuelvo el domingo.<time>10:30</time></div></div>`, btn('Prestar hasta el domingo', { cl:'ok' })) },
+  { lado:'a', txt:'Listo: la escalera figura "Prestada hasta el domingo" (sin decir a quién) y los dos saben cuándo vuelve.',
+    al(){ push('a', '🪜', 'Diego te presta la escalera', 'Hasta el domingo · pasá a buscarla'); },
+    a:() => vec('Cosas para prestar', 'Entre vecinos', { campana:1 }) + ap(aviso('ok', '✅', 'Diego te presta la escalera', 'Hasta el domingo · Lote 18')),
+    b:() => vec('Cosas para prestar', 'Lo que ofrecés') + ap(`<div class="ap-card">${it('🪜', 'Escalera de 3 metros', 'Prestada hasta el domingo', 'Prestada', 'warn')}</div>`) },
+  ], fin:'Menos compras, más vecinos: lo que sobra en una casa le sirve a otra.' },
+
+{ id:'peticion', grupo:'Garita y seguridad', e:'✍️', t:'Petición a la garita', s:'Firmada por vos y por la guardia',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno mañana'], hora:'10:15',
+  pasos:[
+  { lado:'a', txt:'Para pedirle algo a la garita <b>por escrito</b> (dejar pasar a un proveedor, una restricción), la petición se <b>firma con el dedo</b>. Firmá y tocá <b>Enviar firmada</b>.', a:() => vec('Peticiones a la garita', 'Firmadas por vos y la guardia') + ap(
+      campo('Qué pedís', 'Autorizar a un proveedor'), campo('Detalle', 'El jueves viene Fletes Sur a llevar un sillón, entre las 9 y las 12.'), firma('vecino'), btn('Enviar firmada', { set:'firma:vecino' })),
+    b:() => garitaInicio() },
+  { lado:'b', txt:'La garita la recibe y la <b>firma también</b>, como acuse de recibo. Firmá en el teléfono de la garita y tocá <b>Recibir y firmar</b>.',
+    al(){ push('b', '✍️', 'Petición de Lote 42', 'Autorizar a un proveedor · falta tu firma'); },
+    a:() => vec('Peticiones a la garita', 'Lote 42') + ap(aviso('info', '⏳', 'Enviada', 'Esperando la firma de recepción de la guardia')),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(`<div class="ap-card"><h4>Petición de Lote 42</h4><b>Autorizar a un proveedor</b><div class="ap-muted" style="margin:4px 0 8px">El jueves viene Fletes Sur a llevar un sillón, entre las 9 y las 12.</div>
+      <div class="ap-muted">Firma del vecino:</div><img class="firma-img" alt="Firma del vecino" src="${S.d.firma_vecino || ''}"></div>`, firma('guardia'), btn('Recibir y firmar', { cl:'ok', set:'firma:guardia' })) },
+  { lado:'a', txt:'Queda firmada por los dos, con un <b>sello digital (SHA-256)</b>: si alguien cambiara una coma, el sello no coincidiría.',
+    al(){ push('a', '✍️', 'La garita firmó tu petición', 'Autorizar a un proveedor · recibida 10:16'); },
+    a:() => vec('Peticiones a la garita', 'Lote 42', { campana:1 }) + ap(aviso('ok', '✅', 'Recibida y firmada por la guardia', '10:16 · Guardia Ruiz'),
+      `<div class="ap-card"><div class="ap-dos"><div><div class="ap-muted">Tu firma</div><img class="firma-img" alt="" src="${S.d.firma_vecino || ''}"></div><div><div class="ap-muted">Guardia</div><img class="firma-img" alt="" src="${S.d.firma_guardia || ''}"></div></div>
+       <div class="ap-muted" style="margin-top:8px">Sello SHA-256</div><div class="ap-mono" style="font-size:10.5px;word-break:break-all">${esc(S.d.sello || 'calculando…')}</div></div>`),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(aviso('ok', '✅', 'Petición recibida y firmada', 'Queda en la lista de la garita hasta el jueves')) },
+  ], fin:'Lo que se pide por escrito queda firmado por las dos partes y no se puede alterar.' },
+
+{ id:'ronda', grupo:'Garita y seguridad', e:'🚓', t:'El policía de la ronda, con QR', s:'Ingreso, rondas que se anotan solas y su constancia',
+  a:['Teléfono del policía', 'Cabo Ruiz · ronda nocturna'], b:['Garita', 'Turno noche'], hora:'22:00',
+  pasos:[
+  { lado:'b', txt:'Llega el policía contratado. En la garita se anota, en este orden, el <b>día</b>, el <b>turno</b> y la <b>hora de ingreso</b>, y después su nombre, su celular y su <b>correo</b>. Tocá <b>Registrar el ingreso</b>.',
+    a:() => `<div class="ap" style="padding-top:60px"><div class="ap-centro" style="font-size:44px">🔒</div><b class="ap-centro">Ronda nocturna</b><div class="ap-centro ap-muted">Esperando el enlace de la garita…</div></div>`,
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card" style="display:grid;gap:8px"><h4>Ingreso del policía</h4>${campo('Día', 'Hoy, domingo 27')}${campo('Turno de la garita', 'Noche · 22 a 6')}${campo('Hora de ingreso', '22:00')}
+      ${campo('Nombre y apellido', 'Cabo Ruiz')}<div class="ap-dos">${campo('Celular', '2901 15 000123')}${campo('Correo', 'cabo.ruiz@correo.demo')}</div></div>`, btn('Registrar el ingreso')) },
+  { lado:'b', txt:'La app genera un <b>código de ronda</b> que se le manda por WhatsApp. Con ese enlace, su teléfono queda habilitado solo por esta noche. Tocá <b>Mandarle el código</b>.',
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Policía contratada</h4>${it('👮', 'Cabo Ruiz', 'Ingresó domingo 27 · turno noche · 22:00', 'De servicio', 'ok')}
+      <div class="ap-muted" style="margin:8px 0 4px">Código de ronda de esta noche</div><div class="ap-codigo">482 915</div></div>`, btn('Mandarle el código por WhatsApp')) },
+  { lado:'a', hora:'23:12', ronda:true, txt:'El policía recorre el barrio y en cada punto de control <b>escanea el QR</b> pegado en el poste. Tocá los seis puntos del plano, en el orden que quieras: la garita lo ve al instante.',
+    al(){ S.d.puntos = S.d.puntos || []; },
+    a:() => pantallaRonda(), b:() => garitaRonda() },
+  { lado:'b', txt:'La ronda se anota sola: con los seis puntos queda en la bitácora con la hora de cada QR. Si pasa una hora sin completarla, queda como <b>incompleta</b>, con los puntos que faltaron. A las 6, el policía se va: tocá <b>Salida</b>.',
+    a:() => `<div class="ap" style="padding-top:50px"><div class="ap-centro" style="font-size:48px">✅</div><b class="ap-centro" style="font-size:17px">Ronda completa</b><div class="ap-centro ap-muted">6 de 6 puntos · 23:12 a ${S.d.finRonda || '23:47'}</div></div>`,
+    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('ok', '🚓', 'Ronda completa · Cabo Ruiz', `23:12 a ${S.d.finRonda || '23:47'} · 6 de 6 puntos`), `<div class="ap-card"><h4>Bitácora</h4>${it('📘', `${S.d.finRonda || '23:47'} · Ronda completa (QR)`, 'Cabo Ruiz · 6 puntos: Portón, Plaza, Quincho, Costanera, Calle 5 y Hotel')}${it('📘', '22:00 · Ingresó el policía', 'Cabo Ruiz · turno noche')}</div>`, btn('Salida', { cl:'sec' })) },
+  { lado:'b', hora:'06:05', txt:'Para la salida, de nuevo: <b>día</b>, <b>turno</b> y <b>hora de salida</b>. Tocá <b>Registrar la salida</b>.',
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card" style="display:grid;gap:8px"><h4>Salida del policía</h4><div class="ap-muted">Cabo Ruiz · ingresó domingo 27 a las 22:00 · 3 rondas</div>${campo('Día', 'Hoy, lunes 28')}${campo('Turno de la garita', 'Noche · 22 a 6')}${campo('Hora de salida', '06:05')}</div>`, btn('Registrar la salida', { cl:'ok' })) },
+  { lado:'a', txt:'Su servicio se cierra: sale de la portada de la garita y queda en <b>Turnos → Servicios del policía</b>. Y al policía le llega por correo la <b>constancia</b>: ingreso, salida, guardias y cada ronda con la hora de cada QR.',
+    al(){ push('a', '✉️', 'Constancia de servicio · Barrio Bahía Cauquén', 'Domingo 27, 22:00 a lunes 28, 06:05 · 3 rondas', 'Correo'); },
+    a:() => barra('Correo', 'Bandeja de entrada', { sos:false }) + ap(`<div class="ap-card"><div class="ap-muted">Barrio Bahía Cauquén · 06:05</div><b>Constancia de servicio</b>
+      <div style="margin-top:8px;display:grid;gap:2px;font-size:12px">${it('🕙', 'Ingreso', 'Domingo 27 · turno noche · 22:00')}${it('🕕', 'Salida', 'Lunes 28 · turno noche · 06:05')}${it('🛡️', 'Guardias de la garita', 'Sosa y Pereyra')}${it('🚓', '3 rondas, todas completas por QR', 'Ronda 1: Portón 23:12 · Plaza 23:19 · Quincho 23:26 · …')}</div></div>`),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Policía contratada</h4><div class="ap-muted">Nadie de servicio ahora</div><div style="margin-top:8px"><span class="ap-btn chico sec">＋ Registrar ingreso</span></div></div>`,
+      `<div class="ap-card"><h4>Turnos · Servicios del policía</h4>${it('👮', 'Cabo Ruiz', 'Dom 27 22:00 → lun 28 06:05 · 3 rondas', 'Constancia enviada', 'ok')}</div>`) },
+  ], fin:'Nadie tiene que anotar las rondas a mano, y el policía se lleva por correo la constancia de su servicio.' },
+
+{ id:'sos', grupo:'Emergencias', e:'🆘', t:'El botón SOS', s:'Mantener 3 segundos y avisa a todos',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno noche'], hora:'03:12',
+  pasos:[
+  { lado:'a', txt:'Arriba a la derecha está el <b>SOS</b>. Se mantiene apretado <b>3 segundos</b> (se va llenando de rojo), así no sale sin querer desde el bolsillo.', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
+      `<div class="ap-hola"><small>Buenas noches,</small><b>Lucía</b></div>`, `<div class="ap-card ap-centro" style="padding:18px">${btn('🆘 SOS · mantené apretado', { cl:'rojo', hold:3000 })}<div class="ap-muted" style="margin-top:6px">3 segundos</div></div>`),
+    b:() => garitaInicio() },
+  { lado:'a', txt:'Elegí qué pasa.', a:() => vec('SOS', '¿Qué pasa?') + ap(btn('🚑 Emergencia médica', { cl:'sec', set:'tipo:Emergencia médica' }), btn('🛡️ Seguridad / intrusión', { cl:'sec', set:'tipo:Seguridad / intrusión' }), btn('🔥 Incendio', { cl:'sec', set:'tipo:Incendio' }), btn('❗ Otra', { cl:'sec', set:'tipo:Otra' })) },
+  { lado:'b', txt:'La alerta salta con sonido en la garita, en la Administración y en las apps abiertas de los vecinos, con tu nombre, tu lote y dónde está pasando (GPS). Tocá <b>Voy en camino</b>.',
+    al(){ alarma(); push('b', '🆘', 'SOS · ' + (S.d.tipo || 'Seguridad / intrusión'), 'Lote 42 · Lucía Fernández'); },
+    a:() => vec('SOS', 'Tu alerta está activa') + ap(aviso('mal', '🆘', 'Tu alerta está activa', `${esc(S.d.tipo || 'Seguridad / intrusión')} · la recibieron la garita, la Administración y los vecinos. Quedate en un lugar seguro.`), `<span class="ap-btn rojo">Llamar al 911</span>`),
+    b:() => `<div class="ap-roja"><div class="medio">🆘 SOS · ${esc((S.d.tipo || 'Seguridad / intrusión').toUpperCase())}</div><div class="grande">LOTE 42</div><div class="medio">Lucía Fernández · Calle 3 N.º 42</div>
+      <span class="ap-btn claro">📍 Cómo llegar (GPS de la alerta)</span>${btn('Voy en camino', { cl:'ok' })}<span class="ap-btn claro">Llamar al 911</span></div>` },
+  { lado:'a', txt:'Te llega que la guardia va en camino. Cuando todo esté bien, tocás <b>Ya está solucionado</b> y la alerta se cierra para todos.',
+    al(){ push('a', '🛡️', 'La guardia va en camino', 'Guardia Sosa'); },
+    a:() => vec('SOS', 'Tu alerta está activa', { campana:1 }) + ap(aviso('info', '🛡️', 'La guardia va en camino', 'Guardia Sosa · quedate en un lugar seguro'), btn('Ya está solucionado', { cl:'ok' })),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('warn', '🆘', 'SOS · Lote 42', 'Vas en camino · 03:12')) },
+  { lado:'a', hora:'03:26', txt:'La alerta se cierra en todos los teléfonos y queda en la bitácora de la garita.',
+    a:() => casaSimple(aviso('ok', '✅', 'Alerta cerrada', 'Gracias por avisar que ya está todo bien')),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Bitácora</h4>${it('📘', '03:26 · SOS cerrado por la vecina', 'Lote 42 · Seguridad')}${it('📘', '03:13 · Sale la guardia hacia Lote 42', 'Guardia Sosa')}</div>`) },
+  ], fin:'Tres segundos apretando un botón, y todo el barrio sabe dónde hace falta ayuda.' },
+
+{ id:'casasola', grupo:'Garita y seguridad', e:'🏠', t:'Me voy de viaje', s:'Revisan tu casa cada día y te avisan',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno noche'], hora:'19:00',
+  pasos:[
+  { lado:'a', txt:'Antes de viajar, en <b>Mi casa → Me voy de viaje</b> ponés las fechas y un contacto. Tocá <b>Avisar a la garita</b>.', a:() => vec('Me voy de viaje', 'Lote 42') + ap(
+      `<div class="ap-dos">${campo('Desde', 'Hoy')}${campo('Hasta', 'Sábado 4')}</div>`, campo('Contacto si pasa algo', 'Pablo · 2901 15 000001'), campo('¿Alguien pasa por la casa?', 'Riega el vecino del 43 los martes'),
+      btn('Avisar a la garita'), `<div class="ap-muted">Lo ven solo la garita, la Administración y las cuentas de tu lote.</div>`),
+    b:() => garitaInicio() },
+  { lado:'b', hora:'23:40', txt:'Tu casa entra en <b>Casas solas</b>. Cada día, la garita o el policía de la ronda la revisa. Tocá <b>Revisada</b>.',
+    al(){ push('b', '🔒', 'Casa sola: Lote 42', 'Del domingo al sábado 4'); },
+    a:() => casaSimple(aviso('info', '🔒', 'Tu casa sola: todavía sin revisar hoy', 'La garita o el policía la revisa una vez por día')),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Casas solas · 1 sin revisar hoy</h4>${it('🔒', 'Lote 42', 'Hasta el sábado 4 · Pablo 2901 15 000001', 'Falta', 'warn')}${it('✅', 'Lote 18', 'Revisada 22:10 · policía', 'En orden', 'ok')}</div>`, btn('Revisada: Lote 42', { cl:'ok' })) },
+  { lado:'b', txt:'Elegí quién la revisó y cómo estaba, y tocá <b>Listo</b>.', b:() => garita('Turno noche · Guardia Sosa') + ap(
+      `<div class="ap-card" style="display:grid;gap:10px"><h4>Revisar Lote 42</h4><div><div class="ap-muted">¿Quién la revisó?</div><div class="seg"><span class="on">🚓 Policía de la ronda</span><span>Garita</span></div></div>
+       <div><div class="ap-muted">¿Cómo estaba?</div><div class="seg"><span class="on">✅ Todo en orden</span><span>⚠️ Hay una novedad</span></div></div>${campo('Detalle', 'Portón cerrado, luces apagadas')}</div>`, btn('Listo', { cl:'ok' })) },
+  { lado:'a', txt:'Estés donde estés, te llega <b>Tu casa está en orden</b>, todos los días. Si hubiera una novedad, te llega con urgencia.',
+    al(){ push('a', '🏠', 'Tu casa está en orden', 'La revisó el policía de la ronda a las 23:40 · Portón cerrado, luces apagadas'); },
+    a:() => casaSimple(aviso('ok', '🏠', 'Tu casa sola: en orden', 'La revisó el policía de la ronda a las 23:40'), 1),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Casas solas · todas revisadas hoy</h4>${it('✅', 'Lote 42', 'En orden · 23:40 · policía', 'En orden', 'ok')}${it('✅', 'Lote 18', 'En orden · 22:10 · policía', 'En orden', 'ok')}</div>`) },
+  ], fin:'Viajás tranquilo: cada día sabés que tu casa está bien.' },
+
+{ id:'llegada', grupo:'Garita y seguridad', e:'🚪', t:'Llegó alguien sin avisar', s:'La garita te pregunta y contestás con un toque',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'21:05',
+  pasos:[
+  { lado:'b', txt:'Llega un delivery que no anunciaste. El guardia toca <b>Llegó sin aviso</b>, elige tu lote y el motivo. Tocá <b>Consultar al vecino</b>.', a:() => casaSimple(),
+    b:() => garita() + ap(`<div class="ap-card" style="display:grid;gap:8px"><h4>Llegó sin aviso</h4>${campo('¿A qué casa va?', 'Lote 42 · Lucía Fernández')}${campo('Nombre', 'Juan · Pizzería del Canal')}<div class="ap-dos">${campo('Patente', 'AF 221 JK')}${campo('Motivo', 'Delivery')}</div></div>`, btn('Consultar al vecino')) },
+  { lado:'a', txt:'Te salta arriba de todo, con sonido, estés donde estés. Tocá <b>Que pase</b>.',
+    al(){ alarma(); push('a', '🚪', 'En la garita: Juan · Pizzería del Canal', 'Delivery · ¿Lo dejamos pasar?'); },
+    a:() => vec('Bahía Cauquén', 'Lucía · Lote 42', { campana:1 }) + ap(aviso('warn', '🚪', 'En la garita: Juan · Pizzería del Canal', 'Delivery · AF 221 JK · ¿Lo dejamos pasar?'), `<div class="ap-btns">${btn('Que pase', { cl:'ok' })}<span class="ap-btn sec">No lo conozco</span></div>`),
+    b:() => garita() + ap(aviso('info', '⏳', 'Consultando a Lote 42…', 'Juan · Pizzería del Canal · hace 1 min')) },
+  { lado:'b', txt:'La garita ve tu respuesta al instante. Tocá <b>Ingresó</b>.',
+    al(){ push('b', '✅', 'Lote 42: que pase', 'Juan · Pizzería del Canal'); },
+    a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(aviso('ok', '✅', 'Dijiste que pase', 'Juan · Pizzería del Canal')),
+    b:() => garita() + ap(aviso('ok', '✅', 'Puede pasar · Lote 42', 'Juan · Pizzería del Canal · AF 221 JK'), btn('Ingresó', { cl:'ok' })) },
+  { lado:'a', txt:'Te avisa que entró. Si hubieras tocado "No lo conozco", no pasaba, y quedaba anotado.',
+    al(){ push('a', '🛡️', 'Juan entró al barrio', '21:07 · va para tu casa'); },
+    a:() => casaSimple(aviso('ok', '🍕', 'Juan · Pizzería del Canal entró', '21:07 · va para tu casa'), 1),
+    b:() => garitaInicio('', [it('🍕', 'Juan · Pizzería del Canal', 'Delivery · Lote 42', 'Adentro', 'ok')]) },
+  ], fin:'Nadie entra sin que vos lo sepas, y no tenés que atender el portero.' },
+
+{ id:'camion', grupo:'Temporada', e:'🚛', t:'El camión de la basura', s:'Sabés cuándo entra y cuándo sale',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno mañana'], hora:'08:40',
+  pasos:[
+  { lado:'b', txt:'La víspera, la pizarra ya avisó "Mañana pasa el camión". Hoy, cuando entra, la garita lo registra: tocá <b>Entró el camión</b>.', a:() => casaSimple(`<div class="ap-card">${it('🟡', 'Hoy pasa el camión de basura', 'Sacá las bolsas temprano')}</div>`),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(`<div class="ap-card"><h4>Camión de la basura</h4>${campo('Patente', 'AD 482 KT')}</div>`, btn('🚛 Entró el camión')) },
+  { lado:'b', hora:'08:41', txt:'A todo el barrio le llega el aviso (con el teléfono bloqueado también) y el camión cruza la pantalla mientras está adentro. Cuando termine, tocá <b>Salió el camión</b> en la garita.',
+    al(){ push('a', '🚛', 'Entró el camión de la basura', 'Si todavía no sacaste las bolsas, es ahora'); },
+    a:() => `<div class="camion" aria-hidden="true">${CAMION}</div>` + casaSimple(`<div class="ap-card">${it('🚛', 'El camión está en el barrio', 'Entró 08:41')}</div>`, 1),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(aviso('warn', '🚛', 'Camión adentro desde las 08:41', 'AD 482 KT'), btn('Salió el camión')) },
+  { lado:'a', hora:'09:22', txt:'Cuando sale, el aviso se va solo: nadie lee a la noche que "entró el camión".', a:() => casaSimple(),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(aviso('ok', '🚛', 'El camión salió a las 09:22', 'Estuvo 41 minutos')) },
+  ], fin:'Martes y jueves, todos los residuos; sábados, los voluminosos.' },
+
+{ id:'sismo', grupo:'Temporada', e:'🎒', t:'La mochila para sismos', s:'El recordatorio de cada domingo',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:null, hora:'10:00',
+  pasos:[
+  { lado:'a', txt:'Tierra del Fuego es zona sísmica. Los domingos a las 10 llega el recordatorio de revisar la mochila de emergencia. Tocá <b>Revisarla</b>.',
+    al(){ push('a', '⚠️', 'Domingo de revisión: tu mochila de emergencia', 'Agua, linterna y pilas, radio, abrigo y botiquín'); },
+    a:() => casaSimple(`<div class="ap-card">${it('🎒', 'Revisión semanal de la mochila', 'Para vos · sismo', 'Pendiente', 'warn')}</div>${btn('Revisarla')}`, 1) },
+  { lado:'a', txt:'Fijate que esté todo y que funcione. Tocá cada cosa para marcarla y después <b>Listo, revisado</b>.', a:() => vec('Preparados para un sismo', 'Mochila de emergencia') + ap(
+      `<div class="ap-card">${['💧 Agua (4 litros por persona por día)', '🥫 Comida que no haya que cocinar', '🔦 Linterna y pilas de repuesto', '📻 Radio a pilas', '🧥 Abrigo y manta térmica', '🩹 Botiquín y remedios', '🔋 Batería externa cargada', '📄 Documentos en bolsa hermética']
+        .map((x, i) => `<button class="chk ${S.d['c' + i] ? 'on' : ''}" data-act="chk" data-i="${i}"><span class="o">${S.d['c' + i] ? '✓' : ''}</span>${x}</button>`).join('')}</div>`, btn('Listo, revisado', { cl:'ok' })) },
+  { lado:'a', txt:'Queda anotado para todo tu lote hasta el domingo que viene. En esa misma sección están el <b>plan familiar</b> (para imprimir y pegar en la heladera) y un <b>simulacro guiado</b> de un minuto.',
+    a:() => vec('Preparados para un sismo', 'Lote 42') + ap(aviso('ok', '✅', 'Esta semana ya revisaron la mochila', 'Hasta el domingo que viene'),
+      `<div class="ap-card"><h4>Durante un sismo</h4><b>Agachate, cubrite y sujetate.</b><div class="ap-muted">Lejos de ventanas. No salgas corriendo mientras tiembla.</div></div>`, `<div class="ap-card">${it('📞', 'Defensa Civil', '103')}</div>`) },
+  ], fin:'Basado en las recomendaciones de Defensa Civil de Ushuaia.' },
+
+{ id:'nieve', grupo:'Temporada', e:'❄️', t:'Ángeles de la nieve', s:'Un vecino despeja la entrada de quien no puede',
+  a:['Teléfono de Elsa', '82 años · Lote 31'], b:['Diego', 'ángel de la nieve · Lote 18'], hora:'07:50',
+  pasos:[
+  { lado:'a', txt:'Nevó 20 centímetros y Elsa no puede palear. En <b>Ángeles de la nieve</b> toca <b>Necesito ayuda con la nieve</b>.', a:() => vec('Ángeles de la nieve', 'Elsa · Lote 31') + ap(
+      aviso('info', '❄️', 'Nevó esta noche', '20 cm en el barrio · 3 ángeles anotados'), btn('❄️ Necesito ayuda con la nieve'), `<div class="ap-muted">Un vecino voluntario te despeja la entrada.</div>`),
+    b:() => vec('Bahía Cauquén', 'Diego · Lote 18') + ap(`<div class="ap-hola"><small>Buen día,</small><b>Diego</b></div>`, `<div class="ap-card">${it('😇', 'Sos ángel de la nieve', 'Te avisamos cuando alguien necesite ayuda')}</div>`) },
+  { lado:'b', txt:'A los <b>ángeles</b> anotados les llega el pedido. Diego tocá <b>Voy</b>.',
+    al(){ push('b', '❄️', 'Elsa (Lote 31) necesita ayuda con la nieve', 'La entrada de su casa'); },
+    a:() => vec('Ángeles de la nieve', 'Elsa · Lote 31') + ap(aviso('info', '⏳', 'Pedido enviado a los ángeles', 'Te avisamos quién va')),
+    b:() => vec('Ángeles de la nieve', 'Pedidos de hoy', { campana:1 }) + ap(`<div class="ap-card">${it('🏠', 'Elsa · Lote 31', 'La entrada de su casa · pidió 07:50', 'Esperando', 'warn')}</div>`, btn('Voy', { cl:'ok' })) },
+  { lado:'b', hora:'08:35', txt:'Cuando termina, toca <b>Listo, despejada</b>.',
+    al(){ push('a', '😇', 'Diego va a despejar tu entrada', 'Lote 18 · en camino'); },
+    a:() => vec('Ángeles de la nieve', 'Elsa · Lote 31', { campana:1 }) + ap(aviso('ok', '😇', 'Diego va en camino', 'Ángel de la nieve · Lote 18')),
+    b:() => vec('Ángeles de la nieve', 'Estás ayudando') + ap(aviso('info', '❄️', 'Despejando la entrada de Elsa', 'Lote 31 · desde las 07:55'), btn('Listo, despejada', { cl:'ok' })) },
+  { lado:'a', txt:'A Elsa le llega que ya puede salir. Así funciona en los barrios de Canadá, y ahora en el nuestro.',
+    al(){ push('a', '✅', 'Tu entrada ya está despejada', 'Gracias a Diego · Lote 18'); },
+    a:() => vec('Ángeles de la nieve', 'Elsa · Lote 31', { campana:2 }) + ap(aviso('ok', '✅', 'Tu entrada ya está despejada', 'Diego terminó a las 08:35. ¡Cuidado con el hielo!')),
+    b:() => vec('Ángeles de la nieve', '¡Gracias!') + ap(aviso('ok', '😇', 'Gracias por ayudar a Elsa', 'Lote 31 · 08:35')) },
+  ], fin:'En invierno nadie queda encerrado en su casa por la nieve.' },
+
+{ id:'kayak', grupo:'Temporada', e:'🛶', t:'Salida en kayak', s:'Si no volvés a la hora, alguien se entera',
+  a:['Teléfono de Pablo', 'sale en kayak · Lote 12'], b:['Garita', 'Turno tarde'], hora:'13:30',
+  pasos:[
+  { lado:'a', txt:'Pablo sale en kayak. En <b>Salidas seguras</b> anota a dónde va, con quién y a qué hora vuelve. Tocá <b>Avisar mi salida</b>.', a:() => vec('Salidas seguras', 'Pablo · Lote 12') + ap(
+      `<div class="seg"><span class="on">🛶 Kayak</span><span>🥾 Trekking</span><span>🧗 Escalada</span><span>🎣 Pesca</span></div>`, campo('A dónde', 'Bahía Lapataia'), `<div class="ap-dos">${campo('Con quién', 'Pedro')}${campo('Vuelvo', '18:00')}</div>`, campo('Llevo', 'Radio VHF · chaleco · traje seco'), btn('Avisar mi salida')),
+    b:() => garitaInicio() },
+  { lado:'b', hora:'18:31', txt:'Son las 18:31 y no avisó que volvió. Le llega a la <b>garita</b>, a la <b>Administración</b> y a sus contactos, con los datos para <b>Prefectura (106)</b>. Tocá <b>Llamar a Pablo</b>.',
+    al(){ alarma(); push('b', '🛶', 'Pablo no volvió de su salida', 'Kayak · Bahía Lapataia · volvía 18:00'); },
+    a:() => vec('Salidas seguras', 'Pablo · Lote 12') + ap(aviso('info', '🛶', 'Salida en curso', 'Bahía Lapataia · volvés 18:00')),
+    b:() => garita() + ap(aviso('mal', '🛶', 'Lote 12 · Pablo no volvió de su salida', 'Kayak en Bahía Lapataia con Pedro · volvía 18:00 · lleva VHF'), `<div class="ap-card">${it('📞', 'Pablo · 2901 15 000012', 'Llamar')}${it('⚓', 'Prefectura Naval', '106')}</div>`, btn('Llamar a Pablo')) },
+  { lado:'a', hora:'18:34', txt:'Pablo estaba volviendo, con el viento en contra. Toca <b>Volví</b>.',
+    al(){ push('a', '🛶', '¿Ya volviste?', 'Tocá "Volví" para que se queden tranquilos'); },
+    a:() => vec('Salidas seguras', 'Pablo · Lote 12', { campana:1 }) + ap(aviso('warn', '⏰', 'Pasó tu hora de regreso', 'Avisamos a la garita y a tus contactos'), btn('Volví', { cl:'ok' })),
+    b:() => garita() + ap(aviso('info', '📞', 'Llamando a Pablo…', 'Lote 12')) },
+  { lado:'b', txt:'A todos les llega que volvió bien. Lo ven solo la garita, la Administración y sus contactos.',
+    al(){ push('b', '✅', 'Pablo volvió', 'Kayak · 18:34 · todo bien'); },
+    a:() => vec('Salidas seguras', 'Pablo · Lote 12') + ap(aviso('ok', '✅', 'Avisaste que volviste', '18:34 · ¡buena remada!')),
+    b:() => garita() + ap(aviso('ok', '✅', 'Pablo volvió · 18:34', 'Kayak en Bahía Lapataia')) },
+  ], fin:'El agua y la montaña del fin del mundo, con alguien que sabe que saliste.' }
+];
+
+/* ---------- la ronda: plano y lista ---------- */
+const PUNTOS = [['Portón', 52, 196], ['Plaza', 132, 150], ['Quincho', 212, 120], ['Calle 5', 96, 84], ['Costanera', 206, 214], ['Hotel', 250, 52]];
+function horaRonda(n){ const m = 12 + n * 7; return `23:${String(m).padStart(2, '0')}`; }
+function pantallaRonda(){
+  const p = S.d.puntos || [];
+  return barra('Ronda nocturna', `Cabo Ruiz · ${p.length} de 6 puntos`, { clase:'staff' }) + ap(
+    `<div class="plano"><svg viewBox="0 0 300 250" role="img" aria-label="Plano ilustrativo del barrio con seis puntos de control">
+      <rect width="300" height="250" fill="var(--surf-2)"/><path d="M0 232 Q80 214 150 228 T300 222 V250 H0Z" fill="var(--sky-soft)"/>
+      <text x="150" y="245" text-anchor="middle" style="fill:var(--sky)">Bahía · Canal Beagle</text>
+      <path d="M40 210 C60 160 110 150 132 150 S200 118 212 120 M132 150 C120 120 100 100 96 84 M212 120 C230 90 245 70 250 52 M132 150 C160 180 190 200 206 214" fill="none" stroke="var(--line-2)" stroke-width="9" stroke-linecap="round"/>
+      ${PUNTOS.map(([n, x, y], i) => { const ok = p.includes(i); return `<g class="pt ${ok ? 'ok' : ''}" data-act="punto" data-i="${i}" role="button" aria-label="Escanear el QR de ${n}"><circle class="aro" cx="${x}" cy="${y}" r="17"/><circle cx="${x}" cy="${y}" r="9" fill="${ok ? 'var(--ok)' : 'var(--danger)'}"/><text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:#fff;font-size:9px">${ok ? '✓' : 'QR'}</text><text x="${x}" y="${y - 21}" text-anchor="middle">${n}</text></g>`; }).join('')}
+    </svg></div>`,
+    `<div class="ap-card">${PUNTOS.map(([n], i) => { const k = p.indexOf(i); return it(k >= 0 ? '✅' : '▫️', n, k >= 0 ? `Escaneado ${horaRonda(k)}` : 'Tocá el punto en el plano', k >= 0 ? 'Listo' : '', k >= 0 ? 'ok' : ''); }).join('')}</div>`);
+}
+function garitaRonda(){
+  const p = S.d.puntos || [];
+  return garita('Turno noche · Guardia Sosa') + ap(aviso(p.length ? 'info' : 'warn', '🚓', `Ronda en curso · ${p.length} de 6`, p.length ? `Último: ${PUNTOS[p[p.length - 1]][0]} a las ${horaRonda(p.length - 1)}` : 'Esperando el primer QR'),
+    `<div class="ap-card"><h4>Recorrido de la ronda</h4>${p.map((i, k) => it('✅', PUNTOS[i][0], horaRonda(k), 'OK', 'ok')).join('') || '<div class="ap-muted">Todavía ningún punto.</div>'}
+     <div style="height:8px;border-radius:5px;background:var(--surf-3);margin-top:10px;overflow:hidden"><div style="height:100%;width:${p.length / 6 * 100}%;background:var(--ok);transition:width .4s"></div></div></div>`);
+}
+
+/* ---------- el motor ---------- */
+function pasoDe(e, i, l){ for (let k = i; k >= 0; k--) if (e.pasos[k][l]) return e.pasos[k][l]; return null; }
+function horaDe(e, i){ for (let k = i; k >= 0; k--) if (e.pasos[k].hora) return e.pasos[k].hora; return e.hora; }
+function rolDe(e, i, l){ if (l === 'b') for (let k = i; k >= 0; k--) if (e.pasos[k].rolB) return e.pasos[k].rolB; return e[l]; }
+
+function pintarMenu(){
+  const grupos = [...new Set(ESC.map(e => e.grupo))];
+  $('#menu').innerHTML = grupos.map(g => `<div class="menu-grupo"><h2>${g}</h2><div class="lista">${ESC.map((e, i) => e.grupo !== g ? '' :
+    `<button class="opc ${i === S.esc ? 'on' : ''}" data-esc="${i}" ${i === S.esc ? 'aria-current="true"' : ''}><span class="ic">${S.hechas.has(e.id) ? '✅' : e.e}</span><span>${e.t}<small>${e.s}</small></span></button>`).join('')}</div></div>`).join('');
+}
+function pintar(){
+  limpiar();
+  const e = ESC[S.esc], p = e.pasos[S.paso], fin = S.paso >= e.pasos.length - 1 && !!e.fin;
+  $('#escTit').textContent = e.t; $('#escSub').textContent = e.s;
+  document.querySelectorAll('.hora').forEach(h => h.textContent = horaDe(e, S.paso));
+  const conB = !!e.b;
+  $('#mesa').classList.toggle('uno', !conB); $('#colB').hidden = !conB;
+  ['a', 'b'].forEach(l => {
+    const r = rolDe(e, S.paso, l); if (!r) return;
+    const el = $('#rol' + l.toUpperCase()); el.innerHTML = `${esc(r[0])} <span>· ${esc(r[1])}</span>`; el.classList.toggle('le-toca', p.lado === l && conB);
+    const f = pasoDe(e, S.paso, l); $('#app' + l.toUpperCase()).innerHTML = f ? f() : '';
+    $('#ver' + l.toUpperCase()).textContent = r[0];
+  });
+  /* En el teléfono: se ve un teléfono por vez, y la app muestra el que tiene que tocar. */
+  if (!conB) S.ver = 'a'; else S.ver = p.lado;
+  mirar(S.ver);
+  /* El botón que hay que tocar late. */
+  const app = $('#app' + p.lado.toUpperCase());
+  const objetivo = app.querySelector('[data-go]') || app.querySelector('[data-act="punto"]');
+  if (objetivo && !objetivo.matches('[data-act="punto"]')) objetivo.classList.add('toca');
+  $('#pasoN').textContent = `PASO ${S.paso + 1} DE ${e.pasos.length}`;
+  $('#pasos').innerHTML = e.pasos.map((x, i) => `<li class="${i < S.paso ? 'hecho' : i === S.paso ? 'ahora' : ''}"><span>${x.txt}</span></li>`).join('') + (fin ? `<div class="fin"><b>Listo.</b> ${esc(e.fin)}</div>` : '');
+  $('#siguiente').hidden = !fin;
+  if (fin) { S.hechas.add(e.id); }
+  pintarMenu();
+  document.querySelectorAll('[data-qr]').forEach(dibujarQR);
+  document.querySelectorAll('canvas[data-firma]').forEach(prepararFirma);
+  if (p.al) p.al();
+}
+function mirar(l){
+  S.ver = l;
+  $('#verA').setAttribute('aria-pressed', l === 'a'); $('#verB').setAttribute('aria-pressed', l === 'b');
+  $('#colA').classList.toggle('oculto', l !== 'a'); $('#colB').classList.toggle('oculto', l !== 'b');
+}
+function avanzar(){ const e = ESC[S.esc]; if (S.paso < e.pasos.length - 1){ S.paso++; pintar(); } }
+function irA(i){ S.esc = i; S.paso = 0; S.d = {}; pintar(); if (matchMedia('(max-width:900px)').matches) $('#escTit').scrollIntoView({ behavior:'smooth', block:'start' }); }
+
+/* ---------- QR (con la librería qrcode-generator; si no carga, un dibujo parecido) ---------- */
+function dibujarQR(el){
+  const txt = el.dataset.qr || 'BHC';
+  try { const q = qrcode(0, 'M'); q.addData(txt); q.make(); el.innerHTML = q.createSvgTag({ cellSize:4, margin:0, scalable:true }); return; } catch(err){}
+  let h = 0; for (const c of txt) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  let s = ''; for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++){ h = (h * 1103515245 + 12345) >>> 0; const esq = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
+    const on = esq ? (x % 6 === 0 || y % 6 === 0 || (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5) || x === 20 || y === 20 || x === 14 || y === 14) : (h >> 16) & 1; if (on) s += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
+  el.innerHTML = `<svg viewBox="0 0 21 21" shape-rendering="crispEdges">${s}</svg>`;
+}
+
+/* ---------- firma con el dedo ---------- */
+function prepararFirma(cv){
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = r.width * dpr; cv.height = r.height * dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr); g.lineWidth = 2.2; g.lineCap = 'round'; g.strokeStyle = getComputedStyle(document.body).color;
+  let dib = false; cv.dataset.trazos = '0';
+  const pos = ev => { const b = cv.getBoundingClientRect(); return [ev.clientX - b.left, ev.clientY - b.top]; };
+  cv.addEventListener('pointerdown', ev => { dib = true; cv.setPointerCapture(ev.pointerId); const [x, y] = pos(ev); g.beginPath(); g.moveTo(x, y); });
+  cv.addEventListener('pointermove', ev => { if (!dib) return; const [x, y] = pos(ev); g.lineTo(x, y); g.stroke(); cv.dataset.trazos = String(+cv.dataset.trazos + 1); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, () => { dib = false; }));
+}
+/* Una firma "de muestra" si la persona no quiere firmar. */
+function firmaDeMuestra(cv){
+  const g = cv.getContext('2d'), w = cv.clientWidth, h = cv.clientHeight; g.beginPath(); g.moveTo(w * .15, h * .6);
+  for (let i = 0; i <= 40; i++){ const t = i / 40; g.lineTo(w * (.15 + t * .7), h * (.55 + Math.sin(t * 14) * .18 - t * .1)); } g.stroke(); cv.dataset.trazos = '9';
+}
+async function sha256(t){ try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch(e){ return 'b7e1c4…(sin cifrado en este navegador)'; } }
+
+/* ---------- los toques ---------- */
+let sosteniendo = null;
+document.addEventListener('pointerdown', ev => {
+  const b = ev.target.closest('[data-hold]'); if (!b) return;
+  ev.preventDefault(); const ms = +b.dataset.hold, desde = Date.now();
+  sosteniendo = { b, t:setInterval(() => { const p = Math.min(1, (Date.now() - desde) / ms); b.style.setProperty('--carga', p);
+    if (p >= 1){ clearInterval(sosteniendo.t); sosteniendo = null; b.style.removeProperty('--carga'); tono([[660, 0, .15], [990, .12, .2]]); avanzar(); } }, 30) };
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => document.addEventListener(t, ev => {
+  if (!sosteniendo || (t === 'pointerleave' && ev.target !== sosteniendo.b)) return;
+  clearInterval(sosteniendo.t); const b = sosteniendo.b; b.style.removeProperty('--carga'); sosteniendo = null;
+  const lado = b.closest('#appA') ? 'a' : 'b'; toastTel(lado, 'Mantenelo apretado hasta que se llene');
+}, true));
+
+document.addEventListener('click', async ev => {
+  const opc = ev.target.closest('[data-esc]'); if (opc){ irA(+opc.dataset.esc); return; }
+  const tel = ev.target.closest('.tel-app'); if (!tel) return;
+  const lado = tel.id === 'appA' ? 'a' : 'b', e = ESC[S.esc], p = e.pasos[S.paso];
+  const act = ev.target.closest('[data-act]');
+  if (act){
+    const a = act.dataset.act;
+    if (a === 'compartir'){ toastTel(lado, 'Acá se abriría WhatsApp con el pase'); return; }
+    if (a === 'no'){ toastTel(lado, 'No se mandó nada'); return; }
+    if (a === 'chk'){ const i = act.dataset.i; S.d['c' + i] = !S.d['c' + i]; pintarParcial(); return; }
+    if (a === 'punto'){
+      if (e.id !== 'ronda' || !p.ronda) return;
+      const i = +act.dataset.i; S.d.puntos = S.d.puntos || []; if (S.d.puntos.includes(i)) return;
+      S.d.puntos.push(i); tono([[1320, 0, .12]]); document.querySelectorAll('.hora').forEach(h => h.textContent = horaRonda(S.d.puntos.length - 1));
+      $('#appA').innerHTML = pantallaRonda(); $('#appB').innerHTML = garitaRonda();
+      if (matchMedia('(max-width:680px)').matches) toastTel('a', `La garita lo vio al instante (${S.d.puntos.length} de 6)`);
+      if (S.d.puntos.length === 6){ S.d.finRonda = horaRonda(5); setTimeout(avanzar, 700); }
+      return;
+    }
+  }
+  const go = ev.target.closest('[data-go]'); if (!go || go.dataset.hold) return;
+  if (lado !== p.lado){ toastTel(lado, 'Ahora le toca al otro teléfono'); if (matchMedia('(max-width:680px)').matches) mirar(p.lado); return; }
+  const set = go.dataset.set || '';
+  if (set.startsWith('firma:')){
+    const quien = set.slice(6), cv = tel.querySelector('canvas[data-firma]');
+    if (cv && +cv.dataset.trazos < 3) firmaDeMuestra(cv);
+    if (cv) S.d['firma_' + quien] = cv.toDataURL();
+    if (quien === 'guardia') S.d.sello = await sha256('Autorizar a un proveedor|El jueves viene Fletes Sur|' + (S.d.firma_vecino || '').length + '|' + (S.d.firma_guardia || '').length);
+  }
+  if (set.startsWith('tipo:')) S.d.tipo = set.slice(5);
+  avanzar();
+});
+function pintarParcial(){ const e = ESC[S.esc], f = pasoDe(e, S.paso, 'a'); $('#appA').innerHTML = f(); const b = $('#appA [data-go]'); if (b) b.classList.add('toca'); }
+$('#verA').addEventListener('click', () => mirar('a'));
+$('#verB').addEventListener('click', () => mirar('b'));
+$('#reiniciar').addEventListener('click', () => { S.paso = 0; S.d = {}; pintar(); });
+$('#siguiente').addEventListener('click', () => irA((S.esc + 1) % ESC.length));
+
+/* Un enlace directo a una simulación: …#dea, #bien, #ronda… */
+const ancla = (location.hash || '').slice(1); const j = ESC.findIndex(x => x.id === ancla); if (j >= 0) S.esc = j;
+pintar();
+})();
+</script>
+</body>
+</html>

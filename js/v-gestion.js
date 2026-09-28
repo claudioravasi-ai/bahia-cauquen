@@ -88,7 +88,7 @@ F['peticion'] = async d => {
   p.selloVecino = await sello({ id:p.id, userId:p.userId, casa:p.casa, tipo:p.tipo, texto:p.texto, desde:p.desde, hasta:p.hasta, at:p.at, firma });
   Store.cambiar(s => {
     s.peticiones.unshift(p);
-    if (p.tipo === 'viaje'){ const x = s.users.find(z => z.id === u.id); x.viaje = { desde:p.desde, hasta:p.hasta || sumarDias(p.desde, 7), contacto:'', nota:p.texto }; }
+    if (p.tipo === 'viaje' && typeof guardarAusencia === 'function') guardarAusencia(s, u, { desde:p.desde, hasta:p.hasta || sumarDias(p.desde, 7), contacto:'', nota:p.texto });
     auditar(s, 'Petición creada y firmada por el vecino', `${TIPOS_PET[p.tipo].n} · ${u.casa}`, p.id);
     notificar(s, { para:'rol:guardia', titulo:`Petición de ${u.casa}`, texto:TIPOS_PET[p.tipo].n + ' · falta tu firma de recepción', icon:'edit', color:'warn', urgente:true, link:'peticiones', sonido:true });
   });
@@ -681,15 +681,19 @@ function chatInterno(idP){
 }
 R.privado = {
   titulo: p => { const [con, id] = String(p || '').split('|'); if (con === 'interno') return esGuardia() ? 'Administración' : 'Garita';
+    if (esHotel()) return 'Comunicación interna';
     return esStaff() && id ? (usuario(id)?.nombre || 'Conversación') : con === 'guardia' ? 'Guardia' : 'Administración'; },
   icon: 'lock', color: 'accent',
   sub: p => { const [con, id] = String(p || '').split('|');
     if (con === 'interno') return 'Entre la garita y la Administración · no lo ve ningún vecino';
+    if (esHotel()) return con === 'guardia' ? 'Con la garita · solo la ven el hotel y la garita' : con === 'admin' ? 'Con la Administración · solo la ven el hotel y la Administración' : 'Privada · elegí con quién hablar';
     return esStaff() && id ? (usuario(id)?.casa || '') : con === 'guardia' ? 'Privado: solo lo ven vos y la guardia' : 'Privado: solo lo ven vos y la Administración'; },
   render(p){
     const u = yo(), s = Store.s;
     const [conP, idP] = String(p || '').split('|');
     if (conP === 'interno') return chatInterno(idP);
+    /* El hotel entra por "Comunicación interna" y elige con quién (v-hotel.js). */
+    if (esHotel() && conP !== 'guardia' && conP !== 'admin') return comunicacionHotel();
     const con = conP === 'guardia' ? 'guardia' : 'admin';
     /* La guardia ve solo sus conversaciones; la Administración, las suyas. */
     const miCanal = esGuardia() ? 'guardia' : esAdmin() ? 'admin' : con;
@@ -710,13 +714,13 @@ R.privado = {
     const mio = m => esStaff() ? m.from !== 'vecino' : m.from === 'vecino';
     if (h && h.msgs.some(m => !mio(m) && !m.leido)){ h.msgs.forEach(m => { if (!mio(m)) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
     const msgs = h ? h.msgs : [];
-    const chips = esStaff() ? '' : `<div class="chips">
+    const chips = esStaff() ? '' : esHotel() ? chipsHotel(con) : `<div class="chips">
       <button class="chip ${con === 'admin' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="admin">${I('sliders')}Administración</button>
       <button class="chip ${con === 'guardia' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="guardia">${I('shield')}Guardia</button></div>`;
     return `<div class="chat-wrap">${chips}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
         <div class="b">${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
-        : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? 'Escribile a la guardia. Nadie más lo ve.' : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
-      <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}"><input name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? 'Mensaje a la guardia' : 'Mensaje a la Administración'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
+        : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? (esHotel() ? 'Escribile a la garita. Solo la leen el hotel y la garita.' : 'Escribile a la guardia. Nadie más lo ve.') : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
+      <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}"><input name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'Mensaje a la Administración'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
   },
   alPintar(){ const c = $('#cuerpo'); if (c) c.scrollTop = c.scrollHeight; },
 };
@@ -902,18 +906,24 @@ R.emergencias = {
     const cats = [...new Set(s.agenda.map(a => a.categoria))].filter(c => CATS_EMERGENCIA.test(c));
     const c = s.config, mio = typeof Dea !== 'undefined' ? Dea.mio() : null;
     return `<div class="btns" style="margin-bottom:12px"><a class="btn btn-danger" href="tel:911">${I('phone')}911</a><a class="btn btn-danger-soft" href="tel:107">107 Ambulancia</a><a class="btn btn-danger-soft" href="tel:100">100 Bomberos</a><a class="btn btn-danger-soft" href="tel:101">101 Policía</a></div>
-      ${telGarita() || telAdmin() ? `<div class="btns" style="margin-bottom:12px">
-        ${telGarita() ? `<a class="btn btn-pri grow" href="${telLink(telGarita())}">${I('gate')}Garita · ${esc(telGarita())}</a>` : ''}
-        ${telAdmin() ? `<a class="btn btn-sec grow" href="${telLink(telAdmin())}">${I('sliders')}Administración · ${esc(telAdmin())}</a>` : ''}</div>` : ''}
+      ${(() => { /* La garita no ve un botón para llamarse a sí misma (pedido de Claudio, 27-09). */
+        const g = esGuardia() ? '' : telGarita();
+        return g || telAdmin() ? `<div class="btns" style="margin-bottom:12px">
+        ${g ? `<a class="btn btn-pri grow" href="${telLink(g)}">${I('gate')}Garita · ${esc(g)}</a>` : ''}
+        ${telAdmin() ? `<a class="btn btn-sec grow" href="${telLink(telAdmin())}">${I('sliders')}Administración · ${esc(telAdmin())}</a>` : ''}</div>` : ''; })()}
       <div class="card dea-card"><div class="dea-fila"><span class="dea-corazon" aria-hidden="true">${I('heart')}</span>
         <div class="grow"><b>Desfibrilador (DEA) del barrio · operativo</b><div class="small" style="color:var(--ink-2);margin-top:2px">${esc(c.dea)}</div></div>
         ${esGuardia() ? '' : `<button type="button" class="dea-pedir" id="deaBtn" aria-label="Solicitar el DEA: mantener apretado 2 segundos"><span>SOLICITARLO</span></button>`}</div>
         ${mio ? `<div style="margin-top:12px">${aviso(mio.estado === 'en_camino' ? 'ok' : 'danger latido', 'heart', mio.estado === 'en_camino' ? 'El DEA va en camino' : 'Tu pedido del DEA está en la garita',
-            mio.estado === 'en_camino' ? `Salió ${hace(mio.enCaminoAt || mio.at)}.` : 'Esperando que salgan con el DEA. Llamá al 911.', `<button class="btn btn-xs btn-sec" data-a="dea-listo" data-id="${mio.id}">Ya no hace falta</button>`)}</div>`
+            mio.estado === 'en_camino' ? `Salió ${hace(mio.enCaminoAt || mio.at)}.${(() => { const van = Object.entries(mio.responden || {}).filter(([, r]) => r && r.v === 'voy').map(([id]) => nombreDe(id).split(' ')[0]);
+              return van.length ? ` También va${van.length > 1 ? 'n' : ''} ${esc(van.join(', '))}, del equipo de salud.` : mio.respAvisados ? ` Avisamos a ${plural(mio.respAvisados, 'vecino', 'vecinos')} del equipo de salud.` : ''; })()}` : 'Esperando que salgan con el DEA. Llamá al 911.', `<button class="btn btn-xs btn-sec" data-a="dea-listo" data-id="${mio.id}">Ya no hace falta</button>`)}</div>`
         : esGuardia() ? '' : `<p class="muted tiny" style="margin:10px 0 0">En una emergencia (alguien se desmayó y no respira), <b>mantené apretado SOLICITARLO 2 segundos</b> y confirmá: a la garita le salta la alarma con tu lote y tu apellido. Llamá también al 911.</p>`}</div>
       ${c.deaHotel ? `<div class="card plana small" style="margin:-4px 0 12px">${I('heart')} <b>Otro DEA en el barrio:</b> ${esc(HOTEL_NOMBRE)} · ${esc(c.deaHotel.lugar || 'recepción')}${c.deaHotel.tel ? ` · <a href="${telLink(c.deaHotel.tel)}">${esc(c.deaHotel.tel)}</a>` : ''}. Ante una emergencia, la garita se lo pide al hotel.</div>` : ''}
+      ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
+      ${esStaff() ? '' : (() => { const n = typeof Respondedores !== 'undefined' ? Respondedores.lista().length : 0, u = yo();
+        return `<div class="card plana small" style="margin:-4px 0 12px">${I('heart')} <b>${n ? plural(n, 'vecino del equipo de salud o con RCP', 'vecinos del equipo de salud o con RCP') : 'Vecinos del equipo de salud o con RCP'}</b>: cuando la garita sale con el DEA, les llega un aviso para que se acerquen. ${u && u.respondedor ? 'Vos estás anotado/a.' : '¿Sos médico/a, enfermero/a o sabés RCP? <button class="link" data-a="abrir" data-v="perfil">Marcalo en Mi casa</button>.'}</div>`; })()}
       ${sosDelDia()}
-      ${sec('Del barrio')}<div class="card lista">${s.contactos.map(k => renglonAgenda({ nombre:k.nombre, detalle:k.detalle, tel:telContacto(k), wa: k.wa !== false })).join('')}</div>
+      ${sec('Del barrio')}<div class="card lista">${s.contactos.filter(k => !(esGuardia() && /garita|guardia/i.test(k.nombre || ''))).map(k => renglonAgenda({ nombre:k.nombre, detalle:k.detalle, tel:telContacto(k), wa: k.wa !== false })).join('')}</div>
       ${cats.map(c => `${sec(esc(c))}<div class="card lista">${s.agenda.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('')}`;
   },
 };
@@ -1419,7 +1429,8 @@ R.perfil = {
         <div class="field"><label>Teléfono / WhatsApp</label><input name="tel" id="pfTel" value="${esc(u.tel || '')}" inputmode="tel" maxlength="20"></div>
         <div class="field"><label>Oficios o servicios que ofrecés</label><input name="skills" id="pfSkills" value="${esc(u.skills || '')}" maxlength="120" placeholder="Ej: electricista, clases de inglés"></div>
         <label class="check"><input type="checkbox" name="mostrarTel" ${u.mostrarTel ? 'checked' : ''}><span>Publicar mi oficio en <b>Profesionales y oficios</b> (Ushuaia y servicios) con mi WhatsApp</span></label>
-        <label class="check"><input type="checkbox" name="respondedor" ${u.respondedor ? 'checked' : ''}><span><b>Sé primeros auxilios / RCP o soy del equipo de salud.</b> Avisame si un vecino pide ayuda médica con el SOS.</span></label>
+        <label class="check"><input type="checkbox" name="respondedor" ${u.respondedor ? 'checked' : ''}><span><b>Sé primeros auxilios / RCP o soy del equipo de salud.</b> Avisame si un vecino pide ayuda médica con el SOS y cuando la garita sale con el DEA.</span></label>
+        <div class="field" style="margin:6px 0 0 30px"><label>¿Qué sos? (lo ve la garita cuando vas en camino)</label><select name="saludProf" id="pfSalud"><option value="">Elegí…</option>${Object.entries(typeof PROF_SALUD !== 'undefined' ? PROF_SALUD : {}).map(([k, n]) => `<option value="${k}" ${u.saludProf === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
         <hr class="sep"><div class="lbl">Directorio de vecinos</div>
         <div class="grid2"><div class="field"><label>Profesión</label><input name="profesion" id="pfProf" value="${esc(u.profesion || '')}" maxlength="60" placeholder="Médica, abogado, docente…"></div>
           <div class="field"><label>Dirección dentro del barrio</label><input name="direccion" id="pfDir" value="${esc(u.direccion || '')}" maxlength="60" placeholder="Calle 3 N° 42"></div></div>
@@ -1434,7 +1445,7 @@ R.perfil = {
       ${Store.s.infracciones.some(i => i.casa === u.casa) ? superficie({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones de la Administración', s:'Infracciones y descargos de tu casa' }) : ''}
       ${sec('Guardia')}
       ${superficie({ a:'abrir', v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas y con historial' })}
-      ${superficie({ a:'modo-viaje', icon:'lock', color:'wood', t:'Me voy de viaje', s: u.viaje ? `Casa sola hasta el ${fechaCorta(u.viaje.hasta)}` : 'Rondas extra mientras no estás' })}
+      ${(() => { const au = typeof ausenciaDe === 'function' ? ausenciaDe(u) : null; return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t:'Me voy de viaje', s: au ? `Casa sola hasta el ${fechaCorta(au.hasta)} · la revisan cada día` : 'La revisan cada día y te avisan que está en orden' }); })()}
       ${sec('Este equipo')}
       <div class="card"><div class="lbl">Modo de pantalla · ahora está en ${modoActual()}</div>
         <div class="seg">${[['auto','Automático','sunrise'],['light','Día','sun'],['dark','Noche','moon']].map(([k, t, ic]) => `<label><input type="radio" name="tema" ${tema === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
@@ -1443,12 +1454,12 @@ R.perfil = {
         ${typeof Push !== 'undefined' && Push.estado() !== 'demo' ? tarjetaPush(false) : notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
         <label class="check" style="margin-top:10px"><input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span>Sonido cuando escribe la guardia o la Administración</span></label></div>
       ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras' })}
-      ${superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
+      ${esGuardia() ? '' : superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
       ${superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Descargarlos o pedir que se borren (Ley 25.326)' })}
       ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', cls:'peligro' })}`;
   },
 };
-F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { ...('relacion' in d ? { relacion:d.relacion } : {}), tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, integrantes:d.integrantes.trim(),
+F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { ...('relacion' in d ? { relacion:d.relacion } : {}), tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, saludProf:d.respondedor && typeof PROF_SALUD !== 'undefined' && PROF_SALUD[d.saludProf] ? d.saludProf : '', integrantes:d.integrantes.trim(),
   profesion:(d.profesion || '').trim(), direccion:(d.direccion || '').trim(), ubicacion:(d.ubicacion || '').trim(), enDirectorio:!!d.enDirectorio })); toast('Guardado', 'check'); };
 /* La carta poder: el propietario autoriza al inquilino (o a un familiar)
    a votar por el lote. La Administración la revisa y la aprueba. */
@@ -1512,7 +1523,10 @@ A['pedir-notifs'] = async () => { try { const r = await Notification.requestPerm
 A['sonido'] = el => { setTimeout(() => { Store.sesion.sinSonido = !el.checked; Store.guardarSesion(); }, 0); return true; };
 A['mis-datos'] = () => {
   const u = yo(), s = Store.s;
-  const datos = { usuario:u, pases:s.pases.filter(p => p.hostId === u.id), reservas:s.reservas.filter(r => r.userId === u.id), reclamos:s.reclamos.filter(r => r.userId === u.id), peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })) };
+  const datos = { usuario:u, pases:s.pases.filter(p => p.hostId === u.id), reservas:s.reservas.filter(r => r.userId === u.id), reclamos:s.reclamos.filter(r => r.userId === u.id), peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
+    /* 27-09: "Estoy bien" y salidas, lo que presta, la nieve y los cuidados de su casa. */
+    estoyBien: typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, cosas:aLista(s.cosas).filter(x => x.userId === u.id),
+    nieve:aLista(s.nieve).filter(x => x.userId === u.id), casaEnInvierno:aLista(s.casaTareas).filter(x => x.lote === u.casa) };
   const blob = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type:'application/json' }));
   hoja('Mis datos personales', `<p class="small" style="margin:0 0 12px;color:var(--ink-2)">Por la Ley 25.326 podés ver, corregir y pedir que se borren tus datos. Descargá una copia o pedile la baja a la Administración.</p>
     <div class="btns"><a class="btn btn-sec" href="${blob}" download="mis-datos-bahia-cauquen.json">${I('download')}Descargar</a><button class="btn btn-danger-soft" data-a="pedir-baja">Pedir la baja</button></div>`);
@@ -1606,8 +1620,9 @@ A['descargar'] = el => {
    Un navegador no puede leer la web del hotel directamente: el sitio no
    autoriza que otra página lo lea (es la misma limitación que con los
    aviones en vivo). Hay dos caminos, y los dos funcionan:
-     1. La Administración las carga a mano en Contenido → Promociones.
-        Es lo que anda hoy, sin depender de nadie.
+     1. Las cargan a mano el hotel (desde su cuenta) o la Administración
+        (sala del hotel → Promociones, o Contenido → Promociones). Es lo
+        que anda hoy, sin depender de nadie (ver js/v-hotel.js).
      2. Con un programita propio (un Worker de Cloudflare o un Apps
         Script) que lea la página del hotel y devuelva la lista en JSON.
         Se pega su dirección en Ajustes → Promociones y la app las
@@ -1670,7 +1685,7 @@ function tiraPromos(){
      no se le cuenta: para él son propuestas del hotel y punto. */
   const aviso = (ps[0] && ps[0].muestra && esAdmin())
     ? `<div class="card plana small" style="margin:8px 0 0">${I('info')} Estas son promociones <b>de ejemplo</b>.
-        Las reales se cargan en <b>Administración → Contenido → Promociones</b>, o pegando la dirección del lector del hotel en <b>Ajustes</b>.</div>`
+        Las reales las cargan el hotel desde su cuenta o la Administración en <b>Día a día → Hotel Los Cauquenes → Promociones del hotel</b>.</div>`
     : '';
   const chips = ps.map(p => `<button class="promo-chip" data-a="ver-promo" data-id="${esc(p.id)}">
       ${p.descuento ? `<span class="promo-desc">${esc(p.descuento)}</span>` : `<span class="ic ic-wood">${I('star')}</span>`}
@@ -1691,7 +1706,7 @@ A['ver-promo'] = el => {
       <div class="small">de descuento para vecinos del barrio</div></div>` : ''}
     ${p.detalle ? `<p style="margin:0 0 14px;color:var(--ink-2)">${esc(p.detalle)}</p>` : ''}
     ${p.desde || p.hasta ? `<div class="card plana small">${I('calendar')} ${p.desde ? 'Desde ' + fechaLarga(p.desde) : ''}${p.hasta ? (p.desde ? ' · hasta ' : 'Hasta ') + fechaLarga(p.hasta) : ''}</div>` : ''}
-    ${p.url ? `<a class="btn btn-pri btn-block" href="${esc(p.url)}" target="_blank" rel="noopener">${I('link')}Ver en el Hotel Los Cauquenes</a>` : ''}
-    <p class="muted tiny" style="margin-top:12px">${p.muestra ? 'Promoción de MUESTRA, para ver cómo se ve la sección: no es una oferta real. La Administración las reemplaza desde Contenido → Promociones. ' : p.web ? 'Tomado del sitio del Hotel Los Cauquenes. ' : 'Cargada por la Administración del barrio. '}Confirmá las condiciones directamente con el Hotel Los Cauquenes antes de reservar.</p>`);
+    ${enlaceWeb(p.url) ? `<a class="btn btn-pri btn-block" href="${esc(enlaceWeb(p.url))}" target="_blank" rel="noopener">${I('link')}Ver en el Hotel Los Cauquenes</a>` : ''}
+    <p class="muted tiny" style="margin-top:12px">${p.muestra ? 'Promoción de MUESTRA, para ver cómo se ve la sección: no es una oferta real. La Administración las reemplaza desde Contenido → Promociones. ' : p.web ? 'Tomado del sitio del Hotel Los Cauquenes. ' : (p.autor || (p.hotel ? 'hotel' : 'admin')) === 'hotel' ? 'Publicada por el Hotel Los Cauquenes. ' : 'Cargada por la Administración del barrio. '}Confirmá las condiciones directamente con el Hotel Los Cauquenes antes de reservar.</p>`);
 };
 A['promos-actualizar'] = () => Promos.pedir(true).then(() => { refrescar(); toast('Promociones actualizadas', 'refresh'); });

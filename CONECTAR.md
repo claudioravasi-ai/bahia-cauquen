@@ -30,7 +30,7 @@ nada; para probar de verdad la identidad y los permisos, hay que entrar **sin**
 | Arribos y partidas | Tablero de London Supply | No. Se lee directo. |
 | Aviones en vivo sobre el barrio | ADS-B | Sí, un Worker propio (Ajustes → Vuelos). Opcional. |
 | Recaladas de cruceros | Las carga la Administración | Contenido → Recaladas |
-| Promociones del Hotel Los Cauquenes | Las carga la Administración | Contenido → Promociones. Con un Worker propio se leen solas (Ajustes → Promociones). |
+| Promociones del Hotel Los Cauquenes | Las cargan el hotel (desde su cuenta) o la Administración | Promociones del hotel (o Contenido → Promociones). Con un Worker propio se leen solas (Ajustes → Promociones). |
 | Feriados y calendario religioso | **Se calculan** en `js/calendario.js` | Solo lo provincial, lo municipal y los puentes |
 | Correo | Google Apps Script | Sí, ver `CORREO.md` |
 

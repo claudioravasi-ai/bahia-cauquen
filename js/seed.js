@@ -176,6 +176,42 @@ function seed(){
       { id:'pr2', empresa:'Construcciones del Beagle', rubro:'Construcción', cuit:'', tel:'', artVence:D(200), seguroVence:D(200), personal:'Carlos Vera\nMatías Ruiz\nOmar Gil' },
       { id:'pr3', empresa:'Jardines del Fin del Mundo', rubro:'Jardinería', cuit:'', tel:'', artVence:D(-2), seguroVence:D(40), personal:'Ana Toledo' },
     ],
+    /* 27-09: cosas para prestar, ángeles de la nieve, la casa en invierno y
+       "Estoy bien" (Martín vive solo: siempre lo cuidan la garita y la
+       Administración; además eligió a Lucía y a Claudio, y a su hermana Ana
+       por correo). */
+    cosas: [
+      { id:'c1', userId:'u_diego', casa:'Lote 18', nombre:'Escalera extensible de 7 m', cat:'herramientas', detalle:'De aluminio', condiciones:'Hasta 3 días', estado:'disponible', prestamos:2, createdAt:n - 9*DIA, at:n - 9*DIA },
+      { id:'c2', userId:'u_diego', casa:'Lote 18', nombre:'Hidrolavadora', cat:'herramientas', detalle:'1.600 W, con lanza', condiciones:'', estado:'prestada', prestada:{ casa:'Lote 42', hasta:D(2), at:n - DIA }, prestamos:1, createdAt:n - 8*DIA, at:n - DIA },
+      { id:'c3', userId:'u_lucia', casa:'Lote 42', nombre:'Cadenas para nieve', cat:'nieve', detalle:'Rodado 16', condiciones:'Devolverlas secas', estado:'disponible', prestamos:0, createdAt:n - 6*DIA, at:n - 6*DIA },
+      { id:'c4', userId:'u_martin', casa:'Lote 23', nombre:'Carpa para 4 personas', cat:'deporte', detalle:'Con doble techo', condiciones:'', estado:'disponible', prestamos:0, createdAt:n - 5*DIA, at:n - 5*DIA },
+      { id:'c5', userId:'u_claudio', casa:'Lote 148', nombre:'Generador eléctrico', cat:'casa', detalle:'3 kVA a nafta', condiciones:'Siempre al aire libre', estado:'disponible', prestamos:0, createdAt:n - 4*DIA, at:n - 4*DIA },
+    ],
+    nieve: [
+      { id:'n-u_martin', userId:'u_martin', casa:'Lote 23', nombre:'Martín', tipo:'ayuda', nota:'Operado de la rodilla: la rampa del garaje y los escalones', activo:true, angel:'u_diego', at:n - 20*DIA },
+      { id:'n-u_diego', userId:'u_diego', casa:'Lote 18', nombre:'Diego', tipo:'angel', nota:'Pala y sal gruesa', activo:true, at:n - 21*DIA },
+      { id:'n-u_lucia', userId:'u_lucia', casa:'Lote 42', nombre:'Lucía', tipo:'angel', nota:'Pala', activo:true, at:n - 15*DIA },
+    ],
+    casaTareas: [
+      { id:'ct-148-co', lote:'Lote 148', tarea:'co', hecho:n - 150*DIA, por:'u_claudio', at:n - 150*DIA },
+      { id:'ct-148-gas', lote:'Lote 148', tarea:'gas', hecho:n - 200*DIA, por:'u_claudio', at:n - 200*DIA },
+      { id:'ct-42-chimenea', lote:'Lote 42', tarea:'chimenea', hecho:n - 170*DIA, por:'u_lucia', at:n - 170*DIA },
+      /* la mochila para sismos del Lote 148, a medio armar */
+      { id:'ct-148-moch-agua', lote:'Lote 148', tarea:'moch-agua', hecho:n - 200*DIA, por:'u_claudio', at:n - 200*DIA },
+      { id:'ct-148-moch-linterna', lote:'Lote 148', tarea:'moch-linterna', hecho:n - 20*DIA, por:'u_claudio', at:n - 20*DIA },
+      { id:'ct-148-moch-abrigo', lote:'Lote 148', tarea:'moch-abrigo', hecho:n - 20*DIA, por:'u_claudio', at:n - 20*DIA },
+    ],
+    /* Diego está de viaje: su casa es una "casa sola" que la garita revisa cada día. */
+    ausencias: [
+      { id:'au-u_diego', userId:'u_diego', casa:'Lote 18', desde:D(-1), hasta:D(5), contacto:'Sofía · 2901 15 000002', nota:'Pasa a regar el vecino del 19 los martes',
+        revisiones:{ [D(-1)]:{ at:n - 20*HORA, quien:'u_garita', por:'policia', policia:'Cabo Ruiz', novedad:false, nota:'Portón cerrado, sin novedades' } }, at:n - 20*HORA },
+    ],
+    cuidado: {
+      u_martin: { id:'u_martin', nombre:'Martín Sosa', casa:'Lote 23', tel:'5492901000004', activo:true, hora:'10:00', creado:n - 12*DIA,
+        ultimo: (() => { const d = new Date(); d.setHours(8, 12, 0, 0); return d.getTime() <= n ? d.getTime() : d.getTime() - DIA; })(),
+        contactos:{ u_lucia:{ nombre:'Lucía Fernández', casa:'Lote 42', agregado:n - 12*DIA, acepta:n - 11*DIA }, u_claudio:{ nombre:'Claudio Ravasi', casa:'Lote 148', agregado:n - 2*DIA } },
+        garita:true, familiares:[{ nombre:'Ana (hermana)', email:'ana.sosa@ejemplo.demo', tel:'5492901000099' }], consentimiento:n - 12*DIA, aviso:{}, recordado:{} },
+    },
   };
 }
 

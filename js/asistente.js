@@ -47,11 +47,31 @@ const Asistente = {
     } catch(e){ fin(); }
   },
 
+  /* =========================================================
+     iPHONE Y iPAD (Claudio, 27-09: "en el iPad el registro de voz no me
+     capta lo que pido, se traba la app y debo salir bruscamente")
+     Safari no deja abrir el micrófono si no es con un TOQUE: al terminar
+     el saludo se abría solo y quedaba colgado "escuchando". Además el
+     reconocimiento de Apple puede no tener el acento "es-AR" y ese error
+     no se atendía. Ahora, en iPhone y iPad:
+       · el micrófono se abre SOLO al tocar el botón del micrófono;
+       · el "sí/no" de una confirmación se contesta con los botones;
+       · se prueba otro acento de español si el primero no está.
+     Y en todos los equipos: si el micrófono no arranca en 5 s, si hay
+     2,5 s de silencio después de hablar o si pasan 12 s, se corta solo y
+     se usa lo que se alcanzó a entender. Tocar cualquier otra parte de la
+     app también lo corta: nunca más queda la app esperando.
+     ========================================================= */
+  esApple(){ return typeof Push !== 'undefined' && Push.esIOS ? Push.esIOS() : /iPad|iPhone|iPod/.test(navigator.userAgent); },
+  IDIOMAS(){ return this.esApple() ? ['es-MX', 'es-ES', 'es-US'] : ['es-AR', 'es-US', 'es-ES']; },
+  idioma(){ let i = 0; try { i = +localStorage.getItem(this.KEY + '.idioma') || 0; } catch(e){} const l = this.IDIOMAS(); return l[Math.min(i, l.length - 1)]; },
+  otroIdioma(){ try { const i = (+localStorage.getItem(this.KEY + '.idioma') || 0) + 1; if (i < this.IDIOMAS().length){ localStorage.setItem(this.KEY + '.idioma', String(i)); return true; } } catch(e){} return false; },
+
   /* Se llama al terminar el saludo del escudo. */
   alSaludar(){
     if (!this.paraMi() || !this.soportado()) return;
     const p = this.permiso();
-    if (p === 'si') this.escuchar();
+    if (p === 'si'){ if (this.esApple()) this.panel('', 'Tocá el micrófono y decime qué necesitás'); else this.escuchar(); }
     else if (!p) this.pedirPermiso();
   },
   pedirPermiso(){
@@ -70,23 +90,44 @@ const Asistente = {
       <button class="cerrar" data-a="asistente-cerrar" aria-label="Cerrar">${I('x')}</button>
       ${botones ? `<div class="asis-btns">${botones}</div>` : ''}</div>`;
   },
-  cerrar(){ try { this.rec && this.rec.abort(); } catch(e){} this.rec = null; this.escuchando = false; this.pendiente = null; $('#asistente')?.remove(); },
+  /* Corta la escucha sin esperar nada del navegador. */
+  cortar(msg){
+    const r = this.rec; this.rec = null; this.escuchando = false;
+    [this.vigia, this.tope, this.silencio].forEach(t => clearTimeout(t));
+    if (r){ r.onresult = r.onerror = r.onend = r.onaudiostart = null; try { r.abort(); } catch(e){} }
+    if (msg && $('#asistente')) this.panel('', msg);
+  },
+  cerrar(){ this.cortar(); try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch(e){} this.pendiente = null; $('#asistente')?.remove(); },
   escuchar(alTerminar){
     if (!this.soportado()){ toast('Este navegador no tiene reconocimiento de voz', 'alert'); return; }
-    try { this.rec && this.rec.abort(); } catch(e){}
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition, r = new SR();
-    r.lang = 'es-AR'; r.interimResults = true; r.maxAlternatives = 1; r.continuous = false;
-    let final = '';
+    this.cortar();
+    /* Hablar y escuchar a la vez traba el audio en el iPhone y el iPad. */
+    try { if ('speechSynthesis' in window && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); } catch(e){}
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let r; try { r = new SR(); } catch(e){ this.panel('', 'Este equipo no deja usar el reconocimiento de voz.'); return; }
+    r.lang = this.idioma(); r.interimResults = true; r.maxAlternatives = 1; r.continuous = false;
+    let final = '', parcial = '', termino = false, arranco = false;
     this.rec = r; this.escuchando = true;
     this.panel('oye', alTerminar ? 'Decí "sí" o "no"' : '');
-    r.onresult = e => { let t = ''; for (let i = 0; i < e.results.length; i++){ t += e.results[i][0].transcript; if (e.results[i].isFinal) final = t; }
-      const b = $('#asistente .asis-txt b'); if (b) b.textContent = t; };
-    r.onerror = e => { this.escuchando = false;
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') this.panel('', 'Tocá el micrófono para hablar (el navegador pidió permiso)');
-      else if (e.error === 'no-speech') this.panel('', 'No te escuché. Tocá el micrófono para probar de nuevo.'); };
-    r.onend = () => { this.escuchando = false; const t = final.trim(); if (!t) return;
-      if (alTerminar) alTerminar(t); else this.interpretar(t); };
-    try { r.start(); } catch(e){ this.panel('', 'Tocá el micrófono para hablar'); }
+    const usar = () => { if (termino) return; termino = true; const t = (final || parcial).trim(); this.cortar(t ? '' : 'No te escuché. Tocá el micrófono para probar de nuevo.');
+      if (t){ if (alTerminar) alTerminar(t); else this.interpretar(t); } };
+    r.onaudiostart = () => { arranco = true; };
+    r.onresult = e => { arranco = true; let t = ''; for (let i = 0; i < e.results.length; i++){ t += e.results[i][0].transcript; if (e.results[i].isFinal) final = t; }
+      parcial = t; const b = $('#asistente .asis-txt b'); if (b) b.textContent = t;
+      /* Si el navegador no marca el final (pasa en el iPad), 2,5 s de silencio alcanzan. */
+      clearTimeout(this.silencio); this.silencio = setTimeout(usar, 2500); };
+    r.onerror = e => { if (termino) return; termino = true;
+      if (e.error === 'language-not-supported' && this.otroIdioma()){ this.cortar('Tocá el micrófono de nuevo: pruebo con otro acento de español.'); return; }
+      const m = { 'not-allowed':'Tocá el micrófono para hablar (el equipo pidió permiso para usarlo).',
+        'service-not-allowed': this.esApple() ? 'El iPhone o iPad no dejó usar el reconocimiento de voz. Revisá en Configuración que Safari tenga permiso de micrófono y que el Dictado esté activado, o usá los botones.' : 'El navegador no dejó usar el reconocimiento de voz.',
+        'no-speech':'No te escuché. Tocá el micrófono para probar de nuevo.', 'audio-capture':'No encuentro el micrófono de este equipo.',
+        'network':'Hace falta internet para entender la voz. Probá de nuevo.', 'aborted':'' }[e.error];
+      this.cortar(m === '' ? '' : m || 'No pude escucharte. Tocá el micrófono para probar de nuevo.'); };
+    r.onend = () => usar();
+    /* Vigías: el micrófono que no arranca y la escucha que no termina nunca. */
+    this.vigia = setTimeout(() => { if (!termino && !arranco){ termino = true; this.cortar(this.esApple() ? 'El micrófono no arrancó. Tocá el botón del micrófono para hablar.' : 'El micrófono no respondió. Tocá el micrófono para probar de nuevo.'); } }, 5000);
+    this.tope = setTimeout(usar, 12000);
+    try { r.start(); } catch(e){ termino = true; this.cortar('Tocá el micrófono para hablar'); }
   },
 
   /* ---------- entender ---------- */
@@ -170,11 +211,17 @@ const Asistente = {
   confirmar(pregunta, boton, hacer){
     this.pendiente = hacer;
     this.panel('pregunta', esc(pregunta), `<button class="btn btn-sm btn-ok" data-a="asistente-confirmar">${I('check')}${esc(boton)}</button><button class="btn btn-sm btn-sec" data-a="asistente-cerrar">No</button>`);
+    /* En iPhone y iPad el "sí" se toca: abrir el micrófono solo lo traba. */
+    if (this.esApple()){ this.decir(pregunta); return; }
     this.decir(pregunta, () => { if (!this.pendiente || !$('#asistente')) return;
       this.escuchar(r => { const x = normTxt(r); if (/\b(si|dale|mandalo|mandar|publicalo|ok|claro|correcto|hacelo)\b/.test(x)) A['asistente-confirmar'](); else if (/\b(no|cancel|deja|nada)\b/.test(x)){ this.decir('Listo, no hago nada.'); this.cerrar(); }
         else this.panel('pregunta', esc(pregunta), `<button class="btn btn-sm btn-ok" data-a="asistente-confirmar">${I('check')}${esc(boton)}</button><button class="btn btn-sm btn-sec" data-a="asistente-cerrar">No</button>`); }); });
   },
 };
+/* Tocar cualquier otra cosa de la app mientras escucha, o salir de la app,
+   corta el micrófono: la app nunca queda esperando. */
+document.addEventListener('pointerdown', e => { if (Asistente.escuchando && !e.target.closest('#asistente')) Asistente.cortar('Listo, dejé de escuchar. Tocá el micrófono para hablar.'); }, true);
+document.addEventListener('visibilitychange', () => { if (document.hidden && $('#asistente')) Asistente.cerrar(); });
 A['asistente-si'] = () => { Asistente.poner('si'); cerrarHoja(); toast('Asistente por voz activado en este equipo', 'volume'); Asistente.escuchar(); };
 A['asistente-no'] = () => { Asistente.poner('no'); cerrarHoja(); toast('Listo. Lo podés activar cuando quieras en Tu cuenta.', 'check'); };
 A['asistente-hablar'] = () => { if (Asistente.permiso() !== 'si'){ Asistente.pedirPermiso(); return; } Asistente.escuchar(); };

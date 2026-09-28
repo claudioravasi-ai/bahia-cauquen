@@ -1,4 +1,4 @@
-# Subir la versión nueva y probarla — paso a paso (26-09-2026)
+# Subir la versión nueva y probarla — paso a paso (actualizado el 27-09-2026)
 
 Orden: **1. Preparar en la Mac → 2. Firebase (reglas) → 3. Apps Script → 4. GitHub → 5. Encender en la app → 6. Probar.**
 Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con ellas.
@@ -15,7 +15,7 @@ Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con 
 
 | Archivos sueltos | Carpetas |
 |---|---|
-| `index.html`, `sw.js`, `pago.html`, `limpiar.html`, `manifest.webmanifest`, `reglas-firebase.txt`, `revisar.py`, `version.py`, los `.md` (guías) | `js/` (incluye los nuevos **`v-hotel.js`**, **`asistente.js`** y **`v-manual.js`**), `css/`, `img/`, `icons/`, `apps-script/` |
+| `index.html`, `sw.js`, `pago.html`, `limpiar.html`, **`probar.html`** (la página de simulaciones para los vecinos, 27-09), `manifest.webmanifest`, `reglas-firebase.txt`, `revisar.py`, `version.py`, los `.md` (guías) | `js/` (incluye los nuevos **`v-cuidados.js`** y **`v-casa.js`**, del 27-09), `css/`, `img/`, `icons/`, `apps-script/` |
 
 **Lo que NO se sube nunca:** `datos-privados/` (padrón y liquidación con nombres), `Logo barrio.png`, `Incial DeepSeek/`, `Guia para vecinos/`, y el archivo `.json` de la cuenta de servicio de Firebase (es una llave).
 
@@ -29,7 +29,7 @@ Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con 
 4. Clic dentro del editor → Cmd+A → Borrar → Cmd+V → **Publicar**.
 5. Si marca un error en rojo, no publiques y pasame la línea que marca.
 
-Esto deja andando, además de lo pendiente de antes: el **hotel** (zona `hotel/`), los **paquetes por lote**, la **garita sin el chat vecinal**, los comprobantes de pago, el archivo histórico y las marcas del motor.
+Esto deja andando, además de lo pendiente de antes: **"Estoy bien" y el aviso de salida** (`cuidado/`), **cosas para prestar**, **ángeles de la nieve**, **tu casa en invierno y la mochila para sismos** y la **casa sola revisada cada día** (27-09), el **hotel** (zona `hotel/`), los **paquetes por lote**, la **garita sin el chat vecinal**, los comprobantes de pago, el archivo histórico y las marcas del motor.
 
 ---
 
@@ -52,6 +52,7 @@ Es el "servidor" del barrio: manda los correos, los avisos push, lee los crucero
    **Cómo se saca el `.json`:** Firebase → engranaje → **Configuración del proyecto** → **Cuentas de servicio** → **Generar nueva clave privada**. Se baja un archivo: abrilo con TextEdit, Cmd+A, Cmd+C y pegalo como valor de `FCM_CUENTA`. Después guardalo en un lugar seguro (no en la carpeta de GitHub).
 5. **Implementar → Gestionar implementaciones** → lápiz (editar) → **Versión: Nueva versión** → **Implementar**. La dirección `/exec` no cambia.
 6. Si Google pide permisos ("conectarse a un servicio externo"), aceptalos.
+7. **Una sola vez (versión 8, 27-09): el reloj de "Estoy bien".** En el menú de funciones de arriba elegí **`instalarRelojCuidados`** → **Ejecutar** → aceptá los permisos. Queda revisando cada 10 minutos, aunque todos los teléfonos estén bloqueados (detalle en AVISOS.md).
 
 ---
 
@@ -60,9 +61,10 @@ Es el "servidor" del barrio: manda los correos, los avisos push, lee los crucero
 1. Entrá al repositorio de la app del barrio en github.com (el que publica en GitHub Pages).
 2. **Add file → Upload files**.
 3. Abrí la carpeta **`SUBIR A GITHUB`** del Escritorio → **Cmd+A** (todo lo de adentro, no la carpeta) → arrastralo a la página de GitHub.
-4. Esperá a que termine de cargar la lista. Abajo, en el mensaje: *Hotel, asistente por voz, manual y más (26-09)* → **Commit changes**.
-5. Esperá 1 o 2 minutos (GitHub Pages publica solo). Comprobalo: abrí la app, y en la pantalla de ingreso, abajo, tiene que decir **versión 20260926-…** (la del día).
-6. Si en un equipo sigue la vieja: **Tu cuenta → Actualizar la app**.
+4. Esperá a que termine de cargar la lista. Abajo, en el mensaje: *Garita al día, policía con constancia, vans, Uber/DiDi, Estoy bien y más (27-09)* → **Commit changes**.
+5. Esperá 1 o 2 minutos (GitHub Pages publica solo). Comprobalo: abrí la app, y en la pantalla de ingreso, abajo, tiene que decir **versión 20260927-…** (la del día).
+6. La página de simulaciones queda en **`<dirección de la app>/probar.html`**: ese es el enlace para mandarles a los vecinos (se abre en cualquier navegador, no toca la app ni la base).
+7. Si en un equipo sigue la vieja: **Tu cuenta → Actualizar la app**.
 
 ---
 
@@ -123,11 +125,28 @@ Conviene tener abiertos: **tu cuenta** (vecino y Administración), **la garita**
 4. **Huéspedes → Cargar** uno para hoy con **vuelo de llegada** de hoy (mirá uno real en Vuelos) → en **Traslados** aparece solo "Buscar en aeropuerto · vuelo …".
 5. En la portada del hotel, en un vuelo de la lista → **"Van 14:10"** → guardar el traslado. Cuando esa van salga por la garita, el traslado pasa a **"En viaje"**.
 6. **Eventos → Anunciar** con "avisar a los vecinos" → a la garita le suena; en tu Administración: **Eventos del hotel → Publicar para los vecinos** → aparece en el pizarrón.
-7. **Promociones → Proponer** → en Administración: **Promociones del hotel → Publicar** → aparece en la tira del hotel de los vecinos.
+7. **Promociones → Nueva promoción** → sale enseguida en la tira del hotel de los vecinos y a tu Administración le llega el aviso. En Administración: **Promociones del hotel → Editar** (cambiale el descuento) y después **Borrar** → al hotel le llega cada aviso y la tira se actualiza en todas las apps. **Comunicación interna** → elegí Garita, escribí algo, cambiá a Administración con el botón de arriba: son dos conversaciones separadas.
 8. **Proveedores → Cargar** con ART vencida → en la garita su QR dice **NO HABILITADO**.
 9. **Ficha del hotel** → tildá "tiene DEA" → en Administración: **Emergencias del hotel → Publicar el DEA para los vecinos** → en Emergencias de los vecinos aparece "Otro DEA en el barrio".
 10. Botón rojo **"Garita"** (arriba a la derecha del hotel) → "Avisar a la garita ya" → a la garita le suena.
 11. En Administración → **Huéspedes**: solo la cantidad, sin nombres.
+
+### Garita (27-09)
+- Entrá con la cuenta de la garita: arriba **no** tiene SOS, y en Tu cuenta no aparece "Cambiar mi correo" (sí la contraseña).
+- A la derecha de "Garita" (en el celular, debajo) está **"Hoy la garita no puede olvidar"**: se tilda sola (probá entregar un paquete y mirá cómo se tacha).
+- **Policía contratada**: Registrar ingreso → día, turno, hora, nombre y **correo** (poné uno tuyo para ver la constancia). Anotá una ronda a mano y registrá la **Salida**: desaparece de la portada, queda en **Turnos → Servicios del policía** y te llega el correo "Constancia de servicio".
+- **Turnos**: arriba, quién hace cada turno con sus nombres; los puntos QR plegados; "Ver servicios anteriores".
+- **Vans del hotel · hoy**: con un traslado programado por el hotel, tocá "Salió" y después "Volvió".
+- **Uber/DiDi**: como vecino, Tu casa → "Viene un Uber o DiDi" con una patente; en la garita escribí la patente en el validador.
+- "Cerrar el turno" está solo en su teja; Emergencias de la garita ya no muestra su propio teléfono.
+
+### Asistente por voz en el iPad
+- Tocá el escudo: te saluda y aparece el panel "Tocá el micrófono y decime qué necesitás" (en iPad ya no abre el micrófono solo).
+- Tocá el micrófono y decí "¿tengo paquetes?". Si no te escucha, a los pocos segundos se corta solo; tocar cualquier otra parte de la app también lo corta. La app nunca debería quedar trabada: si pasa, anotá qué dijiste y en qué pantalla estabas.
+- Probalo en Safari y también con la app instalada en la pantalla de inicio.
+
+### Ingreso en Android
+- Si Chrome completa solo el correo y la contraseña, la app avisa "tocá Entrar" y no entra sola. Al tocar Entrar aparece "Entrando…" al instante.
 
 ### Privacidad
 - **Preguntas frecuentes → Tus datos → "¿Y el Hotel Los Cauquenes? ¿Ve mis datos?"**. Los términos dicen **versión del 26 de septiembre de 2026**.
