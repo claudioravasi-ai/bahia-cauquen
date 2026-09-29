@@ -3,7 +3,7 @@
    (bienvenida, avisos, SOS, tema).
 
    La navegación es una PILA de ventanas, como en ASHA:
-     abrir('reservas')      apila una ventana a la derecha
+     abrir('visitas')       apila una ventana a la derecha
      volverA(i)             vuelve a la ventana i (cierra las de la derecha)
      cerrarVentana()        cierra la última (también el Atrás del celular)
    Cada ventana se declara en R: { titulo, sub, icon, color, ancha, render(param) }.
@@ -38,13 +38,14 @@ function sincronizarHistorial(){
    LA GARITA VE SOLO LO SUYO
    La cuenta de la garita no es un vecino ni la Administración: tiene su
    propia lista de ventanas. Lo que no está acá (expensas, contabilidad,
-   votaciones, reservas, mensajes entre vecinos, los datos de un lote…)
+   votaciones, mensajes entre vecinos, los datos de un lote…)
    no se abre desde la garita, ni por un enlace ni por un aviso.
    Y antes de trabajar, cada turno se anota: hasta que no dice quiénes
    están de guardia, la única ventana es la de abrir el turno.
    ========================================================= */
-/* Sin el chat vecinal (26-09, pedido de Claudio): el vecino se comunica con
-   la garita por mensaje privado o por peticiones; el chat es entre vecinos. */
+/* El vecino se comunica con la garita por mensaje privado o por peticiones.
+   (El chat vecinal, que la garita ya no veía desde el 26-09, se sacó de la
+   app el 29-09-2026.) */
 const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron',
   'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda', 'manual',
   /* "Estoy bien": la garita ve solo a los vecinos que la eligieron como contacto (27-09). */
@@ -1059,7 +1060,7 @@ function pintarBienvenida(modo = 'inicio'){
 
   else {
     titulo = 'Bienvenido al barrio';
-    bajada = 'Tus visitas pasan con un QR, la guardia te avisa al instante y el resto está a un toque: reservas, votaciones, el clima y los vuelos de Ushuaia, y todo lo que pasa entre vecinos.';
+    bajada = 'Tus visitas pasan con un QR, la guardia te avisa al instante y el resto está a un toque: tus paquetes, las expensas, las votaciones, el clima y los vuelos de Ushuaia, y todo lo que pasa entre vecinos.';
     cuerpo = `
       ${pend && pend.estado === 'pendiente' ? `<div class="aviso a-warn">${I('clock')}<div class="txt"><b>Tu inscripción está en revisión</b>Cuando la aprueben te llega un correo.${pend.token ? `<div class="acciones"><button class="btn btn-xs btn-sec" data-a="ver-inscripcion" data-v="${pend.token}">Ver mi inscripción</button></div>` : ''}</div></div>` : ''}
       ${pend && pend.estado === 'rechazado' ? `<div class="aviso a-danger">${I('x')}<div class="txt"><b>Tu pedido no fue aprobado</b>Comunicate con la Administración.</div></div>` : ''}

@@ -143,14 +143,16 @@ const Store = {
 };
 
 function migrar(s){
-  const def = { users:[], posts:[], msgs:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[], reservas:[],
-    bloqueos:[], avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
+  const def = { users:[], posts:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[],
+    avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
     hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
+  /* El chat vecinal y las reservas de espacios comunes se sacaron el 29-09-2026:
+     lo que haya quedado guardado en este equipo se borra al abrir la app. */
+  ['msgs', 'reservas', 'bloqueos', 'amenities'].forEach(k => { delete s[k]; });
   /* Lo que es propio del barrio vive en los datos y lo edita la Administración. */
-  if (!Array.isArray(s.amenities) || !s.amenities.length) s.amenities = JSON.parse(JSON.stringify(AMENITIES));
   if (!Array.isArray(s.agenda)) s.agenda = agendaInicial();
   if (!Array.isArray(s.temporadas)) s.temporadas = JSON.parse(JSON.stringify(TEMPORADAS));
   if (!Array.isArray(s.feriados)) s.feriados = JSON.parse(JSON.stringify(FERIADOS));
@@ -291,18 +293,6 @@ const CONFIG_BASE = {
   obraHorario: 'Lunes a viernes de 8 a 18 h · sábados de 9 a 13 h',
   silencio: '22 a 8 h',
 };
-
-const AMENITIES = [
-  { id:'quincho', nombre:'Quincho', icon:'flame', color:'wood', invitadosMax:40,
-    franjas:[['12:00','17:00'],['19:30','01:00']], reglas:'Hasta 40 invitados. Se entrega limpio y con la parrilla fría. La música se baja a la 1.' },
-  { id:'sum', nombre:'SUM', icon:'sofa', color:'accent', invitadosMax:30,
-    franjas:[['09:00','13:00'],['14:00','18:00'],['19:00','23:30']], reglas:'Salón de usos múltiples con calefacción. Hasta 30 personas. Ideal para cumpleaños y reuniones.' },
-  { id:'cancha', nombre:'Cancha', icon:'ball', color:'ok', invitadosMax:14,
-    franjas:[['10:00','11:00'],['11:00','12:00'],['15:00','16:00'],['16:00','17:00'],['17:00','18:00'],['18:00','19:00']], reglas:'Turnos de una hora. Si hay nieve o hielo la administración la cierra.' },
-];
-const MAX_RESERVAS_FUTURAS = 2, DIAS_ANTICIPACION = 30;
-const amenities = () => Store.s.amenities;
-const amenity = id => Store.s.amenities.find(a => a.id === id);
 
 /* Contactos propios del barrio: la Administración los carga. */
 const CONTACTOS = [

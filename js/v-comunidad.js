@@ -1,8 +1,10 @@
 /* =========================================================
-   Comunidad: pizarrón, chat, oficios, mascotas, compras
-   conjuntas y avistamientos. Lo único público entre vecinos
-   es el chat y el pizarrón; lo demás es opcional (cada uno
-   decide si aparece en oficios o en mascotas).
+   Comunidad: pizarrón, oficios, mascotas, compras conjuntas
+   y avistamientos. Lo único público entre vecinos es el
+   pizarrón; lo demás es opcional (cada uno decide si aparece
+   en oficios o en mascotas). El chat vecinal se sacó el
+   29-09-2026 (pedido de Claudio: a los vecinos no les
+   gustaba, se prestaba a diálogos no deseados).
    ========================================================= */
 
 /* El pizarrón es el tablero de "alertas no tan alertas": avisos de la
@@ -112,7 +114,7 @@ A['nuevo-post'] = (el) => {
     <div class="field"><label>Título</label><input name="title" required maxlength="90" placeholder="${pre === 'guardia' ? 'Ej: Portón de servicio cerrado por mantenimiento' : 'Ej: Corte de luz en la calle 2'}"></div>
     <div class="field"><label>Detalle</label><textarea name="body" maxlength="800" placeholder="Contá un poco más…"></textarea></div>
     <div id="extraEvento" ${pre === 'evento' ? '' : 'hidden'} class="grid3"><div class="field"><label>Fecha</label><input type="date" name="fecha" min="${hoyISO()}"></div>
-      <div class="field"><label>Hora</label><input type="time" name="horaEv"></div><div class="field"><label>Lugar</label><input name="lugar" maxlength="40" placeholder="Quincho"></div></div>
+      <div class="field"><label>Hora</label><input type="time" name="horaEv"></div><div class="field"><label>Lugar</label><input name="lugar" maxlength="40" placeholder="Ej: casa del Lote 40"></div></div>
     <div id="extraServicio" ${['ofrezco','busco'].includes(pre) ? '' : 'hidden'} class="grid2"><div class="field"><label>Rubro</label><select name="category">${CATEGORIAS.map(c => `<option>${c}</option>`).join('')}</select></div>
       <div class="field"><label>Precio (opcional)</label><input name="price" maxlength="30" placeholder="$ por hora"></div></div>
     ${campoFoto('fotoPost')}
@@ -161,82 +163,11 @@ F['nuevo-post'] = d => {
 /* Marca como leídos los avisos que llevan a esta ventana. */
 function marcarVisto(link){
   const u = yo(); if (!u) return;
-  const clave = link === 'pizarron' ? 'pizarronVisto' : link === 'chat' ? 'chatVisto' : null;
+  const clave = link === 'pizarron' ? 'pizarronVisto' : null;
   if (clave){ Store.sesion[clave] = Date.now(); Store.guardarSesion(); }
   const pend = aLista(Store.s.notifs).filter(n => n.link && n.link.split(':')[0] === link && meToca(n, u) && !aLista(n.leidas).includes(u.id));
   if (pend.length){ pend.forEach(n => listaDe(n, 'leidas').push(u.id)); Store.guardar(); setTimeout(pintarTop, 0); }
 }
-
-/* ---------- CHAT ---------- */
-const CANALES = { general:'General', seguridad:'Seguridad', mascotas:'Mascotas', servicios:'Oficios', compras:'Compras' };
-R.chat = {
-  titulo: 'Chat vecinal', icon: 'chat', color: 'sky', sub: p => '#' + (CANALES[p] ? p : 'general'),
-  render(p){
-    const canal = CANALES[p] ? p : 'general', u = yo();
-    marcarVisto('chat');
-    const msgs = Store.s.msgs.filter(m => m.channel === canal).sort((a, b) => a.createdAt - b.createdAt).slice(-200);
-    let dia = '';
-    return `<div class="chat-wrap">
-      <div class="chips">${Object.entries(CANALES).map(([k, n]) => `<button class="chip ${k === canal ? 'on' : ''}" data-a="abrir" data-v="chat" data-p="${k}"># ${n}</button>`).join('')}
-        <button class="chip" data-a="hist-chat" data-v="${canal}" title="Mensajes de hace más de ${Historial.VENTANA.msgs[1]} días">${I('clock')}Anteriores</button></div>
-      <div class="chat" id="chatBox">${msgs.length ? msgs.map((m, i) => {
-        const d = isoDe(new Date(m.createdAt)); const sep = d !== dia ? (dia = d, `<div class="dia-sep">${relDia(d)}</div>`) : '';
-        const mia = m.autor === u.id, au = autorVisible(m.autor), oficial = ['admin','guardia'].includes(usuario(m.autor)?.rol);
-        const mismo = i > 0 && msgs[i - 1].autor === m.autor && !sep && m.createdAt - msgs[i - 1].createdAt < 5 * MIN;
-        return `${sep}<div class="msg ${mia ? 'mia' : ''} ${oficial && !mia ? 'oficial' : ''}">${!mia && !mismo ? `<div class="quien">${esc(au.nombre)}${au.casa ? ' · ' + esc(au.casa) : ''}</div>` : ''}
-          <div class="b">${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`; }).join('') : vacio('chat', 'Nadie escribió todavía. ¡Arrancá la charla!')}</div>
-      <form class="chatbar" data-f="chat" data-canal="${canal}"><input name="text" id="chatIn" required maxlength="600" placeholder="Mensaje en #${CANALES[canal]} · sin nombres, usá el lote" autocomplete="off"><button class="btn btn-pri">${I('send')}</button></form></div>`;
-  },
-  alPintar(){ const c = $('#cuerpo'); if (c && !refrescandoChat) c.scrollTop = c.scrollHeight; },
-};
-let refrescandoChat = false;
-/* =========================================================
-   NORMA DE CONDUCTA DEL CHAT VECINAL (pedido de Claudio, 25-09-2026)
-   En el chat no se nombra a nadie: ni vecinos ni gente de la
-   Administración o de la garita. Se habla del lote ("el Lote 148"), no de
-   la persona. La app lo revisa ANTES de enviar: si el mensaje trae un
-   nombre o un apellido de alguien del barrio, no sale.
-   De dónde salen los nombres: las cuentas de la app y el padrón. Se toman
-   las palabras de 3 letras o más y se dejan afuera las que también son
-   palabras comunes del castellano (Rosa, Luna, Paz, Flores…): un
-   "florecen las flores" no puede quedar bloqueado. El número de lote
-   siempre se puede escribir.
-   ========================================================= */
-const PALABRAS_COMUNES = new Set(('rosa luna paz sol luz mar cruz flores flor campos campo rios rio torres torre vega sierra costa lago monte montes blanco blanca '
-  + 'franco bravo rico leal prado roca leon bosque fuentes fuente calle valle mesa lobo cano rey reyes santos santo alegre moreno morena rubio castillo palacios iglesias '
-  + 'ramos olivera olivares pinto nieves nieve dolores angeles angel pilar mercedes gloria soledad consuelo esperanza aurora victoria amparo rocio paloma estrella '
-  + 'clara blanco sosa miel oro plata piedra piedras manzano pereira robles soria salas mena bueno buena justo justa feliz serrano marino rivera ribera toro toros '
-  + 'gallo cordero conejo lobos peña pena sala casa casas villa villar barrio lote lotes garita guardia administracion admin vecino vecina vecinos todos todas '
-  + 'hola gracias buenas buenos dias tardes noches que como para por con los las del una uno unos unas este esta esto ese esa eso hay muy mas bien mal '
-  + 'agua gas luz cable perro perros gato gatos auto autos obra obras').split(' '));
-function nombresDelBarrio(){
-  const s = Store.s, set = new Set();
-  const sumar = t => normTxt(t).split(/[^a-zñ]+/).forEach(w => { if (w.length >= 3 && !PALABRAS_COMUNES.has(w)) set.add(w); });
-  aLista(s.users).forEach(x => { if (x && x.nombre && x.nombre !== 'Garita') sumar(x.nombre); });
-  aLista(s.padron).forEach(p => { if (!p) return; sumar(p.propietario || ''); aLista(p.titulares).forEach(t => sumar(typeof t === 'string' ? t : (t && t.nombre) || '')); });
-  aLista(Store.s.config.nombresChat).forEach(sumar);   /* por si la Administración quiere sumar alguno (guardias, personal) */
-  ['sa', 'srl', 'sas', 'suc', 'sucesion', 'otros', 'otra', 'otro'].forEach(w => set.delete(w));
-  return set;
-}
-/* Devuelve la palabra que no puede ir, o '' si el mensaje está bien. */
-function nombreEnMensaje(texto){
-  const nombres = nombresDelBarrio();
-  const palabras = normTxt(texto).split(/[^a-zñ]+/).filter(Boolean);
-  return palabras.find(w => nombres.has(w)) || '';
-}
-F['chat'] = (d, form) => {
-  const canal = form.dataset.canal, u = yo();
-  const prohibido = nombreEnMensaje(d.text);
-  if (prohibido){
-    hoja('El mensaje no se envió', `${aviso('danger', 'alert', 'Norma de conducta del chat vecinal', `En el chat no se nombra a vecinos ni a personas de la Administración o de la garita. La palabra "${esc(prohibido)}" coincide con un nombre del barrio.`)}
-      <p class="small" style="margin:0 0 12px;color:var(--ink-2)">Nombrá el lote en lugar de la persona: por ejemplo, <b>"el Lote 148"</b>. Si es algo privado, escribile directamente desde Vecinos o a la Administración desde Tu casa → Mensajes.</p>
-      <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido, lo corrijo</button>`);
-    return;
-  }
-  Store.cambiar(s => { s.msgs.push({ id:uid(), channel:canal, autor:u.id, text:d.text.trim(), createdAt:Date.now() }); });
-  const i = $('#chatIn'); if (i){ i.value = ''; i.focus(); }
-  const c = $('#cuerpo'); if (c) c.scrollTop = c.scrollHeight;
-};
 
 /* =========================================================
    PROFESIONALES Y OFICIOS DE VECINOS
@@ -301,12 +232,11 @@ A['se-perdio'] = el => {
   const u = yo(), m = (u.mascotas || []).find(x => x.id === el.dataset.v); if (!m) return;
   Store.cambiar(s => {
     s.posts.unshift({ id:uid(), type:'perdido', title:`Se perdió ${m.nombre}`, body:`${m.especie || ''}. ${m.desc || ''}\nSi la ven, avisen a ${u.casa}.`, autor:u.id, createdAt:Date.now(), reactions:{}, comments:[], foto:m.foto || null });
-    s.msgs.push({ id:uid(), channel:'mascotas', autor:u.id, text:`Se perdió ${m.nombre}. ¿Alguien la vio?`, createdAt:Date.now() });
     notificar(s, { para:'todos', titulo:`Se busca a ${m.nombre}`, texto:`${m.especie || ''} de ${u.casa}`, icon:'paw', color:'warn', link:'mascotas', sonido:true });
   });
   toast('Avisamos a todo el barrio', 'paw');
 };
-A['la-vi'] = el => hoja('¿Dónde la viste?', `<form data-f="la-vi" data-m="${el.dataset.v}" data-id="${el.dataset.id}"><div class="field"><label>Lugar</label><input name="lugar" required maxlength="80" placeholder="Ej: calle 3, cerca de la cancha"></div><button class="btn btn-pri btn-block">${I('send')}Avisar al dueño</button></form>`);
+A['la-vi'] = el => hoja('¿Dónde la viste?', `<form data-f="la-vi" data-m="${el.dataset.v}" data-id="${el.dataset.id}"><div class="field"><label>Lugar</label><input name="lugar" required maxlength="80" placeholder="Ej: calle 3, cerca de los contenedores"></div><button class="btn btn-pri btn-block">${I('send')}Avisar al dueño</button></form>`);
 F['la-vi'] = (d, form) => {
   const u = yo(), dueno = usuario(form.dataset.id), m = (dueno?.mascotas || []).find(x => x.id === form.dataset.m);
   Store.cambiar(s => notificar(s, { para:form.dataset.id, titulo:`${u.nombre.split(' ')[0]} vio a ${m?.nombre || 'tu mascota'}`, texto:`${d.lugar} · ${hora(Date.now())} h`, icon:'paw', color:'warn', urgente:true }));
@@ -375,14 +305,13 @@ const FAQ = [
   ['¿Cómo aviso que viene una visita?', 'En Tu casa → Autorizar una visita. Cargás el nombre (y la patente si viene en auto) y la app arma un código y un QR para mandarle por WhatsApp. La garita lo ve al instante, con tu nombre como quien autorizó. Si viene varias veces (empleada, personal de una obra), marcá "Viene varias veces": es un solo QR para todos esos días.', 'nuevo-pase', '', 'Autorizar una visita'],
   ['¿Cuánto tiempo queda mi historial de visitas?', 'En la app ves las visitas de los últimos {DIAS} días. Las anteriores no se pierden: pasan al archivo histórico del barrio, sin DNI ni patente, y las ves cuando quieras en Mis visitas → "Ver mi historial completo". Así la app no baja todo cada vez que la abrís y sigue rápida.', 'abrir', 'visitas', 'Mis visitas'],
   ['¿Cómo pido el DEA (desfibrilador)?', 'En Ushuaia y servicios → Emergencias, al lado del corazón rojo: mantené apretado el botón verde SOLICITARLO durante 2 segundos y contestá SÍ. A la garita le salta la alarma con tu lote y tu apellido hasta que salen con el DEA; a vos te avisa cuando va en camino. Llamá también al 911.', 'abrir', 'emergencias', 'Ver Emergencias'],
-  ['¿Puedo nombrar a alguien en el chat vecinal?', 'No. Es una norma de conducta: en el chat no se escriben nombres ni apellidos de vecinos ni de la Administración o la garita, y la app no deja enviar el mensaje. Se nombra el lote ("el Lote 148"). Para algo personal, escribile en privado.', 'abrir', 'chat', 'Chat vecinal'],
   ['¿Cómo aviso que tengo una obra?', 'En El barrio → Obras → Registrar mi obra. La ven al instante la Administración, la garita y todo el barrio, y aparece en la Pizarra del día mientras dure. Los días con mixer o camión mandá el "Aviso del día". La garita no la puede editar; la Administración sí.', 'abrir', 'obras', 'Obras'],
   ['¿Cómo aviso que viene un Uber o DiDi?', 'En Tu casa → Autorizar una visita, y en "¿Quién viene?" tocás "Uber, DiDi o taxi": se abre el aviso corto. Elegís la app, si te viene a buscar o trae algo, en cuánto llega y la patente (la ves en la app cuando el chofer acepta; si todavía no la sabés, la agregás después). La garita lo reconoce por la patente y te avisa cuando entra y cuando sale. El aviso vence solo.', 'nuevo-pase', '', 'Autorizar una visita'],
   ['¿Qué hago en una emergencia?', 'Mantené apretado el botón rojo SOS arriba a la derecha durante 3 segundos y elegí qué pasa. Salta en la garita, en la Administración y en las apps abiertas del barrio. Cuando se resuelva, tocá "Ya está solucionado". El DEA (desfibrilador) está en la garita y se pide desde Emergencias.', 'abrir', 'emergencias', 'Ver Emergencias'],
   ['¿Cómo pago las expensas?', 'En Tu casa → Mis expensas ves el saldo y el cupón del mes. Tocá la tarjeta para pagar por transferencia (alias y CBU a mano) y avisá el pago con el comprobante: la Administración lo confirma y te llega el recibo.', 'abrir', 'expensas', 'Mis expensas'],
-  ['¿Cómo reservo el quincho, el SUM o la cancha?', 'En Tu casa → Reservas elegís el espacio, el día y el turno. Si está ocupado se ve en gris.', 'abrir', 'reservas', 'Reservas'],
+  ['¿Para qué sirve Mi credencial?', 'Para que la garita sepa en un segundo que sos del barrio y de qué lote, sin que tengas que mostrar el DNI. Sirve sobre todo cuando la guardia no te reconoce: si llegás en un auto que no es el tuyo (taxi, remís, Uber, uno prestado, alquilado o del taller) o caminando; si sos nuevo, inquilino o familiar y todavía no te conocen; o si en la garita hay un guardia de reemplazo. Mostrás el QR en el celular, la garita lo escanea y ve solo tu nombre, tu lote, las patentes de tus autos y, si la cargaste, la foto del frente de tu casa. No abre el portón, no anota tus entradas ni tus salidas y no sirve para retirar paquetes. Cada cuenta tiene la suya; si alguien la copió, generá una nueva y la anterior deja de valer.', 'mi-credencial', '', 'Mi credencial'],
   ['¿Cómo hago un reclamo a la Administración?', 'En Tu casa → Mis reclamos. Es privado: lo ven solo vos y la Administración, que te contesta por ahí. Si otros vecinos tienen el mismo problema, la Administración puede publicarlo en el pizarrón.', 'abrir', 'reclamos', 'Mis reclamos'],
-  ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el pizarrón y el chat. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Tus mensajes privados y tus reclamos no los ve ningún otro vecino. Más abajo, en "Tus datos: privacidad y seguridad", está todo el detalle.', 'abrir', 'perfil', 'Mi casa'],
+  ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el buscador de Vecinos y en lo que publicás en el pizarrón. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Tus mensajes privados y tus reclamos no los ve ningún otro vecino. Más abajo, en "Tus datos: privacidad y seguridad", está todo el detalle.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Cómo aparezco en la agenda como profesional u oficio?', 'En Mi casa cargá tu profesión u oficio y tu celular, y marcá que se muestre al barrio. Aparecés solo en Profesionales y oficios y en la Agenda, con botón de WhatsApp.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Dónde están las normas del barrio?', 'En El barrio → Manual y normas, solapa "Normas y reglamentos", con un buscador ("¿hasta qué hora puedo hacer obra?"). Ahí también están la ordenanza municipal de barrios cerrados y lo que dice el Código Civil, y cada una se puede descargar (o todas juntas) para imprimir o guardar en PDF.', 'abrir', 'documentos', 'Normas y reglamentos'],
   ['¿Dónde veo quiénes de mi casa están en la app?', 'En Tu casa → Mi casa, al final: "Quiénes están en tu lote", con la relación de cada uno con el lote y si tiene la app abierta. Si aparece alguien que no vive en tu casa (o alguien que no conocés pide entrar en tu lote), tocá "No es de mi lote" y la Administración lo revisa.', 'abrir', 'perfil', 'Mi casa'],
@@ -437,7 +366,7 @@ const FAQ_DATOS = [
     '• Exactitud (art. 4 inc. 4 y 5): cada vecino corrige sus propios datos en Mi casa, en cualquier momento.',
     '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran; los paquetes ya retirados quedan 30 días en la app y después pasan al archivo histórico sin la foto, sin la firma dibujada y sin los dígitos del DNI (queda qué llegó, para qué lote, cuándo, quién lo retiró y el sello de la entrega). Pasado ese plazo, la visita queda solo en el archivo histórico del barrio (quién vino, a qué lote y cuándo), sin DNI ni patente, con las mismas reglas de acceso que el resto: cada vecino ve solo las suyas.',
     '• Privacidad por defecto: lo optativo nace oculto. Tu teléfono, tu oficio o tu dirección se muestran a otros vecinos solo si vos lo marcás, y lo podés quitar cuando quieras.',
-    '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, el hotel no puede leer ninguna carpeta ni lista de vecinos, la garita no puede leer expensas, pagos, reclamos, el chat vecinal ni las conversaciones de los vecinos con la Administración, y la Administración no puede leer las conversaciones de un vecino con la garita.',
+    '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, el hotel no puede leer ninguna carpeta ni lista de vecinos, la garita no puede leer expensas, pagos, reclamos ni las conversaciones de los vecinos con la Administración, y la Administración no puede leer las conversaciones de un vecino con la garita.',
   ]],
   ['¿Está todo cifrado (encriptado)? ¿Qué medidas de seguridad hay?', [
     'En simple: sí, en el viaje y en el guardado. Y además el servidor decide quién puede leer cada cosa.',
@@ -451,11 +380,11 @@ const FAQ_DATOS = [
     '• Límite, dicho con honestidad: no es un cifrado "de punta a punta" como el de WhatsApp. Quien tiene un rol autorizado ve lo que necesita para su tarea. El art. 9 de la Ley 25.326 exige adoptar las medidas técnicas y organizativas necesarias; ninguna ley exige, porque nadie la puede dar, una garantía de seguridad absoluta. La seguridad también depende de que cada uno cuide su contraseña y su teléfono.',
   ]],
   ['¿Quién puede ver cada cosa?', [
-    '• Los otros vecinos: tu nombre y tu lote en el pizarrón y el chat del barrio; tu teléfono, oficio o dirección solo si vos lo autorizás. Nunca tu DNI, tu correo, tus expensas, tus reclamos, tus visitas ni tus mensajes.',
+    '• Los otros vecinos: tu nombre y tu lote en el buscador de Vecinos y en lo que publicás en el pizarrón; tu teléfono, oficio o dirección solo si vos lo autorizás. Nunca tu DNI, tu correo, tus expensas, tus reclamos, tus visitas ni tus mensajes.',
     '• Las otras cuentas de tu mismo lote (por ejemplo, tu pareja): las expensas y los paquetes del lote, porque son de todos los que viven ahí, y lo de la casa (Tu casa en invierno y en verano, la mochila y el plan ante un sismo con sus sugerencias). En Mi casa → "Quiénes están en tu lote" ven tu nombre, tu relación con el lote y si tenés la app abierta; nunca tu DNI, tu correo ni tu teléfono. Tus mensajes, reclamos y visitas siguen siendo solo tuyos.',
     '• "No es de mi lote": si alguien de tu lote avisa que no vivís ahí, a la Administración le llega un aviso privado con los dos nombres para revisarlo; a vos te llega un aviso sin el nombre de quien lo mandó.',
-    '• El chat del barrio: lo leen los vecinos y la Administración. La garita no lo lee: con ella te comunicás por mensaje privado o con una petición.',
-    '• El Hotel Los Cauquenes: nada tuyo. Tiene una cuenta institucional separada que solo ve lo suyo (sus vans, traslados, huéspedes, eventos, proveedores y promociones) y lo público de la ciudad (vuelos, cruceros, agenda, normas del barrio). No puede leer el padrón, las fichas de los vecinos, el chat, el pizarrón, tus visitas, la bitácora de la garita ni los SOS.',
+    '• El chat vecinal y las reservas de espacios comunes: la app ya no los tiene (se sacaron el 29 de septiembre de 2026). Lo que había quedado guardado de antes no lo puede leer ningún vecino, ni la garita, ni el hotel; solo la Administración, para borrarlo desde Protección de datos.',
+    '• El Hotel Los Cauquenes: nada tuyo. Tiene una cuenta institucional separada que solo ve lo suyo (sus vans, traslados, huéspedes, eventos, proveedores y promociones) y lo público de la ciudad (vuelos, cruceros, agenda, normas del barrio). No puede leer el padrón, las fichas de los vecinos, el pizarrón, tus visitas, la bitácora de la garita ni los SOS.',
     '• La garita: lo que necesita para la seguridad: tus visitas y pases, tus paquetes, tus peticiones firmadas, los avisos que le mandás, las conversaciones con ella y la foto del frente de tu casa para ubicar el domicilio.',
     '• Retiro de paquetes: tu teléfono crea una llave que nunca sale de él. En tu ficha queda solo su parte pública (sirve para comprobar la firma del QR, no para firmar) y el tipo de equipo (por ejemplo "iPhone"). Cada entrega queda asentada con quién recibió, quién entregó, la hora y un sello SHA-256. Si retirás sin teléfono, de tu DNI se guardan solo los tres últimos números. Al cerrar sesión, la llave se borra de ese equipo.',
 
@@ -475,7 +404,7 @@ const FAQ_DATOS = [
   ['¿Y el Hotel Los Cauquenes? ¿Ve mis datos?', [
     'En simple: no. El hotel ve lo suyo y lo público de la ciudad; tus datos no los puede leer, y eso lo controla el servidor, no la pantalla.',
     '• El hotel es un propietario del barrio (6 unidades) con actividad comercial. Por eso tiene una cuenta institucional con un rol propio ("hotel"), distinta de la de un vecino y de la del personal del barrio, bajo la responsabilidad de la persona que designe.',
-    '• Las reglas de la base de datos le niegan al hotel toda la información de los vecinos (padrón, fichas, chat, pizarrón, visitas, pagos, mensajes, bitácora y SOS). Se comprobó ruta por ruta con un evaluador de reglas: para vecinos, garita y Administración los permisos quedaron exactamente iguales a los de antes, y el hotel no accede a ningún dato de vecinos.',
+    '• Las reglas de la base de datos le niegan al hotel toda la información de los vecinos (padrón, fichas, pizarrón, visitas, pagos, mensajes, bitácora y SOS). Se comprobó ruta por ruta con un evaluador de reglas: para vecinos, garita y Administración los permisos quedaron exactamente iguales a los de antes, y el hotel no accede a ningún dato de vecinos.',
     '• Los datos de sus huéspedes (nombre, fechas, patente y, si el hotel los carga, los vuelos) los carga el hotel, que es el responsable de esos datos frente a sus huéspedes. Los ven solo el hotel y la garita, que los necesita para dejarlos pasar; la Administración ve únicamente la cantidad, sin nombres. Se borran solos al día siguiente del check-out (principios de finalidad y conservación limitada, art. 4 de la Ley 25.326).',
     '• Sus expensas: el hotel ve solo las de sus 6 unidades (UF 000 a 005). La Administración le deja cada mes una copia con únicamente esas cuotas; el hotel no puede leer la liquidación del barrio ni lo que paga ningún vecino.',
     '• Si hay una emergencia médica en el barrio, la garita puede pedirle al hotel su desfibrilador o su personal con primeros auxilios: al hotel le llega solo el lote al que tiene que ir.',

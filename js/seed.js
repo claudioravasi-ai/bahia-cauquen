@@ -53,8 +53,8 @@ function seed(){
       { id:uid(), type:'alerta', title:'Auto sospechoso por la calle 3', body:'Un auto gris sin patente visible dio varias vueltas. Ya avisé a la garita.',
         autor:'u_diego', createdAt:n - 40*MIN, reactions:{ '🙏':['u_lucia'] },
         comments:[{ id:uid(), autor:'u_garita', text:'Recibido. Salió una ronda a verificar.', createdAt:n - 30*MIN }] },
-      { id:uid(), type:'evento', title:'Asado de primavera', body:'Nos juntamos en el quincho. Cada familia trae algo para compartir. ¡Hay juegos para los chicos!',
-        autor:'u_admin', createdAt:n - 1*DIA, fecha:proxSabado, horaEv:'13:00', lugar:'Quincho', voy:['u_lucia','u_martin'],
+      { id:uid(), type:'evento', title:'Caminata de primavera', body:'Salimos todos juntos desde la garita y recorremos el barrio. ¡Traigan a los chicos!',
+        autor:'u_admin', createdAt:n - 1*DIA, fecha:proxSabado, horaEv:'11:00', lugar:'Garita', voy:['u_lucia','u_martin'],
         reactions:{ '❤️':['u_lucia','u_diego','u_martin'] }, comments:[] },
       { id:uid(), type:'ofrezco', title:'Clases de apoyo escolar', body:'Matemática y física para secundaria. A domicilio dentro del barrio.',
         autor:'u_lucia', category:'Clases particulares', price:'$12.000 / hora', createdAt:n - 5*HORA, reactions:{ '👏':['u_admin'] }, comments:[] },
@@ -62,13 +62,6 @@ function seed(){
         autor:'u_diego', category:'Préstamos', createdAt:n - 8*HORA, reactions:{}, comments:[] },
       { id:uid(), type:'mercado', title:'Regalo leña de lenga', body:'Me sobraron unos 2 m³ cortados. El que la quiera la pasa a buscar.',
         autor:'u_martin', createdAt:n - 26*HORA, reactions:{ '❤️':['u_diego'] }, comments:[] },
-    ],
-    msgs: [
-      { id:uid(), channel:'general', autor:'u_lucia', text:'¡Buen día vecinos! Qué lindo amaneció el canal 🌞', createdAt:n - 50*MIN },
-      { id:uid(), channel:'general', autor:'u_diego', text:'¿Alguien sabe si pasó el camión de la basura?', createdAt:n - 32*MIN },
-      { id:uid(), channel:'general', autor:'u_admin', text:'Sí, pasó 8:30. El jueves se adelanta a las 7.', createdAt:n - 30*MIN },
-      { id:uid(), channel:'seguridad', autor:'u_garita', text:'Recordatorio: el portón de servicio se cierra a las 22 h.', createdAt:n - 2*HORA },
-      { id:uid(), channel:'mascotas', autor:'u_martin', text:'Si ven a Toro suelto avísenme, se escapa por debajo del cerco.', createdAt:n - 5*HORA },
     ],
     privados: [
       { id:uid(), userId:'u_lucia', con:'admin', msgs:[
@@ -95,13 +88,6 @@ function seed(){
       { id:uid(), autor:'u_garita', tipo:'turno', texto:'Tomo el turno. Sin novedades del turno noche.', at:n - 6*HORA },
       { id:uid(), autor:'u_garita', tipo:'ronda', texto:'Ronda completa por el perímetro. Luminaria de calle 3 apagada.', at:n - 4*HORA },
     ],
-    reservas: [
-      { id:uid(), amenity:'quincho', userId:'u_diego', fecha:proxSabado, franja:1, invitados:18, nota:'Cumpleaños de Sofía', listaInvitados:[], createdAt:n - 2*DIA },
-      { id:uid(), amenity:'cancha', userId:'u_martin', fecha:D(1), franja:4, invitados:10, nota:'', listaInvitados:[], createdAt:n - DIA },
-    ],
-    bloqueos: [
-      { id:uid(), amenity:'sum', fecha:D(2), franja:-1, motivo:'Pintura del salón' },
-    ],
     reclamos: [
       { id:uid(), userId:'u_lucia', categoria:'alumbrado', titulo:'Luminaria apagada en calle 3', detalle:'La del poste frente a la casa 12 no prende desde el martes. De noche queda muy oscuro.',
         lugar:'Calle 3, frente a casa 12', estado:'en_curso', apoyos:['u_diego','u_martin'], createdAt:n - 3*DIA,
@@ -113,8 +99,8 @@ function seed(){
     votaciones: [
       { id:uid(), titulo:'¿Instalamos cámaras en el acceso de servicio?', detalle:'Presupuesto: 4 cámaras con grabación 30 días. Se prorratea en tres expensas.',
         opciones:['Sí, instalar','No por ahora','Me abstengo'], cierra:n + 5*DIA, votos:{ 'Lote 18':0, 'Lote 23':0 }, creadaPor:'u_admin', createdAt:n - 2*DIA },
-      { id:uid(), titulo:'Horario de la cancha en invierno', detalle:'Proponemos cerrar a las 18 h de mayo a agosto por la poca luz.',
-        opciones:['De acuerdo','Prefiero hasta las 19 h'], cierra:n - 3*DIA, votos:{ 'Lote 42':0, 'Lote 18':0, 'Lote 23':1 }, creadaPor:'u_admin', createdAt:n - 12*DIA },
+      { id:uid(), titulo:'Horario de obras en invierno', detalle:'Proponemos terminar las obras a las 17 h de mayo a agosto por la poca luz.',
+        opciones:['De acuerdo','Prefiero hasta las 18 h'], cierra:n - 3*DIA, votos:{ 'Lote 42':0, 'Lote 18':0, 'Lote 23':1 }, creadaPor:'u_admin', createdAt:n - 12*DIA },
     ],
     sos: [],
     documentos: [
@@ -127,7 +113,7 @@ function seed(){
 4. Mascotas siempre con correa en espacios comunes. Los perros no pueden andar sueltos.
 5. Residuos en canastos elevados y cerrados (los perros y zorros rompen las bolsas).
 6. Visitas: siempre anunciadas por la app o con la guardia.
-7. Espacios comunes: se reservan por la app y se entregan limpios.` },
+7. Espacios comunes (calles, veredas y áreas verdes): se cuidan y se dejan limpios.` },
       { id:uid(), titulo:'Normas de convivencia (modelo)', tipo:'Convivencia', createdAt:n - 45*DIA, texto:NORMAS_MODELO },
       { id:uid(), titulo:'Protocolo de invierno', tipo:'Protocolo', createdAt:n - 30*DIA, texto:
 `Texto de muestra: ajustalo a lo que haga el barrio.
@@ -259,8 +245,8 @@ MARCO LEGAL
 • Los códigos de ingreso son personales: no se comparten en grupos ni redes.
 
 7. ESPACIOS COMUNES
-• Se reservan por la app, se usan según su reglamento y se entregan limpios.
-• Los daños los paga quien reservó.
+• Calles, veredas, áreas verdes y el acceso son de todos: se cuidan y se dejan limpios.
+• Los daños los paga quien los causa.
 
 8. SEGURIDAD
 • No se abre el portón a desconocidos. Ante algo sospechoso, se avisa a la guardia o se usa el botón SOS.

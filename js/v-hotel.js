@@ -29,8 +29,8 @@
        (la garita o la Administración); cada conversación sigue privada;
      · agenda, vuelos, cruceros, Ushuaia hoy, normas, municipio.
    QUÉ NO VE (Ley 25.326, mínimo acceso): el padrón, las fichas de los
-   vecinos, el chat, el pizarrón, las visitas de los vecinos, la bitácora ni
-   los datos de un SOS. Las reglas de Firebase lo hacen cumplir.
+   vecinos, el pizarrón, las visitas de los vecinos, la bitácora ni los
+   datos de un SOS. Las reglas de Firebase lo hacen cumplir.
 
    LA GARITA opera los pasos de las vans y los proveedores del hotel (un
    toque o su QR) y ve los huéspedes que llegan. LA ADMINISTRACIÓN mira todo

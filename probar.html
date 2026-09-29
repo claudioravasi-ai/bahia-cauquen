@@ -340,13 +340,12 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
       <h2>Todo lo que trae la app</h2>
       <ul>
         <li><b>Expensas claras</b>Tu cuenta, el cupón y el recibo, al día y sin planillas.</li>
-        <li><b>Reservas</b>Quincho, SUM y cancha, sin llamar a nadie.</li>
+        <li><b>Mi credencial</b>Un QR para que la garita te reconozca sin mostrar el DNI.</li>
         <li><b>Votaciones</b>Un voto por lote, desde casa, con el acta lista.</li>
         <li><b>Pizarra del día</b>Lo importante primero, por colores, y se renueva sola.</li>
         <li><b>Paquetes con foto</b>Te avisa apenas llega y lo retirás con tu QR.</li>
         <li><b>Reclamos con seguimiento</b>Sabés en qué está cada pedido.</li>
         <li><b>Obras del barrio</b>Quién construye y el aviso del día del mixer.</li>
-        <li><b>Chat vecinal</b>Entre vecinos, con normas de convivencia.</li>
         <li><b>Agenda de Ushuaia</b>Farmacias, taxis, comidas y los oficios del barrio.</li>
         <li><b>Ushuaia en vivo</b>Clima con alertas de viento, vuelos, cruceros y sismos.</li>
         <li><b>Estoy bien y Salidas seguras</b>Para quien vive solo o sale al agua o la montaña.</li>
@@ -435,7 +434,7 @@ const casaInicio = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía �
     <div class="ap-teja"><span class="e">💳</span><b>Mis expensas</b></div><div class="ap-teja"><span class="e">🌋</span><b>Preparados para un sismo</b></div></div>`);
 const casaSimple = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía · Lote 42', { campana }) + ap(
   `<div class="ap-hola"><small>Hola,</small><b>Lucía</b><span class="ap-muted">Lote 42</span></div>`, extra,
-  `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟢', 'Asado de primavera el sábado', 'Quincho · 13 h')}${it('🟡', 'Corte de agua mañana de 9 a 14', 'Administración')}</div>`);
+  `<div class="ap-card"><h4>Pizarra del día</h4>${it('🟢', 'Caminata de primavera el sábado', 'Sale de la garita · 11 h')}${it('🟡', 'Corte de agua mañana de 9 a 14', 'Administración')}</div>`);
 const garitaInicio = (extra = '', ingresos = []) => garita() + ap(
   `<div class="ap-card"><h4>Validar un ingreso</h4><div class="ap-dos">${campo('Código, patente o DNI', '<span class="ap-muted">______</span>')}<div style="display:grid;align-content:end"><span class="ap-btn chico sec">📷 Escanear QR</span></div></div></div>`,
   extra, `<div class="ap-card"><h4>Ingresos de hoy</h4>${ingresos.join('') || it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok') + it('👤', 'Carla Méndez', 'Visita · Lote 18', 'Salió')}</div>`);
@@ -531,6 +530,26 @@ const ESC = [
     a:() => vec('Bahía Cauquén', 'Asistente') + ap(aviso('ok', '✅', 'Listo, la garita ya lo tiene', 'Lo mandaste con la voz')),
     b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Mensajes con vecinos</h4><div class="ap-chat"><div class="msg">Llego tarde, a las 23.<time>22:41 · Lote 42</time></div></div></div>`) },
   ], fin:'Para quien maneja, cocina o no ve bien la pantalla: la app también escucha.' },
+
+{ id:'credencial', grupo:'Tu casa', e:'🆔', t:'Mi credencial', s:'La garita te reconoce en un segundo, sin mostrar el DNI',
+  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno noche'], hora:'23:10',
+  pasos:[
+  { lado:'a', txt:'Volvés del centro en un <b>remís</b>: la patente no es tuya y esta noche hay un <b>guardia de reemplazo</b> que no te conoce. En <b>Tu casa</b> tocá <b>Mi credencial</b>.', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
+      `<div class="ap-hola"><small>Buenas noches,</small><b>Lucía</b></div>`, `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
+      <div class="ap-teja"><span class="e">🔳</span><b>Autorizar una visita</b></div><div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div>
+      <button class="ap-teja destaca" data-go><span class="e">🆔</span><b>Mi credencial</b></button><div class="ap-teja"><span class="e">🏠</span><b>Mi casa</b></div></div>`),
+    b:() => garitaInicio() },
+  { lado:'a', txt:'Aparece tu credencial: tu nombre, tu lote y un <b>QR personal</b>. Mostráselo al guardia por la ventanilla.', a:() => vec('Mi credencial', 'Lote 42') + ap(
+      `<div class="ap-card ap-centro"><span class="ap-muted">Credencial · Barrio Bahía Cauquén</span><h4 style="margin:4px 0 0">Lucía Fernández</h4><div class="ap-muted">Lote 42</div></div>`,
+      qr('BHC:V-K7M4Q2XR'), `<div class="ap-codigo">V-K7M4Q2XR</div>`, `<div class="nota-sim">Simulación</div>`, btn('El guardia lo escanea →', { cl:'ok' })),
+    b:() => garitaInicio() },
+  { lado:'b', txt:'El guardia <b>escanea el QR</b> (o escribe el código). La app le dice que sos del barrio y de qué lote, con las patentes de tus autos y la foto del frente de tu casa. <b>Sin pedirte el DNI.</b> Tocá <b>Listo</b>.', b:() => garita('Turno noche · Guardia de reemplazo') + ap(
+      aviso('ok', '✅', 'Vecina del barrio', 'Lote 42'), `<div class="ap-card">${it('👤', 'Lucía Fernández', 'Lote 42 · Calle 3 N.º 42')}${it('🚗', 'Sus autos', 'AB 123 CD')}${it('🏠', 'Foto del frente de la casa', 'La que cargó en Mi casa')}</div>`, btn('Listo', { cl:'ok' })),
+    a:() => vec('Mi credencial', 'Lote 42') + ap(qr('BHC:V-K7M4Q2XR'), `<div class="ap-codigo">V-K7M4Q2XR</div>`) },
+  { lado:'a', txt:'Pasás. La credencial <b>no abre el portón, no anota tus entradas ni tus salidas y no lleva tu DNI</b>: solo le dice a la garita quién sos. Si alguien la copia, generás una nueva y la vieja deja de valer.', a:() => vec('Mi credencial', 'Lote 42') + ap(
+      aviso('info', 'ℹ️', '¿Cuándo te sirve?', 'Llegás en un auto que no es tuyo (remís, Uber, prestado, del taller), a pie o en bici; sos nuevo, inquilino o familiar; o hay un guardia de reemplazo.'), `<span class="ap-btn sec">🔄 Generar una credencial nueva</span>`),
+    b:() => garitaInicio() },
+  ], fin:'Te reconocen en un segundo, sin mostrar el DNI.' },
 
 { id:'dea', grupo:'Emergencias', e:'❤️', t:'Pedir el DEA', s:'La garita sale con el desfibrilador y avisa al equipo de salud',
   a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno noche'], hora:'20:40',
@@ -641,21 +660,6 @@ const ESC = [
     b:() => admin('Lucía Fernández · Lote 42') + ap(`<div class="ap-chat"><div class="msg">Hola, la luz de la calle 3, frente al 42, está quemada desde el sábado.<time>18:20</time></div><div class="msg mia">Hola Lucía, gracias por avisar. Ya se lo pedimos al electricista: pasa el jueves a la mañana.<time>18:27 ✓</time></div></div>`) },
   ], fin:'Todo por escrito y en un solo lugar, sin perderse en un grupo de WhatsApp.' },
 
-{ id:'reserva', grupo:'Vida en el barrio', e:'🔥', t:'Reservar el quincho', s:'Elegís el día y el turno libre, y listo',
-  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Administración', 'Reservas'], hora:'11:00',
-  pasos:[
-  { lado:'a', txt:'En <b>Reservas</b> ves la semana del quincho, del SUM y de la cancha, con lo libre en verde. Tocá <b>sábado 3 · 12 a 17</b>.', a:() => vec('Reservas', 'Espacios comunes') + ap(
-      `<div class="seg"><span class="on">🔥 Quincho</span><span>🛋️ SUM</span><span>⚽ Cancha</span></div>`,
-      `<div class="ap-card"><h4>Esta semana</h4><div class="ap-slots"><div class="ap-slot ocup">Vie 2 · 19:30–01<small>Lote 7</small></div><button class="ap-slot libre" data-go>Sáb 3 · 12–17<small>Libre</small></button>
-       <div class="ap-slot ocup">Sáb 3 · 19:30–01<small>Lote 18</small></div><div class="ap-slot libre">Dom 4 · 12–17<small>Libre</small></div></div></div>`, `<div class="ap-muted">Hasta 40 invitados. Se entrega limpio y con la parrilla fría.</div>`),
-    b:() => admin('Reservas') + ap(`<div class="ap-card"><h4>Próximas</h4>${it('🔥', 'Quincho · vie 2 · 19:30', 'Lote 7')}${it('🔥', 'Quincho · sáb 3 · 19:30', 'Lote 18')}</div>`) },
-  { lado:'a', txt:'Contás cuántos vienen y aceptás las normas. Tocá <b>Reservar</b>.', a:() => vec('Quincho', 'Sábado 3 · 12:00 a 17:00') + ap(campo('Invitados', '25'), `<div class="seg"><span class="on">✓ Leí las normas del quincho</span></div>`, btn('Reservar')) },
-  { lado:'a', txt:'<b>Reservado.</b> Nadie más puede tomar ese turno y la Administración lo ve al instante, sin llamadas ni planillas.',
-    al(){ push('b', '🔥', 'Nueva reserva: Quincho', 'Sábado 3 · 12 a 17 · Lote 42 · 25 invitados'); },
-    a:() => vec('Reservas', 'Lote 42') + ap(aviso('ok', '✅', 'Quincho reservado', 'Sábado 3 · 12:00 a 17:00 · 25 invitados'), `<span class="ap-btn sec">📅 Agregar a mi calendario</span>`),
-    b:() => admin('Reservas') + ap(`<div class="ap-card"><h4>Próximas</h4>${it('🔥', 'Quincho · vie 2 · 19:30', 'Lote 7')}${it('🔥', 'Quincho · sáb 3 · 12:00', 'Lote 42 · 25 invitados', 'Nueva', 'ok')}${it('🔥', 'Quincho · sáb 3 · 19:30', 'Lote 18')}</div>`) },
-  ], fin:'El asado del sábado, reservado en diez segundos.' },
-
 { id:'votacion', grupo:'Vida en el barrio', e:'🗳️', t:'Votar desde casa', s:'Un voto por lote, con el resultado en vivo',
   a:['Tu teléfono', 'Lucía · Lote 42'], b:['Administración', 'Votaciones'], hora:'20:10',
   pasos:[
@@ -734,13 +738,13 @@ const ESC = [
     a:() => pantallaRonda(), b:() => garitaRonda() },
   { lado:'b', txt:'La ronda se anota sola: con los seis puntos queda en la bitácora con la hora de cada QR. Si pasa una hora sin completarla, queda como <b>incompleta</b>, con los puntos que faltaron. A las 6, el policía se va: tocá <b>Salida</b>.',
     a:() => `<div class="ap" style="padding-top:50px"><div class="ap-centro" style="font-size:48px">✅</div><b class="ap-centro" style="font-size:17px">Ronda completa</b><div class="ap-centro ap-muted">6 de 6 puntos · 23:12 a ${S.d.finRonda || '23:47'}</div></div>`,
-    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('ok', '🚓', 'Ronda completa · Cabo Ruiz', `23:12 a ${S.d.finRonda || '23:47'} · 6 de 6 puntos`), `<div class="ap-card"><h4>Bitácora</h4>${it('📘', `${S.d.finRonda || '23:47'} · Ronda completa (QR)`, 'Cabo Ruiz · 6 puntos: Portón, Plaza, Quincho, Costanera, Calle 5 y Hotel')}${it('📘', '22:00 · Ingresó el policía', 'Cabo Ruiz · turno noche')}</div>`, btn('Salida', { cl:'sec' })) },
+    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('ok', '🚓', 'Ronda completa · Cabo Ruiz', `23:12 a ${S.d.finRonda || '23:47'} · 6 de 6 puntos`), `<div class="ap-card"><h4>Bitácora</h4>${it('📘', `${S.d.finRonda || '23:47'} · Ronda completa (QR)`, 'Cabo Ruiz · 6 puntos: Portón, Plaza, Residuos, Costanera, Calle 5 y Hotel')}${it('📘', '22:00 · Ingresó el policía', 'Cabo Ruiz · turno noche')}</div>`, btn('Salida', { cl:'sec' })) },
   { lado:'b', hora:'06:05', txt:'Para la salida, de nuevo: <b>día</b>, <b>turno</b> y <b>hora de salida</b>. Tocá <b>Registrar la salida</b>.',
     b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card" style="display:grid;gap:8px"><h4>Salida del policía</h4><div class="ap-muted">Cabo Ruiz · ingresó domingo 27 a las 22:00 · 3 rondas</div>${campo('Día', 'Hoy, lunes 28')}${campo('Turno de la garita', 'Noche · 22 a 6')}${campo('Hora de salida', '06:05')}</div>`, btn('Registrar la salida', { cl:'ok' })) },
   { lado:'a', txt:'Su servicio se cierra: sale de la portada de la garita y queda en <b>Turnos → Servicios del policía</b>. Y al policía le llega por correo la <b>constancia</b>: ingreso, salida, guardias y cada ronda con la hora de cada QR.',
     al(){ push('a', '✉️', 'Constancia de servicio · Barrio Bahía Cauquén', 'Domingo 27, 22:00 a lunes 28, 06:05 · 3 rondas', 'Correo'); },
     a:() => barra('Correo', 'Bandeja de entrada', { sos:false }) + ap(`<div class="ap-card"><div class="ap-muted">Barrio Bahía Cauquén · 06:05</div><b>Constancia de servicio</b>
-      <div style="margin-top:8px;display:grid;gap:2px;font-size:12px">${it('🕙', 'Ingreso', 'Domingo 27 · turno noche · 22:00')}${it('🕕', 'Salida', 'Lunes 28 · turno noche · 06:05')}${it('🛡️', 'Guardias de la garita', 'Sosa y Pereyra')}${it('🚓', '3 rondas, todas completas por QR', 'Ronda 1: Portón 23:12 · Plaza 23:19 · Quincho 23:26 · …')}</div></div>`),
+      <div style="margin-top:8px;display:grid;gap:2px;font-size:12px">${it('🕙', 'Ingreso', 'Domingo 27 · turno noche · 22:00')}${it('🕕', 'Salida', 'Lunes 28 · turno noche · 06:05')}${it('🛡️', 'Guardias de la garita', 'Sosa y Pereyra')}${it('🚓', '3 rondas, todas completas por QR', 'Ronda 1: Portón 23:12 · Plaza 23:19 · Residuos 23:26 · …')}</div></div>`),
     b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Policía contratada</h4><div class="ap-muted">Nadie de servicio ahora</div><div style="margin-top:8px"><span class="ap-btn chico sec">＋ Registrar ingreso</span></div></div>`,
       `<div class="ap-card"><h4>Turnos · Servicios del policía</h4>${it('👮', 'Cabo Ruiz', 'Dom 27 22:00 → lun 28 06:05 · 3 rondas', 'Constancia enviada', 'ok')}</div>`) },
   ], fin:'Nadie tiene que anotar las rondas a mano, y el policía se lleva por correo la constancia de su servicio.' },
@@ -874,7 +878,7 @@ const ESC = [
 ];
 
 /* ---------- la ronda: plano y lista ---------- */
-const PUNTOS = [['Portón', 52, 196], ['Plaza', 132, 150], ['Quincho', 212, 120], ['Calle 5', 96, 84], ['Costanera', 206, 214], ['Hotel', 250, 52]];
+const PUNTOS = [['Portón', 52, 196], ['Plaza', 132, 150], ['Residuos', 212, 120], ['Calle 5', 96, 84], ['Costanera', 206, 214], ['Hotel', 250, 52]];
 function horaRonda(n){ const m = 12 + n * 7; return `23:${String(m).padStart(2, '0')}`; }
 function pantallaRonda(){
   const p = S.d.puntos || [];

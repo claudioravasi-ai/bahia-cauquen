@@ -3,7 +3,7 @@
    -------------------------------------------------------
    Con 152 lotes, si cada equipo baja al abrir la app TODO lo que pasó
    desde el primer día (cada visita, cada línea del libro de guardia, cada
-   mensaje del chat), la app se hace más lenta cada mes. Por eso:
+   mensaje), la app se hace más lenta cada mes. Por eso:
 
    1. Al abrir, cada equipo baja solo lo RECIENTE:
         · visitas, llegadas y pedidos de pase: los últimos N días (los de
@@ -11,14 +11,13 @@
           personal fijo vigente;
         · libro de guardia (bitácora): 60 días;
         · auditoría: 90 días;
-        · chat vecinal: 60 días;
         · conversaciones privadas: los mensajes de los últimos 120 días
           (y siempre los 30 últimos de cada una).
    2. Lo más viejo NO se borra: pasa al ARCHIVO HISTÓRICO de la base
       (hist/<carpeta>/<dueño>/<id>, con las mismas reglas de lectura que la
       carpeta privada: cada vecino ve solo lo suyo; la garita y la
-      Administración, lo que les toca por su función). La bitácora, la
-      auditoría y el chat no se mudan: quedan donde están y solo se baja
+      Administración, lo que les toca por su función). La bitácora y la
+      auditoría no se mudan: quedan donde están y solo se baja
       la ventana reciente.
    3. Quien quiere ver todo, lo pide con un botón ("Ver mi historial
       completo", "Historial de visitas", "Ver el libro completo",
@@ -37,7 +36,7 @@
    ========================================================= */
 const Historial = {
   /* Lo que baja al abrir, en días. */
-  VENTANA: { bitacora:['at', 60], auditoria:['at', 90], msgs:['createdAt', 60] },
+  VENTANA: { bitacora:['at', 60], auditoria:['at', 90] },
   HILO_DIAS: 120, HILO_MIN: 30,
   diasVisitas: () => Math.max(30, +(Store.s.config.datosDias || 90)),
 
@@ -250,23 +249,6 @@ A['hist-auditoria'] = async () => {
   } catch(e){ Historial.fallo(e); }
 };
 A['hist-auditoria-csv'] = () => csvDe([['fecha','accion','detalle','por'], ...aLista(Historial.auditoria).map(x => [new Date(x.at).toISOString(), x.accion, x.detalle, autorVisible(x.por).nombre])], `auditoria-completa-${hoyISO()}.csv`);
-
-/* ---------- Chat vecinal: lo anterior a la ventana ---------- */
-A['hist-chat'] = async el => {
-  const canal = el.dataset.v || 'general', v0 = Historial.VENTANA.msgs;
-  Historial.cargando('Mensajes anteriores');
-  try {
-    let ls;
-    if (Historial.hayNube()){
-      const v = (await Nube.db.ref('barrio/msgs').orderByChild('createdAt').endAt(Date.now() - v0[1] * DIA).get()).val() || {};
-      ls = Object.values(v);
-    } else ls = aLista(Store.s.msgs).filter(m => m.createdAt < Date.now() - v0[1] * DIA);
-    ls = ls.filter(m => m && m.channel === canal).sort((a, b) => b.createdAt - a.createdAt);
-    hoja(`#${CANALES[canal] || canal} · anteriores`, ls.length ? `<p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'mensaje')} de hace más de ${v0[1]} días, del más nuevo al más viejo.</p>
-      <div class="card lista">${ls.slice(0, 500).map(m => { const au = autorVisible(m.autor); return `<div class="it"><div class="txt"><b>${esc(m.text)}</b><span>${esc(au.nombre)}${au.casa ? ' · ' + esc(au.casa) : ''} · ${fechaHora(m.createdAt)}</span></div></div>`; }).join('')}</div>`
-      : vacio('chat', `No hay mensajes de hace más de ${v0[1]} días en este canal.`));
-  } catch(e){ Historial.fallo(e); }
-};
 
 /* ---------- Conversaciones privadas: lo archivado de un hilo ---------- */
 A['hist-hilo'] = async el => {

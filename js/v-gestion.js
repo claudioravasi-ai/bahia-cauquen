@@ -1,5 +1,5 @@
 /* =========================================================
-   Gestión: peticiones firmadas a la garita, reservas, reclamos,
+   Gestión: peticiones firmadas a la garita, reclamos,
    votaciones, mensajes privados, documentos, expensas, residuos,
    agenda, Ushuaia, vuelos y Mi casa.
    ========================================================= */
@@ -141,137 +141,6 @@ A['verificar-peticion'] = async el => {
   if (p.firmaGuardia) okG = (await sello({ id:p.id, selloVecino:p.selloVecino, recibe:p.recibe, recibidaAt:p.recibidaAt, obs:p.obs || '', firma:p.firmaGuardia })) === p.selloGuardia;
   toast(okV && okG ? 'Sellos correctos: la petición no fue modificada' : 'ATENCIÓN: los datos no coinciden con el sello', okV && okG ? 'shield' : 'alert');
 };
-
-/* ---------- RESERVAS ---------- */
-R.reservas = {
-  titulo: 'Reservas', icon: 'calendar', color: 'wood', sub: 'Espacios comunes del barrio',
-  render(param){
-    const [amId, desdeP] = String(param || '').split('|');
-    const am = amenity(amId) || amenities()[0];
-    const u = yo(), s = Store.s, hoy = hoyISO();
-    const inicio = desdeP && desdeP >= hoy ? desdeP : hoy;
-    const dias = Array.from({ length:7 }, (_, i) => sumarDias(inicio, i));
-    const mias = s.reservas.filter(r => r.userId === u.id && r.fecha >= hoy && !r.cancelada).sort((a, b) => a.fecha.localeCompare(b.fecha));
-    const slot = (fecha, i) => {
-      const [d0, d1] = am.franjas[i];
-      const r = s.reservas.find(x => x.amenity === am.id && x.fecha === fecha && x.franja === i && !x.cancelada);
-      const b = s.bloqueos.find(x => x.amenity === am.id && x.fecha === fecha && (x.franja === -1 || x.franja === i));
-      const pasada = fecha === hoy && ahoraMin() > minutosDe(d0);
-      if (b) return `<button class="slot bloqueada" ${esAdmin() ? `data-a="desbloquear" data-id="${b.id}"` : 'disabled'}>${d0}–${d1}<small>${esc(b.motivo || 'No disponible')}</small></button>`;
-      if (r && r.userId === u.id) return `<button class="slot mia" data-a="ver-reserva" data-id="${r.id}">${d0}–${d1}<small>Tuya</small></button>`;
-      if (r) return `<button class="slot ocupada" ${esAdmin() ? `data-a="ver-reserva" data-id="${r.id}"` : 'disabled'}>${d0}–${d1}<small>${esc(usuario(r.userId)?.casa || 'Reservado')}</small></button>`;
-      return `<button class="slot libre ${pasada ? 'pasada' : ''}" data-a="reservar" data-v="${am.id}" data-p="${fecha}|${i}">${d0}–${d1}<small>Libre</small></button>`;
-    };
-    return `<div class="amenities">${amenities().map(a => `<button class="amenity ${a.id === am.id ? 'on' : ''}" data-a="abrir" data-v="reservas" data-p="${a.id}|${inicio}"><span class="ic ic-${a.color}">${I(a.icon)}</span>${esc(a.nombre)}</button>`).join('')}</div>
-      <div class="card plana small" style="color:var(--ink-2)">${I('info')} ${esc(am.reglas)}</div>
-      ${mias.length ? sec('Tus reservas') + mias.map(r => { const a = amenity(r.amenity) || {}; return superficie({ a:'ver-reserva', id:r.id, icon:a.icon || 'calendar', color:a.color || 'wood', t:`${esc(a.nombre || '')} · ${relDia(r.fecha)}`, s:`${(a.franjas?.[r.franja] || []).join(' a ')} h${r.invitados ? ' · ' + plural(+r.invitados, 'invitado') : ''}` }); }).join('') : ''}
-      <div class="semana-nav"><button class="icon-btn" data-a="abrir" data-v="reservas" data-p="${am.id}|${sumarDias(inicio, -7)}" ${inicio <= hoy ? 'disabled style="opacity:.3"' : ''} aria-label="Semana anterior">${I('left')}</button>
-        <b>${fechaCorta(dias[0])} – ${fechaCorta(dias[6])}</b>
-        <button class="icon-btn" data-a="abrir" data-v="reservas" data-p="${am.id}|${sumarDias(inicio, 7)}" ${sumarDias(inicio, 7) > sumarDias(hoy, DIAS_ANTICIPACION) ? 'disabled style="opacity:.3"' : ''} aria-label="Semana siguiente">${I('right')}</button></div>
-      <div class="card" style="padding:4px 14px">${dias.map(f => { const d = fechaDe(f);
-        return `<div class="dia ${f === hoy ? 'hoy-d' : ''}"><div class="f"><small>${DIAS[d.getDay()]}</small><b>${d.getDate()}</b></div><div class="slots">${am.franjas.map((_, i) => slot(f, i)).join('')}</div></div>`; }).join('')}</div>
-      ${esAdmin() ? `<p class="muted tiny">Como Administración: tocá un turno libre para bloquearlo, o uno bloqueado para liberarlo.</p>` : ''}`;
-  },
-};
-A['reservar'] = el => {
-  const am = amenity(el.dataset.v), [fecha, fr] = el.dataset.p.split('|'), i = +fr, u = yo();
-  if (esAdmin()) return hoja('Turno libre', `<p class="muted small" style="margin:0 0 12px">${esc(am.nombre)} · ${fechaLarga(fecha)} · ${am.franjas[i].join(' a ')} h</p>
-    <form data-f="bloquear" data-v="${am.id}" data-p="${fecha}|${i}"><div class="field"><label>Motivo del bloqueo</label><input name="motivo" required maxlength="60" placeholder="Mantenimiento"></div>
-    <label class="check"><input type="checkbox" name="todoDia"><span>Bloquear el día completo</span></label>
-    <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-sec" data-a="reservar-como-vecino" data-v="${am.id}" data-p="${fecha}|${i}">Reservar igual</button><button class="btn btn-danger">Bloquear</button></div></form>`);
-  formReserva(am, fecha, i);
-};
-A['reservar-como-vecino'] = el => { const am = amenity(el.dataset.v), [f, i] = el.dataset.p.split('|'); formReserva(am, f, +i); };
-function formReserva(am, fecha, i){
-  const u = yo(), futuras = Store.s.reservas.filter(r => r.amenity === am.id && r.fecha >= hoyISO() && !r.cancelada && usuario(r.userId)?.casa === u.casa).length;
-  if (futuras >= MAX_RESERVAS_FUTURAS && !esAdmin()){ toast(`Tu casa ya tiene ${MAX_RESERVAS_FUTURAS} reservas del ${am.nombre} por delante`, 'calendar'); return; }
-  hoja(`Reservar ${am.nombre}`, `<form data-f="reservar" data-v="${am.id}" data-p="${fecha}|${i}">
-    <div class="card plana"><b>${fechaLarga(fecha)}</b><div class="muted small">${am.franjas[i].join(' a ')} h</div></div>
-    <div class="grid2"><div class="field"><label>Invitados</label><input type="number" name="invitados" min="0" max="${am.invitadosMax}" value="0"></div>
-      <div class="field"><label>Motivo</label><input name="nota" maxlength="60" placeholder="Cumpleaños"></div></div>
-    <div class="field"><label>Lista de invitados (opcional)</label><textarea name="lista" placeholder="Un invitado por renglón. Nombre, patente&#10;Ej: Laura Gómez, AB123CD"></textarea>
-      <div class="ayuda">Cada invitado recibe su pase con QR para ese día y ese horario. Así no tenés que anunciarlos de a uno.</div></div>
-    ${+am.deposito ? `<div class="card plana small">${I('wallet')} <b>Depósito de garantía: ${plata(+am.deposito)}</b>. Se entrega en la Administración antes del turno y se devuelve después de revisar el espacio.</div>` : ''}
-    <label class="check"><input type="checkbox" name="acepto" required><span>Leí y acepto el reglamento: ${esc(am.reglas)}</span></label>
-    <p class="muted tiny" style="margin:4px 0 0">La víspera te llega un recordatorio y, al terminar, te pedimos que cuentes cómo quedó el espacio.</p>
-    <button class="btn btn-pri btn-block" style="margin-top:10px">${I('calendar')}Confirmar reserva</button></form>`);
-}
-F['reservar'] = (d, form) => {
-  const am = amenity(form.dataset.v), [fecha, fr] = form.dataset.p.split('|'), i = +fr, u = yo();
-  if (Store.s.reservas.some(r => r.amenity === am.id && r.fecha === fecha && r.franja === i && !r.cancelada)){ toast('Alguien lo reservó recién. Elegí otro turno.', 'alert'); cerrarHoja(); refrescar(); return; }
-  const invitados = String(d.lista || '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, am.invitadosMax).map(l => { const [n, p] = l.split(','); return { nombre:n.trim(), patente:(p || '').trim().toUpperCase() }; });
-  const r = { id:uid(), amenity:am.id, userId:u.id, fecha, franja:i, invitados:Math.max(+d.invitados || 0, invitados.length), nota:(d.nota || '').trim(), createdAt:Date.now(), pases:[],
-    reglamentoAceptado:Date.now(), deposito:+am.deposito || 0, depositoEstado: +am.deposito ? 'pendiente' : '' };
-  const [d0, d1] = am.franjas[i];
-  Store.cambiar(s => {
-    invitados.forEach(inv => { const p = { id:uid(), hostId:u.id, tipo:'invitado', nombre:inv.nombre, patente:inv.patente, fecha, desde:d0, hasta:d1 === '01:00' ? '23:59' : d1, codigo:codigoPase(), log:{}, createdAt:Date.now(), reserva:r.id, nota:`${am.nombre}${r.nota ? ' · ' + r.nota : ''}` };
-      s.pases.unshift(p); r.pases.push(p.id); });
-    s.reservas.push(r);
-    notificar(s, { para:'staff', titulo:`Reserva: ${am.nombre}`, texto:`${u.casa} · ${fechaCorta(fecha)} ${d0}${invitados.length ? ' · ' + plural(invitados.length, 'invitado') + ' con pase' : ''}`, icon:am.icon, color:am.color, link:'reservas:' + am.id });
-  });
-  cerrarHoja();
-  if (invitados.length) hoja('Reserva confirmada', `${aviso('ok', 'check', `${am.nombre} reservado`, `${fechaLarga(fecha)} · ${d0} a ${d1} h`)}
-    <p class="small">Se crearon <b>${plural(invitados.length, 'pase')}</b> para tus invitados. Mandales el mensaje con todos los códigos:</p>
-    <button class="btn btn-wa btn-block" data-a="compartir-invitados" data-id="${r.id}">${I('share')}Enviar los pases</button>`);
-  else toast(`${am.nombre} reservado para ${relDia(fecha)}`, 'calendar');
-};
-A['compartir-invitados'] = el => {
-  const r = Store.s.reservas.find(x => x.id === el.dataset.id); if (!r) return;
-  const am = amenity(r.amenity), ps = Store.s.pases.filter(p => r.pases.includes(p.id));
-  compartir(`¡Te espero en el ${am.nombre} del barrio ${Store.s.config.nombre}! ${fechaLarga(r.fecha)}, ${am.franjas[r.franja].join(' a ')} h.\n\nCódigos de ingreso (mostralo en la garita):\n` +
-    ps.map(p => `• ${p.nombre}: ${p.codigo}`).join('\n') + `\n\nCómo llegar: ${Store.s.config.mapa}`);
-};
-A['ver-reserva'] = el => {
-  const r = Store.s.reservas.find(x => x.id === el.dataset.id); if (!r) return;
-  const am = amenity(r.amenity) || {}, v = usuario(r.userId) || {}, mia = r.userId === yo().id;
-  const horas = (fechaDe(r.fecha).getTime() + minutosDe(am.franjas[r.franja][0]) * MIN - Date.now()) / HORA;
-  hoja(am.nombre, `<div class="card plana"><b>${fechaLarga(r.fecha)}</b><div class="muted small">${am.franjas[r.franja].join(' a ')} h · ${esc(v.casa || '')}${r.nota ? ' · ' + esc(r.nota) : ''}</div>
-      ${r.invitados ? `<div class="small" style="margin-top:6px">${plural(+r.invitados, 'invitado')}${r.pases?.length ? ` · ${r.pases.length} con pase` : ''}</div>` : ''}
-      ${r.reglamentoAceptado ? `<div class="tiny muted" style="margin-top:4px">Reglamento aceptado el ${fechaHora(r.reglamentoAceptado)}</div>` : ''}
-      ${r.deposito ? `<div class="small" style="margin-top:6px">${I('wallet')} Depósito ${plata(r.deposito)} · ${({ pendiente:'por entregar', recibido:'entregado', devuelto:'devuelto', retenido:'retenido por daños' })[r.depositoEstado] || ''}</div>` : ''}</div>
-    ${r.cierre ? `<div class="card ${r.cierre.estado === 'ok' ? '' : 'plana'}"><b>${r.cierre.estado === 'ok' ? '✔ El espacio quedó bien' : r.cierre.estado === 'danos' ? '⚠ Informó daños' : '⚠ Informó faltantes'}</b>
-      ${r.cierre.detalle ? `<p class="small" style="margin:6px 0 0">${esc(r.cierre.detalle)}</p>` : ''}${fotoHTML(r.cierre.foto, 'post-foto')}<div class="tiny muted">${hace(r.cierre.at)}</div></div>`
-      : (mia || esAdmin()) && reservaTermino(r) ? `<button class="btn btn-pri btn-block" data-a="reserva-cierre" data-id="${r.id}">${I('clipboard')}Contar cómo quedó el espacio</button>` : ''}
-    ${esAdmin() && r.deposito ? `<div class="btns" style="margin:10px 0">${['recibido','devuelto','retenido'].filter(e => e !== r.depositoEstado).map(e => `<button class="btn btn-xs btn-sec" data-a="reserva-deposito" data-id="${r.id}" data-v="${e}">Depósito ${({ recibido:'entregado', devuelto:'devuelto', retenido:'retenido' })[e]}</button>`).join('')}</div>` : ''}
-    ${r.pases?.length && mia ? `<button class="btn btn-wa btn-block" data-a="compartir-invitados" data-id="${r.id}">${I('share')}Reenviar pases</button>` : ''}
-    ${(mia || esAdmin()) ? `${horas < 24 && mia ? aviso('warn', 'clock', 'Falta menos de un día', 'Si cancelás ahora, avisá a la Administración por si alguien más lo necesitaba.') : ''}
-      <button class="btn btn-danger-soft btn-block" style="margin-top:10px" data-a="cancelar-reserva" data-id="${r.id}">Cancelar reserva</button>` : ''}`);
-};
-/* ---------- el cierre de una reserva: cómo quedó el espacio ---------- */
-const reservaTermino = r => { const am = amenity(r.amenity); if (!am || r.cancelada) return false;
-  const fin = am.franjas[r.franja][1], t = fechaDe(r.fecha).getTime() + (minutosDe(fin) <= minutosDe(am.franjas[r.franja][0]) ? DIA : 0) + minutosDe(fin) * MIN;
-  return Date.now() >= t; };
-A['reserva-cierre'] = el => {
-  const r = Store.s.reservas.find(x => x.id === el.dataset.id); if (!r) return;
-  hoja('¿Cómo quedó el espacio?', `<form data-f="reserva-cierre" data-id="${r.id}">
-    <div class="field"><div class="seg">${[['ok','Quedó bien'],['danos','Hubo daños'],['faltantes','Faltan cosas']].map(([k, t], j) => `<label><input type="radio" name="estado" value="${k}" ${j ? '' : 'checked'}><span>${t}</span></label>`).join('')}</div></div>
-    <div class="field"><label>Detalle (opcional)</label><textarea name="detalle" maxlength="400" placeholder="Ej: se rompió una silla; faltan dos vasos"></textarea></div>
-    ${campoFoto('fotoCierre', 'Foto (opcional)')}
-    <button class="btn btn-pri btn-block">${I('check')}Enviar</button></form>`);
-};
-F['reserva-cierre'] = (d, form) => {
-  Store.cambiar(s => { const r = s.reservas.find(x => x.id === form.dataset.id); if (!r) return;
-    r.cierre = { estado:d.estado, detalle:(d.detalle || '').trim(), foto:fotoParaOtros(d.foto, 30), at:Date.now(), por:yo().id };
-    const am = amenity(r.amenity) || {};
-    notificar(s, { para:'rol:admin', titulo:`${am.nombre}: ${d.estado === 'ok' ? 'quedó bien' : d.estado === 'danos' ? 'informaron daños' : 'informaron faltantes'}`, texto:`${usuario(r.userId)?.casa || ''} · ${fechaCorta(r.fecha)}${d.detalle ? ' · ' + d.detalle.trim().slice(0, 80) : ''}`, icon:am.icon || 'calendar', color: d.estado === 'ok' ? 'ok' : 'warn', link:'reservas' }); });
-  cerrarHoja(); toast('Gracias: la Administración ya lo sabe', 'check');
-};
-A['reserva-deposito'] = el => { Store.cambiar(s => { const r = s.reservas.find(x => x.id === el.dataset.id); if (!r) return; r.depositoEstado = el.dataset.v;
-  if (el.dataset.v !== 'recibido') notificar(s, { para:r.userId, titulo: el.dataset.v === 'devuelto' ? 'Te devolvimos el depósito' : 'El depósito quedó retenido', texto:`${amenity(r.amenity)?.nombre} · ${fechaCorta(r.fecha)}`, icon:'wallet', color: el.dataset.v === 'devuelto' ? 'ok' : 'warn', link:'reservas' });
-  auditar(s, 'Depósito de reserva: ' + el.dataset.v, `${usuario(r.userId)?.casa || ''} · ${fechaCorta(r.fecha)}`, r.id); }); cerrarHoja(); toast('Anotado', 'check'); };
-A['cancelar-reserva'] = async el => {
-  if (!await confirmar('Cancelar reserva', 'Se liberan el turno y los pases de tus invitados.', { si:'Cancelar reserva', peligro:true })) return;
-  Store.cambiar(s => { const r = s.reservas.find(x => x.id === el.dataset.id); if (!r) return; r.cancelada = Date.now();
-    s.pases.forEach(p => { if (p.reserva === r.id) p.cancelado = Date.now(); });
-    if (r.userId !== yo().id) notificar(s, { para:r.userId, titulo:'Tu reserva fue cancelada por la Administración', texto:`${amenity(r.amenity)?.nombre} · ${fechaCorta(r.fecha)}`, icon:'calendar', color:'danger' }); });
-  toast('Reserva cancelada', 'x');
-};
-F['bloquear'] = (d, form) => {
-  const [fecha, i] = form.dataset.p.split('|');
-  Store.cambiar(s => s.bloqueos.push({ id:uid(), amenity:form.dataset.v, fecha, franja: d.todoDia ? -1 : +i, motivo:d.motivo.trim() }));
-  cerrarHoja(); toast('Turno bloqueado', 'lock');
-};
-A['desbloquear'] = el => { Store.cambiar(s => { s.bloqueos = s.bloqueos.filter(b => b.id !== el.dataset.id); }); toast('Turno liberado', 'check'); };
 
 /* ---------- RECLAMOS (privados entre el vecino y la Administración) ---------- */
 const CAT_RECL = {
@@ -1428,7 +1297,7 @@ R.perfil = {
           <label class="btn btn-sm btn-sec">${I('camera')}${u.fotoCasa ? 'Cambiar foto' : 'Sacar o elegir foto'}<input type="file" accept="image/*" capture="environment" data-foto-in="fotoCasaIn" hidden></label>
           <input type="hidden" id="fotoCasaIn">
         </div></div></div>
-      ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Un QR personal para identificarte en la garita y los espacios comunes. Sin datos sensibles.' })}
+      ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Un QR personal para que la garita te reconozca sin mostrar el DNI. Sin datos sensibles.' })}
       <form data-f="perfil" class="card">
         ${tengoLote() ? `<div class="grid2"><div class="field"><label>Tu relación con ${esc(u.casa)}</label><select name="relacion" id="pfRel">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${u.relacion === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="" ${!u.relacion ? 'selected' : ''}>Sin indicar</option></select>
           <div class="ayuda">En las votaciones vota el titular del lote. ${u.representante ? '<b>Sos el representante designado del lote.</b>' : ''}</div></div>
@@ -1594,7 +1463,7 @@ A['mis-datos'] = () => {
   if (esGuardia() || esHotel()){ toast('Es una cuenta institucional: no tiene datos personales de vecino', 'info'); return; }
   const u = yo(), s = Store.s;
   const tecnico = { emitido:new Date().toISOString(), usuario:MisDatos.sinSecretos(u), pases:s.pases.filter(p => p.hostId === u.id).map(p => ({ ...p, dni:p.dni ? '***' + String(p.dni).slice(-3) : '' })),
-    reservas:s.reservas.filter(r => r.userId === u.id), reclamos:s.reclamos.filter(r => r.userId === u.id).map(r => ({ ...r, foto:r.foto ? '[foto]' : null })),
+    reclamos:s.reclamos.filter(r => r.userId === u.id).map(r => ({ ...r, foto:r.foto ? '[foto]' : null })),
     peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
     mensajes:s.privados.filter(h => h.userId === u.id), conversacionesConVecinos:aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)),
     pagos:s.pagos.filter(x => x.lote === u.casa).map(x => ({ ...x, comprobante:x.comprobante ? '[comprobante]' : undefined })), recibos:s.recibos.filter(x => x.lote === u.casa),
@@ -1659,7 +1528,6 @@ function informeMisDatos(){
   out.push(bloque(`4. Expensas del lote: pagos y recibos de ${anio}`, `Los pagos de ${x(u.casa)} de este año y sus recibos. Los ven las cuentas de tu lote y la Administración; se conservan 10 años (art. 328 del Código Civil y Comercial). Los de años anteriores están en Mis expensas. Los comprobantes que subiste se borran 30 días después de confirmados.`,
     tabla(['Fecha', 'Importe', 'Medio', 'Estado', 'Informó'], pagos.map(p => [fc(p.fecha), typeof plata === 'function' ? plata(p.monto) : x(p.monto), x(p.medio), estadoPago(p), cuentasLote.has(p.userId) ? nom(p.userId) : 'La Administración']))
     + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa && delAnio(r.fecha)).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))));
-  out.push(bloque('Reservas', 'Las ven vos, la garita y la Administración.', tabla(['Espacio', 'Fecha', 'Invitados', 'Estado'], s.reservas.filter(r => r.userId === u.id).map(r => [x(amenity(r.amenity)?.nombre || r.amenity), fc(r.fecha), x(r.invitados || 0), r.cancelada ? 'Cancelada' : 'Confirmada']))));
   /* 5 · mensajes */
   const hilo = (titulo, msgs, quien) => `<div class="caja"><b>${titulo}</b>${msgs.length ? `<table style="margin-top:6px">${msgs.map(m => `<tr><td style="width:120px;white-space:nowrap">${fh(m.createdAt || m.at)}</td><td style="width:90px">${quien(m)}</td><td>${x(m.text)}</td></tr>`).join('')}</table>` : '<br><span style="color:#666">Sin mensajes.</span>'}</div>`;
   const privs = s.privados.filter(h => h.userId === u.id);
@@ -1677,9 +1545,8 @@ function informeMisDatos(){
   out.push(bloque('7. Tus votos', 'Cada voto queda en el registro de auditoría con fecha y hora; el resultado se cuenta por lote.', tabla(['Votación', 'Tu opción', 'Cuándo'], votos)));
   /* 8 · lo que publicaste */
   const posts = s.posts.filter(p => p.autor === u.id), coms = s.posts.flatMap(p => aLista(p.comments).filter(k => k && k.autor === u.id).map(k => [x(p.title), x(k.text), fh(k.createdAt)]));
-  out.push(bloque('8. Lo que publicaste', 'Lo del pizarrón y el chat lo ven los vecinos aprobados y la Administración (el chat, no la garita). El chat baja 60 días; lo anterior queda en la base.',
+  out.push(bloque('8. Lo que publicaste', 'Lo del pizarrón lo ven los vecinos aprobados, la garita y la Administración.',
     tabla(['Pizarrón', 'Tipo', 'Fecha'], posts.map(p => [x(p.title), x(p.type), fh(p.createdAt)])) + tabla(['Comentaste en', 'Comentario', 'Fecha'], coms)
-    + tabla(['Chat', 'Mensaje', 'Fecha'], aLista(s.msgs).filter(m => m && m.autor === u.id).map(m => ['#' + x(m.channel), x(m.text), fh(m.createdAt)]))
     + tabla(['Obras', 'Empresa', 'Inicio', 'Estado'], s.obras.filter(o => o.userId === u.id).map(o => [x(o.tipo), x(o.empresa), fc(o.inicio), x(o.estado)]))
     + tabla(['Viajes compartidos', 'Destino', 'Fecha'], s.viajes.filter(v => v.userId === u.id).map(v => [x(v.tipo), x(v.destino), fc(v.fecha) + ' ' + x(v.hora || '')]))
     + tabla(['Cosas para prestar', 'Estado'], aLista(s.cosas).filter(k => k && k.userId === u.id).map(k => [x(k.nombre), x(k.estado)]))

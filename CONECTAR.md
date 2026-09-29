@@ -62,7 +62,7 @@ esto (la app entiende también `title`, `description`, `discount` y `link`):
   - `reclamos`: autor + Administración; los `publico:true`, todos.
   - `pases`, `peticiones`: el vecino dueño + guardia + Administración.
   - `auditoria`: solo se agrega, nadie edita ni borra.
-  - `posts`, `msgs` (pizarrón y chat): todos los vecinos aprobados.
+  - `posts` (pizarrón): todos los vecinos aprobados. (`msgs`, el chat vecinal, se sacó el 29-09-2026.)
 - En el código, se reemplaza `Store.guardar/cargar` por lecturas y escrituras
   por colección. El resto de la app no cambia: todo pasa por `Store.cambiar()`.
 - **Fotos**: siguen viviendo en cada equipo (IndexedDB). Para que las vea otro
@@ -157,9 +157,9 @@ en "Ushuaia hoy". Si algún día hay una fuente, el mismo Worker puede traerla.
 | Idea | Qué hace | Qué hace falta |
 |---|---|---|
 | Pases y avisos por **WhatsApp** | La visita recibe el QR por WhatsApp y el vecino aprueba respondiendo "1" | WhatsApp Business API (Meta o Twilio) |
-| **Calendario del barrio** | Reservas, eventos, recolección y feriados en Google/Apple Calendar | Un enlace .ics que genera el servidor |
+| **Calendario del barrio** | Eventos, recolección y feriados en Google/Apple Calendar | Un enlace .ics que genera el servidor |
 | **Asistente con IA** | Responde dudas del reglamento, resume la bitácora del turno, clasifica reclamos y redacta comunicados | Claude API detrás de una Cloud Function |
-| **Cobros con Mercado Pago** | Seña del quincho, multas firmes, compras conjuntas | Cuenta de MP del consorcio |
+| **Cobros con Mercado Pago** | Multas firmes, compras conjuntas | Cuenta de MP del consorcio |
 | **Portón conectado** | La garita abre al validar el QR; el vecino abre su portón desde el celular al llegar (geocerca) | Relé WiFi (Shelly/ESP32) en la barrera |
 | **Lectura de patentes (LPR)** | Abre solo para autos de vecinos y pases del día; alarma con patentes con restricción | Cámara en el acceso + software LPR |
 | **Botón SOS físico** | Llavero para adultos mayores que dispara el mismo SOS | Botón Bluetooth (tipo Flic) vinculado al celular |

@@ -27,7 +27,7 @@
 const CUENTAS = {
   '1.1':'Caja y bancos', '1.2':'Expensas a cobrar', '1.3':'Gastos particulares a recuperar',
   '2.1':'Proveedores a pagar', '2.2':'Retenciones a depositar',
-  '4.1':'Ingresos por expensas', '4.2':'Intereses por mora', '4.3':'Fondo de Infraestructura', '4.4':'Ingresos de terceros (SUM, publicidad, convenios)', '4.5':'Otros ingresos',
+  '4.1':'Ingresos por expensas', '4.2':'Intereses por mora', '4.3':'Fondo de Infraestructura', '4.4':'Ingresos de terceros (publicidad, convenios)', '4.5':'Otros ingresos',
   '4.6':'Ventas del barrio (calcomanías de ingreso, merchandising)',
   '5.1':'Servicios públicos', '5.2':'Abonos de servicios (vigilancia, administración, recolección)', '5.3':'Mantenimiento de partes comunes',
   '5.4':'Gastos bancarios', '5.5':'Seguros', '5.6':'Otros gastos', '5.7':'Honorarios profesionales', '5.8':'Mejoras y obras',
@@ -163,7 +163,7 @@ CONTA.libro = per => {
     ${cerrado ? aviso('ok', 'lock', `${nombrePeriodo(p)} está cerrado para el contador`, `Cerrado el ${fechaCorta(isoDe(new Date(cfgConta().cerrados[p])))}. Para corregir algo, reabrilo en la Carpeta del contador.`) : ''}
     ${r.cambiaron ? aviso('warn', 'alert', `${plural(r.cambiaron, 'asiento tiene', 'asientos tienen')} cambios en Expensas`, 'Se corrigió el gasto o el pago de origen después de tu corrección. Abrilo para tomar el cambio o dejar tu versión.') : ''}
     <div class="garita-kpis"><div class="kpi"><b>${plataCorta(r.ingresos)}</b><span>Ingresos</span></div><div class="kpi"><b>${plataCorta(r.egresos)}</b><span>Egresos</span></div><div class="kpi"><b>${plataCorta(r.ingresos - r.egresos)}</b><span>Resultado del mes</span></div></div>
-    ${cerrado ? '' : superficie({ a:'ingreso-nuevo', v:p, icon:'plus', color:'ok', t:'Cargar otro ingreso', s:'Calcomanías de ingreso, merchandising, alquiler del SUM, publicidad…' })}
+    ${cerrado ? '' : superficie({ a:'ingreso-nuevo', v:p, icon:'plus', color:'ok', t:'Cargar otro ingreso', s:'Calcomanías de ingreso, merchandising, publicidad…' })}
     ${cerrado ? '' : superficie({ a:'asiento-nuevo', v:p, icon:'plus', color:'brand', t:'Asiento manual', s:'Un ajuste, una comisión bancaria o un gasto que no pasó por Expensas' })}
 
     ${sec('Egresos', `<span class="muted small">${plural(r.egr.length, 'asiento')}</span>`)}<div class="card lista">${r.egr.sort((a, b) => a.cuenta.localeCompare(b.cuenta) || b.importe - a.importe).map(fila).join('') || '<p class="muted small" style="margin:6px 0">Sin egresos.</p>'}</div>
@@ -195,8 +195,8 @@ A['asiento-editar'] = el => {
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button>
     ${!a.origen ? `<button type="button" class="btn btn-danger-soft btn-block" style="margin-top:8px" data-a="asiento-anular" data-id="${a.id}">Anular este asiento</button>` : ''}</form>`, { ancho:'640px' });
 };
-/* Otro ingreso del barrio: calcomanías de ingreso, merchandising, alquiler
-   del SUM, publicidad… (pedido de Claudio, 26-09). Es un asiento manual de
+/* Otro ingreso del barrio: calcomanías de ingreso, merchandising,
+   publicidad… (pedido de Claudio, 26-09). Es un asiento manual de
    ingreso, ya con la cuenta puesta. */
 A['ingreso-nuevo'] = el => {
   const id = 'as' + uid();
@@ -272,7 +272,7 @@ CONTA.carpeta = per => {
       <div class="field"><label>Cierre del ejercicio (MM-DD)</label><input name="ejercicioCierra" value="${esc(c.ejercicioCierra)}" maxlength="5" placeholder="12-31"></div>
       <p class="muted tiny" style="margin:0 0 10px">Lo confirma el contador con las constancias de ARCA y de la Agencia de Recaudación Fueguina. La app avisa 60 días antes de cada vencimiento.</p>
       <button class="btn btn-pri btn-block">${I('check')}Guardar datos fiscales</button></form>
-    ${aviso('info', 'info', 'Esto es una guía, no reemplaza al contador', 'En Tierra del Fuego rige además la Ley 19.640 (por eso muchas facturas locales vienen sin IVA). Si el barrio cobra algo a terceros (SUM, publicidad, convenios), cargalo como asiento en la cuenta 4.4: queda separado para que el contador evalúe si tributa. Al cierre del ejercicio corresponden balance con dictamen, memoria, asamblea y la presentación ante la Inspección General de Justicia de la provincia.')}`;
+    ${aviso('info', 'info', 'Esto es una guía, no reemplaza al contador', 'En Tierra del Fuego rige además la Ley 19.640 (por eso muchas facturas locales vienen sin IVA). Si el barrio cobra algo a terceros (publicidad, convenios), cargalo como asiento en la cuenta 4.4: queda separado para que el contador evalúe si tributa. Al cierre del ejercicio corresponden balance con dictamen, memoria, asamblea y la presentación ante la Inspección General de Justicia de la provincia.')}`;
 };
 F['datos-fiscales'] = d => {
   Store.cambiar(s => { s.config.contable = Object.assign({}, cfgConta(), { ivaCond:d.ivaCond, iibbCond:d.iibbCond, arefNro:String(d.arefNro || '').trim(), arefVence:d.arefVence || '', ganCertVence:d.ganCertVence || '', ejercicioCierra:String(d.ejercicioCierra || '12-31').trim() });

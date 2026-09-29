@@ -1,4 +1,4 @@
-# Subir la versión nueva y probarla — paso a paso (actualizado el 27-09-2026)
+# Subir la versión nueva y probarla — paso a paso (actualizado el 29-09-2026)
 
 Orden: **1. Preparar en la Mac → 2. Firebase (reglas) → 3. Apps Script → 4. GitHub → 5. Encender en la app → 6. Probar.**
 Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con ellas.
@@ -29,7 +29,7 @@ Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con 
 4. Clic dentro del editor → Cmd+A → Borrar → Cmd+V → **Publicar**.
 5. Si marca un error en rojo, no publiques y pasame la línea que marca.
 
-Esto deja andando, además de lo pendiente de antes: **"Estoy bien" y el aviso de salida** (`cuidado/`), **cosas para prestar**, **ángeles de la nieve**, **tu casa en invierno y la mochila para sismos** y la **casa sola revisada cada día** (27-09), el **hotel** (zona `hotel/`), los **paquetes por lote**, la **garita sin el chat vecinal**, los comprobantes de pago, el archivo histórico y las marcas del motor.
+Esto deja andando, además de lo pendiente de antes: **"Estoy bien" y el aviso de salida** (`cuidado/`), **cosas para prestar**, **ángeles de la nieve**, **tu casa en invierno y la mochila para sismos** y la **casa sola revisada cada día** (27-09), el **hotel** (zona `hotel/`), los **paquetes por lote**, los comprobantes de pago, el archivo histórico y las marcas del motor. **Desde el 29-09** además cierra el **chat vecinal** y las **reservas** (se sacaron de la app): nadie puede leer ni escribir ahí salvo la Administración, que borra lo que quedó.
 
 ---
 
@@ -78,6 +78,7 @@ Es el "servidor" del barrio: manda los correos, los avisos push, lee los crucero
    - En otro navegador (o una ventana de incógnito), abrí la app → **"Todavía no tengo cuenta"** → inscribite con un correo de prueba. Truco: `barriobahiacauquen+hotel@gmail.com` (Gmail lo entrega en la misma casilla).
    - Volvé a tu Administración → **Día a día → sala "Hotel Los Cauquenes" → "Cuenta del hotel"** → buscá esa cuenta → **"Hacerla del hotel"**.
    - Entrá con esa cuenta: ya es la del hotel. Cuando el hotel la use de verdad, cambia el correo y la contraseña en **Tu cuenta**.
+6. **Borrar lo que quedó del chat y de las reservas (29-09)**, DESPUÉS de publicar las reglas: **Día a día → Proveedores y cumplimiento → Protección de datos** → botón rojo **"Borrar lo que quedó del chat y las reservas"** → confirmar. Se borra para siempre y queda en la auditoría; la tarea pasa a verde.
 
 ---
 
@@ -106,7 +107,15 @@ Conviene tener abiertos: **tu cuenta** (vecino y Administración), **la garita**
 1. En Administración → **Garita en vivo**: se ve todo, pero sin botones de validar, entregar, camión ni policía; arriba dice "solo para mirar" con "Escribirle a la garita".
 2. **Bitácora** en Administración: se lee, no se escribe.
 3. Una **petición** pendiente: la Administración la ve pero no la firma.
-4. En la **garita** ya no está el **chat vecinal**.
+4. En la **garita** tampoco hay **chat vecinal** (desde el 29-09 no lo tiene nadie).
+
+### Sin chat vecinal ni reservas, y la credencial explicada (29-09)
+1. Como vecino, **El barrio**: ya no está la teja **Chat vecinal**, y la línea de la portada dice "Pizarrón, vecinos y votaciones".
+2. **Tu casa**: ya no está **Reservas**.
+3. **Tu casa → Mi credencial**: abajo del QR aparece **"¿Para qué sirve?"** con los casos (auto ajeno, a pie, vecino nuevo, guardia de reemplazo) y qué ve la garita.
+4. **Preguntas frecuentes**: no están "¿Puedo nombrar a alguien en el chat vecinal?" ni "¿Cómo reservo el quincho…?"; está **"¿Para qué sirve Mi credencial?"**, con el botón que la abre.
+5. **Manual y normas → Manual de uso**: buscá "credencial" (capítulo Mi casa y mi credencial) y "chat" (solo el recuadro "No hay chat vecinal" y la línea de Tus datos).
+6. Como Administración, **Protección de datos**: la tarea "Borrar lo que quedó del chat vecinal y de las reservas" (ver el paso 5.6).
 
 ### Pase vencido
 1. Como vecino, **Autorizar una visita** para hoy con un horario que terminó hace más de una hora (por ejemplo, si son las 11, de 8:00 a 9:00).

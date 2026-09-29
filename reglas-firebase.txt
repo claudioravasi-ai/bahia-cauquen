@@ -34,10 +34,10 @@ QUÉ HACEN, EN CASTELLANO
    Administración o un alta común.
 
 4. TRES ZONAS.
-   /barrio          lo que ven todos los vecinos aprobados (pizarrón, chat,
-                    reservas, votaciones, padrón, documentos, obras…).
+   /barrio          lo que ven todos los vecinos aprobados (pizarrón,
+                    votaciones, padrón, documentos, obras…).
                     Los datos del barrio (padrón, agenda, reglamento,
-                    espacios, proveedores, ajustes) solo los edita la
+                    proveedores, ajustes) solo los edita la
                     Administración.
    /privado/<uid>   lo de cada vecino: sus mensajes con la Administración y
                     la guardia, sus mensajes con otros vecinos, sus reclamos,
@@ -141,14 +141,17 @@ PEGAR DESDE ACÁ
 
       "config":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "padron":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
-      "amenities":     { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 29-09-2026: el chat vecinal (msgs) y las reservas (reservas, bloqueos,
+         amenities) se sacaron de la app. Nadie las lee ni las escribe; solo la
+         Administración, para borrar lo que quedó (Protección de datos). */
+      "amenities":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "agenda":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "temporadas":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "feriados":      { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "contactos":     { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "documentos":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "proveedores":   { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
-      "bloqueos":      { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "bloqueos":    { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "votaciones": {
         ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
         ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
@@ -159,8 +162,8 @@ PEGAR DESDE ACÁ
       "liquidaciones": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
 
       "posts":         { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')" },
-      "msgs":          { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'guardia'", ".indexOn": ["createdAt"] },
-      "reservas":      { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')" },
+      "msgs":        { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "reservas":    { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "compras":       { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')" },
       "viajes":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')" },
       /* Obras: las registra cada vecino y la Administración; la garita las ve pero no las edita. */
@@ -378,6 +381,16 @@ PEGAR DESDE ACÁ
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 29-09-2026 (hay que volver a publicar): SIN CHAT VECINAL NI RESERVAS.
+- barrio/msgs (chat vecinal), barrio/reservas, barrio/bloqueos y
+  barrio/amenities (espacios comunes): se sacaron de la app. Ahora las lee y
+  las escribe SOLO la Administración, para borrar lo que quedó guardado
+  (Gestión → Protección de datos → "Borrar lo que quedó del chat y las
+  reservas"). Vecinos, garita, pendientes y el hotel ya no pueden leer ni
+  escribir ahí: aunque alguien tenga abierta una versión vieja de la app,
+  no puede escribir en el chat ni reservar. Se quitó el índice de msgs.
+-----------------------------------------------------------
 
 ✔ NUEVO 28-09-2026 (hay que volver a publicar): LAS EXPENSAS DEL HOTEL.
 - hotel/hotelLiqs: la copia de las cuotas de las 6 UF del hotel (UF 000 a 005),

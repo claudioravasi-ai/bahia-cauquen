@@ -16,9 +16,11 @@
        ayuda" y la guardia ve quién necesita qué.
      · PAQUETES: la garita saca foto, anota empresa y hora; el vecino
        recibe el aviso y confirma que lo retiró.
-     · CREDENCIAL DEL VECINO: un QR personal para identificarse en la
-       garita, en los espacios comunes y al retirar paquetes. No guarda
-       fotos del DNI ni datos sensibles: es un código que la app valida.
+     · CREDENCIAL DEL VECINO: un QR personal para que la garita lo
+       reconozca sin pedirle el DNI (auto ajeno, a pie, vecino nuevo,
+       guardia de reemplazo). No guarda fotos del DNI ni datos sensibles:
+       es un código que la app valida. No abre el portón, no registra
+       entradas y no sirve para retirar paquetes.
    ========================================================= */
 
 /* ---------- utilidades de este archivo ---------- */
@@ -278,8 +280,10 @@ A['frec-mov'] = el => {
 /* =========================================================
    3. CREDENCIAL DEL VECINO
    Un código propio de cada cuenta (V-XXXXXXXX). La garita lo escanea y
-   ve quién es, de qué lote y la foto del frente de la casa. No lleva
-   foto del DNI ni el número de documento.
+   ve quién es, de qué lote, las patentes de sus autos y la foto del frente
+   de la casa. No lleva foto del DNI ni el número de documento. La hoja le
+   explica al vecino para qué le sirve (29-09-2026: los vecinos preguntaban,
+   y el barrio no tiene espacios comunes para entrar).
    ========================================================= */
 A['mi-credencial'] = () => {
   const u = yo(); if (!u) return;
@@ -287,8 +291,16 @@ A['mi-credencial'] = () => {
   const c = yo().credencial;
   hoja('Tu credencial del barrio', `<div class="ticket"><div class="tk-top"><small>Credencial · Barrio ${esc(Store.s.config.nombre)}</small><h3>${esc(u.nombre)}</h3><div style="opacity:.85;font-size:13px">${esc(u.casa)}</div></div>
     <div class="bottom"><div class="qr-box" data-qr="BHC:${esc(c)}"></div><div class="codigo-grande">${esc(c)}</div>
-    <div class="muted small">Mostralo en la garita o en los espacios comunes.</div></div></div>
-    <p class="muted small" style="margin:12px 2px 0">Es personal. No lleva tu DNI ni ningún dato sensible: la garita solo ve tu nombre, tu lote y la foto del frente de tu casa. Si alguien lo copió, generá uno nuevo y el anterior deja de valer.</p>
+    <div class="muted small">Mostralo en la garita cuando no te reconozcan.</div></div></div>
+    <div class="card plana small" style="margin-top:12px;line-height:1.5"><b>¿Para qué sirve?</b>
+      <p style="margin:4px 0 6px">Para que la garita sepa en un segundo que sos del barrio y de qué lote, sin que tengas que mostrar el DNI. Te sirve sobre todo cuando la guardia no te reconoce:</p>
+      <ul style="margin:0;padding-left:18px">
+        <li>Llegás en un auto que no es el tuyo: taxi, remís, Uber, uno prestado, alquilado o del taller.</li>
+        <li>Llegás caminando o en bici.</li>
+        <li>Sos nuevo en el barrio, inquilino o familiar, y todavía no te conocen.</li>
+        <li>En la garita hay un guardia de reemplazo.</li></ul>
+      <p style="margin:6px 0 0">La garita lo escanea (o escribe el código) y ve solo tu nombre, tu lote, las patentes de tus autos y, si la cargaste, la foto del frente de tu casa. No abre el portón ni anota tus entradas y salidas. Si la guardia ya te conoce, no hace falta mostrarlo.</p></div>
+    <p class="muted small" style="margin:12px 2px 0">Es personal: cada cuenta de tu lote tiene la suya. No lleva tu DNI ni ningún dato sensible. Si alguien lo copió, generá uno nuevo y el anterior deja de valer.</p>
     <p class="muted small" style="margin:8px 2px 0">${I('box')} <b>Para retirar un paquete</b> no sirve esta credencial: se usa el <b>QR de retiro</b>, que cambia cada 30 segundos y solo sale de tu teléfono (Tus paquetes → Mi QR para retirar).</p>
     <button class="btn btn-sec btn-block" data-a="credencial-nueva" style="margin-top:10px">${I('refresh')}Generar una credencial nueva</button>`);
   setTimeout(() => $$('#hoja [data-qr]').forEach(x => pintarQR(x, x.dataset.qr)), 60);
@@ -813,15 +825,6 @@ R.municipio = {
       <p class="muted tiny" style="margin-top:12px">Cada teja abre la página oficial en una pestaña aparte; la app queda abierta atrás.</p>`;
   },
 };
-
-/* Reservas: recordatorio y cierre (la regla va acá porque el motor de
-   reglas, REGLAS, se define en admin.js, que carga después de v-gestion.js). */
-REGLAS.push({ id:'reservas-recordatorio', n:'Reservas → recordatorio la víspera y "¿cómo quedó?" al terminar', d:'El día anterior (desde las 12) recuerda el turno con el reglamento; al terminar, pide que cuenten cómo quedó el espacio.',
-  run(s, hoy){ let n = 0; const man = sumarDias(hoy, 1);
-    s.reservas.filter(r => !r.cancelada).forEach(r => { const am = amenity(r.amenity); if (!am) return;
-      if (r.fecha === man && new Date().getHours() >= 12) n += marca(s, 'res-rec-' + r.id, () => notificar(s, { para:r.userId, titulo:`Mañana tenés el ${am.nombre}`, texto:`${am.franjas[r.franja].join(' a ')} h${r.deposito && r.depositoEstado === 'pendiente' ? ' · acordate del depósito de ' + plata(r.deposito) : ''}. ${am.reglas || ''}`.slice(0, 180), icon:am.icon || 'calendar', color:'ok', link:'reservas' }));
-      if (!r.cierre && reservaTermino(r) && r.fecha >= sumarDias(hoy, -2)) n += marca(s, 'res-fin-' + r.id, () => notificar(s, { para:r.userId, titulo:`¿Cómo quedó el ${am.nombre}?`, texto:'Contanos en un toque si quedó bien o si hubo daños o faltantes.', icon:am.icon || 'calendar', color:'sky', link:'reservas' }));
-    }); return n; } });
 
 /* Todo lo que tiene que revisarse después de cada dibujo o cada tanto. */
 const Servicio = {

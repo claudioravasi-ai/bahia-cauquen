@@ -133,10 +133,10 @@ const Asistente = {
   /* ---------- entender ---------- */
   EJEMPLOS:['avisale a la garita que llego tarde', 'publicá en el pizarrón que hay zorros sueltos', '¿cuánto debo de expensas?', '¿cuándo pasa el camión?', '¿tengo paquetes?', 'abrí mis visitas'],
   VENTANAS:[
-    [/paquete/, 'mis-paquetes'], [/expensa|cupon|cupón|pagar/, 'expensas'], [/visita/, 'visitas'], [/reserva|quincho|sum\b|cancha/, 'reservas'],
+    [/paquete/, 'mis-paquetes'], [/expensa|cupon|cupón|pagar/, 'expensas'], [/visita/, 'visitas'],
     [/vuelo|avion|avión|aeropuerto/, 'vuelos'], [/crucero|barco/, 'cruceros'], [/clima|tiempo|pronostico|pronóstico/, 'ushuaia'], [/pizarr/, 'pizarron'],
-    [/chat/, 'chat'], [/emergencia|telefono|teléfono/, 'emergencias'], [/agenda|taxi|remis|farmacia/, 'agenda'], [/manual|ayuda/, 'manual'],
-    [/norma|reglament/, 'documentos'], [/residuo|basura|camion|camión/, 'recoleccion'], [/mensaje/, 'mensajes'], [/votaci/, 'votaciones'], [/obra/, 'obras'],
+    [/emergencia|telefono|teléfono/, 'emergencias'], [/agenda|taxi|remis|farmacia/, 'agenda'], [/manual|ayuda/, 'manual'],
+    [/norma|reglament/, 'documentos'], [/residuo|basura|camion|camión/, 'recoleccion'], [/mensaje|chat/, 'mensajes'], [/votaci/, 'votaciones'], [/obra/, 'obras'],
     [/reclamo/, 'reclamos'], [/peticion|petición/, 'peticiones'], [/mi casa|mis datos|perfil/, 'perfil'],
   ],
   /* Lo que viene después de "que" ("avisale a la garita QUE llego tarde"). */

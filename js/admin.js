@@ -40,11 +40,6 @@ const REGLAS = [
       if (!t && !vol) return 0;
       const a = anuncioCamion('Mañana', vol ? 'Voluminosos' : t, vol && vol.detalle);
       return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'truck', color:'ok', link:'recoleccion', vence:finDelDia(hoy) })); } },
-  { id:'reserva-recordatorio', n:'Reservas → recordatorio el día anterior', d:'Avisa al vecino que al otro día tiene un espacio reservado.',
-    run(s, hoy){ let n = 0; const man = sumarDias(hoy, 1);
-      s.reservas.filter(r => r.fecha === man && !r.cancelada).forEach(r => { const a = s.amenities.find(x => x.id === r.amenity);
-        n += marca(s, 'res-' + r.id, () => notificar(s, { para:r.userId, titulo:`Mañana tenés el ${a?.nombre || 'espacio'}`, texto:(a?.franjas[r.franja] || []).join(' a ') + ' h', icon:a?.icon || 'calendar', color:'wood', link:'reservas' })); });
-      return n; } },
   { id:'reclamo-72h', n:'Reclamo sin respuesta 72 h → recordar a la Administración', d:'Evita que un reclamo quede olvidado.',
     run(s){ let n = 0; s.reclamos.filter(r => r.estado === 'abierto' && Date.now() - (r.historial.at(-1)?.at || r.createdAt) > 72 * HORA)
       .forEach(r => n += marca(s, 'r72-' + r.id, () => notificar(s, { para:'rol:admin', titulo:'Reclamo sin respuesta hace 3 días', texto:r.titulo, icon:'clipboard', color:'danger', link:'reclamos' }))); return n; } },
@@ -254,11 +249,6 @@ const Motor = {
    un esquema de campos y una colección del estado. */
 const LISTAS = {
   contactos:  { t:'Contactos del barrio', icon:'phone', campos:[['nombre','Nombre'],['detalle','Detalle'],['tel','Teléfono','tel']], titulo:x => x.nombre, sub:x => `${x.detalle || ''} · ${x.tel || 'sin teléfono'}` },
-  amenities:  { t:'Espacios comunes', icon:'calendar', campos:[['nombre','Nombre'],['reglas','Reglas','area'],['invitadosMax','Máximo de invitados','number'],['deposito','Depósito de garantía ($, 0 = sin depósito)','number'],['franjasTxt','Turnos (uno por renglón, 12:00-17:00)','area']],
-                titulo:x => x.nombre, sub:x => x.franjas.map(f => f.join('–')).join(' · '),
-                entrada:x => ({ ...x, franjasTxt:(x.franjas || []).map(f => f.join('-')).join('\n') }),
-                salida:(d, x) => ({ ...x, nombre:d.nombre, reglas:d.reglas, invitadosMax:+d.invitadosMax || 0, deposito:+d.deposito || 0, icon:x.icon || 'calendar', color:x.color || 'brand', id:x.id || 'am' + uid(),
-                  franjas:d.franjasTxt.split('\n').map(l => l.trim().split(/\s*[-–a]\s*/)).filter(f => f.length === 2 && /\d{1,2}:\d{2}/.test(f[0]) && /\d{1,2}:\d{2}/.test(f[1])).map(f => f.map(h => h.padStart(5, '0'))) }) },
   temporadas: { t:'Temporadas de Ushuaia', icon:'sun', campos:[['nombre','Nombre'],['desde','Empieza (MM-DD)'],['hasta','Termina (MM-DD)'],['nota','Nota','area']], titulo:x => x.nombre, sub:x => `${x.desde} a ${x.hasta}` },
   /* Solo lo provincial, lo municipal y los puentes: los nacionales y los
      religiosos los calcula la app sola y no se cargan a mano. */
@@ -340,7 +330,7 @@ const ADMIN_TABS = {
     const kpi = (n, t) => `<div class="kpi"><b>${n}</b><span>${t}</span></div>`;
     return `<div class="admin-hero"><b style="font-size:18px">Barrio ${esc(s.config.nombre)}</b><div class="small" style="opacity:.8">${fechaLarga(hoy)}</div>
       <div class="garita-kpis">${kpi(`${casasRegistradas()}/${s.config.casas}`, 'Casas en la app')}${kpi(s.users.filter(u => u.estado === 'pendiente').length, 'Inscripciones')}${kpi(s.reclamos.filter(r => r.estado !== 'resuelto').length, 'Reclamos')}</div>
-      <div class="garita-kpis" style="margin-top:8px">${kpi(pasesDelDia().length, 'Visitas hoy')}${kpi(s.reservas.filter(r => r.fecha >= hoy && r.fecha <= sumarDias(hoy, 7) && !r.cancelada).length, 'Reservas 7 días')}${kpi(s.peticiones.filter(p => p.estado === 'pendiente').length, 'Peticiones')}</div></div>
+      <div class="garita-kpis" style="margin-top:8px">${kpi(pasesDelDia().length, 'Visitas hoy')}${kpi(s.paquetes.filter(p => !p.retirado).length, 'Paquetes en garita')}${kpi(s.peticiones.filter(p => p.estado === 'pendiente').length, 'Peticiones')}</div></div>
       <div class="card"><b style="font-size:14px">Ingresos por día (últimos 7)</b>
         <div style="display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:12px">${ingresos7.map(x => `<div style="flex:1;text-align:center"><div class="tiny muted">${x.n}</div><div style="height:${x.n / max * 80}px;min-height:3px;background:var(--brand);border-radius:6px 6px 0 0"></div><div class="tiny muted">${DIAS[fechaDe(x.d).getDay()]}</div></div>`).join('')}</div></div>
       <p class="muted small" style="margin:10px 2px 0">${I('info')} Reclamos, peticiones, garita, comunicados, contabilidad y expensas están en <b>Gestión del barrio</b>; acá, los datos y la configuración.</p>`;
@@ -854,7 +844,7 @@ A['invitar-propietario'] = async el => {
   if (!p || !p.email){ toast('Ese lote no tiene correo cargado', 'alert'); return; }
   const salio = await Correo.enviar({ para:p.email, asunto:`Te invitamos a la app del barrio ${Store.s.config.nombre}`, tipo:'invitacion',
     html:Correo.plantilla('La app del barrio', `<p>Hola${p.propietario ? ' ' + esc(p.propietario.split(',')[0].split(' ')[0]) : ''}: ya está andando la app del barrio <b>${esc(Store.s.config.nombre)}</b>.</p>
-      <p>Con ella autorizás visitas con QR, reservás el quincho, ves tus expensas y recibís los avisos de la guardia. Tu lote es el <b>${esc(p.lote)}</b>.</p>
+      <p>Con ella autorizás visitas con QR, te enterás cuando llega un paquete, ves tus expensas y recibís los avisos de la guardia. Tu lote es el <b>${esc(p.lote)}</b>.</p>
       <p>Para entrar, inscribite con este enlace y la Administración te habilita.</p>`, { texto:'Inscribirme', url:urlApp() }) });
   cerrarHoja();
   toast(salio ? 'Invitación enviada' : 'Quedó en la bandeja de salida de Correos', salio ? 'mail' : 'clock');
@@ -1074,7 +1064,7 @@ A['nuevo-comunicado'] = () => {
       <div class="field"><label>Fecha (si es reunión)</label><input type="date" name="fecha" min="${hoyISO()}"></div>
       <div class="field"><label>Hora</label><input type="time" name="hora"></div>
       <div class="field"><label>Deja de mostrarse</label><input type="date" name="vence" min="${hoyISO()}" value="${sumarDias(hoyISO(), 30)}"></div></div>
-    <div class="field"><label>Lugar</label><input name="lugar" maxlength="80" placeholder="Ej: SUM del barrio"></div>
+    <div class="field"><label>Lugar</label><input name="lugar" maxlength="80" placeholder="Ej: Garita del barrio"></div>
     <label class="check"><input type="checkbox" name="mail"><span>Mandarlo también por correo</span></label>
     <button class="btn btn-pri btn-block btn-grande" style="margin-top:14px">${I('send')}Publicar el comunicado</button>
     <p class="muted tiny" style="margin:10px 0 0">Aparece como ventana en la app de cada vecino, suena una vez y no se va hasta que lo acusan. Queda asentado en la auditoría.</p></form>`, { ancho:'620px' });

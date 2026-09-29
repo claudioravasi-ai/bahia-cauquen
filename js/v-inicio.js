@@ -100,10 +100,6 @@ function urgentesVecino(){
 
   if (typeof alertasParaMi === 'function') alertasParaMi().filter(a => !respuestaDe(a)).forEach(a => out.push(aviso('danger latido', 'siren', `Aviso urgente: ${esc(a.titulo)}`, esc(a.zona),
     `<button class="btn btn-xs btn-ok" data-a="alerta-responder" data-id="${a.id}" data-v="ok">Recibido</button><button class="btn btn-xs btn-danger-soft" data-a="alerta-responder" data-id="${a.id}" data-v="ayuda">Necesito ayuda</button>`)));
-  s.reservas.filter(r => r.userId === u.id && (r.fecha === hoy || r.fecha === sumarDias(hoy, 1)) && !r.cancelada).forEach(r => {
-    const a = amenity(r.amenity); if (!a) return;
-    out.push(aviso('ok', a.icon, `${r.fecha === hoy ? 'Hoy' : 'Mañana'} tenés el ${a.nombre}`, `${a.franjas[r.franja]?.join(' a ') || ''} h${r.invitados ? ' · ' + plural(+r.invitados, 'invitado') : ''}`));
-  });
   const v = s.votaciones.find(v => v.cierra > Date.now() && !(u.casa in v.votos));
   if (v) out.push(aviso('info', 'vote', 'Votación abierta', esc(v.titulo), `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="votaciones">Votar</button>`));
   return out;
@@ -180,20 +176,19 @@ const arteDe = k => {
 const SECCIONES = {
   casa: {
     titulo:'Tu casa', icon:'home', color:'ok', ancha:true, lema:'Tu lote, tus visitas y tus cosas',
-    sub:'Visitas, reservas, mensajes y los datos de tu lote',
+    sub:'Visitas, paquetes, mensajes y los datos de tu lote',
     /* Si está de salida (Salidas seguras), el "Volví" va arriba de todo
        también acá, además de la portada y de la ventana de la salida. */
     arriba(u){ const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null; return x && x.salida && !x.salida.volvio && typeof tarjetaSalidaMia === 'function' ? tarjetaSalidaMia(x) : ''; },
     linea(u, s, hoy){
       const v = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy)).length;
       const m = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(x => x.from !== 'vecino' && !x.leido).length, 0) + dmNoLeidos();
-      const r = s.reservas.filter(x => x.userId === u.id && x.fecha >= hoy && !x.cancelada).length;
-      return [v && `${plural(v, 'visita esperada', 'visitas esperadas')} hoy`, m && `${plural(m, 'mensaje sin leer', 'mensajes sin leer')}`,
-        r && `${plural(r, 'reserva')}`].filter(Boolean).join(' · ') || 'Todo en orden en tu lote';
+      return [v && `${plural(v, 'visita esperada', 'visitas esperadas')} hoy`, m && `${plural(m, 'mensaje sin leer', 'mensajes sin leer')}`].filter(Boolean).join(' · ') || 'Todo en orden en tu lote';
     },
+    /* Sin "Reservas" (29-09-2026, pedido de Claudio): el barrio todavía no
+       tiene quincho, SUM, cancha ni pileta; no hay nada que reservar. */
     tejas(u, s, hoy){
       const misHoy = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy));
-      const proxRes = s.reservas.filter(r => r.userId === u.id && r.fecha >= hoy && !r.cancelada).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
       const privNoLeidos = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(m => m.from !== 'vecino' && !m.leido).length, 0);
       return [
         teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Visita, delivery, obra, personal o Uber/DiDi', destaca:true }),
@@ -208,11 +203,10 @@ const SECCIONES = {
           return !d ? 'Un toque por día, para quien vive solo' : d.estado === 'ok' ? `Hoy avisaste a las ${hora(x.ultimo)}` : d.estado === 'pausa' ? 'En pausa' : 'Todavía no avisaste hoy'; })(),
           badge:(typeof Cuidado !== 'undefined' ? Cuidado.personas().filter(p => Cuidado.enAlerta(p) || (p.contactos[u.id] && !p.contactos[u.id].acepta)).length : 0) }),
         ...((m => m >= 10 || m <= 3)(new Date().getMonth() + 1) ? [teja({ v:'verano', icon:'sun', color:'ok', t:'Tu casa en verano', s:(() => { const n = typeof tareasVeranoQueTocan === 'function' ? tareasVeranoQueTocan().length : 0; return n ? `${plural(n, 'cosa para hacer', 'cosas para hacer')}` : 'Pasto, vereda, basura, viento y fuego'; })() }), teja({ v:'invierno', icon:'flame', color:'warn', t:'Tu casa en invierno', s:(() => { const n = typeof tareasQueTocan === 'function' ? tareasQueTocan().length : 0; return n ? `${plural(n, 'cosa para revisar', 'cosas para revisar')}` : 'Gas, monóxido, chimenea y caños'; })() })] : [teja({ v:'invierno', icon:'flame', color:'warn', t:'Tu casa en invierno', s:(() => { const n = typeof tareasQueTocan === 'function' ? tareasQueTocan().length : 0; return n ? `${plural(n, 'cosa para revisar', 'cosas para revisar')}` : 'Gas, monóxido, chimenea y caños'; })() }), teja({ v:'verano', icon:'sun', color:'ok', t:'Tu casa en verano', s:(() => { const n = typeof tareasVeranoQueTocan === 'function' ? tareasVeranoQueTocan().length : 0; return n ? `${plural(n, 'cosa para hacer', 'cosas para hacer')}` : 'Pasto, vereda, basura, viento y fuego'; })() })]),
-        teja({ v:'reservas', icon:'calendar', color:'wood', t:'Reservas', s: proxRes ? `${amenity(proxRes.amenity)?.nombre} · ${relDia(proxRes.fecha)}` : 'Quincho, SUM y cancha' }),
         teja({ v:'peticiones', icon:'edit', color:'brand', t:'Peticiones a la garita', s:'Firmadas por vos y la guardia', n: s.peticiones.filter(p => p.userId === u.id && p.estado !== 'cerrada').length || '' }),
         teja({ v:'reclamos', icon:'clipboard', color:'warn', t:'Mis reclamos', s:'Privados con la Administración', n: s.reclamos.filter(r => r.userId === u.id && r.estado !== 'resuelto').length || '' }),
         teja({ v:'perfil', icon:'home', color:'ok', t:'Mi casa', s:'Quiénes están en tu lote, autos y mascotas' }),
-        teja({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial', s:'Tu QR para la garita y los espacios comunes' }),
+        teja({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial', s:'Tu QR para que la garita te reconozca sin mostrar el DNI' }),
         teja({ v:'ayuda', icon:'info', color:'sky', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa' }),
         ...(s.infracciones.some(i => i.casa === u.casa && i.estado === 'notificada')
           ? [teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificación', s:'Podés presentar tu descargo', badge: s.infracciones.filter(i => i.casa === u.casa && i.estado === 'notificada').length })] : []),
@@ -226,20 +220,19 @@ const SECCIONES = {
     linea(u, s, hoy){
       const piz = s.posts.filter(p => p.createdAt > (Store.sesion.pizarronVisto || 0) && p.autor !== u.id).length;
       const vot = s.votaciones.filter(v => v.cierra > Date.now()).length;
-      const cha = s.msgs.filter(m => m.createdAt > (Store.sesion.chatVisto || 0) && m.autor !== u.id).length;
-      return [piz && `${plural(piz, 'novedad', 'novedades')} en el pizarrón`, vot && `${plural(vot, 'votación abierta', 'votaciones abiertas')}`,
-        cha && `${plural(cha, 'mensaje', 'mensajes')} en el chat`].filter(Boolean).join(' · ') || 'Pizarrón, chat, vecinos y votaciones';
+      return [piz && `${plural(piz, 'novedad', 'novedades')} en el pizarrón`, vot && `${plural(vot, 'votación abierta', 'votaciones abiertas')}`].filter(Boolean).join(' · ') || 'Pizarrón, vecinos y votaciones';
     },
+    /* Sin "Chat vecinal" (29-09-2026, pedido de Claudio): a los vecinos no les
+       gustaba, se prestaba a diálogos no deseados. Lo público entre vecinos
+       queda en el pizarrón; lo personal, en los mensajes privados. */
     tejas(u, s, hoy){
       const pizNuevas = s.posts.filter(p => p.createdAt > (Store.sesion.pizarronVisto || 0) && p.autor !== u.id).length;
-      const chatNuevos = s.msgs.filter(m => m.createdAt > (Store.sesion.chatVisto || 0) && m.autor !== u.id).length;
       const votAbiertas = s.votaciones.filter(v => v.cierra > Date.now()).length;
       const compras = s.compras.filter(x => x.cierra > Date.now()).length;
       return [
         teja({ v:'pizarron', icon:'muro', t:'Pizarrón', s:'Guardia, Administración y vecinos', badge: pizNuevas, destaca:true }),
         teja({ v:'manual', icon:'book', color:'accent', t:'Manual y normas', s:'Cómo usar la app · reglamento, convivencia y protocolos' }),
         teja({ v:'vecinos', icon:'users', color:'sky', t:'Vecinos', s:'Buscá por nombre, oficio o dirección' }),
-        teja({ v:'chat', icon:'chat', color:'sky', t:'Chat vecinal', s:'#general · #seguridad · #mascotas', badge: chatNuevos }),
         teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votAbiertas ? `${plural(votAbiertas, 'abierta')}` : 'Sin votaciones abiertas', n: votAbiertas || '' }),
         teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:(() => { const h = s.obras.filter(o => o.avisoHoy?.fecha === hoy).length; return h ? `${plural(h, 'aviso')} para hoy` : `${plural(s.obras.filter(o => o.estado === 'activa').length, 'en curso', 'en curso')}`; })(), n: s.obras.filter(o => o.estado === 'activa').length || '' }),
         teja({ v:'viajes', icon:'car', color:'sky', t:'Viajes compartidos', s:'Centro, escuela, aeropuerto', n: s.viajes.filter(v => v.fecha >= hoy).length || '' }),
@@ -476,10 +469,10 @@ const puerta = (k, u, s, hoy) => {
    PIZARRA DEL DÍA
    Va arriba de todo en la portada, antes del hotel, en dos columnas:
      · PARA TODO EL BARRIO: avisos de la guardia y la Administración, los
-       comunicados, las alertas, un SOS abierto, lo nuevo del chat vecinal,
-       las obras en curso, los viajes compartidos, las compras conjuntas,
-       el clima que complica y el camión de mañana. Nadie tiene que acordarse
-       de abrir la campanita o el chat para enterarse.
+       comunicados, las alertas, un SOS abierto, las obras en curso, los
+       viajes compartidos, las compras conjuntas, el clima que complica y el
+       camión de mañana. Nadie tiene que acordarse de abrir la campanita
+       para enterarse.
      · PARA VOS: lo que es tuyo (alguien pregunta por vos en la garita, un
        paquete, una votación pendiente, un mensaje, tu propia alerta).
    Cada aviso es una ventanita con el tono de su importancia, para priorizar
@@ -488,7 +481,7 @@ const puerta = (k, u, s, hoy) => {
      AMARILLO  tener en cuenta (guardia, avisos, obras hoy, perdidos),
      VERDE     para saber (eventos, viajes, compras, novedades).
    Mientras no lo viste, TITILA en su tono. Al tocarlo se abre y deja de
-   titilar (en este equipo). El del chat titila hasta leer el último mensaje.
+   titilar (en este equipo).
    ========================================================= */
 const TIPOS_PIZARRA = ['guardia', 'aviso', 'alerta', 'evento', 'perdido'];
 const NIVELES_PZ = { rojo:'Importante', amarillo:'Tener en cuenta', verde:'Para saber' };
@@ -496,8 +489,8 @@ const NIVEL_POST = { alerta:'rojo', guardia:'amarillo', aviso:'amarillo', perdid
 const nivelDeColor = c => c === 'danger' ? 'rojo' : c === 'warn' ? 'amarillo' : 'verde';
 const ORDEN_NIVEL = { rojo:0, amarillo:1, verde:2 };
 /* Los avisos para todos que ya salen por su propio camino en la pizarra
-   (el post, la obra, la compra, el chat) no se repiten. */
-const LINKS_YA_EN_PIZARRA = ['pizarron', 'obras', 'compras', 'viajes', 'chat', 'mascotas'];
+   (el post, la obra, la compra) no se repiten. */
+const LINKS_YA_EN_PIZARRA = ['pizarron', 'obras', 'compras', 'viajes', 'mascotas'];
 
 /* Los avisos del tiempo llevan a "Ushuaia hoy", vengan de donde vengan. */
 const ICONOS_CLIMA = ['snow', 'wind', 'thermo'];
@@ -592,19 +585,6 @@ function avisosGenerales(){
     poner({ k:'post-' + p.id, nivel: NIVEL_POST[p.type] || 'verde', icon:t.icon, tag:t.n, at:p.createdAt, titulo:p.title, texto:p.body,
       de:`${au.nombre}${au.casa && au.casa !== au.nombre ? ' · ' + au.casa : ''}`, fijo:p.fijado, a:'ver-novedad', v:'post', id:p.id });
   });
-  /* El chat vecinal: titila hasta que se lee el último mensaje. */
-  const deOtros = aLista(s.msgs).filter(m => m && m.autor !== u.id).sort((a, b) => a.createdAt - b.createdAt);
-  const ult = deOtros.at(-1);
-  if (ult){
-    const sinLeer = deOtros.filter(m => m.createdAt > (Store.sesion.chatVisto || 0));
-    if (sinLeer.length || ahora - ult.createdAt < 12 * HORA){
-      const au = autorVisible(ult.autor);
-      out.push({ k:'chat', nuevo: sinLeer.length > 0, nivel: sinLeer.some(m => m.channel === 'seguridad') ? 'amarillo' : 'verde', icon:'chat',
-        tag:`Chat #${CANALES[ult.channel] || 'General'}`, at:ult.createdAt,
-        titulo: sinLeer.length ? `${plural(sinLeer.length, 'mensaje nuevo', 'mensajes nuevos')} en el chat vecinal` : 'Último mensaje del chat vecinal',
-        texto:`${au.nombre.split(' ')[0]}${au.casa ? ' (' + au.casa + ')' : ''}: ${ult.text}`, a:'abrir', v:'chat', p:ult.channel || 'general' });
-    }
-  }
   /* Obras en curso: salen solas, y en amarillo si hoy hay movimiento. */
   aLista(s.obras).filter(o => o && o.estado === 'activa' && (!o.inicio || o.inicio <= hoy)).forEach(o => {
     const hoyHay = o.avisoHoy && o.avisoHoy.fecha === hoy;
@@ -1500,7 +1480,7 @@ const PUNTOS_SUGERIDOS = [
   ['Fondo del barrio', 'El punto más alejado de la garita'],
   ['Perímetro norte', 'Cerco lindero con el bosque o terreno abierto'],
   ['Perímetro sur', 'Cerco lindero con la costa o terreno abierto'],
-  ['Espacios comunes', 'SUM, quincho o cancha'],
+  ['Contenedores de residuos', 'Donde se juntan las bolsas antes de que pase el camión'],
   ['Calle más oscura', 'Donde hay lotes baldíos u obras'],
 ];
 const claveAzar = () => { const a = new Uint8Array(9); crypto.getRandomValues(a); return [...a].map(b => 'abcdefghjkmnpqrstuvwxyz23456789'[b % 31]).join(''); };

@@ -5,7 +5,7 @@
    Preguntas frecuentes. El texto está acá, en un solo lugar: si cambia,
    se cambia la fecha de VERSION_LEGAL y listo.
    ========================================================= */
-const VERSION_LEGAL = '28 de septiembre de 2026';
+const VERSION_LEGAL = '29 de septiembre de 2026';
 
 const LEGAL = [
   ['1. Partes y objeto', [
@@ -30,7 +30,7 @@ const LEGAL = [
     'Medidas de seguridad (art. 9 de la Ley 25.326 y Resolución AAIP 47/2018): comunicaciones cifradas (HTTPS/TLS); almacenamiento cifrado por el proveedor; contraseñas conservadas solo como huella criptográfica irreversible; reglas de acceso aplicadas en el servidor, por las que cada Usuario accede solo a su propia información y cada rol solo a las carpetas que su función requiere; los mensajes entre Vecinos no son accesibles para la Administración ni para la guardia; registro de auditoría de las acciones de la Administración; y borrado de los datos locales al cerrar sesión. Quienes acceden por su función (Administración y guardia) están obligados al secreto (art. 10).',
     'Ante un pedido de auxilio (SOS), el nombre, el lote, el tipo de emergencia y la ubicación del Usuario al momento de pedirlo se muestran a todos los Usuarios del Barrio, con la finalidad exclusiva de que puedan saber dónde ocurre y prestar ayuda. La ubicación se toma solo en ese momento y por acto del propio titular.',
     'Los datos se alojan en servicios de Google LLC (Firebase y Google Apps Script), que pueden encontrarse fuera del país. Al usar la Aplicación, el Usuario presta su consentimiento libre, expreso e informado para ese tratamiento y transferencia (arts. 5 y 12 de la Ley 25.326 y art. 12 del Decreto 1558/2001), limitado a las finalidades de comunicación, seguridad, administración y convivencia del Barrio. Google LLC actúa como prestador de servicios informatizados en los términos del art. 25 de la Ley 25.326.',
-    'El Hotel Los Cauquenes, propietario de unidades del Barrio con actividad comercial, usa una cuenta institucional con un rol propio que no accede a los datos personales de los Vecinos (padrón, fichas, chat, pizarrón, visitas, pagos, mensajes, bitácora y SOS); las reglas del servidor se lo impiden. El Hotel es responsable de los datos de sus huéspedes que carga para el ingreso y los traslados, que ven solo el Hotel y la guardia y se eliminan automáticamente al día siguiente del egreso.',
+    'El Hotel Los Cauquenes, propietario de unidades del Barrio con actividad comercial, usa una cuenta institucional con un rol propio que no accede a los datos personales de los Vecinos (padrón, fichas, pizarrón, visitas, pagos, mensajes, bitácora y SOS); las reglas del servidor se lo impiden. El Hotel es responsable de los datos de sus huéspedes que carga para el ingreso y los traslados, que ven solo el Hotel y la guardia y se eliminan automáticamente al día siguiente del egreso.',
     'Los datos sensibles (art. 2 y 7 de la Ley 25.326), como la información de salud que pudiera surgir de un pedido de auxilio, se tratan solo para atender la emergencia y no se ceden a terceros ajenos a ella.',
     'La función "Estoy bien" y el aviso de salida son voluntarios. Con ellos el Usuario acepta que la garita, la Administración y las personas del Barrio que elija conozcan su nombre, lote, teléfono, los datos de contacto de los familiares que anote, la hora a la que avisa cada día y, en una salida, a dónde va, con quién y cuándo vuelve, y reciban un aviso si no confirma; sus familiares lo reciben por correo. Esos datos no los ven los demás Usuarios; los avisos se borran a los 30 días y todo se elimina cuando el Usuario deja de usar la función. La función no pide ni guarda datos de salud.',
     'El personal de seguridad contratado por el Barrio (policía adicional) deja en la garita su nombre, matrícula, celular y correo. Con esos datos la guardia registra el día, el turno y la hora de su ingreso y de su salida y cada ronda con la hora de cada punto de control, y al terminar el servicio la Aplicación le envía a su correo la constancia de lo registrado. Esos datos los ven solo la garita y la Administración, con la finalidad de controlar y acreditar el servicio.',
@@ -112,14 +112,14 @@ A['legal-pdf'] = () => imprimir('Términos de uso y responsabilidad', `<h1>Barri
    vecinos, el compromiso de confidencialidad para imprimir y firmar, y un
    registro de incidentes de seguridad. Todo queda en config.proteccion.
    ========================================================= */
-const cfgDatos = () => Object.assign({ inscripta:false, inscripcionFecha:'', inscripcionNro:'', responsableArco:'', compromisosFirmados:false, compromisosFecha:'', incidentes:[] }, Store.s.config.proteccion || {});
-function tareasDatosPendientes(){ const c = cfgDatos(); return [!c.inscripta, !c.responsableArco, !c.compromisosFirmados].filter(Boolean).length; }
+const cfgDatos = () => Object.assign({ inscripta:false, inscripcionFecha:'', inscripcionNro:'', responsableArco:'', compromisosFirmados:false, compromisosFecha:'', incidentes:[], sacadasBorradas:0 }, Store.s.config.proteccion || {});
+function tareasDatosPendientes(){ const c = cfgDatos(); return [!c.inscripta, !c.responsableArco, !c.compromisosFirmados, !c.sacadasBorradas].filter(Boolean).length; }
 const RESPUESTAS_AAIP = () => {
   const c = Store.s.config;
   return [
     ['Responsable de la base', `Barrio ${c.nombre} (entidad administradora), CUIT ${c.cuit || '—'}, domicilio ${c.domicilio || '—'}, correo ${c.adminEmail || '—'}.`],
     ['Nombre de la base', `Vecinos, visitas y administración del Barrio ${c.nombre}.`],
-    ['Finalidad', 'Comunicación entre vecinos y con la Administración, seguridad y control de acceso al barrio, administración y cobro de expensas, convivencia y gestión de espacios comunes.'],
+    ['Finalidad', 'Comunicación entre vecinos y con la Administración, seguridad y control de acceso al barrio, administración y cobro de expensas, y convivencia del barrio.'],
     ['Datos que se tratan', 'Identificatorios (nombre, DNI, lote, correo, teléfono optativo); de visitas (nombre, DNI y patente, borrados a los ' + (c.datosDias || 90) + ' días); de pagos de expensas; ubicación solo al pedir un SOS; del personal de guardia y del policía contratado (nombre, matrícula, celular para enviarle su código de ronda, correo para enviarle la constancia de su servicio, día, turno y hora de ingreso y de salida, y rondas con la hora de cada punto de control); de los viajes de Uber, DiDi o taxi que avisa un vecino (aplicación, patente, nombre del chofer si se anota y horario). No se tratan datos sensibles salvo el tipo de emergencia de un SOS, informado por el propio titular.'],
     ['Origen de los datos', 'Los aporta el propio titular al inscribirse o al usar la app; los de visitas, el vecino que las anuncia o la propia visita; los del padrón, la liquidación de expensas del barrio.'],
     ['Cesiones', 'No se ceden datos a terceros, salvo obligación legal u orden judicial. El Hotel Los Cauquenes, que usa la app con una cuenta institucional, no accede a los datos de los vecinos.'],
@@ -146,7 +146,9 @@ R.proteccion = {
         ${paso(!!c.responsableArco, 'Quién atiende los pedidos de los vecinos sobre sus datos', c.responsableArco ? esc(c.responsableArco) : 'Pendiente: nombre y correo de quien responde (10 días corridos para el acceso, 5 hábiles para corregir o borrar).')}
         ${paso(c.compromisosFirmados, 'Compromiso de confidencialidad firmado por guardias y Administración', c.compromisosFirmados ? `Firmados${c.compromisosFecha ? ' el ' + fechaCorta(c.compromisosFecha) : ''}` : 'Pendiente (art. 10: deber de secreto). Imprimilo abajo.')}
         ${paso(true, 'Registro de incidentes de seguridad', `${plural(aLista(c.incidentes).length, 'incidente anotado', 'incidentes anotados')}`)}
+        ${paso(!!c.sacadasBorradas, 'Borrar lo que quedó del chat vecinal y de las reservas', c.sacadasBorradas ? `Borrado el ${fechaCorta(isoDe(new Date(c.sacadasBorradas)))}` : 'Pendiente. Esas dos funciones se sacaron de la app el 29-09-2026; lo que quedó guardado en la base ya no tiene finalidad y hay que borrarlo (art. 4 inc. 7).')}
       </div>
+      ${c.sacadasBorradas ? '' : `<div class="btns"><button class="btn btn-sm btn-danger-soft" data-a="datos-sacados-borrar">${I('trash')}Borrar lo que quedó del chat y las reservas</button></div>`}
       ${sec('Cómo inscribir la base en la AAIP')}
       <div class="card small" style="line-height:1.6">
         <p style="margin:0 0 8px">1. Entrá a <b>argentina.gob.ar/aaip/datospersonales</b> y buscá la inscripción de bases de datos en el Registro Nacional de Bases de Datos. El trámite es en línea y gratuito, con la <b>clave fiscal de la entidad del barrio</b> (CUIT ${esc(Store.s.config.cuit || '—')}), por Trámites a Distancia (TAD).</p>
@@ -171,6 +173,26 @@ R.proteccion = {
         : vacio('lock', 'Sin incidentes. Anotá cualquiera: una contraseña que se filtró, un teléfono de la garita perdido, un acceso que no correspondía.')}
       <p class="muted tiny">Ante un incidente: cambiar las contraseñas involucradas, sacar el acceso a quien no corresponde, avisar a los vecinos afectados y dejarlo anotado acá (Resolución AAIP 47/2018).</p>`;
   },
+};
+/* LO QUE QUEDÓ DE DOS FUNCIONES QUE SE SACARON (29-09-2026)
+   El chat vecinal y las reservas de espacios comunes ya no están en la app:
+   ningún equipo baja ni escribe esas carpetas, y las reglas se las cierran a
+   todos menos a la Administración. Lo que quedó guardado ya no tiene
+   finalidad (art. 4 inc. 7 de la Ley 25.326), así que se borra. No se borra
+   solo porque es para siempre: lo hace la Administración con un botón, y
+   queda en la auditoría. */
+const CARPETAS_SACADAS = ['msgs', 'reservas', 'bloqueos', 'amenities'];
+A['datos-sacados-borrar'] = async () => {
+  if (!esAdmin()) return;
+  if (!await confirmar('Borrar el chat vecinal y las reservas', 'Se borran para siempre los mensajes del chat vecinal y las reservas, los turnos bloqueados y los espacios comunes que quedaron guardados en la base. Esas funciones ya no están en la app. No se puede deshacer.', { si:'Borrar para siempre', peligro:true })) return;
+  if (Nube.activa()){
+    if (!Nube.db){ toast('Sin conexión con la base: probá de nuevo en un rato', 'alert'); return; }
+    try { await Promise.all(CARPETAS_SACADAS.map(k => Nube.db.ref('barrio/' + k).remove())); }
+    catch(e){ toast('No se pudo borrar (¿faltan publicar las reglas?)', 'alert'); console.warn('Borrar carpetas sacadas', e.message); return; }
+  }
+  Store.cambiar(s => { s.config.proteccion = Object.assign({}, cfgDatos(), { sacadasBorradas:Date.now() });
+    auditar(s, 'Borró lo que quedaba del chat vecinal y de las reservas', 'Funciones que se sacaron de la app el 29-09-2026'); });
+  toast('Listo: se borró lo que quedaba del chat y de las reservas', 'trash'); refrescar();
 };
 A['aaip-copiar'] = el => { const r = RESPUESTAS_AAIP()[+el.dataset.v]; if (!r) return; try { navigator.clipboard.writeText(r[1]); } catch(e){} toast(`Copiado: ${r[0]}`, 'copy'); };
 A['aaip-imprimir'] = () => imprimir('Inscripción en la AAIP', `<h1>Barrio ${esc(Store.s.config.nombre)}</h1><p><b>Respuestas para la inscripción de la base en el Registro Nacional de Bases de Datos (AAIP)</b><br>${fechaLarga(hoyISO())}</p>

@@ -28,7 +28,7 @@
    ========================================================= */
 const MANUAL_CAPS = [
   { id:'empezar', icon:'sparkle', color:'brand', para:'todos', t:'Antes de empezar', s:'Qué es la app y qué hace falta', b:[
-    ['p', 'La app del barrio {BARRIO} junta en un solo lugar lo que antes estaba desparramado en grupos de WhatsApp, llamadas a la garita y papeles: <b>las visitas, los paquetes, las expensas, los avisos de la guardia, las reservas, el pizarrón, las votaciones</b> y la información útil de Ushuaia.'],
+    ['p', 'La app del barrio {BARRIO} junta en un solo lugar lo que antes estaba desparramado en grupos de WhatsApp, llamadas a la garita y papeles: <b>las visitas, los paquetes, las expensas, los avisos de la guardia, el pizarrón, las votaciones</b> y la información útil de Ushuaia.'],
     ['p', 'No se baja de ninguna tienda (ni App Store ni Google Play): es una <b>página web que se instala en el teléfono</b> y queda con su ícono, como cualquier otra aplicación. Funciona en celulares, tablets y computadoras.'],
     ['h', 'Qué necesitás'],
     ['lista', ['Un celular (o computadora) con internet.', 'Un correo electrónico propio: ahí te llegan los avisos de tu inscripción.', 'Saber el número de tu lote.']],
@@ -226,17 +226,6 @@ const MANUAL_CAPS = [
     ['p', 'En <b>El barrio → Las cuentas del barrio</b> ves en qué se gasta mes a mes y la morosidad general, sin nombres.'],
   ], ir:[['abrir', 'expensas', 'Mis expensas']] },
 
-  { id:'reservas', icon:'calendar', color:'ok', para:'vecinos', t:'Reservar el quincho, el SUM o la cancha', s:'Espacios comunes', b:[
-    ['pasos', [
-      'Entrá a <b>Tu casa → Reservas</b>.',
-      'Elegí el espacio: <b>Quincho</b>, <b>SUM</b> o <b>Cancha</b>.',
-      'Elegí el día y el turno. Los turnos ocupados se ven en gris.',
-      'Poné cuántos invitados vienen y confirmá. Leé el reglamento del espacio que aparece ahí.',
-    ]],
-    ['p', 'Podés tener hasta dos reservas a futuro y reservar con hasta un mes de anticipación. La víspera te llega un recordatorio, y al terminar la app te pregunta en un toque cómo quedó el espacio.'],
-    ['p', 'Si no podés ir, cancelá la reserva desde la misma ventana para que la use otro vecino.'],
-  ], ir:[['abrir', 'reservas', 'Reservas']] },
-
   { id:'mensajes', icon:'chat', color:'accent', para:'vecinos', t:'Mensajes, peticiones y reclamos', s:'Hablar con la Administración, la garita y los vecinos', b:[
     ['h', 'Mensajes privados'],
     ['p', 'En <b>Tu casa → Mensajes</b> están tus conversaciones privadas:'],
@@ -270,7 +259,15 @@ const MANUAL_CAPS = [
     ['p', 'Si ves a alguien que no vive en tu casa, tocá <b>"No es de mi lote"</b>: le avisamos a la Administración para que lo revise, y a esa persona (sin tu nombre) para que confirme su lote.'],
     ['p', 'La contraseña, el correo, el modo de pantalla, los avisos al celular, "Mis datos personales" y cerrar sesión están en <b>Tu cuenta</b> (tu inicial, arriba a la derecha), no en Mi casa.'],
     ['h', 'Mi credencial'],
-    ['p', 'En <b>Tu casa → Mi credencial</b> tenés un QR personal para identificarte en la garita o en los espacios comunes. No lleva tu DNI. Si alguien lo copió, generá uno nuevo y el anterior deja de valer. (Para retirar paquetes se usa el QR de retiro, no la credencial.)'],
+    ['p', 'En <b>Tu casa → Mi credencial</b> tenés un QR personal. Sirve para que la garita sepa en un segundo que sos del barrio y de qué lote, <b>sin que tengas que mostrar el DNI</b>. Te sirve sobre todo cuando la guardia no te reconoce:'],
+    ['lista', [
+      'Llegás en un auto que no es el tuyo: taxi, remís, Uber, uno prestado, alquilado o del taller (la patente no figura como tuya).',
+      'Llegás caminando o en bici.',
+      'Sos nuevo en el barrio, inquilino o familiar, y todavía no te conocen.',
+      'En la garita hay un guardia de reemplazo.',
+    ]],
+    ['pasos', ['Abrí <b>Tu casa → Mi credencial</b>.', 'Mostrale el QR al guardia: lo escanea (o escribe el código que está abajo).', 'La garita ve tu nombre, tu lote, las patentes de tus autos y, si la cargaste, la foto del frente de tu casa. Nada más.']],
+    ['ojo', 'info', 'Lo que la credencial no hace', 'No abre el portón, no anota tus entradas ni tus salidas y no lleva tu DNI. Tampoco sirve para retirar paquetes: para eso está el QR de retiro. Si la guardia ya te conoce, no hace falta mostrarla. Cada cuenta de tu lote tiene la suya; si alguien la copió, tocá "Generar una credencial nueva" y la anterior deja de valer.'],
   ], ir:[['abrir', 'perfil', 'Mi casa'], ['mi-credencial', '', 'Mi credencial']] },
 
   { id:'estoybien', icon:'heart', color:'ok', para:'vecinos', t:'Estoy bien (si vivís solo o sola)', s:'Un toque por día y alguien de confianza se entera', b:[
@@ -381,10 +378,9 @@ const MANUAL_CAPS = [
     ['ojo', 'info', 'Un acuerdo entre vecinos', 'La app solo los pone en contacto: devolvé las cosas limpias y a tiempo; si algo se rompe, se arregla entre ustedes.'],
   ], ir:[['abrir', 'cosas', 'Ir a Cosas para prestar']] },
 
-  { id:'barrio', icon:'muro', color:'brand', para:'vecinos', t:'El barrio: la vida entre vecinos', s:'Pizarrón, chat, votaciones, obras y más', b:[
+  { id:'barrio', icon:'muro', color:'brand', para:'vecinos', t:'El barrio: la vida entre vecinos', s:'Pizarrón, vecinos, votaciones, obras y más', b:[
     ['lista', [
       '<b>Pizarrón</b>: los avisos de la guardia, la Administración y los vecinos. Podés publicar algo (una novedad, un evento, algo perdido o encontrado).',
-      '<b>Chat vecinal</b>: con canales (#general, #seguridad, #mascotas). <b>No se escriben nombres ni apellidos</b> de vecinos, de la Administración ni de la garita: se nombra el lote ("el Lote 148"). La app no deja enviar un mensaje con un nombre.',
       '<b>Vecinos</b>: buscá a alguien por nombre, lote, oficio o dirección y escribile en privado.',
       '<b>Votaciones</b>: votá desde la app. Vota el titular del lote (un voto por lote); si son varios titulares y votan distinto, el voto del lote no se cuenta.',
       '<b>Obras</b>: registrá tu obra ("Registrar mi obra") y, los días con mixer o camión, mandá el "Aviso del día". Todos se enteran en la pizarra.',
@@ -399,6 +395,7 @@ const MANUAL_CAPS = [
       '<b>Residuos</b>: los días del camión. {RESIDUOS} La víspera la pizarra avisa "Mañana pasa el camión" y cuando la garita registra la entrada, te llega el aviso "Entró el camión".',
       '<b>Descargas</b>: aplicaciones, instructivos y planillas que comparte la Administración.',
     ]],
+    ['ojo', 'info', 'No hay chat vecinal', 'Lo que es para todo el barrio va al <b>pizarrón</b>. Lo que es para una persona, por <b>mensaje privado</b> (Vecinos → Mensaje, o Tu casa → Mensajes).'],
   ], ir:[['abrir', 'comunidad', 'Ir a El barrio'], ['abrir', 'documentos', 'Normas y reglamentos']] },
 
   { id:'ciudad', icon:'pin', color:'sky', para:'vecinos', t:'Ushuaia y servicios', s:'Lo de afuera que igual te toca', b:[
@@ -430,7 +427,8 @@ const MANUAL_CAPS = [
 
   { id:'datos', icon:'lock', color:'brand', para:'vecinos', t:'Tus datos y tu privacidad', s:'Quién ve qué', b:[
     ['lista', [
-      'Los demás vecinos ven tu <b>nombre y tu lote</b> en el pizarrón y el chat. Tu teléfono, tu profesión y tu dirección, <b>solo si vos elegís compartirlos</b>.',
+      'Los demás vecinos ven tu <b>nombre y tu lote</b> en el buscador de Vecinos y en lo que publicás en el pizarrón. Tu teléfono, tu profesión y tu dirección, <b>solo si vos elegís compartirlos</b>.',
+      'El <b>chat vecinal</b> y las <b>reservas</b> ya no existen (se sacaron el 29 de septiembre de 2026). Lo que había quedado guardado de antes no lo ve ningún vecino ni la garita; la Administración lo borra.',
       'Tus mensajes privados, tus reclamos, tus pagos y tus paquetes <b>no los ve ningún otro vecino</b> (los paquetes y las expensas, solo las cuentas de tu mismo lote).',
       'La garita ve lo que necesita para su trabajo (visitas, paquetes, peticiones). La Administración, lo que necesita para administrar.',
       'Las fotos buenas no quedan en la base del barrio: viaja una vista previa y la foto se baja solo cuando alguien la toca.',
@@ -506,14 +504,14 @@ const MANUAL_CAPS = [
     ['p', 'Al tocar <b>"Voy en camino con el DEA"</b>, la app avisa además a los vecinos del equipo de salud o con RCP. En la garita queda una banda con a cuántos se avisó y <b>quién va en camino</b> (nombre, profesión y teléfono). Al terminar, <b>"Terminó: cerrar el pedido"</b>.'],
     ['h', 'Estoy bien'],
     ['p', 'Los vecinos que viven solos y usan "Estoy bien" tocan cada día un botón en su app. Si a su hora no lo hicieron, la garita recibe un aviso con sonido y aparece en rojo en su pantalla y en <b>Estoy bien</b>, con los teléfonos de su familia: llamalos o pasá a ver, y tocá <b>"Fuimos: está bien"</b>. Esa lista la ven solo la garita y la Administración.'],
-    ['p', 'Para hablar con la Administración: <b>Administración</b> en las tejas de la garita (canal interno). Con los vecinos, por <b>Mensajes con vecinos</b> y las peticiones: la garita no usa el chat vecinal, que es entre vecinos.'],
+    ['p', 'Para hablar con la Administración: <b>Administración</b> en las tejas de la garita (canal interno). Con los vecinos, por <b>Mensajes con vecinos</b> y las peticiones.'],
   ], ir:[['abrir', 'garita', 'Ir a la Garita'], ['abrir', 'bitacora', 'Bitácora']] },
 
   /* ---------- Para el hotel ---------- */
   { id:'hotel', icon:'star', color:'wood', para:'hotel', t:'Para el Hotel Los Cauquenes', s:'Vans, traslados, huéspedes, eventos, expensas y más', b:[
     ['h', 'Cómo entra el hotel'],
     ['p', 'El hotel tiene <b>una sola cuenta</b>, que usa la recepción en la computadora y en el celular de turno. La crea la Administración del barrio. La primera vez, entrá con el correo y la contraseña que te pasaron y cambialos en <b>Tu cuenta</b> (tu ícono arriba a la derecha): "Cambiar mi correo" y "Cambiar mi contraseña". Si la persona responsable deja el hotel, cambiá la contraseña.'],
-    ['ojo', 'info', 'Qué ve el hotel y qué no', 'Ve lo suyo (vans, traslados, huéspedes, eventos, proveedores, promociones) y lo público de la ciudad (vuelos, cruceros, eventos, agenda, normas del barrio). No ve nada de los vecinos: ni el padrón, ni el chat, ni el pizarrón, ni sus visitas, ni los SOS.'],
+    ['ojo', 'info', 'Qué ve el hotel y qué no', 'Ve lo suyo (vans, traslados, huéspedes, eventos, proveedores, promociones) y lo público de la ciudad (vuelos, cruceros, eventos, agenda, normas del barrio). No ve nada de los vecinos: ni el padrón, ni el pizarrón, ni sus visitas, ni los SOS.'],
     ['h', 'Las vans'],
     ['pasos', ['Entrá a <b>Vans y traslados</b> → "+ Van" y cargá nombre, patente, modelo y chofer.', 'Tocá <b>"QR para la garita"</b> → "Imprimir el QR" y pegalo en el parabrisas, del lado del acompañante.', 'Cada vez que la van entra o sale, la garita lee el QR (o toca "Entró"/"Salió") y en la app ves dónde está cada van.']],
     ['h', 'Los traslados se arman solos'],
@@ -561,6 +559,9 @@ const MANUAL_CAPS = [
     ['p', 'La sala del hotel en el Día a día: el hotel en vivo (sin los nombres de sus huéspedes), sus promociones (las podés agregar, cambiar o borrar, igual que el hotel; cuando el hotel toca una, te llega el aviso), sus eventos (avisar a los vecinos si lo pide), sus proveedores (revisar o suspender), los mensajes con la recepción, la <b>Cuenta del hotel</b> (el hotel se inscribe como cualquier usuario y su inscripción pendiente se convierte en la del hotel; los vecinos aprobados no aparecen en esa lista; una vez hecha, el hotel cambia su correo y su contraseña en Tu cuenta) y el <b>modelo de convenio</b>. Si el hotel declara su DEA, desde Emergencias del hotel se publica para los vecinos.'],
     ['h', 'Estoy bien'],
     ['p', 'La Administración y la garita reciben siempre el aviso cuando un vecino anotado no toca "Estoy bien" a su hora (o no vuelve de una salida), y ven la lista en <b>Gestión → Estoy bien</b> con los teléfonos de su familia. El resto del barrio no. Para que las alarmas salgan aunque todos los teléfonos estén bloqueados, el Apps Script tiene un reloj que revisa cada 10 minutos (una vez: ejecutar <b>instalarRelojCuidados</b>; ver AVISOS.md).'],
+    ['h', 'Protección de datos'],
+    ['p', 'En <b>Proveedores y cumplimiento → Protección de datos</b> están las tareas del barrio como responsable de la base: la inscripción en la AAIP (con las respuestas ya redactadas), quién atiende los pedidos de los vecinos sobre sus datos, el compromiso de confidencialidad y el registro de incidentes.'],
+    ['ojo', 'warn', 'Borrar lo que quedó del chat y de las reservas', 'El chat vecinal y las reservas se sacaron de la app el 29-09-2026. Lo que quedó guardado en la base ya no se usa y la ley pide borrarlo. Es un solo botón en Protección de datos: se borra para siempre y queda en la auditoría.'],
     ['h', 'Expensas y contabilidad'],
     ['p', 'Las facturas del mes se cargan en <b>Contabilidad</b>; al cerrar el mes se arman los cupones. En <b>Expensas</b> se ven los lotes, se confirman los pagos informados, se emiten recibos y se sigue la morosidad.'],
     ['p', '<b>El hotel (6 UF)</b>: sus cupones salen solos al emitir el mes, uno por UF, a su correo y a su ventana "Expensas del hotel". Paga el total de sus 6 UF en un solo pago: en "Por acreditar" aparece como <b>"Hotel Los Cauquenes · 6 UF"</b>, con cómo se reparte; al confirmarlo salen <b>6 recibos</b>, uno por UF. Los pagos con Mercado Pago del hotel se reparten y se pasan a recibo solos, como los de los vecinos. Para eso la app le deja al hotel una copia con solo sus cuotas: no ve las de nadie más.'],

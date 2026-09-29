@@ -10,8 +10,8 @@
    hacen cumplir, no la pantalla):
 
      /barrio    lo que ven todos los vecinos aprobados:
-                pizarrón, chat, reservas, votaciones, padrón,
-                documentos, obras, compras, viajes, perfiles.
+                pizarrón, votaciones, padrón, documentos,
+                obras, compras, viajes, perfiles.
      /pv/<carpeta>/<uid>   lo de cada vecino (desde el 25-09-2026;
                 antes /privado/<uid>): sus mensajes, reclamos,
                 peticiones, pases, pagos y avisos personales. Cada
@@ -44,8 +44,10 @@ const Nube = {
 
   /* Colecciones de cada zona. El resto (config, motorLog) va aparte. */
   ZONAS: {
-    barrio: ['users','padron','amenities','agenda','temporadas','feriados','eventosCiudad','contactos','documentos',
-             'posts','msgs','reservas','bloqueos','votaciones','compras','viajes','obras','proveedores','avistamientos',
+    /* 29-09: sin 'msgs' (chat vecinal) ni 'reservas', 'bloqueos' y 'amenities'
+       (reservas de espacios comunes): se sacaron de la app y ya no bajan. */
+    barrio: ['users','padron','agenda','temporadas','feriados','eventosCiudad','contactos','documentos',
+             'posts','votaciones','compras','viajes','obras','proveedores','avistamientos',
              'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas',
              /* 27-09: cosas para prestar y ángeles de la nieve (js/v-casa.js, js/v-cuidados.js) */
              'cosas','nieve'],
@@ -64,7 +66,7 @@ const Nube = {
             'hotelLiqs'],
   },
   /* Qué baja cada rol. El hotel NO baja nada de los vecinos: solo lo
-     público de la ciudad y lo suyo. La garita no baja el chat vecinal. */
+     público de la ciudad y lo suyo. */
   HOTEL_LEE: {
     hotel:   { barrio:['agenda','temporadas','feriados','contactos','documentos','cruceros','eventosCiudad','promos','camion'],
                hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs'] },
@@ -94,10 +96,8 @@ const Nube = {
     privados:        { listas:['msgs'] },
     bitacora:        { listas:['guardias','policias'] },
     dms:             { listas:['msgs'] },
-    msgs:            { listas:[] },
     pases:           { listas:['dias','listaInvitados'], objetos:['log'] },
     solicitudesPase: { listas:['dias'], objetos:['log'] },
-    reservas:        { listas:['listaInvitados'] },
     reclamos:        { listas:['apoyos','historial'] },
     peticiones:      { listas:['apoyos','historial','firmas'] },
     votaciones:      { listas:['opciones'], objetos:['votos'] },
@@ -109,7 +109,6 @@ const Nube = {
     liquidaciones:   { listas:['filas'] },
     documentos:      { listas:['versiones'] },
     padron:          { listas:['titulares'] },
-    amenities:       { listas:['franjas'] },
     cruceros:        { listas:['escalas'] },
     descargas:       { listas:[] },
     alertas:         { listas:['lotes'], objetos:['respuestas'] },
@@ -274,9 +273,8 @@ const Nube = {
     if (mio.rol !== 'guardia' && esperando()) setTimeout(() => { if (esperando() && yo() && typeof pintar === 'function') pintar(); }, 0);
     const staff = mio.rol === 'admin' || mio.rol === 'guardia', hotel = mio.rol === 'hotel';
     const lee = this.HOTEL_LEE[mio.rol] || {};
-    /* La garita no baja el chat vecinal: es entre vecinos (26-09). El hotel,
-       solo lo público de la ciudad. */
-    this.escucharColeccion('barrio', lee.barrio || (mio.rol === 'guardia' ? this.ZONAS.barrio.filter(c => c !== 'msgs') : this.ZONAS.barrio));
+    /* El hotel, solo lo público de la ciudad. */
+    this.escucharColeccion('barrio', lee.barrio || this.ZONAS.barrio);
     this.escucharConfig();
     if (staff) this.escucharColeccion('staff', this.ZONAS.staff);
     else if (!hotel) this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
@@ -353,14 +351,13 @@ const Nube = {
     } catch(e){ console.warn('No se pudo publicar la dirección del correo (¿faltan publicar las reglas?)', e.message); }
   },
 
-  /* La primera vez, la base está vacía: no tiene los espacios comunes, la
-     agenda de Ushuaia, las temporadas, los feriados ni el reglamento. Eso
-     vive en el código como punto de partida, así que la Administración lo
-     sube una vez y a partir de ahí lo edita desde Contenido. */
+  /* La primera vez, la base está vacía: no tiene la agenda de Ushuaia, las
+     temporadas, los feriados ni el reglamento. Eso vive en el código como
+     punto de partida, así que la Administración lo sube una vez y a partir
+     de ahí lo edita desde Contenido. */
   async sembrarContenido(){
     const base = seed();
     const arranque = {
-      amenities: JSON.parse(JSON.stringify(AMENITIES)),
       agenda: agendaInicial(),
       temporadas: JSON.parse(JSON.stringify(TEMPORADAS)),
       feriados: JSON.parse(JSON.stringify(FERIADOS)),
@@ -437,7 +434,7 @@ const Nube = {
 
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
-      /* Bitácora, auditoría y chat bajan solo lo reciente (ver js/historial.js). */
+      /* Bitácora y auditoría bajan solo lo reciente (ver js/historial.js). */
       const ref = this.db.ref(`${base}/${col}`), q = typeof Historial !== 'undefined' ? Historial.consulta(ref, col) : ref;
       q.on('value', snap => {
         const v = snap.val() || {};

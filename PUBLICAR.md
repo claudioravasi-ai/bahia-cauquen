@@ -526,8 +526,8 @@ una ordenanza:
 **No invites a los 152 lotes el primer día.**
 
 1. Invitá a **diez o quince vecinos** de confianza.
-2. Que se inscriban, que vos los apruebes, que carguen una visita, que reserven
-   el quincho.
+2. Que se inscriban, que vos los apruebes, que carguen una visita y que abran
+   su credencial.
 3. **Probá el SOS**: desde un celular, con la garita abierta en otro equipo.
    Tiene que sonar y aparecer en las dos pantallas.
 4. Emitá una liquidación de prueba y fijate que llegue el cupón por correo.

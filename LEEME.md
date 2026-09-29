@@ -65,8 +65,8 @@ La persona también puede forzarlo desde **Tu cuenta → Actualizar la app**.
 | `js/seed.js` | Datos de muestra para probar sin conexión. |
 | `js/clima.js` | Clima de Ushuaia y luz del día. |
 | `js/v-inicio.js` | Portada, las cuatro secciones, garita, visitas, pases y bitácora. |
-| `js/v-comunidad.js` | Pizarrón, chat, oficios, mascotas, compras. |
-| `js/v-gestion.js` | Peticiones, reservas, reclamos, votaciones, normas, Ushuaia, residuos, vuelos, descargas, promociones del hotel, Mi casa. |
+| `js/v-comunidad.js` | Pizarrón, oficios, mascotas, compras, preguntas frecuentes. (El chat vecinal se sacó el 29-09-2026.) |
+| `js/v-gestion.js` | Peticiones, reclamos, votaciones, normas, Ushuaia, residuos, vuelos, descargas, promociones del hotel, Mi casa. |
 | `js/v-vecinos.js` | Directorio, mensajes entre vecinos, obras, viajes, infracciones, proveedores. |
 | `js/v-expensas.js` | Expensas del vecino, contabilidad y cobranzas. |
 | `js/admin.js` | Administración, padrón, circulares y el motor de automatizaciones. |
