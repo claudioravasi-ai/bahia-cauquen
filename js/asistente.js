@@ -7,7 +7,6 @@
      "publicá en el pizarrón que hay zorros sueltos"
      "mandale a la Administración que se cortó la luz en la calle 3"
      "¿cuánto debo de expensas?"  "¿cuándo pasa el camión?"
-     "¿tengo paquetes?"  "mostrame el QR para retirar"
      "abrí mis visitas"  "autorizá una visita"  "llamá a la garita"
    REGLAS DE ORO
      · Nada se manda ni se publica sin que el vecino diga "sí" (o toque
@@ -131,9 +130,9 @@ const Asistente = {
   },
 
   /* ---------- entender ---------- */
-  EJEMPLOS:['avisale a la garita que llego tarde', 'publicá en el pizarrón que hay zorros sueltos', '¿cuánto debo de expensas?', '¿cuándo pasa el camión?', '¿tengo paquetes?', 'abrí mis visitas'],
+  EJEMPLOS:['avisale a la garita que llego tarde', 'publicá en el pizarrón que hay zorros sueltos', '¿cuánto debo de expensas?', '¿cuándo pasa el camión?', 'abrí mis visitas'],
   VENTANAS:[
-    [/paquete/, 'mis-paquetes'], [/expensa|cupon|cupón|pagar/, 'expensas'], [/visita/, 'visitas'],
+    [/expensa|cupon|cupón|pagar/, 'expensas'], [/visita/, 'visitas'],
     [/vuelo|avion|avión|aeropuerto/, 'vuelos'], [/crucero|barco/, 'cruceros'], [/clima|tiempo|pronostico|pronóstico/, 'ushuaia'], [/pizarr/, 'pizarron'],
     [/emergencia|telefono|teléfono/, 'emergencias'], [/agenda|taxi|remis|farmacia/, 'agenda'], [/manual|ayuda/, 'manual'],
     [/norma|reglament/, 'documentos'], [/residuo|basura|camion|camión/, 'recoleccion'], [/mensaje|chat/, 'mensajes'], [/votaci/, 'votaciones'], [/obra/, 'obras'],
@@ -181,6 +180,7 @@ const Asistente = {
     }
     if (/camion|basura|residuo|recoleccion/.test(t) && /(cuando|pasa|dia|hoy|manana)/.test(t))
       return this.responder(`${typeof proxRecoleccion === 'function' ? proxRecoleccion() : 'Mirá los días en Residuos'}.`);
+    if (/paquete|correo/.test(t) && !hayPaquetes()) return this.responder('La garita no recibe paquetes ni correo de los vecinos: el barrio no lo tiene habilitado.');
     if (/paquete/.test(t) && /(tengo|hay|llego|alguno|algun)/.test(t)){
       const n = paquetesDelLote(u).filter(p => !p.retirado).length;
       return this.responder(n ? `Sí, ${n === 1 ? 'hay un paquete' : 'hay ' + n + ' paquetes'} de tu lote en la garita. Te muestro el QR para retirarlo.` : 'No hay paquetes de tu lote en la garita.', n ? () => { abrir('mis-paquetes'); A['retiro-qr'](); } : null);

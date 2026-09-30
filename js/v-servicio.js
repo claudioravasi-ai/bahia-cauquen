@@ -301,7 +301,7 @@ A['mi-credencial'] = () => {
         <li>En la garita hay un guardia de reemplazo.</li></ul>
       <p style="margin:6px 0 0">La garita lo escanea (o escribe el código) y ve solo tu nombre, tu lote, las patentes de tus autos y, si la cargaste, la foto del frente de tu casa. No abre el portón ni anota tus entradas y salidas. Si la guardia ya te conoce, no hace falta mostrarlo.</p></div>
     <p class="muted small" style="margin:12px 2px 0">Es personal: cada cuenta de tu lote tiene la suya. No lleva tu DNI ni ningún dato sensible. Si alguien lo copió, generá uno nuevo y el anterior deja de valer.</p>
-    <p class="muted small" style="margin:8px 2px 0">${I('box')} <b>Para retirar un paquete</b> no sirve esta credencial: se usa el <b>QR de retiro</b>, que cambia cada 30 segundos y solo sale de tu teléfono (Tus paquetes → Mi QR para retirar).</p>
+    ${hayPaquetes() ? `<p class="muted small" style="margin:8px 2px 0">${I('box')} <b>Para retirar un paquete</b> no sirve esta credencial: se usa el <b>QR de retiro</b>, que cambia cada 30 segundos y solo sale de tu teléfono (Tus paquetes → Mi QR para retirar).</p>` : ''}
     <button class="btn btn-sec btn-block" data-a="credencial-nueva" style="margin-top:10px">${I('refresh')}Generar una credencial nueva</button>`);
   setTimeout(() => $$('#hoja [data-qr]').forEach(x => pintarQR(x, x.dataset.qr)), 60);
 };
@@ -315,6 +315,7 @@ A['credencial-nueva'] = async () => {
    true si lo resolvió; si no, validar() sigue con pases, patentes y DNI. */
 function validarCodigoEspecial(txt){
   /* El QR de retiro de paquetes (firmado, cambia cada 30 s). */
+  if (/^BHR1\./.test(String(txt || '').trim()) && !hayPaquetes()){ paqueteEnPausa(); return true; }
   if (/^BHR1\./.test(String(txt || '').trim())){ const pid = Retiro.paqueteId || ''; Retiro.paqueteId = ''; Retiro.alLeer(String(txt).trim(), pid); return true; }
   const t = String(txt || '').trim().toUpperCase().replace(/^BHC:/, '').replace(/\s/g, '');
   const m = t.match(/^([FVH])-?([A-Z0-9]{6,})$/); if (!m) return false;
@@ -337,7 +338,7 @@ function validarCodigoEspecial(txt){
   hoja('Credencial de vecino', `${aviso('ok', 'check', 'Vecino/a del barrio', esc(u.casa))}
     <div class="card" style="display:flex;gap:12px;align-items:center">${u.fotoCasa ? fotoHTML(u.fotoCasa, 'casa-foto chica') : avatar(u)}
       <div><b style="font-size:17px">${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)}${aLista(u.vehiculos).length ? ' · ' + aLista(u.vehiculos).map(v => esc(v.patente)).join(', ') : ''}</div></div></div>
-    <p class="muted small">${I('box')} Esta credencial identifica, pero <b>no sirve para entregar paquetes</b>: para eso pedile el QR de retiro de su teléfono (cambia cada 30 segundos).</p>
+    ${hayPaquetes() ? `<p class="muted small">${I('box')} Esta credencial identifica, pero <b>no sirve para entregar paquetes</b>: para eso pedile el QR de retiro de su teléfono (cambia cada 30 segundos).</p>` : ''}
     <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Listo</button>`);
   setTimeout(() => Fotos.hidratar($('#hojaCuerpo')), 30);
   return true;
@@ -760,7 +761,7 @@ A['paquete-confirmar'] = el => {
    ========================================================= */
 REGLAS.push({ id:'paquetes-24h', n:'Paquetes → aviso si pasan 24 h sin retirar', d:'Push al lote cada 8 h (de 9 a 21 h) hasta que alguien del lote abre Mis paquetes o lo retira.',
   run(s){ let n = 0; const ahora = Date.now(), h = new Date().getHours();
-    if (h < 9 || h >= 21) return 0;
+    if (!hayPaquetes() || h < 9 || h >= 21) return 0;
     aLista(s.paquetes).filter(p => p && !p.retirado && !p.avisoVisto && p.recibido && ahora - p.recibido >= DIA).forEach(p => {
       const k = 1 + Math.floor((ahora - p.recibido - DIA) / (8 * HORA)); if (k > 6) return;
       const para = [...new Set([p.hostId, ...cuentasDelLote(loteDelPaquete(p)).map(u => u.id)])].filter(Boolean);

@@ -48,8 +48,8 @@ const Push = {
     'no-soportado': ['Este navegador no recibe avisos', 'Probá con Chrome, Edge, Firefox o Safari actualizados.'],
     'sin-config':   ['Falta un paso de la Administración', 'Los avisos push todavía no están configurados (Ajustes → Avisos al celular).'],
     'bloqueado':    ['Los avisos están bloqueados en este equipo', 'Se habilitan desde la configuración del navegador o del teléfono (permisos del sitio → Notificaciones → Permitir).'],
-    'activo':       ['Avisos activados en este equipo', 'Te llegan aunque tengas el celular bloqueado: camión de la basura, SOS, avisos urgentes, paquetes, "Estoy bien" y lo que escriba la guardia.'],
-    'apagado':      ['Activá los avisos en este equipo', 'Para enterarte con el celular bloqueado: camión de la basura, SOS, avisos urgentes, paquetes, "Estoy bien" y lo que escriba la guardia.'],
+    'activo':       ['Avisos activados en este equipo', 'Te llegan aunque tengas el celular bloqueado: camión de la basura, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
+    'apagado':      ['Activá los avisos en este equipo', 'Para enterarte con el celular bloqueado: camión de la basura, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
   },
   cargarSDK(){
     if (firebase.messaging) return Promise.resolve();

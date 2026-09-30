@@ -28,7 +28,7 @@
    ========================================================= */
 const MANUAL_CAPS = [
   { id:'empezar', icon:'sparkle', color:'brand', para:'todos', t:'Antes de empezar', s:'Qué es la app y qué hace falta', b:[
-    ['p', 'La app del barrio {BARRIO} junta en un solo lugar lo que antes estaba desparramado en grupos de WhatsApp, llamadas a la garita y papeles: <b>las visitas, los paquetes, las expensas, los avisos de la guardia, el pizarrón, las votaciones</b> y la información útil de Ushuaia.'],
+    ['p', 'La app del barrio {BARRIO} junta en un solo lugar lo que antes estaba desparramado en grupos de WhatsApp, llamadas a la garita y papeles: <b>las visitas, los mensajes privados entre vecinos, las expensas, los avisos de la guardia, el pizarrón, las votaciones</b> y la información útil de Ushuaia.'],
     ['p', 'No se baja de ninguna tienda (ni App Store ni Google Play): es una <b>página web que se instala en el teléfono</b> y queda con su ícono, como cualquier otra aplicación. Funciona en celulares, tablets y computadoras.'],
     ['h', 'Qué necesitás'],
     ['lista', ['Un celular (o computadora) con internet.', 'Un correo electrónico propio: ahí te llegan los avisos de tu inscripción.', 'Saber el número de tu lote.']],
@@ -76,7 +76,7 @@ const MANUAL_CAPS = [
   { id:'pantalla', icon:'grid', color:'sky', para:'todos', t:'Conocer la pantalla', s:'El encabezado, la portada y cómo moverte', b:[
     ['h', 'El encabezado (la franja de arriba)'],
     ['lista', [
-      '<b>El escudo del barrio</b>: tocándolo volvés siempre a la portada y la app te saluda con la hora y el clima. Si activaste el <b>asistente por voz</b>, después del saludo le podés pedir cosas ("avisale a la garita que llego tarde", "¿tengo paquetes?"). En <b>iPhone y iPad</b> el micrófono se abre solo al tocar su botón, y el "sí" de una confirmación se toca. Si no te escucha, se corta solo a los pocos segundos; tocar cualquier otra parte de la app también lo corta.',
+      '<b>El escudo del barrio</b>: tocándolo volvés siempre a la portada y la app te saluda con la hora y el clima. Si activaste el <b>asistente por voz</b>, después del saludo le podés pedir cosas ("avisale a la garita que llego tarde", "¿cuándo pasa el camión?"). En <b>iPhone y iPad</b> el micrófono se abre solo al tocar su botón, y el "sí" de una confirmación se toca. Si no te escucha, se corta solo a los pocos segundos; tocar cualquier otra parte de la app también lo corta.',
       '<b>Tu nombre y tu lote</b>, con un <b>puntito</b>: verde es que estás conectado con el barrio; amarillo, que se está conectando; rojo, que no hay conexión (lo que hagas se manda cuando vuelva).',
       '<b>La campanita</b>: los avisos que todavía no viste, con un número.',
       '<b>Tu foto o tus iniciales</b>: abre <b>Tu cuenta</b> (contraseña, correo, modo día/noche, avisos al celular, tus datos personales, actualizar la app, cerrar sesión).',
@@ -101,7 +101,7 @@ const MANUAL_CAPS = [
   ] },
 
   { id:'pizarra', icon:'bell', color:'warn', para:'todos', t:'La Pizarra del día y la campanita', s:'Enterarte de todo sin buscar', b:[
-    ['p', 'La <b>Pizarra del día</b> es lo primero que conviene mirar al abrir la app. Muestra en renglones cortos lo importante de hoy: avisos de la guardia y de la Administración, comunicados, el camión de la basura, el clima que complica, obras, viajes compartidos, compras conjuntas y lo que es <b>para vos</b> (un paquete, tus expensas, un mensaje, una visita).'],
+    ['p', 'La <b>Pizarra del día</b> es lo primero que conviene mirar al abrir la app. Muestra en renglones cortos lo importante de hoy: avisos de la guardia y de la Administración, comunicados, el camión de la basura, el clima que complica, obras, viajes compartidos, compras conjuntas y lo que es <b>para vos</b> (tus expensas, un mensaje, una visita).'],
     ['h', 'Los colores'],
     ['lista', ['<b>Rojo</b>: importante.', '<b>Amarillo</b>: para tener en cuenta.', '<b>Verde</b>: para saber.']],
     ['p', 'Lo que todavía no leíste <b>titila</b> en su color. Al tocarlo se abre y queda quieto. Arriba, un semáforo cuenta cuántos avisos sin leer hay de cada color.'],
@@ -112,7 +112,7 @@ const MANUAL_CAPS = [
   ] },
 
   { id:'avisos', icon:'bell', color:'ok', para:'todos', t:'Activar los avisos al celular', s:'Para enterarte con el teléfono bloqueado', b:[
-    ['p', 'Los avisos al celular (también llamados "notificaciones push") te llegan <b>aunque tengas la app cerrada y el teléfono bloqueado</b>: el camión de la basura, un paquete para tu lote, un SOS, un aviso urgente de la Administración, lo que escribe la guardia y, si usás "Estoy bien", el recordatorio de la mañana.'],
+    ['p', 'Los avisos al celular (también llamados "notificaciones push") te llegan <b>aunque tengas la app cerrada y el teléfono bloqueado</b>: el camión de la basura, un mensaje privado, un SOS, un aviso urgente de la Administración, lo que escribe la guardia y, si usás "Estoy bien", el recordatorio de la mañana.'],
     ['pasos', [
       'En iPhone, primero <b>instalá la app</b> (capítulo "Instalar la app en el teléfono"). Sin instalar, el iPhone no los deja llegar.',
       'Tocá tu foto o tus iniciales (arriba a la derecha) para abrir <b>Tu cuenta</b> y buscá <b>"Avisos en este equipo"</b> (o tocá la tarjeta "Activá los avisos" que aparece en la portada).',
@@ -137,7 +137,7 @@ const MANUAL_CAPS = [
     ['p', 'Aparece un cartel rojo con quién la pidió, el lote y "Dónde está pasando". Seguí lo que indica el cartel (por ejemplo, no bloquear la calle). Tocá <b>"Entendido"</b> para cerrarlo.'],
     ['h', 'Pedir el DEA (desfibrilador)'],
     ['pasos', [
-      'Entrá a <b>Ushuaia y servicios → Emergencias</b>.',
+      'Entrá a <b>Tu casa → Emergencias</b>.',
       'Al lado del corazón rojo, <b>mantené apretado 2 segundos</b> el botón verde <b>SOLICITARLO</b>.',
       'Contestá <b>SÍ</b>. A la garita le salta una alarma con tu apellido y tu lote hasta que sale con el DEA; a vos te avisa cuando va en camino.',
       'Cuando la garita toca "Voy en camino con el DEA", con ese mismo toque les llega un aviso a los <b>vecinos del equipo de salud o con RCP</b>. Si alguno va, lo ves en Emergencias ("También va…").',
@@ -181,7 +181,10 @@ const MANUAL_CAPS = [
     ['p', 'Pasada la hora del pase, la garita ya no puede registrar el ingreso con ese pase. Si la persona llega tarde, la garita te pregunta ("Que pase" / "No lo conozco"); si no vino, te avisa que venció, y lo podés editar con otro horario desde Mis visitas.'],
   ], ir:[['nuevo-pase', '', 'Autorizar una visita'], ['abrir', 'visitas', 'Mis visitas']] },
 
-  { id:'paquetes', icon:'box', color:'wood', para:'vecinos', t:'Paquetes', s:'Cuándo llegan, la foto y cómo retirarlos', b:[
+  /* PAQUETES EN PAUSA (30-09-2026): el barrio no aprobó que la garita reciba
+     correo ni paquetes. El capítulo queda guardado y no se muestra mientras
+     hayPaquetes() (core.js) sea falso. */
+  { id:'paquetes', activo: hayPaquetes, icon:'box', color:'wood', para:'vecinos', t:'Paquetes', s:'Cuándo llegan, la foto y cómo retirarlos', b:[
     ['h', 'Cuando llega un paquete'],
     ['p', 'La garita lo registra con la empresa, un detalle y una foto. En ese momento <b>les llega el aviso a todas las cuentas de tu lote</b> (si en tu casa viven dos personas con la app, se enteran las dos), con sonido y en el celular aunque esté bloqueado si activaste los avisos.'],
     ['p', 'Además queda en la <b>Pizarra del día, en "Para vos"</b>, hasta que alguien del lote lo retira.'],
@@ -232,10 +235,18 @@ const MANUAL_CAPS = [
     ['lista', [
       '<b>Con la Administración</b>: solo la leen vos y la Administración.',
       '<b>Con la guardia</b>: solo la leen vos y la garita.',
-      '<b>Con otro vecino</b>: buscalo por nombre, lote u oficio y escribile. Solo lo leen ustedes dos.',
+      '<b>Con otro vecino</b>: solo lo leen ustedes dos.',
     ]],
+    ['h', 'Escribirle a uno o varios vecinos'],
+    ['pasos', [
+      'Entrá a <b>Tu casa → Mensajes</b> y tocá <b>"Buscar un vecino y escribirle"</b>.',
+      'Buscá por apellido, nombre, oficio o número de lote y <b>tildá</b> a quién le querés escribir: uno, dos o hasta diez vecinos.',
+      'Escribí el mensaje una sola vez y tocá <b>Enviar</b>.',
+      'A cada uno le llega <b>por separado</b>, en su chat privado con vos. Cada uno te contesta en su propia conversación, que ves en Mensajes.',
+    ]],
+    ['ojo', 'info', 'No es un grupo', 'Ninguno ve a quién más le mandaste el mensaje ni lo que te contestan los otros. El barrio no quiso un chat de muchos: esto es siempre de a dos. Solo aparecen los vecinos que ya usan la app; para algo que es de todo el barrio está el pizarrón.'],
     ['h', 'Peticiones a la garita (con firma)'],
-    ['p', 'Para pedidos que conviene dejar por escrito: recibir paquetes mientras no estás, <b>no dejar pasar a alguien</b>, avisar que <b>te vas de viaje</b>, dejar o retirar una llave, un permiso especial de ingreso.'],
+    ['p', 'Para pedidos que conviene dejar por escrito: <b>no dejar pasar a alguien</b>, avisar que <b>te vas de viaje</b>, dejar o retirar una llave, un permiso especial de ingreso.'],
     ['pasos', ['Entrá a <b>Tu casa → Peticiones a la garita</b> y tocá "Nueva petición".', 'Elegí el tipo, escribí el pedido y las fechas.', '<b>Firmá con el dedo</b> en el recuadro y tocá "Firmar y enviar".', 'El guardia la recibe y la firma. Te llega el aviso de que está "en funciones".']],
     ['p', 'Cada petición guarda las dos firmas, la hora y un sello digital que prueba que nadie la cambió.'],
     ['h', 'Reclamos'],
@@ -267,7 +278,7 @@ const MANUAL_CAPS = [
       'En la garita hay un guardia de reemplazo.',
     ]],
     ['pasos', ['Abrí <b>Tu casa → Mi credencial</b>.', 'Mostrale el QR al guardia: lo escanea (o escribe el código que está abajo).', 'La garita ve tu nombre, tu lote, las patentes de tus autos y, si la cargaste, la foto del frente de tu casa. Nada más.']],
-    ['ojo', 'info', 'Lo que la credencial no hace', 'No abre el portón, no anota tus entradas ni tus salidas y no lleva tu DNI. Tampoco sirve para retirar paquetes: para eso está el QR de retiro. Si la guardia ya te conoce, no hace falta mostrarla. Cada cuenta de tu lote tiene la suya; si alguien la copió, tocá "Generar una credencial nueva" y la anterior deja de valer.'],
+    ['ojo', 'info', 'Lo que la credencial no hace', 'No abre el portón, no anota tus entradas ni tus salidas y no lleva tu DNI. Si la guardia ya te conoce, no hace falta mostrarla. Cada cuenta de tu lote tiene la suya; si alguien la copió, tocá "Generar una credencial nueva" y la anterior deja de valer.'],
   ], ir:[['abrir', 'perfil', 'Mi casa'], ['mi-credencial', '', 'Mi credencial']] },
 
   { id:'estoybien', icon:'heart', color:'ok', para:'vecinos', t:'Estoy bien (si vivís solo o sola)', s:'Un toque por día y alguien de confianza se entera', b:[
@@ -395,12 +406,11 @@ const MANUAL_CAPS = [
       '<b>Residuos</b>: los días del camión. {RESIDUOS} La víspera la pizarra avisa "Mañana pasa el camión" y cuando la garita registra la entrada, te llega el aviso "Entró el camión".',
       '<b>Descargas</b>: aplicaciones, instructivos y planillas que comparte la Administración.',
     ]],
-    ['ojo', 'info', 'No hay chat vecinal', 'Lo que es para todo el barrio va al <b>pizarrón</b>. Lo que es para una persona, por <b>mensaje privado</b> (Vecinos → Mensaje, o Tu casa → Mensajes).'],
+    ['ojo', 'info', 'No hay chat vecinal', 'Lo que es para todo el barrio va al <b>pizarrón</b>. Lo que es para una persona, por <b>mensaje privado</b> (Vecinos → Mensaje, o Tu casa → Mensajes → "Buscar un vecino y escribirle", que deja elegir hasta diez y le llega a cada uno por separado).'],
   ], ir:[['abrir', 'comunidad', 'Ir a El barrio'], ['abrir', 'documentos', 'Normas y reglamentos']] },
 
   { id:'ciudad', icon:'pin', color:'sky', para:'vecinos', t:'Ushuaia y servicios', s:'Lo de afuera que igual te toca', b:[
     ['lista', [
-      '<b>Emergencias</b>: teléfonos a un toque y el pedido del DEA.',
       '<b>Agenda de Ushuaia</b>: comidas, taxis, supermercados, farmacias y oficios, con buscador y WhatsApp.',
       '<b>Cruceros</b>: los que llegan y salen del puerto hoy y los próximos días.',
       '<b>Ushuaia hoy</b>: el clima, las temporadas, los feriados y los eventos de la ciudad.',
@@ -408,7 +418,7 @@ const MANUAL_CAPS = [
       '<b>Municipalidad de Ushuaia</b>: atajos a trámites, reclamos urbanos, tasas y servicios en el sitio oficial.',
       '<b>Sismos</b>: los movimientos de la región, en vivo, con el acceso a "Preparados para un sismo" (que también está en Tu casa).',
     ]],
-    ['p', '<b>Salidas seguras</b> (kayak, montaña, navegación) pasó a <b>Tu casa</b>.'],
+    ['p', '<b>Emergencias</b> (teléfonos, el pedido del DEA y los SOS del día) y <b>Salidas seguras</b> (kayak, montaña, navegación) están en <b>Tu casa</b>.'],
   ], ir:[['abrir', 'ciudad', 'Ir a Ushuaia y servicios']] },
 
   { id:'cuenta', icon:'user', color:'accent', para:'todos', t:'Tu cuenta', s:'Contraseña, modo noche, avisos, tus datos, actualizar y salir', b:[
@@ -429,18 +439,17 @@ const MANUAL_CAPS = [
     ['lista', [
       'Los demás vecinos ven tu <b>nombre y tu lote</b> en el buscador de Vecinos y en lo que publicás en el pizarrón. Tu teléfono, tu profesión y tu dirección, <b>solo si vos elegís compartirlos</b>.',
       'El <b>chat vecinal</b> y las <b>reservas</b> ya no existen (se sacaron el 29 de septiembre de 2026). Lo que había quedado guardado de antes no lo ve ningún vecino ni la garita; la Administración lo borra.',
-      'Tus mensajes privados, tus reclamos, tus pagos y tus paquetes <b>no los ve ningún otro vecino</b> (los paquetes y las expensas, solo las cuentas de tu mismo lote).',
-      'La garita ve lo que necesita para su trabajo (visitas, paquetes, peticiones). La Administración, lo que necesita para administrar.',
+      'Tus mensajes privados, tus reclamos y tus pagos <b>no los ve ningún otro vecino</b> (las expensas, solo las cuentas de tu mismo lote). Si le escribís a varios vecinos a la vez, cada uno recibe su propia conversación: no se enteran de los demás.',
+      'La garita ve lo que necesita para su trabajo (visitas, peticiones). La Administración, lo que necesita para administrar.',
       'Las fotos buenas no quedan en la base del barrio: viaja una vista previa y la foto se baja solo cuando alguien la toca.',
       '<b>Estoy bien</b> y el <b>aviso de salida</b> los ven solo vos, la garita, la Administración y las personas del barrio que elegiste; tus familiares reciben el aviso por correo. Los demás vecinos no saben que lo usás. Los avisos se borran a los 30 días y, si dejás de usarlo, se borra todo.',
       '<b>Tu casa en invierno</b> y <b>en verano</b>, la <b>mochila y el plan para sismos</b> (con sus sugerencias): los ven y los cambian solo las cuentas de tu lote.',
       '<b>Quiénes están en tu lote</b> (en Mi casa): las cuentas de tu mismo lote ven entre sí el nombre, la relación con el lote y si tienen la app abierta; nada más. "No es de mi lote" avisa a la Administración y, sin tu nombre, a esa persona.',
-      '<b>Paquetes</b>: los retirados se ven 30 días; después pasan al archivo del barrio sin la foto, sin la firma y sin el DNI, y los traés con "Paquetes anteriores".',
       '<b>Me voy de viaje</b> (casa sola): lo ven solo la garita, la Administración y las cuentas de tu lote. Ya no queda en tu ficha.',
       '<b>Cosas para prestar</b> y <b>Ángeles de la nieve</b> los ven los vecinos de la app (tu nombre de pila y tu lote). Los pedidos de préstamo van por mensaje privado. En Ángeles de la nieve no pongas datos de salud.',
       'Si sos del equipo de salud y tocás VOY ante un pedido del DEA, la garita y el vecino ven tu nombre, tu profesión y tu teléfono.',
     ]],
-    ['p', 'Por la <b>Ley 25.326</b> podés pedir ver, corregir o borrar tus datos: en <b>Tu cuenta → Mis datos personales</b> tocá <b>"Ver mi informe"</b>: se abre un documento con todo lo que la app guarda de vos (tu cuenta, visitas, paquetes, pagos, mensajes, reclamos, votos, lo que publicaste, "Estoy bien", lo de tu casa y el archivo histórico), que imprimís o guardás como PDF (de las expensas trae los pagos y recibos de tu lote de este año; los anteriores están en Mis expensas). Ahí mismo pedís la baja. No incluye contraseñas ni códigos para entrar, y el DNI de tus visitas va tapado. Para llevar tus datos a otro sistema hay además una "Copia técnica (JSON)".'],
+    ['p', 'Por la <b>Ley 25.326</b> podés pedir ver, corregir o borrar tus datos: en <b>Tu cuenta → Mis datos personales</b> tocá <b>"Ver mi informe"</b>: se abre un documento con todo lo que la app guarda de vos (tu cuenta, visitas, pagos, mensajes, reclamos, votos, lo que publicaste, "Estoy bien", lo de tu casa y el archivo histórico), que imprimís o guardás como PDF (de las expensas trae los pagos y recibos de tu lote de este año; los anteriores están en Mis expensas). Ahí mismo pedís la baja. No incluye contraseñas ni códigos para entrar, y el DNI de tus visitas va tapado. Para llevar tus datos a otro sistema hay además una "Copia técnica (JSON)".'],
     ['p', 'Los <b>términos de uso</b>, lo que dice la ley sobre tus datos y el deslinde de responsabilidad se abren tocando <b>"by Claudio A. Ravasi"</b> al pie de la portada, y en Preguntas frecuentes → "Tus datos: privacidad y seguridad".'],
   ], ir:[['abrir', 'ayuda', 'Preguntas frecuentes'], ['abrir', 'legal', 'Términos de uso']] },
 
@@ -458,14 +467,14 @@ const MANUAL_CAPS = [
   ], ir:[['actualizar-app', '', 'Actualizar la app']] },
 
   /* ---------- Para la garita ---------- */
-  { id:'garita', icon:'gate', color:'brand', para:'garita', t:'Para la garita', s:'El turno, los ingresos, los paquetes y la ronda', b:[
-    ['ojo', 'info', 'Las tareas de la garita son solo de la garita', 'Registrar ingresos y salidas, paquetes, el camión, el policía y sus rondas, la bitácora, firmar peticiones y atender un SOS lo hace únicamente la cuenta de la garita. La Administración lo ve en vivo, pero no lo toca.'],
+  { id:'garita', icon:'gate', color:'brand', para:'garita', t:'Para la garita', s:'El turno, los ingresos y la ronda', b:[
+    ['ojo', 'info', 'Las tareas de la garita son solo de la garita', 'Registrar ingresos y salidas, el camión, el policía y sus rondas, la bitácora, firmar peticiones y atender un SOS lo hace únicamente la cuenta de la garita. La Administración lo ve en vivo, pero no lo toca.'],
     ['h', 'Lo que no se puede olvidar hoy'],
     ['p', 'A la derecha de "Garita" (en el celular, debajo) está la lista del día, <b>"Hoy la garita no puede olvidar"</b>. <b>Se arma sola</b> con lo que de verdad hay hoy, y lo que no está pedido, programado ni pendiente <b>no aparece</b>:'],
     ['lista', [
       '<b>Primero lo urgente</b> (en rojo): alguien que llegó sin aviso y espera la respuesta del vecino, un "Estoy bien" o una salida sin regreso, avisos de vecinos sin ver, peticiones sin recibir, el camión adentro sin salida.',
       '<b>Lo programado para hoy, por hora</b>: las visitas y viajes anunciados (con la hora, el nombre y el lote), los ingresos frecuentes que tienen hoy entre sus días, las obras y los proveedores que vienen (con el control de la ART y, si alguno la tiene vencida, "no entra"), el camión el día que pasa, las vans del hotel y el policía contratado (en el turno de noche o si ya está de servicio).',
-      '<b>Lo pendiente</b>: quién está adentro sin la salida registrada, los paquetes por entregar (por lote), las casas solas por revisar y los pedidos firmados de vecinos que siguen vigentes hoy (no dejar pasar, llaves, permisos).',
+      '<b>Lo pendiente</b>: quién está adentro sin la salida registrada, las casas solas por revisar y los pedidos firmados de vecinos que siguen vigentes hoy (no dejar pasar, llaves, permisos).',
       '<b>De todo turno</b> (en celeste): anotar las novedades en la bitácora y, al terminar, cerrar el turno.',
     ]],
     ['p', 'Tocar un renglón te lleva a donde se hace. Cuando la app ve que algo está hecho, sale de la lista y pasa al renglón verde <b>"Hecho hoy"</b> (sin tachados).'],
@@ -479,8 +488,8 @@ const MANUAL_CAPS = [
     ['h', 'El Hotel Los Cauquenes'],
     ['p', 'En la portada de la garita, la solapa <b>Vans del hotel · hoy</b> tiene los traslados programados para hoy, por hora, cada uno con su botón grande <b>"Salió"</b> y, cuando vuelve, <b>"Volvió"</b>: un toque y queda todo anotado (bitácora, traslado y aviso a la recepción). Si el traslado no tiene van asignada, la app pregunta cuál sale. Abajo, cada van con su botón para una salida o entrada que no estaba programada (también sirve leer su QR). Aparte, la banda del hotel muestra los <b>huéspedes</b> que llegan (con "Ingresó") y sus <b>eventos</b>. Sus proveedores también tienen QR: con la ART vencida, no pasan.'],
     ['p', '<b>Uber, DiDi o taxi</b>: si el vecino avisó, aparece en "Ingresos de hoy" como "Uber · nombre del chofer", con la patente y si viene a buscarlo o trae algo. Escribí la patente en el validador y tocá "Ingresó" y después "Salió". Si no avisó, "Llegó sin aviso" con el motivo "Uber / DiDi / taxi".'],
-    ['h', 'Paquetes'],
-    ['pasos', ['<b>"Llegó un paquete"</b>: elegí para quién, la empresa, un detalle y sacale una foto a la etiqueta.', 'Al guardar, se avisa a todas las cuentas de ese lote.', 'Para entregar: <b>"Entregar"</b> → <b>"Leer el QR de retiro del vecino"</b>. Si la firma es válida, compará la persona con la foto y tildá los paquetes.', 'Sin teléfono: <b>"Sin teléfono: firma y DNI"</b>. Si retira otra persona, elegí "Otra persona" y anotá su nombre y DNI.']],
+    ...(hayPaquetes() ? [['h', 'Paquetes'],
+    ['pasos', ['<b>"Llegó un paquete"</b>: elegí para quién, la empresa, un detalle y sacale una foto a la etiqueta.', 'Al guardar, se avisa a todas las cuentas de ese lote.', 'Para entregar: <b>"Entregar"</b> → <b>"Leer el QR de retiro del vecino"</b>. Si la firma es válida, compará la persona con la foto y tildá los paquetes.', 'Sin teléfono: <b>"Sin teléfono: firma y DNI"</b>. Si retira otra persona, elegí "Otra persona" y anotá su nombre y DNI.']]] : [['ojo', 'info', 'La garita no recibe paquetes', 'El barrio no aprobó que la garita reciba correo ni paquetes de los vecinos. Si llega un correo o un delivery, se lo trata como cualquier ingreso: se consulta al vecino y pasa a su casa o no.']]),
     ['h', 'El camión, el policía y la ronda'],
     ['lista', ['<b>Camión de la basura</b>: registrá la entrada (patente) y la salida. A todo el barrio le llega el aviso.', '<b>Bitácora</b>: el libro de guardia. Lo que se anota no se borra; si hace falta, marcá que le suene a la Administración.']],
     ['h', 'El policía contratado'],
@@ -553,7 +562,7 @@ const MANUAL_CAPS = [
     ['h', 'Día a día, por salas'],
     ['lista', ['<b>Garita y seguridad</b>: la garita en vivo, la bitácora, los turnos, los mensajes con la garita y los ingresos frecuentes.', '<b>Vecinos</b>: padrón, mensajes, reclamos, infracciones, votaciones y obras.', '<b>Comunicación</b>: comunicados importantes (con acuse), el pizarrón y los avisos urgentes por zona.', '<b>Proveedores y cumplimiento</b>: ART y seguros, y protección de datos.', '<b>Hotel Los Cauquenes</b>, al final: el hotel en vivo, sus promociones, eventos y proveedores, los mensajes con el hotel y su cuenta.']],
     ['h', 'El alcance con la garita'],
-    ['ojo', 'info', 'La Administración mira la garita; no la opera', 'La Administración ve en tiempo real los ingresos, los paquetes, el camión, el policía, la bitácora, las peticiones y los SOS, pero no registra, no entrega, no firma ni escribe en el libro de guardia: eso es exclusivo de la cuenta de la garita. Así no se pisan datos ni responsabilidades.'],
+    ['ojo', 'info', 'La Administración mira la garita; no la opera', 'La Administración ve en tiempo real los ingresos, el camión, el policía, la bitácora, las peticiones y los SOS, pero no registra, no entrega, no firma ni escribe en el libro de guardia: eso es exclusivo de la cuenta de la garita. Así no se pisan datos ni responsabilidades.'],
     ['lista', ['<b>Sí es de la Administración</b>: los horarios de los turnos, los puntos de control de la ronda (y sus QR), las zonas para avisos, los proveedores habilitados, los ingresos frecuentes y el control mensual de horas y rondas del policía.', '<b>Para pedirle algo a la garita</b>: "Mensajes con la garita" (canal interno). Le llega al instante, con sonido.']],
     ['h', 'El Hotel Los Cauquenes'],
     ['p', 'La sala del hotel en el Día a día: el hotel en vivo (sin los nombres de sus huéspedes), sus promociones (las podés agregar, cambiar o borrar, igual que el hotel; cuando el hotel toca una, te llega el aviso), sus eventos (avisar a los vecinos si lo pide), sus proveedores (revisar o suspender), los mensajes con la recepción, la <b>Cuenta del hotel</b> (el hotel se inscribe como cualquier usuario y su inscripción pendiente se convierte en la del hotel; los vecinos aprobados no aparecen en esa lista; una vez hecha, el hotel cambia su correo y su contraseña en Tu cuenta) y el <b>modelo de convenio</b>. Si el hotel declara su DEA, desde Emergencias del hotel se publica para los vecinos.'],
@@ -580,7 +589,7 @@ function manualParaMi(c){
   if (rol === 'guardia') return c.para === 'garita';
   return c.para === 'vecinos';
 }
-const manualCaps = () => MANUAL_CAPS.filter(manualParaMi);
+const manualCaps = () => MANUAL_CAPS.filter(c => (!c.activo || c.activo()) && manualParaMi(c));
 
 /* Las marcas del texto que dependen del barrio o de quien lee. */
 function manualTexto(t){
@@ -657,13 +666,13 @@ R.manual = {
       .map(([a, v, t]) => `<button class="btn btn-sm btn-sec" data-a="${a}" data-v="${esc(v)}">${esc(t)}${I('right')}</button>`).join('');
     return `${guiaSolapas('manual')}<div class="man-intro"><span class="man-intro-ic">${I('book')}</span><div><b>Cómo usar la app, paso a paso</b>
         <span>${plural(todos.length, 'capítulo')}. Tocá uno para abrirlo; tocalo de nuevo para cerrarlo. Arriba podés buscar cualquier palabra.</span></div></div>
-      <form data-f="buscar-manual" class="linea-form" style="margin:0 0 10px"><input name="q" id="qManual" value="${esc(q || '')}" placeholder="Buscar: visita, paquete, expensas, contraseña…" autocomplete="off"><button class="btn btn-pri" aria-label="Buscar">${I('search')}</button></form>
+      <form data-f="buscar-manual" class="linea-form" style="margin:0 0 10px"><input name="q" id="qManual" value="${esc(q || '')}" placeholder="Buscar: visita, mensaje, expensas, contraseña…" autocomplete="off"><button class="btn btn-pri" aria-label="Buscar">${I('search')}</button></form>
       ${pal.length ? `<p class="muted small" style="margin:0 0 10px">${lista.length ? `${plural(lista.length, 'capítulo')} con "${esc(q)}".` : ''} <button class="link" data-a="abrir" data-v="manual">Ver todo el manual</button></p>` : ''}
       ${lista.length ? lista.map((c, i) => `<details class="man-cap card" data-cap="${esc(c.id)}" ${pal.length || Manual.abierto === c.id ? 'open' : ''}>
           <summary><span class="man-n">${todos.indexOf(c) + 1}</span><span class="man-ic ic-${c.color}">${I(c.icon)}</span>
             <span class="man-tit"><b>${manualResaltar(esc(c.t), qq)}</b><small>${esc(c.s)}${c.para === 'garita' ? ' · garita y Administración' : c.para === 'admin' ? ' · solo la Administración' : ''}</small></span>${I('right')}</summary>
           <div class="man-cuerpo">${manualBloques(c, qq)}${ir(c) ? `<div class="btns man-ir">${ir(c)}</div>` : ''}</div></details>`).join('')
-        : vacio('search', 'No encontramos eso en el manual. Probá con otra palabra ("visita", "paquete", "pagar") o mirá las Preguntas frecuentes.')}
+        : vacio('search', 'No encontramos eso en el manual. Probá con otra palabra ("visita", "mensaje", "pagar") o mirá las Preguntas frecuentes.')}
       ${pal.length ? '' : `<div class="card man-bajar"><div><b>${I('download')} Descargar el manual</b><span class="muted small">Llegaste al final. El manual entero, listo para imprimir o guardar como PDF (en el celular: Compartir → Guardar en Archivos, o Imprimir → Guardar como PDF).</span></div>
         <button class="btn btn-pri" data-a="manual-pdf">${I('download')}Descargar o imprimir</button></div>`}
       <p class="muted tiny center" style="margin-top:12px">Este manual acompaña la versión ${esc(window.VERSION || '—')} de la app. ¿Falta algo? Escribile a la Administración.</p>`;

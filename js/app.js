@@ -61,6 +61,7 @@ const VENTANAS_HOTEL = new Set(['hotel', 'hotel-traslados', 'hotel-huespedes', '
 const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
+  if (!hayPaquetes() && PAUSA_PAQUETES.ventanas.has(id)){ paqueteEnPausa(); return; }
   if (!ventanaPermitida(id)){ toast(esHotel() ? 'Esa sección no es del hotel' : VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
   /* Una ventana nunca se abre DEBAJO de una hoja: antes, tocar un aviso en
      la pizarra abría la ventana detrás y la hoja la seguía tapando. Si la
@@ -1060,7 +1061,7 @@ function pintarBienvenida(modo = 'inicio'){
 
   else {
     titulo = 'Bienvenido al barrio';
-    bajada = 'Tus visitas pasan con un QR, la guardia te avisa al instante y el resto está a un toque: tus paquetes, las expensas, las votaciones, el clima y los vuelos de Ushuaia, y todo lo que pasa entre vecinos.';
+    bajada = 'Tus visitas pasan con un QR, la guardia te avisa al instante y el resto está a un toque: las expensas, los mensajes privados con tus vecinos, las votaciones, el clima y los vuelos de Ushuaia, y todo lo que pasa entre vecinos.';
     cuerpo = `
       ${pend && pend.estado === 'pendiente' ? `<div class="aviso a-warn">${I('clock')}<div class="txt"><b>Tu inscripción está en revisión</b>Cuando la aprueben te llega un correo.${pend.token ? `<div class="acciones"><button class="btn btn-xs btn-sec" data-a="ver-inscripcion" data-v="${pend.token}">Ver mi inscripción</button></div>` : ''}</div></div>` : ''}
       ${pend && pend.estado === 'rechazado' ? `<div class="aviso a-danger">${I('x')}<div class="txt"><b>Tu pedido no fue aprobado</b>Comunicate con la Administración.</div></div>` : ''}
@@ -1719,12 +1720,21 @@ const SOLO_GARITA = {
   formularios: new Set(['validar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra',
     'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada']),
 };
+/* Paquetes en pausa (hayPaquetes, core.js): aunque quede un botón o un
+   aviso viejo que lleve ahí, no hace nada. El código sigue guardado. */
+const PAUSA_PAQUETES = {
+  ventanas: new Set(['mis-paquetes']),
+  acciones: new Set(['paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'paquete-confirmar', 'retiro-escanear', 'retiro-manual', 'retiro-qr', 'hist-paquetes']),
+  formularios: new Set(['paquete', 'retiro-qr', 'retiro-manual']),
+};
+const paqueteEnPausa = () => { toast('La recepción de paquetes en la garita no está habilitada en el barrio', 'box'); return true; };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]');
   if (!el) return;
   const f = A[el.dataset.a];
   if (!el.dataset.a) return;   /* data-a vacío: no es un botón */
   if (!f){ console.warn('Acción sin código:', el.dataset.a); toast(`Esa acción no está en esta versión ("${el.dataset.a}")`, 'alert'); return; }
+  if (!hayPaquetes() && PAUSA_PAQUETES.acciones.has(el.dataset.a)){ e.preventDefault(); paqueteEnPausa(); return; }
   if (SOLO_GARITA.acciones.has(el.dataset.a) && !soloGarita()){ e.preventDefault(); return; }
   /* Los tildes y opciones tienen que poder marcarse: a ellos no se les frena el clic. */
   if (el.tagName !== 'INPUT') e.preventDefault();
@@ -1800,6 +1810,7 @@ document.addEventListener('submit', e => {
   }
   const f = F[form.dataset.f];
   if (!f){ toast(`Ese formulario no está en esta versión ("${form.dataset.f}")`, 'alert'); return; }
+  if (!hayPaquetes() && PAUSA_PAQUETES.formularios.has(form.dataset.f)){ paqueteEnPausa(); return; }
   if (SOLO_GARITA.formularios.has(form.dataset.f) && !soloGarita()) return;
   const fd = new FormData(form), d = {};
   for (const [k, v] of fd.entries()){ if (v instanceof File) continue; if (k in d){ d[k] = [].concat(d[k], v); } else d[k] = v; }

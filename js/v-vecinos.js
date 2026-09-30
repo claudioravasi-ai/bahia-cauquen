@@ -91,7 +91,7 @@ R.mensajes = {
   render(){
     const u = yo();
     const hilos = Store.s.dms.filter(h => h.a === u.id || h.b === u.id).sort((x, y) => (y.msgs.at(-1)?.at || 0) - (x.msgs.at(-1)?.at || 0));
-    return `${superficie({ v:'vecinos', icon:'search', t:'Buscar un vecino', s:'Por nombre, apellido, profesión, oficio o dirección', cls:'acento' })}
+    return `${superficie({ v:'dm-nuevo', icon:'search', t:'Buscar un vecino y escribirle', s:'Elegí uno o varios del padrón: a cada uno le llega por separado, en su chat privado con vos', cls:'acento' })}
       ${superficie({ v:'privado', icon:'lock', color:'accent', t:'Administración', s:'Tu conversación privada con la Administración' })}
       ${sec('Conversaciones')}${hilos.length ? hilos.map(h => { const otro = usuario(h.a === u.id ? h.b : h.a) || { nombre:'Ex vecino/a', casa:'' }, ult = h.msgs.at(-1), nl = h.msgs.filter(m => m.de !== u.id && !m.leido).length;
         return `<button class="superficie" data-a="abrir" data-v="dm" data-p="${otro.id || ''}">${avatar(otro)}<span class="txt"><b>${esc(otro.nombre)} · ${esc(otro.casa)}</b><small>${ult ? (ult.de === u.id ? 'Vos: ' : '') + esc(ult.text.slice(0, 60)) + ' · ' + hace(ult.at) : ''}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('') : vacio('chat', 'Todavía no tenés conversaciones.')}`;
@@ -122,6 +122,89 @@ F['dm'] = (d, form) => {
     notificar(s, { para, titulo:`Mensaje de ${u.nombre.split(' ')[0]} (${u.casa})`, texto:d.text.trim().slice(0, 90), icon:'chat', color:'accent', link:'dm:' + u.id });
   });
   const i = $('#dmIn'); if (i){ i.value = ''; i.focus(); }
+};
+/* =========================================================
+   ESCRIBIRLE A UNO O VARIOS VECINOS (pedido de Claudio, 30-09-2026)
+   Sin el chat vecinal (se sacó el 29-09) no había cómo hablar en privado
+   con un vecino elegido del padrón. Acá se buscan y se tildan uno, dos o
+   hasta MAX_DM vecinos, se escribe UN mensaje y a cada uno le llega en su
+   propio chat privado con quien escribe (el mismo de R.dm, vecino a
+   vecino). NO es un grupo: ninguno ve a quién más se le mandó ni lo que
+   contestan los otros; cada respuesta vuelve por separado. El barrio no
+   quería un chat de muchos, sí uno privado entre vecinos.
+   El tope evita que esto se use como circular: para escribirle a todo el
+   barrio está el pizarrón o la Administración.
+   ========================================================= */
+const MAX_DM = 10;
+/* Las cuentas a las que se les puede escribir: vecinos aprobados, menos uno mismo. */
+const destinatarioDM = (x, u) => x && x.id !== u.id && x.estado === 'aprobado' && x.rol === 'vecino';
+R['dm-nuevo'] = {
+  titulo: 'Escribirle a vecinos', icon: 'chat', color: 'accent', sub: 'Del padrón · a cada uno por separado',
+  render(p){
+    const u = yo();
+    if (esStaff() || esHotel()) return vacio('lock', 'Los mensajes entre vecinos son solo para las cuentas de vecinos.');
+    const pre = String(p || '').split(',').filter(Boolean);
+    const fichas = fichasDeVecinos();
+    const conCuenta = fichas.filter(f => f.cuentas.some(x => destinatarioDM(x, u)));
+    const sinCuenta = fichas.filter(f => !f.cuentas.some(x => destinatarioDM(x, u)) && f.casa !== u.casa);
+    const fila = f => `<div class="dmv-lote" data-busca="${esc(textoFicha(f))}" data-lote="${esc(normTxt(f.lote))}">
+        <div class="dmv-cab"><span class="ficha-lote">Lote ${esc(f.lote)}</span><small>${esc(f.nombre || '')}</small></div>
+        ${f.cuentas.filter(x => destinatarioDM(x, u)).map(x => `<label class="dmv-it">
+          <input type="checkbox" name="u~${esc(x.id)}" ${pre.includes(x.id) ? 'checked' : ''}>${avatar(x)}
+          <span class="txt"><b>${esc(x.nombre)}</b><small>${esc(x.casa)}${x.enDirectorio && x.profesion ? ' · ' + esc(x.profesion) : ''}</small></span></label>`).join('')}</div>`;
+    return `<form data-f="dm-varios" class="dmv">
+      <p class="muted small" style="margin:0 0 10px">${I('lock')} Tildá a quién le querés escribir (hasta ${MAX_DM}). A cada uno le llega <b>por separado</b>, en su chat privado con vos: nadie ve a quién más se lo mandaste y cada uno te contesta en su propia conversación.</p>
+      <input type="search" id="dmvBusca" data-filtro-dm placeholder="Apellido, nombre, oficio o lote" autocomplete="off" style="margin-bottom:10px">
+      <div class="dmv-lista" id="dmvLista">${conCuenta.length ? conCuenta.map(fila).join('') : vacio('users', 'Todavía no hay otros vecinos con cuenta en la app.')}
+        <p class="muted small dmv-nada" hidden>Nadie coincide con esa búsqueda entre los vecinos que usan la app.</p></div>
+      ${sinCuenta.length ? `<details class="dmv-sin"><summary>${plural(sinCuenta.length, 'lote todavía no usa', 'lotes todavía no usan')} la app</summary>
+        <p class="muted small">A ellos no se les puede escribir por acá hasta que se inscriban.</p>
+        <p class="small">${sinCuenta.map(f => `Lote ${esc(f.lote)}${f.nombre ? ' · ' + esc(f.nombre) : ''}`).join('<br>')}</p></details>` : ''}
+      <div class="dmv-barra">
+        <div class="dmv-elegidos" id="dmvElegidos">Nadie elegido todavía</div>
+        <textarea name="text" id="dmvTexto" required maxlength="800" rows="3" placeholder="Tu mensaje privado…"></textarea>
+        <button class="btn btn-accent btn-block" id="dmvEnviar" disabled>${I('send')}Enviar</button>
+      </div></form>`;
+  },
+  alPintar(){ dmvContar(); },
+};
+function dmvContar(){
+  const cajas = $$('#dmvLista input[type=checkbox]'); if (!cajas.length && !$('#dmvElegidos')) return;
+  const tild = cajas.filter(c => c.checked);
+  const nombres = tild.map(c => c.closest('.dmv-it')?.querySelector('b')?.textContent || '').filter(Boolean);
+  cajas.forEach(c => { c.disabled = !c.checked && tild.length >= MAX_DM; });
+  const e = $('#dmvElegidos'), b = $('#dmvEnviar');
+  if (e) e.innerHTML = tild.length ? `<b>${plural(tild.length, 'vecino elegido', 'vecinos elegidos')}</b>${tild.length >= MAX_DM ? ` (el máximo)` : ''}: ${esc(nombres.join(', '))}` : 'Nadie elegido todavía';
+  if (b) b.disabled = !tild.length;
+}
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('#dmvLista')) dmvContar(); });
+document.addEventListener('input', e => {
+  if (!e.target.matches || !e.target.matches('[data-filtro-dm]')) return;
+  const qq = normTxt(e.target.value).trim(), palabras = qq.split(/\s+/).filter(Boolean);
+  let hay = 0;
+  $$('#dmvLista .dmv-lote').forEach(l => {
+    const ok = !qq || (palabras.length === 1 && /^\d+[a-z]?$/.test(palabras[0]) ? l.dataset.lote === palabras[0] : palabras.every(w => l.dataset.busca.includes(w)));
+    /* Lo tildado no se esconde: se ve siempre a quién se le va a mandar. */
+    const tildado = !!l.querySelector('input:checked');
+    l.hidden = !ok && !tildado; if (!l.hidden) hay++;
+  });
+  const n = $('#dmvLista .dmv-nada'); if (n) n.hidden = !!hay;
+});
+F['dm-varios'] = d => {
+  const u = yo(), texto = String(d.text || '').trim();
+  const para = [...new Set(Object.keys(d).filter(k => k.startsWith('u~')).map(k => k.slice(2)))].filter(id => destinatarioDM(usuario(id), u));
+  if (!para.length){ toast('Tildá al menos un vecino', 'alert'); return; }
+  if (para.length > MAX_DM){ toast(`Hasta ${MAX_DM} vecinos por mensaje`, 'alert'); return; }
+  if (!texto){ toast('Escribí el mensaje', 'alert'); return; }
+  Store.cambiar(s => para.forEach(id => {
+    let h = s.dms.find(x => (x.a === u.id && x.b === id) || (x.a === id && x.b === u.id));
+    if (!h){ h = { id:uid(), a:u.id, b:id, msgs:[] }; s.dms.push(h); }
+    h.msgs.push({ id:uid(), de:u.id, text:texto, at:Date.now() });
+    /* Un aviso por persona: nadie ve a quién más le llegó. */
+    notificar(s, { para:id, titulo:`Mensaje de ${u.nombre.split(' ')[0]} (${u.casa})`, texto:texto.slice(0, 90), icon:'chat', color:'accent', link:'dm:' + u.id });
+  }));
+  toast(para.length > 1 ? `Enviado a ${para.length} vecinos, a cada uno por separado` : `Enviado a ${usuario(para[0]).nombre.split(' ')[0]}`, 'send');
+  if (para.length === 1) abrir('dm', para[0]); else abrir('mensajes');
 };
 function marcarVistoLink(link){
   const u = yo(); const pend = aLista(Store.s.notifs).filter(n => n.link === link && meToca(n, u) && !aLista(n.leidas).includes(u.id));

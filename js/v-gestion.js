@@ -42,6 +42,7 @@ function auditar(s, accion, detalle, ref = ''){
 
 /* ---------- PETICIONES A LA GARITA ---------- */
 const TIPOS_PET = {
+  /* "correo" no se ofrece mientras los paquetes estén en pausa (hayPaquetes, core.js). */
   correo:   { n:'Recibir correo o paquetes', icon:'box', ej:'Recibir y guardar los paquetes a mi nombre mientras no estoy.' },
   nopasar:  { n:'No dejar pasar a alguien', icon:'x', ej:'No autorizar el ingreso de: (nombre, DNI, patente).' },
   viaje:    { n:'Estoy de viaje', icon:'lock', ej:'La casa queda sola. Contacto de emergencia: …' },
@@ -70,9 +71,10 @@ R.peticiones = {
   },
 };
 A['nueva-peticion'] = el => {
-  const t0 = el?.dataset?.v || 'correo', hoy = hoyISO();
+  const tipos = Object.entries(TIPOS_PET).filter(([k]) => k !== 'correo' || hayPaquetes());
+  const t0 = tipos.some(([k]) => k === el?.dataset?.v) ? el.dataset.v : tipos[0][0], hoy = hoyISO();
   hoja('Nueva petición a la garita', `<form data-f="peticion">
-    <div class="field"><label>Tipo</label><select name="tipo" id="petTipo">${Object.entries(TIPOS_PET).map(([k, t]) => `<option value="${k}" ${k === t0 ? 'selected' : ''}>${t.n}</option>`).join('')}</select></div>
+    <div class="field"><label>Tipo</label><select name="tipo" id="petTipo">${tipos.map(([k, t]) => `<option value="${k}" ${k === t0 ? 'selected' : ''}>${t.n}</option>`).join('')}</select></div>
     <div class="field"><label>Qué le pedís a la guardia</label><textarea name="texto" id="petTexto" required maxlength="600" placeholder="${esc(TIPOS_PET[t0].ej)}"></textarea></div>
     <div class="grid2"><div class="field"><label>Desde</label><input type="date" name="desde" value="${hoy}" required></div><div class="field"><label>Hasta (opcional)</label><input type="date" name="hasta" min="${hoy}"></div></div>
     <div class="field"><label>Tu firma</label>${firmaHTML('firmaVecino')}</div>

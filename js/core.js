@@ -504,6 +504,16 @@ const soloGarita = () => {
 /* Las cuentas aprobadas de un lote (en el 148 viven Mónica y Claudio: los
    dos tienen que enterarse de lo que llega al lote). */
 const cuentasDelLote = casa => casa ? Store.s.users.filter(u => u.estado === 'aprobado' && u.casa === casa) : [];
+/* PAQUETES EN PAUSA (30-09-2026, pedido de Claudio): el barrio no aprobó
+   que la garita reciba correo ni paquetes de los vecinos. Todo el módulo
+   (Mis paquetes, "Llegó un paquete", el QR de retiro, los avisos de 24 h,
+   la pizarra, el asistente, la petición "Recibir correo o paquetes") queda
+   GUARDADO en el código pero no se ve ni se usa en ningún portal: vecinos,
+   garita, Administración ni hotel. Si algún día se aprueba, alcanza con
+   poner esto en true (y volver a escribir el capítulo del manual, que
+   también quedó guardado en js/v-manual.js). */
+const PAQUETES_ACTIVOS = false;
+const hayPaquetes = () => PAQUETES_ACTIVOS;
 /* Los paquetes de todo el lote, no solo los que llegaron a mi nombre. */
 const loteDelPaquete = p => (p && (p.lote || usuario(p.hostId)?.casa)) || '';
 const paquetesDelLote = (u = yo()) => !u ? [] : aLista(Store.s.paquetes).filter(p => p && (p.hostId === u.id || (u.casa && loteDelPaquete(p) === u.casa)));

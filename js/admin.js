@@ -330,7 +330,7 @@ const ADMIN_TABS = {
     const kpi = (n, t) => `<div class="kpi"><b>${n}</b><span>${t}</span></div>`;
     return `<div class="admin-hero"><b style="font-size:18px">Barrio ${esc(s.config.nombre)}</b><div class="small" style="opacity:.8">${fechaLarga(hoy)}</div>
       <div class="garita-kpis">${kpi(`${casasRegistradas()}/${s.config.casas}`, 'Casas en la app')}${kpi(s.users.filter(u => u.estado === 'pendiente').length, 'Inscripciones')}${kpi(s.reclamos.filter(r => r.estado !== 'resuelto').length, 'Reclamos')}</div>
-      <div class="garita-kpis" style="margin-top:8px">${kpi(pasesDelDia().length, 'Visitas hoy')}${kpi(s.paquetes.filter(p => !p.retirado).length, 'Paquetes en garita')}${kpi(s.peticiones.filter(p => p.estado === 'pendiente').length, 'Peticiones')}</div></div>
+      <div class="garita-kpis" style="margin-top:8px">${kpi(pasesDelDia().length, 'Visitas hoy')}${hayPaquetes() ? kpi(s.paquetes.filter(p => !p.retirado).length, 'Paquetes en garita') : ''}${kpi(s.peticiones.filter(p => p.estado === 'pendiente').length, 'Peticiones')}</div></div>
       <div class="card"><b style="font-size:14px">Ingresos por día (últimos 7)</b>
         <div style="display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:12px">${ingresos7.map(x => `<div style="flex:1;text-align:center"><div class="tiny muted">${x.n}</div><div style="height:${x.n / max * 80}px;min-height:3px;background:var(--brand);border-radius:6px 6px 0 0"></div><div class="tiny muted">${DIAS[fechaDe(x.d).getDay()]}</div></div>`).join('')}</div></div>
       <p class="muted small" style="margin:10px 2px 0">${I('info')} Reclamos, peticiones, garita, comunicados, contabilidad y expensas están en <b>Gestión del barrio</b>; acá, los datos y la configuración.</p>`;
@@ -386,7 +386,7 @@ const ADMIN_TABS = {
         <p class="muted small" style="margin-top:0">Las promociones se cargan a mano en <b>Contenido → Promociones</b> y eso ya funciona. Esto es solo si querés que se lean solas del sitio del Hotel Los Cauquenes: hace falta un programita propio que las devuelva en JSON (está explicado en CONECTAR.md), porque el navegador no puede leer otra web directamente.</p>
         ${campo('promosUrl', 'Dirección del lector de promociones', 'url')}</div>
       <div class="card"><h3>Avisos al celular con la pantalla apagada</h3>
-        <p class="muted small" style="margin-top:0">Para que el camión, el SOS, los avisos urgentes y los paquetes lleguen aunque el celular esté bloqueado. Son dos pasos de una sola vez, explicados en <span class="mono">AVISOS.md</span>: la clave pública va acá y la cuenta de servicio, en el Apps Script.</p>
+        <p class="muted small" style="margin-top:0">Para que el camión, el SOS, los avisos urgentes y los mensajes lleguen aunque el celular esté bloqueado. Son dos pasos de una sola vez, explicados en <span class="mono">AVISOS.md</span>: la clave pública va acá y la cuenta de servicio, en el Apps Script.</p>
         <div class="field"><label>Clave pública de avisos (Firebase → Cloud Messaging → Certificados push web)</label>
           <input name="pushVapid" type="text" value="${esc(c.pushVapid ?? '')}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="BK… (un texto de 87 caracteres)">
           <div class="ayuda">${c.pushVapid ? `${I('check')} Guardada en la base del barrio (termina en <span class="mono">…${esc(String(c.pushVapid).slice(-6))}</span>). Ya no se borra sola: antes la pisaba otro equipo de la Administración al abrirse con una copia vieja de los ajustes.` : 'Es la clave <b>pública</b> (empieza con B). La privada no va nunca en la app.'}</div></div>
@@ -404,7 +404,7 @@ const ADMIN_TABS = {
   motor(){
     const s = Store.s;
     return `<p class="muted small" style="margin-top:0">Reglas que la app aplica sola. Hoy corren mientras la app está abierta en algún equipo del barrio; con servidor corren siempre.</p>
-      ${REGLAS.map(r => `<div class="card" style="padding:13px 14px"><div class="row"><span class="ic ic-${motorActivo(r.id) ? 'accent' : 'brand'}" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;opacity:${motorActivo(r.id) ? 1 : .4}">${I('zap')}</span>
+      ${REGLAS.filter(r => hayPaquetes() || !/^paq/.test(r.id)).map(r => `<div class="card" style="padding:13px 14px"><div class="row"><span class="ic ic-${motorActivo(r.id) ? 'accent' : 'brand'}" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;opacity:${motorActivo(r.id) ? 1 : .4}">${I('zap')}</span>
         <div class="grow"><b style="font-size:14px">${esc(r.n.replace('N días', (s.config.datosDias || 90) + ' días'))}</b>${r.d ? `<div class="muted small">${esc(r.d)}</div>` : ''}<div class="tiny muted">${s.motorCuenta?.[r.id] ? `Actuó ${plural(s.motorCuenta[r.id], 'vez', 'veces')}` : 'Todavía no actuó'}</div></div>
         <label class="check" style="margin:0"><input type="checkbox" data-a="regla" data-v="${r.id}" ${motorActivo(r.id) ? 'checked' : ''}></label></div></div>`).join('')}
       <button class="btn btn-sec btn-block" data-a="motor-ahora">${I('zap')}Correr ahora</button>`;
@@ -508,7 +508,7 @@ A['aprobar'] = async el => {
   const nube = typeof Nube !== 'undefined' && Nube.activa();
   const clave = nube ? '' : generarClave(u.rol === 'guardia' ? 'GAR' : u.rol === 'admin' ? 'ADM' : 'VEC');
   const garita = esCorreoGarita(u.email);
-  if (garita && !await confirmar('Aprobar la cuenta de la garita', `Esta cuenta (${esc(u.email)}) va a ver todo lo de la garita: ingresos, paquetes, peticiones y datos de contacto de los vecinos. Aprobala solo si la inscribiste vos o la guardia te lo confirmó.`, { si:'Aprobar como garita' })) return;
+  if (garita && !await confirmar('Aprobar la cuenta de la garita', `Esta cuenta (${esc(u.email)}) va a ver todo lo de la garita: ingresos, peticiones y datos de contacto de los vecinos. Aprobala solo si la inscribiste vos o la guardia te lo confirmó.`, { si:'Aprobar como garita' })) return;
   Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.estado = 'aprobado'; x.clave = clave; x.aprobadoAt = Date.now();
     if (garita){ x.rol = 'guardia'; x.casa = 'Garita'; x.nombre = 'Garita'; }
     auditar(s, garita ? 'Aprobó la cuenta de la garita' : 'Aprobó una inscripción', `${x.nombre} · ${x.casa}`, x.id); });
@@ -844,7 +844,7 @@ A['invitar-propietario'] = async el => {
   if (!p || !p.email){ toast('Ese lote no tiene correo cargado', 'alert'); return; }
   const salio = await Correo.enviar({ para:p.email, asunto:`Te invitamos a la app del barrio ${Store.s.config.nombre}`, tipo:'invitacion',
     html:Correo.plantilla('La app del barrio', `<p>Hola${p.propietario ? ' ' + esc(p.propietario.split(',')[0].split(' ')[0]) : ''}: ya está andando la app del barrio <b>${esc(Store.s.config.nombre)}</b>.</p>
-      <p>Con ella autorizás visitas con QR, te enterás cuando llega un paquete, ves tus expensas y recibís los avisos de la guardia. Tu lote es el <b>${esc(p.lote)}</b>.</p>
+      <p>Con ella autorizás visitas con QR, les escribís en privado a tus vecinos, ves tus expensas y recibís los avisos de la guardia. Tu lote es el <b>${esc(p.lote)}</b>.</p>
       <p>Para entrar, inscribite con este enlace y la Administración te habilita.</p>`, { texto:'Inscribirme', url:urlApp() }) });
   cerrarHoja();
   toast(salio ? 'Invitación enviada' : 'Quedó en la bandeja de salida de Correos', salio ? 'mail' : 'clock');

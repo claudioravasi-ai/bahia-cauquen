@@ -94,7 +94,7 @@ function urgentesVecino(){
   s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente').forEach(r => out.push(aviso('info', 'qr',
     `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}${r.patente ? ' · ' + esc(r.patente) : ''}`,
     `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">${I('check')}Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)));
-  const paq = paquetesDelLote(u).filter(p => !p.retirado);
+  const paq = hayPaquetes() ? paquetesDelLote(u).filter(p => !p.retirado) : [];
   if (paq.length) out.push(aviso('brand', 'box', `${paq.length > 1 ? 'Hay ' + paq.length + ' paquetes' : 'Hay un paquete'} de ${esc(u.casa)} en la garita`, paq.map(p => esc(p.empresa) + (p.hostId !== u.id ? ' (para ' + esc(nombreDe(p.hostId).split(' ')[0]) + ')' : '')).join(', '),
     `<button class="btn btn-xs btn-pri" data-a="retiro-qr">${I('qr')}Mi QR para retirar</button><button class="btn btn-xs btn-sec" data-a="abrir" data-v="mis-paquetes">Ver</button>`));
 
@@ -176,7 +176,7 @@ const arteDe = k => {
 const SECCIONES = {
   casa: {
     titulo:'Tu casa', icon:'home', color:'ok', ancha:true, lema:'Tu lote, tus visitas y tus cosas',
-    sub:'Visitas, paquetes, mensajes y los datos de tu lote',
+    sub:'Visitas, emergencias, mensajes y los datos de tu lote',
     /* Si está de salida (Salidas seguras), el "Volví" va arriba de todo
        también acá, además de la portada y de la ventana de la salida. */
     arriba(u){ const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null; return x && x.salida && !x.salida.volvio && typeof tarjetaSalidaMia === 'function' ? tarjetaSalidaMia(x) : ''; },
@@ -192,8 +192,11 @@ const SECCIONES = {
       const privNoLeidos = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(m => m.from !== 'vecino' && !m.leido).length, 0);
       return [
         teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Visita, delivery, obra, personal o Uber/DiDi', destaca:true }),
+        /* Emergencias vive en Tu casa desde el 30-09-2026 (pedido de Claudio): en
+           Ushuaia y servicios quedaba perdida. */
+        teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · SOS de hoy · hospitales · farmacias' }),
         teja({ v:'visitas', icon:'users', color:'sky', t:'Mis visitas', s: misHoy.length ? `${plural(misHoy.length, 'esperada')} hoy` : 'Nadie anunciado hoy', n: misHoy.length || '' }),
-        teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = paquetesDelLote(u).filter(p => !p.retirado).length; return n ? `${plural(n, 'paquete')} de tu lote en la garita` : 'Lo que llega a la garita para tu lote'; })(), badge: paquetesDelLote(u).filter(p => !p.retirado).length }),
+        ...(!hayPaquetes() ? [] : [teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = paquetesDelLote(u).filter(p => !p.retirado).length; return n ? `${plural(n, 'paquete')} de tu lote en la garita` : 'Lo que llega a la garita para tu lote'; })(), badge: paquetesDelLote(u).filter(p => !p.retirado).length })]),
         teja({ v:'mensajes', icon:'chat', color:'accent', t:'Mensajes', s:'Privados con vecinos y la Administración', badge: privNoLeidos + dmNoLeidos() }),
         teja({ v:'expensas', icon:'wallet', color:'wood', t:'Mis expensas', s:`Tu cuenta, cupones y pagos` }),
         teja({ v:'sismo', icon:'sismo', color:'warn', t:'Preparados para un sismo', s:(() => { const ok = typeof revisionSemanalHecha === 'function' && tengoLote() ? revisionSemanalHecha() : true; return ok ? 'Mochila, plan familiar y qué hacer' : 'Falta la revisión de esta semana'; })() }),
@@ -255,13 +258,12 @@ const SECCIONES = {
       const v = Vuelos.cuantosHoy();
       const f = proximoFeriado();
       return [cru && `${plural(cru, 'crucero recala', 'cruceros recalan')} hoy`, v && `${v} vuelos hoy`,
-        f && `feriado ${relDia(f.fecha)}`].filter(Boolean).join(' · ') || 'Emergencias, agenda, vuelos, cruceros y feriados';
+        f && `feriado ${relDia(f.fecha)}`].filter(Boolean).join(' · ') || 'Agenda, vuelos, cruceros, feriados y sismos';
     },
     tejas(u, s, hoy){
       const prox = proximoFeriado();
       return [
-        teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · hospitales · farmacias', destaca:true }),
-        teja({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, súper y más' }),
+        teja({ v:'agenda', icon:'book', color:'sky', t:'Agenda de Ushuaia', s:'Comidas, taxis, súper y más', destaca:true }),
         teja({ v:'cruceros', icon:'send', color:'brand', t:'Cruceros', s: Cruceros.linea(), n: Cruceros.hoy().length || '' }),
         teja({ v:'ushuaia', icon:'pin', color:'sky', t:'Ushuaia hoy', s: prox ? `Próximo feriado: ${relDia(prox.fecha)}` : 'Temporadas, feriados, eventos' }),
         teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: Vuelos.cuantosHoy() || '' }),
@@ -328,7 +330,7 @@ function diaADia(u, s){
     { k:'garita', t:'Garita y seguridad', icon:'gate', color:'brand',
       linea: `${t ? `Turno ${esc(t.turno)} · ${esc(aLista(t.guardias).join(', ')) || 'sin guardias anotados'}` : 'Sin turno abierto'} · ${plural(ingresos, 'ingreso', 'ingresos')} hoy`,
       items:[
-        { v:'garita', icon:'eye', t:'Garita en vivo', s:'Ingresos, camión y paquetes · solo para mirar', n:ingresos },
+        { v:'garita', icon:'eye', t:'Garita en vivo', s:`Ingresos, camión${hayPaquetes() ? ' y paquetes' : ''} · solo para mirar`, n:ingresos },
         { v:'bitacora', icon:'book', t:'Bitácora', s:'Libro de guardia · lo escribe la garita, acá se lee' },
         { v:'turnos', icon:'clock', t:'Turnos de la garita', s: t ? 'Abierto ahora · horarios y policías' : 'Horarios, guardias y policías' },
         { v:'privado', p:'interno', icon:'shield', t:'Mensajes con la garita', s:'Chat con la garita y los pedidos firmados de los vecinos', badge: msgGarita + petPend },
@@ -635,7 +637,7 @@ function avisosPersonales(){
   const reloj = exp ? [{ ...exp, nuevo: exp.siempre || Pizarra.nuevo(exp.k, exp.at) }] : [];
   /* Un paquete del lote en la garita queda en "Para vos" hasta que alguien
      del lote lo retira, aunque ya se haya leído el aviso (26-09-2026). */
-  const paqs = esStaff() ? [] : paquetesDelLote(u).filter(p => !p.retirado).map(p => ({ k:'paq-' + p.id, nuevo:Pizarra.nuevo('paq-' + p.id, p.recibido), nivel:'amarillo', icon:'box', tag:'Para vos · paquete', at:p.recibido,
+  const paqs = esStaff() || !hayPaquetes() ? [] : paquetesDelLote(u).filter(p => !p.retirado).map(p => ({ k:'paq-' + p.id, nuevo:Pizarra.nuevo('paq-' + p.id, p.recibido), nivel:'amarillo', icon:'box', tag:'Para vos · paquete', at:p.recibido,
     titulo:`Paquete en la garita${p.hostId !== u.id ? ' para ' + nombreDe(p.hostId).split(' ')[0] : ''}`, texto:`${p.empresa}${p.detalle ? ' · ' + p.detalle : ''} · se retira con el QR de retiro`, a:'abrir', v:'mis-paquetes' }));
   const ids = new Set(paqs.map(x => x.k));
   /* Dos avisos con el mismo título (el de la helada que dio el motor y una
@@ -1351,7 +1353,7 @@ function parteTurnoHtml(t, nota = ''){
       ${fila('Horario', `${hora(t.at)} a ${hora(fin)} h${t.cierreAuto ? ' (se cerró al abrir el siguiente)' : ''}`)}
       ${fila('Guardias', esc(aLista(t.guardias).join(', ')))}
       ${fila('Ingresos y egresos', String(cuenta(/^(Ingreso|Egreso)/)))}
-      ${fila('Paquetes', String(cuenta(/paquete/i)))}
+      ${hayPaquetes() ? fila('Paquetes', String(cuenta(/paquete/i))) : ''}
       ${fila('SOS', String(cuenta(/^SOS/)))}
     </table>
     ${nota ? `<p style="background:#fff7e0;border-radius:10px;padding:10px 12px;margin:0 0 14px"><b>Novedades para el turno siguiente:</b><br>${esc(nota)}</p>` : ''}
@@ -2122,7 +2124,7 @@ function tareasGarita(){
   if (deObra.length) add(1, 'wrench', 'Obras y proveedores de hoy: controlar la ART al entrar', `${lista3([...new Set(deObra)], x => x)}${provVencida.length ? ` · <b style="color:var(--danger)">ART vencida: ${provVencida.map(p => esc(p.empresa)).join(', ')} (no entra)</b>` : ''}`, { v:'proveedores' });
 
   /* Paquetes por entregar y los entregados hoy. */
-  const paq = s.paquetes.filter(p => !p.retirado), entregados = s.paquetes.filter(p => p.retirado && p.retirado >= inicioDia).length;
+  const paq = hayPaquetes() ? s.paquetes.filter(p => !p.retirado) : [], entregados = hayPaquetes() ? s.paquetes.filter(p => p.retirado && p.retirado >= inicioDia).length : 0;
   if (paq.length) add(2, 'box', `Paquetes para entregar: ${paq.length}`, `${lista3([...new Set(paq.map(p => loteDelPaquete(p) || '—'))], l => esc(l))} · se entregan con el QR del vecino`, { ir:'#garPaquetes' });
   if (entregados) hecho(plural(entregados, 'paquete entregado', 'paquetes entregados'));
 
@@ -2176,7 +2178,7 @@ R.garita = {
     const lista = pasesDelDia(hoy).sort((a, b) => a.desde.localeCompare(b.desde));
     const adentro = lista.filter(p => estadoPase(p) === 'adentro').length;
     const esperados = lista.filter(p => estadoPase(p) === 'esperado').length;
-    const paq = s.paquetes.filter(p => !p.retirado);
+    const paq = hayPaquetes() ? s.paquetes.filter(p => !p.retirado) : [];
     const llegadas = s.llegadas.filter(l => l.estado === 'consultando' || Date.now() - l.at < 30 * MIN);
     const solas = typeof casasSolas === 'function' ? casasSolas(hoy) : [];
     const avisos = s.avisos.filter(a => Date.now() - a.at < 6 * HORA);
@@ -2191,7 +2193,7 @@ R.garita = {
       ${PILA.length === 1 ? `<div class="garita-titulo titulo-vista"><h1>Garita</h1><p>${fechaLarga(hoy)}</p></div>` : ''}
       <aside class="garita-lado">${tareasGarita()}</aside>
       <div class="garita-main">
-      ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos, paquetes, el camión, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
+      ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos${hayPaquetes() ? ', paquetes' : ''}, el camión, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
         <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="interno">${I('chat')}Escribirle a la garita</button></div>`}
       ${bandaTurno()}
       ${bandaPolicia()}
@@ -2203,14 +2205,14 @@ R.garita = {
       ${alertas().filter(alertaActiva).map(a => { const ay = destinatariosAlerta(a).filter(v => a.respuestas?.[v.id]?.r === 'ayuda').length;
         return aviso(ay ? 'danger latido' : 'warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, `${esc(a.zona)} · ${ay ? plural(ay, 'casa pide', 'casas piden') + ' ayuda' : 'nadie pidió ayuda'}`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`); }).join('')}
       ${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
-      <div class="garita-kpis"><div class="kpi"><b>${esperados}</b><span>Esperados</span></div><div class="kpi"><b>${adentro}</b><span>Adentro</span></div><div class="kpi"><b>${paq.length}</b><span>Paquetes</span></div></div>
+      <div class="garita-kpis"><div class="kpi"><b>${esperados}</b><span>Esperados</span></div><div class="kpi"><b>${adentro}</b><span>Adentro</span></div>${hayPaquetes() ? `<div class="kpi"><b>${paq.length}</b><span>Paquetes</span></div>` : ''}</div>
       ${opera ? `<form data-f="validar" class="card">
         <div class="lbl">Código, patente o DNI</div>
         <div class="validador"><input name="q" id="qValidar" autocomplete="off" placeholder="482913" maxlength="12" inputmode="text">
           <button class="btn btn-pri">${I('search')}</button></div>
         <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-sm btn-sec" data-a="escanear">${I('scan')}Escanear QR</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="llegada-nueva">${I('gate')}Llegó sin aviso</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="paquete-nuevo">${I('box')}Llegó un paquete</button>
+          ${hayPaquetes() ? `<button type="button" class="btn btn-sm btn-sec" data-a="paquete-nuevo">${I('box')}Llegó un paquete</button>` : ''}
           <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('clock')}Historial de visitas</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="alerta-nueva">${I('siren')}Aviso urgente</button></div>
