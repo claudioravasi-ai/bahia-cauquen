@@ -348,7 +348,7 @@ function tarjetaSalidaMia(x){
     <button class="btn btn-ok" data-a="salida-volvi">${I('check')}Volví</button></div>`;
 }
 function bloqueCuidado(){
-  const u = yo(); if (!u || esStaff() || esHotel()) return '';
+  const u = yo(); if (!u || esStaff() || esHotel() || esSupervisor()) return '';
   const x = Cuidado.mio(), partes = [];
   /* Si la casa está sola (Me voy de viaje): si hoy ya la revisaron. */
   const sola = typeof lineaCasaSola === 'function' ? lineaCasaSola() : ''; if (sola) partes.push(sola);
@@ -794,7 +794,7 @@ A['resp-voy'] = el => { Respondedores.responder(el.dataset.id, 'voy'); Responded
 A['resp-no'] = el => { Respondedores.responder(el.dataset.id, 'no'); Respondedores.ocultas.add(el.dataset.id); pintarAlarmas(); toast('Entendido', 'check'); };
 /* Para la garita y la Administración: el pedido del DEA en curso. */
 function bandaDeaEnCurso(){
-  if (!esStaff()) return '';
+  if (!veGarita()) return '';
   return aLista(Store.s.sos).filter(x => x && x.tipo === 'dea' && x.estado === 'en_camino' && Date.now() - (x.enCaminoAt || x.at) < 3 * HORA).map(x => {
     const v = usuario(x.userId) || {}, r = x.responden || {};
     const van = Object.entries(r).filter(([, y]) => y && y.v === 'voy').map(([id]) => { const w = usuario(id); return `${esc(w?.nombre || 'Vecino/a')} (${esc(Respondedores.prof(w))}${w?.casa ? ', ' + esc(w.casa) : ''})`; });
@@ -932,7 +932,7 @@ A['nieve-listo'] = el => {
 
 /* ---------- lo que va en "Para vos" de la pizarra ---------- */
 function pizarraCuidados(){
-  const u = yo(); if (!u || esStaff() || esHotel()) return [];
+  const u = yo(); if (!u || esStaff() || esHotel() || esSupervisor()) return [];
   const out = [], hoy = hoyISO(), cm = nevoHoy();
   aLista(Store.s.nieve).filter(x => x && x.tipo === 'ayuda' && x.activo !== false).forEach(x => {
     const p = pedidoDeHoy(x), mia = x.angel === u.id, pide = p && p.estado !== 'hecho';

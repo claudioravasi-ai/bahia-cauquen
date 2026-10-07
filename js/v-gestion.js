@@ -54,13 +54,13 @@ const ESTADO_PET = { pendiente:['Pendiente de recepción','warn'], en_funciones:
 R.peticiones = {
   titulo: 'Peticiones a la garita', icon: 'shield', color: 'brand', sub: 'Con firma del vecino y de la guardia',
   render(f){
-    const u = yo(), s = Store.s, staff = esStaff();
+    const u = yo(), s = Store.s, staff = veGarita();
     let lista = staff ? s.peticiones.slice() : s.peticiones.filter(p => p.userId === u.id);
     const filtro = f || (staff ? 'pendiente' : 'todas');
     if (filtro !== 'todas') lista = lista.filter(p => p.estado === filtro);
     const n = e => (staff ? s.peticiones : s.peticiones.filter(p => p.userId === u.id)).filter(p => p.estado === e).length;
     return `${!staff ? superficie({ a:'nueva-peticion', icon:'edit', t:'Nueva petición a la garita', s:'Queda firmada por vos y por el guardia que la recibe', cls:'acento' }) : ''}
-      ${esAdmin() ? `<p class="muted small" style="margin:0 0 10px">${I('eye')} Son los pedidos que los vecinos le hacen <b>por escrito y firmados</b> a la garita: no dejar pasar a alguien, que se van de viaje, dejar una llave, recibir paquetes. <b>Los recibe y los firma la garita</b>; desde la Administración solo se miran.</p>` : ''}
+      ${esAdmin() || esSupervisor() ? `<p class="muted small" style="margin:0 0 10px">${I('eye')} Son los pedidos que los vecinos le hacen <b>por escrito y firmados</b> a la garita: no dejar pasar a alguien, que se van de viaje, dejar una llave, recibir paquetes. <b>Los recibe y los firma la garita</b>; desde ${esSupervisor() ? 'la supervisión' : 'la Administración'} solo se miran.</p>` : ''}
       <div class="chips">${[['pendiente','Pendientes'],['en_funciones','En funciones'],['cerrada','Cerradas'],['todas','Todas']].map(([k, t]) =>
         `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="peticiones" data-p="${k}">${t}${k !== 'todas' && n(k) ? `<span class="n">${n(k)}</span>` : ''}</button>`).join('')}</div>
       ${lista.length ? lista.map(p => { const t = TIPOS_PET[p.tipo] || TIPOS_PET.otro, e = ESTADO_PET[p.estado], v = usuario(p.userId) || {};

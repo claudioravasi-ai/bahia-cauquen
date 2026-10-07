@@ -225,8 +225,8 @@ R.obras = {
     else if (filtro === 'pendientes') ls = ls.filter(o => o.estado === 'pendiente');
     const hoyObra = s.obras.filter(o => o.avisoHoy && o.avisoHoy.fecha === hoyISO());
     ls.sort((a, b) => (b.ultima || b.createdAt) - (a.ultima || a.createdAt));
-    const puede = o => !esGuardia() && (o.userId === u.id || esAdmin());
-    return `${!esGuardia() ? superficie({ a:'nueva-obra', icon:'plus', t: esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', s: esAdmin() ? 'De un lote o del barrio (espacios comunes). La ven al instante todos: vecinos y garita.' : 'La ven al instante la Administración, la garita y todo el barrio', cls:'acento' }) : ''}
+    const puede = o => !esGuardia() && !esSupervisor() && (o.userId === u.id || esAdmin());
+    return `${!esGuardia() && !esSupervisor() ? superficie({ a:'nueva-obra', icon:'plus', t: esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', s: esAdmin() ? 'De un lote o del barrio (espacios comunes). La ven al instante todos: vecinos y garita.' : 'La ven al instante la Administración, la garita y todo el barrio', cls:'acento' }) : ''}
       <p class="muted tiny" style="margin:0 0 10px">${I('info')} Cada obra en curso aparece todos los días en la Pizarra del día, desde que empieza hasta que termina. Los días con movimiento (mixer, camión, grúa) su dueño manda el "Aviso del día" y sale en amarillo. ${esGuardia() ? 'La garita las ve pero no las edita.' : 'La garita las ve pero no las puede editar; la Administración sí.'}</p>
       ${hoyObra.map(o => aviso('warn', 'truck', `Hoy en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h` : '')).join('')}
       <div class="chips">${[['activas','En curso'], ...(s.obras.some(o => o.estado === 'pendiente') ? [['pendientes','Por aprobar']] : []),['finalizadas','Terminadas'],['todas','Todas']].map(([k, t]) => `<button class="chip ${k === filtro ? 'on' : ''}" data-a="abrir" data-v="obras" data-p="${k}">${t}</button>`).join('')}</div>

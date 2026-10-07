@@ -1,13 +1,14 @@
-# Subir la versión nueva y probarla — paso a paso (actualizado el 29-09-2026)
+# Subir la versión nueva y probarla — paso a paso (actualizado el 07-10-2026)
 
-Orden: **1. Preparar en la Mac → 2. Firebase (reglas) → 3. Apps Script → 4. GitHub → 5. Encender en la app → 6. Probar.**
-Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con ellas.
+**El orden, siempre este:** 1. Preparar en la Mac → 2. Firebase (reglas) → 3. Apps Script → 4. GitHub → 5. Encender en la app → 6. Probar.
+
+**¿Por qué en ese orden?** Las reglas van primero porque la app nueva las necesita y la vieja sigue andando igual con ellas (para vecinos, garita, Administración y hotel no cambia nada: se comparó en 3.330 casos). El Apps Script va antes de GitHub porque la versión 10 también funciona con la app vieja. GitHub va al final: recién ahí los equipos bajan la app nueva, y ya encuentran todo listo.
 
 ---
 
 ## 1. Preparar en la Mac (1 minuto)
 
-1. En la carpeta **Barrio Bahia Cauquen**, doble clic en **`3 - Preparar carpeta para GitHub.command`**.
+1. En la carpeta **Apps → Barrio Bahia Cauquen**, doble clic en **`3 - Preparar carpeta para GitHub.command`**.
 2. Revisa que no haya errores, sella la versión y arma en el Escritorio la carpeta **`SUBIR A GITHUB`**.
    Si dice "HAY UN PROBLEMA", no subas nada y pasame lo que dice.
 
@@ -15,9 +16,9 @@ Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con 
 
 | Archivos sueltos | Carpetas |
 |---|---|
-| `index.html`, `sw.js`, `pago.html`, `limpiar.html`, **`probar.html`** (la página de simulaciones para los vecinos, 27-09), `manifest.webmanifest`, `reglas-firebase.txt`, `revisar.py`, `version.py`, los `.md` (guías) | `js/` (incluye los nuevos **`v-cuidados.js`** y **`v-casa.js`**, del 27-09), `css/`, `img/`, `icons/`, `apps-script/` |
+| `index.html`, `sw.js`, `pago.html`, `limpiar.html`, `probar.html`, `manifest.webmanifest`, `reglas-firebase.txt`, `revisar.py`, `version.py`, los `.md` (guías) | `js/` (incluye el nuevo **`v-supervisor.js`**, del 07-10), `css/`, `img/`, `icons/`, `apps-script/` |
 
-**Lo que NO se sube nunca:** `datos-privados/` (padrón y liquidación con nombres), `Logo barrio.png`, `Incial DeepSeek/`, `Guia para vecinos/`, y el archivo `.json` de la cuenta de servicio de Firebase (es una llave).
+**Lo que NO se sube nunca:** `datos-privados/` (padrón y liquidación con nombres), `Logo barrio.png`, `Incial DeepSeek/`, `Guia para vecinos/`, los `.docx` (como **`Compromiso de donacion - publicidad (para firmar).docx`**: es para el abogado y la firma, no para la web), la carpeta oculta `.claude`, y el archivo `.json` de la cuenta de servicio de Firebase (es una llave). El `.command` ya los deja afuera solo.
 
 ---
 
@@ -29,13 +30,13 @@ Las reglas van primero: la app nueva las necesita, y la vieja sigue andando con 
 4. Clic dentro del editor → Cmd+A → Borrar → Cmd+V → **Publicar**.
 5. Si marca un error en rojo, no publiques y pasame la línea que marca.
 
-Esto deja andando, además de lo pendiente de antes: **"Estoy bien" y el aviso de salida** (`cuidado/`), **cosas para prestar**, **ángeles de la nieve**, **tu casa en invierno y la mochila para sismos** y la **casa sola revisada cada día** (27-09), el **hotel** (zona `hotel/`), los **paquetes por lote**, los comprobantes de pago, el archivo histórico y las marcas del motor. **Desde el 29-09** además cierra el **chat vecinal** y las **reservas** (se sacaron de la app): nadie puede leer ni escribir ahí salvo la Administración, que borra lo que quedó.
+**Lo nuevo del 07-10:** el rol **supervisión de la guardia** (lee lo de la garita y no escribe en ningún lado, salvo sus mensajes y el visto de los partes), las carpetas de sus conversaciones (`pv/privadosSupGarita`, `pv/privadosSupAdmin`) y dos colecciones nuevas: **`staff/alertasSup`** (alertas automáticas) y **`staff/vistos`** (vistos de los partes). Además siguen pendientes todas las anteriores (cuidado, hotel, chat y reservas cerrados, etc.): con pegar este archivo entero quedan todas.
 
 ---
 
-## 3. Apps Script: el código nuevo y sus propiedades (10 minutos)
+## 3. Apps Script: el código nuevo, versión 10 (5 minutos)
 
-Es el "servidor" del barrio: manda los correos, los avisos push, lee los cruceros y cobra con Mercado Pago.
+Es el "servidor" del barrio: manda los correos (también el informe mensual), los avisos push, lee los cruceros, cobra con Mercado Pago y tiene el reloj que vigila "Estoy bien" y, desde la versión 10, **que la garita esté conectada y que los SOS tengan respuesta**.
 
 1. [script.google.com](https://script.google.com) con la cuenta con la que lo creaste (la de la garita) → abrí el proyecto del correo.
 2. Abrí **`apps-script/Codigo.gs`** de la carpeta del barrio con TextEdit → Cmd+A → Cmd+C.
@@ -46,13 +47,14 @@ Es el "servidor" del barrio: manda los correos, los avisos push, lee los crucero
    | Propiedad | Valor | Para qué |
    |---|---|---|
    | `CLAVE_COMPARTIDA` | tu frase (ya debería estar) | que solo la app pueda usarlo |
-   | `FCM_CUENTA` | **todo** el contenido del `.json` de la cuenta de servicio (ver abajo) | los avisos al celular |
+   | `FCM_CUENTA` | **todo** el contenido del `.json` de la cuenta de servicio (ver abajo) | los avisos al celular y el reloj |
    | `MP_ACCESS_TOKEN` | el Access Token de la cuenta de prueba Vendedor (ver la parte 7) | Mercado Pago |
 
    **Cómo se saca el `.json`:** Firebase → engranaje → **Configuración del proyecto** → **Cuentas de servicio** → **Generar nueva clave privada**. Se baja un archivo: abrilo con TextEdit, Cmd+A, Cmd+C y pegalo como valor de `FCM_CUENTA`. Después guardalo en un lugar seguro (no en la carpeta de GitHub).
 5. **Implementar → Gestionar implementaciones** → lápiz (editar) → **Versión: Nueva versión** → **Implementar**. La dirección `/exec` no cambia.
 6. Si Google pide permisos ("conectarse a un servicio externo"), aceptalos.
-7. **Una sola vez (versión 8, 27-09): el reloj de "Estoy bien".** En el menú de funciones de arriba elegí **`instalarRelojCuidados`** → **Ejecutar** → aceptá los permisos. Queda revisando cada 10 minutos, aunque todos los teléfonos estén bloqueados (detalle en AVISOS.md).
+7. **El reloj (si nunca lo instalaste, o para asegurarte):** en el menú de funciones de arriba elegí **`instalarRelojCuidados`** → **Ejecutar** → aceptá los permisos. Queda revisando cada 10 minutos, aunque todos los teléfonos estén bloqueados. Volver a ejecutarlo no duplica nada (borra el anterior y pone uno nuevo).
+8. Comprobalo: a la izquierda, **Activadores** (el relojito) → tiene que haber **uno solo**: `revisarCuidados`, cada 10 minutos.
 
 ---
 
@@ -60,31 +62,44 @@ Es el "servidor" del barrio: manda los correos, los avisos push, lee los crucero
 
 1. Entrá al repositorio de la app del barrio en github.com (el que publica en GitHub Pages).
 2. **Add file → Upload files**.
-3. Abrí la carpeta **`SUBIR A GITHUB`** del Escritorio → **Cmd+A** (todo lo de adentro, no la carpeta) → arrastralo a la página de GitHub.
-4. Esperá a que termine de cargar la lista. Abajo, en el mensaje: *Garita al día, policía con constancia, vans, Uber/DiDi, Estoy bien y más (27-09)* → **Commit changes**.
-5. Esperá 1 o 2 minutos (GitHub Pages publica solo). Comprobalo: abrí la app, y en la pantalla de ingreso, abajo, tiene que decir **versión 20260927-…** (la del día).
-6. La página de simulaciones queda en **`<dirección de la app>/probar.html`**: ese es el enlace para mandarles a los vecinos (se abre en cualquier navegador, no toca la app ni la base).
-7. Si en un equipo sigue la vieja: **Tu cuenta → Actualizar la app**.
+3. Abrí la carpeta **`SUBIR A GITHUB`** del Escritorio → **Cmd+A** (todo lo de adentro, no la carpeta) → arrastralo a la página de GitHub. Los archivos que ya existen se reemplazan; los nuevos (como `js/v-supervisor.js`) se agregan.
+4. Esperá a que termine de cargar la lista. Abajo, en el mensaje: *Supervisión de la guardia, alertas, informe mensual, publicidad y aporte (07-10)* → **Commit changes**.
+5. Esperá 1 o 2 minutos (GitHub Pages publica solo). Comprobalo: abrí la app, y en la pantalla de ingreso, abajo, tiene que decir **versión 20261007-…**.
+6. Si en un equipo sigue la vieja: **Tu cuenta → Actualizar la app**.
 
 ---
 
-## 5. Encender lo nuevo en la app (como Administración, 5 minutos)
+## 5. Encender lo nuevo en la app (como Administración, 10 minutos)
 
-1. Entrá con tu cuenta y elegí **Administración**. Esperá unos segundos: la app hace sola la mudanza de carpetas y reparte pagos y paquetes.
-2. **Ajustes → Correo → "Probar el envío"**: tiene que decir que salió.
-3. **Ajustes → Avisos al celular**: pegá la **clave pública** (la que empieza con `B…`, de Firebase → Configuración → Cloud Messaging → Certificados push web) si todavía no está → Guardar → **"Ver si el Apps Script está listo"**.
-4. **Contabilidad → Parámetros**: tildá **"Cobro online con acreditación automática (Mercado Pago)"** y elegí el método para el pago fuera de término → Guardar.
-5. **La cuenta del hotel (para probarla):**
-   - En otro navegador (o una ventana de incógnito), abrí la app → **"Todavía no tengo cuenta"** → inscribite con un correo de prueba. Truco: `barriobahiacauquen+hotel@gmail.com` (Gmail lo entrega en la misma casilla).
-   - Volvé a tu Administración → **Día a día → sala "Hotel Los Cauquenes" → "Cuenta del hotel"** → buscá esa cuenta → **"Hacerla del hotel"**.
-   - Entrá con esa cuenta: ya es la del hotel. Cuando el hotel la use de verdad, cambia el correo y la contraseña en **Tu cuenta**.
-6. **Borrar lo que quedó del chat y de las reservas (29-09)**, DESPUÉS de publicar las reglas: **Día a día → Proveedores y cumplimiento → Protección de datos** → botón rojo **"Borrar lo que quedó del chat y las reservas"** → confirmar. Se borra para siempre y queda en la auditoría; la tarea pasa a verde.
-
----
+1. Entrá con tu cuenta y elegí **Administración**.
+2. **Ajustes → Correo → "Probar el envío"**: tiene que decir que salió (el informe mensual sale por ahí).
+3. **Supervisión de la guardia (07-10):**
+   - Para probarla, en otro navegador (o una ventana de incógnito) abrí la app → **"Soy vecino nuevo"** → inscribite con un correo de prueba (truco: `barriobahiacauquen+super@gmail.com`, Gmail lo entrega en la misma casilla) → en **"Tu lote"**, al final de la lista, elegí **"Supervisión de la guardia"**.
+   - Volvé a tu Administración → **Día a día → Garita y seguridad → Supervisión de la guardia** (o Inscripciones) → **Habilitar**. Le llega un correo.
+   - En esa misma ventana, **Alertas e informe mensual**: revisá los minutos (garita sin conexión 20, SOS sin respuesta 3, policía sin ronda 90), dejá tildado "Mandar el informe mensual por correo el día 1" y elegí si te llega también a vos → **Guardar**.
+   - Antes de habilitar al supervisor de verdad, que firme el compromiso de confidencialidad (Protección de datos → Imprimir el compromiso).
+4. **Publicidad y aporte al barrio (07-10):** Día a día → **Proveedores y cumplimiento → Publicidad y aporte al barrio** → **Descargar o imprimir para firmar** (o el Word de la carpeta) → que lo revise el abogado → cuando esté firmado, anotalo ahí mismo (fecha, acta y si se elevó a escritura).
+5. **Borrar lo que quedó del chat y de las reservas (29-09)**, si todavía no lo hiciste, DESPUÉS de publicar las reglas: **Protección de datos** → botón rojo → confirmar.
 
 ## 6. Cómo probar cada cosa nueva
 
 Conviene tener abiertos: **tu cuenta** (vecino y Administración), **la garita** (otro equipo) y, para lo de lote, **la de Mónica**. Para los avisos al celular, en cada equipo: **Tu cuenta (tu inicial, arriba a la derecha) → Avisos en este equipo → Activar avisos** (en iPhone, con la app instalada en la pantalla de inicio).
+
+### Supervisión de la guardia (07-10)
+Abrí la cuenta de supervisión de prueba en un celular (con **Activar avisos**) y la garita en otro equipo.
+1. **Portada de la supervisión:** "La garita ahora" (la app de la garita abierta, el turno, el último registro y el policía), los números del día y "Lo último, en vivo". Anotá algo en la bitácora desde la garita: aparece al instante.
+2. **Solo mirar:** abrí **Garita en vivo** y tocá algo de la garita (por ejemplo un "Ingresó"): tiene que decir que eso lo hace la garita. No hay botón SOS ni el contador de conectados.
+3. **Mensajes:** "Mensajes con la garita" → escribí algo → en la garita suena y aparece la teja **Supervisión** con el número. Contestá desde la garita. Lo mismo con **Mensajes con la Administración**. Un vecino no ve ninguna de las dos.
+4. **SOS:** con una cuenta de vecino, mandá un SOS de prueba → a la supervisión le salta a pantalla completa (sin botones de la garita). **No toques "Voy en camino"** en la garita: a los 3 minutos a la supervisión y a la Administración les llega **"SOS sin respuesta de la garita"**. Después cerralo desde el vecino ("Ya está solucionado").
+5. **Garita sin conexión:** cerrá la app de la garita (o apagá su wifi) más de 20 minutos → al celular de la supervisión llega **"La garita está sin conexión"**; al volver a abrirla, **"La garita volvió a conectarse"** (el reloj revisa cada 10 minutos: puede tardar hasta 30).
+6. **Policía sin ronda:** registrá un policía en la garita y no le anotes rondas → a los 90 minutos llega **"Sin ronda hace 90 min"** a la supervisión y a la garita.
+7. **Visto del parte:** en la garita, **Cerrar el turno** → en la supervisión aparece en "Partes de turno para dar el visto" → **Leer** → **Visto** → "Con observaciones" + un texto → en la garita y en tu Administración llega el aviso, y en **Turnos** el turno dice "Con observaciones".
+8. **Informe mensual:** en la supervisión, teja **Informe mensual** → mirá el mes en curso (parcial) → **Mandármelo por correo** → revisá cómo llega: arriba "El mes en 30 segundos" con colores, los 8 números, y abajo el detalle numerado. En el correo no tienen que aparecer lotes ni nombres de vecinos. El día 1 de noviembre sale solo el de octubre.
+
+### Publicidad y aporte (07-10)
+1. Como vecino: **pie "by Claudio A. Ravasi" → Términos de uso** → punto **4. Publicidad, promociones y aporte del 50 % al Barrio**; abajo, el botón **"Publicidad y aporte al barrio"**.
+2. **Preguntas frecuentes → "¿La app tiene publicidad? ¿Quién la cobra?"**.
+3. Como Administración, en **Publicidad y aporte al barrio**: anotá una entrega de prueba (semestre, monto, destino) → como vecino se ve el total → borrala con el tachito.
 
 ### Saludo y asistente por voz
 1. Tocá el **escudo** de arriba a la izquierda → tiene que decir "Hola, Claudio, que tengas una buena tarde… son las 19 y 40, y hace 4 grados".

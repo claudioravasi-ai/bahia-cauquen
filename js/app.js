@@ -57,12 +57,19 @@ const VENTANAS_HOTEL = new Set(['hotel', 'hotel-traslados', 'hotel-huespedes', '
   'hotel-ficha', 'hotel-convenio', 'privado', 'agenda', 'cruceros', 'vuelos', 'ushuaia', 'municipio', 'sismos', 'documentos', 'legal', 'manual', 'recoleccion',
   /* 28-09: las expensas de las 6 UF del hotel (js/v-expensas.js, expensasHotel) */
   'expensas']);
+/* EL SUPERVISOR DE LA GUARDIA (07-10-2026): la garita vista en vivo, sin
+   tocar nada (ver js/v-supervisor.js). Sin huéspedes del hotel, sin "Estoy
+   bien", sin los mensajes de los vecinos ni nada de expensas. */
+const VENTANAS_SUPERVISOR = new Set(['supervisor', 'garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'alertas',
+  'hotel-vivo', 'hotel-traslados', 'hotel-eventos', 'obras', 'proveedores', 'vuelos', 'cruceros', 'agenda', 'documentos',
+  'recoleccion', 'sismos', 'ushuaia', 'municipio', 'manual', 'legal', 'informe-servicio']);
+VENTANAS_HOTEL.add('aporte');
 ['hotel-vivo', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
-const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
+const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : esSupervisor() ? VENTANAS_SUPERVISOR.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
   if (!hayPaquetes() && PAUSA_PAQUETES.ventanas.has(id)){ paqueteEnPausa(); return; }
-  if (!ventanaPermitida(id)){ toast(esHotel() ? 'Esa sección no es del hotel' : VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
+  if (!ventanaPermitida(id)){ toast(esHotel() ? 'Esa sección no es del hotel' : esSupervisor() ? 'Esa sección no es de la supervisión' : VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
   /* Una ventana nunca se abre DEBAJO de una hoja: antes, tocar un aviso en
      la pizarra abría la ventana detrás y la hoja la seguía tapando. Si la
      hoja era la pizarra, se anota para volver a ella al cerrar la ventana.
@@ -299,7 +306,7 @@ document.addEventListener('wheel', e => {
   Estirar.ruedaFin = setTimeout(() => { Estirar.rueda = 0; Estirar.d = 0; Estirar.ruedaVale = false; Estirar.terminar(); }, 300);
 }, { passive:true });
 
-const inicioId = () => esGuardia() ? 'garita' : esHotel() ? 'hotel' : 'inicio';
+const inicioId = () => esGuardia() ? 'garita' : esHotel() ? 'hotel' : esSupervisor() ? 'supervisor' : 'inicio';
 const titulo = (def, p) => typeof def.titulo === 'function' ? def.titulo(p) : def.titulo;
 
 /* =========================================================
@@ -365,16 +372,16 @@ function pintarTop(){
   const u = yo(); if (!u) return;
   const nl = noLeidas().length + sosEnCampanita().length;
   const modo = modoActivo();
-  const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia', hotel:'Hotel' }[modo] || '';
+  const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia', hotel:'Hotel', supervisor:'Supervisión' }[modo] || '';
   $('#top').classList.toggle('con-modo', puedeAdministrar());
   $('#top').innerHTML = `
     <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
       <span class="logo">${LOGO}</span>
       <span class="marca-txt"><b><span class="marca-pre">Barrio </span>${esc(Store.s.config.nombre)}</b>
         <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
-          : `<span class="rol-chip">${rol}</span><span class="casa"> · ${esc(u.casa)}</span>`}</small></span>
+          : `<span class="rol-chip">${rol}</span>${u.rol === 'supervisor' ? '' : `<span class="casa"> · ${esc(u.casa)}</span>`}`}</small></span>
     </button>
-    ${esHotel() ? '' : Presencia.chip()}
+    ${esHotel() || esSupervisor() ? '' : Presencia.chip()}
     ${puedeAdministrar() ? `<button class="modo-btn ${modo}" data-a="cambiar-modo" aria-label="Cambiar de modo">${I(modo === 'admin' ? 'sliders' : 'home')}<span>${modo === 'admin' ? 'Admin' : 'Vecino'}</span></button>` : ''}
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
     <button class="icon-btn" data-a="mi-cuenta" aria-label="Mi cuenta">${avatar(u, 'sm')}</button>
@@ -382,7 +389,8 @@ function pintarTop(){
       /* La garita no lleva SOS (pedido de Claudio, 27-09): es la que RECIBE
          los SOS. Si la garita misma está en peligro, usa "Aviso urgente"
          (le llega a todo el barrio) y llama al 911/101. */
-      : esGuardia() ? '' : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
+      /* El supervisor tampoco: mira la garita, no es vecino del barrio. */
+      : esGuardia() || esSupervisor() ? '' : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
 }
 
 function pintar(){
@@ -707,14 +715,14 @@ const sosAbiertas = () => aLista(Store.s.sos).filter(x => x && x.estado !== 'res
 /* Las que van en la campanita de quien mira. */
 const sosEnCampanita = () => {
   const u = yo(); if (!u) return [];
-  return sosAbiertas().filter(x => esStaff() || x.userId === u.id || Date.now() - x.at < SOS_EN_CAMPANITA)
+  return sosAbiertas().filter(x => veGarita() || x.userId === u.id || Date.now() - x.at < SOS_EN_CAMPANITA)
     .sort((a, b) => b.at - a.at);
 };
 const sosQueVeo = () => {
   const u = yo(); if (!u) return [];
   return sosAbiertas().filter(x => !sosOcultas.has(x.id)).filter(x => {
     if (x.userId === u.id) return true;
-    if (esStaff()) return x.estado !== 'atendida';
+    if (veGarita()) return x.estado !== 'atendida';
     return sosEnPantalla.has(x.id);
   });
 };
@@ -744,7 +752,7 @@ function pintarAlarmas(){
   if (!act.length){ box.innerHTML = ''; return; }
   const s0 = act[0], t = TIPOS_SOS[s0.tipo] || TIPOS_SOS.otra;
   box.innerHTML = `<div class="sos-pantalla" role="alertdialog" aria-label="Alerta SOS"><div class="sos-caja">
-    ${s0.userId === u.id ? sosPanelMio(s0, t) : esStaff() ? sosPanelStaff(s0, t, act.length) : sosPanelVecino(s0, t)}
+    ${s0.userId === u.id ? sosPanelMio(s0, t) : veGarita() ? sosPanelStaff(s0, t, act.length) : sosPanelVecino(s0, t)}
   </div></div>`;
   Fotos.hidratar(box);
 }
@@ -780,7 +788,7 @@ function sosPanelStaff(s0, t, cuantas){
       </div>
       ${s0.tipo === 'medica' && typeof cuentaHotel === 'function' && cuentaHotel() && typeof hotelInfo === 'function' && (hotelInfo().dea || hotelInfo().auxilios) ? `<button class="btn btn-block sos-b-tenue" data-a="sos-pedir-hotel" data-id="${s0.id}">${I('heart')}Pedir ayuda al hotel (${hotelInfo().dea ? 'DEA' : ''}${hotelInfo().dea && hotelInfo().auxilios ? ' y ' : ''}${hotelInfo().auxilios ? 'primeros auxilios' : ''})</button>` : ''}` : `<div class="btns"><button class="btn btn-sec grow" data-a="sos-entendido" data-id="${s0.id}">${I('check')}Entendido</button>
         <button class="btn btn-sec" data-a="sos-repetir" data-id="${s0.id}">${I('volume')}Repetir sonido</button></div>
-      <p class="sos-nota">La atiende la garita. La Administración la sigue en vivo.</p>`}
+      <p class="sos-nota">La atiende la garita. ${esSupervisor() ? 'Vos la seguís en vivo desde la supervisión; para coordinar, escribile a la garita.' : 'La Administración la sigue en vivo.'}</p>`}
       <a class="btn btn-block sos-b-oscuro" href="tel:${t.llamar}">${I('siren')}Llamar al ${t.llamar}</a>
     </div>`;
 }
@@ -939,7 +947,7 @@ A['dea-si'] = () => {
     const coords = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
     Store.cambiar(s => { const x = s.sos.find(o => o.id === id); if (x) x.coords = coords; });
   }, () => {}, { enableHighAccuracy:true, timeout:8000 });
-  if (typeof Push !== 'undefined') Push.enviar({ para:'rol:guardia', titulo:'🚨 EMERGENCIA · Piden el DEA', texto:`${u.casa} · ${apellido}`, tag:'dea-' + id, urgente:true, sonido:'sos', link:'garita' });
+  if (typeof Push !== 'undefined') Push.enviar({ para:['rol:guardia', 'rol:supervisor'], titulo:'🚨 EMERGENCIA · Piden el DEA', texto:`${u.casa} · ${apellido}`, tag:'dea-' + id, urgente:true, sonido:'sos', link:'garita' });
   const g = Store.s.config.garitaTel || contactoTel('Garita');
   hoja('Pedido enviado a la garita', `<div class="aviso a-danger latido">${I('heart')}<div class="txt"><b>La garita ya recibió tu pedido del DEA</b>Mientras llega, llamá al 911 y, si sabés, empezá la reanimación (RCP).</div></div>
     <div class="btns" style="margin-top:6px"><a class="btn btn-danger" href="tel:911">${I('phone')}Llamar al 911</a>
@@ -992,7 +1000,9 @@ function pintarBienvenida(modo = 'inicio'){
   const c = Store.s.config;
   const grupo = (t, campos, ayuda = '') => `<section class="grupo"><h3>${t}</h3>${campos}${ayuda ? `<p class="grupo-ayuda">${ayuda}</p>` : ''}</section>`;
   const campo = (label, input, ancho = '') => `<div class="field ${ancho}"><label>${label}</label>${input}</div>`;
-  const selectLote = (sel = '') => `<select name="casa" required><option value="">Elegí tu lote…</option>${LOTES.map(l => `<option value="Lote ${l.lote}" ${'Lote ' + l.lote === sel ? 'selected' : ''}>${esc(nombreLote(l))}</option>`).join('')}</select>`;
+  /* 07-10: quien supervisa la guardia no vive en el barrio: elige "Supervisión" (la Administración lo habilita). */
+  const selectLote = (sel = '') => `<select name="casa" required><option value="">Elegí tu lote…</option>${LOTES.map(l => `<option value="Lote ${l.lote}" ${'Lote ' + l.lote === sel ? 'selected' : ''}>${esc(nombreLote(l))}</option>`).join('')}
+    <optgroup label="No vivo en el barrio"><option value="Supervisión" ${sel === 'Supervisión' ? 'selected' : ''}>Supervisión de la guardia</option></optgroup></select>`;
 
   let titulo, bajada, cuerpo, pie = '';
 
@@ -1074,7 +1084,8 @@ function pintarBienvenida(modo = 'inicio'){
         <button data-a="demo" data-v="u_lucia">Lucía · Lote 42</button>
         <button data-a="demo" data-v="u_diego">Diego · Lote 18</button>
         <button data-a="demo" data-v="u_garita">Guardia</button>
-        <button data-a="demo" data-v="u_admin">Administración</button></div>
+        <button data-a="demo" data-v="u_admin">Administración</button>
+        <button data-a="demo" data-v="u_super">Supervisión</button></div>
         <p class="grupo-ayuda">Datos inventados, solo para mirar cómo funciona.</p></section>`}`;
   }
 
@@ -1278,7 +1289,7 @@ A['sos-enviar'] = el => {
     s.bitacora.unshift({ id:uid(), autor:'sistema', tipo:'incidente', texto:`SOS ${t.nombre} desde ${u.casa} (${u.nombre}).`, at:Date.now() });
   });
   /* A todos los equipos del barrio, aunque tengan la pantalla apagada. */
-  if (typeof Push !== 'undefined') Push.enviar({ para:'todos', titulo:`🚨 SOS · ${t.nombre}`, texto:`${u.casa} · ${u.nombre}`, tag:'sos-' + idSos, urgente:true, sonido:'sos', link:'emergencias' });
+  if (typeof Push !== 'undefined') Push.enviar({ para:['todos', 'rol:supervisor'], titulo:`🚨 SOS · ${t.nombre}`, texto:`${u.casa} · ${u.nombre}`, tag:'sos-' + idSos, urgente:true, sonido:'sos', link:'emergencias' });
   const g = Store.s.config.garitaTel || contactoTel('Garita');
   hoja('Ayuda en camino', `
     <div class="aviso a-danger latido">${I('siren')}<div class="txt"><b>La guardia ya recibió tu alerta</b>Quedate en un lugar seguro. Si podés, llamá también:</div></div>
@@ -1290,7 +1301,7 @@ A['sos-enviar'] = el => {
 };
 A['sos-voy'] = el => Store.cambiar(s => {
   const x = s.sos.find(o => o.id === el.dataset.id); if (!x) return;
-  x.estado = 'en_camino'; x.atiende = yo().id;
+  x.estado = 'en_camino'; x.atiende = yo().id; x.enCaminoAt = x.enCaminoAt || Date.now();
   notificar(s, { para:x.userId, titulo:'La guardia va en camino', texto:'Recibimos tu alerta. Ya salimos.', icon:'shield', color:'ok', urgente:true });
 });
 /* La guardia la da por atendida: sale de su pantalla, pero en el barrio
@@ -1335,7 +1346,7 @@ A['mi-cuenta'] = () => { const u = yo(); Cuenta.enSub = false;
   setTimeout(() => { const d = $('#hoja'); if (d && $('#hojaTitulo')?.textContent === 'Tu cuenta') d.dataset.origen = 'cuenta'; }, 0);
   hoja('Tu cuenta', `<div class="row" style="margin-bottom:14px">${avatar(u, 'lg')}<div class="grow"><b style="font-size:16px">${esc(u.nombre)}</b>
       <div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
-      <div class="muted tiny">${{ vecino:'Vecino/a', hotel:'Cuenta institucional del hotel · la usa la recepción', admin:'Administración', guardia:'Garita' + (turnoAbierto() ? ' · turno ' + esc(turnoAbierto().turno) + ': ' + esc(aLista(turnoAbierto().guardias).join(', ')) : '') }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
+      <div class="muted tiny">${{ vecino:'Vecino/a', hotel:'Cuenta institucional del hotel · la usa la recepción', supervisor:'Supervisión de la guardia · solo para mirar la garita', admin:'Administración', guardia:'Garita' + (turnoAbierto() ? ' · turno ' + esc(turnoAbierto().turno) + ': ' + esc(aLista(turnoAbierto().guardias).join(', ')) : '') }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
     ${puedeAdministrar() ? superficie({ a:'cambiar-modo', icon: modoActivo() === 'admin' ? 'sliders' : 'home', color: modoActivo() === 'admin' ? 'accent' : 'ok',
       t: modoActivo() === 'admin' ? 'Estás como Administración' : 'Estás como vecino/a',
       s: modoActivo() === 'admin' ? 'Tocá para pasar a tu vista de vecino/a' : 'Tocá para volver al panel de administración', cls:'acento' }) : ''}
@@ -1348,14 +1359,14 @@ A['mi-cuenta'] = () => { const u = yo(); Cuenta.enSub = false;
       return `<div class="card" style="margin-bottom:8px"><div class="lbl">Avisos en este equipo</div>
         ${typeof Push !== 'undefined' && Push.estado() !== 'demo' ? tarjetaPush(false) : notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
         <label class="check" style="margin-top:10px"><input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span>Sonido cuando escribe la guardia o la Administración</span></label></div>`; })()}
-    ${(() => { const otros = esGuardia() || esHotel() ? [] : Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
+    ${(() => { const otros = esGuardia() || esHotel() || esSupervisor() ? [] : Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
       return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa. <button class="link" data-a="abrir" data-v="perfil">Ver quiénes</button></div>` : ''; })()}
     ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
     ${esGuardia() ? '' : superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
     ${superficie({ a:'abrir-manual', icon:'book', color:'accent', t:'Manual de uso', s:'Paso a paso, por capítulos' })}
     ${typeof Asistente !== 'undefined' && Asistente.paraMi() && Asistente.soportado() ? superficie({ a:'asistente-ajuste', icon:'volume', color:'sky', t: Asistente.permiso() === 'si' ? 'Asistente por voz: activado' : 'Asistente por voz: apagado', s: Asistente.permiso() === 'si' ? 'Tocá el escudo y pedile algo. Tocá acá para apagarlo en este equipo.' : 'Pedirle cosas a la app con la voz. Tocá para activarlo en este equipo.' }) : ''}
-    ${esGuardia() || esHotel() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
-    ${esGuardia() || esHotel() ? '' : superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Ver todo lo que la app guarda de vos, en PDF, o pedir que se borre (Ley 25.326)' })}
+    ${esGuardia() || esHotel() || esSupervisor() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
+    ${esGuardia() || esHotel() || esSupervisor() ? '' : superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Ver todo lo que la app guarda de vos, en PDF, o pedir que se borre (Ley 25.326)' })}
 
     ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
     ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
@@ -1923,6 +1934,7 @@ const PIEZAS = [
   ['js/sismos.js',     () => typeof Sismos],
   ['js/nube.js',       () => typeof Nube],
   ['js/historial.js',  () => typeof Historial],
+  ['js/v-supervisor.js', () => typeof Supervisor],
 ];
 function piezasQueFaltan(){
   const falta = [];

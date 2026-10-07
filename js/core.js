@@ -147,7 +147,9 @@ function migrar(s){
     avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
     hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[],
-    cosas:[], nieve:[], casaTareas:[], ausencias:[] };
+    cosas:[], nieve:[], casaTareas:[], ausencias:[],
+    /* 07-10: supervisión de la guardia (js/v-supervisor.js) */
+    alertasSup:[], vistos:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* El chat vecinal y las reservas de espacios comunes se sacaron el 29-09-2026:
      lo que haya quedado guardado en este equipo se borra al abrir la app. */
@@ -188,6 +190,8 @@ function migrar(s){
   if (!s.motorLog || typeof s.motorLog !== 'object') s.motorLog = {};
   /* En la demo (?local) hay un hotel de muestra para probar su portal. */
   if (typeof hotelDemo === 'function' && !(typeof Nube !== 'undefined' && Nube.activa())) hotelDemo(s);
+  /* Y una cuenta de supervisión de la guardia (js/v-supervisor.js). */
+  if (typeof supervisionDemo === 'function' && !(typeof Nube !== 'undefined' && Nube.activa())) supervisionDemo(s);
   s.config = Object.assign({}, CONFIG_BASE, s.config || {});
 }
 
@@ -485,6 +489,13 @@ const esStaff = () => esAdmin() || esGuardia();
    público de la ciudad. Ver js/v-hotel.js. */
 const HOTEL_NOMBRE = 'Hotel Los Cauquenes';
 const esHotel = () => yo()?.rol === 'hotel';
+/* EL SUPERVISOR DE LA GUARDIA (07-10-2026, pedido de Claudio). Una cuenta
+   personal con rol propio que mira la garita en vivo (ingresos, bitácora,
+   turnos, rondas, SOS, DEA…) sin poder tocar nada: solo les escribe a la
+   garita y a la Administración. Ver js/v-supervisor.js. */
+const esSupervisor = () => yo()?.rol === 'supervisor';
+/* Quién puede MIRAR la garita: la garita, la Administración y el supervisor. */
+const veGarita = () => esStaff() || esSupervisor();
 const cuentaHotel = () => Store.s.users.find(x => x.rol === 'hotel' && x.estado === 'aprobado') || null;
 /* =========================================================
    LA GARITA OPERA, LA ADMINISTRACIÓN MIRA (pedido de Claudio, 26-09-2026)
@@ -498,7 +509,8 @@ const cuentaHotel = () => Store.s.users.find(x => x.rol === 'hotel' && x.estado 
    ========================================================= */
 const soloGarita = () => {
   if (esGuardia()) return true;
-  toast('Eso lo hace solo la garita. Desde la Administración se ve en vivo; para pedirle algo, escribile en "Mensajes con la garita".', 'lock');
+  if (esSupervisor()) toast('Eso lo hace solo la garita. Desde la supervisión se mira en vivo; para pedirle algo, escribile a la garita.', 'lock');
+  else toast('Eso lo hace solo la garita. Desde la Administración se ve en vivo; para pedirle algo, escribile en "Mensajes con la garita".', 'lock');
   return false;
 };
 /* Las cuentas aprobadas de un lote (en el 148 viven Mónica y Claudio: los
@@ -562,7 +574,9 @@ function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand'
   if (s.notifs.length > 400) s.notifs.length = 400;
   /* Lo que suena también sale como aviso push: llega con el celular
      bloqueado (ver js/push.js). */
-  if (push && typeof empujarAviso === 'function') setTimeout(() => empujarAviso(n), 0);
+  /* (En el ensayo que hace la cuenta del supervisor antes de guardar, ver
+     js/v-supervisor.js, no sale nada: se manda cuando se guarda de verdad.) */
+  if (push && !(typeof Supervisor !== 'undefined' && Supervisor.ensayo) && typeof empujarAviso === 'function') setTimeout(() => empujarAviso(n), 0);
 }
 /* =========================================================
    LO QUE LA BASE SE COME: LAS LISTAS VACÍAS
@@ -588,6 +602,9 @@ const listaDe = (obj, campo) => { const l = aLista(obj[campo]); obj[campo] = l; 
 
 function meToca(n, u = yo()){
   if (!u || !n || n.de === u.id) return false;
+  /* Al supervisor le llega solo lo suyo: no los avisos de todo el barrio
+     (el camión, la pizarra), que no son para él. Los SOS los ve aparte. */
+  if (u.rol === 'supervisor') return aLista(n.para).some(p => p === u.id || p === 'rol:supervisor');
   return aLista(n.para).some(p => p === 'todos' || p === u.id || p === 'rol:' + u.rol || (p === 'staff' && (u.rol === 'admin' || u.rol === 'guardia')));
 }
 /* "Entró el camión de la basura" sirve solo mientras el camión está en el
@@ -888,7 +905,8 @@ const Correo = {
      Su correo sale igual, sin quedar en el historial. */
   anota(){
     if (typeof Nube === 'undefined' || !Nube.activa()) return true;
-    const u = yo(); return !!(u && u.estado === 'aprobado');
+    /* La supervisión no anota en la bandeja de la Administración (solo mira). */
+    const u = yo(); return !!(u && u.estado === 'aprobado' && u.rol !== 'supervisor');
   },
   /* Lo que devuelve Google cuando algo está mal configurado, en castellano. */
   motivo(err){

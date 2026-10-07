@@ -27,7 +27,7 @@ const Asistente = {
   soportado(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); },
   permiso(){ try { return localStorage.getItem(this.KEY); } catch(e){ return null; } },
   poner(v){ try { if (v) localStorage.setItem(this.KEY, v); else localStorage.removeItem(this.KEY); } catch(e){} },
-  paraMi(){ const u = yo(); return !!u && !esStaff() && !esHotel() && u.estado === 'aprobado'; },
+  paraMi(){ const u = yo(); return !!u && !esStaff() && !esHotel() && !esSupervisor() && u.estado === 'aprobado'; },
 
   /* Hablar con la misma voz del saludo; `luego` corre cuando termina. */
   decir(texto, luego){

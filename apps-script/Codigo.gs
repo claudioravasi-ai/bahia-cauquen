@@ -93,7 +93,7 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 8;
+var VERSION_SCRIPT = 10;
 
 function doPost(e) {
   try {
@@ -221,7 +221,9 @@ function tokensDe(db, para, excluir) {
       var e = equipos[k]; if (!e || !e.t) return;
       var rol = e.rol || 'vecino';
       var toca = lista.some(function (p) {
-        return p === 'todos' || p === uid || p === 'rol:' + rol || (p === 'staff' && (rol === 'admin' || rol === 'guardia'));
+        /* La supervisión de la guardia (07-10-2026) no recibe los avisos de todo
+           el barrio (el camión, la pizarra): solo lo suyo y lo que va a 'rol:supervisor'. */
+        return (p === 'todos' && rol !== 'supervisor') || p === uid || p === 'rol:' + rol || (p === 'staff' && (rol === 'admin' || rol === 'guardia'));
       });
       if (toca) out.push({uid: uid, clave: k, t: e.t});
     });
@@ -389,7 +391,77 @@ function revisarCuidados() {
         }
       } catch (err) { registrar('CUIDADO-ERROR', 'vecino', String(err).slice(0, 200)); }
     });
+    /* La supervisión de la guardia (versión 10): mismo reloj. */
+    try { revisarSupervision(base, acceso); } catch (err) { registrar('SUPERVISION-ERROR', 'reloj', String(err).slice(0, 200)); }
   } finally { lock.releaseLock(); }
+}
+
+/**
+ * LA SUPERVISIÓN DE LA GUARDIA (07-10-2026, versión 10)
+ * ---------------------------------------------------------------------------
+ * Con el mismo reloj de cada 10 minutos (instalarRelojCuidados):
+ *   · si la app de la garita lleva más de N minutos sin conexión (nadie de la
+ *     garita figura en barrio/presencia), avisa a la supervisión, y cuando
+ *     vuelve, avisa que volvió y anota cuánto estuvo afuera;
+ *   · si un SOS o el pedido del DEA sigue sin "Voy en camino" a los N minutos,
+ *     avisa a la supervisión y a la Administración. Si una app ya lo avisó, no
+ *     se repite: las dos reclaman la misma marca (barrio/motorLog/sos-esc-<id>).
+ * Los minutos se fijan en la app: Gestión → Supervisión de la guardia.
+ */
+function revisarSupervision(base, acceso) {
+  var cfg = leerBase(base, acceso, 'barrio/config/supervision') || {};
+  if (cfg.alertas === false) return;
+  var us = leerBase(base, acceso, 'barrio/users') || {};
+  var conRol = function (rol) { return Object.keys(us).filter(function (k) { return us[k] && us[k].rol === rol && us[k].estado === 'aprobado'; }); };
+  var sup = conRol('supervisor'), adm = conRol('admin'), gar = conRol('guardia');
+  var ahora = Date.now(), cambios = {}, avisos = [], props = PropertiesService.getScriptProperties();
+  var anotar = function (para, id, titulo, texto, link, urgente) {
+    var n = {id: id, para: para, titulo: titulo, texto: texto, icon: 'eye', color: urgente ? 'danger' : 'ok', link: link, urgente: !!urgente, sonido: true, de: 'sistema', at: ahora};
+    para.forEach(function (p) { cambios['pv/notifs/' + p + '/' + id] = n; });
+    if (para.length) avisos.push({db: base, para: para, titulo: titulo, texto: texto, link: link, tag: id, urgente: !!urgente, sonido: urgente ? 'sos' : ''});
+  };
+  /* 1. La app de la garita, sin conexión. */
+  if (sup.length && gar.length) {
+    var pres = leerBase(base, acceso, 'barrio/presencia') || {};
+    var conectada = gar.some(function (g) { return pres[g] && typeof pres[g] === 'object' && Object.keys(pres[g]).length > 0; });
+    var desde = +props.getProperty('GARITA_FUERA_DESDE') || 0, avisada = props.getProperty('GARITA_FUERA_AVISO') || '';
+    var minimo = Math.max(10, +cfg.garitaMin || 20) * 60000;
+    if (!conectada) {
+      if (!desde) { desde = ahora; props.setProperty('GARITA_FUERA_DESDE', String(desde)); }
+      if (ahora - desde >= minimo && avisada !== String(desde)) {
+        if (reclamarEnBase(base, acceso, 'barrio/motorLog/gf-' + desde, ahora)) {
+          var tt = 'La garita está sin conexión', tx = 'La app de la garita no está conectada desde las ' + horaBarrio(desde) + ' h (hace ' + Math.round((ahora - desde) / 60000) + ' min). Llamá a la garita.';
+          cambios['staff/alertasSup/as-gf-' + desde] = {id: 'as-gf-' + desde, tipo: 'garita', ref: 'gf-' + desde, titulo: tt, texto: tx, at: ahora, desde: desde};
+          anotar(sup, 'm-gf-' + desde, tt, tx, 'supervisor', true);
+        }
+        props.setProperty('GARITA_FUERA_AVISO', String(desde));
+      }
+    } else if (desde) {
+      if (avisada === String(desde)) {
+        cambios['staff/alertasSup/as-gf-' + desde + '/hasta'] = ahora;
+        anotar(sup, 'm-gv-' + desde, 'La garita volvió a conectarse', 'Estuvo sin conexión desde las ' + horaBarrio(desde) + ' hasta las ' + horaBarrio(ahora) + ' h.', 'supervisor', false);
+      }
+      props.deleteProperty('GARITA_FUERA_DESDE'); props.deleteProperty('GARITA_FUERA_AVISO');
+    }
+  }
+  /* 2. SOS o DEA sin "Voy en camino". */
+  var sos = leerBase(base, acceso, 'staff/sos') || {}, lim = Math.max(1, +cfg.sosMin || 3) * 60000;
+  Object.keys(sos).forEach(function (k) {
+    var x = sos[k];
+    if (!x || x.estado !== 'activa' || x.escaladoAt || !x.at || ahora - x.at < lim || ahora - x.at > 6 * 3600000) return;
+    if (!reclamarEnBase(base, acceso, 'barrio/motorLog/sos-esc-' + k, ahora)) return;
+    var dea = x.tipo === 'dea', casa = (us[x.userId] || {}).casa || 'Un lote';
+    var tt = dea ? 'El DEA todavía no salió' : 'SOS sin respuesta de la garita';
+    var tx = casa + ' · ' + (dea ? 'pidieron el DEA' : 'pidieron ayuda') + ' hace ' + Math.round((ahora - x.at) / 60000) + ' min y la garita no tocó "Voy en camino".';
+    cambios['staff/sos/' + k + '/escaladoAt'] = ahora;
+    cambios['staff/alertasSup/as-sos-' + k] = {id: 'as-sos-' + k, tipo: dea ? 'dea' : 'sos', ref: 'sos-' + k, titulo: tt, texto: tx, at: ahora};
+    anotar(sup, 'm-sos-esc-' + k + '-1', tt, tx, 'supervisor', true);
+    anotar(adm.filter(function (a) { return sup.indexOf(a) < 0; }), 'm-sos-esc-' + k + '-2', tt, tx, 'garita', true);
+  });
+  if (Object.keys(cambios).length)
+    UrlFetchApp.fetch(base + '/.json?access_token=' + encodeURIComponent(acceso), {method: 'patch', contentType: 'application/json', payload: JSON.stringify(cambios), muteHttpExceptions: true});
+  avisos.forEach(function (a) { mandarPush(a); });
+  if (avisos.length) registrar('SUPERVISION', avisos.length + ' avisos', 'alertas a la supervisión');
 }
 
 /* Lo mismo que Cuidado.avisar() de la app: mismos textos y mismos ids de

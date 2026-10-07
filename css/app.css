@@ -497,6 +497,9 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .validador{display:flex;gap:8px}
 .validador input{font-size:22px!important;font-weight:800;letter-spacing:4px;text-align:center;font-family:ui-monospace,"SF Mono",Menlo,monospace;text-transform:uppercase}
 .garita-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+/* Supervisión de la guardia (07-10-2026): cuatro números en una fila; en el teléfono, dos por fila. */
+.garita-kpis.sup-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:600px){.garita-kpis.sup-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 8px;text-align:center;min-width:0;overflow-wrap:anywhere}
 .kpi b{display:block;font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.1;overflow-wrap:anywhere}
 .kpi span{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
@@ -2312,3 +2315,16 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 .tp-reloj b{white-space:nowrap;overflow-wrap:normal}
 .tp-monto{overflow-wrap:anywhere}
 @media (max-width:380px){ .tp-reloj{grid-template-columns:minmax(0,1fr)} }
+/* Supervisión de la guardia (07-10-2026): el visto de cada parte y el informe mensual. */
+.visto-ok{color:var(--ok, #1f9d55);font-weight:600}
+.visto-obs{color:var(--warn, #c47f00);font-weight:600}
+.informe-hoja{background:#fff;border-radius:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.informe-hoja > div{min-width:0}
+.informe-hoja table{max-width:100%}
+/* En el teléfono, los números del informe van de a dos por fila y las tablas se pueden correr de costado. */
+@media (max-width:560px){
+  .informe-hoja table.inf-kpis, .informe-hoja table.inf-kpis tbody, .informe-hoja table.inf-kpis tr{display:block !important;width:100% !important}
+  .informe-hoja td.inf-kpi{display:inline-block !important;width:50% !important;box-sizing:border-box}
+  .informe-hoja > div > div{padding-left:14px !important;padding-right:14px !important}
+  .informe-hoja th, .informe-hoja td:not(.inf-kpi){padding:6px 4px !important;font-size:11.5px !important}
+}

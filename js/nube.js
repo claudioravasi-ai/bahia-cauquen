@@ -56,7 +56,9 @@ const Nube = {
               'casaTareas',
               /* 27-09: "Me voy de viaje" (casa sola), antes en la ficha pública */
               'ausencias'],
-    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos'],
+    staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos',
+            /* 07-10: alertas a la supervisión y vistos de los partes (js/v-supervisor.js) */
+            'alertasSup','vistos'],
     /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
        los huéspedes, solo el hotel y la garita; las promociones propuestas,
@@ -72,6 +74,13 @@ const Nube = {
                hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs'] },
     admin:   { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv','hotelPromos','hotelLiqs'] },
     guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv'] },
+    /* El supervisor de la guardia (07-10-2026) baja lo que la garita usa para
+       trabajar y nada más: sin votaciones, expensas, pizarrón, compras,
+       comunicados ni lo del hotel que no es de la garita (los huéspedes). */
+    supervisor: { barrio:['users','padron','agenda','temporadas','feriados','eventosCiudad','contactos','documentos','obras','proveedores',
+                          'avistamientos','cruceros','camion','alertas'],
+                  staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos'],
+                  hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv'] },
   },
 
   /* =========================================================
@@ -276,15 +285,20 @@ const Nube = {
     /* El hotel, solo lo público de la ciudad. */
     this.escucharColeccion('barrio', lee.barrio || this.ZONAS.barrio);
     this.escucharConfig();
+    const sup = mio.rol === 'supervisor';
     if (staff) this.escucharColeccion('staff', this.ZONAS.staff);
+    else if (sup) this.escucharColeccion('staff', lee.staff);
     else if (!hotel) this.escucharColeccion('staff', ['sos'], true);  /* para ver el estado de la propia alerta */
     if (lee.hotel) this.escucharColeccion('hotel', lee.hotel);
     this.escucharPv(mio.rol);
     if (mio.rol === 'admin') setTimeout(() => this.mudarPrivado(), 3000);
     this.arrancada = true;
     /* "Estoy bien": lo mío y lo de quienes cuido (js/v-cuidados.js). */
-    if (!hotel && typeof Cuidado !== 'undefined') Cuidado.escuchar(mio.rol);
-    if (!hotel) this.anotarPresencia();
+    if (!hotel && !sup && typeof Cuidado !== 'undefined') Cuidado.escuchar(mio.rol);
+    /* El supervisor no se cuenta entre los que tienen la app abierta, pero
+       mira la presencia: así sabe si la garita está conectada. */
+    if (sup) this.escucharPresencia();
+    else if (!hotel) this.anotarPresencia();
     /* Si administra el barrio, elige desde qué brazo entra. */
     if (mio.rol === 'admin' && !Store.sesion.modo) setTimeout(() => { if (typeof elegirModo === 'function' && yo()) elegirModo({ alEntrar:true }); }, 500);
     /* Las alertas que ya estaban abiertas antes de entrar no saltan ni
@@ -409,6 +423,11 @@ const Nube = {
     this.db.ref('barrio/presencia').on('value', snap => { if (typeof Presencia !== 'undefined') Presencia.poner(snap.val()); },
       err => console.warn('No se pudo leer la presencia (¿faltan publicar las reglas?)', err.message));
   },
+  escucharPresencia(){
+    if (this.presEscucha) return; this.presEscucha = true;
+    this.db.ref('barrio/presencia').on('value', snap => { if (typeof Presencia !== 'undefined') Presencia.poner(snap.val()); },
+      err => console.warn('No se pudo leer la presencia', err.message));
+  },
   async borrarPresencia(){
     const r = this.presRef; this.presRef = null;
     if (r) try { await r.onDisconnect().cancel(); await r.remove(); } catch(e){}
@@ -497,23 +516,29 @@ const Nube = {
     privados:        { col:'privados',        leen:['admin'] },
     privadosGuardia: { col:'privados',        leen:['guardia'] },
     privadosInterno: { col:'privados',        leen:['admin', 'guardia'] },
+    /* El supervisor de la guardia (07-10-2026) con la garita y con la
+       Administración: cada conversación en la carpeta del supervisor, que
+       lee solo él y el otro lado (la garita o la Administración). */
+    privadosSupGarita: { col:'privados',      leen:['guardia'] },
+    privadosSupAdmin:  { col:'privados',      leen:['admin'] },
     dms:             { col:'dms',             leen:[] },
     notifs:          { col:'notifs',          leen:[] },
     reclamos:        { col:'reclamos',        leen:['admin'] },
     infracciones:    { col:'infracciones',    leen:['admin'] },
     pagos:           { col:'pagos',           leen:['admin'] },
     recibos:         { col:'recibos',         leen:['admin'] },
-    peticiones:      { col:'peticiones',      leen:['admin', 'guardia'] },
-    pases:           { col:'pases',           leen:['admin', 'guardia'] },
+    peticiones:      { col:'peticiones',      leen:['admin', 'guardia', 'supervisor'] },
+    pases:           { col:'pases',           leen:['admin', 'guardia', 'supervisor'] },
     solicitudesPase: { col:'solicitudesPase', leen:['admin', 'guardia'] },
-    llegadas:        { col:'llegadas',        leen:['admin', 'guardia'] },
+    llegadas:        { col:'llegadas',        leen:['admin', 'guardia', 'supervisor'] },
     paquetes:        { col:'paquetes',        leen:['admin', 'guardia'] },
     casaTareas:      { col:'casaTareas',      leen:[] },
-    ausencias:       { col:'ausencias',       leen:['admin', 'guardia'] },
+    ausencias:       { col:'ausencias',       leen:['admin', 'guardia', 'supervisor'] },
   },
   carpetaDe(col, x){
     if (col !== 'privados') return col;
-    return x && x.con === 'guardia' ? 'privadosGuardia' : x && x.con === 'interno' ? 'privadosInterno' : 'privados';
+    return x && x.con === 'guardia' ? 'privadosGuardia' : x && x.con === 'interno' ? 'privadosInterno'
+      : x && x.con === 'supGarita' ? 'privadosSupGarita' : x && x.con === 'supAdmin' ? 'privadosSupAdmin' : 'privados';
   },
   pvDatos: {}, pvDonde: {},
   /* =========================================================
@@ -706,14 +731,23 @@ const Nube = {
       if (col === 'notifs') return this.esNotifGeneral(x) ? [`barrio/notifsTodos/${x.id}`] : this.duenos(col, x).map(u => `pv/notifs/${u}/${x.id}`);
       return this.duenos(col, x).filter(Boolean).map(u => `pv/${this.carpetaDe(col, x)}/${u}/${x.id}`);
     };
+    /* EL SUPERVISOR SOLO MIRA (07-10-2026): de su equipo no sale nada más
+       que sus conversaciones con la garita y la Administración, sus avisos
+       y su propia ficha. Aunque algo se cambiara en su pantalla, no viaja
+       (y las reglas de la base tampoco lo aceptarían). */
+    const sup = yo()?.rol === 'supervisor';
+    const supPuede = (col, x) => col === 'notifs' || (col === 'users' && x.id === this.uid) || (col === 'vistos' && x.por === this.uid && !(this.ultimo.vistos || {})[x.id])
+      || (col === 'privados' && x.userId === this.uid && (x.con === 'supGarita' || x.con === 'supAdmin'));
     [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff, ...this.ZONAS.hotel].forEach(col => {
       if (col === 'notifsTodos') return;
+      if (sup && !['notifs', 'users', 'privados', 'vistos'].includes(col)) return;
       const arr = s[col]; if (!Array.isArray(arr)) return;
       const antes = this.ultimo[col] || {}, ahora = {};
       arr.forEach(x => {
         if (!x || !x.id) return;
         const txt = JSON.stringify(x); ahora[x.id] = txt;
         if (antes[x.id] === txt) return;
+        if (sup && !supPuede(col, x)) return;
         const P = this.soloSuParte(col, x);
         if (P){ if (antes[x.id]) this.cambiosSueltos(col, P, JSON.parse(antes[x.id]), JSON.parse(txt)).forEach(([r, v]) => poner(r, v)); return; }
         rutasDe(col, x).forEach(r => poner(r, JSON.parse(txt)));
@@ -721,6 +755,7 @@ const Nube = {
       Object.keys(antes).forEach(id => { if (id in ahora) return;
         /* Se mira el registro viejo entero: su dueño sí puede borrarlo. */
         const viejo = JSON.parse(antes[id]);
+        if (sup) return;
         if (this.soloSuParte(col, viejo)) return;
         rutasDe(col, viejo).forEach(r => poner(r, null));
       });

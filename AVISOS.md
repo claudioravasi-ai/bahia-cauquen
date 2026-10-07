@@ -44,7 +44,7 @@ La misma cuenta de servicio le permite al Apps Script leer la lista de equipos a
 **aunque todos los teléfonos estén bloqueados**. Lo hace un reloj del Apps Script que
 revisa cada 10 minutos.
 
-1. Pegá el `apps-script/Codigo.gs` nuevo (**versión 8**) → **Guardar** →
+1. Pegá el `apps-script/Codigo.gs` nuevo (**versión 10**, del 07-10-2026: no le manda a la supervisión los avisos de todo el barrio y vigila que la garita esté conectada y que los SOS tengan respuesta) → **Guardar** →
    **Implementar → Gestionar implementaciones → editar → Nueva versión → Implementar**.
 2. Arriba, en el menú de funciones, elegí **`instalarRelojCuidados`** y tocá **Ejecutar**.
    Google pide permiso ("activadores" y "servicio externo"): aceptalo.
@@ -54,6 +54,17 @@ Usa la misma `FCM_CUENTA` del paso 2 y la dirección de la base (`BASE_URL`), qu
 sola la primera vez que la app manda un aviso push (por ejemplo, **Ajustes → Avisos al celular → Probar**).
 Sin el reloj, "Estoy bien" igual avisa, pero recién cuando alguna app de un contacto o de la
 garita está abierta; la garita, que está abierta las 24 horas, lo cubre si el vecino la eligió.
+
+## La supervisión de la guardia (07-10-2026)
+
+A la cuenta de supervisión le llegan al celular solo los **SOS**, los **pedidos del DEA**, los
+**mensajes que le escriben** la garita o la Administración y sus **alertas**: la garita sin
+conexión más de 20 minutos (la vigila el reloj del Apps Script, cada 10 minutos), un SOS o el DEA
+sin "Voy en camino" a los 3 minutos (también a la Administración) y el policía sin ronda más de 90
+minutos (también a la garita). Los minutos se cambian en Gestión → Supervisión de la guardia.
+El día 1 de cada mes le llega además por correo el **informe mensual del servicio**. Los avisos de todo el barrio (el
+camión, la pizarra) no: eso lo filtra el `Codigo.gs` **versión 10**. Con una versión anterior
+pegada, le llegarían también esos.
 
 ## Paso 3 — Cada vecino, en cada equipo
 

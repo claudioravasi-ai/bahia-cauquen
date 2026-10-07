@@ -337,7 +337,7 @@ R.verano = {
 
 /* ---------- "Para vos" de la pizarra ---------- */
 function pizarraCasa(){
-  const u = yo(); if (!u || esStaff() || esHotel()) return [];
+  const u = yo(); if (!u || esStaff() || esHotel() || esSupervisor()) return [];
   const out = [], tocan = tareasQueTocan();
   if (tocan.length){ const mes = hoyISO().slice(0, 7);
     out.push({ k:`invierno-${mes}-${tocan.length}`, nuevo:Pizarra.nuevo(`invierno-${mes}-${tocan.length}`, fechaDe(mes + '-01').getTime()), nivel:'amarillo', icon:'flame', tag:'Para vos · tu casa', at:fechaDe(mes + '-01').getTime(),
@@ -670,7 +670,7 @@ function guardarAusencia(s, u, datos){
 }
 /* La ficha vieja (users.viaje) pasa a la carpeta privada. */
 function mudarViaje(s){
-  const u = yo(); if (!u || !u.viaje || esStaff() || esHotel()) return 0;
+  const u = yo(); if (!u || !u.viaje || esStaff() || esHotel() || esSupervisor()) return 0;
   const v = u.viaje;
   if (v.hasta >= hoyISO()) guardarAusencia(s, u, { desde:v.desde, hasta:v.hasta, contacto:v.contacto || '', nota:v.nota || '' });
   else { const yu = s.users.find(z => z.id === u.id); if (yu) delete yu.viaje; }
@@ -720,7 +720,7 @@ F['casa-revisada'] = (d, form) => {
 };
 /* ---------- el vecino ---------- */
 function lineaCasaSola(){
-  const u = yo(); if (!u || esStaff() || esHotel()) return '';
+  const u = yo(); if (!u || esStaff() || esHotel() || esSupervisor()) return '';
   const a = ausenciaDe(u); if (!a || a.desde > hoyISO()) return '';
   const r = revisionDeHoy(a);
   return `<button class="eb-listo${r && r.novedad ? ' novedad' : ''}" data-a="abrir" data-v="visitas">${I(r ? (r.novedad ? 'alert' : 'check') : 'lock')}<span><b>${r ? (r.novedad ? 'Novedad en tu casa' : 'Tu casa sola: en orden') : 'Tu casa sola: todavía sin revisar hoy'}</b>

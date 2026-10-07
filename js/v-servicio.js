@@ -370,12 +370,12 @@ R.alertas = {
   titulo:'Avisos urgentes', icon:'siren', color:'danger', ancha:true, sub:'Por zona, con "Recibido" o "Necesito ayuda"',
   render(){
     const u = yo();
-    if (!esStaff()){
+    if (!veGarita()){
       const mias = alertas().filter(a => alertaMeToca(a) || (respuestaDe(a) && Date.now() - a.at < 3 * DIA));
       return mias.length ? mias.map(a => tarjetaAlertaVecino(a)).join('') : vacio('check', 'No hay avisos urgentes para tu zona.');
     }
     const act = alertas().filter(alertaActiva), viejas = alertas().filter(a => !alertaActiva(a)).slice(0, 15);
-    return `${superficie({ a:'alerta-nueva', icon:'siren', color:'danger', t:'Mandar un aviso urgente', s:'A todo el barrio o a una zona: suena y pide respuesta', cls:'peligro' })}
+    return `${esSupervisor() ? '' : superficie({ a:'alerta-nueva', icon:'siren', color:'danger', t:'Mandar un aviso urgente', s:'A todo el barrio o a una zona: suena y pide respuesta', cls:'peligro' })}
       ${esAdmin() ? superficie({ a:'zonas-editar', icon:'pin', color:'sky', t:'Zonas del barrio', s:`${plural(zonasBarrio().length - 1, 'zona definida', 'zonas definidas')} · por rango de lotes` }) : ''}
       ${act.length ? sec('Activos') + act.map(tarjetaAlertaStaff).join('') : ''}
       ${viejas.length ? sec('Anteriores') + viejas.map(tarjetaAlertaStaff).join('') : ''}
