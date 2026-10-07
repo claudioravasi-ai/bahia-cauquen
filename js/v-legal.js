@@ -227,16 +227,19 @@ F['incidente'] = d => {
     auditar(s, 'Anotó un incidente de seguridad', d.que.trim().slice(0, 80)); });
   cerrarHoja(); toast('Incidente anotado', 'check'); refrescar();
 };
-A['compromiso-imprimir'] = () => { const c = Store.s.config;
-  imprimir('Compromiso de confidencialidad', `<h1>Barrio ${esc(c.nombre)}</h1><p><b>Compromiso de confidencialidad sobre datos personales</b></p>
-  <p>En la ciudad de Ushuaia, a los ____ días del mes de ______________ de 20____, quien suscribe, ____________________________________________, DNI ______________, en su carácter de ______________________ (guardia / supervisor de la guardia / integrante de la Administración / otro), declara:</p>
+/* `nombre` y `cargo` (07-10): el de la supervisión sale con su nombre y su función ya puestos. */
+const compromisoHTML = ({ nombre = '', cargo = '' } = {}) => { const c = Store.s.config;
+  return `<h1>Barrio ${esc(c.nombre)}</h1><p><b>Compromiso de confidencialidad sobre datos personales</b></p>
+  <p>En la ciudad de Ushuaia, a los ____ días del mes de ______________ de 20____, quien suscribe, ${nombre ? '<b>' + esc(nombre) + '</b>' : '____________________________________________'}, DNI ______________, en su carácter de ${cargo ? '<b>' + esc(cargo) + '</b>' : '______________________ (guardia / supervisor de la guardia / integrante de la Administración / otro)'}, declara:</p>
   <p>1. Que en el ejercicio de su función accede a datos personales de los vecinos, de sus visitas y de terceros, a través de la aplicación del Barrio ${esc(c.nombre)} y de otros registros del barrio.</p>
   <p>2. Que se obliga a guardar secreto sobre esos datos, conforme el art. 10 de la Ley 25.326 de Protección de los Datos Personales, y que esta obligación subsiste aun después de finalizada su relación con el barrio.</p>
   <p>3. Que usará los datos exclusivamente para las tareas de su función (seguridad, control de acceso, administración), y que no los copiará, fotografiará, reenviará ni comunicará a terceros, salvo orden judicial o de autoridad competente.</p>
   <p>4. Que mantendrá en reserva su contraseña, no dejará la sesión abierta en equipos sin supervisión, y avisará de inmediato a la Administración ante la pérdida de un equipo o cualquier acceso indebido.</p>
   <p>5. Que conoce que el acceso ilegítimo a un banco de datos personales o la revelación de su contenido pueden constituir delito (arts. 153 bis y 157 bis del Código Penal), sin perjuicio de la responsabilidad civil y de las sanciones que correspondan.</p>
   <p style="margin-top:48px">Firma: ______________________________ &nbsp;&nbsp; Aclaración: ______________________________</p>
-  <p style="margin-top:28px">Por la Administración del Barrio: ______________________________</p>`); };
+  <p style="margin-top:28px">Por la Administración del Barrio: ______________________________</p>`; };
+A['compromiso-imprimir'] = el => { const u = el && el.dataset && el.dataset.id ? usuario(el.dataset.id) : null;
+  imprimir('Compromiso de confidencialidad', compromisoHTML(u ? { nombre:u.nombre, cargo:'supervisor/a de la guardia' } : {})); };
 
 /* =========================================================
    PUBLICIDAD Y APORTE DEL 50 % AL BARRIO (pedido de Claudio, 07-10-2026)

@@ -528,19 +528,19 @@ const MANUAL_CAPS = [
     ['h', 'Cómo entrar'],
     ['pasos', [
       'Abrí la app y tocá <b>"Soy vecino nuevo"</b> (o, desde Entrar, <b>"Todavía no tengo cuenta"</b>). Completá tu nombre, tu DNI, tu correo y una contraseña. En <b>"Tu lote"</b> elegí, al final de la lista, <b>"Supervisión de la guardia"</b>.',
-      'La Administración revisa el pedido y te habilita (antes te va a pedir que firmes el compromiso de confidencialidad). Te llega un correo.',
+      'La Administración revisa el pedido y te habilita. Antes te pide que firmes el <b>compromiso de confidencialidad</b> (lo imprime con tu nombre; vos también lo podés ver e imprimir al pie de tu portada, en "Mi compromiso de confidencialidad"). Te llega un correo.',
       'Entrás con tu correo y tu contraseña. Al habilitarte, la app borra el DNI y el lote que cargaste: no los necesita.',
     ]],
     ['h', 'Tu portada'],
     ['lista', [
       '<b>La garita ahora</b>: si la app de la garita está abierta (o conectada pero minimizada, o sin conexión), qué turno está abierto y quiénes están de guardia, cuándo fue el último registro en el libro y si hay policía de servicio con sus rondas.',
       'Arriba, en rojo, cualquier <b>SOS</b>, <b>pedido del DEA</b> o <b>aviso urgente</b> activo. Un SOS nuevo además te salta a pantalla completa y suena, con el vecino, el lote y la ubicación.',
-      'Los números del día: visitas esperadas y adentro, peticiones sin recibir y casas solas.',
+      '<b>Hoy en la entrada</b>: las visitas anunciadas para hoy que todavía no llegaron, las que entraron y siguen en el barrio, los pedidos firmados de vecinos que la garita todavía no recibió y las casas de vecinos de viaje que hay que revisar hoy.',
       '<b>Lo último, en vivo</b>: los registros de hoy del libro de guardia, a medida que la garita los anota.',
       'Las tejas para mirar cada cosa: <b>Garita en vivo</b>, <b>Bitácora</b>, <b>Turnos y policía</b> (quién trabajó cada turno, servicios y rondas del policía), <b>Peticiones</b>, el <b>hotel</b> (vans, traslados y eventos), <b>obras</b> y <b>proveedores</b>.',
     ]],
     ['h', 'Escribirles a la garita y a la Administración'],
-    ['p', 'Tocá <b>Mensajes con la garita</b> o <b>Mensajes con la Administración</b>. Arriba de la conversación están las dos, para pasar de una a otra. A quien le escribís le suena al instante. La conversación con la garita la ven solo la garita y vos; la de la Administración, solo la Administración y vos.'],
+    ['p', 'Tocá <b>Mensajes</b>, arriba en tu portada (dice cuántos tenés sin leer). Arriba de la conversación están las dos, para pasar de una a otra. A quien le escribís le suena al instante. La conversación con la garita la ven solo la garita y vos; la de la Administración, solo la Administración y vos.'],
     ['ojo', 'info', 'Solo para mirar', 'Si tocás algo que es tarea de la garita (dar un ingreso, firmar una petición, registrar al policía), la app te avisa que eso lo hace la garita. Para pedirlo, escribile.'],
     ['h', 'Alertas al celular'],
     ['lista', [

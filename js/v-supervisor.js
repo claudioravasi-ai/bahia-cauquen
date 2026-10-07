@@ -180,8 +180,8 @@ R.supervisor = {
     const hoyBit = bit.filter(b => isoDe(new Date(b.at)) === hoy).slice(0, 15);
     const estado = (ok, ic, tt, x) => `<div class="it"><span class="ic ic-${ok === true ? 'ok' : ok === false ? 'danger' : 'warn'}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(ic)}</span><div class="txt"><b>${tt}</b><span style="white-space:normal">${x}</span></div></div>`;
     return `${PILA.length === 1 ? `<div class="titulo-vista"><h1>Supervisión de la guardia</h1><p>${fechaLarga(hoy)} · ${esc(primerNombre(u.nombre))}</p></div>` : ''}
-      <div class="garita-vivo">${I('eye')}<div class="grow"><b>Solo para mirar, en tiempo real</b><span>Ves lo mismo que la garita, al instante. Registrar, firmar o cambiar algo lo hace la garita; vos les escribís, das el visto a cada parte de turno y recibís las alertas.</span></div>
-        <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="supGarita">${I('chat')}Escribirle a la garita</button></div>
+      <div class="garita-vivo">${I('eye')}<div class="grow"><b>Solo para mirar, en tiempo real</b><span>Ves lo mismo que la garita, al instante. Registrar, firmar o cambiar algo lo hace la garita; vos les escribís a la garita o a la Administración (en Mensajes elegís a quién), das el visto a cada parte de turno y recibís las alertas.</span></div>
+        ${(() => { const nl = sinLeerSup('supGarita', u.id) + sinLeerSup('supAdmin', u.id); return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${sinLeerSup('supAdmin', u.id) && !sinLeerSup('supGarita', u.id) ? 'supAdmin' : 'supGarita'}">${I('chat')}Mensajes${nl ? ` (${nl} sin leer)` : ''}</button>`; })()}</div>
       ${deas.map(x => { const v = usuario(x.userId) || {}; return aviso('danger latido', 'heart', `PIDEN EL DEA · ${esc(v.casa || '')} · ${esc(apellidoDe(v.nombre) || '')}`, `${hace(x.at)} · la garita todavía no salió con el DEA`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="privado" data-p="supGarita">Escribirle a la garita</button>`); }).join('')}
       ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
       ${sos.map(x => { const v = usuario(x.userId) || {}, tp = TIPOS_SOS[x.tipo] || TIPOS_SOS.otra;
@@ -196,7 +196,9 @@ R.supervisor = {
         ${estado(ult ? (Date.now() - ult.at < 3 * HORA ? true : null) : null, 'book', ult ? `Último registro: ${hace(ult.at)}` : 'Sin registros en el libro', ult ? esc(ult.texto.slice(0, 110)) : 'Cuando la garita anote algo, aparece acá.')}
         ${t ? estado(ps.length ? true : null, 'shield', ps.length ? `Policía de servicio: ${esc(ps.map(p => p.nombre).join(', '))}` : 'Sin policía de servicio ahora', ps.length ? ps.map(p => { const rc = typeof rondaEnCurso === 'function' ? rondaEnCurso(p) : null; return `${esc(p.nombre)}: ${plural(aLista(p.rondas).length, 'ronda')}${rc ? ' · ronda en curso' : ''}`; }).join(' · ') : 'Si hoy corresponde, lo registra la garita al llegar.') : ''}
       </div>
-      <div class="garita-kpis sup-kpis"><div class="kpi"><b>${esperados}</b><span>Esperados</span></div><div class="kpi"><b>${adentro}</b><span>Adentro</span></div><div class="kpi"><b>${petPend}</b><span>Peticiones sin recibir</span></div><div class="kpi"><b>${solas.length}</b><span>Casas solas</span></div></div>
+      ${sec('Hoy en la entrada')}
+      <div class="garita-kpis sup-kpis"><div class="kpi"><b>${esperados}</b><span>Visitas anunciadas que todavía no llegaron</span></div><div class="kpi"><b>${adentro}</b><span>Visitas que entraron y siguen en el barrio</span></div><div class="kpi"><b>${petPend}</b><span>Pedidos firmados de vecinos que la garita no recibió</span></div><div class="kpi"><b>${solas.length}</b><span>Casas de vecinos de viaje para revisar hoy</span></div></div>
+      <p class="muted tiny" style="margin:-4px 2px 12px">Las visitas son las que los vecinos anunciaron para hoy con su código o QR. Cuando la garita registra que una entra, pasa de "no llegaron" a "en el barrio"; cuando registra la salida, deja de contarse.</p>
       ${sec('Lo último, en vivo', `<button class="link" data-a="abrir" data-v="bitacora">Libro completo</button>`)}
       <div class="card">${hoyBit.length ? `<div class="lista">${hoyBit.map(b => { const tb = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad;
         return `<div class="it"><span class="ic ic-${tb[2]}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(tb[1])}</span><div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(tb[0])}</span></div></div>`; }).join('')}</div>` : vacio('book', 'Hoy todavía no hay registros en el libro de guardia.')}</div>
@@ -210,15 +212,13 @@ R.supervisor = {
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'El libro de guardia' })}
         ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos y policía', s:'Quién trabajó, rondas y servicios' })}
         ${teja({ v:'peticiones', icon:'edit', color:'warn', t:'Peticiones', s:'Pedidos firmados de los vecinos', badge: petPend })}
-        ${teja({ v:'privado', p:'supGarita', icon:'shield', color:'brand', t:'Mensajes con la garita', s:'Le suena al instante', badge: sinLeerSup('supGarita', u.id) })}
-        ${teja({ v:'privado', p:'supAdmin', icon:'sliders', color:'accent', t:'Mensajes con la Administración', s:'Privado entre la supervisión y la Administración', badge: sinLeerSup('supAdmin', u.id) })}
         ${teja({ v:'hotel-vivo', icon:'star', color:'wood', t:HOTEL_NOMBRE, s:'Vans, traslados y eventos (sin huéspedes)' })}
         ${teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:'Las del día y en curso' })}
         ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día' })}
         ${teja({ v:'informe-servicio', icon:'file', color:'ok', t:'Informe mensual', s:'Turnos, rondas, emergencias y alertas del mes' })}
         ${teja({ v:'manual', icon:'book', color:'accent', t:'Manual de uso', s:'El capítulo de la supervisión' })}
       </div>
-      <p class="muted tiny" style="margin-top:12px">${I('lock')} No ves los mensajes privados de los vecinos, ni "Estoy bien", ni los huéspedes del hotel, ni expensas. Estás obligado/a a guardar secreto sobre lo que ves (art. 10 de la Ley 25.326).</p>`;
+      <p class="muted tiny" style="margin-top:12px">${I('lock')} Estás obligado/a a guardar secreto sobre lo que ves (art. 10 de la Ley 25.326). <button class="link" data-a="compromiso-imprimir" data-id="${esc(u.id)}">Mi compromiso de confidencialidad</button></p>`;
   },
 };
 
@@ -241,9 +241,10 @@ R.supervisores = {
       ${sups.length ? sups.map(x => { const nl = sinLeerSup('supAdmin', x.id);
         return `<div class="card"><div class="row" style="gap:12px">${avatar(x)}<div class="grow"><b>${esc(x.nombre)}</b><div class="muted small">${esc(x.email || '')}${x.tel ? ' · ' + esc(x.tel) : ''}</div><div class="muted tiny">Supervisión desde ${x.supervisorDesde ? fechaCorta(isoDe(new Date(x.supervisorDesde))) : '—'}</div></div></div>
           <div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-sec" data-a="abrir" data-v="privado" data-p="supAdmin|${esc(x.id)}">${I('chat')}Mensajes${nl ? ` (${nl})` : ''}</button>
+            <button class="btn btn-sm btn-sec" data-a="compromiso-imprimir" data-id="${esc(x.id)}">${I('file')}Su compromiso de confidencialidad</button>
             <button class="btn btn-sm btn-danger-soft" data-a="sup-quitar" data-id="${esc(x.id)}">${I('x')}Quitarle el acceso</button></div></div>`; }).join('')
         : aviso('info', 'eye', 'Todavía no hay supervisión', 'Quien supervisa se inscribe desde "Soy vecino nuevo" (o "Todavía no tengo cuenta") y en "Tu lote" elige "Supervisión de la guardia". Después lo habilitás abajo.')}
-      <div class="card plana small" style="margin-top:10px">${I('file')} Antes de habilitarlo, que firme el compromiso de confidencialidad: Gestión → Protección de datos → Imprimir el compromiso.</div>
+      <div class="card plana small" style="margin-top:10px">${I('file')} Antes de habilitarlo, que firme el compromiso de confidencialidad: imprimilo con el botón "Su compromiso de confidencialidad" de cada supervisor (sale con su nombre y su función) o en blanco desde Protección de datos. El firmado se guarda en papel, en la Administración.</div>
       ${sec('Alertas, vistos e informe')}
       ${ajustesSupervision()}
       ${superficie({ a:'abrir', v:'informe-servicio', icon:'file', color:'ok', t:'Informe mensual del servicio', s:'El mismo que le llega por correo a la supervisión el día 1' })}
