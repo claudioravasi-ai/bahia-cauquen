@@ -536,6 +536,8 @@ function chatInterno(idP){
   const yoSoy = esGuardia() ? 'guardia' : 'admin';
   const h = s.privados.find(x => x.userId === garitaId && x.con === 'interno');
   const msgs = h ? aLista(h.msgs) : [];
+  /* Abrirla apaga también su aviso en la campanita. */
+  if (typeof marcarVistoLink === 'function') setTimeout(() => marcarVistoLink(esGuardia() ? 'privado:interno' : 'privado:interno|' + garitaId), 0);
   if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
   /* Las peticiones firmadas de los vecinos a la garita ya no tienen su teja
      en la Administración (Claudio: "cumplen la misma función que los
@@ -593,7 +595,10 @@ R.privado = {
     const quienId = esStaff() ? idP : u.id;
     /* Abrir la conversación también apaga su aviso en la campanita (08-10-2026):
        antes se marcaban leídos los mensajes, pero el aviso seguía contando. */
-    if (!esStaff() && typeof marcarVistoLink === 'function') setTimeout(() => ['privado:' + miCanal, ...(miCanal === 'admin' ? ['privado'] : [])].forEach(marcarVistoLink), 0);
+    /* En la garita y la Administración pasaba lo mismo (08-10-2026, Claudio):
+       el aviso "Mensaje de Lote …" lleva el link 'privado:canal|cuenta'. */
+    const linksAviso = esStaff() ? ['privado:' + miCanal + '|' + quienId] : ['privado:' + miCanal, ...(miCanal === 'admin' ? ['privado'] : [])];
+    if (typeof marcarVistoLink === 'function') setTimeout(() => linksAviso.forEach(marcarVistoLink), 0);
     let h = s.privados.find(x => x.userId === quienId && (x.con || 'admin') === miCanal);
     const yoSoy = esStaff() ? miCanal : 'vecino';
     const mio = m => esStaff() ? m.from !== 'vecino' : m.from === 'vecino';

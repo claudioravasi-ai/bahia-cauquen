@@ -110,7 +110,7 @@ const MANUAL_CAPS = [
     ['p', 'Se ven los primeros renglones; tocá <b>"Ver todo"</b> para ver la pizarra completa en dos columnas: <b>Para todo el barrio</b> y <b>Para vos</b>.'],
     ['ojo', 'info', 'Lo que pide una decisión tuya va arriba de todo', 'Si alguien pregunta por vos en la garita, si una visita te pide un pase o si tenés una alerta abierta, aparece arriba con sus botones ("Que pase", "Aprobar", "Ya está solucionado"). Eso no queda escondido en una lista.'],
     ['h', 'La campanita'],
-    ['p', 'Guarda los avisos que <b>todavía no viste</b>. Al abrir uno, te lleva a donde corresponde y deja de contarse. Con <b>"Marcar todos como vistos"</b> la vaciás de una vez.'],
+    ['p', 'Guarda los avisos que <b>todavía no viste</b>. Al abrir uno, te lleva a donde corresponde y deja de contarse. Lo mismo si entrás directo a una conversación privada (de un vecino, de la garita o de la Administración): sus avisos se apagan solos. Con <b>"Marcar todos como vistos"</b> la vaciás de una vez.'],
   ] },
 
   { id:'avisos', icon:'bell', color:'ok', para:'todos', t:'Activar los avisos al celular', s:'Para enterarte con el teléfono bloqueado', b:[
