@@ -105,18 +105,33 @@ const Store = {
     try { const m = sessionStorage.getItem('bhc.modo'); if (m !== null) this.sesion.modo = m || ''; } catch(e){}
     if (this.bc) this.bc.onmessage = e => {
       if (e.data === 'cambio'){
-        try { const cfg = this.cfgPropia(); this.s = JSON.parse(localStorage.getItem(this.KEY)); migrar(this.s); if (cfg) this.s.config = cfg; } catch(err){}
+        try { this.deOtraPestana(JSON.parse(localStorage.getItem(this.KEY))); } catch(err){}
         this.avisar(true);
       }
     };
     /* Otra pestaña sin BroadcastChannel: el evento storage cubre el hueco. */
     window.addEventListener('storage', e => {
-      if (e.key === this.KEY && e.newValue){ try { const cfg = this.cfgPropia(); this.s = JSON.parse(e.newValue); migrar(this.s); if (cfg) this.s.config = cfg; this.avisar(true); } catch(err){} }
+      if (e.key === this.KEY && e.newValue){ try { this.deOtraPestana(JSON.parse(e.newValue)); this.avisar(true); } catch(err){} }
     });
   },
   /* Con la base del barrio, la configuración de esta pestaña es la que
      bajó de la nube: la copia de otra pestaña (que puede ser vieja) no la
      reemplaza. */
+  /* LO QUE LLEGA DE OTRA PESTAÑA (arreglado el 08-10-2026)
+     Con la base del barrio, cada pestaña escucha la nube por su cuenta: lo
+     que vive en la nube NO se toma de la copia de otra pestaña. Antes sí, y
+     una pestaña abierta desde una versión vieja (que no conocía los
+     correos) le pasaba a la nueva una lista vacía: la nueva creía que el
+     correo se había borrado y lo borraba de la base. El camión de correos
+     daba una vuelta y desaparecía en todas las pantallas. */
+  deOtraPestana(nuevo){
+    if (!nuevo || typeof nuevo !== 'object') return;
+    const cfg = this.cfgPropia(); migrar(nuevo);
+    if (typeof Nube !== 'undefined' && Nube.activa() && this.s){
+      [...Nube.ZONAS.barrio, ...Nube.ZONAS.privado, ...Nube.ZONAS.staff, ...Nube.ZONAS.hotel, 'notifs', 'motorLog'].forEach(c => { if (c in this.s) nuevo[c] = this.s[c]; });
+    }
+    this.s = nuevo; if (cfg) this.s.config = cfg;
+  },
   cfgPropia(){ return typeof Nube !== 'undefined' && Nube.activa() && Nube.configLista && this.s ? this.s.config : null; },
   guardar(){
     try {

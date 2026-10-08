@@ -197,7 +197,7 @@ const SECCIONES = {
         teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · SOS de hoy · hospitales · farmacias' }),
         teja({ v:'visitas', icon:'users', color:'sky', t:'Mis visitas', s: misHoy.length ? `${plural(misHoy.length, 'esperada')} hoy` : 'Nadie anunciado hoy', n: misHoy.length || '' }),
         ...(!hayPaquetes() ? [] : [teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = paquetesDelLote(u).filter(p => !p.retirado).length; return n ? `${plural(n, 'paquete')} de tu lote en la garita` : 'Lo que llega a la garita para tu lote'; })(), badge: paquetesDelLote(u).filter(p => !p.retirado).length })]),
-        teja({ v:'mensajes', icon:'chat', color:'accent', t:'Mensajes', s:'Privados con vecinos y la Administración', badge: privNoLeidos + dmNoLeidos() }),
+        teja({ v:'mensajes', icon:'chat', color:'accent', t:'Mensajes', s:'Privados con vecinos, la Administración y la Guardia', badge: privNoLeidos + dmNoLeidos() }),
         teja({ v:'expensas', icon:'wallet', color:'wood', t:'Mis expensas', s:`Tu cuenta, cupones y pagos` }),
         teja({ v:'sismo', icon:'sismo', color:'warn', t:'Preparados para un sismo', s:(() => { const ok = typeof revisionSemanalHecha === 'function' && tengoLote() ? revisionSemanalHecha() : true; return ok ? 'Mochila, plan familiar y qué hacer' : 'Falta la revisión de esta semana'; })() }),
         teja({ v:'salidas', icon:'pin', color:'sky', t:'Salidas seguras', s:(() => { const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, sa = x && x.salida && !x.salida.volvio ? x.salida : null;

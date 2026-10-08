@@ -266,8 +266,7 @@ const MANUAL_CAPS = [
     ['h', 'Mensajes privados'],
     ['p', 'En <b>Tu casa → Mensajes</b> están tus conversaciones privadas:'],
     ['lista', [
-      '<b>Con la Administración</b>: solo la leen vos y la Administración.',
-      '<b>Con la guardia</b>: solo la leen vos y la garita.',
+      '<b>Administración o Guardia</b>: tocalo y arriba elegís con quién. Con la Administración, solo la leen vos y la Administración; con la Guardia, solo vos y la garita. Si alguna te escribió, el cartel dice cuántos mensajes sin leer tenés de cada una.',
       '<b>Con otro vecino</b>: solo lo leen ustedes dos.',
     ]],
     ['h', 'Escribirle a uno o varios vecinos'],

@@ -1712,18 +1712,17 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 .cm-nom{font-size:12.5px;font-weight:800;color:var(--ink);text-align:center;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cm-otro{border-style:dashed}
 @media (min-width:560px){ .correo-menu{grid-template-columns:repeat(3,minmax(0,1fr))} }
-.correo-elegido{position:relative;display:grid;place-items:center;padding:14px 12px;margin:0 0 8px;border-radius:14px;background:#fff;border:2px solid var(--ok);box-shadow:0 0 0 4px var(--ok-soft)}
-.ce-ok{position:absolute;top:-10px;right:10px;display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;background:var(--ok);color:#fff;font-size:11px;font-weight:800}
+.correo-elegido{position:relative;display:grid;place-items:center;padding:16px 12px 14px;margin:2px 0 10px;border-radius:14px;background:#fff;border:2px solid var(--ok);box-shadow:0 0 0 4px var(--ok-soft)}
+.ce-ok{position:absolute;top:6px;right:6px;display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:var(--ok);color:#fff;font-size:11px;font-weight:800}
 .ce-ok svg.i{width:12px;height:12px}
-/* "¿Era otro?": los demás correos en una tira de logos chicos; un toque cambia sin perder lo escrito. */
-.correo-cambiar{display:flex;align-items:center;gap:8px;margin:0 0 14px}
-.correo-cambiar > span{flex:none;font-size:12px;font-weight:700;color:var(--muted)}
-.cc-tira{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px}
-.cc-tira::-webkit-scrollbar{display:none}
-.cc-op{all:unset;box-sizing:border-box;cursor:pointer;flex:none;display:grid;place-items:center;height:34px;min-width:58px;padding:4px 8px;border-radius:10px;background:#fff;border:1px solid var(--line-2);opacity:.85;transition:transform .15s,opacity .15s,border-color .15s}
-.cc-op:hover,.cc-op:focus-visible{opacity:1;transform:translateY(-1px);border-color:var(--sky);outline:none}
-.cc-op img{height:18px;max-width:64px}
-.cc-op .correo-otro{font-size:11px} .cc-op .correo-otro svg.i{width:13px;height:13px}
+/* "¿Era otro?" (08-10-2026): los otros cinco correos en una fila pareja que entra entera, sin cortar ninguno. */
+.correo-cambiar{margin:0 0 14px}
+.correo-cambiar > span{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 2px 6px}
+.cc-tira{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.cc-op{all:unset;box-sizing:border-box;cursor:pointer;min-width:0;display:grid;place-items:center;height:38px;padding:4px 5px;border-radius:10px;background:#fff;border:1px solid var(--line-2);transition:transform .15s,border-color .15s,box-shadow .15s}
+.cc-op:hover,.cc-op:focus-visible{transform:translateY(-1px);border-color:var(--sky);box-shadow:0 4px 10px rgba(0,0,0,.08);outline:none}
+.cc-op img{height:auto;max-height:20px;max-width:100%;object-fit:contain}
+.cc-op .correo-otro{font-size:11px;gap:3px} .cc-op .correo-otro svg.i{width:13px;height:13px}
 .correo-otro{display:inline-flex;align-items:center;gap:6px;color:#46535f;font-size:15px}
 .correo-otro svg.i{width:22px;height:22px}
 .correo-mini{flex:none;display:grid;place-items:center;width:64px;height:34px;padding:4px 6px;box-sizing:border-box;border-radius:9px;background:#fff;border:1px solid var(--line)}

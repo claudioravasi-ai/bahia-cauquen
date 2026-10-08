@@ -92,7 +92,10 @@ R.mensajes = {
     const u = yo();
     const hilos = Store.s.dms.filter(h => h.a === u.id || h.b === u.id).sort((x, y) => (y.msgs.at(-1)?.at || 0) - (x.msgs.at(-1)?.at || 0));
     return `${superficie({ v:'dm-nuevo', icon:'search', t:'Buscar un vecino y escribirle', s:'Elegí uno o varios del padrón: a cada uno le llega por separado, en su chat privado con vos', cls:'acento' })}
-      ${superficie({ v:'privado', icon:'lock', color:'accent', t:'Administración', s:'Tu conversación privada con la Administración' })}
+      ${(() => { const sin = c => Store.s.privados.filter(h => h.userId === u.id && (h.con || 'admin') === c).reduce((n, h) => n + aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length, 0);
+        const a = sin('admin'), g = sin('guardia'), nuevo = [a ? `${a} sin leer de la Administración` : '', g ? `${g} sin leer de la Guardia` : ''].filter(Boolean).join(' · ');
+        /* 08-10-2026: abre las dos conversaciones (se elige arriba): el cartel lo dice. */
+        return superficie({ v:'privado', p: g && !a ? 'guardia' : 'admin', icon:'lock', color:'accent', t:'Administración o Guardia', s: nuevo || 'Tu conversación privada con cada una · arriba elegís con quién' }); })()}
       ${sec('Conversaciones')}${hilos.length ? hilos.map(h => { const otro = usuario(h.a === u.id ? h.b : h.a) || { nombre:'Ex vecino/a', casa:'' }, ult = h.msgs.at(-1), nl = h.msgs.filter(m => m.de !== u.id && !m.leido).length;
         return `<button class="superficie" data-a="abrir" data-v="dm" data-p="${otro.id || ''}">${avatar(otro)}<span class="txt"><b>${esc(otro.nombre)} · ${esc(otro.casa)}</b><small>${ult ? (ult.de === u.id ? 'Vos: ' : '') + esc(ult.text.slice(0, 60)) + ' · ' + hace(ult.at) : ''}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('') : vacio('chat', 'Todavía no tenés conversaciones.')}`;
   },

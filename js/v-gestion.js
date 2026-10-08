@@ -569,6 +569,9 @@ R.privado = {
   render(p){
     const u = yo(), s = Store.s;
     const [conP, idP, deExpensas] = privadoParam(p);
+    /* Quien administra y vive en un lote recibe mensajes de la garita como
+       vecino: el aviso lo lleva a SU conversación (pasa a modo vecino). */
+    if (esAdmin() && conP === 'guardia' && !idP && tengoLote()){ Store.sesion.modo = 'vecino'; Store.guardarSesion(); setTimeout(() => { pintarTop(); toast('Pasaste a modo vecino: es tu conversación con la garita', 'home'); }, 0); }
     if (conP === 'interno') return chatInterno(idP);
     /* El hotel entra por "Comunicación interna" y elige con quién (v-hotel.js). */
     if (esHotel() && conP !== 'guardia' && conP !== 'admin') return comunicacionHotel();
@@ -588,6 +591,9 @@ R.privado = {
           : vacio('lock', 'No hay conversaciones.')}`;
     }
     const quienId = esStaff() ? idP : u.id;
+    /* Abrir la conversación también apaga su aviso en la campanita (08-10-2026):
+       antes se marcaban leídos los mensajes, pero el aviso seguía contando. */
+    if (!esStaff() && typeof marcarVistoLink === 'function') setTimeout(() => ['privado:' + miCanal, ...(miCanal === 'admin' ? ['privado'] : [])].forEach(marcarVistoLink), 0);
     let h = s.privados.find(x => x.userId === quienId && (x.con || 'admin') === miCanal);
     const yoSoy = esStaff() ? miCanal : 'vecino';
     const mio = m => esStaff() ? m.from !== 'vecino' : m.from === 'vecino';

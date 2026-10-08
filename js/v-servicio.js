@@ -322,7 +322,7 @@ A['correo-elegir'] = el => {
   const f0 = $('#hoja form[data-f="correo-entra"]'), antes = f0 ? { hora:f0.hora?.value, patente:f0.patente?.value, lotes:f0.lotes?.value } : null;
   hoja(k === 'otro' ? 'Entró otro correo' : `Entró ${e.n}`, `<form data-f="correo-entra" data-emp="${k}">
     <div class="correo-elegido">${logoCorreo(k, 34)}<span class="ce-ok">${I('check')}Elegido</span></div>
-    <div class="correo-cambiar" role="group" aria-label="Cambiar de correo"><span>¿Era otro?</span>
+    <div class="correo-cambiar" role="group" aria-label="Cambiar de correo"><span>¿Era otro? Tocá el correcto (lo que escribiste no se pierde):</span>
       <div class="cc-tira">${Object.keys(EMPRESAS_CORREO).filter(x => x !== k).map(x => `<button type="button" class="cc-op" data-a="correo-elegir" data-v="${x}" aria-label="Cambiar a ${esc(EMPRESAS_CORREO[x].n)}">${logoCorreo(x, 18)}</button>`).join('')}</div></div>
     ${k === 'otro' ? `<div class="field"><label>¿Qué correo es?</label><input name="nombre" required maxlength="30" list="otrosCorreos" placeholder="DHL, Via Cargo, FedEx…"></div>
       <datalist id="otrosCorreos"><option>DHL</option><option>FedEx</option><option>UPS</option><option>Via Cargo</option><option>Cruz del Sur</option><option>Urbano</option><option>Credifin</option><option>Fast Mail</option></datalist>` : ''}

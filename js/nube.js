@@ -761,6 +761,8 @@ const Nube = {
         /* Se mira el registro viejo entero: su dueño sí puede borrarlo. */
         const viejo = JSON.parse(antes[id]);
         if (sup) return;
+        /* Un correo que entró hace menos de un día no se borra nunca desde un equipo (se marca su salida). */
+        if (col === 'mensajeria' && Date.now() - (viejo.entra || 0) < DIA) return;
         if (this.soloSuParte(col, viejo)) return;
         rutasDe(col, viejo).forEach(r => poner(r, null));
       });
