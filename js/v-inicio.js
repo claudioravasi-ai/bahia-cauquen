@@ -2277,7 +2277,7 @@ R.garita = {
         ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos', s:'Horarios y quién trabajó' })}
         ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'Controlar ART', n: s.proveedores.filter(p => artEstado(p)[1] === 'danger').length || '' })}
         ${teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:'Avisos del día' })}
-        ${teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas' })}
+        ${teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas de hoy', n: typeof Vuelos !== 'undefined' && Vuelos.cuantosHoy ? Vuelos.cuantosHoy() || '' : '' })}
         ${teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'Teléfonos útiles y DEA' })}
         ${teja({ v:'documentos', icon:'file', color:'brand', t:'Reglamento', s:'Normas y protocolos' })}
         ${teja({ v:'hotel-vivo', icon:'star', color:'wood', t:HOTEL_NOMBRE, s:'Vans, traslados, huéspedes y eventos' })}

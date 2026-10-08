@@ -20,7 +20,7 @@ const normTxt = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀
    ========================================================= */
 function fichasDeVecinos(){
   const s = Store.s;
-  const cuentas = s.users.filter(x => x.estado === 'aprobado' && x.rol === 'vecino' && x.casa);
+  const cuentas = s.users.filter(x => esVecinoDeLote(x) && x.casa);
   const padron = aLista(s.padron).filter(p => p && p.lote !== undefined && p.lote !== '');
   const fichas = [];
   if (padron.length){
@@ -136,8 +136,12 @@ F['dm'] = (d, form) => {
    barrio está el pizarrón o la Administración.
    ========================================================= */
 const MAX_DM = 10;
-/* Las cuentas a las que se les puede escribir: vecinos aprobados, menos uno mismo. */
-const destinatarioDM = (x, u) => x && x.id !== u.id && x.estado === 'aprobado' && x.rol === 'vecino';
+/* Las cuentas a las que se les puede escribir: vecinos aprobados, menos uno
+   mismo. Quien administra y además vive en un lote (08-10-2026: Claudio en el
+   148; mañana Paula Juncos) también es vecino de su lote: le pueden escribir
+   como a cualquiera. Una cuenta de Administración sin lote, no. */
+const esVecinoDeLote = x => !!x && x.estado === 'aprobado' && (x.rol === 'vecino' || (x.rol === 'admin' && /^Lote\s/i.test(x.casa || '')));
+const destinatarioDM = (x, u) => x && x.id !== u.id && esVecinoDeLote(x);
 R['dm-nuevo'] = {
   titulo: 'Escribirle a vecinos', icon: 'chat', color: 'accent', sub: 'Del padrón · a cada uno por separado',
   render(p){

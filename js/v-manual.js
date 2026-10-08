@@ -273,6 +273,7 @@ const MANUAL_CAPS = [
     ['h', 'Escribirle a uno o varios vecinos'],
     ['pasos', [
       'Entrá a <b>Tu casa → Mensajes</b> y tocá <b>"Buscar un vecino y escribirle"</b>.',
+      'Quien es de la Administración y vive en un lote aparece como vecino de su lote: le podés escribir como a cualquier vecino (para temas de la Administración, usá el canal "Administración").',
       'Si en un lote hay varias cuentas, <b>"Todo el lote"</b> las tilda a todas de un toque; o tildá solo a quién querés (en un lote de cuatro, a dos: los otros dos no lo reciben).',
       'Buscá por apellido, nombre, oficio o número de lote y <b>tildá</b> a quién le querés escribir: uno, dos o hasta diez vecinos.',
       'Escribí el mensaje una sola vez y tocá <b>Enviar</b>.',

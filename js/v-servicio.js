@@ -312,8 +312,12 @@ A['correo-menu'] = () => hoja('Entró un correo', `<p class="muted small" style=
   <div class="correo-menu">${Object.keys(EMPRESAS_CORREO).map(k => `<button type="button" class="correo-op" data-a="correo-elegir" data-v="${k}" aria-label="${esc(EMPRESAS_CORREO[k].n)}">${logoCorreo(k, 30)}</button>`).join('')}</div>`);
 A['correo-elegir'] = el => {
   const k = el.dataset.v, e = EMPRESAS_CORREO[k]; if (!e) return;
+  /* Si ya estaba el formulario de otro correo, lo escrito se conserva al cambiar. */
+  const f0 = $('#hoja form[data-f="correo-entra"]'), antes = f0 ? { hora:f0.hora?.value, patente:f0.patente?.value, lotes:f0.lotes?.value } : null;
   hoja(k === 'otro' ? 'Entró otro correo' : `Entró ${e.n}`, `<form data-f="correo-entra" data-emp="${k}">
-    <div class="correo-elegido">${logoCorreo(k, 34)}</div>
+    <div class="correo-elegido">${logoCorreo(k, 34)}<span class="ce-ok">${I('check')}Elegido</span></div>
+    <div class="correo-cambiar" role="group" aria-label="Cambiar de correo"><span>¿Era otro?</span>
+      <div class="cc-tira">${Object.keys(EMPRESAS_CORREO).filter(x => x !== k).map(x => `<button type="button" class="cc-op" data-a="correo-elegir" data-v="${x}" aria-label="Cambiar a ${esc(EMPRESAS_CORREO[x].n)}">${logoCorreo(x, 18)}</button>`).join('')}</div></div>
     ${k === 'otro' ? `<div class="field"><label>¿Qué correo es?</label><input name="nombre" required maxlength="30" list="otrosCorreos" placeholder="DHL, Via Cargo, FedEx…"></div>
       <datalist id="otrosCorreos"><option>DHL</option><option>FedEx</option><option>UPS</option><option>Via Cargo</option><option>Cruz del Sur</option><option>Urbano</option><option>Credifin</option><option>Fast Mail</option></datalist>` : ''}
     <div class="grid2"><div class="field"><label>Hora de entrada</label><input name="hora" type="time" required value="${hora(Date.now())}"></div>
@@ -321,8 +325,9 @@ A['correo-elegir'] = el => {
     <div class="field"><label>¿A qué lotes va? (opcional)</label><input name="lotes" maxlength="200" inputmode="text" placeholder="Ej: 12, 40, 133A">
       <div class="ayuda">A esas casas les llega "va a tu casa" al celular, como un WhatsApp: con la pantalla apagada, la app cerrada o la sesión cerrada (si activaron los avisos).</div></div>
     <p class="muted small" style="margin:0 0 12px">Al guardar, a todos les cruza el camión de ${esc(k === 'otro' ? 'correo' : e.n)} por la pantalla, con su bocina, hasta que registres la salida. Los lotes y la patente los ve solo la garita.</p>
-    <button class="btn btn-pri btn-block">${I('login')}Registrar la entrada</button></form>
-    <button class="link" data-a="correo-menu" style="margin-top:10px">${I('left')}Elegir otro correo</button>`);
+    <button class="btn btn-pri btn-block">${I('login')}Registrar la entrada</button></form>`);
+  const f = $('#hoja form[data-f="correo-entra"]');
+  if (f && antes){ if (antes.hora) f.hora.value = antes.hora; f.patente.value = antes.patente || ''; f.lotes.value = antes.lotes || ''; }
 };
 /* Los lotes que escribió la garita: los que existen y los que no. */
 function lotesCorreo(txt){

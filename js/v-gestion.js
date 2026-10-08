@@ -639,9 +639,11 @@ F['privado'] = (d, form) => {
    cuatro y se le escribe a dos: los otros dos no lo reciben). A cada uno le
    llega en su conversación privada con la garita o la Administración.
    ========================================================= */
-const lotesConCuentas = () => [...new Set(Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && /^Lote\s/i.test(u.casa || '')).map(u => u.casa))]
+/* Quien administra y además vive en un lote (rol admin con casa "Lote …") también es del lote. */
+const esCuentaDeLote = u => !!u && u.estado === 'aprobado' && (u.rol === 'vecino' || u.rol === 'admin') && /^Lote\s/i.test(u.casa || '');
+const lotesConCuentas = () => [...new Set(Store.s.users.filter(esCuentaDeLote).map(u => u.casa))]
   .sort((a, b) => a.localeCompare(b, 'es', { numeric:true }));
-const cuentasPrivLote = casa => cuentasDelLote(casa).filter(u => u.rol === 'vecino');
+const cuentasPrivLote = casa => cuentasDelLote(casa).filter(esCuentaDeLote);
 function filasPrivLote(casa){
   const cs = cuentasPrivLote(casa);
   if (!cs.length) return '<p class="muted small" style="margin:6px 0">Elegí un lote.</p>';
