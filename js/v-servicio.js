@@ -308,8 +308,14 @@ const logoCorreo = (k, alto = 26) => { const e = EMPRESAS_CORREO[k] || EMPRESAS_
   return e.logo ? `<img src="${e.logo}" alt="${esc(e.n)}" style="height:${alto}px;max-width:100%;object-fit:contain">` : `<span class="correo-otro">${I('mail')}<b>Otro</b></span>`; };
 
 /* La garita: el menú de correos y la entrada. */
-A['correo-menu'] = () => hoja('Entró un correo', `<p class="muted small" style="margin:0 0 12px">¿Cuál?</p>
-  <div class="correo-menu">${Object.keys(EMPRESAS_CORREO).map(k => `<button type="button" class="correo-op" data-a="correo-elegir" data-v="${k}" aria-label="${esc(EMPRESAS_CORREO[k].n)}">${logoCorreo(k, 30)}</button>`).join('')}</div>`);
+/* EL MENÚ DE CORREOS (rediseño pedido por Claudio, 08-10-2026): cada
+   empresa es su propio camioncito, con sus colores y su logo, como el que
+   después cruza la pantalla. "Otro" va a lo ancho, abajo, y nunca se sale
+   del cuadro. Un toque elige y pasa directo a registrar la entrada. */
+A['correo-menu'] = () => hoja('¿Qué correo entró?', `<div class="correo-menu">
+  ${Object.keys(EMPRESAS_CORREO).map(k => `<button type="button" class="cm-op ${k === 'otro' ? 'cm-otro' : ''}" data-a="correo-elegir" data-v="${k}" style="--cm:${EMPRESAS_CORREO[k].franja}">
+    <span class="cm-camion" aria-hidden="true">${camionCorreoSVG({ emp:k, nombre: k === 'otro' ? 'Otro' : '' })}</span><span class="cm-nom">${k === 'otro' ? 'Otro (DHL, FedEx…)' : esc(EMPRESAS_CORREO[k].n)}</span></button>`).join('')}
+  </div>`);
 A['correo-elegir'] = el => {
   const k = el.dataset.v, e = EMPRESAS_CORREO[k]; if (!e) return;
   /* Si ya estaba el formulario de otro correo, lo escrito se conserva al cambiar. */
@@ -358,8 +364,9 @@ F['correo-entra'] = (d, form) => {
   if (emp === 'otro' && !nombre){ toast('Escribí qué correo es', 'alert'); return; }
   const { ok:lotes, malos } = lotesCorreo(d.lotes);
   if (malos.length){ toast(`No existe ${malos.length === 1 ? 'el lote' : 'los lotes'} ${malos.join(', ')}`, 'alert'); return; }
-  const [h, m] = String(d.hora || '').split(':').map(Number), f = new Date(); f.setHours(h || 0, m || 0, 0, 0);
-  const entra = Math.min(Date.now(), f.getTime()), patente = normPatente(d.patente || '');
+  /* Si la hora no se entiende (o quedó vacía), vale "ahora": nunca una hora que lo dé por ido. */
+  const [h, m] = String(d.hora || '').split(':').map(Number), f = new Date(); f.setHours(h, m, 0, 0);
+  const entra = Number.isFinite(f.getTime()) && Number.isFinite(h) && Number.isFinite(m) ? Math.min(Date.now(), f.getTime()) : Date.now(), patente = normPatente(d.patente || '');
   let v, r = { avisadas:[], sinCuenta:[] };
   Store.cambiar(s => {
     s.mensajeria = aLista(s.mensajeria).filter(x => x && Date.now() - (x.entra || 0) < 30 * DIA);
@@ -409,7 +416,9 @@ A['correo-probar'] = el => { if (el.dataset.v === 'timbre') Mensajeria.timbre();
 /* En la garita, justo abajo del camión de la basura: el botón y los que están adentro. */
 function bandaCorreos(garita = false){
   const ls = Mensajeria.adentro().slice().reverse();
-  const boton = garita ? `<button class="superficie" data-a="correo-menu"><span class="ic ic-sky">${I('mail')}</span><span class="txt"><b>Correos</b><small>Registrar la entrada: Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro</small></span>${I('right')}</button>` : '';
+  const sinReglas = typeof Nube !== 'undefined' && Nube.activa() && Nube.sinPermiso && Nube.sinPermiso.has('mensajeria');
+  const alerta = sinReglas ? aviso('danger', 'alert', 'Los correos no se guardan en la base del barrio', 'Falta publicar las reglas nuevas de Firebase (reglas-firebase.txt, paso 2 de PASO-A-PASO). Hasta entonces el camión de correo no les llega a los vecinos y se pierde al recargar.') : '';
+  const boton = alerta + (garita ? `<button class="superficie" data-a="correo-menu"><span class="ic ic-sky">${I('mail')}</span><span class="txt"><b>Correos</b><small>Registrar la entrada: Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro</small></span>${I('right')}</button>` : '');
   if (!ls.length) return boton;
   return `${boton}<span id="garCorreos" class="ancla"></span>${ls.map(v => {
     const d = veGarita() ? Mensajeria.detalle(v.id) : { lotes:[], patente:'' }, min = Math.max(1, Math.round((Date.now() - v.entra) / MIN));

@@ -476,7 +476,7 @@ const Nube = {
         if (col === 'notifsTodos') this.recordar('notifs', Store.s.notifs);
         this.listos.add(base + col);
         if (this.arrancada) this.llegoAlgo();
-      }, err => { this.listos.add(base + col); if (!opcional) console.warn('No se pudo leer', base, col, err.message); });
+      }, err => { this.listos.add(base + col); (this.sinPermiso = this.sinPermiso || new Set()).add(col); if (!opcional) console.warn('No se pudo leer', base, col, err.message); });
       if (!opcional) this.esperados.add(base + col);
     });
   },
@@ -826,6 +826,8 @@ const Nube = {
         console.warn('No se pudo guardar', g, e.message);
         /* Lo que es del personal (bitácora, auditoría) no es tarea del vecino:
            si no llega, no se lo asusta con un cartel. */
+        /* Los correos (08-10-2026): si las reglas nuevas no están publicadas, se dice qué hacer. */
+        if (g === 'barrio/mensajeria'){ (this.sinPermiso = this.sinPermiso || new Set()).add('mensajeria'); toast('El correo no se guardó en la base del barrio: falta publicar las reglas nuevas de Firebase (reglas-firebase.txt). Hasta entonces el camión no llega a los demás.', 'alert'); return; }
         if (!/^staff\/(bitacora|auditoria)$/.test(g)) toast('No se pudo guardar en la nube (' + g.split('/')[1] + '): ' + e.message, 'alert');
       });
     });
