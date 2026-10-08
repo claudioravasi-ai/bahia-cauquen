@@ -209,6 +209,7 @@ R.supervisor = {
       ${sec('Mirar')}
       <div class="mosaico">
         ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita en vivo', s:'Ingresos, avisos, camión, policía', n: lista.length || '' })}
+        ${teja({ v:'vecinos', icon:'search', color:'sky', t:'Buscar un vecino', s:'Lote, dirección y teléfonos' })}
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'El libro de guardia' })}
         ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos y policía', s:'Quién trabajó, rondas y servicios' })}
         ${teja({ v:'peticiones', icon:'edit', color:'warn', t:'Peticiones', s:'Pedidos firmados de los vecinos', badge: petPend })}

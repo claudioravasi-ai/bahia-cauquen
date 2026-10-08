@@ -140,6 +140,42 @@ Sí: en la ficha de cada lote está **Editar**. Para 152 lotes conviene la
 planilla, pero para corregir dos o tres, a mano es más rápido.
 
 **¿Los vecinos ven el padrón?**
-No. La ventana Padrón es solo de la Administración. Los vecinos tienen el
-directorio (*Vecinos*), donde cada uno decide si comparte su profesión, su
-teléfono y su dirección.
+No. Desde el 8 de octubre de 2026 el padrón de expensas (titular, DNI,
+correo, deuda) **no baja a ningún equipo que no sea de la Administración**:
+lo impiden las reglas de Firebase. Los vecinos tienen *Vecinos*, que usa la
+**guía del barrio** (abajo).
+
+---
+
+## La guía del barrio (quién vive en cada lote, su dirección y sus teléfonos)
+
+Es otra lista, aparte del padrón. Sirve para que la garita, cuando alguien
+dice "soy invitado de Pérez", escriba el apellido, el lote o la calle y
+vea: **Juan Pérez y Ana Gómez · Lote 42 · Los Salesianos 3500**, con
+los teléfonos para llamar.
+
+- **La dirección de cada lote** (calle y altura, el lado de la garita en Los
+  Salesianos, y la entrada por Los Ñires de los lotes 45 a 49) ya está en la
+  app, sin nombres (`js/padron.js`).
+- **Quién vive y los teléfonos** se cargan desde la planilla
+  `datos-privados/guia-del-barrio-2026-08-09.csv`, que salió del LISTADO
+  GENERAL del 09-08-2026. Lo dudoso del listado está en
+  `datos-privados/guia-para-revisar.md`.
+
+| Quién | Qué ve |
+|---|---|
+| Garita, Administración, supervisión | Lote, dirección, quién vive (propietario o inquilino), baldío o cabaña, **teléfonos** y nota |
+| Vecinos | Lote, dirección y quién vive. **Sin teléfonos** (cada uno comparte el suyo desde Mi casa si quiere) |
+| Hotel | Solo lote y dirección, sin nombres |
+
+**Cargarla:** Vecinos → Padrón → abajo, **"Cargar la guía del barrio"** →
+elegí el CSV de `datos-privados`. La nueva reemplaza a la anterior.
+
+**Corregirla:** un lote, desde *Vecinos* → la ficha → **Editar**. Muchos:
+**"Descargar la guía (CSV)"**, corregir en Excel (columnas `lote; estado;
+propietarios; alquila; inquilinos; cabana; telefonos; nota`, los nombres
+separados con ` / ` y los teléfonos con ` | `, por ejemplo
+`Sr.: 15489595 | Sra.: 15610304`) y volver a subirla.
+
+> El CSV de la guía tiene teléfonos de todo el barrio: guardalo siempre en
+> `datos-privados/`, que no se sube a GitHub.

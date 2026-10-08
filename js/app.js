@@ -62,13 +62,17 @@ const VENTANAS_HOTEL = new Set(['hotel', 'hotel-traslados', 'hotel-huespedes', '
    bien", sin los mensajes de los vecinos ni nada de expensas. */
 const VENTANAS_SUPERVISOR = new Set(['supervisor', 'garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'alertas',
   'hotel-vivo', 'hotel-traslados', 'hotel-eventos', 'obras', 'proveedores', 'vuelos', 'cruceros', 'agenda', 'documentos',
-  'recoleccion', 'mensajeria', 'sismos', 'ushuaia', 'municipio', 'manual', 'legal', 'informe-servicio']);
+  'recoleccion', 'mensajeria', 'sismos', 'ushuaia', 'municipio', 'manual', 'legal', 'informe-servicio',
+  /* 08-10: buscar un vecino (lote, dirección y teléfonos), igual que la garita */
+  'vecinos']);
 /* EL PROPIETARIO A DISTANCIA (07-10-2026): su lote está alquilado (o no vive
    en el barrio). Ve lo que le toca como dueño; el día a día es del inquilino
    (ver esPropDistancia en core.js). */
 const VENTANAS_PROPIETARIO = new Set(['inicio', 'expensas', 'votaciones', 'tablero', 'documentos', 'privado', 'dm', 'infracciones', 'perfil',
   'manual', 'ayuda', 'legal', 'aporte', 'descargas']);
 VENTANAS_HOTEL.add('aporte');
+/* 08-10-2026: el hotel ve las direcciones del barrio (lote y calle, sin nombres). */
+VENTANAS_HOTEL.add('vecinos');
 ['hotel-vivo', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
 const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : esSupervisor() ? VENTANAS_SUPERVISOR.has(id) : esPropDistancia() ? VENTANAS_PROPIETARIO.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){

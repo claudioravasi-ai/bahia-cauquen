@@ -9,76 +9,176 @@
    teléfono y dirección exacta, solo si cada uno lo comparte. */
 const normTxt = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 /* =========================================================
-   BUSCAR UN VECINO
-   Salen los 152 lotes del padrón, con el nombre del propietario tal como
-   figura en la liquidación de expensas y el número de lote, estén o no en
-   la app. Si alguien de ese lote ya tiene cuenta y subió la foto del frente
-   de su casa, se ve la foto: es lo que la garita necesita para ubicar un
-   domicilio y lo que un vecino usa para saber quién es quién.
-   Se busca por nombre, apellido o número de lote, sin importar acentos ni
-   mayúsculas. Si el padrón todavía no se cargó, salen las cuentas de la app.
+   BUSCAR UN VECINO · LA GUÍA DEL BARRIO (pedido de Claudio, 08-10-2026)
+   "Alguien llega a la garita y dice: soy invitado de Pérez y nunca vine,
+   ¿qué calle es?". La garita escribe el apellido, el lote o la calle y le
+   sale: Juan Pérez y Ana Gómez · Lote 42 · Los Salesianos 3500.
+
+   Salen SIEMPRE los 152 lotes, cada uno con su dirección (está en
+   js/padron.js, sin nombres). Encima, según quién mira:
+     · la guía del barrio (/barrio/guia): quién vive en cada lote, si es
+       propietario o inquilino, si es baldío o una cabaña del hotel. La ven
+       los vecinos, la garita, la Administración y la supervisión;
+     · los teléfonos de cada lote (/staff/telefonos): solo la garita, la
+       Administración y la supervisión, con su botón de llamar;
+     · el hotel ve solo el lote y la dirección (sin nombres).
+   La guía se carga desde Administración (un CSV hecho con el LISTADO
+   GENERAL, que queda en datos-privados/ y no va a GitHub).
+
+   El buscador perdona errores: "Peres" encuentra a Pérez y "Gonsales" a
+   González (b y v, s, z y c, ll e y, la h muda y una letra de más o de
+   menos). La idea sale de Fuse.js (20.000★ en GitHub); el código es propio.
    ========================================================= */
-function fichasDeVecinos(){
-  const s = Store.s;
-  const cuentas = s.users.filter(x => esVecinoDeLote(x) && x.casa);
-  const padron = aLista(s.padron).filter(p => p && p.lote !== undefined && p.lote !== '');
-  const fichas = [];
-  if (padron.length){
-    padron.forEach(p => { const casa = 'Lote ' + p.lote; fichas.push({ casa, lote:String(p.lote), nombre:p.propietario || '', cuentas:cuentas.filter(x => x.casa === casa) }); });
-    cuentas.filter(x => !padron.some(p => 'Lote ' + p.lote === x.casa))
-      .forEach(x => fichas.push({ casa:x.casa, lote:x.casa.replace(/^Lote\s*/i, ''), nombre:x.nombre, cuentas:[x] }));
-  } else {
-    const porCasa = new Map();
-    cuentas.forEach(x => { if (!porCasa.has(x.casa)) porCasa.set(x.casa, []); porCasa.get(x.casa).push(x); });
-    porCasa.forEach((cs, casa) => fichas.push({ casa, lote:casa.replace(/^Lote\s*/i, ''), nombre:cs.map(x => x.nombre).join(' · '), cuentas:cs }));
+const guiaDe = id => aLista(Store.s.guia).find(g => g && String(g.lote) === String(id));
+const privadoLote = id => aLista(Store.s.telefonos).find(t => t && String(t.lote) === String(id)) || {};
+const telsDe = id => aLista(privadoLote(id).tels).filter(t => t && t.n);
+/* La nota del lote va con los teléfonos (/staff/telefonos): la ven solo la garita, la Administración y la supervisión. */
+const notaDe = id => privadoLote(id).nota || '';
+const veTelefonos = () => esStaff() || esSupervisor();
+const ESTADO_GUIA = { baldio:'Baldío', cabana:'Cabaña del hotel', hotel:HOTEL_NOMBRE };
+/* "Casa A: Rosi y Parmiggiani" (dos casas en un lote) ya trae su "y": esas van separadas con un punto. */
+const listaNombres = xs => xs.length < 2 ? (xs[0] || '') : xs.some(x => /:/.test(x)) ? xs.join(' · ') : xs.slice(0, -1).join(', ') + ' y ' + xs.at(-1);
+
+/* Un teléfono tal como lo anotaron ("15489595", "446719", "0111538151639")
+   → cómo se lee, el enlace para llamar y el de WhatsApp (si es celular). */
+function telInfo(n){
+  const d = soloDigitos(n).replace(/^0+/, '');
+  if (/^4\d{5}$/.test(d)) return { ver:`${d.slice(0, 2)}-${d.slice(2)}`, tel:'+542901' + d, wa:'', fijo:true };
+  const w = typeof waNumeroAR === 'function' ? waNumeroAR(n) : '';
+  if (!w) return { ver:String(n), tel:'', wa:'', dudoso:true };
+  const diez = w.slice(3), area = diez.startsWith('2901') ? '2901' : diez.startsWith('11') ? '11' : diez.slice(0, 4), resto = diez.slice(area.length);
+  return { ver:`${area} ${resto.slice(0, -4)}-${resto.slice(-4)}`, tel:'+' + w, wa:w };
+}
+
+/* ---------- El buscador que perdona ---------- */
+const fonetica = t => normTxt(t).replace(/[^a-z0-9 ]/g, ' ')
+  .replace(/ch/g, '%').replace(/qu(?=[ei])/g, 'k').replace(/c(?=[ei])/g, 's').replace(/g(?=[ei])/g, 'j').replace(/c/g, 'k')
+  .replace(/z/g, 's').replace(/v/g, 'b').replace(/ll/g, 'y').replace(/h/g, '').replace(/%/g, 'ch')
+  .replace(/([a-z])\1+/g, '$1');
+function distancia(a, b, tope){
+  if (Math.abs(a.length - b.length) > tope) return tope + 1;
+  let prev = Array.from({ length:b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++){
+    const cur = [i]; let min = i;
+    for (let j = 1; j <= b.length; j++){ cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); min = Math.min(min, cur[j]); }
+    if (min > tope) return tope + 1;
+    prev = cur;
   }
-  return fichas.sort((a, b) => String(a.lote).localeCompare(String(b.lote), 'es', { numeric:true }));
+  return prev[b.length];
 }
-const textoFicha = f => normTxt([f.nombre, f.casa, 'lote ' + f.lote, ...f.cuentas.map(x => [x.nombre,
-  x.enDirectorio ? x.profesion : '', x.skills && x.mostrarTel ? x.skills : '', x.enDirectorio ? x.direccion : ''].join(' '))].join(' '));
-function coincideFicha(f, qq){
-  if (!qq) return true;
-  const palabras = qq.split(/\s+/).filter(Boolean), t = textoFicha(f);
-  /* Un número solo busca el lote exacto: "14" es el lote 14, no el 140. */
-  if (palabras.length === 1 && /^\d+[a-z]?$/.test(palabras[0])) return normTxt(f.lote) === palabras[0];
-  return palabras.every(w => t.includes(w));
+/* 0 = no coincide; 2 = coincide tal cual; 1 = coincide perdonando un error. */
+function coincidePalabra(w, palabras, fon){
+  if (palabras.some(p => p.startsWith(w))) return 2;
+  if (/^\d+$/.test(w)) return 0;
+  const fw = fonetica(w); if (!fw) return 0;
+  if (fon.some(p => p.startsWith(fw))) return 1;
+  if (fw.length < 4) return 0;
+  const tope = fw.length >= 8 ? 2 : 1;
+  return fon.some(p => p.length >= 3 && distancia(fw, p.slice(0, Math.max(p.length, fw.length)), tope) <= tope) ? 1 : 0;
 }
+
+function fichasDeVecinos(){
+  const s = Store.s, hotel = esHotel();
+  const cuentas = hotel ? [] : s.users.filter(x => esVecinoDeLote(x) && x.casa);
+  const padron = aLista(s.padron).filter(p => p && p.lote !== undefined && p.lote !== '');
+  const fichas = LOTES.map(L => {
+    const casa = 'Lote ' + L.lote, g = hotel ? null : guiaDe(L.lote), p = padron.find(x => String(x.lote) === L.lote);
+    const prop = g ? aLista(g.propietarios) : p && p.propietario ? [p.propietario] : [];
+    const inq = g ? aLista(g.inquilinos) : [];
+    const cs = cuentas.filter(x => x.casa === casa);
+    const estado = g?.estado || (L.grupo === 'hotel' ? 'hotel' : '');
+    return { casa, lote:L.lote, L, g, prop, inq, estado, cuentas:cs,
+      nombre: inq.length ? listaNombres(inq) : prop.length ? listaNombres(prop) : estado === 'hotel' ? HOTEL_NOMBRE : cs.map(x => x.nombre).join(' · ') };
+  });
+  cuentas.filter(x => !LOTES.some(L => 'Lote ' + L.lote === x.casa)).forEach(x =>
+    fichas.push({ casa:x.casa, lote:x.casa.replace(/^Lote\s*/i, ''), L:null, g:null, prop:[], inq:[], estado:'', nombre:x.nombre, cuentas:[x] }));
+  return fichas;
+}
+function textoFicha(f){
+  if (f._t) return f._t;
+  const tels = veTelefonos() ? telsDe(f.lote).map(t => soloDigitos(t.n) + ' ' + (t.de || '')) : [];
+  const txt = normTxt([...f.prop, ...f.inq, f.nombre, 'lote ' + f.lote, f.L?.dir || '', f.L?.nires ? 'los nires' : '',
+    f.g?.cabana ? 'cabana ' + f.g.cabana : '', ESTADO_GUIA[f.estado] || '', veTelefonos() ? notaDe(f.lote) : '', ...tels,
+    ...f.cuentas.map(x => [x.nombre, x.enDirectorio ? x.profesion : '', x.skills && x.mostrarTel ? x.skills : ''].join(' '))].join(' '));
+  const palabras = txt.split(/[^a-z0-9]+/).filter(Boolean);
+  return (f._t = { palabras, fon:palabras.map(fonetica) });
+}
+/* Devuelve el puntaje (0 = no va). Un número solo, de 1 a 3 cifras, es el
+   lote exacto: "14" es el lote 14, no el 140. De 4 cifras o más, la altura
+   ("3340") o un teléfono. */
+function puntajeFicha(f, qq){
+  if (!qq) return 1;
+  const ws = qq.split(/\s+/).filter(Boolean);
+  if (ws.length === 1 && /^\d{1,3}[a-z]?$/.test(ws[0])) return normTxt(f.lote) === ws[0] ? 3 : 0;
+  const { palabras, fon } = textoFicha(f);
+  let total = 0;
+  for (const w of ws){
+    if (w === 'lote' || w === 'calle') continue;
+    const m = coincidePalabra(w, palabras, fon); if (!m) return 0; total += m;
+  }
+  return total || 1;
+}
+const coincideFicha = (f, qq) => puntajeFicha(f, qq) > 0;
+
 R.vecinos = {
-  titulo: 'Vecinos', icon: 'users', color: 'sky', sub: 'Por nombre, apellido o número de lote',
+  titulo: () => esHotel() ? 'Direcciones del barrio' : 'Vecinos',
+  icon: 'users', color: 'sky',
+  sub: () => esHotel() ? 'Calle y altura de cada lote' : veTelefonos() ? 'Por apellido, lote o calle · con teléfonos' : 'Por nombre, apellido, lote o calle',
   render(q){
-    const u = yo(), qq = normTxt(q || '').trim(), staff = esStaff();
-    const todas = fichasDeVecinos(), ls = todas.filter(f => coincideFicha(f, qq));
+    const u = yo(), qq = normTxt(q || '').trim(), staff = esStaff(), hotel = esHotel();
+    const todas = fichasDeVecinos();
+    const ls = todas.map(f => [f, puntajeFicha(f, qq)]).filter(([, p]) => p > 0)
+      .sort((a, b) => b[1] - a[1] || String(a[0].lote).localeCompare(String(b[0].lote), 'es', { numeric:true })).map(([f]) => f);
     const mostrar = ls.slice(0, 160);
-    return `<form data-f="buscar-vecino" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecino" value="${esc(q || '')}" placeholder="Ej: Pérez, Lucía, 148" autocomplete="off"><button class="btn btn-pri">${I('search')}</button></form>
-      ${!staff && u.rol === 'vecino' && !u.fotoCasa ? aviso('info', 'camera', 'Subí la foto del frente de tu casa', 'Así te reconocen en el buscador y la garita ubica tu domicilio en una emergencia.', `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">Subirla</button>`) : ''}
+    const sinGuia = !hotel && !aLista(Store.s.guia).length;
+    return `<form data-f="buscar-vecino" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecino" value="${esc(q || '')}" placeholder="${hotel ? 'Ej: 148, De la Plaza, Salesianos' : 'Ej: Pérez, 42, Los Salesianos 3500'}" autocomplete="off" enterkeyhint="search"><button class="btn btn-pri">${I('search')}</button></form>
+      ${sinGuia && esAdmin() ? aviso('warn', 'upload', 'Falta cargar la guía del barrio', 'Sin la guía, acá salen las direcciones y los nombres del padrón, pero no quién vive en cada lote ni los teléfonos.', `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="padron">Cargarla</button>`) : ''}
+      ${!staff && !hotel && u.rol === 'vecino' && !u.fotoCasa ? aviso('info', 'camera', 'Subí la foto del frente de tu casa', 'Así te reconocen en el buscador y la garita ubica tu domicilio en una emergencia.', `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">Subirla</button>`) : ''}
       <div class="muted small" style="margin:0 2px 8px">${qq ? `${plural(ls.length, 'lote encontrado', 'lotes encontrados')}` : `${plural(todas.length, 'lote')} del barrio`}</div>
-      <div class="fichas-vecinos">${mostrar.length ? mostrar.map(f => fichaVecino(f, u, staff)).join('') : vacio('search', 'Nadie coincide con esa búsqueda.')}</div>`;
+      <div class="fichas-vecinos">${mostrar.length ? mostrar.map(f => hotel ? fichaDireccion(f) : fichaVecino(f, u, staff)).join('') : vacio('search', 'Nadie coincide con esa búsqueda.')}</div>
+      <p class="muted tiny" style="margin-top:12px">${I('lock')} ${hotel ? 'Solo el lote y la dirección. Los nombres y teléfonos de los vecinos no los ve el hotel.'
+        : veTelefonos() ? 'Los teléfonos los ven solo la garita, la Administración y la supervisión. Uso exclusivo para el servicio (Ley 25.326).'
+        : 'Nombre, lote y dirección los ve todo el barrio. Los teléfonos, solo la garita y la Administración; el tuyo lo compartís vos desde Mi casa.'}</p>`;
   },
 };
+const lineaDireccion = f => f.L?.dir ? `<span class="ficha-dir">${I('pin')}<span><b>${esc(f.L.dir)}</b>${comoLlegarLote(f.lote) ? `<em>${esc(comoLlegarLote(f.lote))}</em>` : ''}</span></span>` : '';
+/* Lo que ve el hotel: lote y dirección, nada más. */
+const fichaDireccion = f => `<div class="ficha-vecino"><span class="ficha-foto vacia">${I('home')}</span><div class="ficha-txt">
+  <span class="ficha-lote">Lote ${esc(f.lote)}</span>${lineaDireccion(f) || '<small class="muted">Sin dirección cargada</small>'}</div></div>`;
 function fichaVecino(f, u, staff){
   const conFoto = f.cuentas.find(x => x.fotoCasa);
   /* "Fernández, Lucía" y "Lucía Fernández" son la misma persona: no se repite. */
-  const mismas = (a, b) => normTxt(a).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ') === normTxt(b).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
-  const enApp = f.cuentas.filter(x => !mismas(x.nombre, f.nombre));
+  const clave = n => normTxt(n).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
+  const yaNombrados = new Set([...f.prop, ...f.inq].map(clave));
+  const enApp = f.cuentas.filter(x => !yaNombrados.has(clave(x.nombre)) && clave(x.nombre) !== clave(f.nombre));
   const esMio = f.casa === u.casa && !staff;
   const botones = f.cuentas.filter(x => x.id !== u.id).map(x => {
     const primero = esc(x.nombre.split(' ')[0]);
     const quien = f.cuentas.length > 1 ? ' a ' + primero : '';
-    if (staff) return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esGuardia() ? 'guardia' : 'admin'}|${x.id}">${I('chat')}Escribirle${quien}</button>
-      ${x.tel ? `<a class="btn btn-xs btn-sec" href="${telLink(x.tel)}">${I('phone')}Llamar${quien}</a>` : ''}`;
+    if (staff) return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esGuardia() ? 'guardia' : 'admin'}|${x.id}">${I('chat')}Escribirle${quien}</button>`;
+    if (esSupervisor()) return '';
     return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="dm" data-p="${x.id}">${I('chat')}Mensaje${quien}</button>
       ${x.enDirectorio && x.tel ? `<a class="btn btn-xs btn-wa" href="${waLink(x.tel)}" target="_blank" rel="noopener">${I('phone')}</a>` : ''}`;
   }).join('');
   const prof = f.cuentas.map(x => x.enDirectorio && x.profesion ? x.profesion : '').filter(Boolean);
-  return `<div class="ficha-vecino ${esMio ? 'mia' : ''}">
-    ${conFoto ? fotoHTML(conFoto.fotoCasa, 'ficha-foto') : `<span class="ficha-foto vacia">${I('home')}</span>`}
+  const tels = veTelefonos() ? telsDe(f.lote) : [];
+  const quienes = f.inq.length ? `<small>${I('key')} Inquilinos · propietario: ${esc(listaNombres(f.prop) || 'sin cargar')}</small>`
+    : f.prop.length > 1 ? `<small>Propietarios</small>` : f.prop.length ? `<small>Propietario/a</small>` : '';
+  return `<div class="ficha-vecino ${esMio ? 'mia' : ''} ${f.estado === 'baldio' ? 'baldio' : ''}">
+    ${conFoto ? fotoHTML(conFoto.fotoCasa, 'ficha-foto') : `<span class="ficha-foto vacia">${I(f.estado === 'baldio' ? 'pin' : 'home')}</span>`}
     <div class="ficha-txt">
-      <span class="ficha-lote">Lote ${esc(f.lote)}</span>
-      <b>${esc(f.nombre || 'Sin propietario cargado')}</b>
+      <span class="ficha-cab"><span class="ficha-lote">Lote ${esc(f.lote)}</span>${f.estado && f.estado !== 'casa' ? `<span class="ficha-estado e-${esc(f.estado)}">${esc(ESTADO_GUIA[f.estado] || '')}${f.g?.cabana ? ' ' + esc(f.g.cabana) : ''}</span>` : ''}</span>
+      ${lineaDireccion(f)}
+      <b>${esc(f.nombre || 'Sin datos cargados')}</b>
+      ${quienes}
       ${enApp.length ? `<small>En la app: ${enApp.map(x => esc(x.nombre)).join(', ')}</small>` : ''}
       ${prof.length ? `<small>${I('user')} ${esc(prof.join(' · '))}</small>` : ''}
-      ${esMio ? `<small>Es tu lote</small>` : !f.cuentas.length ? `<small class="muted">Todavía no usa la app</small>` : ''}
-      ${botones ? `<div class="btns">${botones}</div>` : ''}
+      ${tels.length ? `<div class="ficha-tels">${tels.map(t => { const i = telInfo(t.n);
+        return `<span class="ficha-tel ${i.dudoso ? 'dudoso' : ''}"><span>${t.de ? `<small>${esc(t.de)}</small>` : ''}${esc(i.ver)}${i.fijo ? ' <small>fijo</small>' : ''}${i.dudoso ? ' <small>a revisar</small>' : ''}</span>
+          ${i.tel ? `<a class="btn btn-xs btn-sec" href="${telLink(i.tel)}" aria-label="Llamar">${I('phone')}</a>` : ''}${i.wa ? `<a class="btn btn-xs btn-wa" href="${waLink(i.wa)}" target="_blank" rel="noopener" aria-label="WhatsApp">${I('chat')}</a>` : ''}</span>`; }).join('')}</div>` : ''}
+      ${veTelefonos() && notaDe(f.lote) ? `<small class="ficha-nota">${I('info')} ${esc(notaDe(f.lote))}</small>` : ''}
+      ${esMio ? `<small>Es tu lote</small>` : !f.cuentas.length && f.estado !== 'baldio' && f.estado !== 'hotel' ? `<small class="muted">Todavía no usa la app</small>` : ''}
+      ${botones || esAdmin() ? `<div class="btns">${botones}${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="editar-guia" data-v="${esc(f.lote)}">${I('edit')}Editar</button>` : ''}</div>` : ''}
     </div></div>`;
 }
 F['buscar-vecino'] = d => abrir('vecinos', d.q || '');
@@ -153,9 +253,9 @@ R['dm-nuevo'] = {
     const pre = String(p || '').split(',').filter(Boolean);
     const fichas = fichasDeVecinos();
     const conCuenta = fichas.filter(f => f.cuentas.some(x => destinatarioDM(x, u)));
-    const sinCuenta = fichas.filter(f => !f.cuentas.some(x => destinatarioDM(x, u)) && f.casa !== u.casa);
+    const sinCuenta = fichas.filter(f => !f.cuentas.some(x => destinatarioDM(x, u)) && f.casa !== u.casa && !['baldio', 'hotel', 'cabana'].includes(f.estado));
     /* "Todo el lote" (08-10-2026): con un toque se tildan todas las cuentas del lote; o se elige a quién. */
-    const fila = f => { const cs = f.cuentas.filter(x => destinatarioDM(x, u)); return `<div class="dmv-lote" data-busca="${esc(textoFicha(f))}" data-lote="${esc(normTxt(f.lote))}">
+    const fila = f => { const cs = f.cuentas.filter(x => destinatarioDM(x, u)); return `<div class="dmv-lote" data-busca="${esc(textoFicha(f).palabras.join(' '))}" data-lote="${esc(normTxt(f.lote))}">
         <div class="dmv-cab"><span class="ficha-lote">Lote ${esc(f.lote)}</span><small>${esc(f.nombre || '')}</small>${cs.length > 1 ? `<label class="dmv-todo"><input type="checkbox" data-todo-lote>Todo el lote (${cs.length})</label>` : ''}</div>
         ${cs.map(x => `<label class="dmv-it">
           <input type="checkbox" name="u~${esc(x.id)}" ${pre.includes(x.id) ? 'checked' : ''}>${avatar(x)}
@@ -195,7 +295,8 @@ document.addEventListener('input', e => {
   const qq = normTxt(e.target.value).trim(), palabras = qq.split(/\s+/).filter(Boolean);
   let hay = 0;
   $$('#dmvLista .dmv-lote').forEach(l => {
-    const ok = !qq || (palabras.length === 1 && /^\d+[a-z]?$/.test(palabras[0]) ? l.dataset.lote === palabras[0] : palabras.every(w => l.dataset.busca.includes(w)));
+    const ps = l.dataset.busca.split(' '), fon = l._fon || (l._fon = ps.map(fonetica));
+    const ok = !qq || (palabras.length === 1 && /^\d+[a-z]?$/.test(palabras[0]) ? l.dataset.lote === palabras[0] : palabras.every(w => coincidePalabra(w, ps, fon) > 0));
     /* Lo tildado no se esconde: se ve siempre a quién se le va a mandar. */
     const tildado = !!l.querySelector('input:checked');
     l.hidden = !ok && !tildado; if (!l.hidden) hay++;

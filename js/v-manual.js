@@ -106,8 +106,9 @@ const MANUAL_CAPS = [
     ['p', 'La <b>Pizarra del día</b> es lo primero que conviene mirar al abrir la app. Muestra en renglones cortos lo importante de hoy: avisos de la guardia y de la Administración, comunicados, el camión de la basura, el clima que complica, obras, viajes compartidos, compras conjuntas y lo que es <b>para vos</b> (tus expensas, un mensaje, una visita).'],
     ['h', 'Los colores'],
     ['lista', ['<b>Rojo</b>: importante.', '<b>Amarillo</b>: para tener en cuenta.', '<b>Verde</b>: para saber.']],
-    ['p', 'Lo que todavía no leíste <b>titila</b> en su color. Al tocarlo se abre y queda quieto. Arriba, un semáforo cuenta cuántos avisos sin leer hay de cada color.'],
-    ['p', 'Se ven los primeros renglones; tocá <b>"Ver todo"</b> para ver la pizarra completa en dos columnas: <b>Para todo el barrio</b> y <b>Para vos</b>.'],
+    ['p', 'Arriba está la fecha de hoy y una barra de colores que muestra cuántos avisos te faltan leer de cada color.'],
+    ['p', 'Lo más importante aparece en una <b>tarjeta grande</b>, en su color y con el texto. Los demás avisos van en <b>tarjetitas</b> que se deslizan con el dedo hacia el costado (en la computadora se ven en grilla).'],
+    ['p', 'Lo que todavía no leíste <b>brilla</b> en su color y tiene un <b>punto que late</b>. Al tocarlo se abre y queda quieto. Tocá <b>"Ver todo"</b> para ver la pizarra completa en dos columnas: <b>Para todo el barrio</b> y <b>Para vos</b>.'],
     ['ojo', 'info', 'Lo que pide una decisión tuya va arriba de todo', 'Si alguien pregunta por vos en la garita, si una visita te pide un pase o si tenés una alerta abierta, aparece arriba con sus botones ("Que pase", "Aprobar", "Ya está solucionado"). Eso no queda escondido en una lista.'],
     ['h', 'La campanita'],
     ['p', 'Guarda los avisos que <b>todavía no viste</b>. Al abrir uno, te lleva a donde corresponde y deja de contarse. Lo mismo si entrás directo a una conversación privada (de un vecino, de la garita o de la Administración): sus avisos se apagan solos. Con <b>"Marcar todos como vistos"</b> la vaciás de una vez.'],
@@ -427,7 +428,7 @@ const MANUAL_CAPS = [
   { id:'barrio', icon:'muro', color:'brand', para:'vecinos', t:'El barrio: la vida entre vecinos', s:'Pizarrón, vecinos, votaciones, obras y más', b:[
     ['lista', [
       '<b>Pizarrón</b>: los avisos de la guardia, la Administración y los vecinos. Podés publicar algo (una novedad, un evento, algo perdido o encontrado).',
-      '<b>Vecinos</b>: buscá a alguien por nombre, lote, oficio o dirección y escribile en privado.',
+      '<b>Vecinos</b>: buscá a alguien por nombre, apellido, lote o calle ("Pérez", "42", "Los Salesianos 3500") y escribile en privado. Salen los 152 lotes con su <b>dirección</b> y quién vive (propietario o inquilino). Aunque escribas mal el apellido ("Peres"), lo encuentra.',
       '<b>Votaciones</b>: votá desde la app. Vota el titular del lote (un voto por lote); si son varios titulares y votan distinto, el voto del lote no se cuenta.',
       '<b>Obras</b>: registrá tu obra ("Registrar mi obra") y, los días con mixer o camión, mandá el "Aviso del día". Todos se enteran en la pizarra.',
       '<b>Viajes compartidos</b>: ofrecé o buscá lugar para ir al centro, la escuela o el aeropuerto.',
@@ -473,7 +474,9 @@ const MANUAL_CAPS = [
 
   { id:'datos', icon:'lock', color:'brand', para:'vecinos', t:'Tus datos y tu privacidad', s:'Quién ve qué', b:[
     ['lista', [
-      'Los demás vecinos ven tu <b>nombre y tu lote</b> en el buscador de Vecinos y en lo que publicás en el pizarrón. Tu teléfono, tu profesión y tu dirección, <b>solo si vos elegís compartirlos</b>.',
+      'Los demás vecinos ven tu <b>nombre, tu lote y la dirección del lote</b> en el buscador de Vecinos (la guía del barrio), y si sos propietario o inquilino. Tu teléfono y tu profesión, <b>solo si vos elegís compartirlos</b>.',
+      'Los <b>teléfonos de cada lote</b> que tiene la Administración los ven solo la garita, la Administración y la supervisión, para ubicarte o avisarte. Ningún vecino ni el hotel. El hotel ve solo la dirección de cada lote, sin nombres.',
+      'El <b>padrón de expensas</b> (titular, DNI, correo y deuda de cada lote) lo ve <b>solo la Administración</b>. Tus expensas las ves vos y las cuentas de tu lote.',
       'El <b>chat vecinal</b> y las <b>reservas</b> ya no existen (se sacaron el 29 de septiembre de 2026). Lo que había quedado guardado de antes no lo ve ningún vecino ni la garita; la Administración lo borra.',
       'Tus mensajes privados, tus reclamos y tus pagos <b>no los ve ningún otro vecino</b> (las expensas, solo las cuentas de tu mismo lote). Si le escribís a varios vecinos a la vez, cada uno recibe su propia conversación: no se enteran de los demás.',
       'La garita ve lo que necesita para su trabajo (visitas, peticiones). La Administración, lo que necesita para administrar.',
@@ -508,6 +511,15 @@ const MANUAL_CAPS = [
 
   /* ---------- Para la garita ---------- */
   { id:'garita', icon:'gate', color:'brand', para:'garita', t:'Para la garita', s:'El turno, los ingresos y la ronda', b:[
+    ['h', 'Buscar un vecino: "soy invitado de Pérez"'],
+    ['p', 'Si alguien dice a quién viene a ver y no sabe la dirección, tocá <b>"Buscar un vecino"</b> y escribí el apellido, el número de lote o la calle. Sale la ficha del lote: <b>quiénes viven</b> (propietarios o inquilinos), la <b>dirección</b> (calle y altura), para qué lado de la garita queda en Los Salesianos, y los <b>teléfonos</b> con su botón para llamar o mandar WhatsApp.'],
+    ['lista', [
+      'Perdona errores: "Peres" encuentra a Pérez y "Gonsales" a González.',
+      'Un número de hasta 3 cifras busca el lote ("14" es el lote 14). Con 4 cifras o más, la altura de la calle ("3340") o un teléfono.',
+      'Los lotes 45 a 49 dicen <b>"Entrada por afuera del barrio, por la calle Los Ñires"</b>.',
+      'También dice si el lote es un baldío o una cabaña del hotel (con su número).',
+    ]],
+    ['ojo', 'warn', 'Los teléfonos son reservados', 'Los ven solo la garita, la Administración y la supervisión. Son para el servicio: no se pasan a nadie (Ley 25.326).'],
     ['ojo', 'info', 'Las tareas de la garita son solo de la garita', 'Registrar ingresos y salidas, el camión, el policía y sus rondas, la bitácora, firmar peticiones y atender un SOS lo hace únicamente la cuenta de la garita. La Administración lo ve en vivo, pero no lo toca.'],
     ['h', 'Lo que no se puede olvidar hoy'],
     ['p', 'A la derecha de "Garita" (en el celular, debajo) está la lista del día, <b>"Hoy la garita no puede olvidar"</b>. <b>Se arma sola</b> con lo que de verdad hay hoy, y lo que no está pedido, programado ni pendiente <b>no aparece</b>:'],
@@ -521,6 +533,9 @@ const MANUAL_CAPS = [
     ['h', 'Empezar y cerrar el turno'],
     ['pasos', ['Al abrir, anotá <b>quiénes están de guardia</b> en este turno. Hasta que no lo hacés, la única ventana es la del turno. Si la app se cerró en pleno turno (o entrás desde otro equipo) y ese turno no se cerró, arriba aparece <b>"El turno … no se cerró · Soy de ese turno: seguir"</b>; si ya se cerró, no aparece. Al empezar un turno nuevo, cualquier turno que haya quedado abierto se cierra solo y queda en la bitácora.', 'Al terminar, tocá la teja <b>"Cerrar el turno"</b> (está solo ahí): dejás las novedades para el que entra. La sesión no se cierra: queda lista para el turno siguiente.']],
     ['p', 'En <b>Turnos</b> se ve quién hace cada turno (mañana, tarde, noche) con los nombres de sus guardias, los últimos turnos, los <b>servicios del policía contratado</b> y, plegados, los puntos de control de la ronda.'],
+    ['h', 'Visitas de hoy'],
+    ['p', 'Arriba del buscador de códigos está la tarjeta <b>Visitas de hoy</b>. La barra de colores muestra el día de un vistazo: en gris las que <b>ya salieron</b>, en verde las que están <b>adentro</b> y en azul las que <b>faltan llegar</b>.'],
+    ['p', 'Debajo hay dos tarjetas. <b>Por llegar</b> cuenta las visitas anunciadas que todavía no entraron y dice cuál es la próxima (nombre, hora y lote). <b>Adentro ahora</b> cuenta las que entraron y no salieron, y dice cuál está adentro hace más tiempo. Tocar cualquiera de las dos te baja a la lista <b>Ingresos de hoy</b>.'],
     ['h', 'Validar un ingreso'],
     ['pasos', ['Escribí el <b>código de 6 números</b>, la <b>patente</b> o el <b>DNI</b>, o tocá <b>"Escanear QR"</b>.', 'La app dice si el pase es para hoy y para este horario, quién lo autorizó y si hay una restricción firmada ("no dejar pasar").', 'Tocá <b>"Ingresó"</b>; cuando se va, <b>"Salió"</b>. Al vecino le llega el aviso.']],
     ['p', 'Si alguien llega sin aviso: <b>"Llegó sin aviso"</b>, elegí la casa y el motivo. Al vecino le salta "Que pase / No lo conozco" y ves la respuesta al instante.'],
@@ -573,6 +588,7 @@ const MANUAL_CAPS = [
       'La Administración revisa el pedido y te habilita. Antes te pide que firmes el <b>compromiso de confidencialidad</b> (lo imprime con tu nombre; vos también lo podés ver e imprimir al pie de tu portada, en "Mi compromiso de confidencialidad"). Te llega un correo.',
       'Entrás con tu correo y tu contraseña. Al habilitarte, la app borra el DNI y el lote que cargaste: no los necesita.',
     ]],
+    ['p', '<b>Buscar un vecino</b> (en tu portada): igual que la garita, por apellido, lote o calle, con la dirección del lote y los teléfonos. Es para controlar el servicio: no se pasan a nadie.'],
     ['h', 'Tu portada'],
     ['lista', [
       '<b>La garita ahora</b>: si la app de la garita está abierta (o conectada pero minimizada, o sin conexión), qué turno está abierto y quiénes están de guardia, cuándo fue el último registro en el libro y si hay policía de servicio con sus rondas.',
@@ -611,6 +627,7 @@ const MANUAL_CAPS = [
     ['h', 'Cómo entra el hotel'],
     ['p', 'El hotel tiene <b>una sola cuenta</b>, que usa la recepción en la computadora y en el celular de turno. La crea la Administración del barrio. La primera vez, entrá con el correo y la contraseña que te pasaron y cambialos en <b>Tu cuenta</b> (tu ícono arriba a la derecha): "Cambiar mi correo" y "Cambiar mi contraseña". Si la persona responsable deja el hotel, cambiá la contraseña.'],
     ['ojo', 'info', 'Qué ve el hotel y qué no', 'Ve lo suyo (vans, traslados, huéspedes, eventos, proveedores, promociones) y lo público de la ciudad (vuelos, cruceros, eventos, agenda, normas del barrio). No ve nada de los vecinos: ni el padrón, ni el pizarrón, ni sus visitas, ni los SOS.'],
+    ['p', '<b>Direcciones del barrio</b>: la calle y la altura de cada lote, para indicarle a un huésped o a un proveedor cómo llegar. Se busca por lote o por calle. No muestra nombres ni teléfonos de los vecinos.'],
     ['h', 'Las vans'],
     ['pasos', ['Entrá a <b>Vans y traslados</b> → "+ Van" y cargá nombre, patente, modelo y chofer.', 'Tocá <b>"QR para la garita"</b> → "Imprimir el QR" y pegalo en el parabrisas, del lado del acompañante.', 'Cada vez que la van entra o sale, la garita lee el QR (o toca "Entró"/"Salió") y en la app ves dónde está cada van.']],
     ['h', 'Los traslados se arman solos'],
@@ -651,6 +668,15 @@ const MANUAL_CAPS = [
     ['p', 'Quien administra y además vive en el barrio elige al entrar si está como <b>vecino</b> o como <b>Administración</b>, y cambia con el botón del encabezado. En modo Administración solo se ve la gestión; en modo vecino, solo lo de vecino.'],
     ['h', 'Día a día, por salas'],
     ['lista', ['<b>Garita y seguridad</b>: la garita en vivo, la bitácora, los turnos, los mensajes con la garita, los ingresos frecuentes y la supervisión de la guardia.', '<b>Vecinos</b>: padrón, mensajes, reclamos, infracciones, votaciones y obras.', '<b>Comunicación</b>: comunicados importantes (con acuse), el pizarrón y los avisos urgentes por zona.', '<b>Proveedores y cumplimiento</b>: ART y seguros, protección de datos, y publicidad y aporte al barrio.', '<b>Hotel Los Cauquenes</b>, al final: el hotel en vivo, sus promociones, eventos y proveedores, los mensajes con el hotel y su cuenta.']],
+    ['h', 'La guía del barrio y el padrón de expensas'],
+    ['p', 'Son dos listas distintas. El <b>padrón de expensas</b> (titular, DNI, correo, coeficiente y deuda) es para cobrar y lo ve <b>solo la Administración</b>. La <b>guía del barrio</b> dice quién vive en cada lote (propietarios o inquilinos), si es baldío o cabaña, y los teléfonos: la usa la garita en "Buscar un vecino".'],
+    ['pasos', [
+      'Entrá a <b>Vecinos → Padrón</b> y bajá hasta <b>"Guía del barrio"</b>.',
+      'Tocá <b>"Cargar la guía del barrio"</b> y elegí el archivo <b>guia-del-barrio-….csv</b> de la carpeta <b>datos-privados</b> (en tu computadora).',
+      'La app dice cuántos lotes y teléfonos cargó. Desde ese momento la garita los ve.',
+      'Para corregir un lote, buscalo en <b>Vecinos</b> y tocá <b>"Editar"</b>. Para cambiar muchos, <b>"Descargar la guía (CSV)"</b>, corregila en Excel y volvé a subirla: reemplaza a la anterior.',
+    ]],
+    ['ojo', 'warn', 'Quién ve qué', 'Los nombres, el lote y la dirección los ven los vecinos, la garita y la supervisión. Los <b>teléfonos y la nota</b> de cada lote, solo la garita, la Administración y la supervisión. El hotel, solo la dirección. El archivo con teléfonos guardalo siempre en <b>datos-privados</b>: nunca va a GitHub.'],
     ['h', 'Dar de alta a un vecino o inquilino'],
     ['p', 'Para quien no sabe inscribirse (muchos dueños mayores, inquilinos nuevos): <b>Administración → Vecinos → "Dar de alta a un vecino o inquilino"</b>. Cargás nombre, DNI, lote, qué es del lote, correo y celular. La cuenta queda aprobada al instante con una <b>contraseña provisoria</b>, que se manda por correo y con el botón de WhatsApp. Si es un inquilino, el lote queda alquilado solo. La primera vez que la persona entra, acepta los términos y puede elegir su contraseña. En <b>Vecinos → ⋯</b> también podés marcar que un propietario <b>no vive en el lote</b>.'],
     ['h', 'Escribir a un lote o a vecinos'],

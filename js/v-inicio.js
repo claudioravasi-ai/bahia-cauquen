@@ -541,11 +541,11 @@ const Pizarra = {
     const lim = Date.now() - 10 * DIA;
     Object.keys(v).forEach(x => { if (v[x] < lim) delete v[x]; });
     Store.guardarSesion();
-    document.querySelectorAll(`.pz[data-k="${CSS.escape(k)}"],.pzr[data-k="${CSS.escape(k)}"]`).forEach(el => { el.classList.remove('titila'); el.classList.add('leido'); el.querySelector('.pz-nueva')?.remove(); });
+    document.querySelectorAll(`.pz[data-k="${CSS.escape(k)}"],.pzr[data-k="${CSS.escape(k)}"],.pzt[data-k="${CSS.escape(k)}"]`).forEach(el => { el.classList.remove('titila'); el.classList.add('leido'); el.querySelector('.pz-nueva')?.remove(); });
   },
 };
 document.addEventListener('click', e => {
-  const b = e.target.closest && e.target.closest('.pz[data-k],.pzr[data-k]');
+  const b = e.target.closest && e.target.closest('.pz[data-k],.pzr[data-k],.pzt[data-k]');
   if (!b) return;
   Pizarra.marcar(b.dataset.k);
   /* Tocado desde la pizarra abierta en la hoja: lo que se abra (otra hoja o
@@ -674,7 +674,6 @@ const ventanita = x => `<button class="pz nv-${x.nivel} ${x.nuevo ? 'titila' : '
    que pregunta por vos, una visita que pide pase) va arriba como aviso
    con sus botones: eso no puede quedar escondido en una lista.
    ========================================================= */
-const MAX_PIZARRA = 4;
 function itemsPizarra(){
   const per = avisosPersonales().map(x => ({ ...x, tag: x.tag === 'Para vos' ? 'Para vos' : x.tag }));
   const gen = avisosGenerales();
@@ -690,21 +689,43 @@ function decisionesPendientes(){
   const u = yo(), s = Store.s;
   return urgentesVecino().filter((h, i) => i < 3 && /latido|a-info/.test(h) && /data-a="(sos-cancelar|llegada-si|sol-pase-si)"/.test(h));
 }
+/* LA PIZARRA, MÁS VISUAL (pedido de Claudio, 08-10-2026: "más atractiva
+   para el vecino, más visual, más innovadora"). Lo que dice y cómo se marca
+   como visto no cambia; cambia cómo se ve:
+     · arriba, la fecha como una hoja de almanaque y un medidor de colores
+       con lo que falta leer;
+     · lo más importante, en una tarjeta grande en su color, con el texto;
+     · lo demás, en tarjetitas que se deslizan con el dedo (en computadora,
+       en grilla). Lo no leído tiene su punto que late y un brillo en su
+       color; lo leído queda quieto y más suave.
+   Ocupa más o menos lo mismo que la lista de renglones. */
+const MAX_TARJETAS_PZ = 8;
+const tarjetaPz = (x, grande) => `<button class="pzt ${grande ? 'pzd' : ''} nv-${x.nivel} ${x.nuevo ? 'titila' : 'leido'}${x.siempre ? ' siempre' : ''}" data-k="${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
+    ${grande ? `<span class="pzt-arr"><span class="pzt-ic">${I(x.icon)}</span><span class="pzt-tag">${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</span>${x.nuevo ? '<span class="pzt-nuevo"><i></i>Nuevo</span>' : ''}<time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></span>`
+      : `<span class="pzt-arr"><span class="pzt-ic">${I(x.icon)}${x.nuevo ? '<i class="pzt-punto" title="Nuevo"></i>' : ''}</span><time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></span><span class="pzt-tag">${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</span>`}
+    <b>${esc(x.titulo)}</b>${grande && x.texto ? `<span class="pzt-txt">${esc(x.texto)}</span>` : ''}
+    ${grande ? `<span class="pzt-pie">${x.de ? `<span>${esc(x.de)}</span>` : '<span></span>'}<span class="pzt-abrir">Abrir${I('right')}</span></span>` : ''}</button>`;
 function pizarraDelDia(){
   const items = itemsPizarra(), dec = decisionesPendientes();
   const nuevos = items.filter(x => x.nuevo);
   const cuenta = n => nuevos.filter(x => x.nivel === n).length;
-  const semaforo = ['rojo', 'amarillo', 'verde'].filter(n => cuenta(n)).map(n =>
-    `<span class="pz-luz nv-${n}"><i></i>${cuenta(n)} ${n === 'rojo' ? (cuenta(n) > 1 ? 'importantes' : 'importante') : n === 'amarillo' ? 'a tener en cuenta' : 'para saber'}</span>`).join('');
-  const ver = items.slice(0, MAX_PIZARRA);
-  const resto = items.length - ver.length;
-  return `<div class="pz-compacta">
-    <div class="pz-cab2"><h2>Pizarra del día</h2>
-      <div class="pz-semaforo">${semaforo || `<span class="pz-luz ok">${I('check')}Nada sin leer</span>`}</div>
-      <button class="link" data-a="pizarra-toda">Ver todo${items.length ? ` (${items.length})` : ''}</button></div>
+  const NOM = { rojo:['importante', 'importantes'], amarillo:['a tener en cuenta', 'a tener en cuenta'], verde:['para saber', 'para saber'] };
+  const hoy = new Date(), mes = hoy.toLocaleDateString('es-AR', { month:'short' }).replace('.', '');
+  const medidor = nuevos.length
+    ? `<div class="pzv-medidor"><div class="pzv-barra">${['rojo', 'amarillo', 'verde'].filter(cuenta).map(n => `<i class="nv-${n}" style="flex:${cuenta(n)}"></i>`).join('')}</div>
+        <div class="pzv-luces">${['rojo', 'amarillo', 'verde'].filter(cuenta).map(n => `<span class="nv-${n}"><i></i>${cuenta(n)} ${NOM[n][cuenta(n) > 1 ? 1 : 0]}</span>`).join('')}</div></div>`
+    : '';
+  const [top, ...resto] = items;
+  const carrusel = resto.slice(0, MAX_TARJETAS_PZ - 1), faltan = items.length - 1 - carrusel.length;
+  return `<div class="pzv">
+    <div class="pzv-cab">
+      <span class="pzv-dia" aria-hidden="true"><small>${esc(mes)}</small><b>${hoy.getDate()}</b></span>
+      <div class="pzv-tit"><h2>Pizarra del día</h2><small>${nuevos.length ? `${plural(nuevos.length, 'aviso sin leer', 'avisos sin leer')} · ${items.length} en total` : items.length ? `${I('check')}Ya viste todo · ${items.length} en la pizarra` : 'Hoy está tranquilo'}</small></div>
+      ${items.length ? `<button class="pzv-todo" data-a="pizarra-toda">Ver todo${I('right')}</button>` : ''}</div>
+    ${medidor}
     ${dec.length ? `<div class="pz-decisiones">${dec.join('')}</div>` : ''}
-    ${ver.length ? `<div class="pz-renglones">${ver.map(renglonPz).join('')}</div>` : `<div class="pz-nada">${I('check')}<span>Hoy no hay avisos.<small>Lo que llegue para vos o para el barrio aparece acá.</small></span></div>`}
-    ${resto > 0 ? `<button class="pz-mas" data-a="pizarra-toda">${resto} ${resto > 1 ? 'avisos más' : 'aviso más'}${nuevos.length > ver.filter(x => x.nuevo).length ? ` · ${nuevos.length - ver.filter(x => x.nuevo).length} sin leer` : ''}${I('right')}</button>` : ''}
+    ${top ? tarjetaPz(top, true) : `<div class="pzv-nada"><span class="pzv-sol">${I('check')}</span><span><b>Hoy no hay avisos</b><small>Lo que llegue para vos o para el barrio aparece acá, con su color.</small></span></div>`}
+    ${carrusel.length ? `<div class="pzv-carrusel">${carrusel.map(x => tarjetaPz(x, false)).join('')}${faltan > 0 ? `<button class="pzt pzv-mas" data-a="pizarra-toda"><b>+${faltan}</b><span>${faltan > 1 ? 'avisos más' : 'aviso más'}</span>${I('right')}</button>` : ''}</div>` : ''}
   </div>`;
 }
 /* La pizarra entera, en una hoja: las dos columnas de antes. */
@@ -2194,6 +2215,33 @@ function tareasGarita(){
     ${hechas.length ? `<p class="td-hecho-hoy">${I('check')} <b>Hecho hoy:</b> ${hechas.join(' · ')}</p>` : ''}
     <p class="muted tiny" style="margin:8px 2px 0">Se arma sola con lo pedido, lo programado y lo pendiente de hoy; lo que no hay, no aparece. Cada cosa sale de la lista cuando la app ve que está hecha.</p></details>`;
 }
+/* VISITAS DE HOY EN LA GARITA (pedido de Claudio, 08-10-2026)
+   Antes eran dos cuadros con un número ("Esperados" y "Adentro") que no
+   decían qué contaban; con los paquetes apagados quedaron dos solos. Ahora
+   es un tablero que se lee de un vistazo: una barra del día (ya salieron ·
+   adentro · por llegar), y dos tarjetas que dicen qué cuentan, quién es la
+   próxima visita y quién está adentro hace más tiempo. Tocar una tarjeta
+   baja a la lista de ingresos. */
+function tableroVisitas(lista, paquetes = 0){
+  const hoy = hoyISO(), de = e => lista.filter(p => estadoPase(p) === e);
+  const esp = de('esperado').sort((a, b) => String(a.desde).localeCompare(String(b.desde)));
+  const adn = de('adentro').sort((a, b) => (a.log[hoy].in || 0) - (b.log[hoy].in || 0));
+  const sal = de('salio').length, total = esp.length + adn.length + sal;
+  const lote = p => usuario(p.hostId)?.casa || '';
+  const chipPaq = hayPaquetes() ? `<button class="vis-paq" data-a="garita-ir" data-v="#garPaquetes">${I('box')}${plural(paquetes, 'paquete sin retirar', 'paquetes sin retirar')}</button>` : '';
+  if (!total) return `<div class="vis-hoy vacio-vis"><span class="vis-ic">${I('users')}</span><div class="grow"><b>Visitas de hoy</b><small>Todavía no hay visitas anunciadas. Cuando un vecino anuncia una, aparece acá sola.</small></div>${chipPaq}</div>`;
+  const prox = esp[0], larga = adn[0];
+  const tarjeta = (cls, n, t, s, det) => `<button class="vis-t ${cls}" data-a="garita-ir" data-v="#garIngresos">
+      <span class="vis-n">${n}</span><span class="vis-txt"><b>${t}</b><small>${s}</small>${det ? `<em>${det}</em>` : ''}</span></button>`;
+  return `<section class="vis-hoy" aria-label="Visitas de hoy">
+    <div class="vis-cab"><span class="vis-ic">${I('users')}</span><div class="grow"><b>Visitas de hoy</b><small>${plural(total, 'visita anunciada', 'visitas anunciadas')} · se actualiza sola</small></div>${chipPaq}</div>
+    <div class="vis-barra" role="img" aria-label="${sal} salieron, ${adn.length} adentro, ${esp.length} por llegar">${sal ? `<i class="vb-sal" style="flex:${sal}"></i>` : ''}${adn.length ? `<i class="vb-adn" style="flex:${adn.length}"></i>` : ''}${esp.length ? `<i class="vb-esp" style="flex:${esp.length}"></i>` : ''}</div>
+    <div class="vis-ley"><span class="l-sal">Ya salieron ${sal}</span><span class="l-adn">Adentro ${adn.length}</span><span class="l-esp">Por llegar ${esp.length}</span></div>
+    <div class="vis-dos">
+      ${tarjeta('esp', esp.length, 'Por llegar', 'Anunciadas que todavía no entraron', prox ? `Próxima: ${esc(prox.nombre)} · ${esc(prox.desde)} h${lote(prox) ? ' · ' + esc(lote(prox)) : ''}` : 'No falta llegar nadie')}
+      ${tarjeta('adn' + (adn.length ? ' vivo' : ''), adn.length, 'Adentro ahora', 'Entraron y todavía no salieron', larga ? `Hace más tiempo: ${esc(larga.nombre)}${lote(larga) ? ' · ' + esc(lote(larga)) : ''} · desde las ${hora(larga.log[hoy].in)} h` : 'No hay visitas adentro')}
+    </div></section>`;
+}
 A['garita-ir'] = el => { const d = document.querySelector(el.dataset.v); if (d) d.scrollIntoView({ behavior:'smooth', block:'start' }); else toast('Ahora no hay nada de eso en la garita', 'check'); };
 
 R.garita = {
@@ -2233,7 +2281,7 @@ R.garita = {
       ${alertas().filter(alertaActiva).map(a => { const ay = destinatariosAlerta(a).filter(v => a.respuestas?.[v.id]?.r === 'ayuda').length;
         return aviso(ay ? 'danger latido' : 'warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, `${esc(a.zona)} · ${ay ? plural(ay, 'casa pide', 'casas piden') + ' ayuda' : 'nadie pidió ayuda'}`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`); }).join('')}
       ${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
-      <div class="garita-kpis"><div class="kpi"><b>${esperados}</b><span>Esperados</span></div><div class="kpi"><b>${adentro}</b><span>Adentro</span></div>${hayPaquetes() ? `<div class="kpi"><b>${paq.length}</b><span>Paquetes</span></div>` : ''}</div>
+      ${tableroVisitas(lista, paq.length)}
       ${opera ? `<form data-f="validar" class="card">
         <div class="lbl">Código, patente o DNI</div>
         <div class="validador"><input name="q" id="qValidar" autocomplete="off" placeholder="482913" maxlength="12" inputmode="text">
@@ -2270,7 +2318,7 @@ R.garita = {
         ${teja({ v:'peticiones', icon:'edit', color:'warn', t:'Peticiones', s:'Recibir y firmar', badge: s.peticiones.filter(p => p.estado === 'pendiente').length })}
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
         ${teja({ a:'nuevo-post', v:'guardia', icon:'muro', t:'Escribir en el pizarrón', s:'Les suena a todos los vecinos' })}
-        ${teja({ v:'vecinos', icon:'search', color:'brand', t:'Buscar un vecino', s:'Por nombre, apellido o lote, con la foto de la casa' })}
+        ${teja({ v:'vecinos', icon:'search', color:'brand', t:'Buscar un vecino', s:'Por apellido, lote o calle · dirección y teléfonos' })}
         ${teja({ v:'privado', icon:'lock', color:'accent', t:'Mensajes con vecinos', s:'Avisar algo a un lote', badge: s.privados.filter(h => (h.con || 'admin') === 'guardia').reduce((n, h) => n + aLista(h.msgs).filter(m => m.from === 'vecino' && !m.leido).length, 0) })}
         ${esGuardia() && typeof haySupervision === 'function' && haySupervision() ? teja({ v:'privado', p:'supGarita', icon:'eye', color:'brand', t:'Supervisión', s:'Mensajes con quien supervisa la guardia', badge: sinLeerDeSupervision('supGarita') }) : ''}
         ${esGuardia() ? teja({ v:'privado', p:'interno', icon:'sliders', color:'accent', t:'Administración', s:'Mensajes entre la garita y la Administración', badge: s.privados.filter(h => h.con === 'interno' && h.userId === u.id).reduce((n, h) => n + aLista(h.msgs).filter(m => m.from === 'admin' && !m.leido).length, 0) }) : ''}

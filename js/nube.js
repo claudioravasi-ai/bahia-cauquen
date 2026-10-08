@@ -52,7 +52,9 @@ const Nube = {
              /* 27-09: cosas para prestar y ángeles de la nieve (js/v-casa.js, js/v-cuidados.js) */
              'cosas','nieve',
              /* 07-10: los correos que están en el barrio (solo empresa y horas; js/v-servicio.js) */
-             'mensajeria'],
+             'mensajeria',
+             /* 08-10: la guía del barrio: quién vive en cada lote, sin teléfonos (js/v-vecinos.js) */
+             'guia'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
@@ -60,7 +62,9 @@ const Nube = {
               'ausencias'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos',
             /* 07-10: alertas a la supervisión y vistos de los partes (js/v-supervisor.js) */
-            'alertasSup','vistos'],
+            'alertasSup','vistos',
+            /* 08-10: los teléfonos de cada lote (garita, Administración y supervisión) */
+            'telefonos'],
     /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
        los huéspedes, solo el hotel y la garita; las promociones propuestas,
@@ -79,9 +83,9 @@ const Nube = {
     /* El supervisor de la guardia (07-10-2026) baja lo que la garita usa para
        trabajar y nada más: sin votaciones, expensas, pizarrón, compras,
        comunicados ni lo del hotel que no es de la garita (los huéspedes). */
-    supervisor: { barrio:['users','padron','agenda','temporadas','feriados','eventosCiudad','contactos','documentos','obras','proveedores',
+    supervisor: { barrio:['users','guia','agenda','temporadas','feriados','eventosCiudad','contactos','documentos','obras','proveedores',
                           'avistamientos','cruceros','camion','mensajeria','alertas'],
-                  staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos'],
+                  staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos','telefonos'],
                   hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv'] },
   },
 
@@ -120,6 +124,8 @@ const Nube = {
     liquidaciones:   { listas:['filas'] },
     documentos:      { listas:['versiones'] },
     padron:          { listas:['titulares'] },
+    guia:            { listas:['propietarios','inquilinos'] },
+    telefonos:       { listas:['tels'] },
     cruceros:        { listas:['escalas'] },
     descargas:       { listas:[] },
     alertas:         { listas:['lotes'], objetos:['respuestas'] },
@@ -286,7 +292,10 @@ const Nube = {
     const staff = mio.rol === 'admin' || mio.rol === 'guardia', hotel = mio.rol === 'hotel';
     const lee = this.HOTEL_LEE[mio.rol] || {};
     /* El hotel, solo lo público de la ciudad. */
-    this.escucharColeccion('barrio', lee.barrio || this.ZONAS.barrio);
+    /* EL PADRÓN DE EXPENSAS (DNI, correo, teléfono y deuda de cada lote) lo
+       baja SOLO la Administración (08-10-2026). Antes bajaba a todos los
+       equipos; para saber quién vive dónde está la guía del barrio. */
+    this.escucharColeccion('barrio', (lee.barrio || this.ZONAS.barrio).filter(c => c !== 'padron' || mio.rol === 'admin'));
     this.escucharConfig();
     const sup = mio.rol === 'supervisor';
     if (staff) this.escucharColeccion('staff', this.ZONAS.staff);
@@ -746,6 +755,8 @@ const Nube = {
     [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff, ...this.ZONAS.hotel].forEach(col => {
       if (col === 'notifsTodos') return;
       if (sup && !['notifs', 'users', 'privados', 'vistos'].includes(col)) return;
+      /* El padrón, la guía y los teléfonos los escribe solo la Administración. */
+      if (['padron', 'guia', 'telefonos'].includes(col) && yo()?.rol !== 'admin') return;
       const arr = s[col]; if (!Array.isArray(arr)) return;
       const antes = this.ultimo[col] || {}, ahora = {};
       arr.forEach(x => {

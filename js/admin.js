@@ -830,7 +830,8 @@ R.padron = {
     if (!s.padron.length) return `${aviso('warn', 'upload', 'Todavía no cargaste el padrón',
       'Sin padrón, la app conoce los 152 lotes y sus coeficientes pero no sabe de quién es cada uno. Se carga una sola vez y se actualiza cuando cambia un propietario.')}
       ${cajaImportarPadron()}
-      ${superficie({ a:'padron-modelo', icon:'download', color:'sky', t:'Bajar el modelo de planilla', s:'Un CSV con las columnas que espera la app, ya con los 152 lotes' })}`;
+      ${superficie({ a:'padron-modelo', icon:'download', color:'sky', t:'Bajar el modelo de planilla', s:'Un CSV con las columnas que espera la app, ya con los 152 lotes' })}
+      ${sec('Guía del barrio')}${cajaImportarGuia()}`;
     const ls = buscarPadron(q || '');
     const conCuenta = s.padron.filter(cuentaDeApp).length;
     const conMail = s.padron.filter(p => p.email).length;
@@ -850,7 +851,11 @@ R.padron = {
       ${ls.length > 200 ? `<p class="muted small center">Se muestran las primeras 200. Afiná la búsqueda.</p>` : ''}
       ${sec('Mantenimiento')}
       ${cajaImportarPadron()}
-      ${superficie({ a:'exportar-padron', icon:'download', color:'sky', t:'Descargar el padrón (CSV)', s:'Para editarlo en Excel y volver a subirlo' })}`;
+      ${superficie({ a:'exportar-padron', icon:'download', color:'sky', t:'Descargar el padrón (CSV)', s:'Para editarlo en Excel y volver a subirlo' })}
+      ${sec('Guía del barrio')}
+      <p class="muted small" style="margin:0 2px 8px">Quién vive en cada lote (propietario o inquilino) y sus teléfonos. La garita la usa en "Buscar un vecino". El padrón de arriba es el de expensas: lo ve solo la Administración.</p>
+      ${cajaImportarGuia()}
+      ${aLista(Store.s.guia).length ? superficie({ a:'exportar-guia', icon:'download', color:'sky', t:'Descargar la guía (CSV)', s:'Para corregirla en Excel y volver a subirla · tiene teléfonos' }) : ''}`;
   },
 };
 const cajaImportarPadron = () => `<label class="superficie acento"><span class="ic">${I('upload')}</span>
@@ -928,6 +933,109 @@ A['padron-modelo'] = () => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }));
   a.download = 'modelo-padron-bahia-cauquen.csv'; a.click();
   toast('Completá la columna "propietario" y volvé a subirlo', 'download');
+};
+
+/* =========================================================
+   LA GUÍA DEL BARRIO: CARGARLA, BAJARLA Y CORREGIRLA (08-10-2026)
+   Es la planilla que salió del LISTADO GENERAL (datos-privados/guia-…csv):
+   lote; estado (casa, baldío, hotel, cabaña); propietarios; alquila;
+   inquilinos; cabaña; teléfonos ("Sr.: 15489595 | Sra.: 15610304"); nota.
+   Se puede abrir en Excel, corregir y volver a subir: la nueva reemplaza a
+   la anterior. Los nombres van a /barrio/guia (los ven los vecinos) y los
+   teléfonos y la nota a /staff/telefonos (solo garita, Administración y
+   supervisión).
+   ========================================================= */
+const COLS_GUIA = { lote:['lote'], estado:['estado'], propietarios:['propietarios', 'propietario'], alquila:['alquila', 'alquilado'],
+  inquilinos:['inquilinos', 'inquilino'], cabana:['cabana', 'cabana nº', 'cabana n'], telefonos:['telefonos', 'telefono', 'tel'], nota:['nota', 'notas'] };
+const partirNombres = t => String(t || '').split(/\s+\/\s+/).map(x => x.trim()).filter(Boolean);
+const partirTels = t => String(t || '').split(/\s*[|\n]\s*/).map(x => x.trim()).filter(Boolean).map(x => {
+  const m = x.match(/^(.*?):\s*([\d\s\-+()]+)$/);
+  return m ? { de:m[1].trim(), n:soloDigitos(m[2]) } : { de:'', n:soloDigitos(x) }; }).filter(t => t.n);
+const estadoGuia = t => { const e = sinAcentos(t); return /baldi|valdi/.test(e) ? 'baldio' : /caban/.test(e) ? 'cabana' : /hotel/.test(e) ? 'hotel' : 'casa'; };
+const telsTexto = ts => aLista(ts).map(t => (t.de ? t.de + ': ' : '') + t.n).join(' | ');
+function leerGuia(texto){
+  const filas = filasCSV(String(texto).replace(/^﻿/, ''));
+  const iCab = filas.findIndex(f => f.some(c => sinAcentos(c) === 'lote'));
+  if (iCab < 0) throw new Error('No encontré la columna "lote"');
+  const cab = filas[iCab].map(sinAcentos), ix = {};
+  for (const k in COLS_GUIA){ const i = cab.findIndex(c => COLS_GUIA[k].includes(c)); if (i >= 0) ix[k] = i; }
+  if (ix.propietarios === undefined) throw new Error('No encontré la columna "propietarios"');
+  const malos = [], out = [];
+  filas.slice(iCab + 1).forEach(f => {
+    const g = k => ix[k] === undefined ? '' : String(f[ix[k]] ?? '').trim();
+    const lote = g('lote').replace(/^lote\s*/i, '').toUpperCase();
+    if (!lote) return;
+    if (!LOTES.some(L => L.lote.toUpperCase() === lote)){ malos.push(lote); return; }
+    const L = LOTES.find(x => x.lote.toUpperCase() === lote);
+    const inq = partirNombres(g('inquilinos'));
+    out.push({ guia:{ id:'lote-' + L.lote, lote:L.lote, estado:estadoGuia(g('estado')), propietarios:partirNombres(g('propietarios')),
+      alquila: /^s/i.test(g('alquila')) || inq.length > 0, inquilinos:inq, cabana:g('cabana') },
+      /* Teléfonos y nota van a /staff: no los leen los vecinos. */
+      tels:{ id:'lote-' + L.lote, lote:L.lote, tels:partirTels(g('telefonos')), nota:g('nota') } });
+  });
+  if (!out.length) throw new Error('No encontré ningún lote');
+  return { out, malos };
+}
+const cajaImportarGuia = () => `<label class="superficie ${aLista(Store.s.guia).length ? '' : 'acento'}"><span class="ic ic-sky">${I('pin')}</span>
+  <span class="txt"><b>${aLista(Store.s.guia).length ? 'Actualizar la guía del barrio' : 'Cargar la guía del barrio'}</b>
+  <small>Quién vive en cada lote y sus teléfonos (el CSV hecho con el LISTADO GENERAL). Los teléfonos los ven solo la garita, la Administración y la supervisión.</small></span>
+  <input type="file" accept=".csv,text/csv" id="importarGuia" hidden></label>`;
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'importarGuia' || !e.target.files[0]) return;
+  const f = e.target.files[0];
+  try {
+    if (!esAdmin()) throw new Error('solo la Administración carga la guía');
+    const { out, malos } = leerGuia(await f.text());
+    const nTels = out.reduce((n, x) => n + x.tels.tels.length, 0);
+    if (aLista(Store.s.guia).length && !await confirmar('Reemplazar la guía', `La guía nueva trae ${plural(out.length, 'lote')} y ${plural(nTels, 'teléfono')}. Reemplaza a la que está cargada.`, { si:'Reemplazar' })) { e.target.value = ''; return; }
+    Store.cambiar(s => {
+      s.guia = out.map(x => ({ ...x.guia, at:Date.now() }));
+      s.telefonos = out.filter(x => x.tels.tels.length || x.tels.nota).map(x => ({ ...x.tels, at:Date.now() }));
+      auditar(s, 'Cargó la guía del barrio', `${out.length} lotes · ${nTels} teléfonos`);
+    });
+    toast(`Guía cargada: ${plural(out.length, 'lote')} y ${plural(nTels, 'teléfono')}${malos.length ? ` · no existen: ${malos.join(', ')}` : ''}`, 'check');
+    abrir('vecinos');
+  } catch(err){ toast('No pude leer la guía: ' + err.message, 'alert'); }
+  e.target.value = '';
+});
+A['exportar-guia'] = () => {
+  if (!esAdmin()) return;
+  const cab = ['lote', 'estado', 'propietarios', 'alquila', 'inquilinos', 'cabana', 'telefonos', 'nota'];
+  const est = { casa:'casa', baldio:'baldío', hotel:'hotel', cabana:'cabaña' };
+  const filas = LOTES.map(L => { const g = guiaDe(L.lote) || {};
+    return [L.lote, est[g.estado] || '', aLista(g.propietarios).join(' / '), g.alquila ? 'sí' : '', aLista(g.inquilinos).join(' / '), g.cabana || '', telsTexto(telsDe(L.lote)), notaDe(L.lote)]; });
+  const csv = cab.join(';') + '\n' + filas.map(f => f.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }));
+  a.download = `guia-del-barrio-${hoyISO()}.csv`; a.click();
+  toast('Bajó la guía. Tiene teléfonos: guardala en la carpeta de datos privados', 'download');
+};
+A['editar-guia'] = el => {
+  if (!esAdmin()) return;
+  const lote = el.dataset.v, g = guiaDe(lote) || { lote, estado:'casa' }, L = LOTES.find(x => x.lote === lote);
+  hoja(`Lote ${esc(lote)}${L?.dir ? ' · ' + esc(L.dir) : ''}`, `<form data-f="editar-guia" data-v="${esc(lote)}">
+    <div class="grid2"><div class="field"><label>Qué hay</label><select name="estado">${[['casa', 'Casa'], ['baldio', 'Baldío'], ['cabana', 'Cabaña del hotel'], ['hotel', 'Hotel']].map(([v, t]) => `<option value="${v}" ${g.estado === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Nº de cabaña</label><input name="cabana" value="${esc(g.cabana || '')}" maxlength="10"></div></div>
+    <div class="field"><label>Propietarios</label><input name="propietarios" value="${esc(aLista(g.propietarios).join(' / '))}" maxlength="200" placeholder="Nombre Apellido / Nombre Apellido"></div>
+    <div class="field"><label>Inquilinos (si está alquilado)</label><input name="inquilinos" value="${esc(aLista(g.inquilinos).join(' / '))}" maxlength="200" placeholder="Vacío si viven los dueños"></div>
+    <div class="field"><label>Teléfonos (uno por renglón)</label><textarea name="telefonos" rows="3" placeholder="Sr.: 15489595&#10;Casa: 446719">${esc(telsDe(lote).map(t => (t.de ? t.de + ': ' : '') + t.n).join('\n'))}</textarea>
+      <div class="ayuda">Los ven solo la garita, la Administración y la supervisión.</div></div>
+    <div class="field"><label>Nota (solo garita, Administración y supervisión)</label><input name="nota" value="${esc(notaDe(lote))}" maxlength="200"></div>
+    <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`);
+};
+F['editar-guia'] = (d, form) => {
+  if (!esAdmin()) return;
+  const lote = form.dataset.v, inq = partirNombres(d.inquilinos), tels = partirTels(d.telefonos);
+  Store.cambiar(s => {
+    const g = { id:'lote-' + lote, lote, estado:d.estado || 'casa', propietarios:partirNombres(d.propietarios), alquila:inq.length > 0, inquilinos:inq,
+      cabana:(d.cabana || '').trim(), at:Date.now() };
+    const i = s.guia.findIndex(x => x && x.lote === lote); if (i >= 0) s.guia[i] = g; else s.guia.push(g);
+    const j = s.telefonos.findIndex(x => x && x.lote === lote);
+    const nota = (d.nota || '').trim();
+    if (tels.length || nota){ const t = { id:'lote-' + lote, lote, tels, nota, at:Date.now() }; if (j >= 0) s.telefonos[j] = t; else s.telefonos.push(t); }
+    else if (j >= 0) s.telefonos.splice(j, 1);
+    auditar(s, 'Editó la guía del barrio', `Lote ${lote}`);
+  });
+  cerrarHoja(); toast('Guardado', 'check');
 };
 
 

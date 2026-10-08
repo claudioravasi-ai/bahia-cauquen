@@ -35,7 +35,9 @@ QUÉ HACEN, EN CASTELLANO
 
 4. TRES ZONAS.
    /barrio          lo que ven todos los vecinos aprobados (pizarrón,
-                    votaciones, padrón, documentos, obras…).
+                    votaciones, la guía del barrio, documentos, obras…).
+                    El padrón de expensas (DNI, correo, deuda) está acá
+                    pero lo lee SOLO la Administración (ver 8 quater).
                     Los datos del barrio (padrón, agenda, reglamento,
                     proveedores, ajustes) solo los edita la
                     Administración.
@@ -75,6 +77,17 @@ QUÉ HACEN, EN CASTELLANO
    del lote (casa sola, plan ante un sismo, paquetes) se guarda solo en las
    carpetas de quienes viven ahí: el propietario de un lote alquilado no lo
    recibe.
+
+8 quater. LA GUÍA DEL BARRIO Y EL PADRÓN (08-10-2026).
+   /barrio/guia: quién vive en cada lote (propietarios, inquilinos, si es
+   baldío o cabaña). La leen los vecinos aprobados, la garita, la
+   Administración y la supervisión; el hotel NO (el hotel ve solo la
+   dirección de cada lote, que está en el programa, sin nombres).
+   /staff/telefonos: los teléfonos de cada lote. Los leen SOLO la garita, la
+   Administración y la supervisión. Los vecinos no.
+   /barrio/padron: el padrón de expensas (titular, DNI, correo, teléfono,
+   deuda). Antes lo leían todos los vecinos aprobados; ahora SOLO la
+   Administración. Las tres las escribe solo la Administración.
 
 8 bis. LOS CORREOS (07-10-2026). /barrio/mensajeria dice solo qué correo
    (Andreani, OCA…) está en el barrio y a qué hora entró y salió: lo anota la
@@ -168,7 +181,11 @@ PEGAR DESDE ACÁ
       },
 
       "config":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
-      "padron":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 08-10-2026: el padrón de expensas (DNI, correo, deuda), solo la
+         Administración. La guía (quién vive dónde, sin teléfonos), los
+         vecinos aprobados, la garita y la supervisión; el hotel no. */
+      "padron":        { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "guia":          { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* 29-09-2026: el chat vecinal (msgs) y las reservas (reservas, bloqueos,
          amenities) se sacaron de la app. Nadie las lee ni las escribe; solo la
          Administración, para borrar lo que quedó (Protección de datos). */
@@ -390,6 +407,9 @@ PEGAR DESDE ACÁ
       /* Ingresos frecuentes (proveedores del hotel, personal doméstico…):
          los carga la Administración y los lee la garita. */
       "frecuentes": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* Los teléfonos de cada lote (08-10-2026): la garita, la Administración
+         y la supervisión. Los vecinos no. Los carga la Administración. */
+      "telefonos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* El libro contable: solo la Administración. */
       "asientos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "impuestos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },

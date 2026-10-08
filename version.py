@@ -34,3 +34,15 @@ sw = re.sub(r"'\./css/app\.css(\?v=[^']*)?'", f"'./css/app.css?v={v}'", sw)
 (raiz / 'sw.js').write_text(sw, encoding='utf-8')
 
 print(f'Versión sellada: {v}')
+
+# Guarda el sellado en el historial (git) para que no quede el cartel
+# "Confirmar cambios" en Claude (pedido de Claudio, 08-10-2026).
+# Si no hay git o no hay nada nuevo, no hace nada.
+import subprocess
+if (raiz / '.git').exists():
+    try:
+        subprocess.run(['git', 'add', '-u'], cwd=raiz, check=True, capture_output=True)
+        if subprocess.run(['git', 'diff', '--cached', '--quiet'], cwd=raiz).returncode:
+            subprocess.run(['git', 'commit', '-q', '-m', f'Versión sellada: {v}'], cwd=raiz, check=True, capture_output=True)
+    except Exception:
+        pass

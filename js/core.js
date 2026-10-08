@@ -202,6 +202,9 @@ function migrar(s){
     if (!x) s.descargas.push(JSON.parse(JSON.stringify(f))); else if (!x.url && f.url) Object.assign(x, f); });
   /* Padrón con nombres de propietarios: se importa desde Administración. */
   if (!Array.isArray(s.padron)) s.padron = [];
+  /* La guía del barrio (quién vive en cada lote) y los teléfonos de cada lote (08-10-2026). */
+  if (!Array.isArray(s.guia)) s.guia = [];
+  if (!Array.isArray(s.telefonos)) s.telefonos = [];
   if (!s.motorLog || typeof s.motorLog !== 'object') s.motorLog = {};
   /* En la demo (?local) hay un hotel de muestra para probar su portal. */
   if (typeof hotelDemo === 'function' && !(typeof Nube !== 'undefined' && Nube.activa())) hotelDemo(s);
@@ -582,7 +585,10 @@ const vecinosAprobados = () => Store.s.users.filter(u => u.estado === 'aprobado'
 const casasRegistradas = () => new Set(Store.s.users.filter(u => u.estado === 'aprobado' && u.casa && u.rol === 'vecino').map(u => u.casa)).size;
 const totalLotes = () => (typeof LOTES !== 'undefined' ? lotesVecinos().length : Store.s.config.casas);
 const loteDe = u => typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === u.casa) : null;
-const propietarioDe = casa => (Store.s.padron.find(p => 'Lote ' + p.lote === casa) || {}).propietario || '';
+/* El titular de expensas lo conoce solo la Administración (padrón); los
+   demás ven el propietario que figura en la guía del barrio. */
+const propietarioDe = casa => (Store.s.padron.find(p => 'Lote ' + p.lote === casa) || {}).propietario
+  || aLista((aLista(Store.s.guia).find(g => g && 'Lote ' + g.lote === casa) || {}).propietarios).join(' y ') || '';
 
 function generarClave(pref = 'VEC'){
   const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
