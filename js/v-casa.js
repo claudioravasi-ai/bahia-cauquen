@@ -706,7 +706,7 @@ F['casa-revisada'] = (d, form) => {
   const novedad = d.estado === 'novedad', nota = String(d.nota || '').trim().slice(0, 140);
   if (novedad && !nota){ toast('Contá cuál es la novedad', 'alert'); return; }
   const r = { at:Date.now(), quien:yo().id, por:d.por === 'policia' ? 'policia' : 'garita', policia:d.por === 'policia' ? String(d.policia || '').slice(0, 60) : '', novedad, nota };
-  const lote = cuentasDelLote(a.casa).map(u => u.id); if (a.userId && !lote.includes(a.userId)) lote.push(a.userId);
+  const lote = residentesDelLote(a.casa).map(u => u.id); if (a.userId && !lote.includes(a.userId)) lote.push(a.userId);
   Store.cambiar(s => {
     if (a.viejo){ const u = s.users.find(z => z.id === a.userId); if (u) guardarAusencia(s, u, { desde:a.desde, hasta:a.hasta, contacto:a.contacto || '', nota:a.nota || '' }); }
     const x = aLista(s.ausencias).find(z => z.casa === a.casa && z.desde <= hoyISO() && z.hasta >= hoyISO());

@@ -338,6 +338,7 @@ const ADMIN_TABS = {
   solicitudes(){
     const s = Store.s, pend = s.users.filter(u => u.estado === 'pendiente'), rech = s.users.filter(u => u.estado === 'rechazado');
     const card = u => `<div class="card">${esCorreoGarita(u.email) ? `<div class="pill p-brand" style="margin-bottom:8px">${I('shield')}Cuenta de la GARITA · al aprobarla ve solo lo de la garita</div>` : u.casa === 'Supervisión' && u.estado === 'pendiente' ? `<div class="pill p-brand" style="margin-bottom:8px">${I('eye')}Pide SUPERVISIÓN de la guardia · al aprobarla solo mira la garita</div>` : ''}<div class="row">${avatar(u)}<div class="grow"><b>${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${hace(u.createdAt)}</div></div><span class="pill ${u.estado === 'pendiente' ? 'p-warn' : 'p-danger'}">${u.estado}</span></div>
+      ${u.relacion ? `<div class="pill ${u.relacion === 'inquilino' ? 'p-warn' : ''}" style="margin-top:8px">${esc(RELACIONES[u.relacion] || u.relacion)}${u.relacion === 'inquilino' ? ' · al aprobarlo, el lote queda alquilado' : ''}</div>` : ''}
       <div class="small" style="margin:10px 0;color:var(--ink-2)">DNI ${esc(u.dni || '—')} · ${esc(u.email)} · ${esc(u.tel || 'sin teléfono')}${u.consentimiento ? ' · aceptó el uso de datos' : ''}</div>
       ${(() => { const misma = s.users.filter(x => x.id !== u.id && x.casa === u.casa && x.estado === 'aprobado'); return misma.length ? `<div class="small" style="margin-bottom:10px">${I('info')} En ${esc(u.casa)} ya están: ${misma.map(x => esc(x.nombre)).join(', ')}</div>` : ''; })()}
       <div class="btns">${u.estado === 'pendiente' ? `<button class="btn btn-sm btn-ok" data-a="aprobar" data-id="${u.id}">${I('check')}Aprobar y mandar clave</button><button class="btn btn-sm btn-danger-soft" data-a="rechazar" data-id="${u.id}">Rechazar</button>`
@@ -348,10 +349,11 @@ const ADMIN_TABS = {
     const s = Store.s, qq = (q || '').toLowerCase();
     const ls = s.users.filter(u => u.estado === 'aprobado' && (!qq || (u.nombre + u.casa + u.email + (u.dni || '')).toLowerCase().includes(qq))).sort((a, b) => a.casa.localeCompare(b.casa, 'es', { numeric:true }));
     return `<form data-f="buscar-vecino-admin" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecAdm" value="${esc(q || '')}" placeholder="Nombre, casa, email o DNI"><button class="btn btn-pri">${I('search')}</button></form>
+      ${superficie({ a:'alta-vecino', icon:'user', color:'ok', t:'Dar de alta a un vecino o inquilino', s:'La Administración crea la cuenta y le manda el acceso (para quien no sabe inscribirse)', cls:'acento' })}
       ${superficie({ a:'alta-staff', icon:'plus', color:'accent', t:'Dar de alta guardia o administrador', s:'Cuentas del personal' })}
       ${superficie({ a:'pasar-admin', icon:'key', color:'wood', t:'Pasar la Administración a otro vecino', s:'Por ejemplo, a Paula cuando la app esté andando' })}
       ${Store.s.padron.length ? `<div class="card plana small"><b>${LOTES.length} lotes</b> · ${lotesVecinos().length} de vecinos y ${LOTES.length - lotesVecinos().length} del hotel y las cabañas · ${casasRegistradas()} con cuenta en la app</div>` : ''}
-      <div class="card lista">${ls.map(u => `<div class="it">${avatar(u, 'sm')}<div class="txt"><b>${esc(u.nombre)}</b><span>${esc(u.casa)} · ${esc(u.email)}${u.dni ? ' · DNI ' + esc(u.dni) : ''}</span></div>
+      <div class="card lista">${ls.map(u => `<div class="it">${avatar(u, 'sm')}<div class="txt"><b>${esc(u.nombre)}</b><span>${esc(u.casa)}${u.relacion ? ' · ' + esc(RELACIONES[u.relacion] || u.relacion) : ''}${esPropDistancia(u) ? ' (no vive en el lote)' : ''} · ${esc(u.email)}${u.dni ? ' · DNI ' + esc(u.dni) : ''}</span></div>
         <span class="pill ${u.rol === 'admin' ? 'p-accent' : u.rol === 'guardia' ? 'p-brand' : ''}">${u.rol}</span><button class="icon-btn" data-a="gestionar-vecino" data-id="${u.id}" aria-label="Gestionar">${I('more')}</button></div>`).join('')}</div>`;
   },
   contenido(sub){
@@ -513,7 +515,8 @@ A['aprobar'] = async el => {
   if (garita && !await confirmar('Aprobar la cuenta de la garita', `Esta cuenta (${esc(u.email)}) va a ver todo lo de la garita: ingresos, peticiones y datos de contacto de los vecinos. Aprobala solo si la inscribiste vos o la guardia te lo confirmó.`, { si:'Aprobar como garita' })) return;
   Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.estado = 'aprobado'; x.clave = clave; x.aprobadoAt = Date.now();
     if (garita){ x.rol = 'guardia'; x.casa = 'Garita'; x.nombre = 'Garita'; }
-    auditar(s, garita ? 'Aprobó la cuenta de la garita' : 'Aprobó una inscripción', `${x.nombre} · ${x.casa}`, x.id); });
+    auditar(s, garita ? 'Aprobó la cuenta de la garita' : 'Aprobó una inscripción', `${x.nombre} · ${x.casa}`, x.id);
+    if (!garita) avisoLoteAlquilado(s, x, true); });
   const salio = await Correo.enviar({ para:u.email, asunto:'Tu acceso al barrio está aprobado', tipo:'clave',
     html:Correo.plantilla('¡Bienvenido/a al barrio!', `<p>Hola ${esc(u.nombre.split(' ')[0])}: la Administración aprobó tu inscripción para <b>${esc(u.casa)}</b>.</p>` +
       (nube ? `<p>Ya podés entrar con tu email y la contraseña que elegiste al inscribirte.</p>`
@@ -525,6 +528,16 @@ A['aprobar'] = async el => {
     ${clave ? `<div class="codigo-grande">${clave}</div>` : ''}
     <div class="btns">${u.tel ? `<a class="btn btn-wa" href="${waLink(u.tel, msg)}" target="_blank" rel="noopener">${I('phone')}WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar mensaje</button></div>`);
 };
+/* LOTE ALQUILADO (07-10-2026): cuando entra o se va un inquilino, los dueños del lote se enteran. */
+function avisoLoteAlquilado(s, x, entra){
+  if (!x || x.relacion !== 'inquilino' || !/^Lote\s/i.test(x.casa || '')) return;
+  const otros = s.users.filter(o => o.id !== x.id && o.casa === x.casa && o.estado === 'aprobado' && o.relacion === 'inquilino');
+  const duenos = s.users.filter(o => o.casa === x.casa && o.estado === 'aprobado' && (o.relacion === 'propietario' || o.relacion === 'cotitular')).map(o => o.id);
+  if (!duenos.length || (!entra && otros.length)) return;
+  notificar(s, entra
+    ? { para:duenos, titulo:`${x.casa} figura alquilado`, texto:`${x.nombre} se inscribió como inquilino/a y la Administración lo aprobó. El día a día del lote (garita, visitas, correos y SOS) pasa a ser suyo. Vos seguís viendo las expensas, las votaciones y los comunicados, y le podés escribir en privado.`, icon:'key', color:'sky', link:'inicio', sonido:true }
+    : { para:duenos, titulo:`${x.casa} ya no figura alquilado`, texto:`Se dio de baja la cuenta de ${x.nombre}, inquilino/a. Volvés a tener la app completa del lote.`, icon:'home', color:'ok', link:'inicio', sonido:true });
+}
 A['rechazar'] = async el => {
   if (!await confirmar('Rechazar inscripción', 'La persona no va a poder entrar a la app.', { si:'Rechazar', peligro:true })) return;
   const u = Store.s.users.find(x => x.id === el.dataset.id);
@@ -540,18 +553,19 @@ A['gestionar-vecino'] = el => {
     ${/^Lote\s/i.test(u.casa || '') ? `<div class="grid2"><div class="field"><label>Relación con el lote</label><select name="relacion">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${u.relacion === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="" ${!u.relacion ? 'selected' : ''}>Sin indicar</option></select></div>
       <div class="field"><label>Votaciones</label><label class="check" style="margin:6px 0 0"><input type="checkbox" name="representante" ${u.representante ? 'checked' : ''}><span>Representante designado del ${esc(u.casa)} (solo vale su voto)</span></label></div></div>
       ${u.poderFoto ? `<div class="card plana small"><b>Carta poder</b>${u.poderHasta ? ' · hasta ' + fechaCorta(u.poderHasta) : ''}${fotoHTML(u.poderFoto, 'post-foto')}
-        <label class="check" style="margin-top:8px"><input type="checkbox" name="poderOk" ${u.poderOk ? 'checked' : ''}><span>Aprobada: puede votar por el lote</span></label></div>` : ''}` : ''}
+        <label class="check" style="margin-top:8px"><input type="checkbox" name="poderOk" ${u.poderOk ? 'checked' : ''}><span>Aprobada: puede votar por el lote</span></label></div>` : ''}
+      <label class="check"><input type="checkbox" name="noVive" ${u.noVive ? 'checked' : ''}><span><b>No vive en el lote</b> (propietario a distancia: ve expensas, votaciones y comunicados; no el día a día)</span></label>` : ''}
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
     <div class="btns" style="margin-top:10px"><button class="btn btn-sec" data-a="nueva-clave" data-id="${u.id}">${I('key')}Nueva clave</button><button class="btn btn-danger-soft" data-a="baja-vecino" data-id="${u.id}">${I('trash')}Dar de baja</button></div>`);
 };
 F['gestionar-vecino'] = (d, form) => { Store.cambiar(s => { const x = s.users.find(z => z.id === form.dataset.id); Object.assign(x, { casa:d.casa.trim(), rol:d.rol, email:d.email.trim().toLowerCase() });
-  if ('relacion' in d){ x.relacion = d.relacion; x.representante = !!d.representante; if (x.poderFoto) x.poderOk = !!d.poderOk;
+  if ('relacion' in d){ const antes = x.relacion; x.relacion = d.relacion; x.noVive = !!d.noVive && (d.relacion === 'propietario' || d.relacion === 'cotitular'); if (antes !== 'inquilino' && d.relacion === 'inquilino') avisoLoteAlquilado(s, x, true); x.representante = !!d.representante; if (x.poderFoto) x.poderOk = !!d.poderOk;
     /* Un solo representante por lote. */
     if (x.representante) s.users.forEach(o => { if (o.id !== x.id && o.casa === x.casa && o.representante) o.representante = false; }); } auditar(s, 'Editó un vecino', `${x.nombre} · ${x.casa} · ${x.rol}`, x.id); }); cerrarHoja(); toast('Guardado', 'check'); };
 A['nueva-clave'] = el => { const c = generarClave(); Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); x.clave = c; auditar(s, 'Generó una clave nueva', x.nombre, x.id); }); hoja('Clave nueva', `<div class="codigo-grande">${c}</div><button class="btn btn-sec btn-block" data-a="copiar" data-v="${c}">${I('copy')}Copiar</button>`); };
 A['baja-vecino'] = async el => {
   if (!await confirmar('Dar de baja', 'Se borran sus datos personales, sus mensajes privados y sus pases. Lo que publicó en el pizarrón queda sin nombre.', { si:'Dar de baja', peligro:true })) return;
-  Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); auditar(s, 'Dio de baja a un vecino', `${x.nombre} · ${x.casa}`, x.id);
+  Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); auditar(s, 'Dio de baja a un vecino', `${x.nombre} · ${x.casa}`, x.id); avisoLoteAlquilado(s, { ...x, estado:'baja' }, false);
     s.privados = s.privados.filter(h => h.userId !== x.id); s.pases = s.pases.filter(p => p.hostId !== x.id); s.users = s.users.filter(z => z.id !== x.id); });
   cerrarHoja(); toast('Vecino dado de baja', 'trash');
 };
@@ -585,6 +599,56 @@ F['pasar-admin'] = async d => {
   cerrarHoja();
   toast(`${nuevo.nombre.split(' ')[0]} ya es Administración`, 'shield');
   if (d.dejar) pintar();
+};
+/* =========================================================
+   ALTA HECHA POR LA ADMINISTRACIÓN (pedido de Claudio, 08-10-2026)
+   Muchos dueños son mayores y no van a inscribirse ni "autorizar" a nadie.
+   La Administración, que conoce a cada uno, crea la cuenta: nombre, DNI,
+   lote, qué es del lote, correo y teléfono. Queda aprobada al instante, con
+   una contraseña provisoria que se le manda por WhatsApp o correo. Si es un
+   inquilino, el lote queda alquilado solo (y el dueño se entera). La
+   primera vez que entra, acepta los términos y puede elegir su contraseña.
+   ========================================================= */
+const claveProvisoria = () => { const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; const r = new Uint32Array(6); crypto.getRandomValues(r);
+  return 'Cauquen-' + abc[r[0] % abc.length] + abc[r[1] % abc.length] + [2, 3, 4, 5].map(i => r[i] % 10).join(''); };
+A['alta-vecino'] = () => {
+  if (!esAdmin()) return;
+  hoja('Dar de alta a un vecino', `<form data-f="alta-vecino">
+    <div class="field"><label>Nombre y apellido</label><input name="nombre" required maxlength="60"></div>
+    <div class="grid2"><div class="field"><label>DNI</label><input name="dni" required inputmode="numeric" maxlength="11"></div>
+      <div class="field"><label>Lote</label><select name="casa" required><option value="">Elegí…</option>${LOTES.map(l => `<option value="Lote ${l.lote}">${esc(nombreLote(l))}${propietarioDe('Lote ' + l.lote) ? ' · ' + esc(propietarioDe('Lote ' + l.lote)) : ''}</option>`).join('')}</select></div></div>
+    <div class="field"><label>¿Qué es del lote?</label><select name="relacion">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${k === 'inquilino' ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <div class="ayuda">Inquilino/a: el día a día del lote pasa a ser suyo y el propietario ve solo lo de dueño.</div></div>
+    <label class="check"><input type="checkbox" name="noVive"><span>Es propietario y <b>no vive en el lote</b></span></label>
+    <div class="grid2"><div class="field"><label>Correo (para entrar)</label><input name="email" type="email" required maxlength="80"></div>
+      <div class="field"><label>Celular / WhatsApp</label><input name="tel" inputmode="tel" maxlength="20" placeholder="549 2901 …"></div></div>
+    <button class="btn btn-pri btn-block">${I('check')}Crear la cuenta</button></form>`);
+};
+F['alta-vecino'] = async d => {
+  if (!esAdmin()) return;
+  const email = String(d.email || '').trim().toLowerCase(), dni = soloDigitos(d.dni), nombre = String(d.nombre || '').trim();
+  if (dni.length < 7 || dni.length > 9){ toast('Revisá el DNI', 'alert'); return; }
+  if (!/^Lote\s/.test(d.casa || '') || !RELACIONES[d.relacion]){ toast('Elegí el lote y qué es del lote', 'alert'); return; }
+  if (Store.s.users.some(u => (u.email || '').toLowerCase() === email)){ toast('Ese correo ya tiene una cuenta en la app', 'alert'); return; }
+  const clave = claveProvisoria(), nube = typeof Nube !== 'undefined' && Nube.activa();
+  let id = 'u' + uid();
+  if (nube){ try { id = await Nube.crearCuentaAjena(email, clave); }
+    catch(e){ toast({ 'auth/email-already-in-use':'Ese correo ya tiene cuenta. Si es de esta persona, buscala en Vecinos.', 'auth/invalid-email':'El correo no es válido' }[e.code] || e.message, 'alert'); return; } }
+  let x;
+  Store.cambiar(s => {
+    x = { id, nombre, casa:d.casa, dni, email, tel:String(d.tel || '').trim(), rol:'vecino', estado:'aprobado', relacion:d.relacion, noVive:!!d.noVive && (d.relacion === 'propietario' || d.relacion === 'cotitular'),
+      altaPorAdmin:Date.now(), aprobadoAt:Date.now(), clave: nube ? '' : clave, createdAt:Date.now(), vehiculos:[], mascotas:[] };
+    s.users.push(x);
+    auditar(s, 'Dio de alta a un vecino', `${nombre} · ${d.casa} · ${RELACIONES[d.relacion]}`, id);
+    avisoLoteAlquilado(s, x, true);
+  });
+  const msg = `Hola ${nombre.split(' ')[0]}: la Administración te creó la cuenta de la app del barrio ${Store.s.config.nombre} (${d.casa}).\n\nEntrá en ${urlApp()}\nCorreo: ${email}\nContraseña provisoria: ${clave}\n\nLa primera vez te pide aceptar los términos y podés elegir tu propia contraseña.`;
+  Correo.enviar({ para:email, asunto:'Tu acceso a la app del barrio', tipo:'clave',
+    html:Correo.plantilla('Tu acceso a la app del barrio', `<p>Hola ${esc(nombre.split(' ')[0])}: la Administración te creó la cuenta para <b>${esc(d.casa)}</b>.</p><p>Correo: <b>${esc(email)}</b><br>Contraseña provisoria: <b style="font-family:monospace;font-size:20px">${esc(clave)}</b></p><p>La primera vez te pide aceptar los términos y podés elegir tu propia contraseña.</p>`, { texto:'Entrar a la app', url:urlApp() }) });
+  hoja('Cuenta creada', `${aviso('ok', 'check', `${esc(nombre)} ya puede entrar`, `${esc(d.casa)} · ${esc(RELACIONES[d.relacion])}${x.relacion === 'inquilino' ? ' · el lote quedó alquilado' : ''}`)}
+    <p class="small" style="margin:0 0 6px">Correo: <b>${esc(email)}</b></p><div class="codigo-grande">${esc(clave)}</div>
+    <p class="muted small">Contraseña provisoria. También le mandamos un correo con estos datos.</p>
+    <div class="btns">${x.tel ? `<a class="btn btn-wa" href="${waLink(x.tel, msg)}" target="_blank" rel="noopener">${I('phone')}Mandárselo por WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar el mensaje</button></div>`);
 };
 A['alta-staff'] = () => hoja('Alta de personal', `<form data-f="alta-staff"><div class="field"><label>Nombre</label><input name="nombre" required></div>
   <div class="grid2"><div class="field"><label>Rol</label><select name="rol"><option value="guardia">Guardia</option><option value="admin">Administración</option></select></div><div class="field"><label>DNI</label><input name="dni" inputmode="numeric"></div></div>

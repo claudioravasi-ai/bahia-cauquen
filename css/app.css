@@ -1685,6 +1685,31 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 .camion-pasa.quieto .cam-pista{display:none}
 @media (prefers-reduced-motion:reduce){ .cam-auto{animation:none;left:12px} .cam-auto svg,.cam-rueda{animation:none} }
 
+/* ---------- Los correos (07-10-2026) ----------
+   Mismo recorrido que el camión de la basura. Si los dos están adentro a
+   la vez, los correos van un carril más arriba para no pisarse. Los logos
+   van siempre sobre blanco (son de cada empresa: en modo oscuro no se leen). */
+.correo-pasa{z-index:57}
+.correo-pasa .cam-pista{height:90px}
+.correo-pasa .cam-auto{width:170px;animation:correo-cruza 14s linear infinite}
+@keyframes correo-cruza{from{transform:translateX(-190px)}to{transform:translateX(calc(100vw + 20px))}}
+.correo-pasa.con-camion .cam-pista{bottom:calc(env(safe-area-inset-bottom) + 200px)}
+.correo-pasa.con-camion .cam-cartel{bottom:calc(env(safe-area-inset-bottom) + 152px)}
+.correo-pasa .cam-ic{background:var(--sky-soft);color:var(--sky)}
+.correo-pasa.mia .cam-ic{background:#e8590c;color:#fff;animation:correo-late 1.4s ease-in-out infinite}
+.correo-pasa.mia .cam-cartel{border-color:#e8590c}
+@keyframes correo-late{50%{transform:scale(1.12)}}
+.correo-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.correo-op{all:unset;box-sizing:border-box;cursor:pointer;display:grid;place-items:center;height:70px;padding:10px 12px;border-radius:14px;background:#fff;border:1px solid var(--line-2);box-shadow:var(--sh-1)}
+.correo-op:hover,.correo-op:focus-visible{border-color:var(--sky);outline:2px solid var(--sky-soft)}
+.correo-op img{height:30px}
+.correo-elegido{display:grid;place-items:center;padding:12px;margin:0 0 12px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+.correo-otro{display:inline-flex;align-items:center;gap:6px;color:#46535f;font-size:15px}
+.correo-otro svg.i{width:22px;height:22px}
+.correo-mini{flex:none;display:grid;place-items:center;width:64px;height:34px;padding:4px 6px;box-sizing:border-box;border-radius:9px;background:#fff;border:1px solid var(--line)}
+.correo-mini .correo-otro{font-size:11px} .correo-mini .correo-otro svg.i{width:14px;height:14px}
+@media (prefers-reduced-motion:reduce){ .correo-pasa .cam-auto{animation:none} .correo-pasa.mia .cam-ic{animation:none} }
+
 /* ---------- Avisos urgentes por zona ---------- */
 .alerta-pantalla .comunicado-caja{border-top:6px solid var(--danger)}
 .alerta-vecino.nv-rojo{border-left:4px solid var(--danger)}
@@ -2328,3 +2353,40 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
   .informe-hoja > div > div{padding-left:14px !important;padding-right:14px !important}
   .informe-hoja th, .informe-hoja td:not(.inf-kpi){padding:6px 4px !important;font-size:11.5px !important}
 }
+
+/* ---------- El hotel en la garita (rediseño 07-10-2026) ----------
+   Una tarjeta con identidad propia (cobre, como la marca del hotel), tres
+   números grandes que se tocan y las filas de llegadas y eventos. */
+.hotel-garita{margin:0 0 12px;border-radius:20px;overflow:hidden;background:var(--surface);border:1px solid color-mix(in srgb,var(--wood) 35%,var(--line));box-shadow:var(--sh-1)}
+.hg-cab{display:flex;align-items:center;gap:12px;padding:14px 14px 12px;color:#fff;
+  background:linear-gradient(135deg,#7a3b14 0%,#b85f24 55%,#d98a4e 100%)}
+.hg-sello{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+.hg-sello svg.i{width:20px;height:20px}
+.hg-cab small{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.82}
+.hg-cab b{display:block;font-size:16px;font-weight:800;line-height:1.2}
+.hg-vivo{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;font-size:12.5px;font-weight:800;background:rgba(255,255,255,.95);color:#7a3b14;flex:none}
+.hg-vivo svg.i{width:15px;height:15px}
+.hg-vivo:focus-visible,.hg-kpi:focus-visible,.hg-mas:focus-visible{outline:2px solid var(--wood);outline-offset:2px}
+.hg-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px}
+.hg-kpi{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:10px 8px;border-radius:14px;text-align:center;background:var(--surface-2);border:1px solid var(--line)}
+.hg-kpi b{font-size:24px;font-weight:800;line-height:1.1;color:var(--ink)} .hg-kpi b small{font-size:14px;color:var(--muted);font-weight:700}
+.hg-kpi span{font-size:11px;color:var(--muted);line-height:1.25}
+.hg-kpi.activo{background:var(--wood-soft);border-color:color-mix(in srgb,var(--wood) 40%,transparent)} .hg-kpi.activo b{color:var(--wood)}
+.hg-bloque{padding:0 12px 12px}
+.hg-tit{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:2px 2px 6px}
+.hg-fila{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;background:var(--surface-2);margin-bottom:6px}
+.hg-fila b{display:block;font-size:14px} .hg-fila small{display:block;font-size:12px;color:var(--muted)} .hg-fila small svg.i{width:12px;height:12px;vertical-align:-1px}
+.hg-fila > svg.i{width:16px;height:16px;color:var(--wood);flex:none}
+.hg-av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none;font-weight:800;background:var(--wood-soft);color:var(--wood)}
+.hg-hora{flex:none;min-width:48px;padding:6px 8px;border-radius:10px;text-align:center;font-weight:800;font-size:13px;background:var(--wood-soft);color:var(--wood)}
+.hg-mas{all:unset;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;width:100%;box-sizing:border-box;padding:8px;border-radius:12px;font-size:13px;font-weight:700;color:var(--wood)}
+.hg-mas svg.i{width:14px;height:14px}
+.hg-listo{margin:0;padding:0 14px 14px;font-size:13px;color:var(--ok)} .hg-listo svg.i{width:14px;height:14px;vertical-align:-2px}
+
+/* ---------- El propietario a distancia (07-10-2026) ---------- */
+.prop-hero{min-height:220px}
+.prop-inq{border-left:4px solid var(--sky)}
+
+/* "Todo el lote" en Escribirle a vecinos (08-10-2026) */
+.dmv-todo{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;white-space:nowrap}
+.dmv-todo input{width:16px;height:16px}

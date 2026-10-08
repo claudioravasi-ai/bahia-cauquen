@@ -1,8 +1,8 @@
-# Subir la versión nueva y probarla — paso a paso (actualizado el 07-10-2026)
+# Subir la versión nueva y probarla — paso a paso (actualizado el 08-10-2026)
 
 **El orden, siempre este:** 1. Preparar en la Mac → 2. Firebase (reglas) → 3. Apps Script → 4. GitHub → 5. Encender en la app → 6. Probar.
 
-**¿Por qué en ese orden?** Las reglas van primero porque la app nueva las necesita y la vieja sigue andando igual con ellas (para vecinos, garita, Administración y hotel no cambia nada: se comparó en 3.330 casos). El Apps Script va antes de GitHub porque la versión 10 también funciona con la app vieja. GitHub va al final: recién ahí los equipos bajan la app nueva, y ya encuentran todo listo.
+**¿Por qué en ese orden?** Las reglas van primero porque la app nueva las necesita y la vieja sigue andando igual con ellas (para vecinos, garita, Administración y hotel no cambia nada: se comparó en 3.330 casos). El Apps Script va antes de GitHub porque la versión 11 también funciona con la app vieja. GitHub va al final: recién ahí los equipos bajan la app nueva, y ya encuentran todo listo.
 
 ---
 
@@ -30,13 +30,13 @@
 4. Clic dentro del editor → Cmd+A → Borrar → Cmd+V → **Publicar**.
 5. Si marca un error en rojo, no publiques y pasame la línea que marca.
 
-**Lo nuevo del 07-10:** el rol **supervisión de la guardia** (lee lo de la garita y no escribe en ningún lado, salvo sus mensajes y el visto de los partes), las carpetas de sus conversaciones (`pv/privadosSupGarita`, `pv/privadosSupAdmin`) y dos colecciones nuevas: **`staff/alertasSup`** (alertas automáticas) y **`staff/vistos`** (vistos de los partes). Además siguen pendientes todas las anteriores (cuidado, hotel, chat y reservas cerrados, etc.): con pegar este archivo entero quedan todas.
+**Lo nuevo del 07-10:** el rol **supervisión de la guardia** (lee lo de la garita y no escribe en ningún lado, salvo sus mensajes y el visto de los partes), las carpetas de sus conversaciones (`pv/privadosSupGarita`, `pv/privadosSupAdmin`) y dos colecciones nuevas: **`staff/alertasSup`** (alertas automáticas) y **`staff/vistos`** (vistos de los partes). A la noche: la **relación con el lote** se elige una sola vez (después solo la cambia la Administración). Y a la tarde, **`barrio/mensajeria`**: los correos que están en el barrio (solo la empresa y las horas; la garita escribe, los vecinos leen, el hotel no). Además siguen pendientes todas las anteriores (cuidado, hotel, chat y reservas cerrados, etc.): con pegar este archivo entero quedan todas.
 
 ---
 
-## 3. Apps Script: el código nuevo, versión 10 (5 minutos)
+## 3. Apps Script: el código nuevo, versión 11 (5 minutos)
 
-Es el "servidor" del barrio: manda los correos (también el informe mensual), los avisos push, lee los cruceros, cobra con Mercado Pago y tiene el reloj que vigila "Estoy bien" y, desde la versión 10, **que la garita esté conectada y que los SOS tengan respuesta**.
+Es el "servidor" del barrio: manda los correos (también el informe mensual), los avisos push, lee los cruceros, cobra con Mercado Pago y tiene el reloj que vigila "Estoy bien" y, desde la versión 10, **que la garita esté conectada y que los SOS tengan respuesta**. La **versión 11** (07-10, tarde) manda el aviso **"un correo va a tu casa"** también a los equipos con la sesión cerrada (y solo ese). Y al **propietario a distancia** (lote alquilado) le manda, de lo que va a todo el barrio, solo votaciones, expensas y comunicados.
 
 1. [script.google.com](https://script.google.com) con la cuenta con la que lo creaste (la de la garita) → abrí el proyecto del correo.
 2. Abrí **`apps-script/Codigo.gs`** de la carpeta del barrio con TextEdit → Cmd+A → Cmd+C.
@@ -62,9 +62,9 @@ Es el "servidor" del barrio: manda los correos (también el informe mensual), lo
 
 1. Entrá al repositorio de la app del barrio en github.com (el que publica en GitHub Pages).
 2. **Add file → Upload files**.
-3. Abrí la carpeta **`SUBIR A GITHUB`** del Escritorio → **Cmd+A** (todo lo de adentro, no la carpeta) → arrastralo a la página de GitHub. Los archivos que ya existen se reemplazan; los nuevos (como `js/v-supervisor.js`) se agregan.
-4. Esperá a que termine de cargar la lista. Abajo, en el mensaje: *Supervisión de la guardia, alertas, informe mensual, publicidad y aporte (07-10)* → **Commit changes**.
-5. Esperá 1 o 2 minutos (GitHub Pages publica solo). Comprobalo: abrí la app, y en la pantalla de ingreso, abajo, tiene que decir **versión 20261007-…**.
+3. Abrí la carpeta **`SUBIR A GITHUB`** del Escritorio → **Cmd+A** (todo lo de adentro, no la carpeta) → arrastralo a la página de GitHub. Los archivos que ya existen se reemplazan; los nuevos (como `js/v-supervisor.js` y la carpeta `img/correos/` con los logos) se agregan.
+4. Esperá a que termine de cargar la lista. Abajo, en el mensaje: *Supervisión, correos, lote alquilado, hotel, alta por la Administración, mensajes a un lote y QR por WhatsApp (07 y 08-10)* → **Commit changes**.
+5. Esperá 1 o 2 minutos (GitHub Pages publica solo). Comprobalo: abrí la app, y en la pantalla de ingreso, abajo, tiene que decir **versión 20261008-…**.
 6. Si en un equipo sigue la vieja: **Tu cuenta → Actualizar la app**.
 
 ---
@@ -95,6 +95,31 @@ Abrí la cuenta de supervisión de prueba en un celular (con **Activar avisos**)
 6. **Policía sin ronda:** registrá un policía en la garita y no le anotes rondas → a los 90 minutos llega **"Sin ronda hace 90 min"** a la supervisión y a la garita.
 7. **Visto del parte:** en la garita, **Cerrar el turno** → en la supervisión aparece en "Partes de turno para dar el visto" → **Leer** → **Visto** → "Con observaciones" + un texto → en la garita y en tu Administración llega el aviso, y en **Turnos** el turno dice "Con observaciones".
 8. **Informe mensual:** en la supervisión, teja **Informe mensual** → mirá el mes en curso (parcial) → **Mandármelo por correo** → revisá cómo llega: arriba "El mes en 30 segundos" con colores, los 8 números, y abajo el detalle numerado. En el correo no tienen que aparecer lotes ni nombres de vecinos. El día 1 de noviembre sale solo el de octubre.
+
+### Correos en el barrio (07-10, tarde)
+Tené la garita en un equipo y tu cuenta (Lote 148, con **Activar avisos**) en el celular.
+1. **En la garita**, justo abajo de **Camión de la basura**, está **Correos** → tocalo → elegí **Andreani** → en "¿A qué lotes va?" escribí **148** → **Registrar la entrada**.
+2. **En todas las pantallas** cruza el camión de Andreani con su logo y suena una bocina corta. En la garita queda el renglón "Andreani en el barrio · va a Lote 148" con **Registrar la salida** y **Avisar a otro lote**.
+3. **En tu celular, bloqueado y con la app cerrada**, llega **"📬 Andreani va a tu casa"** con el sonido de avisos del teléfono, como un WhatsApp. Con la app abierta, el camión dice **"VA A TU CASA"** y suena un aviso.
+4. **Sesión cerrada:** en tu celular, Tu cuenta → **Cerrar sesión** → dejá tildado "Seguir recibiendo… cuando un correo va a mi casa". Registrá otro correo para el 148 desde la garita: tiene que llegar igual. Un aviso de otro tipo (por ejemplo, el camión de la basura) ya no llega a ese equipo. Volvé a entrar: en unos segundos vuelve a recibir todo.
+5. **Salida:** en la garita, **Registrar la salida** → el camión deja de verse en todos lados y el "va a tu casa" desaparece de la pizarra.
+6. Probá también **Otro** (pide el nombre, por ejemplo DHL) y un lote que no existe (por ejemplo 999: no deja registrar).
+
+### Lote alquilado: inquilino y propietario (07-10, noche)
+1. Con tu cuenta de Administración, en **Inscripciones**, cada pedido muestra qué es del lote. Inscribí una cuenta de prueba en tu lote eligiendo **Inquilino/a** y aprobala: al propietario le llega **"… figura alquilado"**.
+2. Entrá con la cuenta del propietario: la portada es la de **propietario a distancia** (expensas, votaciones, "Escribirle a …", Administración). No hay botón SOS ni Pizarra; tocar la garita o las visitas no abre.
+3. En la garita, **Llegó sin aviso → ¿A qué casa va?**: para ese lote aparece solo el inquilino. Un correo para ese lote le avisa al inquilino.
+4. Con la cuenta del inquilino: en **Mi casa** aparece la tarjeta "el día a día es tuyo" con **Escribirle** al propietario.
+5. Dá de baja la cuenta de prueba: el propietario recibe **"ya no figura alquilado"** y vuelve a la app completa.
+
+### La tarjeta del hotel en la garita (07-10, noche)
+En la portada de la garita, con huéspedes o eventos del día: encabezado cobre, tres números que se tocan y "Ingresó" en cada huésped.
+
+### Alta por la Administración, mensajes a un lote y QR por WhatsApp (08-10)
+1. **Alta de un vecino o inquilino:** Administración → Vecinos → **"Dar de alta a un vecino o inquilino"** → cargá una persona de prueba (con un correo tuyo distinto) como Inquilino/a de tu lote → **Crear la cuenta**. Aparece la contraseña provisoria y el botón de WhatsApp; llega también el correo. Entrá con esa cuenta: pide aceptar los términos y deja elegir contraseña. Tu cuenta de propietario recibe "… figura alquilado".
+2. **Escribir a un lote:** desde la garita (Mensajes con vecinos) o la Administración, **"Escribir a un lote o a vecinos"** → elegí un lote con dos cuentas → destildá una → Enviar: le llega solo a la tildada.
+3. **Vecinos:** Tu casa → Mensajes → "Buscar un vecino y escribirle" → en un lote con varias cuentas aparece **"Todo el lote"**.
+4. **QR por WhatsApp:** desde el celular, Autorizar una visita → **Enviar por WhatsApp** → elegí un contacto: llega la **imagen con el QR y el código** y el texto. El enlace "Tu QR" del texto abre la página con el QR. Lo mismo en Ingresos frecuentes → QR → **"Mandarlo por WhatsApp (QR y código)"**.
 
 ### Publicidad y aporte (07-10)
 1. Como vecino: **pie "by Claudio A. Ravasi" → Términos de uso** → punto **4. Publicidad, promociones y aporte del 50 % al Barrio**; abajo, el botón **"Publicidad y aporte al barrio"**.

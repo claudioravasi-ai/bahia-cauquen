@@ -145,7 +145,7 @@ const Store = {
 function migrar(s){
   const def = { users:[], posts:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[],
     avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
-    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
+    gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], mensajeria:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
     hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[],
     /* 07-10: supervisión de la guardia (js/v-supervisor.js) */
@@ -516,6 +516,40 @@ const soloGarita = () => {
 /* Las cuentas aprobadas de un lote (en el 148 viven Mónica y Claudio: los
    dos tienen que enterarse de lo que llega al lote). */
 const cuentasDelLote = casa => casa ? Store.s.users.filter(u => u.estado === 'aprobado' && u.casa === casa) : [];
+/* =========================================================
+   LOTE ALQUILADO: EL PROPIETARIO A DISTANCIA (pedido de Claudio, 07-10-2026)
+   -------------------------------------------------------
+   Un lote queda ALQUILADO solo, sin tocar nada más, cuando la
+   Administración aprueba una cuenta inscripta como "Inquilino/a" en él.
+   Desde ahí:
+     · el inquilino y su familia (relación "inquilino" o "familiar") usan la
+       app completa: es su casa y el día a día es de ellos (la garita le
+       consulta a ellos, las visitas, los correos, los paquetes, el SOS);
+     · el propietario y los cotitulares pasan a PROPIETARIO A DISTANCIA: un
+       portal propio con lo que les toca como dueños (expensas, votaciones,
+       comunicados, las cuentas del barrio, las normas, la Administración y
+       un canal privado con su inquilino). No ven el día a día ni les llegan
+       sus avisos, y no autorizan visitas a una casa donde no viven.
+   Cuando la cuenta del inquilino se da de baja, el lote vuelve a ser del
+   propietario. Un propietario que no vive en el barrio (casa vacía, o un
+   inquilino sin la app) también puede pasar a este portal desde Mi casa
+   ("No vivo en el lote"). El padrón no se toca: el titular sigue siendo el
+   titular, para las expensas y los votos.
+   ========================================================= */
+const inquilinosDe = casa => casa ? Store.s.users.filter(u => u && u.estado === 'aprobado' && u.rol === 'vecino' && u.casa === casa && u.relacion === 'inquilino') : [];
+const loteAlquilado = casa => inquilinosDe(casa).length > 0;
+const esDuenoDelLote = u => !!u && (u.relacion === 'propietario' || u.relacion === 'cotitular');
+function esPropDistancia(u = yo()){
+  return !!u && u.rol === 'vecino' && /^Lote\s/i.test(u.casa || '') && esDuenoDelLote(u) && (!!u.noVive || loteAlquilado(u.casa));
+}
+/* Quienes VIVEN en el lote: a ellos les llega lo del día a día. */
+const residentesDelLote = casa => cuentasDelLote(casa).filter(u => !esPropDistancia(u));
+/* De lo que va a todo el barrio, al propietario a distancia le toca solo
+   lo de dueño: votaciones, expensas, las cuentas, las normas y los
+   comunicados de la Administración. El Apps Script aplica la misma regla a
+   los avisos al celular (ver tokensDe). */
+const LINKS_PROPIETARIO = ['votaciones', 'expensas', 'tablero', 'documentos', 'privado', 'inicio'];
+const avisoDePropietario = n => LINKS_PROPIETARIO.includes(String(n.link || '').split(':')[0]) || /^(Comunicado|Invitación):/.test(n.titulo || '');
 /* PAQUETES EN PAUSA (30-09-2026, pedido de Claudio): el barrio no aprobó
    que la garita reciba correo ni paquetes de los vecinos. Todo el módulo
    (Mis paquetes, "Llegó un paquete", el QR de retiro, los avisos de 24 h,
@@ -562,13 +596,15 @@ function codigoPase(){
    ========================================================= */
 const Automatico = { clave:null, n:0 };
 const idAutomatico = () => 'm-' + String(Automatico.clave).replace(/[.#$\[\]\/\s]/g, '_') + '-' + (++Automatico.n);
-function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '', vence = 0 }){
+function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '', mensId = '', vence = 0 }){
   const auto = !!Automatico.clave, id = auto ? idAutomatico() : uid();
   /* Ya está (lo dio otro equipo y ya bajó): no se repite ni se le borra a
      nadie el "visto". */
   if (auto && aLista(s.notifs).some(x => x && x.id === id)) return;
   const n = { id, para: [].concat(para), titulo, texto, icon, color, link, urgente, sonido: sonido || urgente, de: auto ? 'sistema' : Store.sesion.userId, at: Date.now(), leidas: [] };
   if (camionId) n.camionId = camionId;
+  /* "Andreani va a tu casa" queda atado a ese correo (js/v-servicio.js). */
+  if (mensId) n.mensId = mensId;
   if (vence) n.vence = vence;
   s.notifs.unshift(n);
   if (s.notifs.length > 400) s.notifs.length = 400;
@@ -605,6 +641,8 @@ function meToca(n, u = yo()){
   /* Al supervisor le llega solo lo suyo: no los avisos de todo el barrio
      (el camión, la pizarra), que no son para él. Los SOS los ve aparte. */
   if (u.rol === 'supervisor') return aLista(n.para).some(p => p === u.id || p === 'rol:supervisor');
+  /* El propietario a distancia: lo que es para él y, de lo de todos, lo de dueño. */
+  if (esPropDistancia(u)){ const para = aLista(n.para); return para.includes(u.id) || (para.some(p => p === 'todos' || p === 'rol:vecino') && avisoDePropietario(n)); }
   return aLista(n.para).some(p => p === 'todos' || p === u.id || p === 'rol:' + u.rol || (p === 'staff' && (u.rol === 'admin' || u.rol === 'guardia')));
 }
 /* "Entró el camión de la basura" sirve solo mientras el camión está en el
@@ -613,6 +651,12 @@ function meToca(n, u = yo()){
    vecino abría la app y leía que el camión había entrado, cuando ya se había
    ido a la mañana. Confunde y no sirve para nada. */
 function avisoCaduco(n){
+  /* "Un correo va a tu casa": lo mismo, mientras el correo está adentro. */
+  if (n && n.mensId){
+    if (Date.now() - (n.at || 0) > 4 * HORA) return true;
+    const v = typeof Mensajeria !== 'undefined' ? Mensajeria.lista().find(x => x.id === n.mensId) : null;
+    return !!(v && v.sale);
+  }
   if (!n || n.icon !== 'tacho' || String(n.link || '').split(':')[0] !== 'recoleccion') return false;
   if (Date.now() - (n.at || 0) > 8 * HORA) return true;
   if (typeof Camion === 'undefined') return false;
@@ -754,6 +798,43 @@ function cargarQR(){
   });
   return qrLib;
 }
+/* =========================================================
+   EL PASE VIAJA CON SU QR (pedido de Claudio, 08-10-2026)
+   Antes el WhatsApp llevaba solo el código: el enlace "Tu pase con QR"
+   abría una página que no existía. Ahora se arma una IMAGEN con el QR
+   grande y el código debajo, y se manda en el MISMO mensaje que el texto:
+   en el celular, por el menú de compartir (WhatsApp → contacto: llega la
+   foto con el texto como epígrafe). En la computadora, que no puede
+   adjuntar desde la web, se baja la imagen y se abre WhatsApp con el
+   texto, que además trae un enlace que muestra el QR (#/qr/…).
+   ========================================================= */
+async function imagenQR(contenido, codigo, titulo = '', sub = ''){
+  const q = await cargarQR(); if (!q) return null;
+  const qr = q(0, 'M'); qr.addData(contenido); qr.make();
+  const n = qr.getModuleCount(), cel = 12, lado = n * cel, W = Math.max(lado + 96, 520), H = lado + 300;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#0d6b66'; g.fillRect(0, 0, W, 86);
+  g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.font = '700 26px system-ui, -apple-system, sans-serif';
+  g.fillText(titulo || ('Barrio ' + Store.s.config.nombre), W / 2, 40);
+  g.font = '18px system-ui, -apple-system, sans-serif'; g.fillText(sub || 'Pase de ingreso', W / 2, 68);
+  const x0 = (W - lado) / 2, y0 = 112; g.fillStyle = '#0f1f1e';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) g.fillRect(x0 + k * cel, y0 + r * cel, cel, cel);
+  g.font = '800 46px ui-monospace, Menlo, monospace'; g.fillText(codigo, W / 2, y0 + lado + 70);
+  g.fillStyle = '#5b6b69'; g.font = '17px system-ui, -apple-system, sans-serif'; g.fillText('Mostrá el QR en la garita o decí el código', W / 2, y0 + lado + 110);
+  return new Promise(ok => c.toBlob(ok, 'image/png'));
+}
+async function compartirPase({ texto, contenido, codigo, titulo = '', sub = '', tel = '', archivo = 'pase-barrio.png' }){
+  const blob = await imagenQR(contenido, codigo, titulo, sub).catch(() => null);
+  if (blob && navigator.canShare){
+    const f = new File([blob], archivo, { type:'image/png' });
+    if (navigator.canShare({ files:[f] })){ try { await navigator.share({ files:[f], text:texto, title:titulo || 'Pase de ingreso' }); return; } catch(e){ if (e.name === 'AbortError') return; } }
+  }
+  if (blob){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = archivo; document.body.appendChild(a); a.click(); a.remove();
+    toast('Se bajó la imagen del QR: adjuntala en el WhatsApp que se abre', 'download'); }
+  window.open(tel ? waLink(tel, texto) : 'https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+}
+const enlaceQR = contenido => urlApp('qr/' + encodeURIComponent(contenido));
 async function pintarQR(el, texto){
   const q = await cargarQR();
   if (!el) return;

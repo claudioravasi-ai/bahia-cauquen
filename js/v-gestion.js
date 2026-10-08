@@ -581,7 +581,8 @@ R.privado = {
          tarde): tiene su lugar propio ("Mensajes con la garita" en el Día a
          día de la Administración; "Administración" en las tejas de la
          garita). Esta lista es solo de conversaciones con vecinos. */
-      return `${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote', s:'Elegí el lote en "¿Para quién?"' })}
+      return `${superficie({ a:'priv-lote', icon:'chat', color:'accent', t:'Escribir a un lote o a vecinos', s:'A todo el lote o a quienes elijas · en privado, a cada uno por separado', cls:'acento' })}
+        ${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote en el pizarrón', s:'Elegí el lote en "¿Para quién?"' })}
         ${hilos.length ? hilos.map(h => { const v = usuario(h.userId) || {}, ult = h.msgs.at(-1), nl = h.msgs.filter(m => m.from === 'vecino' && !m.leido).length;
           return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${miCanal}|${h.userId}">${v.fotoCasa ? fotoHTML(v.fotoCasa, 'casa-foto chica') : avatar(v)}<span class="txt"><b>${esc(v.nombre || '')} · ${esc(v.casa || '')}</b><small>${ult ? esc(ult.text.slice(0, 70)) + ' · ' + hace(ult.createdAt) : 'Sin mensajes'}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')
           : vacio('lock', 'No hay conversaciones.')}`;
@@ -629,6 +630,53 @@ F['privado'] = (d, form) => {
       : { para: con === 'guardia' ? 'rol:guardia' : 'rol:admin', titulo:`Mensaje de ${u.casa}`, texto:d.text.trim().slice(0, 90), icon:'lock', color:'accent', link:'privado:' + con + '|' + u.id });
   });
   const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
+};
+
+/* =========================================================
+   ESCRIBIR A UN LOTE O A VECINOS PUNTUALES (pedido de Claudio, 08-10-2026)
+   La garita y la Administración eligen el lote y, adentro, a quién: todo
+   el lote (lo reciben todas sus cuentas) o solo algunas (en el 42 viven
+   cuatro y se le escribe a dos: los otros dos no lo reciben). A cada uno le
+   llega en su conversación privada con la garita o la Administración.
+   ========================================================= */
+const lotesConCuentas = () => [...new Set(Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && /^Lote\s/i.test(u.casa || '')).map(u => u.casa))]
+  .sort((a, b) => a.localeCompare(b, 'es', { numeric:true }));
+const cuentasPrivLote = casa => cuentasDelLote(casa).filter(u => u.rol === 'vecino');
+function filasPrivLote(casa){
+  const cs = cuentasPrivLote(casa);
+  if (!cs.length) return '<p class="muted small" style="margin:6px 0">Elegí un lote.</p>';
+  return `${cs.length > 1 ? `<label class="check" style="margin:4px 0 6px"><input type="checkbox" data-pl-todo checked><span><b>Todo el lote</b> (${cs.length} cuentas)</span></label>` : ''}
+    ${cs.map(x => `<label class="check" style="margin:2px 0 2px ${cs.length > 1 ? '22px' : '0'}"><input type="checkbox" name="u~${esc(x.id)}" checked><span>${esc(x.nombre)} <small class="muted">· ${esc(RELACIONES[x.relacion] || 'vecino/a')}${esPropDistancia(x) ? ', no vive en el lote' : ''}</small></span></label>`).join('')}`;
+}
+A['priv-lote'] = el => {
+  if (!esStaff()) return;
+  const pre = el?.dataset?.v || '';
+  hoja('Escribir a un lote', `<form data-f="priv-lote">
+    <div class="field"><label>Lote</label><select name="casa" id="plCasa" required><option value="">Elegí…</option>${lotesConCuentas().map(c => `<option ${c === pre ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="field"><label>¿A quién?</label><div id="plCuentas">${filasPrivLote(pre)}</div></div>
+    <div class="field"><label>Mensaje</label><textarea name="text" required maxlength="800" rows="4" placeholder="Escribí el mensaje…"></textarea></div>
+    <p class="muted tiny" style="margin:0 0 10px">${I('lock')} A cada uno le llega en su conversación privada con ${esGuardia() ? 'la garita' : 'la Administración'}, con aviso al celular. Los que no tildes no lo reciben.</p>
+    <button class="btn btn-pri btn-block">${I('send')}Enviar</button></form>`);
+};
+document.addEventListener('change', e => {
+  if (e.target.id === 'plCasa'){ const b = $('#plCuentas'); if (b) b.innerHTML = filasPrivLote(e.target.value); return; }
+  if (e.target.matches && e.target.matches('[data-pl-todo]')){ $$('#plCuentas input[name^="u~"]').forEach(c => { c.checked = e.target.checked; }); return; }
+  if (e.target.closest && e.target.closest('#plCuentas')){ const t = $('#plCuentas [data-pl-todo]'), cs = $$('#plCuentas input[name^="u~"]'); if (t) t.checked = cs.every(c => c.checked); }
+});
+F['priv-lote'] = d => {
+  if (!esStaff()) return;
+  const con = esGuardia() ? 'guardia' : 'admin', texto = String(d.text || '').trim();
+  const para = Object.keys(d).filter(k => k.startsWith('u~')).map(k => k.slice(2)).filter(id => { const x = usuario(id); return x && x.casa === d.casa && x.estado === 'aprobado'; });
+  if (!para.length){ toast('Tildá al menos una persona', 'alert'); return; }
+  if (!texto){ toast('Escribí el mensaje', 'alert'); return; }
+  const todo = para.length === cuentasPrivLote(d.casa).length;
+  Store.cambiar(s => para.forEach(id => {
+    let h = s.privados.find(x => x.userId === id && (x.con || 'admin') === con);
+    if (!h){ h = { id:uid(), userId:id, con, msgs:[] }; s.privados.push(h); }
+    h.msgs.push({ id:uid(), from:con, text:texto, createdAt:Date.now(), ...(todo && para.length > 1 ? { aLote:d.casa } : {}) });
+    notificar(s, { para:id, titulo: con === 'guardia' ? 'Mensaje de la guardia' : 'Mensaje de la Administración', texto:texto.slice(0, 90), icon:'lock', color:'accent', link:'privado:' + con, sonido:true });
+  }));
+  cerrarHoja(); toast(todo ? `Enviado a todo ${d.casa} (${plural(para.length, 'cuenta')})` : `Enviado a ${plural(para.length, 'persona')} de ${d.casa}`, 'send');
 };
 
 /* ---------- NORMAS Y REGLAMENTOS, con buscador ----------
@@ -1288,6 +1336,7 @@ R.perfil = {
   titulo: 'Mi casa', icon: 'home', color: 'ok', sub: 'Tus datos, familia, autos y mascotas',
   render(){
     const u = yo(), tema = Store.sesion.tema || 'auto';
+    if (esPropDistancia(u)) return perfilPropietario(u);
     const notif = 'Notification' in window ? Notification.permission : 'no';
     const L = loteDe(u);
     return `<div class="card"><div class="perfil-cab">${avatar(u, 'lg')}<div class="grow"><b style="font-size:18px">${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
@@ -1301,8 +1350,12 @@ R.perfil = {
         </div></div></div>
       ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Un QR personal para que la garita te reconozca sin mostrar el DNI. Sin datos sensibles.' })}
       <form data-f="perfil" class="card">
-        ${tengoLote() ? `<div class="grid2"><div class="field"><label>Tu relación con ${esc(u.casa)}</label><select name="relacion" id="pfRel">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${u.relacion === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="" ${!u.relacion ? 'selected' : ''}>Sin indicar</option></select>
-          <div class="ayuda">En las votaciones vota el titular del lote. ${u.representante ? '<b>Sos el representante designado del lote.</b>' : ''}</div></div>
+        ${tengoLote() ? `<div class="grid2"><div class="field"><label>Tu relación con ${esc(u.casa)}</label>${u.relacion
+            /* Una vez elegida la cambia solo la Administración (07-10-2026): de ella dependen el voto y quién maneja el lote alquilado. */
+            ? `<p style="margin:6px 0 0"><b>${esc(RELACIONES[u.relacion] || u.relacion)}</b></p><div class="ayuda">Si cambió, pedíselo a la <button type="button" class="link" data-a="abrir" data-v="privado" data-p="admin">Administración</button>.</div>`
+            : `<select name="relacion" id="pfRel"><option value="" selected>Elegí…</option>${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select><div class="ayuda">Se elige una sola vez; después la cambia la Administración.</div>`}
+          <div class="ayuda">En las votaciones vota el titular del lote. ${u.representante ? '<b>Sos el representante designado del lote.</b>' : ''}</div>
+          ${esDuenoDelLote(u) && !loteAlquilado(u.casa) ? `<button type="button" class="link" data-a="vivo-en-el-lote" data-v="no" style="margin-top:6px">No vivo en el lote (lo tengo vacío o alquilado)</button>` : ''}</div>
           ${u.relacion === 'inquilino' || u.relacion === 'familiar' ? `<div class="field"><label>Carta poder para votar</label>${u.poderOk ? `<p class="small" style="margin:6px 0 0">${I('check')} Aprobada${u.poderHasta ? ' hasta el ' + fechaCorta(u.poderHasta) : ''}</p>` : u.poderFoto ? '<p class="small muted" style="margin:6px 0 0">Enviada, esperando que la Administración la apruebe.</p>' : `<button type="button" class="btn btn-sm btn-sec" data-a="subir-poder">${I('upload')}Cargar la carta poder</button>`}</div>` : ''}</div>` : ''}
         <div class="field"><label>Teléfono / WhatsApp</label><input name="tel" id="pfTel" value="${esc(u.tel || '')}" inputmode="tel" maxlength="20"></div>
         <div class="field"><label>Oficios o servicios que ofrecés</label><input name="skills" id="pfSkills" value="${esc(u.skills || '')}" maxlength="120" placeholder="Ej: electricista, clases de inglés"></div>
@@ -1323,7 +1376,7 @@ R.perfil = {
       ${Store.s.infracciones.some(i => i.casa === u.casa) ? superficie({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones de la Administración', s:'Infracciones y descargos de tu casa' }) : ''}
       ${sec('Guardia')}
       ${(() => { const au = typeof ausenciaDe === 'function' ? ausenciaDe(u) : null; return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t:'Me voy de viaje', s: au ? `Casa sola hasta el ${fechaCorta(au.hasta)} · la revisan cada día` : 'La revisan cada día y te avisan que está en orden' }); })()}
-      ${tengoLote() ? familiaDelLote(u) : ''}
+      ${tengoLote() ? tarjetaInquilino(u) + familiaDelLote(u) : ''}
       <p class="muted small" style="margin:14px 2px 0">${I('user')} La contraseña, el correo, el modo de pantalla, los avisos del celular, tus datos personales y cerrar sesión están en <button class="link" data-a="mi-cuenta">Tu cuenta</button> (tu inicial, arriba a la derecha).</p>`;
   },
 };
@@ -1345,12 +1398,104 @@ function familiaDelLote(u){
   const ls = cuentasDeMiLote(u), otros = ls.filter(x => x.id !== u.id);
   return `${sec(`Quiénes están en ${esc(u.casa)}`, `<span class="muted small">${plural(ls.length, 'cuenta')}</span>`)}
     <div class="card lista familia-lote">${ls.map(x => `<div class="it">${avatar(x)}<div class="txt"><b>${esc(x.nombre)}${x.id === u.id ? ' <span class="muted small">(vos)</span>' : ''}</b>
-        <span>${esc(RELACIONES[x.relacion] || 'Relación con el lote sin indicar')}${x.representante ? ' · representante del lote' : ''}</span></div>
+        <span>${esc(RELACIONES[x.relacion] || 'Relación con el lote sin indicar')}${esPropDistancia(x) ? ' · no vive en el lote' : ''}${x.representante ? ' · representante del lote' : ''}</span></div>
       ${x.estado === 'pendiente' ? '<span class="pill p-warn">Esperando aprobación</span>' : conAppAbierta(x.id) ? `<span class="pill p-ok">${I('check')}App abierta</span>` : ''}
       ${x.id !== u.id ? `<button class="btn btn-xs btn-sec" data-a="lote-ajeno" data-id="${esc(x.id)}" title="Avisar que no es de ${esc(u.casa)}">No es de mi lote</button>` : ''}</div>`).join('')}</div>
     <p class="muted tiny" style="margin:6px 2px 0">${otros.length ? `Todas estas cuentas son un solo lote: comparten los paquetes, las expensas, el plan ante un sismo y los cuidados de la casa, y votan como un lote.` : `Por ahora sos la única cuenta de ${esc(u.casa)}. Cuando alguien más de tu casa se inscriba, aparece acá.`}
       Si ves a alguien que no vive en tu casa, tocá <b>No es de mi lote</b>: le avisamos a la Administración para que lo revise.</p>`;
 }
+/* =========================================================
+   EL PROPIETARIO A DISTANCIA Y SU INQUILINO (pedido de Claudio, 07-10-2026)
+   La regla está en core.js (esPropDistancia). Acá: su portada, su "Mi
+   lote", la tarjeta que ve el inquilino y el "No vivo en el lote".
+   ========================================================= */
+function portadaPropietario(){
+  const u = yo(), s = Store.s, hoy = hoyISO(), c = Clima.d?.c, inq = inquilinosDe(u.casa);
+  const hr = new Date().getHours(), saludo = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const saldo = typeof saldoLote === 'function' ? saldoLote(u.casa) : 0;
+  const votar = aLista(s.votaciones).filter(v => { const vv = v && (v.votos || {})[u.casa]; return v && v.cierra > Date.now() && !(vv && vv.personas && u.id in vv.personas) && puedeVotarEn(v, u).ok; }).length;
+  const coms = aLista(s.comunicados).filter(x => x && !x.archivado && (x.para === 'todos' || x.para === u.casa) && (!x.vence || x.vence >= hoy)).sort((a, b) => b.at - a.at).slice(0, 4);
+  const infr = aLista(s.infracciones).filter(i => i && i.casa === u.casa).length;
+  const nombres = inq.map(x => esc(x.nombre)).join(' y ');
+  const hero = `<div class="hero prop-hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+    <div class="hero-centro">
+      <div class="saludo">${saludo},</div>
+      <h1>${esc(primerNombre(u.nombre))}</h1>
+      <div class="sub">${esc(u.casa)} · ${esc(RELACIONES[u.relacion] || 'Propietario/a')} a distancia</div>
+      ${c ? `<div class="clima-datos una"><span>${I('pin')}En el barrio ahora: ${Math.round(c.temperature_2m)} °C · ${Clima.cod(c.weather_code)[0]}</span></div>` : ''}
+    </div></div>`;
+  const quien = inq.length
+    ? aviso('info', 'key', `${esc(u.casa)} está alquilado`, `El día a día del lote (la garita, las visitas, los correos y el SOS) lo maneja ${nombres} (${inq.length > 1 ? 'inquilinos' : 'inquilino/a'}). Vos ves y hacés lo que te toca como dueño.`)
+    : aviso('info', 'key', 'No vivís en el lote', `Marcaste que no vivís en ${esc(u.casa)}: acá tenés lo que te toca como dueño. Si volvés a vivir ahí, cambialo en <b>Mi lote</b>.`);
+  return `${hero}<div class="inicio-lienzo">
+    <section class="bloque">${quien}</section>
+    ${coms.length ? `<section class="bloque">${sec('Comunicados de la Administración')}${coms.map(x => `<button class="superficie" data-a="ver-novedad" data-v="com" data-id="${esc(x.id)}"><span class="ic ic-danger">${I(x.tipo === 'reunion' ? 'calendar' : 'tack')}</span><span class="txt"><b>${esc(x.titulo)}</b><small>${x.fecha ? fechaLarga(x.fecha) + (x.hora ? ' · ' + esc(x.hora) + ' h' : '') + ' · ' : ''}${esc(String(x.texto || '').slice(0, 90))}</small></span>${I('right')}</button>`).join('')}</section>` : ''}
+    <section class="bloque">${sec('Lo tuyo como propietario/a')}<div class="mosaico">
+      ${teja({ v:'expensas', icon:'wallet', color:'wood', t:'Expensas del lote', s: saldo > 0.5 ? `Saldo ${plata(saldo)}` : 'Al día · cupones, pagos y recibos', destaca: saldo > 0.5 })}
+      ${teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votar ? `${plural(votar, 'abierta')} para votar` : 'Asambleas y decisiones del barrio', badge: votar })}
+      ${inq.length ? teja({ v:'dm', p:inq[0].id, icon:'chat', color:'ok', t:`Escribirle a ${esc(primerNombre(inq[0].nombre))}`, s:'Tu inquilino/a, en privado' }) : ''}
+      ${teja({ v:'privado', p:'admin', icon:'lock', color:'brand', t:'Mensajes con la Administración', s:'Consultas y avisos del lote' })}
+      ${teja({ v:'tablero', icon:'wallet', color:'sky', t:'Las cuentas del barrio', s:'En qué se gasta, mes a mes' })}
+      ${teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamentos', s:'El reglamento y la convivencia' })}
+      ${infr ? teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones del lote', s:'Infracciones y descargos', n:infr }) : ''}
+      ${teja({ v:'perfil', icon:'home', color:'ok', t:'Mi lote', s:'Quiénes están, tu teléfono y si vivís ahí' })}
+      ${teja({ v:'manual', icon:'book', color:'accent', t:'Manual de uso', s:'Cómo funciona tu parte' })}
+    </div></section>
+    <p class="muted tiny" style="margin:4px 2px 18px">${I('lock')} No ves el día a día del barrio ni te llegan sus avisos (la garita, el camión, los correos, el SOS): son de quien vive en el lote. Las expensas las ven las dos partes; vota el propietario, salvo que le dé la carta poder al inquilino.</p>
+  </div>`;
+}
+/* "Mi lote" del propietario a distancia: lo justo. */
+function perfilPropietario(u){
+  const inq = inquilinosDe(u.casa);
+  return `<div class="card"><div class="perfil-cab">${avatar(u, 'lg')}<div class="grow"><b style="font-size:18px">${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
+      <div class="muted tiny">${esc(RELACIONES[u.relacion] || '')} · no vive en el lote</div></div></div></div>
+    ${inq.length ? '' : `<div class="card"><b>¿Volviste a vivir en ${esc(u.casa)}?</b><p class="muted small" style="margin:4px 0 10px">Vuelve la app completa: la garita, las visitas, los avisos del barrio y el SOS.</p>
+      <button class="btn btn-sm btn-ok" data-a="vivo-en-el-lote" data-v="si">${I('home')}Vivo en el lote</button></div>`}
+    <form data-f="perfil-prop" class="card"><div class="field"><label>Teléfono / WhatsApp</label><input name="tel" value="${esc(u.tel || '')}" inputmode="tel" maxlength="20"></div>
+      <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
+    ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Si venís al barrio, para que la garita te reconozca sin el DNI' })}
+    ${familiaDelLote(u)}
+    <p class="muted small" style="margin:14px 2px 0">${I('user')} La contraseña, el correo, tus datos personales y cerrar sesión están en <button class="link" data-a="mi-cuenta">Tu cuenta</button>.</p>`;
+}
+/* Lo que ve el inquilino en Mi casa: quién es el dueño y qué ve cada uno. */
+function tarjetaInquilino(u){
+  if (u.relacion !== 'inquilino') return '';
+  const duenos = cuentasDelLote(u.casa).filter(esDuenoDelLote);
+  return `<div class="card prop-inq"><div class="row" style="align-items:flex-start"><span class="ic ic-sky" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none">${I('key')}</span>
+      <div class="grow"><b>${esc(u.casa)} está alquilado: el día a día es tuyo</b>
+      <p class="small" style="margin:4px 0 0;color:var(--ink-2)">Vos manejás la garita, las visitas, los correos, los paquetes y el SOS. ${duenos.length ? `${duenos.map(d => esc(d.nombre)).join(' y ')} (${duenos.length > 1 ? 'propietarios' : 'propietario/a'}) ve${duenos.length > 1 ? 'n' : ''} las expensas, las votaciones y los comunicados, y te puede escribir en privado; no ve tus visitas, tus paquetes ni tus mensajes.` : 'El propietario todavía no tiene cuenta en la app.'}</p>
+      ${duenos.length ? `<div class="btns" style="margin-top:8px">${duenos.map(d => `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="dm" data-p="${esc(d.id)}">${I('chat')}Escribirle a ${esc(primerNombre(d.nombre))}</button>`).join('')}</div>` : ''}</div></div></div>`;
+}
+/* La cuenta la creó la Administración: la primera vez, la persona acepta
+   los términos (Ley 25.326, art. 5) y puede elegir su propia contraseña. */
+let consentimientoPedido = false;
+function pedirConsentimiento(){
+  const u = yo(); if (!u || !u.altaPorAdmin || u.consentimiento || consentimientoPedido || hojaAbierta()) return;
+  consentimientoPedido = true;
+  hoja('Bienvenido/a a la app del barrio', `<form data-f="consentimiento">
+    <p class="small" style="margin:0 0 12px">La Administración te creó la cuenta de <b>${esc(u.casa)}</b>. Antes de empezar:</p>
+    <label class="check"><input type="checkbox" name="acepto" required><span>Acepto que la Administración use mis datos solo para la vida del barrio y el control de acceso (Ley 25.326). Puedo pedir verlos, corregirlos o borrarlos.</span></label>
+    <label class="check"><input type="checkbox" name="aceptoTerminos" required><span>Leí y acepto los <button type="button" class="link" data-a="ver-legal">Términos de uso</button>.</span></label>
+    ${typeof Nube !== 'undefined' && Nube.activa() ? `<div class="field" style="margin-top:10px"><label>Tu propia contraseña (opcional, mínimo 6)</label><input name="clave" type="password" minlength="6" autocomplete="new-password" placeholder="Si la dejás vacía, seguís con la provisoria"></div>` : ''}
+    <button class="btn btn-pri btn-block">${I('check')}Empezar</button></form>`);
+}
+F['consentimiento'] = async d => {
+  if (!d.acepto || !d.aceptoTerminos){ toast('Hace falta aceptar las dos casillas', 'alert'); return; }
+  if (d.clave){ if (String(d.clave).length < 6){ toast('La contraseña tiene que tener al menos 6 caracteres', 'lock'); return; }
+    try { await Nube.cambiarClave(d.clave); } catch(e){ toast('No se pudo cambiar la contraseña ahora: hacelo después en Tu cuenta', 'lock'); } }
+  Store.cambiar(s => { const x = s.users.find(z => z.id === yo().id); if (x) x.consentimiento = Date.now(); });
+  cerrarHoja(); toast('¡Listo! Ya podés usar la app', 'check');
+};
+F['perfil-prop'] = d => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x) x.tel = String(d.tel || '').trim(); }); toast('Guardado', 'check'); };
+/* "No vivo en el lote" / "Vivo en el lote": lo elige el propietario. */
+A['vivo-en-el-lote'] = async el => {
+  const u = yo(); if (!u || !esDuenoDelLote(u)) return;
+  const vive = el.dataset.v === 'si';
+  if (!vive && !await confirmar('No vivo en el lote', `La app te muestra solo lo de dueño: expensas, votaciones, comunicados, las cuentas del barrio y la Administración. Dejás de ver el día a día (la garita, las visitas, los correos, el SOS) y no te llegan sus avisos. Lo podés volver atrás cuando quieras desde Mi lote.`, { si:'No vivo en el lote' })) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x) x.noVive = !vive; });
+  PILA.length = 0; refrescar(); pintarTop();
+  toast(vive ? 'Listo: volvés a tener la app completa' : 'Listo: ahora ves lo que te toca como propietario/a', 'home');
+};
 A['lote-ajeno'] = async el => {
   const u = yo(), x = usuario(el.dataset.id); if (!u || !x || x.id === u.id || x.casa !== u.casa) return;
   if (!await confirmar('No es de mi lote', `Le avisamos a la Administración que ${esc(x.nombre)} no vive en ${esc(u.casa)}, para que lo revise. A esa persona le llega un aviso, sin tu nombre, para que confirme su lote.`, { si:'Avisar' })) return;
@@ -1363,7 +1508,7 @@ A['lote-ajeno'] = async el => {
   });
   toast('Listo: la Administración lo va a revisar', 'send');
 };
-F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { ...('relacion' in d ? { relacion:d.relacion } : {}), tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, saludProf:d.respondedor && typeof PROF_SALUD !== 'undefined' && PROF_SALUD[d.saludProf] ? d.saludProf : '', integrantes:d.integrantes.trim(),
+F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { ...('relacion' in d && !u.relacion && RELACIONES[d.relacion] ? { relacion:d.relacion } : {}), tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, saludProf:d.respondedor && typeof PROF_SALUD !== 'undefined' && PROF_SALUD[d.saludProf] ? d.saludProf : '', integrantes:d.integrantes.trim(),
   profesion:(d.profesion || '').trim(), direccion:(d.direccion || '').trim(), ubicacion:(d.ubicacion || '').trim(), enDirectorio:!!d.enDirectorio })); toast('Guardado', 'check'); };
 /* La carta poder: el propietario autoriza al inquilino (o a un familiar)
    a votar por el lote. La Administración la revisa y la aprueba. */

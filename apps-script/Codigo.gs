@@ -93,7 +93,7 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 10;
+var VERSION_SCRIPT = 11;  /* 11 (07-10-2026): equipos con la sesión cerrada reciben solo "un correo va a tu casa"; un equipo vale para la cuenta más nueva */
 
 function doPost(e) {
   try {
@@ -208,22 +208,41 @@ function baseValida(url) {
   url = String(url || '').replace(/\/+$/, '');
   return /^https:\/\/[a-z0-9-]+\.(firebaseio\.com|[a-z0-9-]+\.firebasedatabase\.app)$/.test(url) ? url : '';
 }
-function tokensDe(db, para, excluir) {
+/* EQUIPOS CON LA SESIÓN CERRADA (07-10-2026): al cerrar sesión, la app
+   marca el equipo con `cerrada` si la persona quiere seguir enterándose de
+   los correos que van a su casa. Ese equipo recibe SOLO esos avisos
+   (sonido 'correo'), y por 90 días como mucho. Y si el mismo equipo quedó
+   anotado en dos cuentas (salió una y entró otra), vale la anotación más
+   nueva: a la cuenta anterior no le llega nada ahí. */
+var CERRADA_DIAS = 90;
+/* El propietario a distancia (lote alquilado, 07-10-2026): de lo que va a todo el
+   barrio recibe solo lo de dueño (votaciones, expensas, comunicados). */
+function paraPropietario(link, titulo) {
+  return /^(votaciones|expensas|tablero|documentos|privado|inicio)\b/.test(String(link || '')) || /^(Comunicado|Invitación):/.test(String(titulo || ''));
+}
+function tokensDe(db, para, excluir, sonido, link, titulo) {
   var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email');
   var r = UrlFetchApp.fetch(db + '/barrio/pushTokens.json?access_token=' + encodeURIComponent(acceso), {muteHttpExceptions: true});
   if (r.getResponseCode() !== 200) throw new Error('No se pudo leer la lista de equipos: ' + r.getContentText().slice(0, 160));
   var todos = JSON.parse(r.getContentText() || 'null') || {};
-  var lista = [].concat(para || 'todos'), out = [];
+  var lista = [].concat(para || 'todos'), out = [], ahora = Date.now();
+  var masNuevo = {};
+  Object.keys(todos).forEach(function (uid) {
+    var equipos = todos[uid] || {};
+    Object.keys(equipos).forEach(function (k) { var e = equipos[k]; if (e && e.t && (!(e.t in masNuevo) || (e.at || 0) > masNuevo[e.t])) masNuevo[e.t] = e.at || 0; });
+  });
   Object.keys(todos).forEach(function (uid) {
     if (excluir && uid === excluir) return;
     var equipos = todos[uid] || {};
     Object.keys(equipos).forEach(function (k) {
       var e = equipos[k]; if (!e || !e.t) return;
+      if ((e.at || 0) < masNuevo[e.t]) return;
+      if (e.cerrada && (sonido !== 'correo' || ahora - e.cerrada > CERRADA_DIAS * 86400000)) return;
       var rol = e.rol || 'vecino';
       var toca = lista.some(function (p) {
         /* La supervisión de la guardia (07-10-2026) no recibe los avisos de todo
            el barrio (el camión, la pizarra): solo lo suyo y lo que va a 'rol:supervisor'. */
-        return (p === 'todos' && rol !== 'supervisor') || p === uid || p === 'rol:' + rol || (p === 'staff' && (rol === 'admin' || rol === 'guardia'));
+        return (p === 'todos' && rol !== 'supervisor' && (rol !== 'propietario' || paraPropietario(link, titulo))) || p === uid || p === 'rol:' + rol || (p === 'staff' && (rol === 'admin' || rol === 'guardia'));
       });
       if (toca) out.push({uid: uid, clave: k, t: e.t});
     });
@@ -240,7 +259,7 @@ function mandarPush(d) {
   if (contarHoy('PUSH') >= 400) return {ok: false, error: 'tope diario de avisos push alcanzado'};
   /* La dirección de la base queda guardada: la usa el reloj de "Estoy bien". */
   if (props.getProperty('BASE_URL') !== db) props.setProperty('BASE_URL', db);
-  var destino = tokensDe(db, d.para, d.excluir);
+  var destino = tokensDe(db, d.para, d.excluir, String(d.sonido || ''), d.link, d.titulo);
   if (!destino.equipos.length) return {ok: true, enviados: 0};
   var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.messaging');
   var url = 'https://fcm.googleapis.com/v1/projects/' + cuenta.project_id + '/messages:send';

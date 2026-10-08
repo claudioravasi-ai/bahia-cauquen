@@ -68,6 +68,23 @@ QUÉ HACEN, EN CASTELLANO
    lote (pv/casaTareas). Las cosas para prestar y los ángeles de la nieve
    los ven todos los vecinos aprobados; cada uno escribe solo lo suyo.
 
+8 ter. INQUILINOS Y PROPIETARIOS (07-10-2026). La relación con el lote
+   (propietario, cotitular, inquilino, familiar) la elige cada uno UNA vez
+   (al inscribirse o en Mi casa); después solo la cambia la Administración,
+   porque decide el voto y quién maneja un lote alquilado. Lo del día a día
+   del lote (casa sola, plan ante un sismo, paquetes) se guarda solo en las
+   carpetas de quienes viven ahí: el propietario de un lote alquilado no lo
+   recibe.
+
+8 bis. LOS CORREOS (07-10-2026). /barrio/mensajeria dice solo qué correo
+   (Andreani, OCA…) está en el barrio y a qué hora entró y salió: lo anota la
+   garita (o la Administración) y lo leen los vecinos, la Administración y la
+   supervisión; el hotel no. A qué lotes va y la patente quedan en la
+   bitácora (/staff), que los vecinos no leen. Cada casa se entera de lo suyo
+   por su aviso personal (pv/notifs). Los equipos anotados para los avisos
+   pueden llevar la marca "cerrada" (se cerró la sesión): el Apps Script les
+   manda solo el aviso "un correo va a tu casa".
+
 7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
    ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
    escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
@@ -98,7 +115,7 @@ PEGAR DESDE ACÁ
         ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
         "$uid": {
           ".read": "auth.uid === $uid",
-          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && auth.token.email != null && auth.token.email.toLowerCase() === 'garitabarriobahiacauquen@gmail.com' && newData.child('rol').val() === 'guardia' && newData.child('estado').val() === 'aprobado' && newData.child('casa').val() === 'Garita') || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/publico/instalado').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val() && newData.child('casa').val() === data.child('casa').val() && newData.child('representante').val() === data.child('representante').val() && newData.child('poderOk').val() === data.child('poderOk').val())))",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && auth.token.email != null && auth.token.email.toLowerCase() === 'garitabarriobahiacauquen@gmail.com' && newData.child('rol').val() === 'guardia' && newData.child('estado').val() === 'aprobado' && newData.child('casa').val() === 'Garita') || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/publico/instalado').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val() && newData.child('casa').val() === data.child('casa').val() && newData.child('representante').val() === data.child('representante').val() && newData.child('poderOk').val() === data.child('poderOk').val() && (!data.child('relacion').exists() || data.child('relacion').val() === '' || newData.child('relacion').val() === data.child('relacion').val()))))",
           "recomiendan": {
             ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')"
           }
@@ -136,6 +153,11 @@ PEGAR DESDE ACÁ
 
       /* El camión de la basura: lo registra la garita, lo ven todos. */
       "camion":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+
+      /* Los correos que están en el barrio (07-10-2026): solo la empresa y las
+         horas. Los anota la garita; los ven los vecinos, la Administración y la
+         supervisión (el hotel no). Los lotes y la patente van a la bitácora. */
+      "mensajeria":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
 
       /* Avisos urgentes por zona: los manda la garita o la Administración;
          cada vecino escribe SOLO su respuesta. */

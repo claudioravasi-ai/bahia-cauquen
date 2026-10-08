@@ -47,7 +47,7 @@ function sincronizarHistorial(){
    (El chat vecinal, que la garita ya no veía desde el 26-09, se sacó de la
    app el 29-09-2026.) */
 const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron',
-  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda', 'manual',
+  'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'mensajeria', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda', 'manual',
   /* "Estoy bien": la garita ve solo a los vecinos que la eligieron como contacto (27-09). */
   'estoy-bien', 'salidas']);
 /* El hotel ve solo lo suyo y lo público de la ciudad (ver js/v-hotel.js).
@@ -62,14 +62,19 @@ const VENTANAS_HOTEL = new Set(['hotel', 'hotel-traslados', 'hotel-huespedes', '
    bien", sin los mensajes de los vecinos ni nada de expensas. */
 const VENTANAS_SUPERVISOR = new Set(['supervisor', 'garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'alertas',
   'hotel-vivo', 'hotel-traslados', 'hotel-eventos', 'obras', 'proveedores', 'vuelos', 'cruceros', 'agenda', 'documentos',
-  'recoleccion', 'sismos', 'ushuaia', 'municipio', 'manual', 'legal', 'informe-servicio']);
+  'recoleccion', 'mensajeria', 'sismos', 'ushuaia', 'municipio', 'manual', 'legal', 'informe-servicio']);
+/* EL PROPIETARIO A DISTANCIA (07-10-2026): su lote está alquilado (o no vive
+   en el barrio). Ve lo que le toca como dueño; el día a día es del inquilino
+   (ver esPropDistancia en core.js). */
+const VENTANAS_PROPIETARIO = new Set(['inicio', 'expensas', 'votaciones', 'tablero', 'documentos', 'privado', 'dm', 'infracciones', 'perfil',
+  'manual', 'ayuda', 'legal', 'aporte', 'descargas']);
 VENTANAS_HOTEL.add('aporte');
 ['hotel-vivo', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
-const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : esSupervisor() ? VENTANAS_SUPERVISOR.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
+const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : esSupervisor() ? VENTANAS_SUPERVISOR.has(id) : esPropDistancia() ? VENTANAS_PROPIETARIO.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
   if (!hayPaquetes() && PAUSA_PAQUETES.ventanas.has(id)){ paqueteEnPausa(); return; }
-  if (!ventanaPermitida(id)){ toast(esHotel() ? 'Esa sección no es del hotel' : esSupervisor() ? 'Esa sección no es de la supervisión' : VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
+  if (!ventanaPermitida(id)){ toast(esHotel() ? 'Esa sección no es del hotel' : esSupervisor() ? 'Esa sección no es de la supervisión' : esPropDistancia() ? 'Eso es del día a día del lote: lo maneja quien vive ahí' : VENTANAS_GARITA.has(id) ? 'Primero anotá quiénes están de turno' : 'Esa sección no es de la garita', 'lock'); return; }
   /* Una ventana nunca se abre DEBAJO de una hoja: antes, tocar un aviso en
      la pizarra abría la ventana detrás y la hoja la seguía tapando. Si la
      hoja era la pizarra, se anota para volver a ella al cerrar la ventana.
@@ -378,10 +383,10 @@ function pintarTop(){
     <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
       <span class="logo">${LOGO}</span>
       <span class="marca-txt"><b><span class="marca-pre">Barrio </span>${esc(Store.s.config.nombre)}</b>
-        <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}</span>`
+        <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}${esPropDistancia() ? ' · propietario/a' : ''}</span>`
           : `<span class="rol-chip">${rol}</span>${u.rol === 'supervisor' ? '' : `<span class="casa"> · ${esc(u.casa)}</span>`}`}</small></span>
     </button>
-    ${esHotel() || esSupervisor() ? '' : Presencia.chip()}
+    ${esHotel() || esSupervisor() || esPropDistancia() ? '' : Presencia.chip()}
     ${puedeAdministrar() ? `<button class="modo-btn ${modo}" data-a="cambiar-modo" aria-label="Cambiar de modo">${I(modo === 'admin' ? 'sliders' : 'home')}<span>${modo === 'admin' ? 'Admin' : 'Vecino'}</span></button>` : ''}
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
     <button class="icon-btn" data-a="mi-cuenta" aria-label="Mi cuenta">${avatar(u, 'sm')}</button>
@@ -390,14 +395,15 @@ function pintarTop(){
          los SOS. Si la garita misma está en peligro, usa "Aviso urgente"
          (le llega a todo el barrio) y llama al 911/101. */
       /* El supervisor tampoco: mira la garita, no es vecino del barrio. */
-      : esGuardia() || esSupervisor() ? '' : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
+      /* El propietario a distancia tampoco: no está en el barrio. */
+      : esGuardia() || esSupervisor() || esPropDistancia() ? '' : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
 }
 
 function pintar(){
   aplicarTema();
   /* El QR de un punto de ronda abre su pantallita aunque el teléfono tenga
      una sesión abierta: nada la tapa hasta que se cierra. */
-  if (/^#\/(punto|ronda)\//.test(location.hash)){ rutaPublica(); return; }
+  if (/^#\/(punto|ronda|qr)\//.test(location.hash)){ rutaPublica(); return; }
   const u = yo();
   if (!u){ PILA.length = 0; return pintarBienvenida(); }
   if (!$('#lienzo')){
@@ -730,6 +736,9 @@ function pintarAlarmas(){
   const box = $('#alarmas'); if (!box) return;
   const u = yo();
   if (!u){ box.innerHTML = ''; Dea.silencio(); return; }
+  /* El propietario a distancia no está en el barrio: las alarmas de los
+     vecinos (SOS, DEA) no le saltan. */
+  if (esPropDistancia(u)){ box.innerHTML = ''; return; }
   /* La garita: un pedido del DEA tapa todo hasta que alguien sale con él. */
   if (Dea.pintarEnGarita(box)) return;
   /* Los vecinos del equipo de salud: la garita salió con el DEA y los
@@ -1028,8 +1037,10 @@ function pintarBienvenida(modo = 'inicio'){
       ${grupo('Quién sos',
         campo('Nombre y apellido', `<input name="nombre" required maxlength="60" autocomplete="name" placeholder="Como figura en la escritura">`) +
         `<div class="grid2">${campo('DNI', `<input name="dni" required inputmode="numeric" pattern="[0-9.]{7,11}" maxlength="11" placeholder="Sin puntos">`)}
-          ${campo('Tu lote', selectLote())}</div>`,
-        `El barrio tiene ${lotesVecinos().length} lotes de vecinos. Si no encontrás el tuyo, escribinos.`)}
+          ${campo('Tu lote', selectLote())}</div>` +
+        /* 07-10-2026: decide quién maneja el lote si está alquilado (ver esPropDistancia en core.js). */
+        campo('¿Qué sos del lote?', `<select name="relacion"><option value="propietario">Propietario/a</option><option value="cotitular">Cotitular</option><option value="inquilino">Inquilino/a (lo alquilo)</option><option value="familiar">Familiar o conviviente</option></select>`),
+        `El barrio tiene ${lotesVecinos().length} lotes de vecinos. Si no encontrás el tuyo, escribinos. Si alquilás, elegí Inquilino/a: el día a día del lote pasa a ser tuyo y el propietario ve solo lo de dueño.`)}
       ${grupo('Cómo te contactamos',
         campo('Correo', `<input name="email" type="email" required maxlength="80" autocomplete="email" inputmode="email" placeholder="tucorreo@mail.com">`) +
         campo('Teléfono o WhatsApp', `<input name="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="549 2901 …">`),
@@ -1610,6 +1621,7 @@ F['entrar'] = async (d, form) => {
   entrarComo(u.id);
   toast(`¡Hola, ${u.nombre.split(' ')[0]}!`, 'home');
 };
+const relacionInscripcion = d => /^Lote\s/i.test(d.casa || '') && ['propietario', 'cotitular', 'inquilino', 'familiar'].includes(d.relacion) ? d.relacion : '';
 F['registro'] = async d => {
   const email = (d.email || '').trim().toLowerCase();
   /* La garita se inscribe una sola vez con su correo; no tiene lote ni DNI.
@@ -1621,7 +1633,7 @@ F['registro'] = async d => {
   if (Nube.activa()){
     if (!d.clave || d.clave.length < 6){ toast('La contraseña tiene que tener al menos 6 caracteres', 'lock'); return; }
     try {
-      const u = await Nube.registrar({ nombre:d.nombre.trim(), casa:d.casa, dni, email, tel:(d.tel || '').trim(), clave:d.clave,
+      const u = await Nube.registrar({ nombre:d.nombre.trim(), casa:d.casa, dni, email, tel:(d.tel || '').trim(), clave:d.clave, relacion:relacionInscripcion(d),
         profesion:(d.profesion || '').trim(), publicar:!!d.publicar });
       if (u.estado === 'aprobado'){ toast('Primera cuenta del barrio: quedás como Administración', 'shield'); return; }
       /* Quien se inscribe todavía no puede leer los ajustes del barrio: la
@@ -1647,7 +1659,7 @@ F['registro'] = async d => {
     toast('Inscripción recibida. Revisá tu correo.', 'mail'); pintarBienvenida(); return;
   }
   const token = uid() + uid();
-  const nuevo = { id:'u' + uid(), nombre:d.nombre.trim(), casa:d.casa.trim(), dni, email, tel:(d.tel || '').trim(), rol:'vecino', estado:'pendiente', clave:'',
+  const nuevo = { id:'u' + uid(), nombre:d.nombre.trim(), casa:d.casa.trim(), dni, email, tel:(d.tel || '').trim(), rol:'vecino', estado:'pendiente', clave:'', relacion:relacionInscripcion(d),
     profesion:(d.profesion || '').trim(), enDirectorio:!!d.publicar, mostrarTel:!!d.publicar,
     token, skills:'', consentimiento:Date.now(), createdAt:Date.now(), vehiculos:[], mascotas:[] };
   Store.cambiar(s => {
@@ -1664,15 +1676,20 @@ F['registro'] = async d => {
   if (!salio) Store.sesion.enlaceInscripcion = urlApp('inscripcion/' + token), Store.guardarSesion();
   pintarBienvenida();
 };
+/* Con los avisos al celular activados, se elige si este equipo sigue
+   recibiendo el aviso de "un correo va a tu casa" con la sesión cerrada
+   (pedido de Claudio, 07-10-2026: que llegue como un WhatsApp). */
 A['salir'] = async () => {
-  if (!await confirmar('Cerrar sesión', 'Vas a tener que volver a entrar con tu correo y tu clave.', { si:'Cerrar sesión' })) return;
-  await cerrarSesion();
+  const conPush = typeof Push !== 'undefined' && Push.estado() === 'activo' && !esGuardia() && !esSupervisor() && !esHotel();
+  if (!await confirmar('Cerrar sesión', `Vas a tener que volver a entrar con tu correo y tu clave.${conPush ? `<label class="check" style="margin-top:14px"><input type="checkbox" name="seguirCorreos" checked><span>Seguir recibiendo en este equipo el aviso cuando un correo va a mi casa (solo eso: los demás avisos se cortan)</span></label>` : ''}`, { si:'Cerrar sesión' })) return;
+  const seguir = conPush && !!$('#hojaCuerpo input[name="seguirCorreos"]')?.checked;
+  await cerrarSesion({ seguirCorreos:seguir });
 };
-async function cerrarSesion(){
+async function cerrarSesion({ seguirCorreos = false } = {}){
   cerrarHoja();
   Store.sesion.turnoId = '';
   if (typeof Nube !== 'undefined' && Nube.activa()){
-    await Nube.salir();
+    await Nube.salir({ seguirCorreos });
     /* En un equipo compartido no puede quedar nada del barrio después de
        salir: se borra lo que vino de la nube y queda solo la preferencia de
        pantalla. Al volver a entrar se baja todo de nuevo. */
@@ -1683,6 +1700,9 @@ async function cerrarSesion(){
   /* La llave para retirar paquetes se borra del equipo: en un equipo
      prestado no puede quedar nada que firme a tu nombre. */
   if (typeof Retiro !== 'undefined') await Retiro.olvidar();
+  /* Los camiones que estaban cruzando la pantalla se van con la sesión. */
+  if (typeof Camion !== 'undefined') Camion.quitar();
+  if (typeof Mensajeria !== 'undefined') Mensajeria.quitar();
   Store.sesion.userId = null; Store.sesion.modo = ''; Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
 }
 
@@ -1725,10 +1745,10 @@ window.addEventListener('unhandledrejection', e => {
    quedara a la vista por error, desde otra cuenta no hacen nada. */
 const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
-    'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
+    'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'correo-menu', 'correo-elegir', 'correo-sale', 'correo-lotes', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
     'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno',
     'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hhuesped-ingreso', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar']),
-  formularios: new Set(['validar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra',
+  formularios: new Set(['validar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
     'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada']),
 };
 /* Paquetes en pausa (hayPaquetes, core.js): aunque quede un botón o un
@@ -1875,6 +1895,7 @@ Store.alCambiar(remoto => {
 function rutaPublica(){
   const h = location.hash;
   if (h.startsWith('#/pedir/')){ pintarPedirPase(decodeURIComponent(h.slice(8))); return true; }
+  if (h.startsWith('#/qr/')){ if (!$('#qrPublico')) pintarQRPublico(h.slice(5)); return true; }
   if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return true; }
   if (h.startsWith('#/punto/')){ if (!$('#puntoPublico')) pintarPunto(h.slice(8)); return true; }
   if (h.startsWith('#/ronda/')){ if (!$('#puntoPublico')) pintarRondaHabilitar(h.slice(8)); return true; }

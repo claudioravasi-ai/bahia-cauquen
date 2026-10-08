@@ -8,6 +8,11 @@
        por la pantalla de todos, una y otra vez, hasta que sale. Al
        entrar suena una melodía de camión de helados y llega un aviso
        al celular aunque tenga la pantalla apagada.
+     · LOS CORREOS: Correo Argentino, Andreani, OCA, OCASA, Mercado
+       Libre u otro. La garita marca la entrada y la salida; mientras
+       está adentro, cruza un camión de correo con su logo y suena una
+       bocina. Si la garita anota a qué lotes va, a esas casas les llega
+       "va a tu casa" al celular, como un mensaje de WhatsApp.
      · INGRESOS FRECUENTES: proveedores del hotel, la van, el personal
        doméstico… La Administración los carga UNA vez y les da un QR
        fijo; la garita lo escanea cada vez que entran.
@@ -52,7 +57,7 @@ const Camion = {
   revisar(){
     const c = this.adentro();
     let oculto = ''; try { oculto = localStorage.getItem(this.OCULTO) || ''; } catch(e){}
-    if (!c || !yo() || !this.encendido() || oculto === c.id){ this.quitar(); return; }
+    if (!c || !yo() || esPropDistancia() || !this.encendido() || oculto === c.id){ this.quitar(); return; }
     this.mostrar(c);
     /* La melodía suena una sola vez por viaje en cada equipo, y solo si el
        camión entró hace poco (no al abrir la app dos horas después). */
@@ -165,6 +170,268 @@ function bandaCamion(garita = false){
 }
 
 /* =========================================================
+   1b. LOS CORREOS (pedido de Claudio, 07-10-2026)
+   -------------------------------------------------------
+   En la garita, abajo del camión de la basura, el botón "Correos": se
+   elige la empresa (Correo Argentino, Andreani, OCA, OCASA, Mercado Libre
+   u otro) y se marca la entrada; después, la salida. Mientras está
+   adentro, a todos les cruza por la pantalla un camión de correo al estilo
+   norteamericano, pintado con los colores y el logo de esa empresa, con
+   una bocina al entrar. Varios a la vez, cruzan varios.
+
+   A QUÉ CASA VA (opcional): la garita anota los lotes. A todas las cuentas
+   de esos lotes les llega "Andreani va a tu casa" como llega un WhatsApp:
+   al celular, con la pantalla apagada, la app cerrada y hasta con la
+   sesión cerrada (ver Push.alCerrarSesion). En la app suena un timbre y su
+   camión dice "va a tu casa".
+
+   QUIÉN VE QUÉ: lo que se publica para todos (mensajeria) es solo la
+   empresa y las horas. Los lotes y la patente van a la bitácora, que lee
+   solo la garita, la Administración y la supervisión; cada casa se entera
+   de lo suyo por su aviso personal. Los logos están en img/correos/,
+   bajados de los sitios de cada empresa (el de Correo Argentino, de
+   Wikimedia Commons, dominio público). Sirven solo para reconocer quién
+   entró; las marcas son de sus dueños.
+   ========================================================= */
+const EMPRESAS_CORREO = {
+  correo:   { n:'Correo Argentino', logo:'img/correos/correo-argentino.svg', caja:'#ffce00', franja:'#152663' },
+  andreani: { n:'Andreani', logo:'img/correos/andreani.svg', caja:'#ffffff', franja:'#d0080f' },
+  oca:      { n:'OCA', logo:'img/correos/oca.svg', caja:'#ffffff', franja:'#5b2b82', franja2:'#f3912d' },
+  ocasa:    { n:'OCASA', logo:'img/correos/ocasa.svg', caja:'#ffffff', franja:'#231f20', franja2:'#0099a8' },
+  meli:     { n:'Mercado Libre', logo:'img/correos/mercadolibre.png', caja:'#ffe600', franja:'#2d3277' },
+  otro:     { n:'Otro correo', logo:'', caja:'#f4f6f8', franja:'#46535f' },
+};
+const nombreCorreo = v => v ? (v.emp === 'otro' ? (v.nombre || 'Un correo') : (EMPRESAS_CORREO[v.emp] || EMPRESAS_CORREO.otro).n) : '';
+const Mensajeria = {
+  PREF:'bhc.correos', OCULTO:'bhc.correos.oculto', SONO:'bhc.correos.sono', TIMBRE:'bhc.correos.timbre', el:null,
+  /* Si nadie marca la salida, a las 4 horas se da por ido. */
+  DURA: 4 * HORA,
+  lista(){ return aLista(Store.s.mensajeria).filter(v => v && v.entra).sort((a, b) => b.entra - a.entra); },
+  adentro(){ const ahora = Date.now(); return this.lista().filter(v => !v.sale && ahora - v.entra < this.DURA); },
+  /* Lo que solo ve la garita: patente y lotes (en la bitácora). */
+  detalle(id){
+    const bs = aLista(Store.s.bitacora).filter(b => b && b.mensId === id);
+    return { lotes:[...new Set(bs.flatMap(b => aLista(b.lotes)))], patente:(bs.find(b => b.patente) || {}).patente || '' };
+  },
+  /* ¿Este correo viene a MI casa? Lo dice el aviso personal que mandó la garita. */
+  vaAMiCasa(v){ return !!v && !esGuardia() && aLista(Store.s.notifs).some(n => n && n.mensId === v.id && aLista(n.para).includes(yo()?.id)); },
+  encendido(){ try { return localStorage.getItem(this.PREF) !== 'no'; } catch(e){ return true; } },
+  prender(si){ try { localStorage.setItem(this.PREF, si ? 'si' : 'no'); } catch(e){} },
+  leer(k){ try { return (localStorage.getItem(k) || '').split(',').filter(Boolean); } catch(e){ return []; } },
+  anotar(k, ids){ try { localStorage.setItem(k, [...new Set([...this.leer(k), ...ids])].slice(-30).join(',')); } catch(e){} },
+  revisar(){
+    const u = yo();
+    if (!u || esHotel() || esPropDistancia(u)){ this.quitar(); return; }
+    const ocultos = this.leer(this.OCULTO), ahora = Date.now();
+    const ver = this.adentro().filter(v => !ocultos.includes(v.id) && (this.encendido() || this.vaAMiCasa(v)));
+    if (!ver.length) this.quitar(); else this.mostrar(ver);
+    /* La bocina suena una vez por correo en cada equipo, y solo si entró
+       hace poco (no al abrir la app dos horas después). El timbre de "va a
+       tu casa", aparte: el aviso personal puede llegar un instante después. */
+    const sono = this.leer(this.SONO), nuevos = ver.filter(v => !sono.includes(v.id) && ahora - v.entra < 15 * MIN);
+    if (nuevos.length){ this.anotar(this.SONO, nuevos.map(v => v.id)); this.bocina(); }
+    const tim = this.leer(this.TIMBRE), mios = ver.filter(v => this.vaAMiCasa(v) && !tim.includes(v.id) && ahora - v.entra < 30 * MIN);
+    if (mios.length){ this.anotar(this.TIMBRE, mios.map(v => v.id)); setTimeout(() => this.timbre(), nuevos.length ? 1700 : 0); }
+  },
+  mostrar(ver){
+    ver = ver.slice().sort((a, b) => a.entra - b.entra);   /* el que entró primero, primero */
+    const firma = ver.map(v => v.id + (this.vaAMiCasa(v) ? '*' : '')).join('|') + (Camion.el ? '+c' : '');
+    const mia = ver.find(v => this.vaAMiCasa(v)), prim = ver[0];
+    const titulo = mia ? `${nombreCorreo(mia)} va a tu casa`
+      : ver.length === 1 ? `${nombreCorreo(ver[0])} está en el barrio`
+      : `${[...new Set(ver.map(nombreCorreo))].join(', ').replace(/, ([^,]*)$/, ' y $1')} están en el barrio`;
+    const sub = mia ? `entró ${hora(mia.entra)} h · está en el barrio` : ver.length === 1 ? `entró ${hora(ver[0].entra)} h` : `${plural(ver.length, 'correo')} · el primero entró ${hora(prim.entra)} h`;
+    if (this.el && this.el.isConnected && this.el.dataset.firma === firma){ const b = this.el.querySelector('.cam-txt'); if (b) b.innerHTML = `<b>${esc(titulo)}</b><span class="cam-hora">${esc(sub)}</span>`; return; }
+    this.quitar();
+    const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const el = this.el = document.createElement('div');
+    el.className = 'camion-pasa correo-pasa' + (quieto ? ' quieto' : '') + (Camion.el ? ' con-camion' : '') + (mia ? ' mia' : '');
+    el.dataset.firma = firma;
+    /* Cada camión sale un poco después del anterior, para que no se pisen. */
+    const paso = 14 / Math.max(1, ver.length);
+    el.innerHTML = `<div class="cam-pista" aria-hidden="true">${ver.slice(0, 4).map((v, i) => `<div class="cam-auto" style="animation-delay:-${(i * paso).toFixed(1)}s">${camionCorreoSVG(v, this.vaAMiCasa(v))}</div>`).join('')}</div>
+      <div class="cam-cartel" role="status"><span class="cam-ic">${I(mia ? 'home' : 'mail')}</span>
+        <button class="cam-txt" data-cor="ver"><b>${esc(titulo)}</b><span class="cam-hora">${esc(sub)}</span></button>
+        <button class="cam-x" data-cor="ocultar" aria-label="Ocultar los correos en este equipo">${I('x')}</button></div>`;
+    el.addEventListener('click', e => {
+      const b = e.target.closest('[data-cor]'); if (!b) return;
+      if (b.dataset.cor === 'ocultar'){ this.anotar(this.OCULTO, ver.map(v => v.id)); this.quitar(); toast('Listo: no se muestra hasta que entre otro correo', 'mail'); }
+      else abrir('mensajeria');
+    });
+    document.body.appendChild(el);
+  },
+  quitar(){ if (this.el){ this.el.remove(); this.el = null; } },
+  /* La bocina de dos tonos de un camión de reparto y, atrás, la llamada
+     del cornetín de posta (el símbolo de los correos). Tonada propia. */
+  bocina(){
+    const toque = (t, d) => [[392, t, d], [494, t, d]];
+    Sonido.tocar([...toque(0, .17), ...toque(.27, .4)], 'sawtooth', .045);
+    Sonido.tocar([[523.3, .85, .14], [659.3, .99, .14], [784, 1.13, .14], [1046.5, 1.27, .45]], 'triangle', .13);
+    Sonido.vibrar([90, 60, 220]);
+  },
+  /* "Va a tu casa": un aviso corto y claro, como el de un mensaje, dos veces. */
+  timbre(){
+    Sonido.tocar([[1318.5, 0, .16], [1760, .12, .32], [1318.5, .75, .16], [1760, .87, .38]], 'sine', .2);
+    Sonido.vibrar([200, 100, 200, 100, 400]);
+  },
+  arrancar(){
+    if (this.timer) return;
+    /* Los logos se bajan antes: si no, el primer camión cruza un instante sin logo. */
+    Object.values(EMPRESAS_CORREO).forEach(e => { if (e.logo){ const i = new Image(); i.src = e.logo; } });
+    this.timer = setInterval(() => { try { this.revisar(); } catch(e){} }, 5000);
+  },
+};
+
+/* El camión de correo: una camioneta alta y cuadrada como las del correo
+   de Estados Unidos, con los colores de la empresa y su logo en el costado. */
+function camionCorreoSVG(v, mia = false){
+  const e = EMPRESAS_CORREO[v.emp] || EMPRESAS_CORREO.otro, borde = 'rgba(0,0,0,.18)';
+  const nom = String(nombreCorreo(v)).toUpperCase().slice(0, 16);
+  const logo = e.logo ? `<image href="${e.logo}" x="13" y="14" width="100" height="32" preserveAspectRatio="xMidYMid meet"/>`
+    : `<g transform="translate(14 21)"><rect width="22" height="16" rx="2" fill="#fff" stroke="${e.franja}" stroke-width="2"/><path d="M1 2l10 8 10-8" fill="none" stroke="${e.franja}" stroke-width="2"/></g>
+       <text x="76" y="34" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="${nom.length > 10 ? 9 : 12}" font-weight="800" fill="${e.franja}">${esc(nom)}</text>`;
+  return `<svg viewBox="0 0 170 86" width="170" height="86">
+  <rect x="4" y="6" width="118" height="56" rx="6" fill="${e.caja}" stroke="${borde}"/>
+  ${logo}
+  ${e.franja2 ? `<rect x="4" y="50" width="154" height="3" fill="${e.franja2}"/>` : ''}
+  <path d="M122 16h16q4 0 6 4l12 20q2 3 2 7v15h-36z" fill="${e.caja}" stroke="${borde}"/>
+  <path d="M126 21h11q2 0 3 2l10 17h-24z" fill="#9fd3e8"/>
+  <rect x="4" y="54" width="154" height="7" fill="${e.franja}"/>
+  <rect x="139" y="23" width="3" height="10" rx="1" fill="#23272b"/>
+  <rect x="153" y="45" width="5" height="5" rx="1" fill="#ffd166"/>
+  <rect x="4" y="61" width="156" height="4" fill="#3d4246"/><rect x="150" y="60" width="16" height="5" rx="2" fill="#5b5f63"/><rect x="0" y="60" width="9" height="5" rx="2" fill="#5b5f63"/>
+  ${mia ? `<g transform="translate(96 0)"><rect width="66" height="13" rx="6.5" fill="#e8590c"/><text x="33" y="9.5" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="8" font-weight="800" fill="#fff">VA A TU CASA</text></g>` : ''}
+  <g class="cam-rueda"><circle cx="32" cy="70" r="10" fill="#23272b"/><circle cx="32" cy="70" r="4" fill="#bfc5ca"/><path d="M32 62v16M24 70h16" stroke="#8a9096" stroke-width="1.5"/></g>
+  <g class="cam-rueda"><circle cx="138" cy="70" r="10" fill="#23272b"/><circle cx="138" cy="70" r="4" fill="#bfc5ca"/><path d="M138 62v16M130 70h16" stroke="#8a9096" stroke-width="1.5"/></g></svg>`;
+}
+const logoCorreo = (k, alto = 26) => { const e = EMPRESAS_CORREO[k] || EMPRESAS_CORREO.otro;
+  return e.logo ? `<img src="${e.logo}" alt="${esc(e.n)}" style="height:${alto}px;max-width:100%;object-fit:contain">` : `<span class="correo-otro">${I('mail')}<b>Otro</b></span>`; };
+
+/* La garita: el menú de correos y la entrada. */
+A['correo-menu'] = () => hoja('Entró un correo', `<p class="muted small" style="margin:0 0 12px">¿Cuál?</p>
+  <div class="correo-menu">${Object.keys(EMPRESAS_CORREO).map(k => `<button type="button" class="correo-op" data-a="correo-elegir" data-v="${k}" aria-label="${esc(EMPRESAS_CORREO[k].n)}">${logoCorreo(k, 30)}</button>`).join('')}</div>`);
+A['correo-elegir'] = el => {
+  const k = el.dataset.v, e = EMPRESAS_CORREO[k]; if (!e) return;
+  hoja(k === 'otro' ? 'Entró otro correo' : `Entró ${e.n}`, `<form data-f="correo-entra" data-emp="${k}">
+    <div class="correo-elegido">${logoCorreo(k, 34)}</div>
+    ${k === 'otro' ? `<div class="field"><label>¿Qué correo es?</label><input name="nombre" required maxlength="30" list="otrosCorreos" placeholder="DHL, Via Cargo, FedEx…"></div>
+      <datalist id="otrosCorreos"><option>DHL</option><option>FedEx</option><option>UPS</option><option>Via Cargo</option><option>Cruz del Sur</option><option>Urbano</option><option>Credifin</option><option>Fast Mail</option></datalist>` : ''}
+    <div class="grid2"><div class="field"><label>Hora de entrada</label><input name="hora" type="time" required value="${hora(Date.now())}"></div>
+      <div class="field"><label>Patente (opcional)</label><input name="patente" maxlength="10" style="text-transform:uppercase"></div></div>
+    <div class="field"><label>¿A qué lotes va? (opcional)</label><input name="lotes" maxlength="200" inputmode="text" placeholder="Ej: 12, 40, 133A">
+      <div class="ayuda">A esas casas les llega "va a tu casa" al celular, como un WhatsApp: con la pantalla apagada, la app cerrada o la sesión cerrada (si activaron los avisos).</div></div>
+    <p class="muted small" style="margin:0 0 12px">Al guardar, a todos les cruza el camión de ${esc(k === 'otro' ? 'correo' : e.n)} por la pantalla, con su bocina, hasta que registres la salida. Los lotes y la patente los ve solo la garita.</p>
+    <button class="btn btn-pri btn-block">${I('login')}Registrar la entrada</button></form>
+    <button class="link" data-a="correo-menu" style="margin-top:10px">${I('left')}Elegir otro correo</button>`);
+};
+/* Los lotes que escribió la garita: los que existen y los que no. */
+function lotesCorreo(txt){
+  const ok = lotesDeTexto(txt);
+  const malos = String(txt || '').split(/[,;\s]+/).map(p => p.replace(/^lote/i, '').toUpperCase()).filter(p => p && !/^\d+-\d+$/.test(p) && !ok.includes(p));
+  return { ok, malos };
+}
+/* Le avisa a cada lote (a todas sus cuentas) que el correo va para ahí.
+   Devuelve las cuentas avisadas y los lotes que no tienen ninguna. */
+function avisarLotesCorreo(s, v, lotes){
+  const avisadas = [], sinCuenta = [];
+  lotes.forEach(l => {
+    const ids = residentesDelLote('Lote ' + l).map(u => u.id);
+    if (!ids.length){ sinCuenta.push(l); return; }
+    avisadas.push(...ids);
+    notificar(s, { para:ids, titulo:`${nombreCorreo(v)} va a tu casa`, texto:`Entró al barrio a las ${hora(v.entra)} h con un envío para el Lote ${l}. Si no hay nadie, avisale a la garita.`,
+      icon:'mail', color:'sky', link:'mensajeria', push:false, mensId:v.id, vence:v.entra + Mensajeria.DURA });
+  });
+  return { avisadas:[...new Set(avisadas)], sinCuenta };
+}
+/* Al celular, como un WhatsApp (sale con la app cerrada o la sesión cerrada). */
+const pushLotesCorreo = (v, ids) => { if (ids.length && typeof Push !== 'undefined')
+  Push.enviar({ para:ids, titulo:`${nombreCorreo(v)} va a tu casa`, texto:`Entró al barrio a las ${hora(v.entra)} h con un envío para tu lote.`, link:'mensajeria', tag:'correo-' + v.id, sonido:'correo' }); };
+const textoSinCuenta = l => l.length ? ` ${l.length === 1 ? 'El Lote ' + l[0] + ' no tiene' : 'Los lotes ' + l.join(', ') + ' no tienen'} cuentas en la app: avisá por teléfono.` : '';
+F['correo-entra'] = (d, form) => {
+  const emp = form.dataset.emp; if (!EMPRESAS_CORREO[emp]) return;
+  const nombre = emp === 'otro' ? String(d.nombre || '').trim().slice(0, 30) : '';
+  if (emp === 'otro' && !nombre){ toast('Escribí qué correo es', 'alert'); return; }
+  const { ok:lotes, malos } = lotesCorreo(d.lotes);
+  if (malos.length){ toast(`No existe ${malos.length === 1 ? 'el lote' : 'los lotes'} ${malos.join(', ')}`, 'alert'); return; }
+  const [h, m] = String(d.hora || '').split(':').map(Number), f = new Date(); f.setHours(h || 0, m || 0, 0, 0);
+  const entra = Math.min(Date.now(), f.getTime()), patente = normPatente(d.patente || '');
+  let v, r = { avisadas:[], sinCuenta:[] };
+  Store.cambiar(s => {
+    s.mensajeria = aLista(s.mensajeria).filter(x => x && Date.now() - (x.entra || 0) < 30 * DIA);
+    v = { id:'co' + uid(), emp, entra, por:yo().id }; if (nombre) v.nombre = nombre;
+    s.mensajeria.unshift(v); if (s.mensajeria.length > 150) s.mensajeria.length = 150;
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', mensId:v.id, lotes, patente, at:Date.now(),
+      texto:`Ingreso de ${nombreCorreo(v)}${patente ? ' · ' + patente : ''}${lotes.length ? ' → ' + lotes.map(l => 'Lote ' + l).join(', ') : ''} · ${hora(entra)} h` });
+    r = avisarLotesCorreo(s, v, lotes);
+  });
+  pushLotesCorreo(v, r.avisadas);
+  cerrarHoja();
+  toast(`Entrada registrada.${r.avisadas.length ? ` Se avisó a ${plural(r.avisadas.length, 'cuenta')} de ${lotes.length === 1 ? 'ese lote' : 'esos lotes'}.` : ''}${textoSinCuenta(r.sinCuenta)}`, 'mail');
+  Mensajeria.revisar(); refrescar();
+};
+/* Si el correo dice que va a otra casa más, se le avisa a esa también. */
+A['correo-lotes'] = el => {
+  const v = Mensajeria.adentro().find(x => x.id === el.dataset.id); if (!v) return;
+  hoja(`${nombreCorreo(v)} va también a…`, `<form data-f="correo-lotes" data-id="${v.id}">
+    <div class="field"><label>Lotes</label><input name="lotes" required maxlength="200" placeholder="Ej: 12, 40, 133A"></div>
+    <button class="btn btn-pri btn-block">${I('send')}Avisar a esas casas</button></form>`);
+};
+F['correo-lotes'] = (d, form) => {
+  const v = Mensajeria.adentro().find(x => x.id === form.dataset.id); if (!v){ cerrarHoja(); toast('Ese correo ya salió', 'alert'); return; }
+  const ya = Mensajeria.detalle(v.id).lotes, { ok, malos } = lotesCorreo(d.lotes), lotes = ok.filter(l => !ya.includes(l));
+  if (malos.length){ toast(`No existe ${malos.length === 1 ? 'el lote' : 'los lotes'} ${malos.join(', ')}`, 'alert'); return; }
+  if (!lotes.length){ toast(ok.length ? 'Esos lotes ya estaban avisados' : 'Escribí al menos un lote', 'alert'); return; }
+  let r;
+  Store.cambiar(s => {
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', mensId:v.id, lotes, at:Date.now(), texto:`${nombreCorreo(v)} va también a ${lotes.map(l => 'Lote ' + l).join(', ')}` });
+    r = avisarLotesCorreo(s, v, lotes);
+  });
+  pushLotesCorreo(v, r.avisadas);
+  cerrarHoja(); toast(`${r.avisadas.length ? `Se avisó a ${plural(r.avisadas.length, 'cuenta')}.` : 'Anotado.'}${textoSinCuenta(r.sinCuenta)}`, 'mail'); refrescar();
+};
+A['correo-sale'] = async el => {
+  const v = Mensajeria.adentro().find(x => x.id === el.dataset.id); if (!v) return;
+  if (!await confirmar(`Salida de ${esc(nombreCorreo(v))}`, `¿Registrar que ${esc(nombreCorreo(v))} salió del barrio ahora (${hora(Date.now())} h)?`, { si:'Registrar salida' })) return;
+  Store.cambiar(s => {
+    const x = aLista(s.mensajeria).find(z => z.id === v.id); if (!x) return;
+    x.sale = Date.now(); x.salePor = yo().id;
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', mensId:x.id, at:Date.now(), texto:`Egreso de ${nombreCorreo(x)} · ${hora(x.sale)} h (estuvo ${Math.max(1, Math.round((x.sale - x.entra) / MIN))} min)` });
+  });
+  Mensajeria.revisar(); toast('Salida registrada. Su camión deja de verse en las pantallas.', 'check'); refrescar();
+};
+A['correo-aviso'] = () => { Mensajeria.prender(!Mensajeria.encendido()); Mensajeria.revisar(); refrescar(); toast(Mensajeria.encendido() ? 'Los camiones de correo se van a ver cuando entren' : 'Listo: solo vas a ver los que van a tu casa', 'mail'); };
+A['correo-probar'] = el => { if (el.dataset.v === 'timbre') Mensajeria.timbre(); else Mensajeria.bocina(); };
+/* En la garita, justo abajo del camión de la basura: el botón y los que están adentro. */
+function bandaCorreos(garita = false){
+  const ls = Mensajeria.adentro().slice().reverse();
+  const boton = garita ? `<button class="superficie" data-a="correo-menu"><span class="ic ic-sky">${I('mail')}</span><span class="txt"><b>Correos</b><small>Registrar la entrada: Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro</small></span>${I('right')}</button>` : '';
+  if (!ls.length) return boton;
+  return `${boton}<span id="garCorreos" class="ancla"></span>${ls.map(v => {
+    const d = veGarita() ? Mensajeria.detalle(v.id) : { lotes:[], patente:'' }, min = Math.max(1, Math.round((Date.now() - v.entra) / MIN));
+    return aviso(min > 60 ? 'warn' : 'info', 'mail', `${esc(nombreCorreo(v))} en el barrio${d.patente ? ' · ' + esc(d.patente) : ''}`,
+      `Entró a las ${hora(v.entra)} h · hace ${min} min${d.lotes.length ? ' · va a ' + d.lotes.map(l => 'Lote ' + esc(l)).join(', ') : ''}`,
+      garita ? `<button class="btn btn-xs btn-pri" data-a="correo-sale" data-id="${v.id}">${I('logout')}Registrar la salida</button><button class="btn btn-xs btn-sec" data-a="correo-lotes" data-id="${v.id}">${I('home')}Avisar a otro lote</button>` : ''); }).join('')}`;
+}
+R.mensajeria = {
+  titulo:'Correos en el barrio', icon:'mail', color:'sky', sub:'Qué correo está adentro, en vivo',
+  render(){
+    const hoy = hoyISO(), ad = Mensajeria.adentro(), hoyL = Mensajeria.lista().filter(v => isoDe(new Date(v.entra)) === hoy && !ad.includes(v));
+    const fila = v => `<div class="it"><span class="correo-mini">${logoCorreo(v.emp, 18)}</span><div class="txt"><b>${esc(nombreCorreo(v))}</b><span>${v.sale ? `De ${hora(v.entra)} a ${hora(v.sale)} h` : `Entró a las ${hora(v.entra)} h · sigue en el barrio`}</span></div>${Mensajeria.vaAMiCasa(v) ? `<span class="pill p-warn">${I('home')}va a tu casa</span>` : ''}</div>`;
+    /* La garita ve los de adentro con sus lotes y el botón de salida; el resto, solo la empresa y la hora. */
+    return `${veGarita() ? bandaCorreos(esGuardia()) + (ad.length ? '' : vacio('mail', 'No hay ningún correo adentro.'))
+        : sec('Ahora en el barrio') + (ad.length ? `<div class="card lista">${ad.map(fila).join('')}</div>` : vacio('mail', 'No hay ningún correo adentro.'))}
+      ${hoyL.length ? sec('Hoy ya pasaron') + `<div class="card lista">${hoyL.map(fila).join('')}</div>` : ''}
+      ${esStaff() || esSupervisor() ? '' : `${sec('Los correos en tu pantalla')}
+        ${superficie({ a:'correo-aviso', icon:'mail', color: Mensajeria.encendido() ? 'ok' : 'accent', t: Mensajeria.encendido() ? 'Ver los camiones de correo: activado' : 'Ver los camiones de correo: apagado',
+          s: Mensajeria.encendido() ? 'Cuando entra uno, cruza su camión por la pantalla hasta que sale' : 'Solo vas a ver los que van a tu casa' })}
+        ${superficie({ a:'correo-probar', v:'bocina', icon:'volume', color:'sky', t:'Escuchar la bocina', s:'La que suena cuando entra un correo' })}
+        ${superficie({ a:'correo-probar', v:'timbre', icon:'bell', color:'wood', t:'Escuchar el aviso de "va a tu casa"', s:'Con la app abierta. Con el celular bloqueado suena el aviso del teléfono' })}
+        ${typeof tarjetaPush === 'function' ? tarjetaPush() : ''}`}
+      <p class="muted tiny" style="margin-top:12px">${I('lock')} La garita anota qué correo entra y cuándo sale, y, si lo sabe, a qué lotes va. Todos ven solo qué correo está en el barrio; a qué casa va lo ve la garita y esa casa, que recibe el aviso al celular aunque tenga la pantalla apagada, la app cerrada o la sesión cerrada (si activó los avisos en ese equipo). Los logos son de cada empresa y están solo para reconocerla.</p>`;
+  },
+};
+
+/* =========================================================
    2. INGRESOS FRECUENTES (proveedores asiduos)
    ========================================================= */
 const TIPOS_FREC = {
@@ -198,7 +465,7 @@ R.frecuentes = {
     const qq = normTxt(q || '');
     const ls = frecuentes().filter(f => !qq || normTxt([f.nombre, f.empresa, f.destino, f.patente, TIPOS_FREC[f.tipo]?.n].join(' ')).includes(qq))
       .sort((a, b) => (!!a.baja - !!b.baja) || a.nombre.localeCompare(b.nombre));
-    return `<p class="muted small" style="margin:0 0 12px">Para quien entra todas las semanas: la Administración lo carga una vez y le manda su QR. En la garita se escanea o se escribe el código, y queda anotado el ingreso y la salida. Los que entran de vez en cuando (Uber, DiDi, taxis, correo) no van acá: entran con su patente por "Llegó sin aviso", o con el pase que les manda el vecino.</p>
+    return `<p class="muted small" style="margin:0 0 12px">Para quien entra todas las semanas: la Administración lo carga una vez y le manda su QR. En la garita se escanea o se escribe el código, y queda anotado el ingreso y la salida. Los que entran de vez en cuando (Uber, DiDi, taxis) no van acá: entran con su patente por "Llegó sin aviso", o con el pase que les manda el vecino. Los correos, con el botón "Correos" de la garita.</p>
       ${esAdmin() ? superficie({ a:'frec-editar', icon:'plus', color:'brand', t:'Agregar un ingreso frecuente', s:'Nombre, a dónde va, días y horario: la app arma su QR', cls:'acento' }) : ''}
       <form data-f="buscar-frec" class="linea-form" style="margin:12px 0"><input name="q" id="qFrec" value="${esc(q || '')}" placeholder="Nombre, empresa, patente o destino"><button class="btn btn-pri">${I('search')}</button></form>
       ${ls.length ? ls.map(f => { const t = TIPOS_FREC[f.tipo] || TIPOS_FREC.otro, v = frecuenteVigente(f), ult = ultimoMovFrec(f);
@@ -258,10 +525,16 @@ A['frec-qr'] = el => {
   hoja('Pase fijo', `<div class="ticket"><div class="tk-top"><small>Pase fijo · ${esc(Store.s.config.nombre)}</small><h3>${esc(f.nombre)}</h3><div style="opacity:.85;font-size:13px">${esc(t.n)} → ${esc(f.destino || 'Barrio')}</div></div>
     <div class="bottom"><div class="qr-box" data-qr="BHC:${esc(f.codigo)}"></div><div class="codigo-grande">${esc(f.codigo)}</div>
     <div class="muted small">${aLista(f.dias).length ? 'Días: ' + aLista(f.dias).map(d => DIAS[d]).join(', ') : 'Cualquier día'}${f.desde ? ` · ${f.desde} a ${f.hasta} h` : ''}${f.vence ? ' · hasta el ' + fechaCorta(f.vence) : ''}</div></div></div>
-    <div class="btns" style="margin-top:12px">${f.tel ? `<a class="btn btn-wa grow" href="${waLink(f.tel, texto)}" target="_blank" rel="noopener">${I('phone')}Mandarlo por WhatsApp</a>` : ''}
+    <div class="btns" style="margin-top:12px"><button class="btn btn-wa grow" data-a="frec-wa" data-id="${esc(f.id)}">${I('share')}Mandarlo por WhatsApp (QR y código)</button>
       <button class="btn btn-sec grow" data-a="copiar" data-v="${esc(f.codigo)}">${I('copy')}Copiar el código</button></div>
     <p class="muted tiny" style="margin:10px 2px 0">Sirve para siempre (o hasta la fecha de vencimiento). Si se pierde, desde Editar se genera uno nuevo y el viejo deja de valer.</p>`);
   setTimeout(() => $$('#hoja [data-qr]').forEach(x => pintarQR(x, x.dataset.qr)), 60);
+};
+A['frec-wa'] = el => {
+  const f = frecuentes().find(x => x.id === el.dataset.id); if (!f) return;
+  const tp = TIPOS_FREC[f.tipo] || TIPOS_FREC.otro;
+  const texto = `Hola ${f.nombre.split(' ')[0]}: este es tu pase fijo para entrar al barrio ${Store.s.config.nombre} (${tp.n.toLowerCase()} → ${f.destino || 'Barrio'}). En la garita mostrá el QR de la imagen o decí el código ${f.codigo}.\n\nTu QR: ${enlaceQR('BHC:' + f.codigo)}`;
+  compartirPase({ texto, contenido:'BHC:' + f.codigo, codigo:f.codigo, sub:`Pase fijo · ${f.nombre}`, tel:f.tel || '', archivo:`pase-fijo-${f.codigo}.png` });
 };
 A['frec-mov'] = el => {
   const f = frecuentes().find(x => x.id === el.dataset.id); if (!f) return;
@@ -362,7 +635,7 @@ const TIPOS_ALERTA = {
 const zonasBarrio = () => [{ id:'todo', nombre:'Todo el barrio', lotes:'' }, ...aLista(Store.s.config.zonas).filter(z => z && z.nombre)];
 const alertas = () => aLista(Store.s.alertas).filter(Boolean).sort((a, b) => b.at - a.at);
 const alertaActiva = a => a && !a.cerrada && (!a.hasta || a.hasta > Date.now());
-const alertaMeToca = (a, u = yo()) => !!u && alertaActiva(a) && a.por !== u.id && u.rol === 'vecino' && (!aLista(a.lotes).length || aLista(a.lotes).includes(numeroDeLote(u.casa)));
+const alertaMeToca = (a, u = yo()) => !!u && alertaActiva(a) && a.por !== u.id && u.rol === 'vecino' && !esPropDistancia(u) && (!aLista(a.lotes).length || aLista(a.lotes).includes(numeroDeLote(u.casa)));
 const respuestaDe = (a, u = yo()) => u && a.respuestas ? a.respuestas[u.id] : null;
 const alertasParaMi = () => alertas().filter(a => alertaMeToca(a));
 
@@ -384,7 +657,7 @@ R.alertas = {
 };
 function destinatariosAlerta(a){
   const lotes = aLista(a.lotes);
-  return Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && (!lotes.length || lotes.includes(numeroDeLote(u.casa))));
+  return Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && !esPropDistancia(u) && (!lotes.length || lotes.includes(numeroDeLote(u.casa))));
 }
 function tarjetaAlertaStaff(a){
   const t = TIPOS_ALERTA[a.tipo] || TIPOS_ALERTA.otro, dest = destinatariosAlerta(a), rs = a.respuestas || {};
@@ -509,7 +782,7 @@ A['paquete-nuevo'] = () => hoja('Llegó un paquete', `<form data-f="paquete">
    el paquete se entrega (o a los 7 días, lo que llegue primero). */
 F['paquete'] = d => {
   const foto = fotoParaOtros(d.foto, 7), host = usuario(d.hostId) || {}, lote = host.casa || '';
-  const para = [...new Set([d.hostId, ...cuentasDelLote(lote).map(u => u.id)])].filter(Boolean);
+  const para = [...new Set([d.hostId, ...residentesDelLote(lote).map(u => u.id)])].filter(Boolean);
   Store.cambiar(s => { s.paquetes.unshift({ id:uid(), hostId:d.hostId, lote, empresa:d.empresa, detalle:d.detalle, foto, recibido:Date.now(), recibidoPor:yo().id, retirado:null, confirmado:null });
     notificar(s, { para, titulo:`Llegó un paquete para ${lote || 'tu lote'}`, texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''} · a nombre de ${(host.nombre || '').split(' ')[0] || 'tu lote'} · llegó ${hora(Date.now())} h · se retira en la garita con el QR de retiro`, icon:'box', color:'wood', link:'mis-paquetes', sonido:true });
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Paquete de ${d.empresa} para ${lote}`, at:Date.now() }); });
@@ -645,7 +918,7 @@ const Retiro = {
 
         notificar(s, { para:p.hostId, titulo:aviso_, texto:`${p.empresa} · ${hora(at)} h · lo entregó la garita${prueba.metodo === 'qr' ? ' contra tu QR' : ' con firma y DNI'}. Si no fuiste vos, avisá enseguida.`, icon:'box', color: prueba.tercero ? 'warn' : 'ok', link:'mis-paquetes', sonido:true });
         /* Los demás del lote también se enteran (sin sonido): así nadie lo va a buscar de nuevo. */
-        const otros = cuentasDelLote(loteDelPaquete(p)).map(u => u.id).filter(x => x !== p.hostId);
+        const otros = residentesDelLote(loteDelPaquete(p)).map(u => u.id).filter(x => x !== p.hostId);
         if (otros.length) notificar(s, { para:otros, titulo:`Ya retiraron el paquete de ${loteDelPaquete(p)}`, texto:`${p.empresa} · lo retiró ${recibe.nombre}${prueba.tercero ? ' (tercero)' : ''} · ${hora(at)} h`, icon:'box', color:'ok', link:'mis-paquetes' });
       });
       const quien = `${recibe.nombre}${prueba.tercero ? ' (tercero)' : ''}`;
@@ -764,7 +1037,7 @@ REGLAS.push({ id:'paquetes-24h', n:'Paquetes → aviso si pasan 24 h sin retirar
     if (!hayPaquetes() || h < 9 || h >= 21) return 0;
     aLista(s.paquetes).filter(p => p && !p.retirado && !p.avisoVisto && p.recibido && ahora - p.recibido >= DIA).forEach(p => {
       const k = 1 + Math.floor((ahora - p.recibido - DIA) / (8 * HORA)); if (k > 6) return;
-      const para = [...new Set([p.hostId, ...cuentasDelLote(loteDelPaquete(p)).map(u => u.id)])].filter(Boolean);
+      const para = [...new Set([p.hostId, ...residentesDelLote(loteDelPaquete(p)).map(u => u.id)])].filter(Boolean);
       const dias = Math.floor((ahora - p.recibido) / DIA);
       n += marca(s, `paq24-${p.id}-${k}`, () => notificar(s, { para, titulo:`Tu paquete sigue en la garita (${dias === 1 ? '1 día' : dias + ' días'})`,
         texto:`${p.empresa}${p.detalle ? ' · ' + p.detalle : ''} · retiralo con tu QR de retiro`, icon:'box', color:'warn', link:'mis-paquetes', sonido:true }));
@@ -829,6 +1102,6 @@ R.municipio = {
 
 /* Todo lo que tiene que revisarse después de cada dibujo o cada tanto. */
 const Servicio = {
-  despues(){ Camion.revisar(); mostrarAlertaUrgente(); },
-  arrancar(){ Camion.arrancar(); setInterval(() => { try { mostrarAlertaUrgente(); } catch(e){} }, 6000); },
+  despues(){ Camion.revisar(); Mensajeria.revisar(); mostrarAlertaUrgente(); pedirConsentimiento(); },
+  arrancar(){ Camion.arrancar(); Mensajeria.arrancar(); setInterval(() => { try { mostrarAlertaUrgente(); } catch(e){} }, 6000); },
 };

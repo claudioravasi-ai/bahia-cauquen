@@ -50,7 +50,9 @@ const Nube = {
              'posts','votaciones','compras','viajes','obras','proveedores','avistamientos',
              'gastos','liquidaciones','cruceros','promos','comunicados','notifsTodos','descargas','camion','alertas',
              /* 27-09: cosas para prestar y ángeles de la nieve (js/v-casa.js, js/v-cuidados.js) */
-             'cosas','nieve'],
+             'cosas','nieve',
+             /* 07-10: los correos que están en el barrio (solo empresa y horas; js/v-servicio.js) */
+             'mensajeria'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
@@ -78,7 +80,7 @@ const Nube = {
        trabajar y nada más: sin votaciones, expensas, pizarrón, compras,
        comunicados ni lo del hotel que no es de la garita (los huéspedes). */
     supervisor: { barrio:['users','padron','agenda','temporadas','feriados','eventosCiudad','contactos','documentos','obras','proveedores',
-                          'avistamientos','cruceros','camion','alertas'],
+                          'avistamientos','cruceros','camion','mensajeria','alertas'],
                   staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos'],
                   hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv'] },
   },
@@ -103,7 +105,7 @@ const Nube = {
     notifs:          { listas:['para','leidas'] },
     notifsTodos:     { listas:['para','leidas'] },
     privados:        { listas:['msgs'] },
-    bitacora:        { listas:['guardias','policias'] },
+    bitacora:        { listas:['guardias','policias','lotes'] },
     dms:             { listas:['msgs'] },
     pases:           { listas:['dias','listaInvitados'], objetos:['log'] },
     solicitudesPase: { listas:['dias'], objetos:['log'] },
@@ -125,6 +127,7 @@ const Nube = {
     hotelViajes:     { listas:['huespedes'] },
     hotelProv:       { listas:['dias'] },
     camion:          { listas:[] },
+    mensajeria:      { listas:[] },
     sos:             { objetos:['responden'] },
     ausencias:       { objetos:['revisiones'] },
     casaTareas:      { listas:['sugerencias','cambioQue'] },
@@ -151,7 +154,7 @@ const Nube = {
          aprobadas del lote, más la persona a cuyo nombre vino. */
       case 'paquetes': {
         const lote = x.lote || usuario(x.hostId)?.casa;
-        const us = lote ? Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').map(u => u.id) : [];
+        const us = lote ? Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado' && !esPropDistancia(u)).map(u => u.id) : [];
         if (x.hostId && !us.includes(x.hostId)) us.push(x.hostId);
         return us;
       }
@@ -159,10 +162,10 @@ const Nube = {
         return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
       /* Los cuidados de la casa en invierno son del LOTE: van a todas sus cuentas. */
       case 'casaTareas':
-        return x.lote ? Store.s.users.filter(u => u.casa === x.lote && u.estado === 'aprobado').map(u => u.id) : [];
+        return x.lote ? Store.s.users.filter(u => u.casa === x.lote && u.estado === 'aprobado' && !esPropDistancia(u)).map(u => u.id) : [];
       /* La casa sola: a las cuentas del lote y a quien la avisó. */
       case 'ausencias': {
-        const us = x.casa ? Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id) : [];
+        const us = x.casa ? Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado' && !esPropDistancia(u)).map(u => u.id) : [];
         if (x.userId && !us.includes(x.userId)) us.push(x.userId);
         return us;
       }
@@ -293,6 +296,8 @@ const Nube = {
     this.escucharPv(mio.rol);
     if (mio.rol === 'admin') setTimeout(() => this.mudarPrivado(), 3000);
     this.arrancada = true;
+    /* Si este equipo había quedado como "sesión cerrada", vuelve a recibir todo. */
+    if (typeof Push !== 'undefined') setTimeout(() => Push.alDia(), 6000);
     /* "Estoy bien": lo mío y lo de quienes cuido (js/v-cuidados.js). */
     if (!hotel && !sup && typeof Cuidado !== 'undefined') Cuidado.escuchar(mio.rol);
     /* El supervisor no se cuenta entre los que tienen la app abierta, pero
@@ -922,6 +927,14 @@ const Nube = {
       if (Object.keys(fotos).length){ await this.db.ref().update(fotos); await this.db.ref().update(indice); }
     } catch(e){ console.warn('No se pudieron limpiar las fotos vencidas', e.message); }
   },
+  /* La Administración crea la cuenta de otra persona (08-10-2026: dueños
+     mayores e inquilinos que no se inscriben solos). Se usa una segunda
+     conexión de Firebase, así la sesión de la Administración no se toca. */
+  async crearCuentaAjena(email, clave){
+    const app2 = firebase.initializeApp(configFirebase(), 'alta-' + Date.now());
+    try { const cred = await app2.auth().createUserWithEmailAndPassword(email, clave); const id = cred.user.uid; await app2.auth().signOut().catch(() => {}); return id; }
+    finally { try { await app2.delete(); } catch(e){} }
+  },
   async registrar(d){
     const cred = await this.auth.createUserWithEmailAndPassword(d.email, d.clave);
     const uid = cred.user.uid;
@@ -933,7 +946,7 @@ const Nube = {
     try { primero = !(await this.db.ref('barrio/publico/instalado').get()).exists(); } catch(e){}
     const u = { id:uid, nombre:d.nombre, casa:d.casa, dni:d.dni, email:d.email, tel:d.tel || '',
       rol: primero ? 'admin' : 'vecino', estado: primero ? 'aprobado' : 'pendiente',
-      profesion:d.profesion || '', enDirectorio:!!d.publicar, mostrarTel:!!d.publicar,
+      profesion:d.profesion || '', enDirectorio:!!d.publicar, mostrarTel:!!d.publicar, relacion:d.relacion || '',
       consentimiento:Date.now(), createdAt:Date.now() };
     await this.db.ref('barrio/users/' + uid).set(u);
     if (primero) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
@@ -949,7 +962,10 @@ const Nube = {
     if (this.libre) await this.db.ref('barrio/publico/instalado').set(true).catch(() => {});
     return u;
   },
-  async salir(){ await this.borrarPresencia(); if (typeof Cuidado !== 'undefined') Cuidado.soltar(); try { await this.auth.signOut(); } catch(e){} },
+  /* Antes de soltar la cuenta: qué avisos al celular le siguen llegando a
+     este equipo (ver Push.alCerrarSesion). Sin elegir, solo el de los
+     correos que van a su casa. */
+  async salir({ seguirCorreos = true } = {}){ if (typeof Push !== 'undefined') await Push.alCerrarSesion(seguirCorreos); await this.borrarPresencia(); if (typeof Cuidado !== 'undefined') Cuidado.soltar(); try { await this.auth.signOut(); } catch(e){} },
   async cambiarClave(nueva){ return this.auth.currentUser.updatePassword(nueva); },
   /* Cambio de correo: Firebase manda un aviso a la dirección nueva y el
      cambio se hace efectivo cuando la persona lo confirma desde ahí. */

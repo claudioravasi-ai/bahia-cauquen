@@ -48,7 +48,7 @@ function textoPase(p){
   const cuando = p.dias?.length ? `${p.dias.map(d => DIAS[d]).join(', ')} de ${p.desde} a ${p.hasta} (hasta el ${fechaCorta(p.fechaFin)})` : `${fechaLarga(p.fecha)} de ${p.desde} a ${p.hasta}`;
   return `¡Hola${p.nombre ? ' ' + p.nombre.split(' ')[0] : ''}! ${p.autoriza || u.nombre || 'Un vecino'} (${u.casa || ''}) te autorizó a entrar al barrio ${c.nombre}.\n\n` +
     `Tu código de ingreso: ${p.codigo}\nVálido: ${cuando}.\nMostralo en la garita (código o QR).\n\n` +
-    `Tu pase con QR: ${urlApp('pase/' + p.id)}\nCómo llegar: ${c.mapa}`;
+    `Tu QR: ${enlaceQR('BHC:' + p.codigo)}\nCómo llegar: ${c.mapa}`;
 }
 function tarjetaPase(p, { garita = false } = {}){
   const t = TIPOS_PASE[p.tipo] || TIPOS_PASE.visita, est = estadoPase(p), host = usuario(p.hostId) || {};
@@ -246,6 +246,7 @@ const SECCIONES = {
         teja({ v:'nieve', icon:'snow', color:'sky', t:'Ángeles de la nieve', s:(() => { const n = aLista(s.nieve).filter(x => x.tipo === 'ayuda' && x.activo !== false && !x.angel).length; return n ? `${plural(n, 'casa espera', 'casas esperan')} un ángel` : 'Despejar la entrada de quien no puede'; })() }),
         teja({ v:'tablero', icon:'wallet', color:'wood', t:'Las cuentas del barrio', s:'En qué se gasta, mes a mes, y la morosidad (sin nombres)' }),
         teja({ v:'recoleccion', icon:'truck', color:'ok', t:'Residuos', s: proxRecoleccion() }),
+        teja({ v:'mensajeria', icon:'mail', color:'sky', t:'Correos en el barrio', s:(() => { const n = typeof Mensajeria !== 'undefined' ? Mensajeria.adentro().length : 0; return n ? `${plural(n, 'correo', 'correos')} adentro ahora` : 'Andreani, OCA, Mercado Libre… en vivo'; })(), n: typeof Mensajeria !== 'undefined' && Mensajeria.adentro().length || '' }),
         teja({ v:'descargas', icon:'download', color:'sky', t:'Descargas', s:'Apps, instructivos y planillas', n:descargasVisibles().filter(d => (d.url || d.texto) && !esNormaDescarga(d)).length || '' }),
       ].join('');
     },
@@ -757,6 +758,8 @@ R.inicio = {
   titulo: 'Inicio', icon: 'home', ancha: true,
   render(){
     const u = yo(), s = Store.s, hoy = hoyISO(), c = Clima.d?.c;
+    /* El propietario de un lote alquilado (o que no vive en el barrio) tiene su propia portada. */
+    if (esPropDistancia(u) && typeof portadaPropietario === 'function') return portadaPropietario();
     const hr = new Date().getHours();
     const saludo = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
     const [desc] = c ? Clima.cod(c.weather_code) : [''];
@@ -1034,7 +1037,19 @@ F['pase-app-patente'] = (d, form) => {
     notificar(s, { para:'rol:guardia', titulo:`Patente del ${APPS_VIAJE[p.app] || 'viaje'} a ${u.casa}`, texto:`${patente} · ${p.nota || ''}`, icon:'car', color:'warn', link:'garita' }); });
   cerrarHoja(); toast('Patente guardada. La garita ya la tiene.', 'car');
 };
-A['compartir-pase'] = el => { const p = Store.s.pases.find(x => x.id === el.dataset.id); if (p) compartir(textoPase(p), 'Pase de ingreso'); };
+A['compartir-pase'] = el => { const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
+  compartirPase({ texto:textoPase(p), contenido:'BHC:' + p.codigo, codigo:p.codigo, sub:`Pase de ${p.nombre} · ${usuario(p.hostId)?.casa || ''}`, archivo:`pase-${p.codigo}.png` }); };
+/* La página pública del QR (#/qr/…): la abre la visita desde el enlace del WhatsApp.
+   No lee nada de la base: dibuja el QR con lo que trae el enlace. */
+function pintarQRPublico(contenido){
+  const c = decodeURIComponent(contenido || ''), cod = c.replace(/^BHC:/, '');
+  $('#app').innerHTML = `<section class="bienvenida" id="qrPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+    <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
+    <h1 style="font-size:28px">Tu pase de ingreso</h1>
+    <div class="panel" style="text-align:center"><div class="qr-box" id="qrPub" style="background:#fff;padding:14px;border-radius:14px;max-width:260px;margin:0 auto"></div>
+      <div class="codigo-grande" style="margin-top:12px">${esc(cod)}</div><p style="margin:8px 0 0;opacity:.9">Mostrá este QR en la garita o decí el código.</p></div></section>`;
+  pintarQR($('#qrPub'), c);
+}
 A['cancelar-pase'] = async el => {
   if (!await confirmar('Cancelar el pase', 'El código deja de servir en la garita.', { si:'Cancelar pase', peligro:true })) return;
   Store.cambiar(s => { const p = s.pases.find(x => x.id === el.dataset.id); if (p) p.cancelado = Date.now(); });
@@ -2107,6 +2122,13 @@ function tareasGarita(){
     else if (paso) hecho(`camión (entró ${hora(paso.entra)} h)`);
     else add(1, 'tacho', 'Camión de residuos: registrar la entrada y la salida', `Hoy pasa (${esc(vol ? 'voluminosos' : String(dh).toLowerCase())}). Al registrar la entrada, se avisa solo a todo el barrio.`, { a:'camion-entra' }); }
 
+  /* Los correos adentro: marcar la salida (si pasó más de una hora, urge). */
+  if (typeof Mensajeria !== 'undefined'){ const cor = Mensajeria.adentro(), largos = cor.filter(v => ahora - v.entra > HORA);
+    if (cor.length) add(largos.length ? 0 : 2, 'mail', largos.length ? `Correo adentro hace más de una hora: ¿ya salió?` : `Correos adentro: registrar la salida (${cor.length})`,
+      lista3(cor.slice().reverse(), v => `${esc(nombreCorreo(v))} · entró ${hora(v.entra)} h`), { ir:'#garCorreos' });
+    const fueron = Mensajeria.lista().filter(v => v.sale && v.entra >= inicioDia).length;
+    if (fueron) hecho(plural(fueron, 'correo con entrada y salida', 'correos con entrada y salida')); }
+
   /* Quién viene hoy y quién está adentro. */
   const lista = pasesDelDia(hoy), esp = lista.filter(p => estadoPase(p) === 'esperado').sort((a, b) => String(a.desde).localeCompare(String(b.desde))), adn = lista.filter(p => estadoPase(p) === 'adentro');
   if (esp.length) add(1, 'users', `Vienen hoy: ${plural(esp.length, 'visita anunciada', 'visitas anunciadas')}`, lista3(esp, p => `${esc(p.desde || '')} ${esc(p.nombre)} → ${nombreCasa(p.hostId)}${p.patente ? ' · ' + esc(p.patente) : ''}`), { ir:'#garIngresos' }, { hora:esp[0].desde || '' });
@@ -2198,11 +2220,12 @@ R.garita = {
       ${PILA.length === 1 ? `<div class="garita-titulo titulo-vista"><h1>Garita</h1><p>${fechaLarga(hoy)}</p></div>` : ''}
       <aside class="garita-lado">${tareasGarita()}</aside>
       <div class="garita-main">
-      ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos${hayPaquetes() ? ', paquetes' : ''}, el camión, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
+      ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos${hayPaquetes() ? ', paquetes' : ''}, el camión, los correos, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
         <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esSupervisor() ? 'supGarita' : 'interno'}">${I('chat')}Escribirle a la garita</button></div>`}
       ${bandaTurno()}
       ${bandaPolicia()}
       ${bandaCamion(opera)}
+      ${typeof bandaCorreos === 'function' ? bandaCorreos(opera) : ''}
       ${typeof bandaVansGarita === 'function' ? bandaVansGarita(opera) : ''}
       ${typeof bandaHotel === 'function' ? bandaHotel(opera) : ''}
       ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
@@ -2340,7 +2363,8 @@ function movimiento(id, tipo){
   cerrarHoja();
   toast(tipo === 'in' ? 'Ingreso registrado. El vecino ya fue avisado.' : 'Salida registrada', tipo === 'in' ? 'login' : 'logout');
 }
-const opcionesCasas = () => vecinosAprobados().sort((a, b) => a.casa.localeCompare(b.casa, 'es', { numeric:true }))
+/* Solo quienes viven en el lote: al propietario a distancia no se le consulta quién entra. */
+const opcionesCasas = () => vecinosAprobados().filter(u => !esPropDistancia(u)).sort((a, b) => a.casa.localeCompare(b.casa, 'es', { numeric:true }))
   .map(u => `<option value="${u.id}">${esc(u.casa)} · ${esc(u.nombre)}</option>`).join('');
 /* Todos los lotes del padrón, estén o no registrados en la app. */
 const opcionesLotes = (sel = '') => LOTES.map(l => `<option value="Lote ${l.lote}" ${'Lote ' + l.lote === sel ? 'selected' : ''}>${esc(nombreLote(l))}${propietarioDe('Lote ' + l.lote) ? ' · ' + esc(propietarioDe('Lote ' + l.lote)) : ''}</option>`).join('');

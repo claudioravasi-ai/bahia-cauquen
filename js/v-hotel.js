@@ -1024,13 +1024,32 @@ R['hotel-vivo'] = {
 /* La banda del hotel en la portada de la garita: eventos y huéspedes que
    llegan hoy. Las vans y sus traslados tienen su propia solapa
    (bandaVansGarita), para marcar salidas y regresos a un toque. */
+/* LA TARJETA DEL HOTEL EN LA GARITA (rediseño pedido por Claudio, 07-10-2026)
+   Antes eran dos renglones con enlaces grises. Ahora: un encabezado con la
+   identidad del hotel, tres números grandes que se tocan (llegan hoy,
+   eventos, vans en el barrio) y, abajo, lo que la garita tiene que hacer:
+   cada huésped que llega con su botón "Ingresó" y cada evento con su hora. */
 function bandaHotel(opera){
-  const ev = hotelEventos().filter(e => e.fecha === hoyISO());
-  const hs = hotelHuespedes().filter(x => x.desde === hoyISO() && !x.ingreso);
+  const hoy = hoyISO(), ev = hotelEventos().filter(e => e.fecha === hoy).sort((a, b) => String(a.desde).localeCompare(String(b.desde)));
+  const hs = hotelHuespedes().filter(x => x.desde === hoy), falta = hs.filter(x => !x.ingreso), vans = hotelVans(), adentro = vans.filter(v => estadoVan(v).adentro).length;
   if (!ev.length && !hs.length) return '';
-  return `<div class="card hv-banda"><div class="hv-cab">${I('star')}<b>${HOTEL_NOMBRE}</b><button class="link" data-a="abrir" data-v="hotel-vivo">Ver todo</button></div>
-    ${ev.map(e => `<div class="small" style="margin:4px 0">${I('star')} <b>Evento hoy:</b> ${esc(e.titulo)} · ${esc(e.desde || '')}${e.hasta ? '–' + esc(e.hasta) : ''} h · ${plural(+e.asistentes || 0, 'invitado')}</div>`).join('')}
-    ${hs.length ? `<div class="small" style="margin-top:6px">${I('users')} ${plural(hs.length, 'huésped llega', 'huéspedes llegan')} hoy · <button class="link" data-a="abrir" data-v="hotel-huespedes">ver la lista</button></div>` : ''}</div>`;
+  const kpi = (v, n, t, cls = '') => `<button type="button" class="hg-kpi ${cls}" data-a="abrir" data-v="${v}"><b>${n}</b><span>${t}</span></button>`;
+  const llega = h => `<div class="hg-fila"><span class="hg-av">${esc(String(h.nombre || '?').trim().charAt(0).toUpperCase())}</span>
+      <div class="grow"><b>${esc(h.nombre)}${+h.pax > 1 ? ` <small>+${+h.pax - 1}</small>` : ''}</b><small>${h.llegaVuelo ? `${I('send')} vuelo ${esc(h.llegaVuelo)}` : 'llega hoy'}${h.patente ? ` · <span class="mono">${esc(h.patente)}</span>` : ''}</small></div>
+      ${opera ? `<button class="btn btn-sm btn-ok" data-a="hhuesped-ingreso" data-id="${esc(h.id)}">${I('login')}Ingresó</button>` : '<span class="pill p-sky">Esperado</span>'}</div>`;
+  const evento = e => `<div class="hg-fila"><span class="hg-hora">${esc(e.desde || '—')}</span>
+      <div class="grow"><b>${esc(e.titulo)}</b><small>${e.hasta ? 'hasta las ' + esc(e.hasta) + ' h · ' : ''}${plural(+e.asistentes || 0, 'invitado')}</small></div>${I('star')}</div>`;
+  return `<section class="hotel-garita">
+    <header class="hg-cab"><span class="hg-sello">${I('star')}</span>
+      <div class="grow"><small>Hoy en el hotel</small><b>${HOTEL_NOMBRE}</b></div>
+      <button type="button" class="hg-vivo" data-a="abrir" data-v="hotel-vivo">${I('eye')}En vivo</button></header>
+    <div class="hg-kpis">${kpi('hotel-huespedes', falta.length, falta.length === 1 ? 'huésped por llegar' : 'huéspedes por llegar', falta.length ? 'activo' : '')}
+      ${kpi('hotel-eventos', ev.length, ev.length === 1 ? 'evento hoy' : 'eventos hoy', ev.length ? 'activo' : '')}
+      ${kpi('hotel-vivo', vans.length ? `${adentro}<small>/${vans.length}</small>` : '—', 'vans en el barrio')}</div>
+    ${falta.length ? `<div class="hg-bloque"><div class="hg-tit">Llegan hoy</div>${falta.slice(0, 4).map(llega).join('')}${falta.length > 4 ? `<button type="button" class="hg-mas" data-a="abrir" data-v="hotel-huespedes">Ver los ${falta.length} huéspedes ${I('right')}</button>` : ''}</div>` : ''}
+    ${ev.length ? `<div class="hg-bloque"><div class="hg-tit">Eventos</div>${ev.map(evento).join('')}</div>` : ''}
+    ${hs.length && !falta.length ? `<p class="hg-listo">${I('check')} Ya ingresaron los ${plural(hs.length, 'huésped', 'huéspedes')} de hoy</p>` : ''}
+  </section>`;
 }
 /* La sala del hotel en el Día a día de la Administración. */
 function salaHotel(){

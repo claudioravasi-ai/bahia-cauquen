@@ -44,7 +44,7 @@ La misma cuenta de servicio le permite al Apps Script leer la lista de equipos a
 **aunque todos los teléfonos estén bloqueados**. Lo hace un reloj del Apps Script que
 revisa cada 10 minutos.
 
-1. Pegá el `apps-script/Codigo.gs` nuevo (**versión 10**, del 07-10-2026: no le manda a la supervisión los avisos de todo el barrio y vigila que la garita esté conectada y que los SOS tengan respuesta) → **Guardar** →
+1. Pegá el `apps-script/Codigo.gs` nuevo (**versión 11**, del 07-10-2026: no le manda a la supervisión los avisos de todo el barrio, vigila que la garita esté conectada y que los SOS tengan respuesta, y a un equipo con la sesión cerrada le manda solo "un correo va a tu casa") → **Guardar** →
    **Implementar → Gestionar implementaciones → editar → Nueva versión → Implementar**.
 2. Arriba, en el menú de funciones, elegí **`instalarRelojCuidados`** y tocá **Ejecutar**.
    Google pide permiso ("activadores" y "servicio externo"): aceptalo.
@@ -66,6 +66,24 @@ El día 1 de cada mes le llega además por correo el **informe mensual del servi
 camión, la pizarra) no: eso lo filtra el `Codigo.gs` **versión 10**. Con una versión anterior
 pegada, le llegarían también esos.
 
+## Los correos y la sesión cerrada (07-10-2026, versión 11)
+
+Cuando la garita anota a qué lotes va un correo (Andreani, OCA, Mercado Libre…), a las cuentas de
+esos lotes les llega **"va a tu casa"** al celular, como un WhatsApp: con la pantalla apagada y la
+app cerrada. Además, al **cerrar sesión** el vecino elige si ese equipo sigue recibiendo **solo ese
+aviso** (la empresa y la hora, nada más): el equipo queda marcado `cerrada` en la lista y el
+`Codigo.gs` **versión 11** le manda únicamente los avisos de correo, durante 90 días o hasta que vuelva
+a entrar. Si en ese equipo entra otra cuenta, vale la anotación más nueva y la anterior deja de recibir.
+Con una versión anterior pegada, un equipo con la sesión cerrada sigue recibiendo **todos** los avisos
+de esa cuenta (como pasaba hasta ahora): conviene pegar la versión 11 y hacer **Nueva versión**.
+
+## El propietario a distancia (07-10-2026, versión 11)
+
+Si el lote está alquilado (o el propietario marcó "No vivo en el lote"), su equipo se anota como
+`propietario` y el `Codigo.gs` versión 11 le manda, de lo que va a todo el barrio, **solo** votaciones,
+expensas y comunicados de la Administración (no el camión, los correos ni el SOS). Lo que es para él,
+le llega siempre.
+
 ## Paso 3 — Cada vecino, en cada equipo
 
 **Tu cuenta (tu inicial, arriba a la derecha) → Avisos en este equipo → Activar avisos.** El navegador pide permiso: *Permitir*.
@@ -81,7 +99,7 @@ Con **Probar** llega un aviso de prueba a ese mismo equipo: bloqueá el teléfon
 ## Lo que NO se puede
 
 - Elegir el **sonido** del aviso: con la pantalla apagada suena el sonido de notificación
-  del teléfono. La melodía del camión de helados suena cuando la app está abierta (o se abre al tocar el aviso).
+  del teléfono. La melodía del camión de helados, la bocina de los correos y el aviso de "va a tu casa" suenan cuando la app está abierta (o se abre al tocar el aviso).
   Sí se elige la **vibración**: el camión tiene su propio ritmo.
 - Garantizar la entrega en equipos en **ahorro de batería extremo** o sin datos.
 

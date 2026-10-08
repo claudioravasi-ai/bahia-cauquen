@@ -147,11 +147,12 @@ R['dm-nuevo'] = {
     const fichas = fichasDeVecinos();
     const conCuenta = fichas.filter(f => f.cuentas.some(x => destinatarioDM(x, u)));
     const sinCuenta = fichas.filter(f => !f.cuentas.some(x => destinatarioDM(x, u)) && f.casa !== u.casa);
-    const fila = f => `<div class="dmv-lote" data-busca="${esc(textoFicha(f))}" data-lote="${esc(normTxt(f.lote))}">
-        <div class="dmv-cab"><span class="ficha-lote">Lote ${esc(f.lote)}</span><small>${esc(f.nombre || '')}</small></div>
-        ${f.cuentas.filter(x => destinatarioDM(x, u)).map(x => `<label class="dmv-it">
+    /* "Todo el lote" (08-10-2026): con un toque se tildan todas las cuentas del lote; o se elige a quién. */
+    const fila = f => { const cs = f.cuentas.filter(x => destinatarioDM(x, u)); return `<div class="dmv-lote" data-busca="${esc(textoFicha(f))}" data-lote="${esc(normTxt(f.lote))}">
+        <div class="dmv-cab"><span class="ficha-lote">Lote ${esc(f.lote)}</span><small>${esc(f.nombre || '')}</small>${cs.length > 1 ? `<label class="dmv-todo"><input type="checkbox" data-todo-lote>Todo el lote (${cs.length})</label>` : ''}</div>
+        ${cs.map(x => `<label class="dmv-it">
           <input type="checkbox" name="u~${esc(x.id)}" ${pre.includes(x.id) ? 'checked' : ''}>${avatar(x)}
-          <span class="txt"><b>${esc(x.nombre)}</b><small>${esc(x.casa)}${x.enDirectorio && x.profesion ? ' · ' + esc(x.profesion) : ''}</small></span></label>`).join('')}</div>`;
+          <span class="txt"><b>${esc(x.nombre)}</b><small>${esc(x.casa)}${x.relacion && typeof RELACIONES !== 'undefined' ? ' · ' + esc(RELACIONES[x.relacion] || '') : ''}${x.enDirectorio && x.profesion ? ' · ' + esc(x.profesion) : ''}</small></span></label>`).join('')}</div>`; };
     return `<form data-f="dm-varios" class="dmv">
       <p class="muted small" style="margin:0 0 10px">${I('lock')} Tildá a quién le querés escribir (hasta ${MAX_DM}). A cada uno le llega <b>por separado</b>, en su chat privado con vos: nadie ve a quién más se lo mandaste y cada uno te contesta en su propia conversación.</p>
       <input type="search" id="dmvBusca" data-filtro-dm placeholder="Apellido, nombre, oficio o lote" autocomplete="off" style="margin-bottom:10px">
@@ -169,7 +170,8 @@ R['dm-nuevo'] = {
   alPintar(){ dmvContar(); },
 };
 function dmvContar(){
-  const cajas = $$('#dmvLista input[type=checkbox]'); if (!cajas.length && !$('#dmvElegidos')) return;
+  const cajas = $$('#dmvLista input[name^="u~"]'); if (!cajas.length && !$('#dmvElegidos')) return;
+  $$('#dmvLista [data-todo-lote]').forEach(t => { const cs = $$('input[name^="u~"]', t.closest('.dmv-lote')); t.checked = cs.length > 0 && cs.every(c => c.checked); });
   const tild = cajas.filter(c => c.checked);
   const nombres = tild.map(c => c.closest('.dmv-it')?.querySelector('b')?.textContent || '').filter(Boolean);
   cajas.forEach(c => { c.disabled = !c.checked && tild.length >= MAX_DM; });
@@ -177,7 +179,10 @@ function dmvContar(){
   if (e) e.innerHTML = tild.length ? `<b>${plural(tild.length, 'vecino elegido', 'vecinos elegidos')}</b>${tild.length >= MAX_DM ? ` (el máximo)` : ''}: ${esc(nombres.join(', '))}` : 'Nadie elegido todavía';
   if (b) b.disabled = !tild.length;
 }
-document.addEventListener('change', e => { if (e.target.closest && e.target.closest('#dmvLista')) dmvContar(); });
+document.addEventListener('change', e => {
+  if (!e.target.closest || !e.target.closest('#dmvLista')) return;
+  if (e.target.matches('[data-todo-lote]')) $$('input[name^="u~"]', e.target.closest('.dmv-lote')).forEach(c => { c.checked = e.target.checked; });
+  dmvContar(); });
 document.addEventListener('input', e => {
   if (!e.target.matches || !e.target.matches('[data-filtro-dm]')) return;
   const qq = normTxt(e.target.value).trim(), palabras = qq.split(/\s+/).filter(Boolean);

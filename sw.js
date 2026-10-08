@@ -1,11 +1,12 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261007-180725';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261007-180725',
-  './js/firebase-config.js?v=20261007-180725', './js/icons.js?v=20261007-180725', './js/agenda.js?v=20261007-180725', './js/padron.js?v=20261007-180725', './js/core.js?v=20261007-180725', './js/seed.js?v=20261007-180725', './js/clima.js?v=20261007-180725', './js/calendario.js?v=20261007-180725',
-  './js/v-inicio.js?v=20261007-180725', './js/v-comunidad.js?v=20261007-180725', './js/v-gestion.js?v=20261007-180725', './js/admin.js?v=20261007-180725', './js/v-vecinos.js?v=20261007-180725', './js/v-expensas.js?v=20261007-180725', './js/v-plan.js?v=20261007-180725', './js/v-contable.js?v=20261007-180725', './js/v-servicio.js?v=20261007-180725', './js/v-legal.js?v=20261007-180725', './js/v-hotel.js?v=20261007-180725', './js/v-cuidados.js?v=20261007-180725', './js/v-casa.js?v=20261007-180725', './js/asistente.js?v=20261007-180725', './js/v-manual.js?v=20261007-180725', './js/push.js?v=20261007-180725', './js/sismos.js?v=20261007-180725', './js/nube.js?v=20261007-180725', './js/historial.js?v=20261007-180725', './js/v-supervisor.js?v=20261007-180725', './js/app.js?v=20261007-180725',
-  './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png'];
+const CACHE = 'bhc-20261008-143929';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261008-143929',
+  './js/firebase-config.js?v=20261008-143929', './js/icons.js?v=20261008-143929', './js/agenda.js?v=20261008-143929', './js/padron.js?v=20261008-143929', './js/core.js?v=20261008-143929', './js/seed.js?v=20261008-143929', './js/clima.js?v=20261008-143929', './js/calendario.js?v=20261008-143929',
+  './js/v-inicio.js?v=20261008-143929', './js/v-comunidad.js?v=20261008-143929', './js/v-gestion.js?v=20261008-143929', './js/admin.js?v=20261008-143929', './js/v-vecinos.js?v=20261008-143929', './js/v-expensas.js?v=20261008-143929', './js/v-plan.js?v=20261008-143929', './js/v-contable.js?v=20261008-143929', './js/v-servicio.js?v=20261008-143929', './js/v-legal.js?v=20261008-143929', './js/v-hotel.js?v=20261008-143929', './js/v-cuidados.js?v=20261008-143929', './js/v-casa.js?v=20261008-143929', './js/asistente.js?v=20261008-143929', './js/v-manual.js?v=20261008-143929', './js/push.js?v=20261008-143929', './js/sismos.js?v=20261008-143929', './js/nube.js?v=20261008-143929', './js/historial.js?v=20261008-143929', './js/v-supervisor.js?v=20261008-143929', './js/app.js?v=20261008-143929',
+  './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
+  './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
@@ -28,7 +29,9 @@ self.addEventListener('fetch', e => {
    Safari (iPhone) da de baja la suscripción de una página que recibe
    avisos sin mostrarlos, y a partir de ahí no llegaba nada más.
    ========================================================= */
-const ICONO_TIPO = { camion:'🚛 ', sos:'🆘 ', urgente:'⚠️ ', paquete:'📦 ', bien:'💚 ' };
+/* 'correo': "Andreani va a tu casa" (07-10-2026). Llega como un WhatsApp: con el
+   sonido de avisos del teléfono, aunque la app esté cerrada o la sesión cerrada. */
+const ICONO_TIPO = { camion:'🚛 ', correo:'📬 ', sos:'🆘 ', urgente:'⚠️ ', paquete:'📦 ', bien:'💚 ' };
 self.addEventListener('push', e => {
   let j = {};
   try { j = e.data ? e.data.json() : {}; } catch(err){ j = { data:{ texto: e.data ? e.data.text() : '' } }; }
@@ -41,7 +44,7 @@ self.addEventListener('push', e => {
     body: d.texto || d.body || '', icon:'./icons/icon-192.png', badge:'./icons/badge.png', lang:'es-AR', dir:'ltr',
     tag: d.tag || undefined, renotify: !!d.tag, requireInteraction: urgente || d.sonido === 'sos',
     silent: false, timestamp: Date.now(),
-    vibrate: d.sonido === 'camion' ? [120, 60, 120, 60, 120, 200, 300] : (urgente || d.sonido === 'sos') ? [500, 150, 500, 150, 500, 150, 500] : [200, 100, 200],
+    vibrate: d.sonido === 'camion' ? [120, 60, 120, 60, 120, 200, 300] : d.sonido === 'correo' ? [200, 100, 200, 100, 400] : (urgente || d.sonido === 'sos') ? [500, 150, 500, 150, 500, 150, 500] : [200, 100, 200],
     actions: [{ action:'abrir', title:'Abrir' }],
     data:{ link: d.link || '', sonido: d.sonido || '' },
   };

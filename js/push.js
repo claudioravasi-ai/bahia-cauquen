@@ -48,8 +48,8 @@ const Push = {
     'no-soportado': ['Este navegador no recibe avisos', 'Probá con Chrome, Edge, Firefox o Safari actualizados.'],
     'sin-config':   ['Falta un paso de la Administración', 'Los avisos push todavía no están configurados (Ajustes → Avisos al celular).'],
     'bloqueado':    ['Los avisos están bloqueados en este equipo', 'Se habilitan desde la configuración del navegador o del teléfono (permisos del sitio → Notificaciones → Permitir).'],
-    'activo':       ['Avisos activados en este equipo', 'Te llegan aunque tengas el celular bloqueado: camión de la basura, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
-    'apagado':      ['Activá los avisos en este equipo', 'Para enterarte con el celular bloqueado: camión de la basura, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
+    'activo':       ['Avisos activados en este equipo', 'Te llegan aunque tengas el celular bloqueado: camión de la basura, un correo que va a tu casa, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
+    'apagado':      ['Activá los avisos en este equipo', 'Para enterarte con el celular bloqueado: camión de la basura, un correo que va a tu casa, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
   },
   cargarSDK(){
     if (firebase.messaging) return Promise.resolve();
@@ -82,7 +82,10 @@ const Push = {
     const u = yo(); if (!u || !Nube.db) return;
     const viejo = this.token();
     if (viejo && viejo !== t) await Nube.db.ref(`barrio/pushTokens/${Nube.uid}/${this.claveEquipo(viejo)}`).remove().catch(() => {});
-    await Nube.db.ref(`barrio/pushTokens/${Nube.uid}/${this.claveEquipo(t)}`).set({ t, rol:u.rol, casa:u.casa || '', at:Date.now(),
+    /* El propietario a distancia se anota como 'propietario': el Apps Script le manda solo lo de dueño. */
+    const rol = typeof esPropDistancia === 'function' && esPropDistancia(u) ? 'propietario' : u.rol;
+    try { localStorage.setItem(this.KEY + '.rol', rol); } catch(e){}
+    await Nube.db.ref(`barrio/pushTokens/${Nube.uid}/${this.claveEquipo(t)}`).set({ t, rol, casa:u.casa || '', at:Date.now(),
       equipo: /Android/i.test(navigator.userAgent) ? 'Android' : this.esIOS() ? 'iPhone/iPad' : /Mac/i.test(navigator.userAgent) ? 'Mac' : /Windows/i.test(navigator.userAgent) ? 'Windows' : 'Otro' });
     try { localStorage.setItem(this.KEY, t); localStorage.setItem(this.KEY + '.at', String(Date.now())); } catch(e){}
   },
@@ -99,14 +102,41 @@ const Push = {
      vez en cuando, y así queda al día el rol y el lote). */
   async alDia(){
     try {
-      if (this.estado() !== 'activo') return;
+      if (this.estado() !== 'activo' || !yo()) return;
+      /* Después de cerrar sesión (at = 0) se anota de nuevo en cuanto se
+         vuelve a entrar: así el equipo deja de figurar como "sesión cerrada". */
       const at = +(localStorage.getItem(this.KEY + '.at') || 0);
-      if (Date.now() - at < DIA) return;
+      /* Si cambió cómo hay que anotarlo (el lote se alquiló o dejó de estarlo), se anota ya. */
+      const rol = typeof esPropDistancia === 'function' && esPropDistancia() ? 'propietario' : yo().rol;
+      if (Date.now() - at < DIA && localStorage.getItem(this.KEY + '.rol') === rol) return;
       await this.cargarSDK();
       const reg = await navigator.serviceWorker.ready;
       const t = await firebase.messaging().getToken({ vapidKey:Store.s.config.pushVapid, serviceWorkerRegistration:reg });
       if (t) await this.anotar(t);
     } catch(e){ console.warn('No se pudo renovar el aviso push', e.message); }
+  },
+  /* =========================================================
+     AL CERRAR SESIÓN (07-10-2026)
+     Antes el equipo seguía anotado tal cual y le seguían llegando TODOS los
+     avisos de la cuenta (mensajes privados incluidos) aunque se hubiera
+     cerrado la sesión. Ahora, antes de salir:
+       · si la persona quiere seguir enterándose de los correos que van a su
+         casa, el equipo queda marcado "sesión cerrada" y el Apps Script le
+         manda SOLO ese aviso (como un WhatsApp: empresa y hora, nada más),
+         durante 90 días o hasta que vuelva a entrar;
+       · si no, el equipo se borra de la lista y no le llega nada.
+     Si en ese equipo entra otra cuenta, vale la anotación más nueva: la
+     anterior deja de recibir (lo resuelve el Apps Script).
+     ========================================================= */
+  async alCerrarSesion(seguirCorreos){
+    const t = this.token();
+    if (!t || typeof Nube === 'undefined' || !Nube.db || !Nube.uid) return;
+    const ref = Nube.db.ref(`barrio/pushTokens/${Nube.uid}/${this.claveEquipo(t)}`);
+    try {
+      if (seguirCorreos) await ref.update({ cerrada:Date.now() });
+      else await ref.remove();
+    } catch(e){ console.warn('Aviso push al salir', e.message); }
+    try { localStorage.setItem(this.KEY + '.at', '0'); } catch(e){}
   },
   /* Pedirle al Apps Script que avise. Si falla, no pasa nada: el aviso ya
      está en la campanita y suena en las apps abiertas. */
@@ -151,9 +181,12 @@ const Push = {
     setTimeout(() => this.alDia(), 8000);
     /* El aviso "Entró el camión" que quedó en la bandeja del teléfono se
        quita cuando el camión ya salió (igual que en la campanita). */
+    /* Lo mismo con "va a tu casa", cuando ese correo ya salió. */
     setInterval(() => {
-      if (!('serviceWorker' in navigator) || typeof Camion === 'undefined' || typeof Nube === 'undefined' || !Nube.arrancada || Camion.adentro()) return;
-      navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(n => { if (String(n.tag || '').startsWith('camion-')) n.close(); })).catch(() => {});
+      if (!('serviceWorker' in navigator) || typeof Camion === 'undefined' || typeof Nube === 'undefined' || !Nube.arrancada) return;
+      const camion = !!Camion.adentro(), correos = typeof Mensajeria !== 'undefined' ? Mensajeria.adentro().map(v => 'correo-' + v.id) : [];
+      navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(n => { const tag = String(n.tag || '');
+        if ((tag.startsWith('camion-') && !camion) || (tag.startsWith('correo-') && !correos.includes(tag))) n.close(); })).catch(() => {});
     }, 60000);
   },
 };
