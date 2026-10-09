@@ -208,6 +208,21 @@ app*. Si los pagos de septiembre se hacen por fuera (a Octavo Piso) y no se regi
 liquidación de septiembre todos aparecerían debiendo agosto. Antes de emitir, registrar los pagos
 (Pagos → Registrar un pago a mano, o el extracto) o seguir usando la app solo como comparación.
 
+**Liquidación real de cada mes (desde el 09-10-2026).** Mientras se lleve en paralelo, cada mes
+se trae la liquidación de Octavo Piso: Automáticas → *Traer la liquidación real de un mes* con
+`datos-privados/liquidacion-<mes>.json` (lo arma Claude con el PDF; sin nombres de vecinos). Registra
+los cobros del mes lote por lote (id fijo `ci-<mes anterior>-<lote>`: corrige la carga inicial, no
+duplica), reemplaza los gastos del mes (los estimados quedan anulados) con las obleas como gastos
+particulares, arma el cupón de cada lote con el interés nuevo y guarda el banco y la deuda reales.
+Al final dice si los 152 lotes coinciden al centavo con el PDF. Septiembre 2026: 25 gastos por
+$ 52.119.136,17 + $ 390.885 de obleas, cupones por $ 97.279.177,58, cobros de agosto por
+$ 53.352.387,55. **Mes contra mes** (pestaña de Automáticas) compara cada mes con el anterior.
+
+**"Ya la pagué" (mientras Mercado Pago no esté activo).** El vecino marca su expensa como pagada
+con un toque, sin comprobante obligatorio: queda *Pagada* para él (sin recordatorios) y "por
+acreditar" para la Administración, que la confirma con el resumen del banco (los centavos dicen el
+lote). Nada se da por cobrado porque lo diga el teléfono.
+
 **Lo que ve el vecino:** en su cuenta, *Tus próximas expensas (estimadas)*; y en El barrio →
 **Las cuentas del barrio**, el tablero transparente: gastos mes a mes, en qué se gasta, previsto
 contra real y la morosidad total, sin nombres.

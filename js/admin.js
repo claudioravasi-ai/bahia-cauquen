@@ -988,16 +988,41 @@ document.addEventListener('change', async e => {
     const { out, malos } = leerGuia(await f.text());
     const nTels = out.reduce((n, x) => n + x.tels.tels.length, 0);
     if (aLista(Store.s.guia).length && !await confirmar('Reemplazar la guía', `La guía nueva trae ${plural(out.length, 'lote')} y ${plural(nTels, 'teléfono')}. Reemplaza a la que está cargada.`, { si:'Reemplazar' })) { e.target.value = ''; return; }
+    if (typeof Nube !== 'undefined' && Nube.enviado){ delete Nube.enviado['barrio/guia']; delete Nube.enviado['staff/telefonos']; }
     Store.cambiar(s => {
       s.guia = out.map(x => ({ ...x.guia, at:Date.now() }));
       s.telefonos = out.filter(x => x.tels.tels.length || x.tels.nota).map(x => ({ ...x.tels, at:Date.now() }));
       auditar(s, 'Cargó la guía del barrio', `${out.length} lotes · ${nTels} teléfonos`);
     });
-    toast(`Guía cargada: ${plural(out.length, 'lote')} y ${plural(nTels, 'teléfono')}${malos.length ? ` · no existen: ${malos.join(', ')}` : ''}`, 'check');
-    abrir('vecinos');
-  } catch(err){ toast('No pude leer la guía: ' + err.message, 'alert'); }
+    resultadoGuia(out.length, nTels, malos);
+  } catch(err){ hoja('No se cargó la guía', `${aviso('danger', 'alert', 'No pude leer el archivo', esc(err.message) + '. Revisá que sea el CSV de la guía (guia-del-barrio-….csv) y probá de nuevo.')}
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`); }
   e.target.value = '';
 });
+/* "NO SÉ SI SE CARGÓ" (Claudio, 09-10-2026): antes salía un cartelito de
+   3 segundos y la app saltaba a Vecinos, y no se veía. Ahora queda una
+   ventana abierta que dice cuántos lotes y teléfonos leyó y espera la
+   respuesta de la base del barrio: "Guardada" o qué falló y qué hacer. */
+function resultadoGuia(nLotes, nTels, malos){
+  const datos = `<div class="garita-kpis"><div class="kpi"><b>${nLotes}</b><span>${nLotes === 1 ? 'Lote' : 'Lotes'}</span></div><div class="kpi"><b>${nTels}</b><span>${nTels === 1 ? 'Teléfono' : 'Teléfonos'}</span></div></div>
+    ${malos.length ? aviso('warn', 'alert', 'Algunos lotes no existen y no se cargaron', esc(malos.join(', '))) : ''}`;
+  const pie = `<div class="btns" style="margin-top:14px"><button class="btn btn-sec" data-a="cerrar-hoja">Cerrar</button>
+    <button class="btn btn-pri grow" data-a="guia-ver-vecinos">${I('search')}Ver la guía</button></div>`;
+  const mostrar = estado => { if (!hojaAbierta() || $('#hojaTitulo').textContent !== 'Guía del barrio') return;
+    $('#hojaCuerpo').innerHTML = estado + datos + pie; };
+  const nube = typeof Nube !== 'undefined' && Nube.activa();
+  hoja('Guía del barrio', '');
+  if (!nube){ mostrar(aviso('ok', 'check', 'Guía cargada en este equipo', 'Estás probando sin la base del barrio: los demás no la ven.')); return; }
+  mostrar(`<div class="card plana" style="margin-bottom:12px;display:flex;align-items:center;gap:12px"><div class="cargando" style="margin:0"><span></span><span></span><span></span></div>Guardando en la base del barrio…</div>`);
+  const env = Nube.enviado || {}, esperar = ['barrio/guia', 'staff/telefonos'].map(g => env[g]).filter(Boolean);
+  const tope = new Promise(r => setTimeout(() => r({ ok:false, msg:'tiempo' }), 20000));
+  Promise.race([Promise.all(esperar).then(rs => rs.find(r => !r.ok) || { ok:true }), tope]).then(r => {
+    if (r.ok) mostrar(aviso('ok', 'check', 'Listo: la guía quedó guardada', 'La garita, la Administración y la supervisión ya la ven en "Buscar un vecino". Los teléfonos no los ven los vecinos.'));
+    else if (r.msg === 'tiempo') mostrar(aviso('warn', 'clock', 'Todavía no hay respuesta de la base', 'Puede ser la conexión. La guía queda en este equipo y se manda sola cuando vuelva internet. Mirá en un rato en "Buscar un vecino".'));
+    else mostrar(aviso('danger', 'alert', 'La base del barrio no la aceptó', /permission/i.test(r.msg) ? 'Faltan publicar las reglas nuevas de Firebase (reglas-firebase.txt). Publicalas y volvé a cargar el archivo.' : esc(r.msg)));
+  });
+}
+A['guia-ver-vecinos'] = () => { cerrarHoja(); abrir('vecinos'); };
 A['exportar-guia'] = () => {
   if (!esAdmin()) return;
   const cab = ['lote', 'estado', 'propietarios', 'alquila', 'inquilinos', 'cabana', 'telefonos', 'nota'];

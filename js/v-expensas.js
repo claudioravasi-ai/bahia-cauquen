@@ -132,6 +132,10 @@ function cuentaLote(lote){
       : { fecha:l.emitidaAt - 1, periodo:l.periodo, detalle:`Saldo a favor anterior a ${nombrePeriodo(l.periodo)}`, haber:-c.saldoInicial, tipo:'saldo' });
     movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:`Expensas ${nombrePeriodo(l.periodo)}`, debe:c.total, tipo:'cuota' });
     if (c.interes) movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:'Intereses por saldo impago', debe:c.interes, tipo:'interes' });
+    /* Una liquidación real de Octavo Piso (js/v-plan.js, importarReal) trae a
+       veces una diferencia chica con lo que la app tenía: se muestra aparte. */
+    if (c.ajuste) movs.push(c.ajuste > 0 ? { fecha:l.emitidaAt, periodo:l.periodo, detalle:`Ajuste para igualar ${l.fuente || 'la liquidación'}`, debe:c.ajuste, tipo:'ajuste' }
+      : { fecha:l.emitidaAt, periodo:l.periodo, detalle:`Ajuste a favor para igualar ${l.fuente || 'la liquidación'}`, haber:-c.ajuste, tipo:'ajuste' });
   });
   Store.s.pagos.filter(p => pagoDelLote(p, lote) && p.estado !== 'rechazado' && !esPrueba(p)).forEach(p => {
     const acred = pagoAcreditado(p), grupo = repartoDe(p).length > 1;
@@ -467,13 +471,13 @@ function carpetaVecino(lote, { ajena = false } = {}){
   return `
     <button class="tarjeta-pago ${alDia ? 'al-dia' : cubierto ? 'por-acreditar' : pagar.vencido ? 'vencida' : e && e.fase === 'ultimo' ? 'ultimo-dia' : ''}" ${alDia || ajena || cubierto ? 'disabled' : 'data-a="pagar-expensas"'}>
       <span class="tp-arriba">
-        <span class="tp-rotulo">${alDia ? 'Tu cuenta está al día' : cubierto ? 'Pago informado · por acreditar' : pagar.vencido ? 'Tenés un saldo vencido' : 'Tu expensa de este mes'}</span>
-        ${alDia ? `<span class="tp-chip">${I('check')}Sin deuda</span>` : cubierto ? `<span class="tp-chip">${I('clock')}Por acreditar</span>` : `<span class="tp-chip">${I('wallet')}Pagar ahora</span>`}
+        <span class="tp-rotulo">${alDia ? 'Tu cuenta está al día' : cubierto ? (pagoSimple() ? 'Pagada · la Administración la confirma con el banco' : 'Pago informado · por acreditar') : pagar.vencido ? 'Tenés un saldo vencido' : 'Tu expensa de este mes'}</span>
+        ${alDia ? `<span class="tp-chip">${I('check')}Sin deuda</span>` : cubierto ? `<span class="tp-chip">${I(pagoSimple() ? 'check' : 'clock')}${pagoSimple() ? 'Pagada' : 'Por acreditar'}</span>` : `<span class="tp-chip">${I('wallet')}Pagar ahora</span>`}
       </span>
       <span class="tp-monto">${plata(Math.max(0, cuenta.saldo))}</span>
       ${pagar.periodo && !cuenta1 ? `<span class="tp-detalle">${nombrePeriodo(pagar.periodo)} · vence el ${fechaCorta(pagar.vto1)}${pagar.recargo ? ` · con recargo ${plata(pagar.total)}` : ''}</span>` : ''}
       ${cuenta1}
-      ${cuenta.informado ? `<span class="tp-detalle">${I('clock')} ${plata(cuenta.informado)} por acreditar: la Administración está corroborando tu comprobante${cubierto ? '' : ` · te quedarían ${plata(cuenta.saldo - cuenta.informado)}`}</span>` : ''}
+      ${cuenta.informado ? `<span class="tp-detalle">${I('clock')} ${plata(cuenta.informado)} ${pagoSimple() ? 'pagados: la Administración los confirma con el banco y te llega el recibo' : 'por acreditar: la Administración está corroborando tu comprobante'}${cubierto ? '' : ` · te quedarían ${plata(cuenta.saldo - cuenta.informado)}`}</span>` : ''}
       ${!alDia && !ajena && !cubierto ? `<span class="tp-pie">${I('right')}Tocá para pagar: tarjeta, Mercado Pago, billeteras, QR o transferencia</span>` : ''}
     </button>
     ${!alDia && !ajena && !cubierto ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagué por fuera de la app · adjuntar comprobante</button>` : ''}
@@ -536,8 +540,8 @@ function expensasHotel(){
   const estadoUF = x => { const debe = x.cu.saldo - x.cu.informado; return x.cu.saldo <= .5 ? ['p-ok', 'Al día'] : debe <= .5 ? ['p-warn', 'Por acreditar'] : ['p-danger', 'Debe ' + plata(debe)]; };
   return `
     <button class="tarjeta-pago ${alDia ? 'al-dia' : cubierto ? 'por-acreditar' : vencido ? 'vencida' : fase === 'ultimo' ? 'ultimo-dia' : ''}" ${alDia || cubierto ? 'disabled' : 'data-a="pagar-expensas"'}>
-      <span class="tp-arriba"><span class="tp-rotulo">${alDia ? 'Las 6 UF están al día' : cubierto ? 'Pago informado · por acreditar' : vencido ? 'Hay saldo vencido' : `Expensas de ${ult ? nombrePeriodo(ult.periodo) : 'este mes'} · ${lotes.length} UF`}</span>
-        ${alDia ? `<span class="tp-chip">${I('check')}Sin deuda</span>` : cubierto ? `<span class="tp-chip">${I('clock')}Por acreditar</span>` : `<span class="tp-chip">${I('wallet')}Pagar el total</span>`}</span>
+      <span class="tp-arriba"><span class="tp-rotulo">${alDia ? 'Las 6 UF están al día' : cubierto ? (pagoSimple() ? 'Pagada · la Administración la confirma con el banco' : 'Pago informado · por acreditar') : vencido ? 'Hay saldo vencido' : `Expensas de ${ult ? nombrePeriodo(ult.periodo) : 'este mes'} · ${lotes.length} UF`}</span>
+        ${alDia ? `<span class="tp-chip">${I('check')}Sin deuda</span>` : cubierto ? `<span class="tp-chip">${I(pagoSimple() ? 'check' : 'clock')}${pagoSimple() ? 'Pagada' : 'Por acreditar'}</span>` : `<span class="tp-chip">${I('wallet')}Pagar el total</span>`}</span>
       <span class="tp-monto">${plata(Math.max(0, alDia || cubierto ? saldo : total))}</span>
       ${ult && !reloj ? `<span class="tp-detalle">${nombrePeriodo(ult.periodo)} · vence el ${fechaCorta(v1)}</span>` : ''}
       ${reloj}
@@ -617,6 +621,8 @@ A['pagar-expensas'] = () => {
       <div style="font-size:34px;font-weight:800;letter-spacing:-1.4px;color:var(--wood)">${plata(total)}</div>
       ${pagar.periodo ? `<div class="muted small">${nombrePeriodo(pagar.periodo)} · ${lote}</div>` : ''}</div>
 
+    ${pagoSimple() && total > 0.5 ? `<button class="btn btn-ok btn-block btn-grande" data-a="marcar-pagada" style="margin-bottom:6px">${I('check')}Ya la pagué · marcarla como pagada</button>
+      <p class="muted tiny center" style="margin:0 0 14px">Si ya transferiste o depositaste, tocá acá: queda pagada en la app y la Administración la confirma con el banco. Si todavía no pagaste, elegí cómo abajo.</p>` : ''}
     ${sec('Elegí cómo')}
     ${MercadoPago.activo() ? medio('wallet', 'sky', 'Pagar online ahora', 'Tarjeta de crédito o débito, saldo de Mercado Pago o QR desde cualquier banco o billetera (MODO, Ualá, Brubank, Naranja X…) · se descuenta al instante y el recibo sale solo', `data-a="pago-mp"`) : ''}
     ${!MercadoPago.activo() && c.mpLink ? medio('wallet', 'sky', 'Mercado Pago', 'Saldo, débito, crédito o la billetera que uses', `data-a="pago-link" data-v="${esc(c.mpLink)}" data-t="Mercado Pago"`) : ''}
@@ -633,6 +639,27 @@ A['pagar-expensas'] = () => {
     <p class="muted tiny" style="margin-top:12px">${MercadoPago.activo() ? 'Lo que pagás con "Pagar online ahora" se descuenta solo, con recibo: no hace falta avisarlo. Las transferencias, depósitos y el efectivo sí se avisan con el comprobante.' : 'Los pagos con Mercado Pago o MODO igual conviene avisarlos con el comprobante: así la Administración los corrobora y te emite el recibo enseguida.'}</p>`,
 
     { ancho:'520px' });
+};
+/* =========================================================
+   "YA LA PAGUÉ", DE UN TOQUE (pedido de Claudio, 09-10-2026)
+   "Aún no las pagó nadie, así que deben aparecer por pagar, salvo que
+   cada vecino, por este mes, al apretar el botón Pagar las cargue pagas
+   hasta arreglar y programar el pago con Mercado Pago."
+   Mientras Mercado Pago no esté andando (pagoSimple), el vecino marca su
+   expensa como pagada con un toque, sin comprobante obligatorio. Queda
+   "pagada" para él (sin más recordatorios) y la Administración la ve en
+   Pagos para confirmarla con el banco: el dinero no se da por cobrado
+   porque lo diga el teléfono. Los centavos del importe dicen el lote.
+   Cuando Mercado Pago se active, vuelve solo el circuito de siempre.
+   ========================================================= */
+const pagoSimple = () => !MercadoPago.activo();
+A['marcar-pagada'] = async () => {
+  const H = esHotel() ? cobroHotel() : null, lote = H ? H.etiqueta : miLote(), cuenta = H ? null : cuentaLote(lote), pagar = H ? { periodo:H.periodo } : aPagar(lote);
+  const debe = H ? H.total : Math.max(0, cuenta.saldo - cuenta.informado);
+  const monto = H ? H.total : pagar.recargo && debe ? conCentavosDelLote(debe * (1 + cfgExp().recargo2 / 100), lote).total : debe;
+  if (!(monto > 0.5)) return toast('No tenés nada pendiente de pago', 'check');
+  if (!await confirmar('Marcar como pagada', `¿Ya pagaste <b>${plata(monto)}</b>${pagar.periodo ? ` de las expensas de ${nombrePeriodo(pagar.periodo)}` : ''}? Queda pagada en la app y la Administración la confirma con el banco. Si querés, después mandás el comprobante desde "Ya pagué por fuera de la app".`, { si:'Sí, ya pagué' })) return;
+  await F['informar-pago']({ monto:monto.toFixed(2), fecha:hoyISO(), medio:'Transferencia bancaria', nota:'Marcada como pagada con el botón Pagar', comp:'' });
 };
 A['pago-link'] = el => {
   window.open(el.dataset.v, '_blank', 'noopener');
@@ -758,7 +785,7 @@ const Comprobantes = {
   },
 };
 /* El campo para adjuntarlo: toma PDF, fotos y capturas. */
-const campoComprobante = () => `<div class="field"><label>Comprobante <span class="muted small">(PDF, JPG, PNG o captura · obligatorio salvo efectivo)</span></label>
+const campoComprobante = () => `<div class="field"><label>Comprobante <span class="muted small">(PDF, JPG, PNG o captura · ${pagoSimple() ? 'optativo: con él la Administración lo confirma más rápido' : 'obligatorio salvo efectivo'})</span></label>
   <label class="comp-in" id="compPagoCaja">${I('upload')}<span><b>Adjuntar el comprobante</b><small>Tocá para elegir el archivo o sacarle una foto</small></span>
     <input type="file" accept="image/*,application/pdf,.pdf,.heic,.heif" data-comp-in="compPago" hidden></label>
   <input type="hidden" name="comp" id="compPago"></div>`;
@@ -791,7 +818,7 @@ A['informar-pago'] = () => {
 F['informar-pago'] = async d => {
   const u = yo(), H = esHotel() ? cobroHotel() : null, lote = H ? H.lote : miLote(), monto = Math.round(+d.monto * 100) / 100;
   let comp = null; try { comp = d.comp ? JSON.parse(d.comp) : null; } catch(e){}
-  if (!comp && !/efectivo/i.test(d.medio)){ toast('Adjuntá el comprobante: es lo que la Administración necesita para acreditarlo', 'alert'); return; }
+  if (!comp && !/efectivo/i.test(d.medio) && !pagoSimple()){ toast('Adjuntá el comprobante: es lo que la Administración necesita para acreditarlo', 'alert'); return; }
   if (!(monto > 0)){ toast('Poné el importe que pagaste', 'alert'); return; }
   const id = uid();
   let subido = true;
@@ -800,11 +827,11 @@ F['informar-pago'] = async d => {
     s.pagos.unshift({ id, lote, userId:u.id, monto, fecha:d.fecha, medio:d.medio, nota:(d.nota || '').trim(),
       comp: comp ? { id:comp.id, tipo:comp.tipo, nombre:comp.nombre, kb:comp.kb, de:u.id, subido } : null, foto: comp && comp.mini ? { mini:comp.mini } : null,
       ...(H ? { reparto:repartoHotel(monto), hotel:true } : {}), estado:'informado', at:Date.now() });
-    notificar(s, { para:'rol:admin', titulo:`Pago por fuera de la app · ${H ? H.etiqueta : lote}`, texto:`${plata(monto)} · ${d.medio} · ya figura por acreditar: corroboralo con el comprobante`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas', sonido:true });
+    notificar(s, { para:'rol:admin', titulo:`Pago por fuera de la app · ${H ? H.etiqueta : lote}`, texto:`${plata(monto)} · ${d.medio} · ${comp ? 'ya figura por acreditar: corroboralo con el comprobante' : 'sin comprobante: confirmalo con el banco (los centavos dicen el lote)'}`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas', sonido:true });
     auditar(s, 'Informó un pago por fuera de la app', `${lote} · ${plata(monto)} · ${d.medio}${comp ? ' · con comprobante' : ''}`);
   });
   cerrarHoja();
-  toast(subido ? 'Listo: la Administración ya tiene tu comprobante. Queda por acreditar.' : 'Pago informado. El comprobante quedó en tu equipo: no se pudo subir, avisale a la Administración.', subido ? 'check' : 'alert');
+  toast(!comp ? 'Listo: quedó pagada. La Administración la confirma con el banco.' : subido ? 'Listo: la Administración ya tiene tu comprobante. Queda por acreditar.' : 'Pago informado. El comprobante quedó en tu equipo: no se pudo subir, avisale a la Administración.', subido ? 'check' : 'alert');
 };
 A['ver-comprobante'] = async el => {
   const p = Store.s.pagos.find(x => x.id === el.dataset.id); if (!p) return;

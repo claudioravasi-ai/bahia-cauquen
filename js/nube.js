@@ -869,7 +869,10 @@ const Nube = {
        propio si alguna copia se rechaza. */
     Object.keys(cambios).forEach(r => { const g = r.split('/').slice(0, r.startsWith('pv/') ? 3 : 2).join('/'); (grupos[g] = grupos[g] || {})[r] = cambios[r]; });
     Object.entries(grupos).forEach(([g, paquete]) => {
-      this.db.ref().update(paquete).then(() => { if (this.sinPermiso && g === 'barrio/mensajeria' && this.sinPermiso.delete('mensajeria') && typeof refrescar === 'function') refrescar(); }).catch(e => {
+      const envio = this.db.ref().update(paquete);
+      /* Quien necesita saber si llegó (la carga de la guía) lo mira acá. */
+      (this.enviado = this.enviado || {})[g] = envio.then(() => ({ ok:true }), e => ({ ok:false, msg:e.message }));
+      envio.then(() => { if (this.sinPermiso && g === 'barrio/mensajeria' && this.sinPermiso.delete('mensajeria') && typeof refrescar === 'function') refrescar(); }).catch(e => {
         console.warn('No se pudo guardar', g, e.message);
         /* Lo que es del personal (bitácora, auditoría) no es tarea del vecino:
            si no llega, no se lo asusta con un cartel. */

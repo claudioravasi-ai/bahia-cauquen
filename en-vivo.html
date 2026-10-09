@@ -1,0 +1,1238 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bahía Cauquén en vivo</title>
+<meta name="description" content="Cuatro teléfonos a la vez: la vecina, la garita, la Administración y el equipo de salud, el electricista, el hotel o el policía. Simulación interactiva de la app del barrio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#edf2f1; --surf:#ffffff; --surf-2:#f5f8f7; --surf-3:#e6eeec;
+  --ink:#0f1f1e; --ink-2:#3d4f4d; --muted:#667775; --line:#dce5e3; --line-2:#c9d6d3;
+  --brand:#0d6b66; --brand-2:#14968c; --brand-soft:#d8eeea; --deep:#0b3c47;
+  --ok:#1b8f5a; --ok-soft:#dcf3e7; --danger:#d33a3a; --danger-soft:#fde5e5;
+  --warn:#b7790a; --warn-soft:#fcf0d2; --sky:#2b6fb3; --sky-soft:#e1edf9; --wood:#b85f24; --wood-soft:#fbe9dc;
+  --marco:#1b2629; --marco-2:#2c393c; --sombra:0 24px 60px rgba(11,60,71,.22);
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+    --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+    --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --deep:#0b3c47;
+    --ok:#4fd08f; --ok-soft:#133526; --danger:#f07171; --danger-soft:#3d1c1d;
+    --warn:#f0b54a; --warn-soft:#3a2c10; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --wood-soft:#3a2415;
+    --marco:#000000; --marco-2:#1f2a2d; --sombra:0 24px 60px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+  --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+  --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --deep:#0b3c47;
+  --ok:#4fd08f; --ok-soft:#133526; --danger:#f07171; --danger-soft:#3d1c1d;
+  --warn:#f0b54a; --warn-soft:#3a2c10; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --wood-soft:#3a2415;
+  --marco:#000000; --marco-2:#1f2a2d; --sombra:0 24px 60px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-inline:16px;padding-block:0 40px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.02em}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2.5px solid var(--brand-2);outline-offset:2px;border-radius:8px}
+.envol{max-width:1240px;margin:0 auto}
+
+/* ---------- portada ---------- */
+.cabeza{position:relative;margin:16px 0 22px;border-radius:26px;overflow:hidden;color:#fff;background:var(--deep)}
+.cabeza-foto{position:absolute;inset:0;background:url("img/portada-dia.jpg") center 58%/cover no-repeat;opacity:.55}
+.cabeza::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,rgba(7,40,47,.94) 0%,rgba(7,40,47,.78) 45%,rgba(7,40,47,.2) 100%)}
+.cabeza-in{position:relative;z-index:1;padding:26px 26px 24px;display:grid;gap:14px;max-width:720px}
+.marca{display:flex;align-items:center;gap:12px}
+.marca img{width:52px;height:52px;border-radius:50%;background:#fff;object-fit:cover;box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+.marca b{display:block;font-size:15px;font-weight:800}
+.marca small{display:block;font-size:12.5px;opacity:.85}
+.cabeza h1{font-size:clamp(30px,5vw,50px);font-weight:800;line-height:1.02}
+.cabeza p{font-size:16.5px;max-width:58ch;opacity:.94}
+.sellos{display:flex;flex-wrap:wrap;gap:8px}
+.sello{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2)}
+.sonido{justify-self:start;display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:13.5px;padding:9px 14px;border-radius:12px;background:#fff;color:var(--deep)}
+.sonido[aria-pressed="true"]{background:#ffd97a}
+
+/* ---------- título "pronto" y cifras ---------- */
+.pronto{justify-self:start;display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border-radius:999px;background:#ffd97a;color:#3a2a00}
+.pronto::before{content:"";width:8px;height:8px;border-radius:50%;background:#d33a3a;animation:vivo 1.6s infinite}
+.cifras{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 22px}
+.cifra{background:var(--surf);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.cifra b{display:block;font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.03em;color:var(--brand)}
+.cifra span{display:block;font-size:13px;color:var(--ink-2);line-height:1.35}
+@media (max-width:760px){ .cifras{grid-template-columns:1fr 1fr} }
+
+/* ---------- el banco de pruebas ---------- */
+.banco{display:grid;grid-template-columns:260px minmax(0,1fr);gap:22px;align-items:start}
+.menu{position:sticky;top:12px;display:flex;flex-direction:column;gap:14px}
+.menu h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:800;margin:0 4px 6px}
+.menu-grupo{display:flex;flex-direction:column;gap:4px}
+.opc{display:flex;align-items:center;gap:10px;text-align:left;padding:9px 10px;border-radius:14px;color:var(--ink-2);font-weight:600;font-size:14.5px;line-height:1.25}
+.opc .ic{flex:none;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--surf);border:1px solid var(--line);font-size:16px}
+.opc:hover{background:var(--surf)}
+.opc.on{background:var(--surf);color:var(--ink);box-shadow:0 1px 2px rgba(15,31,30,.06),0 6px 18px rgba(15,31,30,.06)}
+.opc.on .ic{background:var(--brand);border-color:var(--brand);color:#fff}
+.opc.hecha .ic::after{content:"✓";position:absolute;font-size:10px}
+.opc small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
+
+.escena{display:grid;gap:18px}
+.escena-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+.escena-cab h2{font-size:clamp(22px,3vw,30px);font-weight:800}
+.escena-cab p{color:var(--ink-2);max-width:60ch}
+.mesa{display:grid;grid-template-columns:repeat(2,minmax(0,300px)) minmax(0,1fr);gap:22px;align-items:start}
+.mesa.uno{grid-template-columns:minmax(0,300px) minmax(0,1fr)}
+.col-tel{display:grid;gap:10px;justify-items:center}
+.col-tel[hidden]{display:none!important}
+.rol{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--ink);min-height:30px;transition:color .3s}
+.rol span{font-weight:600;color:var(--muted)}
+.rol.le-toca{color:var(--brand)}
+.rol.le-toca::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--brand-2);box-shadow:0 0 0 0 var(--brand-2);animation:vivo 1.6s infinite}
+@keyframes vivo{70%{box-shadow:0 0 0 8px rgba(20,150,140,0)}100%{box-shadow:0 0 0 0 rgba(20,150,140,0)}}
+
+/* el teléfono */
+.tel{position:relative;width:min(300px,100%);height:620px;border-radius:44px;background:var(--marco);padding:11px;box-shadow:var(--sombra),inset 0 0 0 2px var(--marco-2)}
+.tel-pantalla{position:relative;height:100%;border-radius:34px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column}
+.tel-isla{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:92px;height:26px;border-radius:14px;background:#000;z-index:5}
+.tel-estado{flex:none;display:flex;justify-content:space-between;align-items:center;padding:12px 24px 4px;font-size:12.5px;font-weight:800;color:var(--ink);font-family:var(--mono)}
+.tel-estado i{font-style:normal;letter-spacing:1px;font-size:10px}
+.tel-app{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;position:relative}
+.tel-app::-webkit-scrollbar{display:none}
+.tel-push{position:absolute;top:44px;left:10px;right:10px;z-index:8;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.push{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:18px;background:color-mix(in srgb,var(--surf) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 30px rgba(0,0,0,.2);border:1px solid var(--line);animation:baja .45s cubic-bezier(.2,.9,.3,1.2) both;font-size:12.5px;line-height:1.35}
+.push.sale{animation:sube .35s ease-in both}
+.push .pi{flex:none;width:30px;height:30px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:15px}
+.push b{display:block;font-size:12.5px}
+.push small{display:block;color:var(--muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+@keyframes baja{from{transform:translateY(-120%);opacity:0}}
+@keyframes sube{to{transform:translateY(-120%);opacity:0}}
+
+/* ---------- la app, dentro del teléfono ---------- */
+.ap{padding:0 12px 18px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.ap-top{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:8px;padding:6px 12px 8px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.ap-top img{width:30px;height:30px;border-radius:50%;background:#fff;object-fit:cover}
+.ap-top .t{flex:1;min-width:0}
+.ap-top b{display:block;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ap-top small{display:block;font-size:10.5px;color:var(--muted)}
+.ap-campana{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--surf);border:1px solid var(--line);font-size:13px;position:relative}
+.ap-campana[data-n]::after{content:attr(data-n);position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;border-radius:8px;background:var(--danger);color:#fff;font-size:9px;font-weight:800;display:grid;place-items:center;padding:0 3px}
+.ap-sos{font-size:11px;font-weight:800;color:#fff;background:#d33a3a;padding:6px 9px;border-radius:999px;position:relative;overflow:hidden}
+.ap-top.staff{background:color-mix(in srgb,var(--deep) 94%,transparent);color:#fff;border-bottom:0}
+.ap-top.staff small{color:rgba(255,255,255,.75)}
+.ap-top.rojo{background:#8f1d1d;color:#fff}
+.ap-hola{padding:14px 12px 4px}
+.ap-hola small{color:var(--muted);font-weight:700}
+.ap-hola b{display:block;font-size:20px;font-weight:800;letter-spacing:-.02em}
+.ap-card{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:12px}
+.ap-card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.ap-lbl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:4px 2px -2px}
+.ap-tejas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ap-teja{text-align:left;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:10px;min-height:74px;display:flex;flex-direction:column;justify-content:space-between;gap:4px}
+.ap-teja .e{font-size:18px}
+.ap-teja b{font-size:12px;line-height:1.2}
+.ap-teja.destaca{grid-column:span 2;background:var(--brand);color:#fff;border-color:var(--brand);min-height:62px}
+.ap-it{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.ap-it:last-child{border:0}
+.ap-it .e{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--surf-3);font-size:15px}
+.ap-it .x{flex:1;min-width:0}
+.ap-it b{display:block;font-size:12.5px}
+.ap-it span{display:block;font-size:11.5px;color:var(--muted)}
+.ap-pill{flex:none;font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--surf-3);color:var(--ink-2)}
+.ap-pill.ok{background:var(--ok-soft);color:var(--ok)} .ap-pill.warn{background:var(--warn-soft);color:var(--warn)} .ap-pill.mal{background:var(--danger-soft);color:var(--danger)}
+.ap-campo{display:grid;gap:3px}
+.ap-campo label{font-size:11px;font-weight:800;color:var(--ink-2)}
+.ap-campo .v{border:1.5px solid var(--line-2);background:var(--surf);border-radius:11px;padding:8px 10px;font-size:12.5px;min-height:34px}
+.ap-dos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ap-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 12px;border-radius:13px;background:var(--brand);color:#fff;font-weight:800;font-size:13px;position:relative;overflow:hidden}
+.ap-btn.sec{background:var(--surf-3);color:var(--ink)}
+.ap-btn.ok{background:var(--ok)} .ap-btn.rojo{background:#d33a3a} .ap-btn.claro{background:#fff;color:#8f1d1d}
+.ap-btn.chico{width:auto;padding:7px 10px;font-size:11.5px;border-radius:10px}
+.ap-btns{display:flex;gap:8px}
+.ap-btns > *{flex:1}
+.ap-aviso{display:flex;gap:9px;align-items:flex-start;padding:10px;border-radius:13px;font-size:12px;line-height:1.4}
+.ap-aviso b{display:block;font-size:12.5px}
+.ap-aviso.ok{background:var(--ok-soft);color:var(--ok)} .ap-aviso.ok span{color:var(--ink-2)}
+.ap-aviso.mal{background:var(--danger-soft);color:var(--danger)} .ap-aviso.mal span{color:var(--ink-2)}
+.ap-aviso.info{background:var(--sky-soft);color:var(--sky)} .ap-aviso.info span{color:var(--ink-2)}
+.ap-aviso.warn{background:var(--warn-soft);color:var(--warn)} .ap-aviso.warn span{color:var(--ink-2)}
+.ap-mono{font-family:var(--mono);letter-spacing:.06em}
+.ap-qr{display:grid;place-items:center;background:#fff;border-radius:14px;padding:10px;margin:0 auto;width:170px;height:170px}
+.ap-qr svg{width:150px;height:150px}
+.ap-codigo{font-family:var(--mono);font-size:26px;font-weight:600;text-align:center;letter-spacing:.14em}
+.ap-centro{text-align:center}
+.ap-muted{color:var(--muted);font-size:11.5px}
+.ap-hoja{position:absolute;inset:0;z-index:6;background:rgba(0,0,0,.35);display:flex;align-items:flex-end}
+.ap-hoja > div{width:100%;background:var(--surf);border-radius:22px 22px 0 0;padding:16px 14px 20px;display:grid;gap:10px;animation:baja .01s}
+.ap-roja{min-height:100%;background:#b91c1c;color:#fff;padding:16px 14px 20px;display:flex;flex-direction:column;gap:12px;animation:titila 1.1s ease-in-out infinite}
+.ap-roja .grande{font-size:28px;font-weight:800;letter-spacing:.02em;line-height:1.05}
+.ap-roja .medio{font-size:14px;font-weight:700;opacity:.95}
+@keyframes titila{50%{background:#d62828}}
+.ap-chat{display:flex;flex-direction:column;gap:6px;padding:8px 0}
+.msg{max-width:84%;padding:8px 10px;border-radius:14px;font-size:12.5px;line-height:1.4;background:var(--surf);border:1px solid var(--line)}
+.msg.mia{align-self:flex-end;background:var(--brand);color:#fff;border-color:var(--brand)}
+.msg time{display:block;font-size:10px;opacity:.7;text-align:right;margin-top:2px}
+.ap-escribir{display:flex;gap:6px;align-items:flex-end;background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:6px}
+.ap-escribir .v{flex:1;font-size:12.5px;padding:4px 6px}
+.ap-escribir .ap-btn{width:auto}
+.firma{width:100%;height:110px;border:1.5px dashed var(--line-2);border-radius:12px;background:var(--surf-2);touch-action:none;display:block}
+.firma-img{height:54px;background:#fff;border-radius:8px;border:1px solid var(--line)}
+.bien-boton{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px;border-radius:20px;color:#fff;background:linear-gradient(145deg,#22a866,#15784a);animation:late 1.6s ease-in-out infinite}
+.bien-boton .c{flex:none;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.2);display:grid;place-items:center;font-size:22px}
+.bien-boton b{display:block;font-size:21px;letter-spacing:1.2px}
+.bien-boton small{display:block;font-size:11.5px;opacity:.92}
+.bien-boton.alerta{box-shadow:0 0 0 3px rgba(211,58,58,.7)}
+@keyframes late{50%{box-shadow:0 0 0 10px rgba(34,168,102,0);filter:brightness(1.08)}0%,100%{box-shadow:0 0 0 0 rgba(34,168,102,.5)}}
+.dea-fila{display:flex;gap:12px;align-items:center}
+.dea-corazon{font-size:30px;animation:latido 1s ease-in-out infinite}
+@keyframes latido{50%{transform:scale(1.15)}}
+.ap-btn[data-hold]::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.25);transform-origin:left;transform:scaleX(var(--carga,0))}
+.ap-btn[data-hold] > *{position:relative}
+/* El mismo camión de la app, con la cabina adelante (el emoji 🚛 mira para el otro lado y parecía ir marcha atrás). */
+.camion{position:absolute;top:96px;left:-120px;width:110px;animation:cruza 5.5s linear infinite;z-index:4;pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
+.camion svg{display:block;width:100%;height:auto;animation:rebota .5s ease-in-out infinite alternate}
+.camion .rueda{transform-box:fill-box;transform-origin:center;animation:gira .6s linear infinite}
+@keyframes rebota{to{transform:translateY(-2px)}}
+@keyframes gira{to{transform:rotate(360deg)}}
+@keyframes cruza{to{left:110%}}
+.plano{background:var(--surf);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.plano svg{display:block;width:100%;height:auto}
+.plano .pt{cursor:pointer}
+.plano .pt circle.aro{fill:var(--danger);opacity:.18}
+.plano .pt.ok circle.aro{fill:var(--ok);opacity:.25}
+.plano text{font-family:var(--body);font-size:9px;font-weight:800;fill:var(--ink-2)}
+.chk{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);width:100%;text-align:left;font-size:12.5px;font-weight:600}
+.chk .o{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--line-2);display:grid;place-items:center;font-size:12px;color:#fff}
+.chk.on .o{background:var(--ok);border-color:var(--ok)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg span{padding:7px 10px;border-radius:10px;border:1.5px solid var(--line-2);font-size:12px;font-weight:700}
+.seg span.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.nota-sim{font-size:10.5px;font-weight:800;color:var(--warn);text-transform:uppercase;letter-spacing:.06em;text-align:center}
+.toca{box-shadow:0 0 0 3px var(--surf),0 0 0 6px var(--brand-2);animation:tocame 1.3s ease-in-out infinite}
+@keyframes tocame{50%{box-shadow:0 0 0 3px var(--surf),0 0 0 10px rgba(20,150,140,.25)}}
+.ap-voz{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 12px;text-align:center}
+.ap-voz .mic{width:74px;height:74px;border-radius:50%;display:grid;place-items:center;font-size:30px;background:#d23b3b;color:#fff;animation:late 1.3s ease-in-out infinite}
+.ap-voz .dice{font-size:15px;font-weight:800;line-height:1.35}
+.escudo-grande{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px;border-radius:18px;background:var(--surf);border:1px solid var(--line)}
+.escudo-grande img{width:48px;height:48px;border-radius:50%;background:#fff}
+.ap-barra{height:22px;border-radius:8px;background:var(--surf-3);position:relative;overflow:hidden;margin:4px 0}
+.ap-barra i{position:absolute;inset:0 auto 0 0;background:var(--brand-soft)}
+.ap-barra span{position:relative;display:flex;justify-content:space-between;padding:2px 8px;font-size:11.5px;font-weight:800}
+.ap-slots{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ap-slot{border-radius:10px;padding:7px 8px;font-size:11.5px;font-weight:800;text-align:left;border:1.5px solid var(--line-2);background:var(--surf)}
+.ap-slot small{display:block;font-weight:600;color:var(--muted);font-size:10.5px}
+.ap-slot.libre{border-color:var(--ok);background:var(--ok-soft)}
+.ap-slot.ocup{opacity:.6}
+.ap-toast{position:absolute;left:12px;right:12px;bottom:14px;z-index:9;background:var(--ink);color:var(--bg);padding:9px 12px;border-radius:12px;font-size:12px;font-weight:700;text-align:center;animation:baja .3s both}
+
+/* ---------- lo que está pasando ---------- */
+.relato{background:var(--surf);border:1px solid var(--line);border-radius:22px;padding:18px;display:grid;gap:14px;align-self:start;position:sticky;top:12px}
+.relato .paso-n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.06em}
+.relato ol{margin:0;padding:0;list-style:none;display:grid;gap:4px;counter-reset:p}
+.relato li{counter-increment:p;display:grid;grid-template-columns:26px 1fr;gap:8px;padding:8px;border-radius:12px;color:var(--muted);font-size:14px;line-height:1.45}
+.relato li::before{content:counter(p);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--surf-3);color:var(--muted)}
+.relato li.hecho{color:var(--ink-2)}
+.relato li.hecho::before{content:"✓";background:var(--ok-soft);color:var(--ok)}
+.relato li.ahora{background:var(--brand-soft);color:var(--ink)}
+.relato li.ahora::before{background:var(--brand);color:#fff}
+.relato li b{color:var(--ink)}
+.relato .fin{padding:12px;border-radius:14px;background:var(--ok-soft);color:var(--ink);font-size:14px}
+.relato .fin b{color:var(--ok)}
+.relato-btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 14px;border-radius:12px;font-weight:800;font-size:13.5px;background:var(--surf-3);color:var(--ink)}
+.btn.pri{background:var(--brand);color:#fff}
+.mirar{display:none}
+
+/* ---------- el pie ---------- */
+.mas{margin-top:34px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:22px}
+.mas h2{font-size:22px;font-weight:800;margin-bottom:10px}
+.mas ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.mas li{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:13.5px;color:var(--ink-2)}
+.mas li b{display:block;color:var(--ink);font-size:14px}
+.consulta{background:var(--deep);color:#fff;border-radius:22px;padding:20px;display:grid;gap:12px;align-content:start}
+.consulta b{font-size:18px}
+.consulta p{opacity:.9;font-size:14.5px}
+.consulta .num{font-family:var(--mono);font-size:18px;font-weight:600;user-select:all}
+.wa{justify-self:start;display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--deep);font-weight:800;padding:11px 16px;border-radius:12px;text-decoration:none}
+.aclara{margin-top:18px;font-size:12.5px;color:var(--muted);max-width:90ch}
+
+@media (max-width:1180px){
+  .mesa{grid-template-columns:repeat(2,minmax(0,300px));justify-content:center}
+  .mesa.uno{grid-template-columns:minmax(0,300px)}
+  .relato{grid-column:1/-1;position:static}
+}
+@media (max-width:900px){
+  .banco{grid-template-columns:1fr}
+  .menu{position:static;flex-direction:row;overflow-x:auto;gap:18px;padding-bottom:6px;scrollbar-width:thin}
+  .menu-grupo{flex:none}
+  .menu-grupo .lista{display:flex;gap:6px}
+  .opc{white-space:nowrap}
+  .opc small{display:none}
+  .mas{grid-template-columns:1fr}
+}
+@media (max-width:680px){
+  .mesa,.mesa.uno{grid-template-columns:minmax(0,300px);justify-content:center}
+  .mirar{display:flex;justify-content:center}
+  .mirar .seg-m{display:inline-flex;background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:3px}
+  .mirar button{padding:8px 12px;border-radius:9px;font-size:13px;font-weight:800;color:var(--muted)}
+  .mirar button[aria-pressed="true"]{background:var(--brand);color:#fff}
+  .col-tel.oculto{display:none}
+  .tel{height:590px}
+  .cabeza-in{padding:20px 18px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important}
+  .camion{display:none}
+}
+
+
+/* =========================================================
+   EN VIVO: CUATRO TELÉFONOS A LA VEZ (pedido de Claudio, 09-10-2026)
+   ========================================================= */
+.envol{max-width:1340px}
+.ap-top.hotel{background:#6e3a17;color:#fff;border-bottom:0}
+.ap-top.hotel small{color:rgba(255,255,255,.78)}
+.ap-top.poli{background:#1e3a5f;color:#fff;border-bottom:0}
+.ap-top.poli small{color:rgba(255,255,255,.78)}
+.ap-top.wa{background:#075e54;color:#fff;border-bottom:0}
+.ap-top.wa small{color:rgba(255,255,255,.8)}
+.wa-fondo{background:#e9e1d6;min-height:100%;padding:10px 10px 18px;display:flex;flex-direction:column;gap:8px}
+:root[data-theme="dark"] .wa-fondo{background:#0b141a}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .wa-fondo{background:#0b141a} }
+.wa-msg{align-self:flex-start;max-width:88%;background:#fff;color:#111;border-radius:12px;padding:8px 10px;font-size:12.5px;line-height:1.4;box-shadow:0 1px 1px rgba(0,0,0,.12)}
+.wa-msg time{display:block;text-align:right;font-size:10px;color:#777}
+.wa-msg .ap-qr{width:150px;height:150px;margin:6px 0}
+.wa-msg .ap-qr svg{width:130px;height:130px}
+
+/* selector de situaciones */
+.elegir{display:grid;gap:12px;margin:0 0 18px}
+.elegir-cab{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.elegir-cab h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:800}
+.grupos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.grupo h3{font-size:12.5px;font-weight:800;color:var(--ink-2);margin:0 0 6px 4px}
+.grupo .lista{display:grid;gap:4px}
+@media (max-width:1100px){ .grupos{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:680px){
+  .grupos{display:flex;overflow-x:auto;gap:14px;padding-bottom:6px;scrollbar-width:thin}
+  .grupo{flex:none}
+  .grupo .lista{display:flex;gap:6px}
+  .opc{white-space:nowrap}
+  .opc small{display:none}
+}
+
+/* la guía del paso y los controles */
+.guia{position:sticky;top:8px;z-index:20;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:14px 16px;box-shadow:0 10px 30px rgba(15,31,30,.08);margin-bottom:14px}
+.guia .paso-n{font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.06em}
+.guia .quien{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--brand);margin-left:8px}
+.guia .quien::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--brand-2);animation:vivo 1.6s infinite}
+.guia .txt{font-size:15px;line-height:1.45;margin-top:4px}
+.guia .txt b{color:var(--ink)}
+.guia .fin{margin-top:6px;padding:8px 10px;border-radius:12px;background:var(--ok-soft);font-size:14px}
+.guia .fin b{color:var(--ok)}
+.controles{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.btn[aria-pressed="true"]{background:#ffd97a;color:#3a2a00}
+.barra-pasos{grid-column:1/-1;display:flex;gap:4px}
+.barra-pasos i{flex:1;height:5px;border-radius:3px;background:var(--surf-3)}
+.barra-pasos i.hecho{background:var(--brand-2)}
+.barra-pasos i.ahora{background:var(--brand);animation:vivo 1.6s infinite}
+@media (max-width:760px){ .guia{grid-template-columns:1fr;position:static} .controles{justify-content:flex-start} }
+
+/* los cuatro teléfonos */
+.mesa4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:start;justify-items:center}
+.mesa4 .col-tel{width:100%;max-width:290px}
+.mesa4 .tel{width:100%;height:600px;transition:box-shadow .3s,transform .3s}
+.col-tel.le-toca .tel{box-shadow:var(--sombra),inset 0 0 0 2px var(--marco-2),0 0 0 4px var(--brand-2)}
+.col-tel.le-toca .rol{color:var(--brand)}
+.col-tel.le-toca .rol::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--brand-2);animation:vivo 1.6s infinite}
+.col-tel.recibe .tel{animation:sacude .5s}
+@keyframes sacude{25%{transform:translateX(-3px) rotate(-.6deg)}75%{transform:translateX(3px) rotate(.6deg)}}
+.rol{justify-content:center;text-align:center;line-height:1.2}
+@media (max-width:1180px){ .mesa4{grid-template-columns:repeat(2,minmax(0,290px));justify-content:center} }
+.tabs4{display:none}
+@media (max-width:680px){
+  .mesa4{grid-template-columns:minmax(0,300px)}
+  .mesa4 .col-tel.oculto{display:none}
+  .mesa4 .tel{height:590px}
+  .tabs4{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;scrollbar-width:none}
+  .tabs4 button{flex:none;position:relative;padding:8px 12px;border-radius:12px;font-size:12.5px;font-weight:800;background:var(--surf);border:1px solid var(--line);color:var(--muted)}
+  .tabs4 button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+  .tabs4 button.turno::after,.tabs4 button.aviso::after{content:"";position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--brand-2)}
+  .tabs4 button.aviso::after{background:var(--danger)}
+}
+
+/* el dedo de la reproducción automática */
+.dedo{position:fixed;z-index:50;width:38px;height:38px;margin:-19px 0 0 -19px;border-radius:50%;background:rgba(20,150,140,.35);border:2.5px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;animation:dedo .7s ease-out both}
+@keyframes dedo{0%{transform:scale(1.8);opacity:0}60%{transform:scale(.85);opacity:1}100%{transform:scale(1);opacity:1}}
+
+/* lo que pasa en vivo */
+.vivo{margin-top:18px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px}
+.vivo h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:800;margin:0 0 8px}
+.pasos-lista,.feed{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:14px}
+.pasos-lista ol{margin:0;padding:0;list-style:none;display:grid;gap:4px;counter-reset:p}
+.pasos-lista li{counter-increment:p;display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 8px;border-radius:12px;color:var(--muted);font-size:13.5px;line-height:1.45}
+.pasos-lista li::before{content:counter(p);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--surf-3);color:var(--muted)}
+.pasos-lista li.hecho{color:var(--ink-2)}
+.pasos-lista li.hecho::before{content:"✓";background:var(--ok-soft);color:var(--ok)}
+.pasos-lista li.ahora{background:var(--brand-soft);color:var(--ink)}
+.pasos-lista li.ahora::before{background:var(--brand);color:#fff}
+.pasos-lista li em{font-style:normal;font-weight:800;color:var(--brand)}
+.feed ul{margin:0;padding:0;list-style:none;display:grid;gap:6px;max-height:340px;overflow-y:auto}
+.feed li{display:grid;grid-template-columns:auto 1fr;gap:8px;font-size:13px;line-height:1.4;padding:6px 8px;border-radius:10px;background:var(--surf-2);animation:baja .35s both}
+.feed li time{font-family:var(--mono);font-size:11.5px;color:var(--muted);padding-top:1px}
+.feed li b{color:var(--ink)}
+.feed .vacio{color:var(--muted);font-size:13px}
+@media (max-width:900px){ .vivo{grid-template-columns:1fr} }
+
+/* animaciones que cruzan la pantalla */
+.avion{position:absolute;top:90px;left:-90px;width:84px;z-index:4;pointer-events:none;animation:vuela 4.5s ease-in-out infinite;filter:drop-shadow(0 6px 6px rgba(0,0,0,.25))}
+@keyframes vuela{0%{left:-90px;top:70px}60%{top:150px}100%{left:110%;top:210px}}
+.llama{font-size:34px;animation:latido .7s ease-in-out infinite;display:inline-block}
+.sirena{animation:titila .8s infinite}
+.etapas{display:flex;gap:4px}
+.etapas i{flex:1;height:6px;border-radius:3px;background:var(--surf-3)}
+.etapas i.on{background:var(--ok)}
+.voto{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;border:1.5px solid var(--line-2);font-weight:700;font-size:12.5px;width:100%;text-align:left}
+.voto.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+@media (prefers-reduced-motion:reduce){ .avion{display:none} }
+</style>
+</head>
+<body>
+<div class="envol">
+  <header class="cabeza">
+    <div class="cabeza-foto" aria-hidden="true"></div>
+    <div class="cabeza-in">
+      <div class="marca"><img src="icons/logo.png" alt="Escudo del barrio"><div><b>Barrio Bahía Cauquén</b><small>Ushuaia · Tierra del Fuego</small></div></div>
+      <span class="pronto">En vivo · cuatro teléfonos a la vez</span>
+      <h1>Mirá cómo se conecta todo el barrio</h1>
+      <p>Una vecina, la garita, la Administración y un cuarto teléfono que cambia en cada situación: la médica del barrio, el electricista, el hotel, el policía de la ronda o una visita. Lo que toca uno le llega a los otros al instante. Tocá los botones que laten, o apretá <b>Reproducir solo</b> y mirá.</p>
+      <div class="sellos"><span class="sello">📱 4 teléfonos sincronizados</span><span class="sello">🎬 <span id="nEsc">23</span> situaciones, más de 80 toques</span><span class="sello">🔒 Vecinos inventados: no se guarda ni se envía nada</span></div>
+      <div class="sellos"><button class="sonido" id="sonido" aria-pressed="false">🔇 Activar el sonido de los avisos</button><a class="sonido" href="probar.html" style="text-decoration:none">📱 Versión de dos teléfonos</a></div>
+    </div>
+  </header>
+
+  <section class="elegir" aria-label="Situaciones">
+    <div class="elegir-cab"><h2>Elegí una situación</h2><button class="btn pri" id="todo">▶ Ver el recorrido completo, solo</button></div>
+    <div class="grupos" id="menu"></div>
+  </section>
+
+  <main>
+    <div class="escena-cab" style="margin-bottom:12px"><div><h2 id="escTit" style="font-size:clamp(22px,3vw,30px);font-weight:800"></h2><p id="escSub" style="color:var(--ink-2)"></p></div></div>
+    <div class="guia" aria-live="polite">
+      <div><span class="paso-n" id="pasoN"></span><span class="quien" id="quien"></span><div class="txt" id="pasoTxt"></div><div id="finTxt"></div></div>
+      <div class="controles"><button class="btn" id="reiniciar">↺ De nuevo</button><button class="btn" id="auto" aria-pressed="false">▶ Reproducir solo</button><button class="btn pri" id="siguiente">Siguiente situación →</button></div>
+      <div class="barra-pasos" id="barraPasos"></div>
+    </div>
+    <div class="tabs4" id="tabs4" role="group" aria-label="Qué teléfono mirar"></div>
+    <div class="mesa4" id="mesa"></div>
+    <section class="vivo">
+      <div class="pasos-lista"><h2>Paso a paso</h2><ol id="pasos"></ol></div>
+      <div class="feed"><h2>Lo que va pasando, en vivo</h2><ul id="feed"><li class="vacio">Acá aparece cada aviso que viaja de un teléfono a otro.</li></ul></div>
+    </section>
+  </main>
+
+  <section class="mas">
+    <div>
+      <h2>Quién ve qué</h2>
+      <ul>
+        <li><b>La vecina</b>Su casa, sus visitas, sus reclamos y sus expensas. Nunca los datos de otro lote.</li>
+        <li><b>La garita</b>Los ingresos, los correos, los SOS y los teléfonos de cada lote. No ve expensas ni mensajes entre vecinos.</li>
+        <li><b>La Administración</b>Padrón, expensas, reclamos y el libro de guardia, para administrar.</li>
+        <li><b>Equipo de salud</b>Solo el aviso de la emergencia médica cuando la garita sale con el DEA.</li>
+        <li><b>El hotel</b>Sus huéspedes, sus vans y sus 6 unidades. Ningún dato de vecinos.</li>
+        <li><b>La ronda</b>El policía ve sus puntos de control; la garita lo sigue en vivo.</li>
+      </ul>
+    </div>
+    <div class="consulta">
+      <b>¿Dudas o ideas?</b>
+      <p>Escribile a Claudio Ravasi, vecino del Lote 148 y autor de la app.</p>
+      <span class="num">+54 9 2901 494953</span>
+      <a class="wa" href="https://wa.me/5492901494953?text=Hola%20Claudio%2C%20vi%20la%20app%20del%20barrio%20en%20vivo%20y%20te%20quer%C3%ADa%20comentar%3A%20" target="_blank" rel="noopener">💬 Escribirle por WhatsApp</a>
+    </div>
+  </section>
+  <p class="aclara">Es una simulación: los nombres, lotes, teléfonos, vuelos y montos son inventados y esta página no se conecta con la app ni con la base del barrio. En la app real cada persona ve solo lo que le corresponde (Ley 25.326) y el pago en línea lo procesa Mercado Pago.</p>
+</div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const LOGO = 'icons/logo.png';
+const LADOS = ['a', 'b', 'c', 'd'];
+const angosto = () => matchMedia('(max-width:680px)').matches;
+
+/* ---------- estado ---------- */
+const S = { esc:0, paso:0, d:{}, sonido:false, ver:'a', hechas:new Set(), timers:[], auto:false, todo:false, feed:[] };
+const tiempo = (f, ms) => { const t = setTimeout(f, ms); S.timers.push(() => clearTimeout(t)); return t; };
+const cada = (f, ms) => { const t = setInterval(f, ms); S.timers.push(() => clearInterval(t)); return t; };
+const limpiar = () => { S.timers.forEach(f => f()); S.timers = []; $$('.dedo').forEach(x => x.remove()); };
+
+/* ---------- sonido (solo después de tocar "Activar el sonido") ---------- */
+let ac = null;
+function tono(notas, tipo = 'sine', vol = .14){
+  if (!S.sonido) return;
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t0 = ac.currentTime;
+    notas.forEach(([f, t, d]) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = tipo; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0 + t); g.gain.linearRampToValueAtTime(vol, t0 + t + .02); g.gain.exponentialRampToValueAtTime(.001, t0 + t + d);
+      o.connect(g).connect(ac.destination); o.start(t0 + t); o.stop(t0 + t + d + .05); }); } catch(e){}
+}
+const ding = () => tono([[880, 0, .4], [660, .2, .45]]);
+const alarma = () => tono([[1175, 0, .28], [880, .3, .28], [1175, .6, .28], [880, .9, .35]], 'square', .09);
+$('#sonido').addEventListener('click', e => { S.sonido = !S.sonido; e.currentTarget.setAttribute('aria-pressed', S.sonido);
+  e.currentTarget.textContent = S.sonido ? '🔊 Sonido de los avisos: activado' : '🔇 Activar el sonido de los avisos'; if (S.sonido) ding(); });
+
+/* ---------- piezas de la app ---------- */
+const barra = (tit, sub = '', { campana = 0, sos = true, clase = '' } = {}) => `<div class="ap-top ${clase}"><img src="${LOGO}" alt=""><div class="t"><b>${tit}</b>${sub ? `<small>${sub}</small>` : ''}</div>
+  ${clase ? '' : `<span class="ap-campana" ${campana ? `data-n="${campana}"` : ''}>🔔</span>`}${sos && !clase ? '<span class="ap-sos">SOS</span>' : ''}</div>`;
+const VEC = { lucia:['Lucía', 'Lote 42'], paz:['Dra. Valeria Paz', 'Lote 87'], martin:['Martín Soria', 'Lote 63'], elsa:['Elsa Romero', 'Lote 110'], tomas:['Tomás Ibáñez', 'Lote 95'], jorge:['Jorge Bianchi', 'Lote 44'], diego:['Diego', 'Lote 42'], fede:['Federico Ruiz', 'Lote 120'] };
+const v = (k, o = {}) => barra(o.tit || 'Bahía Cauquén', `${VEC[k][0]} · ${VEC[k][1]}`, o);
+const garita = (sub = 'Turno tarde · Guardia Pereyra') => barra('Garita', sub, { clase:'staff' });
+const admin = (sub = 'Administración del barrio') => barra('Administración', sub, { clase:'staff' });
+const hotel = (sub = 'Recepción') => barra('Hotel Los Cauquenes', sub, { clase:'hotel' });
+const poli = (sub = 'Cabo Gómez · adicional nocturno') => barra('Ronda del policía', sub, { clase:'poli' });
+const wa = (sub = 'en línea') => barra('Lucía (vecina)', sub, { clase:'wa' });
+const btn = (txt, { cl = '', hold = 0, go = true } = {}) => `<button class="ap-btn ${cl}" ${go ? 'data-go' : ''} ${hold ? `data-hold="${hold}"` : ''}><span>${txt}</span></button>`;
+const campo = (l, val) => `<div class="ap-campo"><label>${l}</label><div class="v">${val}</div></div>`;
+const it = (e, b, s, pill = '', cl = '') => `<div class="ap-it"><span class="e">${e}</span><div class="x"><b>${b}</b>${s ? `<span>${s}</span>` : ''}</div>${pill ? `<span class="ap-pill ${cl}">${pill}</span>` : ''}</div>`;
+const aviso = (cl, e, b, s = '') => `<div class="ap-aviso ${cl}"><span>${e}</span><div><b>${b}</b><span>${s}</span></div></div>`;
+const card = (h, ...x) => `<div class="ap-card">${h ? `<h4>${h}</h4>` : ''}${x.join('')}</div>`;
+const qr = txt => `<div class="ap-qr" data-qr="${esc(txt)}"></div>`;
+const ap = (...p) => `<div class="ap">${p.join('')}</div>`;
+const hola = (k, saludo = 'Buenas tardes,', extra = '') => `<div class="ap-hola"><small>${saludo}</small><b>${VEC[k][0].replace(/^Dra\. /, '')}</b><span class="ap-muted">${VEC[k][1]}${extra}</span></div>`;
+const pizarra = (...x) => card('Pizarra del día', ...(x.length ? x : [it('🟢', 'Todo en orden en tu lote', 'Hoy')]));
+const roja = (grande, medio, ...x) => `<div class="ap-roja"><div class="grande">${grande}</div><div class="medio">${medio}</div>${x.join('')}</div>`;
+const inicioV = (k, extra = '', o = {}) => v(k, o) + ap(hola(k, o.saludo), extra, o.sinPizarra ? '' : pizarra(...(o.piz || [])));
+const garitaInicio = (extra = '', ingresos = []) => garita() + ap(card('Validar un ingreso', `<div class="ap-dos">${campo('Código, patente o DNI', '<span class="ap-muted">______</span>')}<div style="display:grid;align-content:end"><span class="ap-btn chico sec">📷 Escanear QR</span></div></div>`),
+  extra, card('Ingresos de hoy', ...(ingresos.length ? ingresos : [it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok'), it('👤', 'Carla Méndez', 'Visita · Lote 18', 'Salió')])));
+const adminInicio = (extra = '', o = {}) => admin(o.sub) + ap(`<div class="ap-hola"><small>Día a día</small><b>Administración</b><span class="ap-muted">152 lotes · 138 con la app</span></div>`, extra,
+  o.sinSalas ? '' : card('Garita en vivo', it('🛡️', 'Turno tarde · Guardia Pereyra', '4 adentro · 12 ingresos hoy', 'En servicio', 'ok')));
+const CAMION = `<svg viewBox="0 0 150 80"><rect x="4" y="16" width="86" height="42" rx="6" fill="#2f8f4e"/><rect x="4" y="16" width="86" height="10" rx="5" fill="#27793f"/>
+  <g stroke="#27793f" stroke-width="3"><path d="M22 30v22M40 30v22M58 30v22M76 30v22"/></g><path d="M90 26h24l16 16v16H90z" fill="#f2f2ec"/><path d="M96 31h16l11 11H96z" fill="#9fd3e8"/>
+  <rect x="88" y="54" width="44" height="6" rx="2" fill="#5b5f63"/><rect x="2" y="56" width="92" height="5" rx="2" fill="#5b5f63"/><rect x="126" y="46" width="6" height="5" rx="1" fill="#ffd166"/>
+  <g class="rueda"><circle cx="26" cy="63" r="10" fill="#23272b"/><circle cx="26" cy="63" r="4" fill="#bfc5ca"/></g><g class="rueda"><circle cx="110" cy="63" r="10" fill="#23272b"/><circle cx="110" cy="63" r="4" fill="#bfc5ca"/></g>
+  <text x="47" y="46" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="10" font-weight="800" fill="#fff">RESIDUOS</text></svg>`;
+const camion = `<div class="camion" aria-hidden="true">${CAMION}</div>`;
+const AVION = `<div class="avion" aria-hidden="true"><svg viewBox="0 0 100 40"><path d="M4 22 L60 18 L78 4 L86 4 L76 18 L94 17 Q99 20 94 23 L76 23 L86 37 L78 37 L60 24 L4 24 Q0 23 4 22Z" fill="#2b6fb3"/><circle cx="66" cy="20" r="1.6" fill="#fff"/><circle cx="60" cy="20" r="1.6" fill="#fff"/><circle cx="54" cy="20" r="1.6" fill="#fff"/></svg></div>`;
+const etapas = n => `<div class="etapas">${[0, 1, 2, 3, 4].map(i => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</div>`;
+
+/* ---------- avisos entre teléfonos ---------- */
+function push(l, e, titulo, texto = '', de = 'Bahía Cauquén', { urgente = false } = {}){
+  const box = $('#push' + l); if (!box) return;
+  const p = document.createElement('div'); p.className = 'push';
+  p.innerHTML = `<span class="pi" ${urgente ? 'style="background:#d33a3a"' : ''}>${e}</span><div><small>${esc(de)} · ahora</small><b>${esc(titulo)}</b>${texto ? esc(texto) : ''}</div>`;
+  box.appendChild(p); urgente ? alarma() : ding();
+  const col = $('#col' + l); col.classList.remove('recibe'); void col.offsetWidth; col.classList.add('recibe');
+  if (angosto() && S.ver !== l){ const t = $(`#tabs4 [data-ver="${l}"]`); if (t) t.classList.add('aviso'); }
+  const quita = setTimeout(() => { p.classList.add('sale'); setTimeout(() => p.remove(), 400); }, 5600);
+  S.timers.push(() => { clearTimeout(quita); p.remove(); });
+  anotar(`<b>${esc(rolDe(ESC[S.esc], S.paso, l)[0])}</b> recibió: ${esc(titulo)}${texto ? ` <span style="color:var(--muted)">· ${esc(texto)}</span>` : ''}`);
+}
+/* Un mismo aviso a varios teléfonos a la vez. */
+const avisar = (ls, ...r) => ls.split('').forEach((l, i) => tiempo(() => push(l, ...r), i * 260));
+function anotar(html){
+  const e = ESC[S.esc]; S.feed.unshift(`<li><time>${horaDe(e, S.paso)}</time><span>${html}</span></li>`); S.feed = S.feed.slice(0, 60);
+  $('#feed').innerHTML = S.feed.join('');
+}
+function toastTel(l, txt){
+  const app = $('#app' + l); const t = document.createElement('div'); t.className = 'ap-toast'; t.textContent = txt;
+  app.parentElement.appendChild(t); setTimeout(() => t.remove(), 2600);
+}
+
+/* =========================================================
+   LAS SITUACIONES
+   Cada una: cuatro roles (a: vecina, b: garita, c: Administración,
+   d: el cuarto teléfono) y sus pasos. En cada paso, `lado` es el teléfono
+   al que le toca tocar; las pantallas que no cambian siguen como estaban.
+   ========================================================= */
+const LU = ['Lucía', 'Vecina · Lote 42'], GA = ['Garita', 'Guardia Pereyra'], AD = ['Administración', 'Del barrio'];
+const ESC = [
+
+/* ======================= EMERGENCIAS ======================= */
+{ id:'dea', grupo:'Emergencias', e:'❤️', t:'El DEA y el aviso a los médicos', s:'La garita sale con el desfibrilador y avisa al equipo de salud del barrio',
+  roles:{ a:LU, b:GA, c:AD, d:['Dra. Valeria Paz', 'Médica · Lote 87'] }, hora:'20:14',
+  pasos:[
+  { lado:'a', txt:'El papá de Lucía se descompone. En la portada, Lucía toca el <b>corazón que late</b> ("DEA operativo en la garita") y <b>mantiene apretado 2 segundos</b> el botón SOLICITARLO.',
+    a:() => v('lucia') + ap(`<div class="ap-card"><div class="dea-fila"><span class="dea-corazon">❤️</span><div><b>Desfibrilador (DEA) del barrio · operativo</b><div class="ap-muted">En la garita</div></div></div></div>`,
+      btn('SOLICITARLO · mantené apretado', { cl:'ok', hold:2000 }), aviso('info', 'ℹ️', 'Llamá también al 107', 'La app avisa a la garita y al equipo de salud; la ambulancia la pedís vos.')),
+    b:() => garitaInicio(), c:() => adminInicio(), d:() => inicioV('paz', '', { saludo:'Buenas noches,' }) },
+  { lado:'b', txt:'A la garita le salta una <b>alarma a pantalla completa</b> con el lote y el apellido, hasta que alguien sale. El guardia toca <b>Voy en camino con el DEA</b>.',
+    al(){ avisar('bc', '❤️', 'Emergencia: piden el DEA', 'Lote 42 · Fernández · Calle 3 N.º 42', 'Bahía Cauquén', { urgente:true }); },
+    a:() => v('lucia') + ap(aviso('warn', '⏳', 'Pedido enviado a la garita', 'Te avisamos cuando salgan con el DEA. Mientras, llamá al 107.'), `<a class="ap-btn rojo"><span>📞 Llamar al 107</span></a>`),
+    b:() => garita('ALARMA') + roja('❤️ PIDEN EL DEA', 'Lote 42 · Fernández · Calle 3 N.º 42', btn('Voy en camino con el DEA', { cl:'claro' }), `<div class="medio">Sigue sonando hasta que alguien sale</div>`),
+    c:() => adminInicio(aviso('mal', '❤️', 'Emergencia médica en curso', 'Lote 42 · la garita todavía no salió'), { sinSalas:true }) },
+  { lado:'d', hora:'20:15', txt:'Con ese mismo toque, a los <b>vecinos del equipo de salud</b> (la doctora Paz) les llega una pantalla roja con el lote y "Cómo llegar". Toca <b>VOY</b>.',
+    al(){ push('a', '🏃', 'La garita va en camino con el DEA', 'Salió 20:15'); push('d', '🩺', 'Emergencia médica · Lote 42', 'La garita va con el DEA. ¿Podés ir?', 'Bahía Cauquén', { urgente:true }); },
+    a:() => v('lucia') + ap(aviso('ok', '🏃', 'La garita va en camino con el DEA', 'Salió a las 20:15 · llega en 2 minutos')),
+    b:() => garita('En camino') + ap(aviso('ok', '🏃', 'Saliste con el DEA', 'Lote 42 · Calle 3 N.º 42'), card('Equipo de salud avisado', it('🩺', 'Dra. Valeria Paz', 'Médica · Lote 87', 'Avisada'), it('🧑‍⚕️', 'Pablo Ruiz', 'Enfermero · Lote 133', 'Avisado'))),
+    d:() => v('paz') + roja('🩺 EMERGENCIA MÉDICA', 'Lote 42 · Calle 3 N.º 42 · a 300 m', btn('VOY', { cl:'claro' }), `<span class="ap-btn sec" style="background:rgba(255,255,255,.2);color:#fff">No puedo ir</span>`, `<div class="medio">📍 Cómo llegar</div>`) },
+  { lado:'a', hora:'20:17', txt:'La vecina ve quién va: la garita con el DEA <b>y la médica</b>, con su teléfono. Cuando todo pasó, Lucía toca <b>Ya está solucionado</b>.',
+    al(){ avisar('ab', '🩺', 'También va la Dra. Valeria Paz', 'Médica · 2901 55-0187'); },
+    a:() => v('lucia') + ap(card('En camino', it('🛡️', 'Garita con el DEA', 'Llega 20:17', 'Llegó', 'ok'), it('🩺', 'Dra. Valeria Paz · médica', '2901 55-0187', 'Va', 'ok')), btn('Ya está solucionado', { cl:'ok' })),
+    b:() => garita('En el Lote 42') + ap(card('En el lugar', it('❤️', 'DEA en el Lote 42', 'Llegaste 20:17'), it('🩺', 'Dra. Valeria Paz', 'Va en camino · 2901 55-0187', 'Va', 'ok'))),
+    d:() => v('paz') + ap(aviso('ok', '🏃', 'Vas al Lote 42', 'Calle 3 N.º 42 · la garita ya está con el DEA'), `<a class="ap-btn"><span>📍 Cómo llegar</span></a>`) },
+  { lado:'c', txt:'Se cierra para todos. La Administración ve el <b>tiempo de respuesta</b> (pidió 20:14, salió 20:15, llegó 20:17) para el informe del mes.',
+    al(){ avisar('bcd', '✅', 'Emergencia del Lote 42 resuelta', 'Gracias por ayudar'); },
+    a:() => v('lucia') + ap(aviso('ok', '✅', 'Solucionado', 'Gracias. La garita y la doctora ya lo saben.')),
+    b:() => garitaInicio(aviso('ok', '❤️', 'DEA de vuelta en la garita', 'Emergencia del Lote 42 cerrada 20:31')),
+    c:() => adminInicio(card('Emergencias del mes', it('❤️', 'Lote 42 · DEA', 'Pidió 20:14 · salió 20:15 · llegó 20:17', '3 min', 'ok')), { sinSalas:true }),
+    d:() => inicioV('paz', aviso('ok', '🙏', 'Gracias por ir', 'La emergencia del Lote 42 se cerró')) },
+  ], fin:'Cuatro teléfonos en tres minutos: la vecina pide, la garita sale, la médica va y la Administración lo registra.' },
+
+{ id:'incendio', grupo:'Emergencias', e:'🔥', t:'Incendio en una casa', s:'SOS de 3 segundos: la garita, la Administración y los vecinos saben qué hacer',
+  roles:{ a:LU, b:GA, c:AD, d:['Jorge Bianchi', 'Vecino de al lado · Lote 44'] }, hora:'15:40',
+  pasos:[
+  { lado:'a', txt:'Sale humo del quincho. Lucía <b>mantiene apretado el botón rojo SOS 3 segundos</b> (si suelta antes, no se manda nada).',
+    a:() => v('lucia') + ap(`<div class="ap-hola"><small>Pedir ayuda</small><b>SOS</b><span class="ap-muted">Mantené apretado 3 segundos</span></div>`, btn('🚨 SOS · mantené apretado', { cl:'rojo', hold:3000 }), aviso('info', 'ℹ️', 'No sale solo desde el bolsillo', 'Tiene que estar apretado los 3 segundos.')),
+    b:() => garitaInicio(), c:() => adminInicio(), d:() => inicioV('jorge') },
+  { lado:'a', txt:'Elegí qué pasa: <b>Incendio</b>. La app manda también la ubicación del teléfono.',
+    a:() => v('lucia') + ap(`<div class="ap-hola"><small>¿Qué pasa?</small><b>Elegí una</b></div>`, `<span class="ap-btn sec">🩺 Emergencia médica</span>`, `<span class="ap-btn sec">🚨 Seguridad / intrusión</span>`, btn('🔥 Incendio', { cl:'rojo' }), `<span class="ap-btn sec">❓ Otra</span>`) },
+  { lado:'b', txt:'Salta en <b>todas</b> las apps: la garita con alarma, la Administración y los vecinos, con lo que tienen que hacer. El guardia toca <b>Voy</b> y llama al <b>100</b>.',
+    al(){ avisar('bcd', '🔥', 'SOS · Incendio en Lote 42', 'Fernández · Calle 3 N.º 42', 'Bahía Cauquén', { urgente:true }); },
+    a:() => v('lucia') + ap(aviso('mal', '🔥', 'SOS enviado', 'La garita, la Administración y los vecinos ya lo ven. Llamá al 100.'), `<a class="ap-btn rojo"><span>📞 Bomberos 100</span></a>`),
+    b:() => garita('ALARMA') + roja('🔥 INCENDIO', 'Lote 42 · Fernández · Calle 3 N.º 42 · 📍 GPS', btn('Voy · y llamo al 100', { cl:'claro' })),
+    c:() => adminInicio(aviso('mal', '🔥', 'SOS · Incendio en Lote 42', 'Activo desde 15:40'), { sinSalas:true }),
+    d:() => v('jorge') + roja('🔥 INCENDIO CERCA', 'Lote 42 · Calle 3 N.º 42 · a 40 m de tu casa', `<div class="medio">• No bloquees la calle: entran los bomberos<br>• Punto de encuentro: la plaza<br>• Si tenés matafuego, avisá a la garita</div>`, btn('Entendido', { cl:'claro' })) },
+  { lado:'b', hora:'15:51', txt:'Llegan los <b>bomberos</b> al portón. El guardia toca <b>Ingresaron los bomberos</b>: la barrera queda abierta y todos se enteran.',
+    a:() => v('lucia') + ap(card('Ayuda en camino', it('🛡️', 'Garita', 'Llegó 15:43', 'En el lugar', 'ok'), it('🚒', 'Bomberos', 'Llegando al portón', 'Van', 'warn'))),
+    b:() => garita('Incendio Lote 42') + ap(aviso('mal', '🔥', 'Incendio activo · Lote 42', 'Desde 15:40'), card('En el portón', it('🚒', 'Bomberos voluntarios', 'Autobomba 12 · van al Lote 42')), btn('Ingresaron los bomberos', { cl:'ok' })),
+    d:() => v('jorge') + ap(aviso('warn', '🔥', 'Incendio en el Lote 42', 'No bloquees la calle: llegan los bomberos')) },
+  { lado:'a', hora:'15:52', txt:'Lucía y el vecino ven que <b>entraron los bomberos</b>. A las 16:20 el fuego está apagado: Lucía toca <b>Ya está solucionado</b> y la alerta se cierra para todo el barrio.',
+    al(){ avisar('ad', '🚒', 'Entraron los bomberos', 'Van al Lote 42'); },
+    a:() => v('lucia') + ap(card('Ayuda en camino', it('🛡️', 'Garita', 'Llegó 15:43', 'En el lugar', 'ok'), it('🚒', 'Bomberos', 'Entraron 15:52', 'Adentro', 'ok')), btn('Ya está solucionado', { cl:'ok' })),
+    b:() => garita('Incendio Lote 42') + ap(aviso('mal', '🔥', 'Incendio activo · Lote 42', 'Bomberos adentro 15:52'), card('Ingresos de emergencia', it('🚒', 'Bomberos voluntarios', 'Autobomba 12 · Lote 42', 'Adentro', 'ok'))),
+    d:() => v('jorge') + ap(aviso('warn', '🚒', 'Los bomberos están en el Lote 42', 'Seguí sin bloquear la calle')) },
+  { lado:'c', txt:'Todos reciben el cierre. Queda en el <b>libro de guardia</b> y en el informe mensual (sin datos personales en el correo).',
+    al(){ avisar('bcd', '✅', 'Incendio del Lote 42: solucionado', 'Gracias por despejar la calle'); },
+    a:() => inicioV('lucia', aviso('ok', '✅', 'Solucionado', 'La alerta se cerró para todos')),
+    b:() => garitaInicio(aviso('ok', '📒', 'Anotado en la bitácora', 'Incendio Lote 42 · 15:40 a 16:20 · bomberos')),
+    c:() => adminInicio(card('Emergencias del mes', it('🔥', 'Incendio · Lote 42', 'Garita en 3 min · bomberos en 12 min', 'Cerrada', 'ok')), { sinSalas:true }),
+    d:() => inicioV('jorge', aviso('ok', '✅', 'Todo en orden en el Lote 42', 'Gracias por despejar la calle')) },
+  ], fin:'Un solo gesto y cada uno recibe lo que tiene que hacer: la garita sale, el vecino despeja la calle y entran los bomberos.' },
+
+{ id:'intrusion', grupo:'Emergencias', e:'🚨', t:'Ruidos de noche: SOS de seguridad', s:'La garita y el policía de la ronda van al lote',
+  roles:{ a:LU, b:['Garita', 'Turno noche · Guardia Sosa'], c:AD, d:['Policía', 'Cabo Gómez · ronda'] }, hora:'02:12',
+  pasos:[
+  { lado:'a', txt:'A las 2 de la mañana Lucía escucha ruidos en el patio. Mantiene apretado el <b>SOS</b> 3 segundos y elige <b>Seguridad / intrusión</b>.',
+    a:() => v('lucia') + ap(`<div class="ap-hola"><small>Buenas noches,</small><b>Lucía</b></div>`, btn('🚨 SOS · mantené apretado', { cl:'rojo', hold:3000 })),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(card('Esta noche', it('🛡️', 'Ronda del policía', '2 de 6 puntos · 01:58', 'En curso', 'warn'))),
+    c:() => adminInicio('', { sinSalas:true }), d:() => poli() + ap(card('Tu ronda', it('✅', 'Portón', '01:46'), it('✅', 'Plaza', '01:58'), it('▫️', 'Residuos', 'Pendiente'))) },
+  { lado:'b', txt:'La garita recibe la alarma con el lote y el GPS. Toca <b>Mandar al policía</b>: al cabo de la ronda le llega el lote al instante.',
+    al(){ avisar('bc', '🚨', 'SOS · Seguridad en Lote 42', 'Fernández · ruidos en el patio', 'Bahía Cauquén', { urgente:true }); },
+    a:() => v('lucia') + ap(aviso('mal', '🚨', 'SOS enviado', 'Quedate adentro. La garita ya lo ve.'), `<a class="ap-btn rojo"><span>📞 Policía 101</span></a>`),
+    b:() => garita('ALARMA') + roja('🚨 SEGURIDAD', 'Lote 42 · Fernández · ruidos en el patio · 📍 GPS', btn('Mandar al policía', { cl:'claro' })),
+    c:() => adminInicio(aviso('mal', '🚨', 'SOS · Seguridad en Lote 42', 'Activo 02:12'), { sinSalas:true }) },
+  { lado:'d', hora:'02:13', txt:'El policía recibe <b>"Ir al Lote 42"</b> en su teléfono y toca <b>Voy</b>. La vecina ve que va.',
+    al(){ push('d', '🚨', 'Ir al Lote 42 ya', 'Calle 3 N.º 42 · ruidos en el patio', 'Garita', { urgente:true }); },
+    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('ok', '👮', 'Avisado al Cabo Gómez', 'Va al Lote 42')),
+    d:() => poli('URGENTE') + roja('🚨 IR AL LOTE 42', 'Calle 3 N.º 42 · ruidos en el patio', btn('Voy', { cl:'claro' })) },
+  { lado:'d', hora:'02:19', txt:'Revisa: era un zorro en la basura. Lo anota en la app (<b>Todo en orden</b>) y la garita lo ve en vivo.',
+    al(){ push('a', '👮', 'El policía va a tu casa', 'Cabo Gómez · llega en 2 min'); },
+    a:() => v('lucia') + ap(card('Ayuda en camino', it('👮', 'Cabo Gómez', 'En camino · 02:14', 'Va', 'ok'), it('🛡️', 'Garita', 'Mirando las cámaras', '', ''))),
+    d:() => poli('Lote 42') + ap(campo('Qué encontraste', 'Un zorro revolviendo la basura. Patio y puertas en orden.'), btn('Todo en orden', { cl:'ok' })) },
+  { lado:'a', txt:'Lucía recibe el resultado y toca <b>Ya está solucionado</b>. Queda en la bitácora y en la ronda del policía.',
+    al(){ avisar('abc', '✅', 'Lote 42: todo en orden', 'Era un zorro en la basura · Cabo Gómez 02:19'); },
+    a:() => v('lucia') + ap(aviso('ok', '🦊', 'Era un zorro en la basura', 'Patio y puertas en orden · Cabo Gómez'), btn('Ya está solucionado', { cl:'ok' })),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('ok', '📒', 'Bitácora', 'SOS Lote 42 · 02:12 · policía 02:19 · zorro')),
+    c:() => adminInicio(aviso('ok', '✅', 'SOS de seguridad cerrado', 'Lote 42 · 7 minutos'), { sinSalas:true }),
+    d:() => poli() + ap(aviso('ok', '✅', 'Anotado en tu ronda', 'Seguí por Residuos')) },
+  ], fin:'La garita no tiene que buscar al policía por radio: le llega el lote al teléfono.' },
+
+{ id:'sismo', grupo:'Emergencias', e:'🌋', t:'Sismo: ¿estamos todos bien?', s:'La app avisa y cada casa responde con un toque',
+  roles:{ a:LU, b:GA, c:AD, d:['Elsa Romero', 'Vive sola · Lote 110'] }, hora:'09:03',
+  pasos:[
+  { lado:'c', txt:'Un <b>sismo de magnitud 5,4</b> a 60 km. La app lo toma del servicio sismológico y la Administración toca <b>Preguntar a todos si están bien</b>.',
+    al(){ avisar('abcd', '🌋', 'Sismo M 5,4 a 60 km de Ushuaia', 'Hace 1 minuto · revisá gas y luz'); },
+    a:() => inicioV('lucia', aviso('warn', '🌋', 'Sismo M 5,4 · hace 1 min', '60 km al SO · revisá gas, luz y agua')), b:() => garitaInicio(aviso('warn', '🌋', 'Sismo M 5,4 · hace 1 min', 'Recorré el portón y la barrera')),
+    c:() => adminInicio(aviso('warn', '🌋', 'Sismo M 5,4 · hace 1 min', '60 km al SO de Ushuaia'), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Preguntar a todos si están bien')}</div>`,
+    d:() => inicioV('elsa', aviso('warn', '🌋', 'Sismo M 5,4 · hace 1 min', 'Revisá gas, luz y agua')) },
+  { lado:'a', txt:'A cada casa le llega <b>"¿Están todos bien?"</b>. Lucía toca <b>Estamos bien</b>.',
+    al(){ avisar('abd', '🌋', '¿Están todos bien en casa?', 'Respondé con un toque'); },
+    a:() => v('lucia') + ap(`<div class="ap-hola"><small>Después del sismo</small><b>¿Están todos bien?</b></div>`, btn('💚 Estamos bien', { cl:'ok' }), `<span class="ap-btn rojo">Necesitamos ayuda</span>`),
+    c:() => adminInicio(card('Respuestas', `<div class="ap-barra"><i style="width:4%"></i><span><span>Respondieron</span><span>6 de 138</span></span></div>`), { sinSalas:true }),
+    d:() => v('elsa') + ap(`<div class="ap-hola"><small>Después del sismo</small><b>¿Están todos bien?</b></div>`, `<span class="ap-btn ok">💚 Estamos bien</span>`, `<span class="ap-btn rojo">Necesito ayuda</span>`) },
+  { lado:'d', txt:'Elsa vive sola y se le cayó un mueble: toca <b>Necesito ayuda</b>.',
+    a:() => v('lucia') + ap(aviso('ok', '💚', 'Gracias, Lucía', 'Quedó anotado que en el Lote 42 están bien')),
+    c:() => adminInicio(card('Respuestas', `<div class="ap-barra"><i style="width:62%"></i><span><span>Respondieron</span><span>86 de 138</span></span></div>`, it('💚', '85 casas', 'Están bien'), it('🆘', '1 casa', 'Pide ayuda', '', '')), { sinSalas:true }),
+    d:() => v('elsa') + ap(`<div class="ap-hola"><small>Después del sismo</small><b>¿Están todos bien?</b></div>`, `<span class="ap-btn ok">💚 Estamos bien</span>`, btn('🆘 Necesito ayuda', { cl:'rojo' })) },
+  { lado:'b', txt:'A la garita y a la Administración les llega el pedido de Elsa <b>primero en la lista</b>. El guardia toca <b>Voy</b>.',
+    al(){ avisar('bc', '🆘', 'Lote 110 pide ayuda después del sismo', 'Elsa Romero · vive sola', 'Bahía Cauquén', { urgente:true }); },
+    b:() => garita('Después del sismo') + ap(aviso('mal', '🆘', 'Lote 110 · Elsa Romero', 'Pide ayuda · vive sola · 82 años'), btn('Voy', { cl:'ok' }), card('Ya respondieron', it('💚', '85 casas', 'Están bien'))),
+    c:() => adminInicio(card('Respuestas', `<div class="ap-barra"><i style="width:70%"></i><span><span>Respondieron</span><span>97 de 138</span></span></div>`, it('🆘', 'Lote 110 · Elsa Romero', 'Pide ayuda', 'Garita avisada', 'warn')), { sinSalas:true }),
+    d:() => v('elsa') + ap(aviso('warn', '⏳', 'Pedido enviado', 'La garita viene a tu casa')) },
+  { lado:'c', hora:'09:20', txt:'Llega la garita: Elsa está bien. La Administración ve el <b>tablero del barrio</b> y manda el aviso de cierre.',
+    al(){ avisar('abd', '✅', 'Después del sismo, el barrio está bien', '131 de 138 casas respondieron'); },
+    b:() => garitaInicio(aviso('ok', '✅', 'Lote 110: Elsa está bien', 'Se le cayó un mueble · la ayudaste 09:12')),
+    c:() => adminInicio(card('Respuestas', `<div class="ap-barra"><i style="width:95%"></i><span><span>Respondieron</span><span>131 de 138</span></span></div>`, it('💚', '131 casas', 'Están bien', 'Listo', 'ok')), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Avisar a todos: el barrio está bien', { cl:'ok' })}</div>`,
+    d:() => inicioV('elsa', aviso('ok', '💚', 'La garita te ayudó', '09:12 · cualquier cosa, tocá SOS')) },
+  { lado:'a', txt:'Fin. Las 7 casas que no respondieron quedan en la lista de la garita para pasar a ver.',
+    a:() => inicioV('lucia', aviso('ok', '✅', 'El barrio está bien', '131 de 138 casas respondieron')),
+    c:() => adminInicio(aviso('ok', '✅', 'Aviso de cierre enviado', 'Quedan 7 casas para que pase la garita'), { sinSalas:true }) },
+  ], fin:'En 17 minutos el barrio sabe quién está bien y quién necesita ayuda, empezando por quien vive solo.' },
+
+{ id:'estoybien', grupo:'Emergencias', e:'💚', t:'"Estoy bien" de quien vive sola', s:'Si Elsa no toca su botón a la hora, avisa a la garita y a quien ella eligió',
+  roles:{ a:['Lucía', 'Elegida por Elsa · Lote 42'], b:GA, c:AD, d:['Elsa Romero', 'Vive sola · Lote 110'] }, hora:'10:00',
+  pasos:[
+  { lado:'d', txt:'Elsa eligió tocar <b>Estoy bien</b> todas las mañanas antes de las 10, y eligió a Lucía para que le avisen. Hoy es tarde y no lo tocó… Tocá <b>Pasa la hora</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), c:() => adminInicio(),
+    d:() => v('elsa') + ap(hola('elsa', 'Buen día,'), `<button class="bien-boton"><span class="c">💚</span><span><b>ESTOY BIEN</b><small>Tocalo antes de las 10:00</small></span></button>`, btn('⏰ Pasa la hora sin tocarlo', { cl:'sec' })) },
+  { lado:'b', hora:'10:01', txt:'A las 10:01 salta <b>una sola alarma</b> a la garita, a la Administración y a Lucía. El guardia toca <b>Llamar a Elsa</b>.',
+    al(){ avisar('bca', '💛', 'Elsa Romero no tocó "Estoy bien"', 'Lote 110 · debía antes de las 10:00', 'Bahía Cauquén', { urgente:true }); },
+    a:() => v('lucia') + ap(aviso('warn', '💛', 'Elsa no tocó "Estoy bien"', 'Lote 110 · te eligió como contacto'), `<a class="ap-btn"><span>📞 Llamar a Elsa</span></a>`),
+    b:() => garita('Aviso') + ap(aviso('warn', '💛', 'Lote 110 · Elsa Romero', 'No tocó "Estoy bien" (antes de las 10:00)'), btn('📞 Llamar a Elsa')),
+    c:() => adminInicio(aviso('warn', '💛', 'Lote 110 no tocó "Estoy bien"', 'La garita está avisada'), { sinSalas:true }),
+    d:() => v('elsa') + ap(`<button class="bien-boton alerta" data-go><span class="c">💚</span><span><b>ESTOY BIEN</b><small>Tocalo: te están buscando</small></span></button>`) },
+  { lado:'d', hora:'10:04', txt:'Elsa estaba en la ducha. Atiende y toca <b>Estoy bien</b>: se tranquilizan todos a la vez.',
+    b:() => garita('Llamando…') + ap(aviso('info', '📞', 'Llamando a Elsa Romero', 'Lote 110')) },
+  { lado:'a', txt:'A Lucía, a la garita y a la Administración les llega <b>"Elsa está bien"</b>. Nadie más ve nada: es privado.',
+    al(){ avisar('bca', '💚', 'Elsa Romero está bien', 'Tocó "Estoy bien" a las 10:04'); },
+    a:() => inicioV('lucia', aviso('ok', '💚', 'Elsa está bien', 'Tocó "Estoy bien" a las 10:04')),
+    b:() => garitaInicio(aviso('ok', '💚', 'Lote 110: Elsa está bien', '10:04')),
+    c:() => adminInicio(aviso('ok', '💚', 'Lote 110 resuelto', '10:04'), { sinSalas:true }),
+    d:() => inicioV('elsa', aviso('ok', '💚', 'Gracias, Elsa', 'Mañana te esperamos antes de las 10')) },
+  ], fin:'Para quien vive sola: un toque por día y, si un día falta, alguien se entera enseguida.' },
+
+{ id:'kayak', grupo:'Emergencias', e:'🛶', t:'Salida en kayak que no vuelve', s:'Si pasa la hora de regreso, avisa con los datos para Prefectura',
+  roles:{ a:['Lucía', 'Contacto de Tomás · Lote 42'], b:GA, c:AD, d:['Tomás Ibáñez', 'Kayakista · Lote 95'] }, hora:'13:30',
+  pasos:[
+  { lado:'d', txt:'Tomás sale en kayak por el canal. En <b>Salidas seguras</b> carga adónde va, con quién y a qué hora vuelve. Toca <b>Salgo</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), c:() => adminInicio(),
+    d:() => v('tomas', { tit:'Salidas seguras' }) + ap(`<div class="seg"><span class="on">🛶 Kayak</span><span>🥾 Montaña</span><span>⛵ Navegación</span></div>`, campo('Adónde', 'Isla Redonda por el Canal Beagle'),
+      `<div class="ap-dos">${campo('Vuelvo a las', '17:00')}${campo('Con', 'Solo')}</div>`, campo('Kayak', 'Rojo · Prijon · chaleco naranja'), btn('Salgo')) },
+  { lado:'d', hora:'17:30', txt:'Son las 17:30 y Tomás no tocó <b>Volví</b>. Tocá <b>Pasa la hora</b>.',
+    al(){ push('b', '🛶', 'Tomás salió en kayak', 'Lote 95 · vuelve a las 17:00'); },
+    b:() => garitaInicio(card('Salidas de hoy', it('🛶', 'Tomás Ibáñez · Lote 95', 'Kayak · vuelve 17:00', 'Afuera', 'warn'))),
+    d:() => v('tomas') + ap(aviso('info', '🛶', 'Estás de salida', 'Isla Redonda · vuelve 17:00'), `<span class="ap-btn ok">Volví</span>`, btn('⏰ Pasa la hora sin volver', { cl:'sec' })) },
+  { lado:'b', txt:'Salta el aviso a la garita, la Administración y Lucía (su contacto), <b>con todo lo que pide Prefectura</b>: adónde fue, el kayak, el chaleco y el 106.',
+    al(){ avisar('bca', '🛶', 'Tomás no volvió de su salida', 'Kayak · debía volver 17:00', 'Bahía Cauquén', { urgente:true }); },
+    a:() => v('lucia') + ap(aviso('mal', '🛶', 'Tomás no volvió', 'Kayak · Isla Redonda · debía volver 17:00'), `<a class="ap-btn"><span>📞 Llamar a Tomás</span></a>`),
+    b:() => garita('Aviso') + ap(aviso('mal', '🛶', 'Tomás Ibáñez · Lote 95', 'Debía volver 17:00'), card('Para Prefectura', it('📍', 'Isla Redonda · Canal Beagle', 'Salió 13:30 · solo'), it('🛶', 'Kayak rojo Prijon', 'Chaleco naranja')), `<a class="ap-btn rojo"><span>📞 Prefectura 106</span></a>`, btn('Lo llamé, contestó', { cl:'sec' })),
+    c:() => adminInicio(aviso('mal', '🛶', 'Salida vencida · Lote 95', 'La garita tiene los datos para el 106'), { sinSalas:true }) },
+  { lado:'d', hora:'17:41', txt:'Tomás atiende: se demoró por el viento. Al llegar toca <b>Volví</b> y se cierra para todos.',
+    d:() => v('tomas') + ap(aviso('warn', '🛶', 'Te están buscando', 'Pasó la hora de regreso'), btn('Volví', { cl:'ok' })) },
+  { lado:'a', txt:'Todos reciben <b>"Tomás volvió"</b>. La salida queda en su historial, nada más.',
+    al(){ avisar('bca', '✅', 'Tomás volvió de su salida', '17:41 · todo bien'); },
+    a:() => inicioV('lucia', aviso('ok', '✅', 'Tomás volvió', '17:41')), b:() => garitaInicio(aviso('ok', '🛶', 'Lote 95 volvió', '17:41')),
+    c:() => adminInicio(aviso('ok', '✅', 'Salida cerrada', 'Lote 95 · 17:41'), { sinSalas:true }), d:() => inicioV('tomas', aviso('ok', '🛶', 'Bienvenido', 'Salida cerrada 17:41')) },
+  ], fin:'Si algo sale mal en el agua o en la montaña, la garita tiene en un segundo lo que pregunta Prefectura.' },
+
+/* ======================= LA GARITA ======================= */
+{ id:'visita', grupo:'La garita', e:'🔳', t:'Una visita con QR', s:'La vecina crea el pase, la visita lo recibe por WhatsApp y entra',
+  roles:{ a:LU, b:GA, c:AD, d:['Marcos Díaz', 'La visita · su WhatsApp'] }, hora:'16:05',
+  pasos:[
+  { lado:'a', txt:'En <b>Tu casa</b> tocá <b>Autorizar una visita</b> y completá quién viene.',
+    a:() => v('lucia', { tit:'Autorizar una visita' }) + ap(campo('Nombre y apellido', 'Marcos Díaz'), `<div class="ap-dos">${campo('Tipo', 'Visita')}${campo('Patente', 'AB 123 CD')}</div>`, `<div class="ap-dos">${campo('Día', 'Hoy')}${campo('Horario', '16 a 20 h')}</div>`, btn('Crear el pase')),
+    b:() => garitaInicio(), c:() => adminInicio(), d:() => wa('en línea') + `<div class="wa-fondo"><div class="wa-msg">¿A qué hora paso?<time>16:01</time></div></div>` },
+  { lado:'a', txt:'Sale un <b>código y un QR</b>. Lucía toca <b>Compartir por WhatsApp</b>: le llega a Marcos.',
+    a:() => v('lucia', { tit:'Pase de ingreso' }) + ap(qr('BHC:P-482915'), `<div class="ap-codigo">482 915</div><div class="ap-muted ap-centro">Hoy de 16:00 a 20:00 · AB 123 CD</div>`, btn('Compartir por WhatsApp', { cl:'ok' })),
+    b:() => garitaInicio('', [it('👤', 'Marcos Díaz', 'Visita de Lucía · Lote 42 · 16–20 h', 'Esperado', 'warn')]) },
+  { lado:'d', hora:'16:30', txt:'Marcos recibe el pase por WhatsApp, <b>sin instalar nada</b>. Al llegar al portón muestra el QR: tocá <b>Mostrar en la garita</b>.',
+    al(){ push('d', '💬', 'Lucía (vecina)', 'Te dejo el pase para entrar al barrio', 'WhatsApp'); },
+    d:() => wa('en línea') + `<div class="wa-fondo"><div class="wa-msg">¿A qué hora paso?<time>16:01</time></div><div class="wa-msg">Te dejo el pase para entrar al barrio Bahía Cauquén 👇${qr('BHC:P-482915')}Código <b>482 915</b> · hoy de 16 a 20 h<time>16:06</time></div>${btn('Mostrar en la garita', { cl:'ok' })}</div>` },
+  { lado:'b', hora:'16:32', txt:'El guardia <b>escanea el QR</b>: la app dice si vale hoy y a esta hora y quién lo autorizó. Toca <b>Ingresó</b>.',
+    b:() => garita() + ap(aviso('ok', '✅', 'PASE VÁLIDO', 'Leído con el QR · 16:32'), card('', it('👤', 'Marcos Díaz', 'Visita · AB 123 CD'), it('🏠', 'Autorizó Lucía Fernández', 'Lote 42 · Calle 3 N.º 42'), it('🕓', 'Hoy de 16 a 20 h', 'Dentro del horario')), btn('Ingresó', { cl:'ok' })),
+    d:() => wa('en línea') + `<div class="wa-fondo"><div class="wa-msg">Te dejo el pase para entrar al barrio 👇${qr('BHC:P-482915')}<time>16:06</time></div></div>` },
+  { lado:'c', txt:'A Lucía le llega <b>"Marcos ingresó"</b> al instante. La Administración ve el movimiento en <b>Garita en vivo</b>, sin tocar nada.',
+    al(){ push('a', '🛡️', 'Marcos Díaz ingresó al barrio', 'Pasó por la garita 16:32'); },
+    a:() => v('lucia', { tit:'Mis visitas', campana:1 }) + ap(card('', it('👤', 'Marcos Díaz', 'Ingresó 16:32 · hasta las 20:00', 'Adentro', 'ok'))),
+    b:() => garitaInicio('', [it('👤', 'Marcos Díaz', 'Visita · Lote 42', 'Adentro', 'ok'), it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok')]),
+    c:() => adminInicio(card('Garita en vivo', it('👤', 'Marcos Díaz', 'Visita · Lote 42 · 16:32', 'Adentro', 'ok'), it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok')), { sinSalas:true }) },
+  ], fin:'La visita no instala nada: entra con el QR de WhatsApp y la vecina se entera al instante.' },
+
+{ id:'correos', grupo:'La garita', e:'📮', t:'Correos en el barrio', s:'La garita anota la moto del correo y cada casa sabe si viene para ella',
+  roles:{ a:LU, b:GA, c:AD, d:['Martín Soria', 'Vecino · Lote 63'] }, hora:'11:20',
+  pasos:[
+  { lado:'b', txt:'Entra la moto de <b>Andreani</b>. El guardia toca la empresa, escribe a qué lotes va y toca <b>Entró</b>.',
+    a:() => inicioV('lucia'), c:() => adminInicio(), d:() => inicioV('martin'),
+    b:() => garita() + ap(card('Correos', `<div class="seg"><span>OCA</span><span class="on">Andreani</span><span>Correo Arg.</span><span>Mercado Libre</span></div>`), campo('Va a los lotes', '42 · 63 · 118'), campo('Patente', 'A 041 KLM'), btn('Entró')) },
+  { lado:'a', txt:'<b>Todos</b> ven que Andreani está en el barrio. Lucía y Martín, además, reciben <b>"Va a tu casa"</b> (solo su lote). Lucía toca <b>Ya lo recibí</b>.',
+    al(){ avisar('ad', '📮', 'Andreani va a tu casa', 'Entró 11:20 · moto'); tiempo(() => push('c', '📮', 'Andreani está en el barrio', 'Entró 11:20'), 600); },
+    a:() => v('lucia', { campana:1 }) + ap(hola('lucia', 'Buen día,'), aviso('info', '📮', 'Andreani va a tu casa', 'Entró 11:20 · moto'), btn('Ya lo recibí', { cl:'ok' }), pizarra(it('📮', 'Andreani en el barrio', 'Desde las 11:20'))),
+    b:() => garita() + ap(card('Correos en el barrio', it('📮', 'Andreani · A 041 KLM', 'Lotes 42, 63 y 118 · 11:20', 'Adentro', 'warn'))),
+    c:() => adminInicio(card('Correos en el barrio', it('📮', 'Andreani', 'Entró 11:20 · 3 lotes', 'Adentro', 'warn')), { sinSalas:true }),
+    d:() => v('martin', { campana:1 }) + ap(hola('martin', 'Buen día,'), aviso('info', '📮', 'Andreani va a tu casa', 'Entró 11:20'), pizarra(it('📮', 'Andreani en el barrio', 'Desde las 11:20'))) },
+  { lado:'b', hora:'11:48', txt:'Andreani termina el recorrido. El guardia toca <b>Salió</b>.',
+    a:() => inicioV('lucia', aviso('ok', '📮', 'Recibiste el envío', 'Andreani · 11:31'), { saludo:'Buen día,' }),
+    b:() => garita() + ap(card('Correos en el barrio', it('📮', 'Andreani · A 041 KLM', 'Lotes 42, 63 y 118 · 11:20', 'Adentro', 'warn')), btn('Salió')) },
+  { lado:'c', txt:'El aviso del correo <b>se va solo</b> de todas las apps y queda en el libro de guardia, con la hora de entrada y de salida.',
+    al(){ avisar('acd', '📮', 'Andreani salió del barrio', '11:48'); },
+    b:() => garitaInicio(card('Correos de hoy', it('📮', 'Andreani · A 041 KLM', '11:20 a 11:48 · 3 lotes', 'Salió'))),
+    c:() => adminInicio(card('Correos de hoy', it('📮', 'Andreani', '11:20 a 11:48 · 3 lotes', 'Salió')), { sinSalas:true }),
+    d:() => inicioV('martin', '', { saludo:'Buen día,' }) },
+  ], fin:'Nadie espera en la puerta en vano: cada casa sabe si el correo viene para ella.' },
+
+{ id:'camion', grupo:'La garita', e:'🚛', t:'Pasa el camión de residuos', s:'La garita marca la entrada y a todos les llega el aviso',
+  roles:{ a:LU, b:['Garita', 'Turno mañana · Guardia Ruiz'], c:AD, d:['Elsa Romero', 'Vecina · Lote 110'] }, hora:'07:52',
+  pasos:[
+  { lado:'b', txt:'Martes 7:52: llega el camión de <b>SEINCO</b>. El guardia toca <b>Entró el camión</b>.',
+    a:() => inicioV('lucia', '', { saludo:'Buen día,', piz:[it('🟡', 'Hoy pasa el camión', 'Todos los residuos')] }), c:() => adminInicio(),
+    d:() => inicioV('elsa', '', { saludo:'Buen día,', piz:[it('🟡', 'Hoy pasa el camión', 'Todos los residuos')] }),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(card('Camión de residuos', it('🚛', 'SEINCO · AD 312 PQ', 'Martes: todos los residuos')), btn('Entró el camión')) },
+  { lado:'a', txt:'A <b>todos</b> les llega el aviso y el camión cruza la pantalla. Lucía toca <b>Saco la bolsa</b>.',
+    al(){ avisar('acd', '🚛', 'Entró el camión de residuos', '07:52 · sacá las bolsas'); },
+    a:() => v('lucia', { campana:1 }) + camion + ap(hola('lucia', 'Buen día,'), aviso('warn', '🚛', 'El camión está en el barrio', 'Entró 07:52'), btn('Saco la bolsa', { cl:'ok' })),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(card('Camión', it('🚛', 'SEINCO', 'Entró 07:52', 'Adentro', 'warn')), btn('Salió el camión', { go:false, cl:'sec' })),
+    c:() => adminInicio(card('Servicios de hoy', it('🚛', 'Camión de residuos', 'Entró 07:52', 'Adentro', 'warn')), { sinSalas:true }),
+    d:() => v('elsa', { campana:1 }) + camion + ap(hola('elsa', 'Buen día,'), aviso('warn', '🚛', 'El camión está en el barrio', 'Entró 07:52')) },
+  { lado:'b', hora:'08:31', txt:'Cuando termina, el guardia toca <b>Salió el camión</b>.',
+    a:() => v('lucia') + ap(hola('lucia', 'Buen día,'), aviso('ok', '👍', 'Bolsa afuera', 'Llegaste a tiempo')),
+    b:() => garita('Turno mañana · Guardia Ruiz') + ap(card('Camión', it('🚛', 'SEINCO', 'Entró 07:52', 'Adentro', 'warn')), btn('Salió el camión')) },
+  { lado:'c', txt:'El aviso <b>desaparece solo</b> de todas las apps, y queda en la bitácora. El sábado, el aviso dice "voluminosos".',
+    al(){ avisar('acd', '✅', 'El camión ya pasó', '07:52 a 08:31'); },
+    a:() => inicioV('lucia', '', { saludo:'Buen día,' }), b:() => garitaInicio(aviso('ok', '📒', 'Bitácora', 'Camión de residuos 07:52 a 08:31')),
+    c:() => adminInicio(card('Servicios de hoy', it('🚛', 'Camión de residuos', '07:52 a 08:31', 'Pasó', 'ok')), { sinSalas:true }), d:() => inicioV('elsa', '', { saludo:'Buen día,' }) },
+  ], fin:'Nadie saca la bolsa tarde ni la deja al viento: el aviso llega cuando el camión entra y se va cuando sale.' },
+
+{ id:'proveedor', grupo:'La garita', e:'🧰', t:'El electricista con la ART vencida', s:'La garita lo frena, él sube la nueva desde su teléfono y entra',
+  roles:{ a:LU, b:GA, c:AD, d:['Martín Soria', 'Electricista · proveedor'] }, hora:'08:55',
+  pasos:[
+  { lado:'a', txt:'Lucía espera al electricista. En <b>Autorizar una visita</b> elige <b>Proveedor</b>: el pase pide la ART.',
+    a:() => v('lucia', { tit:'Autorizar un proveedor' }) + ap(campo('Empresa o persona', 'Martín Soria · electricista'), `<div class="ap-dos">${campo('Día', 'Hoy')}${campo('Horario', '9 a 13 h')}</div>`, campo('ART', 'La controla la garita al llegar'), btn('Crear el pase')),
+    b:() => garitaInicio(), c:() => adminInicio(), d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(aviso('info', '🔳', 'Pase para el Lote 42', 'Hoy de 9 a 13 h')) },
+  { lado:'b', hora:'09:02', txt:'Martín llega. La garita lee su pase y la app avisa: <b>ART vencida ayer</b>. No pasa. El guardia toca <b>Pedirle la ART nueva</b>.',
+    b:() => garita() + ap(aviso('mal', '⛔', 'ART VENCIDA', 'Venció ayer · no puede ingresar'), card('', it('🧰', 'Martín Soria', 'Electricista · Lote 42'), it('📄', 'ART · Galeno', 'Vencida el 08/10')), btn('Pedirle la ART nueva')) },
+  { lado:'d', txt:'A Martín le llega el pedido. Saca una foto del certificado nuevo y toca <b>Subir</b>.',
+    al(){ push('d', '📄', 'Subí tu ART vigente', 'La garita del barrio Bahía Cauquén te la pide'); push('a', '⛔', 'Tu electricista está en la garita', 'Su ART venció: la está renovando'); },
+    a:() => v('lucia', { campana:1 }) + ap(aviso('warn', '⛔', 'Martín Soria está en la garita', 'Su ART venció ayer: la está subiendo')),
+    d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(`<div style="height:120px;border-radius:12px;background:repeating-linear-gradient(45deg,var(--surf-3),var(--surf-3) 8px,var(--surf-2) 8px,var(--surf-2) 16px);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">📷 Certificado de ART · 09/10 al 09/11</div>`, btn('Subir', { cl:'ok' })) },
+  { lado:'c', txt:'La Administración lo ve en <b>Proveedores y cumplimiento</b> y toca <b>Aprobar</b>.',
+    al(){ push('c', '📄', 'ART nueva de Martín Soria', 'Electricista · para aprobar'); },
+    d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(aviso('warn', '⏳', 'ART enviada', 'La Administración la está revisando')),
+    c:() => adminInicio(card('Proveedores y cumplimiento', it('📄', 'Martín Soria · ART Galeno', 'Vigente del 09/10 al 09/11', 'Nueva', 'warn')), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Aprobar', { cl:'ok' })}</div>` },
+  { lado:'b', hora:'09:09', txt:'En la garita el pase cambia a <b>válido</b>. El guardia toca <b>Ingresó</b> y Lucía se entera.',
+    al(){ avisar('bd', '✅', 'ART de Martín Soria aprobada', 'Vigente hasta el 09/11'); },
+    b:() => garita() + ap(aviso('ok', '✅', 'PASE VÁLIDO', 'ART vigente hasta el 09/11'), btn('Ingresó', { cl:'ok' })),
+    c:() => adminInicio(aviso('ok', '✅', 'ART aprobada', 'Martín Soria · hasta el 09/11'), { sinSalas:true }) },
+  { lado:'a', txt:'Listo: Martín entró 14 minutos después de llegar, <b>con la ART en regla</b>.',
+    al(){ push('a', '🧰', 'Martín Soria ingresó', 'Electricista · 09:09'); },
+    a:() => v('lucia', { tit:'Mis visitas', campana:1 }) + ap(card('', it('🧰', 'Martín Soria · electricista', 'Ingresó 09:09 · ART al día', 'Adentro', 'ok'))),
+    b:() => garitaInicio('', [it('🧰', 'Martín Soria', 'Electricista · Lote 42', 'Adentro', 'ok')]), d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(aviso('ok', '✅', 'Estás adentro', 'Lote 42 · Calle 3 N.º 42')) },
+  ], fin:'Nadie entra a trabajar sin seguro, y el que lo tenía vencido lo arregla desde el portón.' },
+
+{ id:'ronda', grupo:'La garita', e:'👮', t:'La ronda del policía, en vivo', s:'Escanea los 6 puntos y la garita lo sigue en el plano',
+  roles:{ a:LU, b:['Garita', 'Turno noche · Guardia Sosa'], c:AD, d:['Policía', 'Cabo Gómez'] }, hora:'23:10',
+  pasos:[
+  { lado:'d', txt:'El cabo Gómez arranca la ronda. En cada punto escanea el QR pegado en el poste. Tocá <b>Escanear el próximo punto</b> (seis veces).', ronda:true,
+    a:() => inicioV('lucia', '', { saludo:'Buenas noches,' }), c:() => adminInicio('', { sinSalas:true }),
+    b:() => garitaRonda(), d:() => poliRonda() },
+  { lado:'c', txt:'Ronda completa: queda en la bitácora y la Administración la ve en el informe. Si a la hora no hay ronda, salta el aviso a la supervisión.',
+    al(){ avisar('bc', '✅', 'Ronda completa', '6 de 6 puntos · 23:10 a 23:47'); },
+    c:() => adminInicio(card('Rondas de hoy', it('👮', 'Cabo Gómez', '6 de 6 puntos · 23:10 a 23:47', 'Completa', 'ok')), { sinSalas:true }) },
+  ], fin:'Ni planillas ni firmas: cada punto queda con su hora y la garita lo ve en el momento.' },
+
+/* ======================= HOTEL Y AEROPUERTO ======================= */
+{ id:'avion', grupo:'Hotel y aeropuerto', e:'✈️', t:'El vuelo se demora y el traslado se corre solo', s:'El hotel carga el vuelo del huésped; la app lo sigue',
+  roles:{ a:LU, b:GA, c:AD, d:['Hotel Los Cauquenes', 'Recepción'] }, hora:'17:40',
+  pasos:[
+  { lado:'d', txt:'El hotel carga a sus huéspedes con el <b>vuelo AR 1872</b> (llega 19:10). La app arma sola el traslado: la van sale 18:40.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), c:() => adminInicio(),
+    d:() => hotel() + ap(card('Huéspedes que llegan hoy', it('🧳', '3 huéspedes · habitación 214', 'Vuelo AR 1872 · llega 19:10')), card('Traslado automático', it('🚐', 'Van 2 · AE 908 TT', 'Sale 18:40 al aeropuerto')), btn('Guardar')) },
+  { lado:'d', hora:'18:15', txt:'La app consulta el vuelo: <b>se demora 45 minutos</b>. El traslado se corre solo a las 19:25 y avisa. El hotel toca <b>Aceptar el cambio</b>.',
+    al(){ push('d', '✈️', 'AR 1872 demorado 45 min', 'El traslado pasa a las 19:25'); push('b', '🚐', 'Van 2 del hotel sale 19:25', 'Antes 18:40 · vuelo demorado'); },
+    b:() => garitaInicio(card('Vans del hotel', it('🚐', 'Van 2 · AE 908 TT', 'Sale 19:25 (era 18:40)', 'Programada', 'warn'))),
+    d:() => hotel() + ap(aviso('warn', '✈️', 'AR 1872 demorado', 'Llega 19:55 en vez de 19:10'), card('Traslado', it('🚐', 'Van 2', 'Sale 19:25 (era 18:40)', 'Corrido', 'warn')), btn('Aceptar el cambio')) },
+  { lado:'b', hora:'19:25', txt:'La van sale: el guardia toca <b>Salió</b>. Mientras, en la portada de todos se ve el <b>avión llegando</b> a Ushuaia.',
+    a:() => v('lucia') + AVION + ap(hola('lucia'), card('Ushuaia en vivo', it('✈️', 'AR 1872 · Buenos Aires', 'Aterriza 19:55', 'En vuelo', 'warn'))),
+    b:() => garita() + ap(card('Vans del hotel', it('🚐', 'Van 2 · AE 908 TT', 'Sale 19:25 · al aeropuerto')), btn('Salió', { cl:'ok' })) },
+  { lado:'b', hora:'20:31', txt:'Vuelve con 3 huéspedes: la garita los ve <b>como cantidad</b> y toca <b>Volvió</b>. No hace falta anotar a nadie a mano.',
+    al(){ push('d', '🚐', 'La van salió al aeropuerto', '19:25'); },
+    a:() => v('lucia') + ap(hola('lucia'), card('Ushuaia en vivo', it('✈️', 'AR 1872 · Buenos Aires', 'Aterrizó 19:56', 'Llegó', 'ok'))),
+    b:() => garita() + ap(card('Vans del hotel', it('🚐', 'Van 2 · AE 908 TT', 'Vuelve con 3 huéspedes del AR 1872')), btn('Volvió', { cl:'ok' })),
+    d:() => hotel() + ap(card('Traslado', it('🚐', 'Van 2', 'En el aeropuerto · 19:52', 'En camino', 'warn'))) },
+  { lado:'c', txt:'El hotel ve a sus huéspedes en casa. La Administración ve el movimiento de vans <b>sin nombres de huéspedes</b>.',
+    al(){ push('d', '🏨', 'La van volvió con 3 huéspedes', '20:31'); },
+    b:() => garitaInicio(card('Vans del hotel', it('🚐', 'Van 2', '19:25 a 20:31 · 3 huéspedes', 'Volvió', 'ok'))),
+    c:() => adminInicio(card('Hotel en vivo', it('🚐', 'Van 2', 'Aeropuerto · 19:25 a 20:31', 'Volvió', 'ok'), it('🧳', 'Huéspedes en el hotel', '41 (solo la cantidad)')), { sinSalas:true }),
+    d:() => hotel() + ap(aviso('ok', '🏨', 'Habitación 214: llegaron', '20:31 · 3 huéspedes')) },
+  ], fin:'Nadie espera en el aeropuerto: si el vuelo se demora, el traslado se corre solo y la garita lo sabe.' },
+
+{ id:'evento', grupo:'Hotel y aeropuerto', e:'🎉', t:'Evento en el hotel', s:'El hotel avisa, la Administración lo publica y la garita espera los autos',
+  roles:{ a:LU, b:GA, c:AD, d:['Hotel Los Cauquenes', 'Eventos'] }, hora:'10:15',
+  pasos:[
+  { lado:'d', txt:'El hotel carga una <b>cena del sábado</b> con 60 invitados y 22 autos, y pide que se avise a los vecinos. Toca <b>Enviar</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), c:() => adminInicio(),
+    d:() => hotel('Eventos') + ap(campo('Evento', 'Cena de gala'), `<div class="ap-dos">${campo('Sábado', '21 a 01 h')}${campo('Invitados', '60 · 22 autos')}</div>`, `<label class="chk on"><span class="o">✓</span>Avisar a los vecinos del barrio</label>`, btn('Enviar')) },
+  { lado:'c', txt:'A la Administración le llega para revisar. Toca <b>Publicar en el pizarrón</b>.',
+    al(){ push('c', '🎉', 'Evento del hotel para revisar', 'Cena de gala · sábado 21 h'); },
+    c:() => adminInicio(card('Hotel', it('🎉', 'Cena de gala · sábado 21 a 01 h', '60 invitados · 22 autos', 'Para revisar', 'warn')), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Publicar en el pizarrón')}</div>`,
+    d:() => hotel('Eventos') + ap(aviso('warn', '⏳', 'Enviado a la Administración', 'Te avisamos cuando se publique')) },
+  { lado:'b', txt:'Los vecinos lo ven en el pizarrón y a la garita le queda la <b>lista de patentes</b> para el sábado. El guardia toca <b>Ver la lista</b>.',
+    al(){ avisar('abd', '🎉', 'Sábado: cena en el hotel', 'Más tránsito de 21 a 01 h por la costanera'); },
+    a:() => v('lucia', { campana:1 }) + ap(hola('lucia'), pizarra(it('🎉', 'Sábado: cena en el hotel', 'Más tránsito de 21 a 01 h · Hotel Los Cauquenes'), it('🟢', 'Todo en orden en tu lote', ''))),
+    b:() => garita() + ap(card('Sábado · Cena del hotel', it('🚗', '22 autos', 'La lista de patentes la carga el hotel'), it('🕘', '21 a 01 h', 'Entrada por la costanera')), btn('Ver la lista')),
+    c:() => adminInicio(aviso('ok', '📌', 'Publicado en el pizarrón', 'Cena del hotel · sábado')), d:() => hotel('Eventos') + ap(aviso('ok', '✅', 'Publicado', 'Los vecinos ya lo ven')) },
+  { lado:'b', hora:'21:12', txt:'El sábado, cada auto entra <b>por patente</b>: la garita la escribe y la app la reconoce.',
+    b:() => garita() + ap(aviso('ok', '✅', 'AF 220 KL · invitado del hotel', 'Cena de gala · 21:12'), card('Llegaron', `<div class="ap-barra"><i style="width:59%"></i><span><span>Autos</span><span>13 de 22</span></span></div>`)) },
+  ], fin:'El hotel trabaja, los vecinos saben qué esperar y la garita no improvisa.' },
+
+/* ======================= TU CASA ======================= */
+{ id:'expensas', grupo:'Tu casa', e:'💳', t:'Expensas: cupón, "Ya la pagué" y recibo', s:'La Administración trae el mes, la vecina paga y recibe el recibo',
+  roles:{ a:LU, b:GA, c:AD, d:['Dra. Valeria Paz', 'Vecina · Lote 87'] }, hora:'09:30',
+  pasos:[
+  { lado:'c', txt:'La Administración trae la <b>liquidación del mes</b>: la app comprueba que los 152 lotes coincidan al centavo y toca <b>Traer</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), d:() => inicioV('paz'),
+    c:() => adminInicio(card('Expensas · Automáticas', it('📄', 'Liquidación de septiembre', '25 gastos · 152 cupones · $ 97,3 M'), it('✅', '152 de 152 lotes', 'Coinciden al centavo con el PDF', 'OK', 'ok')), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Traer')}</div>` },
+  { lado:'a', txt:'A cada vecino le llega <b>su</b> cupón (nadie ve el de otro). El total termina en los <b>centavos de su lote</b>: …,42. Lucía toca la tarjeta.',
+    al(){ avisar('ad', '💳', 'Expensas de septiembre', 'Ya podés ver tu cupón · vence el 10/10'); },
+    a:() => v('lucia', { tit:'Mis expensas', campana:1 }) + ap(`<button class="ap-card" data-go style="text-align:left;background:linear-gradient(145deg,#c8692a,#9a4a17);color:#fff;border:0"><div class="ap-muted" style="color:rgba(255,255,255,.85)">Tu expensa de este mes</div><div style="font-size:26px;font-weight:800">$ 287.177,42</div><div class="ap-dos" style="margin-top:6px"><span>1º vto 10/10<br><b>$ 287.177,42</b></span><span>2º vto 21/10<br><b>$ 291.485,42</b></span></div></button>`),
+    c:() => adminInicio(aviso('ok', '✅', 'Septiembre traída', '152 cupones · avisados'), { sinSalas:true }),
+    d:() => v('paz', { tit:'Mis expensas', campana:1 }) + ap(card('Tu expensa de este mes', `<div style="font-size:24px;font-weight:800">$ 455.087,87</div>`, it('📅', '1º vencimiento', '10/10'))) },
+  { lado:'a', txt:'Ya transfirió desde el banco: toca <b>Ya la pagué · marcarla como pagada</b>. Queda pagada para ella y la Administración la confirma con el banco.',
+    a:() => v('lucia', { tit:'Pagar las expensas' }) + ap(card('', `<div class="ap-centro"><div class="ap-muted">Total a pagar</div><div style="font-size:26px;font-weight:800;color:var(--wood)">$ 287.177,42</div></div>`), btn('✓ Ya la pagué · marcarla como pagada', { cl:'ok' }), it('📋', 'Transferencia', 'Alias bahia.cauquen · CBU y monto para copiar'), it('🏠', 'Efectivo en la Administración', 'De lunes a viernes')) },
+  { lado:'c', hora:'10:05', txt:'A la Administración le llega el aviso. En el resumen del banco ve una transferencia de <b>$ 287.177,42</b>: los centavos dicen que es del Lote 42. Toca <b>Confirmar</b>.',
+    al(){ push('c', '💳', 'Pago del Lote 42 · $ 287.177,42', 'Sin comprobante: confirmalo con el banco (los centavos dicen el lote)'); },
+    a:() => v('lucia', { tit:'Mis expensas' }) + ap(`<div class="ap-card" style="background:linear-gradient(145deg,#22a866,#15784a);color:#fff;border:0"><b>Pagada · la Administración la confirma con el banco</b><div style="font-size:24px;font-weight:800">$ 287.177,42</div></div>`),
+    c:() => adminInicio(card('Pagos por confirmar', it('💳', 'Lote 42 · $ 287.177,42', 'Transferencia · hoy 09:58', 'Banco ✓', 'ok')), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Confirmar y emitir el recibo', { cl:'ok' })}</div>` },
+  { lado:'d', txt:'A Lucía le llega el <b>recibo</b>. (Cuando la Administración active Mercado Pago, la doctora podrá pagar online y se descuenta al instante.)',
+    al(){ push('a', '🧾', 'Recibo N.º 1043', 'Expensas de septiembre · $ 287.177,42'); },
+    a:() => v('lucia', { tit:'Mis expensas', campana:1 }) + ap(`<div class="ap-card" style="background:var(--ok-soft)"><b style="color:var(--ok)">Tu cuenta está al día</b></div>`, card('Recibos', it('🧾', 'Recibo N.º 1043', 'Septiembre · $ 287.177,42', 'PDF', 'ok'))),
+    c:() => adminInicio(aviso('ok', '🧾', 'Recibo 1043 emitido', 'Lote 42 · libro contable al día'), { sinSalas:true }),
+    d:() => v('paz', { tit:'Pagar las expensas' }) + ap(it('💳', 'Pagar online ahora', 'Tarjeta, Mercado Pago o QR · muy pronto'), it('📋', 'Transferencia', 'Alias bahia.cauquen'), `<span class="ap-btn ok">✓ Ya la pagué · marcarla como pagada</span>`) },
+  ], fin:'Sin planillas ni capturas por WhatsApp: el cupón llega, se paga, se confirma con el banco y sale el recibo.' },
+
+{ id:'oficios', grupo:'Tu casa', e:'🔌', t:'Sin luz: el electricista del barrio', s:'Lucía consulta al vecino electricista y la Administración avisa a todos',
+  roles:{ a:LU, b:GA, c:AD, d:['Martín Soria', 'Vecino electricista · Lote 63'] }, hora:'19:20',
+  pasos:[
+  { lado:'a', txt:'Se cortó la luz en casa de Lucía. En <b>Vecinos</b> busca "electricista": aparece Martín, vecino del barrio. Toca <b>Mensaje</b>.',
+    a:() => v('lucia', { tit:'Vecinos' }) + ap(campo('Buscar', 'electricista'), card('', it('🔌', 'Martín Soria · Lote 63', 'Electricista matriculado · lo compartió en su perfil'), btn('Mensaje'))),
+    b:() => garitaInicio(), c:() => adminInicio(), d:() => inicioV('martin') },
+  { lado:'d', txt:'A Martín le llega el mensaje privado. Ve que <b>a él también se le cortó</b>: no es la casa, es la calle. Toca <b>Responder</b>.',
+    al(){ push('d', '💬', 'Lucía · Lote 42', '¿Podés venir? Me quedé sin luz'); },
+    a:() => v('lucia', { tit:'Martín Soria' }) + ap(`<div class="ap-chat"><div class="msg mia">Hola Martín, ¿podés venir? Me quedé sin luz 🙏<time>19:21</time></div></div>`),
+    d:() => v('martin', { tit:'Lucía · Lote 42' }) + ap(`<div class="ap-chat"><div class="msg">Hola Martín, ¿podés venir? Me quedé sin luz 🙏<time>19:21</time></div><div class="msg mia">Es la calle 3 entera, a mí también. Aviso a la Administración<time>19:23</time></div></div>`, btn('Responder')) },
+  { lado:'c', txt:'La Administración confirma con la DPE y manda un <b>aviso urgente</b> a todo el barrio: "Corte de la DPE, vuelve 21 h".',
+    al(){ push('a', '💬', 'Martín Soria', 'Es la calle 3 entera, a mí también'); push('c', '🔌', 'Martín Soria · Lote 63', 'Corte en toda la calle 3'); },
+    a:() => v('lucia', { tit:'Martín Soria' }) + ap(`<div class="ap-chat"><div class="msg mia">¿Podés venir? Me quedé sin luz 🙏<time>19:21</time></div><div class="msg">Es la calle 3 entera, a mí también. Aviso a la Administración<time>19:23</time></div></div>`),
+    c:() => admin() + ap(card('Aviso urgente a todos', campo('Título', 'Corte de luz de la DPE'), campo('Texto', 'Calle 3 y Los Ñires. Vuelve a las 21 h. Si usás equipos médicos, avisá a la garita.')), btn('Mandar a todo el barrio', { cl:'rojo' })) },
+  { lado:'b', txt:'Llega a <b>todos los teléfonos con sonido</b>. La garita lo tiene arriba de todo por si alguien llama.',
+    al(){ avisar('abd', '⚡', 'Corte de luz de la DPE', 'Calle 3 y Los Ñires · vuelve 21 h', 'Administración', { urgente:true }); },
+    a:() => inicioV('lucia', aviso('warn', '⚡', 'Corte de luz de la DPE', 'Vuelve a las 21 h · Administración')),
+    b:() => garitaInicio(aviso('warn', '⚡', 'Corte de luz de la DPE', 'Calle 3 y Los Ñires · vuelve 21 h'), [it('⚡', 'Cuadrilla de la DPE', 'Entra por el portón', 'Esperada', 'warn')]),
+    c:() => adminInicio(aviso('ok', '📣', 'Aviso urgente enviado', '138 teléfonos'), { sinSalas:true }),
+    d:() => inicioV('martin', aviso('warn', '⚡', 'Corte de luz de la DPE', 'Vuelve a las 21 h')) },
+  ], fin:'Los oficios del barrio a un mensaje, y cuando el problema es de todos, el aviso llega a todos.' },
+
+{ id:'reclamo', grupo:'Tu casa', e:'💡', t:'Reclamo: la luminaria apagada', s:'Con foto, se asigna al proveedor y vuelve resuelto',
+  roles:{ a:LU, b:GA, c:AD, d:['Martín Soria', 'Electricista del barrio'] }, hora:'09:40',
+  pasos:[
+  { lado:'a', txt:'La luminaria de la esquina está apagada. Lucía hace un <b>reclamo con foto</b> y toca <b>Enviar</b>.',
+    a:() => v('lucia', { tit:'Nuevo reclamo' }) + ap(`<div class="seg"><span class="on">💡 Luz</span><span>💧 Agua</span><span>🛣️ Calles</span><span>🌳 Espacios</span></div>`, campo('Dónde', 'Calle 3 y Los Ñires'), `<div style="height:80px;border-radius:12px;background:repeating-linear-gradient(45deg,var(--surf-3),var(--surf-3) 8px,var(--surf-2) 8px,var(--surf-2) 16px);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">📷 Foto de la luminaria</div>`, btn('Enviar')),
+    b:() => garitaInicio(), c:() => adminInicio(), d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(card('Trabajos', it('🧰', 'Sin trabajos pendientes', ''))) },
+  { lado:'c', txt:'La Administración lo recibe y toca <b>Asignar a Martín Soria</b> (proveedor de electricidad).',
+    al(){ push('c', '💡', 'Reclamo · Luminaria apagada', 'Calle 3 y Los Ñires · con foto'); },
+    a:() => v('lucia', { tit:'Mis reclamos' }) + ap(card('', it('💡', 'Luminaria apagada', 'Calle 3 y Los Ñires', 'Recibido', 'warn'))),
+    c:() => adminInicio(card('Reclamos', it('💡', 'Luminaria apagada · Lote 42', 'Calle 3 y Los Ñires · con foto', 'Nuevo', 'warn')), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Asignar a Martín Soria')}</div>` },
+  { lado:'d', hora:'15:10', txt:'Martín recibe el trabajo, cambia la lámpara, saca la foto y toca <b>Listo</b>.',
+    al(){ push('d', '🧰', 'Trabajo nuevo', 'Luminaria apagada · Calle 3 y Los Ñires'); push('a', '💡', 'Tu reclamo está en marcha', 'Asignado a Martín Soria'); },
+    a:() => v('lucia', { tit:'Mis reclamos', campana:1 }) + ap(card('', it('💡', 'Luminaria apagada', 'Asignado a Martín Soria', 'En marcha', 'warn'), etapas(2))),
+    c:() => adminInicio(card('Reclamos', it('💡', 'Luminaria · Lote 42', 'Asignado a Martín Soria', 'En marcha', 'warn')), { sinSalas:true }),
+    d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(card('Trabajo', it('💡', 'Luminaria apagada', 'Calle 3 y Los Ñires · ver la foto')), `<div style="height:70px;border-radius:12px;background:var(--ok-soft);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--ok)">📷 Foto: lámpara nueva encendida</div>`, btn('Listo', { cl:'ok' })) },
+  { lado:'a', txt:'A Lucía le llega <b>"Resuelto"</b> con la foto. La garita lo ve en el pizarrón y la Administración lo cierra.',
+    al(){ avisar('acb', '✅', 'Luminaria de Calle 3 arreglada', 'Martín Soria · 15:10 · con foto'); },
+    a:() => v('lucia', { tit:'Mis reclamos', campana:1 }) + ap(card('', it('💡', 'Luminaria apagada', 'Resuelto 15:10 · con foto', 'Resuelto', 'ok'), etapas(5))),
+    b:() => garitaInicio(aviso('ok', '💡', 'Luminaria de Calle 3 arreglada', '15:10')),
+    c:() => adminInicio(card('Reclamos', it('💡', 'Luminaria · Lote 42', 'Resuelto en 5 h 30 min', 'Cerrado', 'ok')), { sinSalas:true }),
+    d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(aviso('ok', '✅', 'Trabajo cerrado', 'La Administración lo aprobó')) },
+  ], fin:'Del reclamo al arreglo, con foto en cada paso y sin llamar a nadie.' },
+
+{ id:'obra', grupo:'Tu casa', e:'🏗️', t:'Una obra y el mixer', s:'El que construye avisa; la garita y los vecinos de la calle se enteran',
+  roles:{ a:['Lucía', 'Vecina de la calle · Lote 42'], b:GA, c:AD, d:['Federico Ruiz', 'Construye · Lote 120'] }, hora:'17:00',
+  pasos:[
+  { lado:'d', txt:'Federico está construyendo. En <b>Mi obra</b> carga que <b>mañana a las 9 viene el mixer</b> y toca <b>Avisar</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), c:() => adminInicio(card('Obras', it('🏗️', 'Lote 120 · casa', 'Etapa: estructura', 'Activa', 'ok')), { sinSalas:true }),
+    d:() => v('fede', { tit:'Mi obra' }) + ap(etapas(2), campo('Qué viene', 'Mixer de hormigón · 2 viajes'), `<div class="ap-dos">${campo('Día', 'Mañana')}${campo('Horario', '9 a 11 h')}</div>`, `<label class="chk on"><span class="o">✓</span>Avisar a los vecinos de la calle</label>`, btn('Avisar')) },
+  { lado:'b', txt:'La garita lo tiene en <b>la lista de mañana</b> y la Administración lo aprueba. Los vecinos de la Calle 3 reciben el aviso. Tocá <b>Al otro día</b>.',
+    al(){ push('a', '🚧', 'Mañana de 9 a 11 pasa un mixer', 'Obra del Lote 120 · Calle 3'); push('c', '🏗️', 'Lote 120 avisa un mixer', 'Mañana 9 a 11 h'); },
+    a:() => v('lucia', { campana:1 }) + ap(hola('lucia'), pizarra(it('🚧', 'Mañana: mixer por la Calle 3', '9 a 11 h · obra del Lote 120'))),
+    b:() => garitaInicio(card('Mañana', it('🚧', 'Mixer · obra Lote 120', '9 a 11 h · 2 viajes', 'Esperado', 'warn')) + btn('⏭ Al otro día', { cl:'sec' })),
+    c:() => adminInicio(card('Obras', it('🚧', 'Lote 120 · mixer', 'Mañana 9 a 11 h', 'Avisado', 'ok')), { sinSalas:true }),
+    d:() => v('fede', { tit:'Mi obra' }) + ap(aviso('ok', '✅', 'Avisado', 'La garita y los vecinos de la calle ya lo saben')) },
+  { lado:'b', hora:'09:04', txt:'Al otro día llega el mixer: el guardia busca la patente en la lista y toca <b>Ingresó</b>.',
+    b:() => garita('Turno mañana') + ap(aviso('ok', '✅', 'AC 771 RT · mixer', 'Obra del Lote 120 · esperado 9 a 11 h'), btn('Ingresó', { cl:'ok' })) },
+  { lado:'d', txt:'Federico se entera y, cuando termina la etapa, la marca. La obra avanza en la ficha que ve la Administración.',
+    al(){ push('d', '🚧', 'Entró el mixer', '09:04 · va al Lote 120'); },
+    b:() => garitaInicio('', [it('🚧', 'Mixer AC 771 RT', 'Obra · Lote 120', 'Adentro', 'ok')]),
+    c:() => adminInicio(card('Obras', it('🏗️', 'Lote 120 · casa', 'Etapa: estructura → cerramientos', 'Activa', 'ok'), etapas(3)), { sinSalas:true }),
+    d:() => v('fede', { tit:'Mi obra' }) + ap(etapas(3), aviso('ok', '🚧', 'El mixer está en tu obra', '09:04')) },
+  ], fin:'Las obras conviven con el barrio: todos saben qué viene y cuándo.' },
+
+{ id:'nieve', grupo:'Tu casa', e:'❄️', t:'Ángeles de la nieve', s:'Una vecina mayor pide ayuda para palear y un vecino la toma',
+  roles:{ a:['Lucía', 'Ángel de la nieve · Lote 42'], b:GA, c:AD, d:['Elsa Romero', 'Lote 110'] }, hora:'08:10',
+  pasos:[
+  { lado:'d', txt:'Nevó 30 cm. Elsa no puede sacar el auto: en <b>Ángeles de la nieve</b> toca <b>Pedir ayuda para palear</b>.',
+    a:() => inicioV('lucia', aviso('info', '❄️', 'Nevada de 30 cm', 'Cuidado con el hielo'), { saludo:'Buen día,' }), b:() => garitaInicio(), c:() => adminInicio(),
+    d:() => v('elsa', { tit:'Ángeles de la nieve' }) + ap(aviso('info', '❄️', 'Nevada de 30 cm', 'Los ángeles de la nieve son vecinos que se ofrecen a ayudar'), campo('Qué necesitás', 'Palear la entrada del auto'), btn('Pedir ayuda para palear')) },
+  { lado:'a', txt:'A los vecinos anotados como <b>ángeles</b> les llega el pedido (solo el lote y qué necesita). Lucía toca <b>Voy yo</b>.',
+    al(){ push('a', '❄️', 'Elsa (Lote 110) necesita palear la entrada', 'Ángeles de la nieve'); push('b', '❄️', 'Pedido de ayuda con la nieve', 'Lote 110'); },
+    a:() => v('lucia', { tit:'Ángeles de la nieve', campana:1 }) + ap(card('Pedidos', it('❄️', 'Lote 110 · Elsa', 'Palear la entrada del auto', 'Nuevo', 'warn')), btn('Voy yo')),
+    b:() => garitaInicio(card('Ángeles de la nieve', it('❄️', 'Lote 110', 'Palear la entrada', 'Buscando', 'warn'))),
+    d:() => v('elsa', { tit:'Ángeles de la nieve' }) + ap(aviso('warn', '⏳', 'Pedido enviado', 'Te avisamos quién viene')) },
+  { lado:'d', hora:'08:40', txt:'Elsa ve que va Lucía. Cuando terminan, toca <b>Gracias, ya está</b>.',
+    al(){ avisar('db', '😇', 'Va Lucía (Lote 42)', 'Ángel de la nieve · llega en 10 min'); },
+    a:() => v('lucia', { tit:'Ángeles de la nieve' }) + ap(aviso('ok', '😇', 'Vas al Lote 110', 'Elsa te espera')),
+    b:() => garitaInicio(card('Ángeles de la nieve', it('😇', 'Lote 110', 'Va Lucía (Lote 42)', 'En camino', 'ok'))),
+    d:() => v('elsa', { tit:'Ángeles de la nieve' }) + ap(aviso('ok', '😇', 'Viene Lucía (Lote 42)', 'Ángel de la nieve'), btn('Gracias, ya está', { cl:'ok' })) },
+  { lado:'c', txt:'La Administración ve cuántas ayudas hubo en el invierno, <b>sin más datos</b>.',
+    al(){ push('a', '💚', 'Elsa te agradece', '¡Gracias por palear la entrada!'); },
+    a:() => inicioV('lucia', aviso('ok', '💚', 'Elsa te agradece', 'Ayudaste a un vecino esta mañana'), { saludo:'Buen día,' }),
+    c:() => adminInicio(card('Ángeles de la nieve', it('😇', '14 ayudas este invierno', '9 ángeles anotados', 'Activo', 'ok')), { sinSalas:true }), d:() => inicioV('elsa', aviso('ok', '💚', 'Listo', 'Gracias, Lucía'), { saludo:'Buen día,' }) },
+  ], fin:'El barrio que se ayuda: el pedido llega a quien se ofreció, con lo justo y necesario.' },
+
+{ id:'viaje', grupo:'Tu casa', e:'🧳', t:'Me voy de viaje', s:'La garita revisa la casa en la ronda y te avisa que está en orden',
+  roles:{ a:LU, b:['Garita', 'Turno noche · Guardia Sosa'], c:AD, d:['Policía', 'Cabo Gómez · ronda'] }, hora:'18:00',
+  pasos:[
+  { lado:'a', txt:'Lucía se va 10 días. En <b>Tu casa</b> toca <b>Me voy de viaje</b>, pone las fechas y quién tiene llave.',
+    a:() => v('lucia', { tit:'Me voy de viaje' }) + ap(`<div class="ap-dos">${campo('Me voy', '10/10')}${campo('Vuelvo', '20/10')}</div>`, campo('Tiene llave', 'Diego · 2901 55-0042'), `<label class="chk on"><span class="o">✓</span>Que la garita revise la casa en la ronda</label>`, btn('Avisar a la garita')),
+    b:() => garitaInicio(), c:() => adminInicio(), d:() => poli() + ap(card('Tu ronda', it('▫️', '6 puntos', 'Arranca 23:00'))) },
+  { lado:'d', hora:'23:22', txt:'Esa noche la garita suma el Lote 42 a la ronda. El policía pasa, mira y toca <b>Todo en orden</b>.',
+    al(){ push('b', '🧳', 'Lote 42 se va de viaje', 'Del 10 al 20/10 · revisar en la ronda'); push('d', '🏠', 'Revisar Lote 42', 'Casa sola hasta el 20/10', 'Garita'); },
+    a:() => v('lucia') + ap(aviso('ok', '🧳', 'Buen viaje', 'La garita revisa tu casa cada noche')),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(card('Casas solas', it('🏠', 'Lote 42', 'Hasta el 20/10 · llave: Diego', 'Revisar', 'warn'))),
+    c:() => adminInicio(card('Casas solas', it('🏠', '3 lotes', 'La garita las revisa', '', '')), { sinSalas:true }),
+    d:() => poli() + ap(card('Revisar', it('🏠', 'Lote 42 · casa sola', 'Puertas, ventanas, luces')), btn('Todo en orden', { cl:'ok' })) },
+  { lado:'a', txt:'A Lucía, lejos, le llega <b>"Tu casa está en orden"</b> cada noche. Nadie más sabe que está de viaje.',
+    al(){ push('a', '🏠', 'Tu casa está en orden', 'Revisada 23:22 · ronda del policía'); push('b', '✅', 'Lote 42 revisado', '23:22 · todo en orden'); },
+    a:() => v('lucia', { campana:1 }) + ap(aviso('ok', '🏠', 'Tu casa está en orden', 'Revisada anoche 23:22')),
+    b:() => garita('Turno noche · Guardia Sosa') + ap(card('Casas solas', it('🏠', 'Lote 42', 'Revisada 23:22', 'En orden', 'ok'))),
+    d:() => poli() + ap(aviso('ok', '✅', 'Anotado', 'Lote 42 en orden')) },
+  ], fin:'Te vas tranquila: cada noche sabés que tu casa está en orden, y que lo sabe solo quien tiene que saberlo.' },
+
+/* ======================= COMUNIDAD ======================= */
+{ id:'votacion', grupo:'Comunidad', e:'🗳️', t:'Votar desde casa', s:'Un voto por lote, con el resultado en vivo y el acta lista',
+  roles:{ a:LU, b:GA, c:AD, d:['Dra. Valeria Paz', 'Vecina · Lote 87'] }, hora:'19:00',
+  pasos:[
+  { lado:'c', txt:'La Administración crea una votación: <b>¿Cambiamos el portón por uno automático?</b> Toca <b>Abrir la votación</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), d:() => inicioV('paz'),
+    c:() => admin() + ap(campo('Pregunta', '¿Cambiamos el portón por uno automático? ($ 18 M en 6 cuotas)'), `<div class="ap-dos">${campo('Cierra', 'Domingo 20 h')}${campo('Vota', '1 por lote')}</div>`, btn('Abrir la votación')) },
+  { lado:'a', txt:'Les llega a los vecinos (la garita no vota). Lucía toca <b>Sí</b>.',
+    al(){ avisar('ad', '🗳️', 'Nueva votación', '¿Portón automático? · cierra el domingo'); },
+    a:() => v('lucia', { tit:'Votación', campana:1 }) + ap(`<div class="ap-hola"><small>Un voto por lote</small><b>¿Portón automático?</b></div>`, `<button class="voto" data-go>✅ Sí</button>`, `<span class="voto">❌ No</span>`, `<span class="voto">➖ Me abstengo</span>`),
+    c:() => adminInicio(card('Votación en curso', `<div class="ap-barra"><i style="width:0%"></i><span><span>Votaron</span><span>0 de 152 lotes</span></span></div>`), { sinSalas:true }),
+    d:() => v('paz', { tit:'Votación', campana:1 }) + ap(`<div class="ap-hola"><small>Un voto por lote</small><b>¿Portón automático?</b></div>`, `<span class="voto">✅ Sí</span>`, `<span class="voto">❌ No</span>`) },
+  { lado:'d', txt:'La doctora vota <b>No</b>. Cada voto suma en vivo, y nadie puede votar dos veces por el mismo lote.',
+    a:() => v('lucia', { tit:'Votación' }) + ap(aviso('ok', '🗳️', 'Votaste: Sí', 'Podés cambiarlo hasta el domingo 20 h')),
+    c:() => adminInicio(card('Votación en curso', `<div class="ap-barra"><i style="width:30%"></i><span><span>Votaron</span><span>46 de 152</span></span></div>`), { sinSalas:true }),
+    d:() => v('paz', { tit:'Votación' }) + ap(`<div class="ap-hola"><small>Un voto por lote</small><b>¿Portón automático?</b></div>`, `<span class="voto">✅ Sí</span>`, `<button class="voto" data-go>❌ No</button>`) },
+  { lado:'c', hora:'Dom 20:00', txt:'El domingo cierra sola. La Administración toca <b>Bajar el acta</b>: con el resultado y los lotes que votaron.',
+    al(){ avisar('ad', '🗳️', 'Cerró la votación: ganó el Sí', '71 % · votaron 118 de 152 lotes'); },
+    a:() => v('lucia', { tit:'Votación', campana:1 }) + ap(aviso('ok', '🗳️', 'Ganó el Sí · 71 %', 'Votaron 118 de 152 lotes')),
+    c:() => adminInicio(card('Resultado', `<div class="ap-barra"><i style="width:71%"></i><span><span>Sí</span><span>71 %</span></span></div>`, `<div class="ap-barra"><i style="width:25%"></i><span><span>No</span><span>25 %</span></span></div>`), { sinSalas:true }) + `<div class="ap" style="padding-top:0">${btn('Bajar el acta (PDF)')}</div>`,
+    d:() => v('paz', { tit:'Votación', campana:1 }) + ap(aviso('ok', '🗳️', 'Ganó el Sí · 71 %', 'Votaron 118 de 152 lotes')) },
+  ], fin:'La decisión del barrio, sin asamblea a la que nadie puede ir: un voto por lote y el acta lista.' },
+
+{ id:'perro', grupo:'Comunidad', e:'🐕', t:'Perro perdido en el pizarrón', s:'Una vecina publica, otra lo ve y la garita lo tiene',
+  roles:{ a:LU, b:GA, c:AD, d:['Dra. Valeria Paz', 'Vecina · Lote 87'] }, hora:'12:30',
+  pasos:[
+  { lado:'d', txt:'Se escapó Toby. La doctora lo publica en el <b>pizarrón</b> con foto y toca <b>Publicar</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), c:() => adminInicio(),
+    d:() => v('paz', { tit:'Escribir en el pizarrón' }) + ap(`<div class="seg"><span class="on">🐕 Mascotas</span><span>📣 Aviso</span><span>🎁 Regalo</span></div>`, campo('Título', 'Se perdió Toby'), campo('Texto', 'Beagle con collar rojo. Salió por la Calle 5.'), `<div style="height:70px;border-radius:12px;background:var(--wood-soft);display:grid;place-items:center;font-size:26px">🐕</div>`, btn('Publicar')) },
+  { lado:'a', txt:'Todos lo ven en el pizarrón, <b>también la garita</b>. Lucía lo vio en la plaza: toca <b>Responder</b>.',
+    al(){ avisar('abc', '🐕', 'Se perdió Toby', 'Beagle con collar rojo · Lote 87'); },
+    a:() => v('lucia', { tit:'Pizarrón', campana:1 }) + ap(card('', it('🐕', 'Se perdió Toby', 'Beagle con collar rojo · hace 2 min · Lote 87')), campo('Tu respuesta', 'Lo vi en la plaza hace un rato'), btn('Responder')),
+    b:() => garita() + ap(card('Pizarrón', it('🐕', 'Se perdió Toby', 'Beagle con collar rojo · Lote 87'))) },
+  { lado:'b', hora:'12:41', txt:'El guardia sale, lo encuentra y escribe en el mismo aviso: <b>Toby está en la garita</b>.',
+    al(){ push('d', '💬', 'Lucía respondió en tu aviso', 'Lo vi en la plaza hace un rato'); push('b', '💬', 'Respuesta en "Se perdió Toby"', 'Lo vieron en la plaza'); },
+    a:() => v('lucia', { tit:'Pizarrón' }) + ap(card('', it('🐕', 'Se perdió Toby', 'Lote 87'), it('💬', 'Lucía', 'Lo vi en la plaza hace un rato'))),
+    b:() => garita() + ap(card('Pizarrón', it('🐕', 'Se perdió Toby', 'Lo vieron en la plaza')), campo('Responder', 'Lo tenemos en la garita 🐕'), btn('Responder')),
+    d:() => v('paz', { tit:'Tu aviso', campana:1 }) + ap(card('', it('🐕', 'Se perdió Toby', 'Publicado 12:30'), it('💬', 'Lucía · Lote 42', 'Lo vi en la plaza hace un rato'))) },
+  { lado:'d', txt:'La doctora lo busca y toca <b>Marcar como encontrado</b>: el aviso se cierra para todos.',
+    al(){ push('d', '🐕', 'Toby está en la garita', 'Garita · 12:41', 'Garita'); },
+    b:() => garita() + ap(card('Pizarrón', it('🐕', 'Se perdió Toby', 'Respondiste: lo tenemos en la garita'))),
+    d:() => v('paz', { tit:'Tu aviso', campana:1 }) + ap(aviso('ok', '🐕', 'Toby está en la garita', '12:41'), btn('Marcar como encontrado', { cl:'ok' })) },
+  { lado:'a', txt:'Todos ven <b>"Encontrado"</b>. Final feliz.',
+    al(){ avisar('abc', '💚', 'Toby apareció', 'Gracias a todos'); },
+    a:() => inicioV('lucia', '', { piz:[it('💚', 'Toby apareció', 'Gracias a todos · Lote 87')] }), b:() => garitaInicio(aviso('ok', '🐕', 'Toby volvió a su casa', '12:52')),
+    d:() => inicioV('paz', aviso('ok', '💚', 'Toby está en casa', 'Gracias a Lucía y a la garita')) },
+  ], fin:'El pizarrón del barrio funciona como el de la entrada, pero llega a todos en un minuto.' },
+
+{ id:'corte', grupo:'Comunidad', e:'💧', t:'Aviso urgente: corte de agua', s:'La Administración avisa a todo el barrio con sonido, y cada uno confirma',
+  roles:{ a:LU, b:GA, c:AD, d:['Tomás Ibáñez', 'Vecino · Lote 95'] }, hora:'07:30',
+  pasos:[
+  { lado:'c', txt:'La DPOSS corta el agua de 9 a 14. La Administración escribe un <b>aviso urgente</b> y toca <b>Mandar a todos</b>.',
+    a:() => inicioV('lucia', '', { saludo:'Buen día,' }), b:() => garitaInicio(), d:() => inicioV('tomas', '', { saludo:'Buen día,' }),
+    c:() => admin() + ap(card('Aviso urgente', campo('Título', 'Corte de agua de 9 a 14'), campo('Texto', 'Trabajos de la DPOSS en la red. Juntá agua antes de las 9.'), it('📲', 'Llega con sonido', 'Aunque el teléfono esté bloqueado')), btn('Mandar a todos', { cl:'rojo' })) },
+  { lado:'a', txt:'Llega a <b>todos a la vez</b>, con sonido. Lucía toca <b>Entendido</b>.',
+    al(){ avisar('abd', '💧', 'Corte de agua de 9 a 14', 'Juntá agua antes de las 9', 'Administración', { urgente:true }); },
+    a:() => v('lucia', { campana:1 }) + ap(aviso('warn', '💧', 'Corte de agua de 9 a 14', 'Juntá agua antes de las 9 · Administración'), btn('Entendido')),
+    b:() => garitaInicio(aviso('warn', '💧', 'Corte de agua de 9 a 14', 'Si llaman, ya está avisado')),
+    c:() => adminInicio(card('Aviso urgente', `<div class="ap-barra"><i style="width:20%"></i><span><span>Lo vieron</span><span>28 de 138</span></span></div>`), { sinSalas:true }),
+    d:() => v('tomas', { campana:1 }) + ap(aviso('warn', '💧', 'Corte de agua de 9 a 14', 'Juntá agua antes de las 9')) },
+  { lado:'c', hora:'08:30', txt:'La Administración ve <b>cuántos lo vieron</b>. A las 14, el aviso se va solo de todas las pantallas.',
+    a:() => inicioV('lucia', '', { saludo:'Buen día,', piz:[it('💧', 'Corte de agua de 9 a 14', 'Administración')] }),
+    c:() => adminInicio(card('Aviso urgente', `<div class="ap-barra"><i style="width:86%"></i><span><span>Lo vieron</span><span>119 de 138</span></span></div>`), { sinSalas:true }) },
+  ], fin:'Un aviso que llega a todos, en el momento, y que se borra solo cuando ya no sirve.' },
+
+{ id:'supervision', grupo:'Comunidad', e:'🧐', t:'La supervisión del servicio', s:'Quien supervisa la guardia ve el turno y da el visto al parte',
+  roles:{ a:LU, b:['Garita', 'Fin del turno · Guardia Pereyra'], c:AD, d:['Supervisión', 'De la guardia'] }, hora:'22:00',
+  pasos:[
+  { lado:'b', txt:'Termina el turno. El guardia toca <b>Cerrar el turno</b>: la app arma el <b>parte</b> con todo lo que pasó.',
+    a:() => inicioV('lucia'), c:() => adminInicio(),
+    d:() => barra('Supervisión', 'De la guardia', { clase:'poli' }) + ap(card('Garita en vivo', it('🛡️', 'Turno tarde', '12 ingresos · 2 correos · 1 ronda', 'En servicio', 'ok'))),
+    b:() => garita('Fin del turno') + ap(card('Parte del turno', it('👥', '12 ingresos', '9 visitas · 3 proveedores'), it('👮', '1 ronda', '6 de 6 puntos'), it('📮', '2 correos', 'Andreani y OCA')), btn('Cerrar el turno')) },
+  { lado:'d', txt:'A la supervisión le llega el parte. Lo lee y toca <b>Dar el visto</b> (con una observación si hace falta).',
+    al(){ avisar('dc', '📋', 'Parte del turno tarde', 'Guardia Pereyra · 12 ingresos · sin novedades'); },
+    b:() => garita('Turno noche · Guardia Sosa') + ap(aviso('ok', '👋', 'Turno cerrado', 'El parte salió a la Administración y a la supervisión')),
+    c:() => adminInicio(card('Partes de hoy', it('📋', 'Turno tarde · Pereyra', 'Sin novedades', 'Por ver', 'warn')), { sinSalas:true }),
+    d:() => barra('Supervisión', 'De la guardia', { clase:'poli' }) + ap(card('Parte del turno tarde', it('👥', '12 ingresos', ''), it('👮', 'Ronda 6 de 6', ''), it('⏱️', 'Respuesta a SOS', 'Sin SOS hoy')), campo('Observación (opcional)', 'Todo en orden'), btn('Dar el visto', { cl:'ok' })) },
+  { lado:'c', txt:'La Administración ve el visto, que <b>no se puede cambiar</b> después. Y el día 1 le llega el informe del mes, sin datos personales.',
+    al(){ push('c', '✅', 'Visto de la supervisión', 'Turno tarde · todo en orden'); },
+    c:() => adminInicio(card('Partes de hoy', it('📋', 'Turno tarde · Pereyra', 'Visto 22:14 · "Todo en orden"', 'Visto', 'ok')), { sinSalas:true }),
+    d:() => barra('Supervisión', 'De la guardia', { clase:'poli' }) + ap(aviso('ok', '✅', 'Diste el visto', 'Turno tarde · 22:14')) },
+  ], fin:'El servicio de la garita se controla con datos, no con impresiones.' },
+];
+
+/* ---------- la ronda del policía, con el plano ---------- */
+const PUNTOS = [['Portón', 52, 196], ['Plaza', 132, 150], ['Residuos', 212, 120], ['Calle 5', 96, 84], ['Costanera', 206, 214], ['Hotel', 250, 52]];
+const horaRonda = n => `23:${String(12 + n * 7).padStart(2, '0')}`;
+function plano(p, tocable){
+  return `<div class="plano"><svg viewBox="0 0 300 250"><rect width="300" height="250" fill="var(--surf-2)"/><path d="M20 210 C 80 150, 160 160, 280 40" stroke="var(--line-2)" stroke-width="14" fill="none" stroke-linecap="round"/>
+    ${PUNTOS.map(([n, x, y], i) => { const ok = p.includes(i); return `<g class="pt ${ok ? 'ok' : ''}" ${tocable ? `data-act="punto" data-i="${i}" role="button" aria-label="Escanear ${n}"` : ''}><circle class="aro" cx="${x}" cy="${y}" r="17"/><circle cx="${x}" cy="${y}" r="9" fill="${ok ? 'var(--ok)' : 'var(--danger)'}"/><text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:#fff;font-size:9px">${ok ? '✓' : 'QR'}</text><text x="${x}" y="${y - 21}" text-anchor="middle">${n}</text></g>`; }).join('')}</svg></div>`;
+}
+function poliRonda(){ const p = S.d.puntos || [];
+  return poli() + ap(plano(p, true), p.length < 6 ? btn(`📷 Escanear el próximo punto (${p.length + 1} de 6)`) : aviso('ok', '✅', 'Ronda completa', '6 de 6 puntos')); }
+function garitaRonda(){ const p = S.d.puntos || [];
+  return garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-lbl">Ronda en vivo</div>`, plano(p, false), card('', ...PUNTOS.map(([n], i) => { const k = p.indexOf(i); return it(k >= 0 ? '✅' : '▫️', n, k >= 0 ? `Escaneado ${horaRonda(k)}` : 'Pendiente', k >= 0 ? 'Listo' : '', k >= 0 ? 'ok' : ''); }))); }
+
+/* ---------- el motor ---------- */
+function pasoDe(e, i, l){ for (let k = i; k >= 0; k--) if (e.pasos[k][l]) return e.pasos[k][l]; return null; }
+function horaDe(e, i){ for (let k = i; k >= 0; k--) if (e.pasos[k].hora) return e.pasos[k].hora; return e.hora; }
+function rolDe(e, i, l){ return e.roles[l]; }
+
+$('#mesa').innerHTML = LADOS.map(l => `<div class="col-tel" id="col${l}"><div class="rol" id="rol${l}"></div>
+  <div class="tel"><div class="tel-pantalla"><div class="tel-isla"></div><div class="tel-estado"><span class="hora"></span><i>●●● 4G ▮</i></div><div class="tel-app" id="app${l}"></div><div class="tel-push" id="push${l}"></div></div></div></div>`).join('');
+$('#nEsc').textContent = ESC.length;
+
+function pintarMenu(){
+  const grupos = [...new Set(ESC.map(e => e.grupo))];
+  $('#menu').innerHTML = grupos.map(g => `<div class="grupo"><h3>${g}</h3><div class="lista">${ESC.map((e, i) => e.grupo !== g ? '' :
+    `<button class="opc ${i === S.esc ? 'on' : ''}" data-esc="${i}" ${i === S.esc ? 'aria-current="true"' : ''}><span class="ic">${S.hechas.has(e.id) ? '✅' : e.e}</span><span>${e.t}</span></button>`).join('')}</div></div>`).join('');
+}
+function pintar(){
+  limpiar();
+  const e = ESC[S.esc], p = e.pasos[S.paso], fin = S.paso >= e.pasos.length - 1;
+  $('#escTit').textContent = `${e.e} ${e.t}`; $('#escSub').textContent = e.s;
+  $$('.hora').forEach(h => h.textContent = horaDe(e, S.paso));
+  LADOS.forEach(l => {
+    const r = rolDe(e, S.paso, l);
+    $('#rol' + l).innerHTML = `${esc(r[0])} <span>· ${esc(r[1])}</span>`;
+    $('#col' + l).classList.toggle('le-toca', p.lado === l && !fin);
+    const f = pasoDe(e, S.paso, l); $('#app' + l).innerHTML = f ? f() : '';
+  });
+  $('#tabs4').innerHTML = LADOS.map(l => `<button data-ver="${l}" aria-pressed="${S.ver === l}" class="${p.lado === l && !fin ? 'turno' : ''}">${esc(rolDe(e, S.paso, l)[0])}</button>`).join('');
+  S.ver = p.lado; mirar(S.ver);
+  const app = $('#app' + p.lado), objetivo = app.querySelector('[data-go],[data-hold]');
+  if (objetivo && !fin) objetivo.classList.add('toca');
+  if (fin && objetivo) objetivo.classList.add('toca');
+  $('#pasoN').textContent = `PASO ${S.paso + 1} DE ${e.pasos.length}`;
+  $('#quien').textContent = `Le toca a: ${rolDe(e, S.paso, p.lado)[0]}`;
+  $('#pasoTxt').innerHTML = p.txt;
+  $('#finTxt').innerHTML = fin ? `<div class="fin"><b>Listo.</b> ${esc(e.fin)}</div>` : '';
+  $('#barraPasos').innerHTML = e.pasos.map((x, i) => `<i class="${i < S.paso ? 'hecho' : i === S.paso ? 'ahora' : ''}"></i>`).join('');
+  $('#pasos').innerHTML = e.pasos.map((x, i) => `<li class="${i < S.paso ? 'hecho' : i === S.paso ? 'ahora' : ''}"><span><em>${esc(rolDe(e, i, x.lado)[0])}:</em> ${x.txt}</span></li>`).join('');
+  if (fin) S.hechas.add(e.id);
+  pintarMenu();
+  $$('[data-qr]').forEach(dibujarQR);
+  if (p.al) p.al();
+  if (S.auto) programarAuto();
+}
+function mirar(l){
+  S.ver = l;
+  $$('#tabs4 button').forEach(b => { b.setAttribute('aria-pressed', b.dataset.ver === l); if (b.dataset.ver === l) b.classList.remove('aviso'); });
+  LADOS.forEach(x => $('#col' + x).classList.toggle('oculto', x !== l));
+}
+function avanzar(){ const e = ESC[S.esc]; if (S.paso < e.pasos.length - 1){ S.paso++; pintar(); } else if (S.auto && S.todo) irA((S.esc + 1) % ESC.length, true); }
+function irA(i, seguir = false){
+  S.esc = i; S.paso = 0; S.d = {}; S.feed = [];
+  $('#feed').innerHTML = '<li class="vacio">Acá aparece cada aviso que viaja de un teléfono a otro.</li>';
+  if (!seguir){ S.auto = false; S.todo = false; marcarAuto(); }
+  pintar();
+  if (!seguir && angosto()) $('#escTit').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+/* ---------- reproducir solo ---------- */
+function marcarAuto(){ $('#auto').setAttribute('aria-pressed', S.auto); $('#auto').textContent = S.auto ? '⏸ Pausar' : '▶ Reproducir solo';
+  $('#todo').textContent = S.todo && S.auto ? '⏸ Pausar el recorrido' : '▶ Ver el recorrido completo, solo'; }
+function programarAuto(){
+  const e = ESC[S.esc], p = e.pasos[S.paso], fin = S.paso >= e.pasos.length - 1;
+  if (fin){ if (S.todo) tiempo(() => irA((S.esc + 1) % ESC.length, true), 4200); else { S.auto = false; marcarAuto(); } return; }
+  const leer = Math.min(6500, 2600 + p.txt.replace(/<[^>]+>/g, '').length * 22);
+  if (p.ronda){ tiempo(() => tocarRonda(), leer); return; }
+  tiempo(() => {
+    const app = $('#app' + p.lado), b = app.querySelector('[data-go],[data-hold]');
+    if (!b){ avanzar(); return; }
+    b.scrollIntoView({ block:'nearest' });
+    const r = b.getBoundingClientRect(), d = document.createElement('div'); d.className = 'dedo'; d.style.left = (r.left + r.width / 2) + 'px'; d.style.top = (r.top + r.height / 2) + 'px'; document.body.appendChild(d);
+    if (b.dataset.hold){ const ms = Math.min(+b.dataset.hold, 2000), desde = Date.now(); const t = cada(() => { const q = Math.min(1, (Date.now() - desde) / ms); b.style.setProperty('--carga', q); if (q >= 1){ clearInterval(t); d.remove(); tono([[660, 0, .15], [990, .12, .2]]); avanzar(); } }, 30); }
+    else tiempo(() => { d.remove(); avanzar(); }, 650);
+  }, leer);
+}
+function tocarRonda(){ const p = S.d.puntos || []; if (p.length >= 6) return; marcarPunto(p.length); if ((S.d.puntos || []).length < 6) tiempo(tocarRonda, 900); }
+$('#auto').addEventListener('click', () => { S.auto = !S.auto; S.todo = false; marcarAuto(); if (S.auto){ if (S.paso >= ESC[S.esc].pasos.length - 1){ S.paso = 0; S.d = {}; } pintar(); } else limpiar(); });
+$('#todo').addEventListener('click', () => { if (S.auto && S.todo){ S.auto = false; S.todo = false; marcarAuto(); limpiar(); return; } S.auto = true; S.todo = true; marcarAuto(); irA(S.esc, true); $('#escTit').scrollIntoView({ behavior:'smooth', block:'start' }); });
+
+/* ---------- QR (con la librería qrcode-generator; si no carga, un dibujo parecido) ---------- */
+function dibujarQR(el){
+  const txt = el.dataset.qr || 'BHC';
+  try { const q = qrcode(0, 'M'); q.addData(txt); q.make(); el.innerHTML = q.createSvgTag({ cellSize:4, margin:0, scalable:true }); return; } catch(err){}
+  let h = 0; for (const c of txt) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  let s = ''; for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++){ h = (h * 1103515245 + 12345) >>> 0; const esq = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
+    const on = esq ? (x % 6 === 0 || y % 6 === 0 || (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5) || x === 20 || y === 20 || x === 14 || y === 14) : (h >> 16) & 1; if (on) s += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
+  el.innerHTML = `<svg viewBox="0 0 21 21" shape-rendering="crispEdges">${s}</svg>`;
+}
+
+/* ---------- los toques ---------- */
+let sosteniendo = null;
+const ladoDe = el => { const t = el.closest('.tel-app'); return t ? t.id.slice(3) : ''; };
+document.addEventListener('pointerdown', ev => {
+  const b = ev.target.closest('[data-hold]'); if (!b || S.auto) return;
+  const l = ladoDe(b), p = ESC[S.esc].pasos[S.paso]; if (l !== p.lado) return;
+  ev.preventDefault(); const ms = +b.dataset.hold, desde = Date.now();
+  sosteniendo = { b, t:setInterval(() => { const q = Math.min(1, (Date.now() - desde) / ms); b.style.setProperty('--carga', q);
+    if (q >= 1){ clearInterval(sosteniendo.t); sosteniendo = null; b.style.removeProperty('--carga'); tono([[660, 0, .15], [990, .12, .2]]); avanzar(); } }, 30) };
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => document.addEventListener(t, ev => {
+  if (!sosteniendo || (t === 'pointerleave' && ev.target !== sosteniendo.b)) return;
+  clearInterval(sosteniendo.t); const b = sosteniendo.b; b.style.removeProperty('--carga'); sosteniendo = null;
+  toastTel(ladoDe(b), 'Mantenelo apretado hasta que se llene');
+}, true));
+function marcarPunto(i){
+  S.d.puntos = S.d.puntos || []; if (S.d.puntos.includes(i)) return;
+  S.d.puntos.push(i); tono([[1320, 0, .12]]); $$('.hora').forEach(h => h.textContent = horaRonda(S.d.puntos.length - 1));
+  $('#appd').innerHTML = poliRonda(); $('#appb').innerHTML = garitaRonda();
+  anotar(`<b>Garita</b> vio en vivo: punto ${esc(PUNTOS[i][0])} escaneado`);
+  if (S.d.puntos.length === 6) tiempo(avanzar, 900);
+}
+document.addEventListener('click', ev => {
+  const opc = ev.target.closest('[data-esc]'); if (opc){ irA(+opc.dataset.esc); return; }
+  const ver = ev.target.closest('[data-ver]'); if (ver){ mirar(ver.dataset.ver); return; }
+  const tel = ev.target.closest('.tel-app'); if (!tel) return;
+  const lado = tel.id.slice(3), e = ESC[S.esc], p = e.pasos[S.paso];
+  const act = ev.target.closest('[data-act="punto"]');
+  if (act || (p.ronda && lado === 'd' && ev.target.closest('[data-go]'))){
+    if (!p.ronda || lado !== 'd'){ return; }
+    const pts = S.d.puntos || []; const i = act ? +act.dataset.i : [0, 1, 2, 3, 4, 5].find(x => !pts.includes(x));
+    if (i !== undefined) marcarPunto(i); return;
+  }
+  const go = ev.target.closest('[data-go]'); if (!go || go.dataset.hold) return;
+  if (S.paso >= e.pasos.length - 1) return;
+  if (lado !== p.lado){ toastTel(lado, `Ahora le toca a ${rolDe(e, S.paso, p.lado)[0]}`); if (angosto()) mirar(p.lado); return; }
+  avanzar();
+});
+$('#reiniciar').addEventListener('click', () => { S.paso = 0; S.d = {}; S.feed = []; $('#feed').innerHTML = '<li class="vacio">Acá aparece cada aviso que viaja de un teléfono a otro.</li>'; pintar(); });
+$('#siguiente').addEventListener('click', () => irA((S.esc + 1) % ESC.length));
+
+/* Un enlace directo a una situación: …#dea, #incendio, #avion… */
+const ancla = (location.hash || '').slice(1); const j = ESC.findIndex(x => x.id === ancla); if (j >= 0) S.esc = j;
+pintar();
+})();
+</script>
+</body>
+</html>

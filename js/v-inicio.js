@@ -176,7 +176,7 @@ const arteDe = k => {
 const SECCIONES = {
   casa: {
     titulo:'Tu casa', icon:'home', color:'ok', ancha:true, lema:'Tu lote, tus visitas y tus cosas',
-    sub:'Visitas, emergencias, mensajes y los datos de tu lote',
+    sub:'Visitas, mensajes, paquetes y los datos de tu lote',
     /* Si está de salida (Salidas seguras), el "Volví" va arriba de todo
        también acá, además de la portada y de la ventana de la salida. */
     arriba(u){ const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null; return x && x.salida && !x.salida.volvio && typeof tarjetaSalidaMia === 'function' ? tarjetaSalidaMia(x) : ''; },
@@ -192,9 +192,7 @@ const SECCIONES = {
       const privNoLeidos = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(m => m.from !== 'vecino' && !m.leido).length, 0);
       return [
         teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Visita, delivery, obra, personal o Uber/DiDi', destaca:true }),
-        /* Emergencias vive en Tu casa desde el 30-09-2026 (pedido de Claudio): en
-           Ushuaia y servicios quedaba perdida. */
-        teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · SOS de hoy · hospitales · farmacias' }),
+        /* Emergencias se abre desde el corazón del DEA de la portada (09-10-2026, pedido de Claudio). */
         teja({ v:'visitas', icon:'users', color:'sky', t:'Mis visitas', s: misHoy.length ? `${plural(misHoy.length, 'esperada')} hoy` : 'Nadie anunciado hoy', n: misHoy.length || '' }),
         ...(!hayPaquetes() ? [] : [teja({ v:'mis-paquetes', icon:'box', color:'wood', t:'Mis paquetes', s:(() => { const n = paquetesDelLote(u).filter(p => !p.retirado).length; return n ? `${plural(n, 'paquete')} de tu lote en la garita` : 'Lo que llega a la garita para tu lote'; })(), badge: paquetesDelLote(u).filter(p => !p.retirado).length })]),
         teja({ v:'mensajes', icon:'chat', color:'accent', t:'Mensajes', s:'Privados con vecinos, la Administración y la Guardia', badge: privNoLeidos + dmNoLeidos() }),
@@ -763,8 +761,10 @@ A['ver-novedad'] = el => {
 A['novedad-al-pizarron'] = () => { cerrarHoja(); abrir('pizarron'); };
 
 /* El DEA de la garita, sobre la foto: es lo que alguien tiene que saber
-   sin buscarlo el día que hace falta. */
-const deaHero = () => `<div class="dea-hero">${I('heart')}<span><b>DEA operativo</b>${esc(/garita/i.test(Store.s.config.dea || '') || !Store.s.config.dea ? 'en la garita' : Store.s.config.dea)}</span></div>`;
+   sin buscarlo el día que hace falta. Desde el 09-10-2026 (pedido de
+   Claudio) el corazón late y al tocarlo abre Emergencias, que salió de Tu casa. */
+const deaHero = () => { const lugar = /garita/i.test(Store.s.config.dea || '') || !Store.s.config.dea ? 'en la garita' : Store.s.config.dea;
+  return `<button class="dea-hero" data-a="abrir" data-v="emergencias" aria-label="DEA operativo ${esc(lugar)}. Abrir Emergencias">${I('heart')}<span><b>DEA operativo</b>${esc(lugar)}</span></button>`; };
 /* El pie de la app: chico y en gris, para que esté pero no moleste.
    "by Claudio A. Ravasi" abre los términos de uso, los datos personales y
    el deslinde de responsabilidad. Hasta el 26-09 había además un renglón

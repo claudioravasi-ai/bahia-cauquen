@@ -303,15 +303,15 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
       <div class="marca"><img src="icons/logo.png" alt="Escudo del barrio"><div><b>Barrio Bahía Cauquén</b><small>Ushuaia · Tierra del Fuego</small></div></div>
       <span class="pronto">Muy pronto en tu teléfono</span>
       <h1>Pronto estaremos ahí para hacerte la vida más fácil</h1>
-      <p>La app del Barrio Bahía Cauquén conecta a los vecinos, la garita y la Administración en un solo lugar. Probala acá, en vivo: veintidós situaciones de todos los días con vecinos inventados. Tocá los botones de los dos teléfonos y mirá cómo le llega a cada uno.</p>
+      <p>La app del Barrio Bahía Cauquén conecta a los vecinos, la garita y la Administración en un solo lugar. Probala acá, en vivo: veintiuna situaciones de todos los días con vecinos inventados. Tocá los botones de los dos teléfonos y mirá cómo le llega a cada uno.</p>
       <div class="sellos"><span class="sello">📱 Dos teléfonos a la vez</span><span class="sello">🔒 No se guarda ni se envía nada</span><span class="sello">⏱ Un par de minutos cada una</span></div>
-      <button class="sonido" id="sonido" aria-pressed="false">🔇 Activar el sonido de los avisos</button>
+      <div class="sellos"><button class="sonido" id="sonido" aria-pressed="false">🔇 Activar el sonido de los avisos</button><a class="sonido" href="en-vivo.html" style="text-decoration:none">📱 Verlo en vivo, con 4 teléfonos</a></div>
     </div>
   </header>
 
   <div class="cifras" aria-label="La app en números">
     <div class="cifra"><b>152 lotes</b><span>conectados con la garita y la Administración</span></div>
-    <div class="cifra"><b>24 h</b><span>la garita en tu bolsillo: visitas, paquetes y rondas</span></div>
+    <div class="cifra"><b>24 h</b><span>la garita en tu bolsillo: visitas, correos y rondas</span></div>
     <div class="cifra"><b>3 segundos</b><span>para pedir ayuda con el SOS, aunque el teléfono esté bloqueado</span></div>
     <div class="cifra"><b>0 papeles</b><span>expensas, recibos, peticiones y votos, todo en la app</span></div>
   </div>
@@ -343,7 +343,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
         <li><b>Mi credencial</b>Un QR para que la garita te reconozca sin mostrar el DNI.</li>
         <li><b>Votaciones</b>Un voto por lote, desde casa, con el acta lista.</li>
         <li><b>Pizarra del día</b>Lo importante primero, por colores, y se renueva sola.</li>
-        <li><b>Paquetes con foto</b>Te avisa apenas llega y lo retirás con tu QR.</li>
+        <li><b>Correos en el barrio</b>Sabés si la moto del correo viene para tu casa.</li>
         <li><b>Reclamos con seguimiento</b>Sabés en qué está cada pedido.</li>
         <li><b>Obras del barrio</b>Quién construye y el aviso del día del mixer.</li>
         <li><b>Agenda de Ushuaia</b>Farmacias, taxis, comidas y los oficios del barrio.</li>
@@ -430,7 +430,7 @@ const casaInicio = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía �
   `<div class="ap-hola"><small>Buenas tardes,</small><b>Lucía</b><span class="ap-muted">Lote 42 · 7 °C · ráfagas 42 km/h</span></div>`, extra,
   `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
     <button class="ap-teja destaca" data-go><span class="e">🔳</span><b>Autorizar una visita</b></button>
-    <div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div><div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div>
+    <div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div><div class="ap-teja"><span class="e">📮</span><b>Correos en el barrio</b></div>
     <div class="ap-teja"><span class="e">💳</span><b>Mis expensas</b></div><div class="ap-teja"><span class="e">🌋</span><b>Preparados para un sismo</b></div></div>`);
 const casaSimple = (extra = '', campana = 0) => vec('Bahía Cauquén', 'Lucía · Lote 42', { campana }) + ap(
   `<div class="ap-hola"><small>Hola,</small><b>Lucía</b><span class="ap-muted">Lote 42</span></div>`, extra,
@@ -445,7 +445,7 @@ const CAMION = `<svg viewBox="0 0 150 80"><rect x="4" y="16" width="86" height="
   <g class="rueda"><circle cx="26" cy="63" r="10" fill="#23272b"/><circle cx="26" cy="63" r="4" fill="#bfc5ca"/></g><g class="rueda"><circle cx="110" cy="63" r="10" fill="#23272b"/><circle cx="110" cy="63" r="4" fill="#bfc5ca"/></g>
   <text x="47" y="46" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="10" font-weight="800" fill="#fff">RESIDUOS</text></svg>`;
 
-/* ---------- las veintidós simulaciones ---------- */
+/* ---------- las veintiuna simulaciones ---------- */
 const ESC = [
 { id:'visita', grupo:'Tu casa', e:'🔳', t:'Autorizar una visita', s:'Creás el pase y la garita lo valida',
   a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'16:05',
@@ -467,36 +467,13 @@ const ESC = [
     b:() => garitaInicio('', [it('👤', 'Marcos Díaz', 'Visita · Lote 42', 'Adentro', 'ok'), it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok')]) },
   ], fin:'Así de simple: la visita pasa con el QR y vos te enterás.' },
 
-{ id:'paquete', grupo:'Tu casa', e:'📦', t:'Retirar un paquete', s:'Llega a la garita y lo retirás con tu QR',
-  a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno mañana'], hora:'11:10',
-  pasos:[
-  { lado:'b', txt:'Llega un paquete. El guardia toca <b>Llegó un paquete</b>, elige el lote y le saca una foto a la etiqueta.', a:() => casaSimple(), b:() => garita('Turno mañana · Guardia Ruiz') + ap(
-      `<div class="ap-card"><h4>Llegó un paquete</h4><div style="display:grid;gap:8px">${campo('Para', 'Lote 42 · Lucía Fernández')}<div class="ap-dos">${campo('Empresa', 'Correo')}${campo('Detalle', 'Caja mediana')}</div>
-      <div style="height:70px;border-radius:12px;background:repeating-linear-gradient(45deg,var(--surf-3),var(--surf-3) 8px,var(--surf-2) 8px,var(--surf-2) 16px);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted)">📷 Foto de la etiqueta</div></div></div>`,
-      btn('Guardar y avisar al lote')) },
-  { lado:'a', txt:'A todas las cuentas del lote les llega el aviso. En <b>Mis paquetes</b>, tocá <b>Mi QR para retirar</b>.',
-    al(){ push('a', '📦', 'Paquete en la garita', 'Correo · Caja mediana'); },
-    a:() => vec('Tus paquetes', 'Lote 42', { campana:1 }) + ap(btn('🔳 Mi QR para retirar'), `<div class="ap-card">${it('📦', 'Correo · Caja mediana', 'Llegó hoy 11:10 · en la garita', 'Para retirar', 'warn')}</div>`),
-    b:() => garita('Turno mañana · Guardia Ruiz') + ap(`<div class="ap-card"><h4>Paquetes en la garita</h4>${it('📦', 'Lote 42 · Correo', 'Caja mediana · llegó 11:10', 'En la garita', 'warn')}</div>`) },
-  { lado:'a', txt:'Tu teléfono arma un <b>QR firmado que cambia cada 30 segundos</b>: una captura vieja no sirve y nadie más lo puede fabricar. Mostralo en la garita.', a:() => vec('Mi QR para retirar', '1 paquete en la garita') + ap(
-      qr('BHR1.lucia.' + Date.now().toString(36), 'id="qrRetiro"'), `<div class="ap-centro"><b id="qrSeg">30</b> <span class="ap-muted">segundos para que cambie</span></div>`,
-      `<div class="nota-sim">Simulación</div>`, btn('La garita lo lee →', { cl:'ok' })),
-    al(){ let n = 30; cada(() => { n = n <= 1 ? 30 : n - 1; const s = $('#qrSeg'); if (s) s.textContent = n; if (n === 30){ const q = $('#qrRetiro'); if (q){ q.dataset.qr = 'BHR1.lucia.' + Date.now().toString(36); dibujarQR(q); } } }, 1000); } },
-  { lado:'b', hora:'18:05', txt:'El guardia lee el QR: la app comprueba la firma y muestra de quién es y qué paquetes tiene. Tocá <b>Entregar</b>.', b:() => garita('Turno tarde · Guardia Pereyra') + ap(
-      aviso('ok', '🔐', 'FIRMA VÁLIDA', 'QR de retiro de Lucía Fernández · Lote 42'), `<div class="ap-card">${it('📦', 'Correo · Caja mediana', 'Llegó hoy 11:10')}</div>`, btn('Entregar', { cl:'ok' })) },
-  { lado:'a', txt:'Queda asentado con un <b>sello digital</b>, en la bitácora de la garita y en tu teléfono.',
-    al(){ push('a', '✅', 'Retiraste tu paquete', 'Correo · 18:05 · con tu QR firmado'); },
-    a:() => vec('Tus paquetes', 'Lote 42') + ap(`<div class="ap-card">${it('📦', 'Correo · Caja mediana', 'Retirado 18:05 con tu QR firmado', 'Retirado', 'ok')}</div>`, `<div class="ap-muted ap-centro ap-mono">sello 9f3c·a1e0·77b2</div>`),
-    b:() => garita('Turno tarde · Guardia Pereyra') + ap(aviso('ok', '📦', 'Entregado a Lucía Fernández', 'Lote 42 · 18:05 · anotado en la bitácora')) },
-  ], fin:'Nadie puede retirar tu paquete con una foto de tu QR: cambia cada 30 segundos.' },
-
 { id:'uber', grupo:'Tu casa', e:'🚕', t:'Viene un Uber o DiDi', s:'Desde Autorizar una visita, en 10 segundos, y la garita lo reconoce por la patente',
   a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'19:40',
   pasos:[
   { lado:'a', txt:'Pediste un Uber para ir al centro. En <b>Tu casa</b> tocá <b>Autorizar una visita</b> y, en "¿Quién viene?", <b>Uber, DiDi o taxi</b>: se abre el aviso corto.', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
       `<div class="ap-hola"><small>Buenas tardes,</small><b>Lucía</b></div>`, `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
       <button class="ap-teja destaca" data-go><span class="e">🔳</span><b>Autorizar una visita</b></button>
-      <div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div><div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div></div>`),
+      <div class="ap-teja"><span class="e">👥</span><b>Mis visitas</b></div><div class="ap-teja"><span class="e">📮</span><b>Correos en el barrio</b></div></div>`),
     b:() => garitaInicio() },
   { lado:'a', txt:'Elegí la app, si te viene a <b>buscar</b> o <b>trae</b> algo, en cuánto llega y la <b>patente</b> (Uber la muestra apenas el chofer acepta; si todavía no la sabés, la agregás después). Tocá <b>Avisar a la garita</b>.', a:() => vec('Viene un Uber, DiDi o taxi', 'Aviso a la garita') + ap(
       `<div><div class="ap-muted">¿De qué app?</div><div class="seg"><span class="on">Uber</span><span>DiDi</span><span>Cabify</span><span>Taxi</span></div></div>`,
@@ -525,7 +502,7 @@ const ESC = [
     al(){ hablar('Le mando a la garita: llego tarde, a las 23. ¿Lo mando?'); },
     a:() => vec('Bahía Cauquén', 'Asistente') + ap(`<div class="ap-voz"><span class="mic" style="animation:none;background:var(--brand)">🎙️</span><div class="ap-muted">¿Lo hago?</div><div class="dice">Le mando a la garita: "Llego tarde, a las 23". ¿Lo mando?</div></div>`,
       `<div class="ap-btns">${btn('Mandar a la garita', { cl:'ok' })}<span class="ap-btn sec">No</span></div>`) },
-  { lado:'b', txt:'A la garita le llega al instante, en privado. También podés preguntarle <b>"¿tengo paquetes?"</b>, <b>"¿cuánto debo de expensas?"</b> o <b>"¿cuándo pasa el camión?"</b>.',
+  { lado:'b', txt:'A la garita le llega al instante, en privado. También podés preguntarle <b>"¿cuánto debo de expensas?"</b> o <b>"¿cuándo pasa el camión?"</b>.',
     al(){ push('b', '💬', 'Lote 42 · Lucía', 'Llego tarde, a las 23'); hablar('Listo, la garita ya lo tiene.'); },
     a:() => vec('Bahía Cauquén', 'Asistente') + ap(aviso('ok', '✅', 'Listo, la garita ya lo tiene', 'Lo mandaste con la voz')),
     b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Mensajes con vecinos</h4><div class="ap-chat"><div class="msg">Llego tarde, a las 23.<time>22:41 · Lote 42</time></div></div></div>`) },
@@ -536,7 +513,7 @@ const ESC = [
   pasos:[
   { lado:'a', txt:'Volvés del centro en un <b>remís</b>: la patente no es tuya y esta noche hay un <b>guardia de reemplazo</b> que no te conoce. En <b>Tu casa</b> tocá <b>Mi credencial</b>.', a:() => vec('Bahía Cauquén', 'Lucía · Lote 42') + ap(
       `<div class="ap-hola"><small>Buenas noches,</small><b>Lucía</b></div>`, `<div class="ap-lbl">Tu casa</div><div class="ap-tejas">
-      <div class="ap-teja"><span class="e">🔳</span><b>Autorizar una visita</b></div><div class="ap-teja"><span class="e">📦</span><b>Mis paquetes</b></div>
+      <div class="ap-teja"><span class="e">🔳</span><b>Autorizar una visita</b></div><div class="ap-teja"><span class="e">📮</span><b>Correos en el barrio</b></div>
       <button class="ap-teja destaca" data-go><span class="e">🆔</span><b>Mi credencial</b></button><div class="ap-teja"><span class="e">🏠</span><b>Mi casa</b></div></div>`),
     b:() => garitaInicio() },
   { lado:'a', txt:'Aparece tu credencial: tu nombre, tu lote y un <b>QR personal</b>. Mostráselo al guardia por la ventanilla.', a:() => vec('Mi credencial', 'Lote 42') + ap(

@@ -140,7 +140,7 @@ const MANUAL_CAPS = [
     ['p', 'Aparece un cartel rojo con quién la pidió, el lote y "Dónde está pasando". Seguí lo que indica el cartel (por ejemplo, no bloquear la calle). Tocá <b>"Entendido"</b> para cerrarlo.'],
     ['h', 'Pedir el DEA (desfibrilador)'],
     ['pasos', [
-      'Entrá a <b>Tu casa → Emergencias</b>.',
+      'En la foto de la portada, arriba a la derecha, tocá el <b>corazón que late</b> ("DEA operativo en la garita"): se abre <b>Emergencias</b>.',
       'Al lado del corazón rojo, <b>mantené apretado 2 segundos</b> el botón verde <b>SOLICITARLO</b>.',
       'Contestá <b>SÍ</b>. A la garita le salta una alarma con tu apellido y tu lote hasta que sale con el DEA; a vos te avisa cuando va en camino.',
       'Cuando la garita toca "Voy en camino con el DEA", con ese mismo toque les llega un aviso a los <b>vecinos del equipo de salud o con RCP</b>. Si alguno va, lo ves en Emergencias ("También va…").',
@@ -153,7 +153,7 @@ const MANUAL_CAPS = [
       'Tocá <b>VOY</b> si podés ir: la garita y el vecino ven tu nombre, tu profesión y tu teléfono. Si no podés, <b>"No puedo ir"</b>.',
     ]],
     ['h', 'Teléfonos'],
-    ['p', 'En Emergencias están, a un toque, el 911, el 107, el 100, el 101, la garita, la Administración, hospitales y farmacias. Tocar un número lo llama.'],
+    ['p', 'A Emergencias se entra tocando el corazón que late del DEA, en la foto de la portada. Ahí están, a un toque, el 911, el 107, el 100, el 101, la garita, la Administración, hospitales y farmacias. Tocar un número lo llama.'],
   ], ir:[['abrir', 'emergencias', 'Ir a Emergencias']] },
 
   { id:'visitas', icon:'qr', color:'brand', para:'vecinos', t:'Autorizar una visita', s:'Código y QR para la garita, y los Uber o DiDi', b:[
@@ -250,6 +250,7 @@ const MANUAL_CAPS = [
       'Tocá la tarjeta de pago (o <b>"Pagar las expensas"</b>).',
       'Elegí cómo: <b>pagar online</b> (cuando la Administración lo tiene activado: tarjeta, Mercado Pago o QR de tu banco, y el recibo sale solo), <b>transferencia</b> (alias, CBU e importe listos para copiar) o <b>efectivo</b> en la Administración.',
     ]],
+    ['ojo', 'ok', 'Mientras no esté el pago online: "Ya la pagué"', 'Hasta que la Administración active Mercado Pago, al tocar la tarjeta de pago aparece arriba el botón verde <b>"Ya la pagué · marcarla como pagada"</b>. Si ya transferiste o depositaste, tocalo y contestá "Sí, ya pagué": tu expensa queda <b>Pagada</b> y no te llegan más recordatorios. La Administración la confirma con el banco (los centavos dicen tu lote) y después te llega el recibo. El comprobante, en ese caso, es optativo.'],
     ['h', 'Si pagaste por fuera de la app'],
     ['pasos', [
       'Tocá <b>"Ya pagué por fuera de la app"</b>.',
@@ -455,7 +456,7 @@ const MANUAL_CAPS = [
       '<b>Municipalidad de Ushuaia</b>: atajos a trámites, reclamos urbanos, tasas y servicios en el sitio oficial.',
       '<b>Sismos</b>: los movimientos de la región, en vivo, con el acceso a "Preparados para un sismo" (que también está en Tu casa).',
     ]],
-    ['p', '<b>Emergencias</b> (teléfonos, el pedido del DEA y los SOS del día) y <b>Salidas seguras</b> (kayak, montaña, navegación) están en <b>Tu casa</b>.'],
+    ['p', '<b>Emergencias</b> (teléfonos, el pedido del DEA y los SOS del día) se abre tocando el <b>corazón del DEA</b> en la foto de la portada. <b>Salidas seguras</b> (kayak, montaña, navegación) está en <b>Tu casa</b>.'],
   ], ir:[['abrir', 'ciudad', 'Ir a Ushuaia y servicios']] },
 
   { id:'cuenta', icon:'user', color:'accent', para:'todos', t:'Tu cuenta', s:'Contraseña, modo noche, avisos, tus datos, actualizar y salir', b:[
@@ -676,7 +677,7 @@ const MANUAL_CAPS = [
     ['pasos', [
       'Entrá a <b>Vecinos → Padrón</b> y bajá hasta <b>"Guía del barrio"</b>.',
       'Tocá <b>"Cargar la guía del barrio"</b> y elegí el archivo <b>guia-del-barrio-….csv</b> de la carpeta <b>datos-privados</b> (en tu computadora).',
-      'La app dice cuántos lotes y teléfonos cargó. Desde ese momento la garita los ve.',
+      'Se abre una ventana que dice cuántos lotes y teléfonos leyó y espera a la base del barrio: cuando dice <b>"Listo: la guía quedó guardada"</b>, la garita ya la ve. Si dice que la base no la aceptó, explica qué hacer (por ejemplo, publicar las reglas de Firebase).',
       'Para corregir un lote, buscalo en <b>Vecinos</b> y tocá <b>"Editar"</b>. Para cambiar muchos, <b>"Descargar la guía (CSV)"</b>, corregila en Excel y volvé a subirla: reemplaza a la anterior.',
     ]],
     ['ojo', 'warn', 'Quién ve qué', 'Los nombres, el lote y la dirección los ven los vecinos, la garita y la supervisión. Los <b>teléfonos y la nota</b> de cada lote, solo la garita, la Administración y la supervisión. El hotel, solo la dirección. El archivo con teléfonos guardalo siempre en <b>datos-privados</b>: nunca va a GitHub.'],
@@ -702,6 +703,18 @@ const MANUAL_CAPS = [
     ['ojo', 'warn', 'Borrar lo que quedó del chat y de las reservas', 'El chat vecinal y las reservas se sacaron de la app el 29-09-2026. Lo que quedó guardado en la base ya no se usa y la ley pide borrarlo. Es un solo botón en Protección de datos: se borra para siempre y queda en la auditoría.'],
     ['h', 'Expensas y contabilidad'],
     ['p', 'Las facturas del mes se cargan en <b>Contabilidad</b>; al cerrar el mes se arman los cupones. En <b>Expensas</b> se ven los lotes, se confirman los pagos informados, se emiten recibos y se sigue la morosidad.'],
+    ['h', 'Traer la liquidación real de Octavo Piso'],
+    ['p', 'Mientras se lleve en paralelo con Octavo Piso, cada mes se puede traer su liquidación y la app queda <b>igual al centavo</b>. Claude arma el archivo <b>liquidacion-&lt;mes&gt;.json</b> con el PDF y lo deja en la carpeta <b>datos-privados</b> (no lleva nombres de vecinos).'],
+    ['pasos', [
+      'Entrá a <b>Gestión → Expensas → Automáticas</b> y, abajo, tocá <b>"Traer la liquidación real de un mes"</b> (también está en "Cómo se calcula").',
+      'Elegí el archivo y tocá <b>"Traer"</b>. La app registra los <b>cobros del mes</b> lote por lote (lo que figura en "Pagos recibidos"), pone los <b>gastos reales</b> (los estimados quedan anulados) con las obleas de cada lote, y arma el <b>cupón de cada lote</b>.',
+      'Se abre una ventana que dice si <b>los 152 lotes coinciden al centavo</b> con el PDF. Si alguno no, lo nombra; si lleva un "Ajuste", el vecino lo ve en su cuenta con ese nombre.',
+      'A cada vecino le aparece su cupón <b>por pagar</b> y le llega un aviso. No se mandan correos: los cupones ya los mandó Octavo Piso.',
+      'Si lo volvés a traer, no se duplica nada.',
+    ]],
+    ['h', 'Mes contra mes'],
+    ['p', 'En <b>Automáticas → Mes contra mes</b> se compara un mes con el anterior: gastos, cuota promedio, cupones, banco y deuda; cada rubro y cada gasto con su cambio en %, cuál es <b>nuevo</b> y cuál <b>ya no está</b>. Se descarga en PDF. No muestra datos de ningún vecino.'],
+    ['p', '<b>"Ya la pagué"</b>: mientras Mercado Pago no esté activado, los vecinos pueden marcar su expensa como pagada con un toque, sin comprobante. Te llega el aviso y el pago aparece en <b>Pagos</b> para confirmarlo con el resumen del banco (los centavos dicen el lote). Recién al confirmarlo se emite el recibo.'],
     ['p', '<b>El hotel (6 UF)</b>: sus cupones salen solos al emitir el mes, uno por UF, a su correo y a su ventana "Expensas del hotel". Paga el total de sus 6 UF en un solo pago: en "Por acreditar" aparece como <b>"Hotel Los Cauquenes · 6 UF"</b>, con cómo se reparte; al confirmarlo salen <b>6 recibos</b>, uno por UF. Los pagos con Mercado Pago del hotel se reparten y se pasan a recibo solos, como los de los vecinos. Para eso la app le deja al hotel una copia con solo sus cuotas: no ve las de nadie más.'],
     ['p', '<b>Probar Mercado Pago</b>: en tu vista de vecino, en Expensas, el botón <b>"Probar el pago con Mercado Pago"</b> (solo lo ve quien administra) cobra el importe de tu último cupón aunque estés al día. Se paga con una tarjeta de prueba (titular APRO) y queda en <b>Pagos de PRUEBA</b>: no cambia tu saldo ni saca recibo, y se borra con un toque en Expensas → Pagos.'],
   ], ir:[['abrir', 'gestion', 'Gestión del barrio']] },
