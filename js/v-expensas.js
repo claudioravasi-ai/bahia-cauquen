@@ -89,8 +89,11 @@ const repartoDe = p => aLista(p && p.reparto).filter(r => r && r.lote);
 const pagoDelLote = (p, lote) => repartoDe(p).length ? repartoDe(p).some(r => r.lote === lote) : p.lote === lote;
 const parteDelLote = (p, lote) => { const r = repartoDe(p); if (r.length){ const x = r.find(z => z.lote === lote); return x ? +x.monto || 0 : 0; } return p.lote === lote ? +p.monto || 0 : 0; };
 /* De dónde salen las liquidaciones: el hotel usa su copia privada (en la
-   demo, sin nube, se arma en el momento con las del barrio). */
-const liqsFuente = () => !esHotel() ? Store.s.liquidaciones : typeof Nube !== 'undefined' && Nube.activa() ? aLista(Store.s.hotelLiqs) : HotelExp.armar();
+   demo, sin nube, se arma en el momento con las del barrio); la
+   Administración, la liquidación completa; cada vecino, el resumen del mes
+   más la cuota de SU lote (ExpLote, 08-10-2026). */
+const liqsFuente = () => esHotel() ? (typeof Nube !== 'undefined' && Nube.activa() ? aLista(Store.s.hotelLiqs) : HotelExp.armar())
+  : yo()?.rol === 'admin' ? Store.s.liquidaciones : ExpLote.paraMi();
 const liquidacionDe = p => liqsFuente().find(l => l.periodo === p);
 const liquidacionesEmitidas = () => liqsFuente().filter(l => l.estado === 'emitida').sort((a, b) => a.periodo.localeCompare(b.periodo));
 const cuotaDe = (l, lote) => aLista(l && l.cuotas).find(c => c.lote === lote);
@@ -1260,14 +1263,14 @@ function emitirLiquidacion(periodo, { auto = false } = {}){
     auditar(s, auto ? 'Emitió sola la liquidación (cierre automático)' : 'Emitió la liquidación', `${nombrePeriodo(periodo)} · ${plata(calc.totalCuotas)} · ${calc.cuotas.length} cupones`);
   });
   toast('Liquidación emitida', 'check');
-  HotelExp.publicar();
+  HotelExp.publicar(); ExpLote.publicar();
   mandarCupones(periodo);
 }
 A['reabrir-liquidacion'] = async el => {
   if (!await confirmar('Reabrir el período', 'Los cupones dejan de estar emitidos hasta que lo vuelvas a cerrar. Los pagos ya registrados no se tocan.', { si:'Reabrir', peligro:true })) return;
   Store.cambiar(s => { const l = s.liquidaciones.find(x => x.periodo === el.dataset.v); if (l) l.estado = 'borrador';
     auditar(s, 'Reabrió un período', el.dataset.v); });
-  HotelExp.publicar();
+  HotelExp.publicar(); ExpLote.publicar();
 };
 A['ver-liquidacion'] = el => imprimir(`Liquidación ${nombrePeriodo(el.dataset.v)}`, liquidacionHTML(el.dataset.v));
 /* REENVIAR CUPONES: a todos, a un lote (eligiendo a cuál de sus correos)
@@ -1831,6 +1834,72 @@ const HotelExp = {
     if (this.huella(arr) === this.huella(Store.s.hotelLiqs)) return 0;
     Store.cambiar(s => { s.hotelLiqs = arr; });
     return arr.length;
+  },
+};
+/* =========================================================
+   LA CUOTA DE CADA LOTE, SOLO PARA SU LOTE (pedido de Claudio, 08-10-2026)
+   La liquidación de cada mes trae, por cada uno de los 152 lotes, el
+   interés por mora, la deuda que arrastra, si está en gestión judicial, las
+   multas y los gastos particulares. Antes bajaba ENTERA al teléfono de
+   todos los vecinos (la pantalla mostraba solo lo propio, pero el resto
+   quedaba en el equipo). Ahora, igual que con el hotel:
+     · /barrio/liquidaciones (completa) la lee solo la Administración;
+     · /barrio/liqResumen: el mes sin las cuotas (totales, rubros,
+       vencimientos), para todos;
+     · pv/cuotasLote/<cuenta>/cl-<lote>: las cuotas de UN lote, en la
+       carpeta de cada cuenta de ese lote (también el propietario a
+       distancia). La app de la Administración las arma y las reparte sola
+       al emitir o reabrir un mes y cada 10 minutos (con los pagos), y solo
+       escribe si algo cambió.
+   Para el vecino no cambia nada en pantalla: liqsFuente() junta el
+   resumen con sus cuotas y el resto del motor (cupón, saldo, reloj de
+   vencimientos) sigue igual.
+   ========================================================= */
+const ExpLote = {
+  /* Para comparar con lo que vuelve de la base: sin vacíos y con las claves
+     en orden. Firebase devuelve como lista un objeto de claves numéricas
+     ({1:…, 2:…} → [ , …, …]): listas y objetos se comparan igual. */
+  canon(x){
+    const limpio = v => {
+      if (v && typeof v === 'object'){ const o = {}; Object.keys(v).sort().forEach(k => { const z = limpio(v[k]); if (z !== undefined) o[k] = z; }); return Object.keys(o).length ? o : undefined; }
+      return v === null || v === undefined || v === '' ? undefined : v;
+    };
+    return JSON.stringify(limpio(x) ?? null);
+  },
+  armar(){
+    const liqs = aLista(Store.s.liquidaciones).filter(l => l && l.periodo);
+    const resumen = liqs.map(l => { const { cuotas, ...r } = l; return { ...JSON.parse(JSON.stringify(r)), id: l.id || 'liq-' + l.periodo, nCuotas: aLista(cuotas).length }; })
+      .sort((a, b) => a.periodo.localeCompare(b.periodo));
+    const porLote = {};
+    liqs.forEach(l => aLista(l.cuotas).forEach(c => { if (c && c.lote) (porLote[c.lote] = porLote[c.lote] || []).push({ ...JSON.parse(JSON.stringify(c)), periodo:l.periodo }); }));
+    const cuotas = Object.entries(porLote).map(([lote, cs]) => ({ id:'cl-' + lote.replace(/^Lote\s*/i, ''), lote,
+      para: Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').map(u => u.id).sort(),
+      porPeriodo: cs.sort((a, b) => a.periodo.localeCompare(b.periodo)) })).filter(x => x.para.length)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    return { resumen, cuotas };
+  },
+  publicar(){
+    if (yo()?.rol !== 'admin') return 0;
+    if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listoParaMotor && Nube.listoParaMotor())) return 0;
+    const { resumen, cuotas } = this.armar();
+    const orden = arr => aLista(arr).slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    const cambiaR = this.canon(orden(resumen)) !== this.canon(orden(Store.s.liqResumen));
+    const cambiaC = this.canon(orden(cuotas)) !== this.canon(orden(Store.s.cuotasLote));
+    if (!cambiaR && !cambiaC) return 0;
+    Store.cambiar(s => { if (cambiaR) s.liqResumen = resumen; if (cambiaC) s.cuotasLote = cuotas; });
+    return 1;
+  },
+  /* Lo que ve una cuenta que no es de la Administración: el resumen de
+     cada mes con SOLO las cuotas de su lote. En la demo (sin nube), hasta
+     que la Administración publica, se usa la liquidación del barrio. */
+  paraMi(){
+    const u = yo(), R = aLista(Store.s.liqResumen), C = aLista(Store.s.cuotasLote);
+    if (!R.length && !(typeof Nube !== 'undefined' && Nube.activa())) return Store.s.liquidaciones;
+    const k = [R, C, u && u.casa];
+    if (this._k && this._k.every((x, i) => x === k[i])) return this._v;
+    const mias = C.filter(x => x && u && x.lote === u.casa).flatMap(x => aLista(x.porPeriodo));
+    this._k = k;
+    return (this._v = R.map(r => ({ ...r, cuotas: mias.filter(c => c.periodo === r.periodo) })));
   },
 };
 /* El hotel (y la Administración) completan el reparto de un pago del hotel

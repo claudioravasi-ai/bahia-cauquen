@@ -54,12 +54,16 @@ const Nube = {
              /* 07-10: los correos que están en el barrio (solo empresa y horas; js/v-servicio.js) */
              'mensajeria',
              /* 08-10: la guía del barrio: quién vive en cada lote, sin teléfonos (js/v-vecinos.js) */
-             'guia'],
+             'guia',
+             /* 08-10: el resumen de cada liquidación, sin las cuotas de los lotes (js/v-expensas.js, ExpLote) */
+             'liqResumen'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
               /* 27-09: "Me voy de viaje" (casa sola), antes en la ficha pública */
-              'ausencias'],
+              'ausencias',
+              /* 08-10: las cuotas de expensas de UN lote, para las cuentas de ese lote (ExpLote) */
+              'cuotasLote'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos',
             /* 07-10: alertas a la supervisión y vistos de los partes (js/v-supervisor.js) */
             'alertasSup','vistos',
@@ -125,6 +129,7 @@ const Nube = {
     documentos:      { listas:['versiones'] },
     padron:          { listas:['titulares'] },
     guia:            { listas:['propietarios','inquilinos'] },
+    cuotasLote:      { listas:['para','porPeriodo'] },
     telefonos:       { listas:['tels'] },
     cruceros:        { listas:['escalas'] },
     descargas:       { listas:[] },
@@ -166,6 +171,8 @@ const Nube = {
       }
       case 'infracciones':
         return Store.s.users.filter(u => u.casa === x.casa && u.estado === 'aprobado').map(u => u.id);
+      /* Las cuotas de expensas de un lote: a las cuentas que armó la Administración (ExpLote). */
+      case 'cuotasLote': return aLista(x.para);
       /* Los cuidados de la casa en invierno son del LOTE: van a todas sus cuentas. */
       case 'casaTareas':
         return x.lote ? Store.s.users.filter(u => u.casa === x.lote && u.estado === 'aprobado' && !esPropDistancia(u)).map(u => u.id) : [];
@@ -222,7 +229,7 @@ const Nube = {
        otra sesión en este equipo, no tienen que subir a la base del barrio. */
     [...this.ZONAS.barrio, ...this.ZONAS.privado, ...this.ZONAS.staff, ...this.ZONAS.hotel].forEach(col => { if (Array.isArray(s[col])) s[col] = []; });
     s.notifs = []; s.motorLog = {}; this.ultimo = {}; this.configLista = false; this.motorListo = false;
-    this.listos = new Set(); this.esperados = new Set(); this.arranqueAt = Date.now();
+    this.listos = new Set(); this.esperados = new Set(); this.arranqueAt = Date.now(); this.reintentos = {}; this.sinPermiso = new Set();
     /* Leer la ficha propia. Si la base falla (conexión lenta, un corte),
        NO es lo mismo que "no hay ficha": antes se confundía y la cuenta de
        la garita terminaba en la pantalla de completar datos. Se reintenta. */
@@ -295,7 +302,10 @@ const Nube = {
     /* EL PADRÓN DE EXPENSAS (DNI, correo, teléfono y deuda de cada lote) lo
        baja SOLO la Administración (08-10-2026). Antes bajaba a todos los
        equipos; para saber quién vive dónde está la guía del barrio. */
-    this.escucharColeccion('barrio', (lee.barrio || this.ZONAS.barrio).filter(c => c !== 'padron' || mio.rol === 'admin'));
+    /* La liquidación completa (las cuotas, intereses y deudas de todos los
+       lotes) también, solo la Administración: los demás bajan el resumen y
+       las cuotas de su lote (ExpLote, 08-10-2026). */
+    this.escucharColeccion('barrio', (lee.barrio || this.ZONAS.barrio).filter(c => (c !== 'padron' && c !== 'liquidaciones') || mio.rol === 'admin'));
     this.escucharConfig();
     const sup = mio.rol === 'supervisor';
     if (staff) this.escucharColeccion('staff', this.ZONAS.staff);
@@ -465,11 +475,15 @@ const Nube = {
   },
   tanda: null,
 
+  /* Colecciones nuevas: si al abrir la app las reglas todavía no las permitían, se reintenta. */
+  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen'],
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
       /* Bitácora y auditoría bajan solo lo reciente (ver js/historial.js). */
       const ref = this.db.ref(`${base}/${col}`), q = typeof Historial !== 'undefined' ? Historial.consulta(ref, col) : ref;
       q.on('value', snap => {
+        /* Si antes no tenía permiso y ahora sí (se publicaron las reglas), se apaga el cartel. */
+        if (this.sinPermiso) this.sinPermiso.delete(col);
         const v = snap.val() || {};
         const arr = Object.keys(v).map(k => this.comoLaGuardamos(col, v[k]));
         if (col === 'notifsTodos') Store.s.notifs = [...arr, ...Store.s.notifs.filter(n => !this.esNotifGeneral(n))];
@@ -485,7 +499,16 @@ const Nube = {
         if (col === 'notifsTodos') this.recordar('notifs', Store.s.notifs);
         this.listos.add(base + col);
         if (this.arrancada) this.llegoAlgo();
-      }, err => { this.listos.add(base + col); (this.sinPermiso = this.sinPermiso || new Set()).add(col); if (!opcional) console.warn('No se pudo leer', base, col, err.message); });
+      }, err => { this.listos.add(base + col); (this.sinPermiso = this.sinPermiso || new Set()).add(col); if (!opcional) console.warn('No se pudo leer', base, col, err.message);
+        /* REINTENTAR SOLO (08-10-2026). Firebase corta la escucha cuando niega
+           el permiso y no vuelve a intentar. Si las reglas nuevas se publican
+           con la app abierta (la garita la tiene abierta todo el día), los
+           correos no llegaban hasta recargar y el cartel rojo seguía. Ahora,
+           lo que es nuevo se vuelve a pedir cada minuto, hasta 30 veces. */
+        this.reintentos = this.reintentos || {};
+        const uid = this.uid, n = this.reintentos[col] = (this.reintentos[col] || 0) + 1;
+        if (this.RELEER.includes(col) && n <= 30) setTimeout(() => { if (this.uid === uid && this.arrancada) this.escucharColeccion(base, [col], true); }, 60000);
+      });
       if (!opcional) this.esperados.add(base + col);
     });
   },
@@ -548,6 +571,7 @@ const Nube = {
     paquetes:        { col:'paquetes',        leen:['admin', 'guardia'] },
     casaTareas:      { col:'casaTareas',      leen:[] },
     ausencias:       { col:'ausencias',       leen:['admin', 'guardia', 'supervisor'] },
+    cuotasLote:      { col:'cuotasLote',      leen:['admin'] },
   },
   carpetaDe(col, x){
     if (col !== 'privados') return col;
@@ -568,6 +592,7 @@ const Nube = {
   repartirPagos(){
     if (!this.db || yo()?.rol !== 'admin' || !this.listoParaMotor || !this.listoParaMotor()) return 0;
     try { if (typeof HotelExp !== 'undefined') HotelExp.publicar(); } catch(e){ console.warn('Copia de expensas del hotel', e.message); }
+    try { if (typeof ExpLote !== 'undefined') ExpLote.publicar(); } catch(e){ console.warn('Cuotas de cada lote', e.message); }
     if (!Store.s.users.some(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || ''))) return 0;
     const cambios = {};
     /* Los paquetes también: uno que llegó antes de que el otro vecino del
@@ -590,7 +615,10 @@ const Nube = {
 
   escucharPv(rol){
     this.pvDatos = {};
-    Object.entries(this.PV).forEach(([f, def]) => {
+    Object.entries(this.PV).forEach(([f, def]) => this.escucharUnaPv(f, def, rol));
+  },
+  escucharUnaPv(f, def, rol){
+    {
       const todo = def.leen.includes(rol);
       this.db.ref(todo ? `pv/${f}` : `pv/${f}/${this.uid}`).on('value', snap => {
         const v = snap.val() || {}, arr = [];
@@ -603,9 +631,13 @@ const Nube = {
         this.juntarPv(def.col);
         this.listos.add('pv/' + f);
         if (this.arrancada) this.llegoAlgo();
-      }, err => { this.listos.add('pv/' + f); console.warn('No se pudo leer', 'pv/' + f, err.message); });
+      }, err => { this.listos.add('pv/' + f); console.warn('No se pudo leer', 'pv/' + f, err.message);
+        /* Las cuotas de cada lote son nuevas (08-10-2026): si las reglas se publican con la app abierta, se reintenta. */
+        if (f === 'cuotasLote'){ this.reintentos = this.reintentos || {}; const uid = this.uid, n = this.reintentos['pv/' + f] = (this.reintentos['pv/' + f] || 0) + 1;
+          if (n <= 30) setTimeout(() => { if (this.uid === uid && this.arrancada) this.escucharUnaPv(f, def, rol); }, 60000); }
+      });
       this.esperados.add('pv/' + f);
-    });
+    }
   },
   juntarPv(col){
     const vistos = new Map(), arr = [];
@@ -756,7 +788,7 @@ const Nube = {
       if (col === 'notifsTodos') return;
       if (sup && !['notifs', 'users', 'privados', 'vistos'].includes(col)) return;
       /* El padrón, la guía y los teléfonos los escribe solo la Administración. */
-      if (['padron', 'guia', 'telefonos'].includes(col) && yo()?.rol !== 'admin') return;
+      if (['padron', 'guia', 'telefonos', 'liquidaciones', 'liqResumen', 'cuotasLote'].includes(col) && yo()?.rol !== 'admin') return;
       const arr = s[col]; if (!Array.isArray(arr)) return;
       const antes = this.ultimo[col] || {}, ahora = {};
       arr.forEach(x => {
@@ -767,6 +799,8 @@ const Nube = {
         const P = this.soloSuParte(col, x);
         if (P){ if (antes[x.id]) this.cambiosSueltos(col, P, JSON.parse(antes[x.id]), JSON.parse(txt)).forEach(([r, v]) => poner(r, v)); return; }
         rutasDe(col, x).forEach(r => poner(r, JSON.parse(txt)));
+        /* Las cuotas de un lote: si una cuenta dejó de ser del lote, se borra su copia. */
+        if (col === 'cuotasLote' && antes[x.id]){ const ahoraPara = aLista(x.para); aLista(JSON.parse(antes[x.id]).para).filter(u => !ahoraPara.includes(u)).forEach(u => poner(`pv/cuotasLote/${u}/${x.id}`, null)); }
       });
       Object.keys(antes).forEach(id => { if (id in ahora) return;
         /* Se mira el registro viejo entero: su dueño sí puede borrarlo. */
@@ -835,7 +869,7 @@ const Nube = {
        propio si alguna copia se rechaza. */
     Object.keys(cambios).forEach(r => { const g = r.split('/').slice(0, r.startsWith('pv/') ? 3 : 2).join('/'); (grupos[g] = grupos[g] || {})[r] = cambios[r]; });
     Object.entries(grupos).forEach(([g, paquete]) => {
-      this.db.ref().update(paquete).catch(e => {
+      this.db.ref().update(paquete).then(() => { if (this.sinPermiso && g === 'barrio/mensajeria' && this.sinPermiso.delete('mensajeria') && typeof refrescar === 'function') refrescar(); }).catch(e => {
         console.warn('No se pudo guardar', g, e.message);
         /* Lo que es del personal (bitácora, auditoría) no es tarea del vecino:
            si no llega, no se lo asusta con un cartel. */

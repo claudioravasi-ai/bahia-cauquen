@@ -162,6 +162,8 @@ function migrar(s){
     avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], mensajeria:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
     hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[],
+    /* 08-10: el resumen de cada liquidación y las cuotas de cada lote (ExpLote, js/v-expensas.js) */
+    liqResumen:[], cuotasLote:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[],
     /* 07-10: supervisión de la guardia (js/v-supervisor.js) */
     alertasSup:[], vistos:[] };

@@ -417,7 +417,7 @@ A['correo-probar'] = el => { if (el.dataset.v === 'timbre') Mensajeria.timbre();
 function bandaCorreos(garita = false){
   const ls = Mensajeria.adentro().slice().reverse();
   const sinReglas = typeof Nube !== 'undefined' && Nube.activa() && Nube.sinPermiso && Nube.sinPermiso.has('mensajeria');
-  const alerta = sinReglas ? aviso('danger', 'alert', 'Los correos no se guardan en la base del barrio', 'Falta publicar las reglas nuevas de Firebase (reglas-firebase.txt, paso 2 de PASO-A-PASO). Hasta entonces el camión de correo no les llega a los vecinos y se pierde al recargar.') : '';
+  const alerta = sinReglas ? aviso('danger', 'alert', 'Los correos no se guardan en la base del barrio', 'Falta publicar las reglas nuevas de Firebase (reglas-firebase.txt, paso 2 de PASO-A-PASO). Hasta entonces el camión de correo no les llega a los vecinos y se pierde al recargar. Si ya las publicaste, la app lo vuelve a probar sola cada minuto, o tocá Recargar.', `<button class="btn btn-xs btn-sec" onclick="location.reload()">${I('refresh')}Recargar</button>`) : '';
   const boton = alerta + (garita ? `<button class="superficie" data-a="correo-menu"><span class="ic ic-sky">${I('mail')}</span><span class="txt"><b>Correos</b><small>Registrar la entrada: Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro</small></span>${I('right')}</button>` : '');
   if (!ls.length) return boton;
   return `${boton}<span id="garCorreos" class="ancla"></span>${ls.map(v => {

@@ -2317,7 +2317,8 @@ R.garita = {
       ${PILA.length === 1 ? sec('Más') + `<div class="mosaico">
         ${teja({ v:'peticiones', icon:'edit', color:'warn', t:'Peticiones', s:'Recibir y firmar', badge: s.peticiones.filter(p => p.estado === 'pendiente').length })}
         ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'Libro de guardia' })}
-        ${teja({ a:'nuevo-post', v:'guardia', icon:'muro', t:'Escribir en el pizarrón', s:'Les suena a todos los vecinos' })}
+        ${/* La garita también LEE el pizarrón (08-10-2026): antes solo tenía el botón para escribir. */
+          teja({ v:'pizarron', icon:'muro', t:'Pizarrón', s:'Leer los avisos del barrio y escribir uno para todos', badge: s.posts.filter(p => p.createdAt > (Store.sesion.pizarronVisto || 0) && p.autor !== u.id).length })}
         ${teja({ v:'vecinos', icon:'search', color:'brand', t:'Buscar un vecino', s:'Por apellido, lote o calle · dirección y teléfonos' })}
         ${teja({ v:'privado', icon:'lock', color:'accent', t:'Mensajes con vecinos', s:'Avisar algo a un lote', badge: s.privados.filter(h => (h.con || 'admin') === 'guardia').reduce((n, h) => n + aLista(h.msgs).filter(m => m.from === 'vecino' && !m.leido).length, 0) })}
         ${esGuardia() && typeof haySupervision === 'function' && haySupervision() ? teja({ v:'privado', p:'supGarita', icon:'eye', color:'brand', t:'Supervisión', s:'Mensajes con quien supervisa la guardia', badge: sinLeerDeSupervision('supGarita') }) : ''}

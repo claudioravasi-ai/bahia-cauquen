@@ -89,6 +89,15 @@ QUÉ HACEN, EN CASTELLANO
    deuda). Antes lo leían todos los vecinos aprobados; ahora SOLO la
    Administración. Las tres las escribe solo la Administración.
 
+8 quinquies. LAS EXPENSAS DE CADA LOTE (08-10-2026). /barrio/liquidaciones
+   (la cuota, el interés por mora, la deuda, las multas y si está en
+   gestión judicial cada lote) la lee SOLO la Administración. Los vecinos
+   leen /barrio/liqResumen (el mes: totales, rubros, vencimientos, sin
+   lotes) y /pv/cuotasLote/<su cuenta>: las cuotas de su propio lote, que
+   reparte la Administración. Los gastos del barrio (/barrio/gastos:
+   proveedor, factura, importe) los siguen viendo todos: es la
+   transparencia de las expensas.
+
 8 bis. LOS CORREOS (07-10-2026). /barrio/mensajeria dice solo qué correo
    (Andreani, OCA…) está en el barrio y a qué hora entró y salió: lo anota la
    garita (o la Administración) y lo leen los vecinos, la Administración y la
@@ -204,7 +213,12 @@ PEGAR DESDE ACÁ
       },
 
       "gastos":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
-      "liquidaciones": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 08-10-2026: la liquidación completa (cuota, interés, deuda, multas y
+         gestión judicial de cada lote) la lee solo la Administración. Los
+         demás leen el resumen del mes (liqResumen) y las cuotas de su lote
+         (pv/cuotasLote). */
+      "liquidaciones": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "liqResumen":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
 
       "posts":         { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
       "msgs":        { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
@@ -300,6 +314,15 @@ PEGAR DESDE ACÁ
     },
 
     "pv": {
+      /* LAS CUOTAS DE CADA LOTE (08-10-2026): la Administración las escribe
+         en la carpeta de cada cuenta del lote; cada cuenta lee solo la suya.
+         Nadie más las escribe (ni el propio vecino). Nombre fijo: va antes
+         que $carpeta y el comodín no lo toma. */
+      "cuotasLote": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$uid": { ".read": "auth.uid === $uid" }
+      },
       /* PAQUETES POR LOTE (26-09-2026, tarde): un paquete va a la carpeta de
          TODAS las cuentas del lote (en el 148, Mónica y Claudio). Por eso un
          vecino puede escribir el paquete también en la carpeta de otra cuenta
