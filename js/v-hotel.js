@@ -198,7 +198,7 @@ const hiloHotel = con => aLista(Store.s.privados).find(h => h.userId === yo()?.i
 const sinLeerHotel = con => { const h = hiloHotel(con); return h ? aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length : 0; };
 function comunicacionHotel(){
   return `${sec('¿Con quién querés hablar?')}
-    ${CANALES_HOTEL.map(c => { const h = hiloHotel(c.con), ult = h ? aLista(h.msgs).at(-1) : null, nl = sinLeerHotel(c.con);
+    ${CANALES_HOTEL.map(c => { const h = hiloHotel(c.con), ult = h ? msgsVisibles(h, 'vecino').at(-1) : null, nl = sinLeerHotel(c.con);
       return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${c.con}"><span class="ic ic-${c.color}">${I(c.icon)}</span>
         <span class="txt"><b>${c.t}</b><small>${ult ? `${ult.from === 'vecino' ? 'Vos: ' : ''}${esc(ult.text.slice(0, 70))} · ${hace(ult.createdAt)}` : c.s}</small></span>
         ${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')}

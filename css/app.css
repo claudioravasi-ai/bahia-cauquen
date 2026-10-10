@@ -568,6 +568,15 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .chatbar{position:sticky;bottom:-28px;margin-bottom:-12px;padding-bottom:12px!important;display:flex;gap:8px;padding:10px 0 0;background:linear-gradient(180deg,transparent,var(--bg) 30%)}
 .chatbar input{border-radius:999px!important;padding:13px 18px!important;box-shadow:var(--sh-2)}
 .chatbar .btn{border-radius:50%;width:48px;height:48px;padding:0;flex:none}
+/* La caja de escribir crece con el texto, como en WhatsApp (10-10-2026):
+   hasta 6 renglones; después se desliza adentro. */
+.chatbar,.linea-form:has(textarea.crece){align-items:flex-end}
+textarea.crece{resize:none;overflow-y:hidden;min-height:48px;max-height:168px;line-height:1.4;border-radius:24px!important;padding:13px 18px!important;box-shadow:var(--sh-2);field-sizing:content}
+.linea-form textarea.crece{min-height:44px;padding:11px 16px!important;border-radius:22px!important;box-shadow:none}
+.msg .b,.cmt .burb{white-space:pre-wrap}
+.resp-rapidas{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;margin:0 -2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.resp-rapidas::-webkit-scrollbar{display:none}
+.resp-rapidas .chip{flex:none;white-space:nowrap}
 
 /* votaciones */
 .opcion{position:relative;display:flex;align-items:center;gap:10px;width:100%;border:1.5px solid var(--line-2);background:var(--surface);border-radius:14px;padding:12px 14px;margin-bottom:8px;text-align:left;font-weight:700;overflow:hidden}
@@ -1864,6 +1873,9 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rec-lista li:not(.hecho) .rec-hora{font-weight:600;color:var(--muted);font-style:italic}
 /* El código de ronda sobre la portada oscura de las pantallas públicas. */
 .bienvenida .codigo-grande{color:#fff;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.25)}
+/* Dentro de la tarjeta blanca del pase, el código va en el color del barrio (antes quedaba blanco sobre blanco: no se veía). */
+.bienvenida .ticket .codigo-grande{color:var(--brand);background:none;border-color:transparent}
+.bienvenida .ticket .muted{color:var(--muted)}
 /* Una dirección web larga dentro de un párrafo no puede ensanchar la ventana. */
 #cuerpo p,#cuerpo li{overflow-wrap:break-word}
 
@@ -2741,7 +2753,22 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 /* Leer la patente con la cámara (10-10-2026). */
 .pat-cam{position:relative;border-radius:16px;overflow:hidden;background:#000}
 .pat-cam video{display:block;width:100%;height:auto}
-.pat-guia{position:absolute;left:8%;top:34%;width:84%;height:32%;border:3px solid #ffd166;border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.pat-guia{position:absolute;left:14%;top:50%;width:72%;aspect-ratio:3.1/1;transform:translateY(-50%);border:3px solid #ffd166;border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.4)}
+.pat-guia::after{content:"";position:absolute;left:6px;right:6px;top:50%;height:2px;background:rgba(255,209,102,.8);animation:patBarre 1.4s ease-in-out infinite alternate}
+@keyframes patBarre{from{transform:translateY(-38px)}to{transform:translateY(38px)}}
+.pat-vivo{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;font:800 18px ui-monospace,Menlo,monospace;letter-spacing:2px;text-shadow:0 1px 4px #000;min-height:22px}
 .pat-leida{display:flex;align-items:center;justify-content:center;gap:10px;margin:4px 0 14px;padding:14px;border-radius:14px;background:var(--surface-2);border:2px solid var(--ink)}
 .pat-leida svg{width:24px;height:24px;color:var(--muted)}
 .pat-leida b{font-size:26px;letter-spacing:2px;font-weight:800}
+/* "Cómo llegar" como mapita (10-10-2026) */
+.mapa-tile{display:flex;align-items:center;gap:14px;margin-top:12px;padding:10px;border-radius:18px;background:var(--surface);border:1px solid var(--line);color:var(--ink);text-decoration:none;box-shadow:var(--sh-1);transition:transform .15s}
+.mapa-tile:active{transform:scale(.98)}
+.mapa-tile svg{width:96px;height:68px;border-radius:12px;flex:none}
+.mapa-tile b{display:block;font-size:16px}
+.mapa-tile small{color:var(--muted);font-size:12.5px}
+/* Encabezado del chat: archivo y "Borrar conversación" (10-10-2026) */
+.chat-barra{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
+.chat-barra .btn{margin:0!important}
+.chat-vaciar{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font:700 12.5px var(--body, inherit);padding:6px 12px;border-radius:999px;cursor:pointer}
+.chat-vaciar svg{width:15px;height:15px}
+.chat-vaciar:hover{color:var(--danger);border-color:var(--danger)}

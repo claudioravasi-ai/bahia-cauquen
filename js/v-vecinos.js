@@ -190,13 +190,13 @@ R.mensajes = {
   titulo: 'Mensajes', icon: 'chat', color: 'accent', sub: 'Privados entre vecinos',
   render(){
     const u = yo();
-    const hilos = Store.s.dms.filter(h => h.a === u.id || h.b === u.id).sort((x, y) => (y.msgs.at(-1)?.at || 0) - (x.msgs.at(-1)?.at || 0));
+    const hilos = Store.s.dms.filter(h => (h.a === u.id || h.b === u.id) && msgsVisibles(h, u.id).length).sort((x, y) => (msgsVisibles(y, u.id).at(-1)?.at || 0) - (msgsVisibles(x, u.id).at(-1)?.at || 0));
     return `${superficie({ v:'dm-nuevo', icon:'search', t:'Buscar un vecino y escribirle', s:'Elegí uno o varios del padrón: a cada uno le llega por separado, en su chat privado con vos', cls:'acento' })}
       ${(() => { const sin = c => Store.s.privados.filter(h => h.userId === u.id && (h.con || 'admin') === c).reduce((n, h) => n + aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length, 0);
         const a = sin('admin'), g = sin('guardia'), nuevo = [a ? `${a} sin leer de la Administración` : '', g ? `${g} sin leer de la Guardia` : ''].filter(Boolean).join(' · ');
         /* 08-10-2026: abre las dos conversaciones (se elige arriba): el cartel lo dice. */
         return superficie({ v:'privado', p: g && !a ? 'guardia' : 'admin', icon:'lock', color:'accent', t:'Administración o Guardia', s: nuevo || 'Tu conversación privada con cada una · arriba elegís con quién' }); })()}
-      ${sec('Conversaciones')}${hilos.length ? hilos.map(h => { const otro = usuario(h.a === u.id ? h.b : h.a) || { nombre:'Ex vecino/a', casa:'' }, ult = h.msgs.at(-1), nl = h.msgs.filter(m => m.de !== u.id && !m.leido).length;
+      ${sec('Conversaciones')}${hilos.length ? hilos.map(h => { const otro = usuario(h.a === u.id ? h.b : h.a) || { nombre:'Ex vecino/a', casa:'' }, vis = msgsVisibles(h, u.id), ult = vis.at(-1), nl = vis.filter(m => m.de !== u.id && !m.leido).length;
         return `<button class="superficie" data-a="abrir" data-v="dm" data-p="${otro.id || ''}">${avatar(otro)}<span class="txt"><b>${esc(otro.nombre)} · ${esc(otro.casa)}</b><small>${ult ? (ult.de === u.id ? 'Vos: ' : '') + esc(ult.text.slice(0, 60)) + ' · ' + hace(ult.at) : ''}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('') : vacio('chat', 'Todavía no tenés conversaciones.')}`;
   },
 };
@@ -209,12 +209,12 @@ R.dm = {
     if (h && h.msgs.some(m => m.de !== u.id && !m.leido)){ h.msgs.forEach(m => { if (m.de !== u.id) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
     marcarVistoLink('dm:' + p);
     let dia = '';
-    return `<div class="chat-wrap">${botonHistHilo('dms', h)}<div class="chat">${h && h.msgs.length ? h.msgs.map(m => { const d = isoDe(new Date(m.at)); const sep = d !== dia ? (dia = d, `<div class="dia-sep">${relDia(d)}</div>`) : '';
+    const vis = msgsVisibles(h, u.id);
+    return `<div class="chat-wrap">${barraHilo('dms', h, u.id)}<div class="chat">${vis.length ? vis.map(m => { const d = isoDe(new Date(m.at)); const sep = d !== dia ? (dia = d, `<div class="dia-sep">${relDia(d)}</div>`) : '';
         return `${sep}<div class="msg ${m.de === u.id ? 'mia' : ''}"><div class="b">${esc(m.text)}<time>${hora(m.at)}${m.de === u.id && m.leido ? ' ✓✓' : ''}</time></div></div>`; }).join('')
         : vacio('chat', `Escribile a ${esc(otro.nombre.split(' ')[0])}. Nadie más ve esta conversación.`)}</div>
-      <form class="chatbar" data-f="dm" data-u="${esc(p)}"><input name="text" id="dmIn" required maxlength="800" placeholder="Mensaje privado…" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
+      <form class="chatbar" data-f="dm" data-u="${esc(p)}"><textarea name="text" id="dmIn" required maxlength="800" placeholder="Mensaje privado…" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
   },
-  alPintar(){ const c = $('#cuerpo'); if (c) c.scrollTop = c.scrollHeight; },
 };
 F['dm'] = (d, form) => {
   const u = yo(), para = form.dataset.u;

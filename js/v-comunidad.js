@@ -139,7 +139,7 @@ function cardPost(p){
     ${puedoBorrar && p.autor !== 'sistema' ? (() => { const v = venceDelPost(p), falta = v ? v - Date.now() : 0;
       return `<div class="post-vence">${I('clock')}<span>${esc(textoVencePost(p))}${p.autor === u.id ? '. Para sacarlo antes, tocá el tachito.' : ''}</span>${p.autor === u.id && RENOVABLES.includes(p.type) && v && falta < 3 * DIA ? `<button class="link" data-a="post-renovar" data-id="${p.id}">Renovar ${plural(diasDelPost(p), 'día')} más</button>` : ''}</div>`; })() : ''}
     ${abiertos ? `<div class="comentarios">${cm.map(c => `<div class="cmt">${avatar(usuario(c.autor), 'sm')}<div><div class="burb"><b>${esc(autorVisible(c.autor).nombre)}</b>${esc(c.text)}</div><time>${hace(c.createdAt)}</time></div></div>`).join('')}
-      <form class="linea-form" data-f="comentar" data-id="${p.id}"><input name="text" id="cm-${p.id}" required maxlength="300" placeholder="Escribí un comentario…" autocomplete="off"><button class="btn btn-pri">${I('send')}</button></form></div>` : ''}
+      <form class="linea-form" data-f="comentar" data-id="${p.id}"><textarea name="text" id="cm-${p.id}" required maxlength="300" placeholder="Escribí un comentario…" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-pri">${I('send')}</button></form></div>` : ''}
   </article>`;
 }
 const abiertosCm = new Set();

@@ -547,8 +547,10 @@ A['frec-qr'] = el => {
 A['frec-wa'] = el => {
   const f = frecuentes().find(x => x.id === el.dataset.id); if (!f) return;
   const tp = TIPOS_FREC[f.tipo] || TIPOS_FREC.otro;
-  const texto = `Hola ${f.nombre.split(' ')[0]}: este es tu pase fijo para entrar al barrio ${Store.s.config.nombre} (${tp.n.toLowerCase()} → ${f.destino || 'Barrio'}). En la garita mostrá el QR de la imagen o decí el código ${f.codigo}.\n\nTu QR: ${enlaceQR('BHC:' + f.codigo)}`;
-  compartirPase({ texto, contenido:'BHC:' + f.codigo, codigo:f.codigo, sub:`Pase fijo · ${f.nombre}`, tel:f.tel || '', archivo:`pase-fijo-${f.codigo}.png` });
+  const dias = aLista(f.dias).length ? aLista(f.dias).map(d => DIAS[d]).join(' ') : 'Todos los días';
+  const texto = `🎟️ *Tu pase fijo para el Barrio ${Store.s.config.nombre}*\n\nHola ${f.nombre.split(' ')[0]}: ${tp.n.toLowerCase()} → ${f.destino || 'Barrio'}.\n\n📅 ${dias}${f.desde ? `, de ${f.desde} a ${f.hasta} h` : ''}${f.vence ? ` (hasta el ${fechaCorta(f.vence)})` : ''}\n🔑 Código: *${codigoEspaciado(f.codigo)}*\n\nEn la garita mostrá el QR de la imagen o decí el código.\n\n📍 *Cómo llegar:* ${mapaCorto()}`;
+  compartirPase({ texto, contenido:'BHC:' + f.codigo, codigo:f.codigo, sub:`Pase fijo · ${f.nombre}`, tel:f.tel || '', archivo:`pase-fijo-${f.codigo}.png`,
+    datos:{ nombre:f.nombre, espera:f.destino || tp.n, cuando:dias, horario: f.desde ? `${f.desde} a ${f.hasta} h` : 'Todo el día' } });
 };
 A['frec-mov'] = el => {
   const f = frecuentes().find(x => x.id === el.dataset.id); if (!f) return;
@@ -797,8 +799,9 @@ A['paquete-nuevo'] = () => hoja('Llegó un paquete', `<form data-f="paquete">
 F['paquete'] = d => {
   const foto = fotoParaOtros(d.foto, 7), host = usuario(d.hostId) || {}, lote = host.casa || '';
   const para = [...new Set([d.hostId, ...residentesDelLote(lote).map(u => u.id)])].filter(Boolean);
-  Store.cambiar(s => { s.paquetes.unshift({ id:uid(), hostId:d.hostId, lote, empresa:d.empresa, detalle:d.detalle, foto, recibido:Date.now(), recibidoPor:yo().id, retirado:null, confirmado:null });
-    notificar(s, { para, titulo:`Llegó un paquete para ${lote || 'tu lote'}`, texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''} · a nombre de ${(host.nombre || '').split(' ')[0] || 'tu lote'} · llegó ${hora(Date.now())} h · se retira en la garita con el QR de retiro`, icon:'box', color:'wood', link:'mis-paquetes', sonido:true });
+  const pid = uid();
+  Store.cambiar(s => { s.paquetes.unshift({ id:pid, hostId:d.hostId, lote, empresa:d.empresa, detalle:d.detalle, foto, recibido:Date.now(), recibidoPor:yo().id, retirado:null, confirmado:null });
+    notificar(s, { para, ref:'paquetes:' + pid, titulo:`Llegó un paquete para ${lote || 'tu lote'}`, texto:`${d.empresa}${d.detalle ? ' · ' + d.detalle : ''} · a nombre de ${(host.nombre || '').split(' ')[0] || 'tu lote'} · llegó ${hora(Date.now())} h · se retira en la garita con el QR de retiro`, icon:'box', color:'wood', link:'mis-paquetes', sonido:true });
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Paquete de ${d.empresa} para ${lote}`, at:Date.now() }); });
   cerrarHoja(); toast(para.length > 1 ? `Paquete guardado. Se avisó a las ${para.length} cuentas de ${lote}.` : 'Paquete guardado. El vecino ya sabe.', 'box');
 };
@@ -1046,6 +1049,19 @@ A['paquete-confirmar'] = el => {
    (avisoVisto en el paquete). La regla va acá y no en admin.js porque
    REGLAS se define allá y este archivo carga después.
    ========================================================= */
+/* =========================================================
+   LLEGÓ SIN AVISO: SI NADIE CONTESTA, SE INSISTE (10-10-2026, idea de
+   novu: escalado). A los 3 minutos sin respuesta les vuelve a sonar a
+   todos los que viven en el lote, una sola vez, con botones en la
+   notificación. La garita, desde los 2 minutos, tiene "Llamar" a cada uno.
+   ========================================================= */
+REGLAS.push({ id:'llegada-3min', n:'Llegó sin aviso → se insiste a los 3 min', d:'Si nadie del lote contestó en 3 minutos, les vuelve a sonar a todos los que viven ahí (una vez).',
+  run(s){ let n = 0; const ahora = Date.now();
+    aLista(s.llegadas).filter(l => l && l.estado === 'consultando' && ahora - (l.at || 0) >= 3 * MIN && ahora - (l.at || 0) < 30 * MIN).forEach(l => {
+      const casa = l.lote || usuario(l.hostId)?.casa || '';
+      n += marca(s, `lleg3-${l.id}`, () => notificar(s, { para:paraElLote(casa, l.hostId), titulo:`Sigue esperando en la garita: ${l.nombre}`,
+        texto:`${l.motivo || 'Visita'}${casa ? ' · ' + casa : ''} · hace ${Math.floor((ahora - l.at) / MIN)} minutos · ¿Lo dejamos pasar?`, icon:'gate', color:'danger', urgente:true, link:'llegada:' + l.id, ref:'llegadas:' + l.id }));
+    }); return n; } });
 REGLAS.push({ id:'paquetes-24h', n:'Paquetes → aviso si pasan 24 h sin retirar', d:'Push al lote cada 8 h (de 9 a 21 h) hasta que alguien del lote abre Mis paquetes o lo retira.',
   run(s){ let n = 0; const ahora = Date.now(), h = new Date().getHours();
     if (!hayPaquetes() || h < 9 || h >= 21) return 0;
@@ -1053,7 +1069,7 @@ REGLAS.push({ id:'paquetes-24h', n:'Paquetes → aviso si pasan 24 h sin retirar
       const k = 1 + Math.floor((ahora - p.recibido - DIA) / (8 * HORA)); if (k > 6) return;
       const para = [...new Set([p.hostId, ...residentesDelLote(loteDelPaquete(p)).map(u => u.id)])].filter(Boolean);
       const dias = Math.floor((ahora - p.recibido) / DIA);
-      n += marca(s, `paq24-${p.id}-${k}`, () => notificar(s, { para, titulo:`Tu paquete sigue en la garita (${dias === 1 ? '1 día' : dias + ' días'})`,
+      n += marca(s, `paq24-${p.id}-${k}`, () => notificar(s, { para, ref:'paquetes:' + p.id, titulo:`Tu paquete sigue en la garita (${dias === 1 ? '1 día' : dias + ' días'})`,
         texto:`${p.empresa}${p.detalle ? ' · ' + p.detalle : ''} · retiralo con tu QR de retiro`, icon:'box', color:'warn', link:'mis-paquetes', sonido:true }));
     }); return n; } });
 R['mis-paquetes'] = {

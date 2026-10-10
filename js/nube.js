@@ -162,7 +162,17 @@ const Nube = {
       case 'privados': return [x.userId];
       case 'dms': return [x.a, x.b];
       case 'reclamos': case 'peticiones': return [x.userId];
-      case 'pases': case 'solicitudesPase': case 'llegadas': return [x.hostId];
+      case 'pases': case 'solicitudesPase': return [x.hostId];
+      /* LLEGÓ SIN AVISO, A TODO EL LOTE (10-10-2026): la garita preguntó
+         por el lote 148 y solo le llegó a Mónica; Claudio, que vive ahí, no
+         se enteró. Ahora va a todas las cuentas que viven en el lote (no al
+         propietario a distancia) y contesta el primero que la ve. */
+      case 'llegadas': {
+        const lote = x.lote || usuario(x.hostId)?.casa;
+        const us = lote ? residentesDelLote(lote).map(u => u.id) : [];
+        if (x.hostId && !us.includes(x.hostId)) us.push(x.hostId);
+        return us;
+      }
       /* PAQUETES POR LOTE (26-09-2026): el paquete de Mónica también le llega
          a Claudio, que vive en el mismo lote. Van a todas las cuentas
          aprobadas del lote, más la persona a cuyo nombre vino. */
@@ -652,6 +662,7 @@ const Nube = {
        carpeta ya figura "confirmado"), gana la más avanzada. */
     const peso = x => col === 'pagos' ? (x.estado === 'confirmado' || x.estado === 'rechazado' ? 2 : 1) * 1e13 + (x.confirmadoAt || x.at || 0)
       : col === 'paquetes' ? (x.retirado ? 2 : 1) * 1e13 + (x.retirado || x.recibido || 0)
+      : col === 'llegadas' ? (x.estado && x.estado !== 'consultando' ? 2 : 1) * 1e13 + (x.respondido || x.at || 0)
       : col === 'casaTareas' || col === 'ausencias' ? (x.at || 0) : 0;
     Object.entries(this.PV).filter(([, d]) => d.col === col).forEach(([f]) => (this.pvDatos[f] || []).forEach(x => {
       if (!x.id) return;

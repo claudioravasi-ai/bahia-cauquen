@@ -167,8 +167,22 @@ const Push = {
     /* El recordatorio de "Estoy bien": tocarlo ya cuenta como aviso. Se
        espera a que baje lo propio de la base antes de marcar. */
     if (link === 'estoy-bien:ok' && typeof Cuidado !== 'undefined'){ abrir('estoy-bien'); Cuidado.cuandoListo(() => A['bien-ok']()); return; }
-    const [id, p] = String(link).split(':');
+    /* "Que pase" / "No lo conozco" tocados en la notificación del celular
+       (10-10-2026, idea de ntfy): la app abre y contesta sola, apenas baja
+       la consulta. Si ya contestó otro del lote, lo dice. */
+    const [id, p, q, r] = String(link).split(':');
+    const conLlegada = (lid, hacer, n = 0) => { if (Store.s.llegadas.some(x => x.id === lid)) hacer(); else if (n < 40) setTimeout(() => conLlegada(lid, hacer, n + 1), 250); else toast('No encontré esa consulta de la garita: puede que ya se haya resuelto', 'gate'); };
+    if (id === 'responder' && p === 'llegada' && q){ conLlegada(q, () => responderLlegada(q, r === 'si' ? 'autorizado' : 'rechazado')); return; }
+    if (id === 'llegada' && p){ conLlegada(p, () => A['llegada-ver']({ dataset:{ id:p } })); return; }
     if (R[id]) abrir(id, p || '');
+  },
+  /* Saca de la bandeja del teléfono los avisos que ya se resolvieron
+     (contestó otro del lote, se aprobó el pase, se retiró el paquete…). */
+  cerrarResueltos(){
+    if (!('serviceWorker' in navigator) || typeof Nube === 'undefined' || !Nube.arrancada) return;
+    navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(x => { const tag = String(x.tag || '');
+      if (!tag.startsWith('n-')) return; const n = aLista(Store.s.notifs).find(z => z && z.id === tag.slice(2));
+      if (n && (n.ref || n.llegadaId) && avisoCaduco(n)) x.close(); })).catch(() => {});
   },
   arrancar(){
     if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.abrir) this.abrirEnlace(e.data.abrir); });
@@ -188,6 +202,7 @@ const Push = {
       navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(n => { const tag = String(n.tag || '');
         if ((tag.startsWith('camion-') && !camion) || (tag.startsWith('correo-') && !correos.includes(tag))) n.close(); })).catch(() => {});
     }, 60000);
+    setInterval(() => this.cerrarResueltos(), 15000);
   },
 };
 

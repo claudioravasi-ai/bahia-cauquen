@@ -42,7 +42,7 @@ const REGLAS = [
       return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'truck', color:'ok', link:'recoleccion', vence:finDelDia(hoy) })); } },
   { id:'reclamo-72h', n:'Reclamo sin respuesta 72 h → recordar a la Administración', d:'Evita que un reclamo quede olvidado.',
     run(s){ let n = 0; s.reclamos.filter(r => r.estado === 'abierto' && Date.now() - (r.historial.at(-1)?.at || r.createdAt) > 72 * HORA)
-      .forEach(r => n += marca(s, 'r72-' + r.id, () => notificar(s, { para:'rol:admin', titulo:'Reclamo sin respuesta hace 3 días', texto:r.titulo, icon:'clipboard', color:'danger', link:'reclamos' }))); return n; } },
+      .forEach(r => n += marca(s, 'r72-' + r.id, () => notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:'Reclamo sin respuesta hace 3 días', texto:r.titulo, icon:'clipboard', color:'danger', link:'reclamos' }))); return n; } },
   { id:'votacion-cierre', n:'Votación cerrada → publicar el resultado', d:'Al cerrar, publica el resultado en el pizarrón y avisa a todos.',
     run(s){ let n = 0; s.votaciones.filter(v => v.cierra <= Date.now()).forEach(v => n += marca(s, 'vot-' + v.id, () => {
       const votos = Object.values(v.votos), cuenta = v.opciones.map((_, i) => votos.filter(x => x === i).length), max = Math.max(...cuenta, 0);

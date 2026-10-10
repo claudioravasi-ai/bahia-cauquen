@@ -92,7 +92,7 @@ F['peticion'] = async d => {
     s.peticiones.unshift(p);
     if (p.tipo === 'viaje' && typeof guardarAusencia === 'function') guardarAusencia(s, u, { desde:p.desde, hasta:p.hasta || sumarDias(p.desde, 7), contacto:'', nota:p.texto });
     auditar(s, 'Petición creada y firmada por el vecino', `${TIPOS_PET[p.tipo].n} · ${u.casa}`, p.id);
-    notificar(s, { para:'rol:guardia', titulo:`Petición de ${u.casa}`, texto:TIPOS_PET[p.tipo].n + ' · falta tu firma de recepción', icon:'edit', color:'warn', urgente:true, link:'peticiones', sonido:true });
+    notificar(s, { para:'rol:guardia', ref:'peticiones:' + p.id, titulo:`Petición de ${u.casa}`, texto:TIPOS_PET[p.tipo].n + ' · falta tu firma de recepción', icon:'edit', color:'warn', urgente:true, link:'peticiones', sonido:true });
   });
   cerrarHoja(); abrir('peticiones', 'todas'); toast('Petición enviada a la garita', 'shield');
 };
@@ -197,7 +197,7 @@ F['reclamo'] = d => {
     const r = { id:uid(), userId:u.id, categoria:d.categoria, titulo:d.titulo.trim(), detalle:d.detalle.trim(), lugar:(d.lugar || '').trim() || (d.coords ? 'Ubicación del GPS' : ''), coords:d.coords || '', foto:fotoParaOtros(d.foto, 45), anonimo:!!d.anonimo,
       estado:'abierto', apoyos:[], createdAt:Date.now(), historial:[{ at:Date.now(), por:u.id, estado:'abierto', texto:'Reclamo creado' }] };
     s.reclamos.unshift(r);
-    notificar(s, { para:'rol:admin', titulo:`Reclamo: ${r.titulo}`, texto:`${CAT_RECL[r.categoria][0]} · ${u.casa}`, icon:'clipboard', color:'warn', link:'reclamos' });
+    notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:`Reclamo: ${r.titulo}`, texto:`${CAT_RECL[r.categoria][0]} · ${u.casa}`, icon:'clipboard', color:'warn', link:'reclamos' });
   });
   cerrarHoja(); toast('Reclamo enviado. Te avisamos cada novedad.', 'send');
 };
@@ -535,7 +535,7 @@ function chatInterno(idP){
   if (!garitaId) return vacio('shield', 'Todavía no hay una cuenta de la garita aprobada.');
   const yoSoy = esGuardia() ? 'guardia' : 'admin';
   const h = s.privados.find(x => x.userId === garitaId && x.con === 'interno');
-  const msgs = h ? aLista(h.msgs) : [];
+  const msgs = msgsVisibles(h, yoSoy);
   /* Abrirla apaga también su aviso en la campanita. */
   if (typeof marcarVistoLink === 'function') setTimeout(() => marcarVistoLink(esGuardia() ? 'privado:interno' : 'privado:interno|' + garitaId), 0);
   if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
@@ -546,11 +546,11 @@ function chatInterno(idP){
      recibe y las firma la garita; la Administración solo las mira. */
   const pet = esAdmin() ? aLista(s.peticiones).filter(p => p && p.estado === 'pendiente').length : 0;
   const barraPet = esAdmin() ? `<button class="chat-pet" data-a="abrir" data-v="peticiones">${I('edit')}<span><b>Pedidos por escrito de los vecinos a la garita</b><small>${pet ? `${plural(pet, 'pedido', 'pedidos')} que la garita todavía no recibió · ` : ''}No dejar pasar a alguien, aviso de viaje, llaves, paquetes… Los firma la garita; acá solo se miran.</small></span>${pet ? `<span class="n">${pet}</span>` : ''}${I('right')}</button>` : '';
-  return `<div class="chat-wrap">${barraPet}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
+  return `<div class="chat-wrap">${barraPet}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
 
       <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
       : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
-    <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno"><input name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
+    <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno"><textarea name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
 }
 /* LA CONSULTA DE EXPENSAS VA SOLO A LA ADMINISTRACIÓN (pedido de Claudio,
    28-09): "Consultar a la Administración" desde Expensas abre la charla con
@@ -581,14 +581,14 @@ R.privado = {
     /* La guardia ve solo sus conversaciones; la Administración, las suyas. */
     const miCanal = esGuardia() ? 'guardia' : esAdmin() ? 'admin' : con;
     if (esStaff() && !idP){
-      const hilos = s.privados.filter(h => (h.con || 'admin') === miCanal).sort((a, b) => (b.msgs.at(-1)?.createdAt || 0) - (a.msgs.at(-1)?.createdAt || 0));
+      const hilos = s.privados.filter(h => (h.con || 'admin') === miCanal && msgsVisibles(h, miCanal).length).sort((a, b) => (msgsVisibles(b, miCanal).at(-1)?.createdAt || 0) - (msgsVisibles(a, miCanal).at(-1)?.createdAt || 0));
       /* La conversación garita ↔ Administración ya no se repite acá (26-09,
          tarde): tiene su lugar propio ("Mensajes con la garita" en el Día a
          día de la Administración; "Administración" en las tejas de la
          garita). Esta lista es solo de conversaciones con vecinos. */
       return `${superficie({ a:'priv-lote', icon:'chat', color:'accent', t:'Escribir a un lote o a vecinos', s:'A todo el lote o a quienes elijas · en privado, a cada uno por separado', cls:'acento' })}
         ${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote en el pizarrón', s:'Elegí el lote en "¿Para quién?"' })}
-        ${hilos.length ? hilos.map(h => { const v = usuario(h.userId) || {}, ult = h.msgs.at(-1), nl = h.msgs.filter(m => m.from === 'vecino' && !m.leido).length;
+        ${hilos.length ? hilos.map(h => { const v = usuario(h.userId) || {}, vis = msgsVisibles(h, miCanal), ult = vis.at(-1), nl = vis.filter(m => m.from === 'vecino' && !m.leido).length;
           return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${miCanal}|${h.userId}">${v.fotoCasa ? fotoHTML(v.fotoCasa, 'casa-foto chica') : avatar(v)}<span class="txt"><b>${esc(v.nombre || '')} · ${esc(v.casa || '')}</b><small>${ult ? esc(ult.text.slice(0, 70)) + ' · ' + hace(ult.createdAt) : 'Sin mensajes'}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')
           : vacio('lock', 'No hay conversaciones.')}`;
     }
@@ -603,16 +603,16 @@ R.privado = {
     const yoSoy = esStaff() ? miCanal : 'vecino';
     const mio = m => esStaff() ? m.from !== 'vecino' : m.from === 'vecino';
     if (h && h.msgs.some(m => !mio(m) && !m.leido)){ h.msgs.forEach(m => { if (!mio(m)) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
-    const msgs = h ? h.msgs : [];
+    const msgs = msgsVisibles(h, yoSoy);
     const chips = esStaff() ? '' : deExpensas ? `<p class="muted small" style="margin:0 0 10px">${I('wallet')} Consulta sobre ${esHotel() ? 'las expensas del hotel' : 'tus expensas'}: planes de pago, diferencias o dudas. La responde la Administración; la garita no la ve.</p>` : esHotel() ? chipsHotel(con) : `<div class="chips">
       <button class="chip ${con === 'admin' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="admin">${I('sliders')}Administración</button>
       <button class="chip ${con === 'guardia' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="guardia">${I('shield')}Guardia</button></div>`;
-    return `<div class="chat-wrap">${chips}${botonHistHilo('privados', h)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
+    return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
         <div class="b">${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
         : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? (esHotel() ? 'Escribile a la garita. Solo la leen el hotel y la garita.' : 'Escribile a la guardia. Nadie más lo ve.') : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
-      <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}"><input name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'Mensaje a la Administración'}" autocomplete="off"><button class="btn btn-accent">${I('send')}</button></form></div>`;
+      ${miCanal === 'guardia' && !esHotel() ? respuestasRapidas(esStaff() ? RESP_GARITA : RESP_VECINO) : ''}
+      <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}"><textarea name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'Mensaje a la Administración'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
   },
-  alPintar(){ const c = $('#cuerpo'); if (c) c.scrollTop = c.scrollHeight; },
 };
 F['privado'] = (d, form) => {
   const u = yo(), para = form.dataset.u;
@@ -654,6 +654,17 @@ F['privado'] = (d, form) => {
 const esCuentaDeLote = u => !!u && u.estado === 'aprobado' && (u.rol === 'vecino' || u.rol === 'admin') && /^Lote\s/i.test(u.casa || '');
 const lotesConCuentas = () => [...new Set(Store.s.users.filter(esCuentaDeLote).map(u => u.casa))]
   .sort((a, b) => a.localeCompare(b, 'es', { numeric:true }));
+/* =========================================================
+   RESPUESTAS RÁPIDAS GARITA ↔ VECINO (pedido de Claudio, 10-10-2026, idea
+   de react-native-gifted-chat, 14.400★: "quick replies")
+   Arriba de la caja de escribir, las frases de todos los días en botones:
+   un toque y sale el mensaje, sin tipear con la visita en la puerta.
+   ========================================================= */
+const RESP_VECINO = ['Ya bajo', 'Que espere, ya voy', 'Dejalo en la garita', 'Que pase', 'No conozco a nadie', 'Ahora no estoy en casa'];
+const RESP_GARITA = ['Llegó tu visita', 'Tenés un paquete en la garita', 'Ya pasó', 'Te llamo en un minuto', 'Recibido, gracias', '¿Lo dejamos pasar?'];
+const respuestasRapidas = frases => `<div class="resp-rapidas" role="group" aria-label="Respuestas rápidas">${frases.map(f => `<button type="button" class="chip" data-a="resp-rapida" data-v="${esc(f)}">${esc(f)}</button>`).join('')}</div>`;
+A['resp-rapida'] = el => { const f = el.closest('.chat-wrap')?.querySelector('form.chatbar'), t = f && f.querySelector('textarea, input[name="text"]'); if (!t) return;
+  t.value = el.dataset.v; f.requestSubmit(); };
 const cuentasPrivLote = casa => cuentasDelLote(casa).filter(esCuentaDeLote);
 function filasPrivLote(casa){
   const cs = cuentasPrivLote(casa);
@@ -1668,7 +1679,7 @@ function informeMisDatos(){
   out.push(bloque('2. Visitas que autorizaste', `Las ven vos, la garita y la Administración. Los datos de la visita (DNI y patente) se borran a los ${typeof Historial !== 'undefined' ? Historial.diasVisitas() : 90} días; después queda solo en el archivo histórico (quién vino y cuándo). El DNI de las visitas va tapado en este informe.`,
     tabla(['Fecha', 'Tipo', 'Quién', 'Patente', 'DNI', 'Movimientos'], pases.map(p => [p.dias?.length ? `${aLista(p.dias).map(d => DIAS[d]).join(' ')} hasta ${fc(p.fechaFin)}` : fc(p.fecha) + (p.desde ? ' ' + x(p.desde) + '–' + x(p.hasta) : ''),
       x((TIPOS_PASE[p.tipo] || TIPOS_PASE.visita).n), x(p.nombre), x(p.patente), p.dni ? '***' + x(String(p.dni).slice(-3)) : '', mov(p) + (p.archivadoAt ? '<br><i>archivo histórico</i>' : '')]))
-    + tabla(['Llegó sin aviso', 'Motivo', 'Cuándo', 'Tu respuesta'], s.llegadas.filter(l => l.hostId === u.id).map(l => [x(l.nombre), x(l.motivo), fh(l.at), x({ consultando:'Sin responder', autorizado:'Que pase', rechazado:'No lo conozco' }[l.estado] || l.estado)]))));
+    + tabla(['Llegó sin aviso', 'Motivo', 'Cuándo', 'Tu respuesta'], s.llegadas.filter(l => llegadaDeMiLote(l, u)).map(l => [x(l.nombre), x(l.motivo), fh(l.at), x({ consultando:'Sin responder', autorizado:'Que pase', rechazado:'No lo conozco' }[l.estado] || l.estado)]))));
   /* 3 · paquetes */
   const paqV = typeof paquetesDelLote === 'function' ? paquetesDelLote(u) : [], idsP = new Set(paqV.map(p => p.id));
   const paqs = [...paqV, ...aLista(H.paquetes).filter(p => p && !idsP.has(p.id))].sort((a, b) => (b.recibido || 0) - (a.recibido || 0));

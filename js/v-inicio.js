@@ -43,12 +43,23 @@ function estadoPase(p, iso = hoyISO()){
 }
 const pasesDelDia = (iso = hoyISO()) => Store.s.pases.filter(p => paseValidoEn(p, iso) || (p.log && p.log[iso]));
 const normPatente = t => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+/* EL MENSAJE DEL PASE (rediseño 10-10-2026): el QR y el código van en la
+   imagen (imagenQR, js/core.js); el texto es corto, con los datos en
+   negrita de WhatsApp, y un solo enlace, el del mapa, al final con 📍.
+   Ya no va el enlace "Tu QR": la visita recibe el QR en la imagen. */
+function datosPase(p){
+  const u = usuario(p.hostId) || {};
+  return { nombre:p.nombre || '', espera:`${(p.autoriza || u.nombre || 'Vecino').split(' ')[0]} · ${u.casa || ''}`,
+    cuando: p.dias?.length ? p.dias.map(d => DIAS[d]).join(' ') : fechaCorta(p.fecha), horario:`${p.desde} a ${p.hasta} h` };
+}
 function textoPase(p){
   const u = usuario(p.hostId) || {}, c = Store.s.config;
-  const cuando = p.dias?.length ? `${p.dias.map(d => DIAS[d]).join(', ')} de ${p.desde} a ${p.hasta} (hasta el ${fechaCorta(p.fechaFin)})` : `${fechaLarga(p.fecha)} de ${p.desde} a ${p.hasta}`;
-  return `¡Hola${p.nombre ? ' ' + p.nombre.split(' ')[0] : ''}! ${p.autoriza || u.nombre || 'Un vecino'} (${u.casa || ''}) te autorizó a entrar al barrio ${c.nombre}.\n\n` +
-    `Tu código de ingreso: ${p.codigo}\nVálido: ${cuando}.\nMostralo en la garita (código o QR).\n\n` +
-    `Tu QR: ${enlaceQR('BHC:' + p.codigo)}\nCómo llegar: ${c.mapa}`;
+  const cuando = p.dias?.length ? `${p.dias.map(d => DIAS[d]).join(', ')}, de ${p.desde} a ${p.hasta} h (hasta el ${fechaCorta(p.fechaFin)})` : `${fechaLarga(p.fecha)}, de ${p.desde} a ${p.hasta} h`;
+  return `🎟️ *Tu pase para el Barrio ${c.nombre}*\n\n` +
+    `¡Hola${p.nombre ? ' ' + p.nombre.split(' ')[0] : ''}! ${p.autoriza || u.nombre || 'Un vecino'} (${u.casa || ''}) te espera.\n\n` +
+    `📅 ${cuando}\n🔑 Código: *${codigoEspaciado(p.codigo)}*\n\n` +
+    `En la garita mostrá el QR de la imagen o decí el código.\n\n` +
+    `📍 *Cómo llegar:* ${mapaCorto(c.mapa)}`;
 }
 function tarjetaPase(p, { garita = false } = {}){
   const t = TIPOS_PASE[p.tipo] || TIPOS_PASE.visita, est = estadoPase(p), host = usuario(p.hostId) || {};
@@ -88,8 +99,8 @@ function urgentesVecino(){
     x.estado === 'en_camino' ? `La guardia va en camino (${nombreDe(x.atiende)})` : x.estado === 'atendida' ? 'La guardia dio por atendida tu alerta' : 'Tu alerta SOS está activa',
     x.estado === 'atendida' ? 'Si ya está todo bien, confirmalo para que se cierre en todo el barrio.' : 'La guardia, la Administración y los vecinos ya fueron avisados.',
     `<button class="btn btn-xs btn-ok" data-a="sos-cancelar" data-id="${x.id}">${I('check')}Ya está solucionado</button>`)));
-  s.llegadas.filter(l => l.hostId === u.id && l.estado === 'consultando').forEach(l => out.push(aviso('warn latido', 'gate',
-    `En la garita: ${esc(l.nombre)} pregunta por vos`, `${esc(l.motivo || 'Sin aviso previo')}${l.patente ? ' · ' + esc(l.patente) : ''} · ${hace(l.at)}`,
+  s.llegadas.filter(l => llegadaDeMiLote(l, u) && l.estado === 'consultando').forEach(l => out.push(aviso('warn latido', 'gate',
+    `En la garita: ${esc(l.nombre)} pregunta por ${l.hostId === u.id && !l.porLote ? 'vos' : 'tu casa'}`, `${esc(l.motivo || 'Sin aviso previo')}${l.patente ? ' · ' + esc(l.patente) : ''} · ${hace(l.at)}`,
     `<button class="btn btn-xs btn-ok" data-a="llegada-si" data-id="${l.id}">${I('check')}Que pase</button><button class="btn btn-xs btn-danger-soft" data-a="llegada-no" data-id="${l.id}">No lo conozco</button>`)));
   s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente').forEach(r => out.push(aviso('info', 'qr',
     `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}${r.patente ? ' · ' + esc(r.patente) : ''}`,
@@ -948,7 +959,7 @@ R.visitas = {
     const deHoy = mios.filter(p => paseValidoEn(p, hoy) || p.log?.[hoy]);
     const futuros = mios.filter(p => !p.dias?.length && p.fecha > hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
     const fijos = mios.filter(p => p.dias?.length && (p.fechaFin || '') >= hoy);
-    const llegadas = s.llegadas.filter(l => l.hostId === u.id).slice(0, 5);
+    const llegadas = s.llegadas.filter(l => llegadaDeMiLote(l, u)).slice(0, 5);
     const pedidos = s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente');
     const mes = hoy.slice(0, 7);
     return `
@@ -967,7 +978,7 @@ R.visitas = {
         return tarjetaPase(p) .replace('</div></div>', `</div><div class="muted small" style="margin-top:8px">${I('check')} Asistencia de este mes: ${plural(dias, 'día')}</div></div>`);
       }).join('') : ''}
       ${llegadas.length ? sec('Llegadas sin aviso') + llegadas.map(l => `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span>
-        <div class="datos"><b>${esc(l.nombre)}</b><span>${esc(l.motivo || '')} · ${hace(l.at)}</span></div><span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Autorizado', rechazado:'Rechazado' }[l.estado]}</span></div></div>`).join('') : ''}
+        <div class="datos"><b>${esc(l.nombre)}</b><span>${esc(l.motivo || '')} · ${hace(l.at)}</span></div><span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Autorizado', rechazado:'Rechazado' }[l.estado]}</span></div>${l.respondio && l.respondio !== u.id ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio).split(' ')[0])}</div>` : ''}</div>`).join('') : ''}
       ${sec('Avisos a la guardia')}
       ${(() => { const au = ausenciaDe(u); return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t: au ? `Casa sola hasta el ${fechaCorta(au.hasta)}` : 'Me voy de viaje', s: au ? 'La revisan una vez por día y te llega el aviso. Tocá para cambiar.' : 'La garita o el policía la revisa cada día y te avisa que está en orden' }); })()}
       ${superficie({ a:'aviso-guardia', icon:'shield', color:'brand', t:'Aviso rápido a la guardia', s:'Viene una visita sin aviso ni QR: que me avisen cuando llegue' })}
@@ -1081,7 +1092,7 @@ F['pase-app-patente'] = (d, form) => {
   cerrarHoja(); toast('Patente guardada. La garita ya la tiene.', 'car');
 };
 A['compartir-pase'] = el => { const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
-  compartirPase({ texto:textoPase(p), contenido:'BHC:' + p.codigo, codigo:p.codigo, sub:`Pase de ${p.nombre} · ${usuario(p.hostId)?.casa || ''}`, archivo:`pase-${p.codigo}.png` }); };
+  compartirPase({ texto:textoPase(p), contenido:'BHC:' + p.codigo, codigo:p.codigo, sub:`Pase de ${p.nombre} · ${usuario(p.hostId)?.casa || ''}`, archivo:`pase-${p.codigo}.png`, datos:datosPase(p) }); };
 /* La página pública del QR (#/qr/…): la abre la visita desde el enlace del WhatsApp.
    No lee nada de la base: dibuja el QR con lo que trae el enlace. */
 function pintarQRPublico(contenido){
@@ -1090,7 +1101,7 @@ function pintarQRPublico(contenido){
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
     <h1 style="font-size:28px">Tu pase de ingreso</h1>
     <div class="panel" style="text-align:center"><div class="qr-box" id="qrPub" style="background:#fff;padding:14px;border-radius:14px;max-width:260px;margin:0 auto"></div>
-      <div class="codigo-grande" style="margin-top:12px">${esc(cod)}</div><p style="margin:8px 0 0;opacity:.9">Mostrá este QR en la garita o decí el código.</p></div></section>`;
+      <div class="codigo-grande" style="margin-top:12px">${esc(codigoEspaciado(cod))}</div><p style="margin:8px 0 0;opacity:.9">Mostrá este QR en la garita o decí el código.</p><div style="text-align:left">${botonMapa()}</div></div></section>`;
   pintarQR($('#qrPub'), c);
 }
 A['cancelar-pase'] = async el => {
@@ -1171,13 +1182,33 @@ A['sol-pase-si'] = el => {
 };
 A['sol-pase-no'] = el => Store.cambiar(s => { const r = s.solicitudesPase.find(x => x.id === el.dataset.id); if (r) r.estado = 'rechazado'; });
 A['llegada-si'] = el => responderLlegada(el.dataset.id, 'autorizado');
+/* Desde el aviso del celular (link "llegada:<id>"): la hoja con los dos botones. */
+A['llegada-ver'] = el => {
+  const l = Store.s.llegadas.find(x => x.id === el.dataset.id); if (!l) return;
+  const casa = l.lote || usuario(l.hostId)?.casa || '';
+  hoja('En la garita', `<div class="aviso-leido"><span class="ic ic-warn">${I('gate')}</span><div><b>${esc(l.nombre)}</b><time>${hace(l.at)}</time></div></div>
+    <p class="aviso-leido-texto">${esc(l.motivo || 'Visita')}${l.patente ? ' · ' + esc(l.patente) : ''} · pregunta por ${esc(casa)}</p>
+    ${l.estado === 'consultando' ? `<div class="btns" style="margin-top:14px"><button class="btn btn-ok grow" data-a="llegada-si" data-id="${l.id}">${I('check')}Que pase</button><button class="btn btn-danger-soft grow" data-a="llegada-no" data-id="${l.id}">No lo conozco</button></div>`
+      : `<p class="muted small" style="margin:12px 0 0">${I('check')} Ya contestó ${l.respondio === yo().id ? 'vos' : esc(nombreDe(l.respondio).split(' ')[0] || 'alguien del lote')}: ${l.estado === 'autorizado' ? 'que pase' : 'no pasa'}.</p>`}`);
+};
 A['llegada-no'] = el => responderLlegada(el.dataset.id, 'rechazado');
+/* Contesta cualquiera del lote; el primero que contesta vale. Al contestar
+   se cierra para todos: desaparecen los botones y el aviso de la
+   campanita (ver avisoCaduco en js/core.js), y a los demás del lote les
+   queda dicho quién contestó y qué. */
 function responderLlegada(id, estado){
+  const u = yo(), l0 = Store.s.llegadas.find(x => x.id === id);
+  if (!l0) return;
+  if (l0.estado !== 'consultando'){ toast(`Ya contestó ${l0.respondio === u.id ? 'vos' : nombreDe(l0.respondio).split(' ')[0] || 'alguien del lote'}: ${l0.estado === 'autorizado' ? 'que pase' : 'no pasa'}`, 'check'); cerrarHoja(); refrescar(); return; }
   Store.cambiar(s => {
     const l = s.llegadas.find(x => x.id === id); if (!l) return;
-    l.estado = estado; l.respondido = Date.now();
-    notificar(s, { para:'rol:guardia', titulo:`${usuario(l.hostId)?.casa}: ${estado === 'autorizado' ? 'que pase' : 'NO autoriza'}`, texto:l.nombre, icon: estado === 'autorizado' ? 'check' : 'x', color: estado === 'autorizado' ? 'ok' : 'danger', urgente:true, link:'garita' });
+    l.estado = estado; l.respondido = Date.now(); l.respondio = u.id;
+    const casa = l.lote || usuario(l.hostId)?.casa || '', quien = u.nombre.split(' ')[0];
+    notificar(s, { para:'rol:guardia', titulo:`${casa}: ${estado === 'autorizado' ? 'que pase' : 'NO autoriza'}`, texto:`${l.nombre} · contestó ${quien}`, icon: estado === 'autorizado' ? 'check' : 'x', color: estado === 'autorizado' ? 'ok' : 'danger', urgente:true, link:'garita' });
+    const otros = residentesDelLote(casa).map(x => x.id).filter(x => x !== u.id);
+    if (otros.length) notificar(s, { para:otros, titulo:`${quien} ${estado === 'autorizado' ? 'dejó pasar' : 'no dejó pasar'} a ${l.nombre}`, texto:'Lo contestó a la garita: ya no hace falta que respondas.', icon: estado === 'autorizado' ? 'check' : 'x', color: estado === 'autorizado' ? 'ok' : 'danger', link:'visitas', push:false });
   });
+  cerrarHoja(); if (typeof Push !== 'undefined' && Push.cerrarResueltos) setTimeout(() => Push.cerrarResueltos(), 300);
   toast(estado === 'autorizado' ? 'Avisamos a la guardia: puede pasar' : 'Avisamos a la guardia: no pasa', estado === 'autorizado' ? 'check' : 'x');
 }
 A['modo-viaje'] = () => {
@@ -2340,6 +2371,7 @@ A['garita-ir'] = el => { const d = document.querySelector(el.dataset.v); if (d) 
 
 R.garita = {
   titulo: 'Garita', icon: 'gate', color: 'brand', ancha: true, sub: () => fechaLarga(hoyISO()),
+  alPintar(){ if (typeof precargarLectorPatente === 'function') precargarLectorPatente(); },
   render(){
     if (!veGarita()) return vacio('lock', 'La garita es solo para la guardia, la Administración y la supervisión.');
     if (esGuardia() && !turnoListo()) return formularioTurno();
@@ -2397,8 +2429,11 @@ R.garita = {
       ${(() => { const rs = s.peticiones.filter(p => p.tipo === 'nopasar' && p.estado === 'en_funciones' && (!p.hasta || p.hasta >= hoy)); return rs.length ? sec('Restricciones de ingreso vigentes') + rs.map(p => `<button class="superficie peligro" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-danger">${I('x')}</span><span class="txt"><b>${esc(p.casa)}</b><small>${esc(p.texto.slice(0, 90))}</small></span>${I('right')}</button>`).join('') : ''; })()}
       ${llegadas.length ? '<span id="garLlegadas" class="ancla"></span>' + sec('Consultando al vecino') + llegadas.map(l => { const h = usuario(l.hostId) || {}; const min = Math.floor((Date.now() - l.at) / MIN);
         return `<div class="card" style="padding:13px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span><div class="datos"><b>${esc(l.nombre)} → ${esc(h.casa || '')}</b><span>${esc(l.motivo || '')}${l.patente ? ' · ' + esc(l.patente) : ''} · hace ${min} min</span></div>
-          <span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Puede pasar', rechazado:'No autorizado' }[l.estado]}</span></div>
-          ${opera && l.estado === 'consultando' && min >= 2 && h.tel ? `<div class="btns" style="margin-top:10px"><a class="btn btn-sm btn-sec" href="${telLink(h.tel)}">${I('phone')}Llamar a ${esc(h.nombre.split(' ')[0])}</a></div>` : ''}</div>`; }).join('') : ''}
+          <span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Puede pasar', rechazado:'No autorizado' }[l.estado]}</span></div>${l.respondio ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio))}</div>` : ''}
+          ${opera && l.estado === 'consultando' && min >= 2 ? (() => {
+            /* A los 2 min, "Llamar" a cada uno de los que viven en el lote; a los 3, la app ya les insistió con sonido (regla llegada-3min). */
+            const tels = paraElLote(l.lote || h.casa, l.hostId).map(usuario).filter(v => v && v.tel);
+            return `<div class="btns" style="margin-top:10px">${tels.map(v => `<a class="btn btn-sm btn-sec" href="${telLink(v.tel)}">${I('phone')}Llamar a ${esc(v.nombre.split(' ')[0])}</a>`).join('')}${min >= 3 ? `<span class="pill p-warn">Se les insistió con sonido</span>` : ''}</div>`; })() : ''}</div>`; }).join('') : ''}
       ${avisos.length ? '<span id="garAvisos" class="ancla"></span>' + sec('Avisos de vecinos') + avisos.map(a => { const v = usuario(a.userId) || {}, t = AVISOS_GUARDIA[a.tipo] || AVISOS_GUARDIA.otro;
         return `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-warn">${I(t.icon)}</span><div class="datos"><b>${esc(v.casa || '')}: ${t.t}</b><span>${esc(a.texto || t.x)} · ${hace(a.at)}</span></div>
           ${a.visto ? `<span class="estado e-autorizado">Visto</span>` : opera ? `<button class="btn btn-xs btn-ok" data-a="aviso-visto" data-id="${a.id}">Visto</button>` : `<span class="estado e-consultando">Sin ver</span>`}</div>
@@ -2506,8 +2541,12 @@ function validar(q){
   const pases = s.pases.filter(p => !p.cancelado && ((dig.length === 6 && p.codigo === dig) || (pat.length >= 6 && normPatente(p.patente) === pat) || (dig.length >= 7 && p.dni === dig)));
   const vecino = pat.length >= 6 ? s.users.find(u => (u.vehiculos || []).some(v => normPatente(v.patente) === pat)) : null;
   if (!pases.length && !vecino){
-    hoja('Sin coincidencias', `${avisoRestriccion(restriccionPara('', dig, pat))}${aviso('danger', 'x', 'No hay ningún pase con ese dato', 'Si dice venir a una casa, registrá la llegada y consultamos al vecino.')}
-      <button class="btn btn-pri btn-block" data-a="llegada-nueva">${I('gate')}Registrar llegada sin aviso</button>`); return;
+    /* Lo que se buscó, a la vista (sobre todo si lo leyó la cámara), y la
+       patente ya cargada en "Registrar llegada sin aviso". */
+    const esPat = typeof patenteDeTexto === 'function' && patenteDeTexto(txt) === pat && pat.length >= 6;
+    hoja('Sin coincidencias', `${esPat ? `<div class="pat-leida">${I('car')}<b>${esc(verPatente(pat))}</b></div>` : ''}${avisoRestriccion(restriccionPara('', dig, pat))}${aviso('danger', 'x', 'No hay ningún pase con ese dato', 'Si dice venir a una casa, registrá la llegada y consultamos al vecino.')}
+      <button class="btn btn-pri btn-block" data-a="llegada-nueva" data-pat="${esPat ? esc(pat) : ''}">${I('gate')}Registrar llegada sin aviso</button>
+      ${esPat ? `<button class="btn btn-sec btn-block" data-a="patente-camara" style="margin-top:8px">${I('camera')}No es esa: leer otra vez</button>` : ''}`); return;
   }
   const restr = pases.map(p => restriccionPara(p.nombre, p.dni, p.patente)).find(Boolean) || restriccionPara('', dig, pat);
   hoja('Resultado', `${avisoRestriccion(restr)}${vecino ? aviso('ok', 'car', `Vehículo de vecino: ${esc(vecino.casa)}`, `${esc(vecino.nombre)} · ${esc((vecino.vehiculos.find(v => normPatente(v.patente) === pat) || {}).modelo || '')}`) : ''}
@@ -2540,8 +2579,9 @@ A['pase-vencido-avisar'] = el => {
     p.vencidoAviso = { at, fecha:hoyISO(), tipo: enGarita ? 'garita' : 'aviso', por:yo().id };
     const casa = usuario(p.hostId)?.casa || '';
     if (enGarita){
-      s.llegadas.unshift({ id:uid(), hostId:p.hostId, nombre:p.nombre, patente:p.patente || '', motivo:`Pase vencido (era de ${p.desde} a ${p.hasta} h)`, at, estado:'consultando', paseId:p.id });
-      notificar(s, { para:p.hostId, titulo:`En la garita: ${p.nombre} (pase vencido)`, texto:`Tu pase era de ${p.desde} a ${p.hasta} h · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'inicio' });
+      const lid = uid();
+      s.llegadas.unshift({ id:lid, hostId:p.hostId, lote:casa, nombre:p.nombre, patente:p.patente || '', motivo:`Pase vencido (era de ${p.desde} a ${p.hasta} h)`, at, estado:'consultando', paseId:p.id });
+      notificar(s, { para:paraElLote(casa, p.hostId), titulo:`En la garita: ${p.nombre} (pase vencido)`, texto:`El pase era de ${p.desde} a ${p.hasta} h · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'llegada:' + lid, llegadaId:lid });
     } else notificar(s, { para:p.hostId, titulo:`Venció el pase de ${p.nombre}`, texto:`Era de ${p.desde} a ${p.hasta} h y no ingresó. Si todavía viene, cambiale el horario o hacé uno nuevo.`, icon:'clock', color:'warn', link:'visitas', sonido:true });
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Pase vencido: ${p.nombre} → ${casa} · ${enGarita ? 'se presentó; se consultó al vecino' : 'no ingresó; se avisó al vecino'}`, at });
   });
@@ -2568,19 +2608,26 @@ const opcionesLotes = (sel = '') => LOTES.map(l => `<option value="Lote ${l.lote
 A['llegada-nueva'] = el => hoja('Llegó alguien sin aviso', `<form data-f="llegada">
   <div class="field"><label>¿A qué casa va?</label><select name="hostId" required>${opcionesCasas(el?.dataset?.u || '')}</select></div>
   <div class="field"><label>Nombre</label><input name="nombre" required maxlength="60" value="${esc(el?.dataset?.p || '')}"></div>
-  <div class="grid2"><div class="field"><label>Patente</label><input name="patente" maxlength="10" style="text-transform:uppercase"></div>
+  <div class="grid2"><div class="field"><label>Patente</label><input name="patente" maxlength="10" style="text-transform:uppercase" value="${esc(el?.dataset?.pat ? verPatente(el.dataset.pat) : '')}"></div>
     <div class="field"><label>Motivo</label><select name="motivo"><option>Visita</option><option>Delivery</option><option>Uber / DiDi / taxi</option><option>Proveedor / obra</option><option>Correo / paquete</option><option>Otro</option></select></div></div>
   <button class="btn btn-pri btn-block">${I('send')}Consultar al vecino</button>
-  <p class="muted tiny" style="margin:10px 0 0">Al vecino le aparece en el celular con dos botones: "Que pase" o "No lo conozco".</p></form>`);
+  <p class="muted tiny" style="margin:10px 0 0">Les aparece a todos los que viven en ese lote, con dos botones: "Que pase" o "No lo conozco". Vale la respuesta del primero que conteste.</p></form>`);
+/* Las cuentas que viven en el lote (más el elegido, por si no figura con ese lote). */
+const paraElLote = (casa, hostId) => { const us = residentesDelLote(casa).map(u => u.id); if (hostId && !us.includes(hostId)) us.push(hostId); return us; };
+const llegadaDeMiLote = (l, u = yo()) => !!l && !!u && (l.hostId === u.id || (!!l.lote && l.lote === u.casa && !esPropDistancia(u)));
 F['llegada'] = d => {
   const r = restriccionPara(d.nombre, '', d.patente);
   if (r){ hoja('Atención', `${avisoRestriccion(r)}<p class="small">No se consulta al vecino: hay un pedido firmado para no dejar pasar a esta persona.</p>`);
     Store.cambiar(s => { s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'incidente', texto:`Se presentó ${d.nombre.trim()} (restricción de ${r.casa}). No ingresó.`, at:Date.now() });
       notificar(s, { para:r.userId, titulo:'Se presentó en la garita alguien con restricción', texto:d.nombre.trim(), icon:'x', color:'danger', urgente:true, link:'peticiones' }); });
     return; }
+  /* A todo el lote (10-10-2026): le llega a cada uno que vive ahí, no solo al elegido. */
+  const casa = usuario(d.hostId)?.casa || '', id = uid();
   Store.cambiar(s => {
-    s.llegadas.unshift({ id:uid(), hostId:d.hostId, nombre:d.nombre.trim(), patente:(d.patente || '').toUpperCase(), motivo:d.motivo, at:Date.now(), estado:'consultando' });
-    notificar(s, { para:d.hostId, titulo:`En la garita: ${d.nombre.trim()}`, texto:`${d.motivo} · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'inicio' });
+    const l = { id, hostId:d.hostId, lote:casa, nombre:d.nombre.trim(), patente:(d.patente || '').toUpperCase(), motivo:d.motivo, at:Date.now(), estado:'consultando' };
+    if (d.porLote) l.porLote = true;
+    s.llegadas.unshift(l);
+    notificar(s, { para:paraElLote(casa, d.hostId), titulo:`En la garita: ${d.nombre.trim()}`, texto:`${d.motivo}${casa ? ' · ' + casa : ''} · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'llegada:' + id, llegadaId:id });
   });
   cerrarHoja(); toast('Consultando al vecino…', 'send');
 };
@@ -2654,7 +2701,7 @@ async function lectorPatente(){
   const T = await cargarOCR(); if (!T) return null;
   try {
     const w = await T.createWorker('eng', 1);
-    await w.setParameters({ tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ', tessedit_pageseg_mode: T.PSM ? T.PSM.SINGLE_LINE : '7' });
+    await w.setParameters({ tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ', tessedit_pageseg_mode: T.PSM ? T.PSM.SINGLE_LINE : '7', user_defined_dpi:'300' });
     return (ocrWorker = w);
   } catch(e){ console.warn('Lector de patentes', e && e.message); return null; }
 }
@@ -2662,7 +2709,9 @@ const FORMATOS_PATENTE = ['LLDDDLL', 'LDDDLLL', 'LLLDDD', 'DDDLLL'];
 const PAT_A_LETRA = { '0':'O', '1':'I', '2':'Z', '4':'A', '5':'S', '6':'G', '7':'T', '8':'B' };
 const PAT_A_NUM = { O:'0', Q:'0', D:'0', U:'0', I:'1', L:'1', J:'1', T:'7', Z:'2', S:'5', B:'8', G:'6', A:'4' };
 /* Del texto leído, la patente que mejor encaja (la que pide menos correcciones). */
-function patenteDeTexto(txt){
+function patenteDeTexto(txt){ return patenteLeida(txt).p; }
+/* Además de la patente, cuántas letras hubo que corregir para que encaje. */
+function patenteLeida(txt){
   const t = String(txt || '').toUpperCase().replace(/[^A-Z0-9]/g, ''), out = [];
   FORMATOS_PATENTE.forEach((f, orden) => { for (let i = 0; i + f.length <= t.length; i++){
     const tramo = t.slice(i, i + f.length); let fix = '', ok = true;
@@ -2672,50 +2721,135 @@ function patenteDeTexto(txt){
     if (ok) out.push({ p:fix, orden, cambios:[...fix].filter((c, k) => c !== tramo[k]).length });
   } });
   out.sort((a, b) => a.cambios - b.cambios || a.orden - b.orden);
-  return out[0] ? out[0].p : '';
+  /* Una lectura que necesitó muchas correcciones no es una patente: es ruido. */
+  return out[0] && out[0].cambios <= 2 ? out[0] : { p:'', cambios:9 };
 }
 const verPatente = p => !p ? '' : p.length === 7 ? (/^[A-Z]{2}\d/.test(p) ? `${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5)}` : `${p.slice(0, 1)} ${p.slice(1, 4)} ${p.slice(4)}`) : p.length === 6 ? `${p.slice(0, 3)} ${p.slice(3)}` : p;
-/* El recuadro del medio de la imagen, en grises y con más contraste: así lee mejor. */
-function recortePatente(v){
-  const W = v.videoWidth, H = v.videoHeight, x = W * 0.08, y = H * 0.34, w = W * 0.84, h = H * 0.32;
-  const k = Math.min(3, 1100 / w), cv = document.createElement('canvas'); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
-  const ctx = cv.getContext('2d', { willReadFrequently:true }); ctx.drawImage(v, x, y, w, h, 0, 0, cv.width, cv.height);
-  const img = ctx.getImageData(0, 0, cv.width, cv.height), d = img.data, gris = new Uint8Array(d.length / 4), hist = new Array(256).fill(0);
-  for (let i = 0, j = 0; i < d.length; i += 4, j++){ const g = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; gris[j] = g; hist[g]++; }
-  const n = gris.length; let a = 0, lo = 0, hi = 255; for (let g = 0; g < 256; g++){ a += hist[g]; if (a > n * 0.05){ lo = g; break; } }
-  a = 0; for (let g = 255; g >= 0; g--){ a += hist[g]; if (a > n * 0.05){ hi = g; break; } }
-  const rango = Math.max(1, hi - lo);
-  for (let i = 0, j = 0; i < d.length; i += 4, j++){ const g = Math.max(0, Math.min(255, (gris[j] - lo) * 255 / rango)); d[i] = d[i + 1] = d[i + 2] = g; }
-  ctx.putImageData(img, 0, 0); return cv;
+/* =========================================================
+   EL LECTOR DE PATENTES, RÁPIDO COMO EL DEL QR (10-10-2026, Claudio: "NO
+   LEE LAS PATENTES, ni acercándome")
+   Antes: había que tocar "Leer la patente", se leía UNA foto con un
+   recuadro grande (entraban el paragolpes, la calcomanía, la banda azul) y
+   el programa recién se bajaba en ese momento. Ahora, como el QR:
+     · el lector se baja apenas se abre la garita (una sola vez; queda
+       guardado en el teléfono) y la cámara arranca leyendo sola;
+     · lee varias veces por segundo SOLO el recuadro amarillo, que tiene la
+       forma de una patente; lo pasa a blanco y negro puro (y lo da vuelta
+       si es una patente vieja, de letras blancas sobre fondo negro);
+     · si el teléfono tiene zoom, la cámara arranca con 2x: no hace falta
+       acercarse tanto;
+     · da la patente por buena apenas coincide con una que el barrio ya
+       conoce (pases de hoy, autos de vecinos, frecuentes, vans y huéspedes
+       del hotel), aunque haya leído mal UNA letra; si es desconocida, cuando
+       la lee igual dos veces;
+     · suena, vibra y muestra el resultado, igual que el QR.
+   GitHub (más de 1000★): openalpr (11k★, AGPL), HyperLPR (6k★) y
+   PaddleOCR (90k★) leen patentes muy bien, pero en una computadora o un
+   servidor, no en el navegador del teléfono; se sigue con tesseract.js
+   (38,7k★, Apache-2.0), afinado para patentes.
+   ========================================================= */
+function patentesConocidas(){
+  const s = Store.s, hoy = hoyISO(), set = new Set(), add = p => { const x = normPatente(p); if (x.length >= 6 && x.length <= 7) set.add(x); };
+  aLista(s.pases).filter(p => p && !p.cancelado && (paseValidoEn(p, hoy) || (p.log && p.log[hoy]))).forEach(p => add(p.patente));
+  aLista(s.users).forEach(u => aLista(u && u.vehiculos).forEach(v => add(v && v.patente)));
+  if (typeof frecuentes === 'function') frecuentes().forEach(f => add(f.patente));
+  if (typeof hotelVans === 'function'){ hotelVans().forEach(v => add(v.patente)); hotelHuespedes().forEach(h => add(h.patente)); }
+  return set;
 }
+/* La conocida que está a UNA letra de lo leído (y una sola, para no confundir). */
+function patenteParecida(p, conocidas){
+  if (conocidas.has(p)) return p;
+  const cerca = [...conocidas].filter(k => k.length === p.length && [...k].filter((c, i) => c !== p[i]).length === 1);
+  return cerca.length === 1 ? cerca[0] : '';
+}
+/* El recuadro de la patente, en blanco y negro puro (umbral de Otsu), con
+   las letras oscuras sobre fondo claro y un margen blanco alrededor. */
+function recortePatente(fuente, r, alReves = false, alto = 110){
+  const k = alto / r.h, ancho = Math.round(r.w * k), m = 24;
+  const cv = document.createElement('canvas'); cv.width = ancho + 2 * m; cv.height = alto + 2 * m;
+  const ctx = cv.getContext('2d', { willReadFrequently:true });
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(fuente, r.x, r.y, r.w, r.h, m, m, ancho, alto);
+  const img = ctx.getImageData(m, m, ancho, alto), d = img.data, n = d.length / 4, gris = new Uint8Array(n), hist = new Array(256).fill(0);
+  for (let i = 0, j = 0; i < d.length; i += 4, j++){ const g = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; gris[j] = g; hist[g]++; }
+  let suma = 0; for (let g = 0; g < 256; g++) suma += g * hist[g];
+  let sB = 0, wB = 0, mejor = 0, umbral = 128;
+  for (let g = 0; g < 256; g++){ wB += hist[g]; if (!wB) continue; const wF = n - wB; if (!wF) break; sB += g * hist[g];
+    const mB = sB / wB, mF = (suma - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > mejor){ mejor = v; umbral = g; } }
+  let claros = 0; for (let j = 0; j < n; j++) if (gris[j] > umbral) claros++;
+  /* Letras oscuras sobre fondo claro. Si alrededor de la patente entra
+     mucho asfalto, el "fondo" puede adivinarse mal: por eso cada cuadro
+     se prueba de una forma y el siguiente al revés (alReves). */
+  const invertir = (claros < n * 0.45) !== alReves, bin = new Uint8Array(n);
+  for (let j = 0; j < n; j++){ let b = gris[j] > umbral ? 1 : 0; if (invertir) b = 1 - b; bin[j] = b; }
+  /* Lo negro que toca el borde del recorte es el auto o la calle que rodea
+     la patente (las letras nunca tocan el borde): se borra. */
+  const pila = [];
+  for (let x = 0; x < ancho; x++){ pila.push(x, (alto - 1) * ancho + x); }
+  for (let y = 0; y < alto; y++){ pila.push(y * ancho, y * ancho + ancho - 1); }
+  while (pila.length){ const j = pila.pop(); if (bin[j]) continue; bin[j] = 1; const x = j % ancho, y = (j / ancho) | 0;
+    if (x > 0) pila.push(j - 1); if (x < ancho - 1) pila.push(j + 1); if (y > 0) pila.push(j - ancho); if (y < alto - 1) pila.push(j + ancho); }
+  /* Franjas y bordes negros enteros (el marco, la banda de arriba, el
+     paragolpes) se borran: no son letras y confunden al lector. */
+  for (let y = 0; y < alto; y++){ let neg = 0; for (let x = 0; x < ancho; x++) neg += 1 - bin[y * ancho + x]; if (neg > ancho * 0.8) for (let x = 0; x < ancho; x++) bin[y * ancho + x] = 1; }
+  for (let x = 0; x < ancho; x++){ let neg = 0; for (let y = 0; y < alto; y++) neg += 1 - bin[y * ancho + x]; if (neg > alto * 0.8) for (let y = 0; y < alto; y++) bin[y * ancho + x] = 1; }
+  for (let i = 0, j = 0; i < d.length; i += 4, j++){ const b = bin[j] ? 255 : 0; d[i] = d[i + 1] = d[i + 2] = b; d[i + 3] = 255; }
+  ctx.putImageData(img, m, m); return cv;
+}
+/* Dónde está el recuadro amarillo, en píxeles del video. */
+function rectGuia(v){
+  const g = $('#patGuia'), rv = v.getBoundingClientRect(); if (!g || !rv.width) return null;
+  const rg = g.getBoundingClientRect(), kx = v.videoWidth / rv.width, ky = v.videoHeight / rv.height;
+  return { x:Math.max(0, (rg.left - rv.left) * kx), y:Math.max(0, (rg.top - rv.top) * ky), w:rg.width * kx, h:rg.height * ky };
+}
+/* Se baja apenas se abre la garita, para que la cámara lea al instante. */
+const precargarLectorPatente = () => { if (!ocrWorker && !ocrCargando && esGuardia()) setTimeout(() => lectorPatente(), 4000); };
 A['patente-camara'] = async () => {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('Este equipo no puede usar la cámara. Escribí la patente.', 'camera'); return; }
-  hoja('Leer la patente', `<div class="pat-cam"><video id="patVideo" playsinline muted></video><div class="pat-guia" aria-hidden="true"></div></div>
-    <p class="small center" id="patEstado" style="margin:10px 0">Poné la patente dentro del recuadro, de frente, y tocá <b>"Leer la patente"</b>.</p>
-    <button class="btn btn-pri btn-block btn-grande" data-a="patente-leer">${I('scan')}Leer la patente</button>
-    <p class="muted tiny" style="margin:10px 0 0">${I('lock')} La foto se lee en este mismo teléfono: no se guarda ni se manda a ningún lado. La primera vez se baja el programa lector (unos pocos MB).</p>`);
+  hoja('Leer la patente', `<div class="pat-cam"><video id="patVideo" playsinline muted></video><div class="pat-guia" id="patGuia" aria-hidden="true"></div><div class="pat-vivo" id="patVivo"></div></div>
+    <p class="small center" id="patEstado" style="margin:10px 0">Apuntá a la patente: que entre justo en el recuadro amarillo. Se lee sola.</p>
+    <form data-f="patente-buscar" class="linea-form"><input name="q" maxlength="12" placeholder="O escribila: AB 123 CD" autocomplete="off" style="text-transform:uppercase"><button class="btn btn-pri" aria-label="Buscar">${I('search')}</button></form>
+    <p class="muted tiny" style="margin:10px 0 0">${I('lock')} La imagen se lee en este mismo teléfono: no se guarda ni se manda a ningún lado.</p>`);
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment', width:{ ideal:1280 }, height:{ ideal:720 } } }); }
+  try { stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment', width:{ ideal:1920 }, height:{ ideal:1080 } } }); }
   catch(e){ cerrarHoja(); toast('No se pudo usar la cámara. Escribí la patente.', 'camera'); return; }
   const v = $('#patVideo'); if (!v){ stream.getTracks().forEach(t => t.stop()); return; }
   v.srcObject = stream; await v.play().catch(() => {});
-  const parar = () => stream.getTracks().forEach(t => t.stop());
+  /* Zoom 2x y foco continuo, si la cámara los tiene: lee desde más lejos. */
+  try { const tr = stream.getVideoTracks()[0], cap = tr.getCapabilities ? tr.getCapabilities() : {}, adv = {};
+    if (cap.zoom) adv.zoom = Math.min(cap.zoom.max, Math.max(cap.zoom.min, 2));
+    if (cap.focusMode && cap.focusMode.includes('continuous')) adv.focusMode = 'continuous';
+    if (Object.keys(adv).length) await tr.applyConstraints({ advanced:[adv] }); } catch(e){}
+  let vivo = true;
+  const parar = () => { vivo = false; stream.getTracks().forEach(t => t.stop()); };
   patCamara = { parar }; $('#hoja').addEventListener('close', parar, { once:true });
-  lectorPatente();   /* se va bajando mientras el guardia apunta */
-};
-A['patente-leer'] = async () => {
-  const v = $('#patVideo'), est = $('#patEstado'); if (!v || !v.videoWidth || !est) return;
-  est.textContent = 'Leyendo la patente…';
-  const cv = recortePatente(v), w = await lectorPatente();
-  if (!w){ est.textContent = 'No se pudo bajar el lector (¿sin conexión?). Escribí la patente en el validador.'; return; }
-  let txt = ''; try { txt = (await w.recognize(cv)).data.text || ''; } catch(e){ txt = ''; }
-  const p = patenteDeTexto(txt);
-  if (!p){ est.textContent = 'No la pude leer. Acercate un poco, que no haya reflejo ni sombra, y tocá "Leer la patente" otra vez.'; return; }
-  if (patCamara) patCamara.parar();
-  hoja('Patente leída', `<form data-f="patente-buscar"><div class="pat-leida">${I('car')}<b>${esc(verPatente(p))}</b></div>
-    <div class="field"><label>Si leyó mal alguna letra, corregila</label><input name="q" value="${esc(verPatente(p))}" maxlength="12" autocomplete="off" style="text-transform:uppercase;font-size:20px;font-weight:800;letter-spacing:1px;text-align:center"></div>
-    <button class="btn btn-pri btn-block btn-grande">${I('search')}Buscar esta patente</button>
-    <button type="button" class="btn btn-sec btn-block" data-a="patente-camara" style="margin-top:8px">${I('camera')}Leer otra vez</button></form>`);
+  const est = $('#patEstado'), ver = $('#patVivo');
+  if (!ocrWorker && est) est.textContent = 'Preparando el lector (solo la primera vez)… ya podés apuntar.';
+  const w = await lectorPatente();
+  if (!vivo) return;
+  if (!w){ if (est) est.textContent = 'No se pudo bajar el lector (¿sin conexión?). Escribí la patente abajo.'; return; }
+  if (est) est.textContent = 'Apuntá a la patente: que entre justo en el recuadro amarillo. Se lee sola.';
+  const conocidas = patentesConocidas(), vistas = []; let cuadro = 0;
+  const listo = p => { vivo = false; parar();
+    if (typeof Sonido !== 'undefined'){ Sonido.tocar([[988, 0, .1], [1319, .1, .22]], 'sine', .18); Sonido.vibrar(90); }
+    cerrarHoja(); validar(p); };
+  while (vivo && $('#hoja')?.open){
+    const r = v.videoWidth ? rectGuia(v) : null;
+    if (r && r.w > 20){
+      let txt = ''; try { /* Cada cuadro, una variante: al derecho y al revés, en dos tamaños. */
+        const n = cuadro++; txt = (await w.recognize(recortePatente(v, r, n % 2 === 1, n % 4 < 2 ? 80 : 140))).data.text || ''; } catch(e){}
+      if (!vivo) return;
+      const { p, cambios } = patenteLeida(txt);
+      if (p){
+        if (ver) ver.textContent = verPatente(p);
+        const k = patenteParecida(p, conocidas); if (k){ listo(k); return; }
+        /* Desconocida: dos lecturas iguales y limpias, o tres si hubo que corregir letras. */
+        vistas.push(p); if (vistas.length > 6) vistas.shift();
+        if (vistas.filter(x => x === p).length >= (cambios ? 3 : 2)){ listo(p); return; }
+      }
+    }
+    await new Promise(ok => setTimeout(ok, 60));
+  }
 };
 F['patente-buscar'] = d => validar(d.q);
 
@@ -2773,8 +2907,8 @@ function pintarPedirPase(hostId){
   else if (r && r.estado === 'aprobado'){
     const p = Store.s.pases.find(x => x.id === r.paseId);
     panel = p ? `<div class="ticket" style="color:var(--ink)"><div class="tk-top"><small>Pase aprobado</small><h3>${esc(p.nombre)}</h3><div style="opacity:.85;font-size:13px">${esc(host.casa)} · ${relDia(p.fecha)} · ${p.desde}–${p.hasta}</div></div>
-      <div class="bottom"><div class="qr-box" data-qr="BHC:${p.codigo}"></div><div class="codigo-grande">${p.codigo}</div><div class="muted small">Mostralo en la garita</div></div></div>
-      <a class="btn btn-sec btn-block" style="margin-top:10px" href="${esc(Store.s.config.mapa)}" target="_blank" rel="noopener">${I('pin')}Cómo llegar</a>` : '';
+      <div class="bottom"><div class="qr-box" data-qr="BHC:${p.codigo}"></div><div class="codigo-grande">${codigoEspaciado(p.codigo)}</div><div class="muted small">Mostrá el QR en la garita o decí el código</div></div></div>
+      ${botonMapa()}` : '';
   } else if (r && r.estado === 'rechazado') panel = aviso('danger', 'x', 'El pedido no fue aprobado', 'Comunicate con quien te invitó.');
   else if (r) panel = aviso('warn latido', 'clock', 'Esperando que te aprueben…', `Le avisamos a ${esc(host.nombre.split(' ')[0])}. Esta pantalla se actualiza sola.`);
   else panel = `<form data-f="pedir-pase" data-host="${esc(hostId)}">
@@ -2796,7 +2930,7 @@ F['pedir-pase'] = (d, form) => {
   const hostId = form.dataset.host, id = uid();
   Store.cambiar(s => {
     s.solicitudesPase.unshift({ id, hostId, nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:(d.patente || '').toUpperCase(), fecha:d.fecha, desde:d.desde, hasta:d.hasta, estado:'pendiente', at:Date.now() });
-    notificar(s, { para:hostId, titulo:`${d.nombre.trim()} te pide un pase`, texto:`${fechaCorta(d.fecha)} · ${d.desde}`, icon:'qr', color:'sky', urgente:true, link:'visitas' });
+    notificar(s, { para:hostId, ref:'solicitudesPase:' + id, titulo:`${d.nombre.trim()} te pide un pase`, texto:`${fechaCorta(d.fecha)} · ${d.desde}`, icon:'qr', color:'sky', urgente:true, link:'visitas' });
   });
   sessionStorage.setItem('bhc.pedido', id);
   pintarPedirPase(hostId);
@@ -2805,10 +2939,10 @@ function pintarPaseQR(id){
   const p = Store.s.pases.find(x => x.id === id), u = p && usuario(p.hostId);
   $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
-    <div class="panel">${p && !p.cancelado ? `<div class="ticket"><div class="tk-top"><small>Pase de ingreso</small><h3>${esc(p.nombre)}</h3>
+    <div class="panel">${p && !p.cancelado ? `<div class="ticket" style="color:var(--ink)"><div class="tk-top"><small>Pase de ingreso</small><h3>${esc(p.nombre)}</h3>
       <div style="opacity:.85;font-size:13px">${esc(u?.casa || '')} · ${p.dias?.length ? p.dias.map(d => DIAS[d]).join(' ') : relDia(p.fecha)} · ${p.desde}–${p.hasta}</div></div>
-      <div class="bottom"><div class="qr-box" data-qr="BHC:${p.codigo}"></div><div class="codigo-grande">${p.codigo}</div></div></div>
-      <a class="btn btn-sec btn-block" style="margin-top:10px" href="${esc(Store.s.config.mapa)}" target="_blank" rel="noopener">${I('pin')}Cómo llegar</a>`
+      <div class="bottom"><div class="qr-box" data-qr="BHC:${p.codigo}"></div><div class="codigo-grande">${codigoEspaciado(p.codigo)}</div><div class="muted small">Mostrá el QR en la garita o decí el código</div></div></div>
+      ${botonMapa()}`
       : aviso('danger', 'x', 'Este pase no existe o fue cancelado', '')}</div></section>`;
   $$('[data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
 }

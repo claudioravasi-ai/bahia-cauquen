@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261010-145841';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261010-145841',
-  './js/firebase-config.js?v=20261010-145841', './js/icons.js?v=20261010-145841', './js/agenda.js?v=20261010-145841', './js/padron.js?v=20261010-145841', './js/core.js?v=20261010-145841', './js/seed.js?v=20261010-145841', './js/clima.js?v=20261010-145841', './js/calendario.js?v=20261010-145841',
-  './js/v-inicio.js?v=20261010-145841', './js/v-comunidad.js?v=20261010-145841', './js/v-gestion.js?v=20261010-145841', './js/admin.js?v=20261010-145841', './js/v-vecinos.js?v=20261010-145841', './js/v-expensas.js?v=20261010-145841', './js/v-plan.js?v=20261010-145841', './js/v-contable.js?v=20261010-145841', './js/v-servicio.js?v=20261010-145841', './js/v-legal.js?v=20261010-145841', './js/v-hotel.js?v=20261010-145841', './js/v-cuidados.js?v=20261010-145841', './js/v-casa.js?v=20261010-145841', './js/asistente.js?v=20261010-145841', './js/v-manual.js?v=20261010-145841', './js/push.js?v=20261010-145841', './js/sismos.js?v=20261010-145841', './js/nube.js?v=20261010-145841', './js/historial.js?v=20261010-145841', './js/v-supervisor.js?v=20261010-145841', './js/app.js?v=20261010-145841',
+const CACHE = 'bhc-20261010-194431';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261010-194431',
+  './js/firebase-config.js?v=20261010-194431', './js/icons.js?v=20261010-194431', './js/agenda.js?v=20261010-194431', './js/padron.js?v=20261010-194431', './js/core.js?v=20261010-194431', './js/seed.js?v=20261010-194431', './js/clima.js?v=20261010-194431', './js/calendario.js?v=20261010-194431',
+  './js/v-inicio.js?v=20261010-194431', './js/v-comunidad.js?v=20261010-194431', './js/v-gestion.js?v=20261010-194431', './js/admin.js?v=20261010-194431', './js/v-vecinos.js?v=20261010-194431', './js/v-expensas.js?v=20261010-194431', './js/v-plan.js?v=20261010-194431', './js/v-contable.js?v=20261010-194431', './js/v-servicio.js?v=20261010-194431', './js/v-legal.js?v=20261010-194431', './js/v-hotel.js?v=20261010-194431', './js/v-cuidados.js?v=20261010-194431', './js/v-casa.js?v=20261010-194431', './js/asistente.js?v=20261010-194431', './js/v-manual.js?v=20261010-194431', './js/push.js?v=20261010-194431', './js/sismos.js?v=20261010-194431', './js/nube.js?v=20261010-194431', './js/historial.js?v=20261010-194431', './js/v-supervisor.js?v=20261010-194431', './js/app.js?v=20261010-194431',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
@@ -45,7 +45,9 @@ self.addEventListener('push', e => {
     tag: d.tag || undefined, renotify: !!d.tag, requireInteraction: urgente || d.sonido === 'sos',
     silent: false, timestamp: Date.now(),
     vibrate: d.sonido === 'camion' ? [120, 60, 120, 60, 120, 200, 300] : d.sonido === 'correo' ? [200, 100, 200, 100, 400] : (urgente || d.sonido === 'sos') ? [500, 150, 500, 150, 500, 150, 500] : [200, 100, 200],
-    actions: [{ action:'abrir', title:'Abrir' }],
+    /* "Llegó sin aviso": se contesta desde la notificación (en Android;
+       el iPhone no muestra botones en los avisos de una app web). */
+    actions: /^llegada:/.test(d.link || '') ? [{ action:'si', title:'✅ Que pase' }, { action:'no', title:'❌ No lo conozco' }] : [{ action:'abrir', title:'Abrir' }],
     data:{ link: d.link || '', sonido: d.sonido || '' },
   };
   e.waitUntil(self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(cs => {
@@ -59,7 +61,8 @@ self.addEventListener('push', e => {
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const link = (e.notification.data && e.notification.data.link) || '';
+  let link = (e.notification.data && e.notification.data.link) || '';
+  if (/^llegada:/.test(link) && (e.action === 'si' || e.action === 'no')) link = 'responder:' + link + ':' + e.action;
   e.waitUntil(self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(cs => {
     const c = cs.find(x => x.url.startsWith(self.registration.scope));
     if (c){ c.focus(); if (link) c.postMessage({ abrir: link }); return; }

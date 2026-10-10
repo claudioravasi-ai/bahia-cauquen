@@ -330,9 +330,11 @@ const GaritaVoz = {
     if (alHotel) return Asistente.confirmar(`Le aviso al hotel que llegó ${d.nombre}. ¿Lo mando?`, 'Avisar al hotel', () => {
       F['privado']({ text:`En la garita: llegó ${d.nombre}, que va al hotel. ¿Lo dejamos pasar?` }, { dataset:{ u:ho.id, con:'guardia' } });
       return 'Listo, el hotel ya lo tiene en sus mensajes con la garita.'; });
-    const h = hosts[0], casa = 'Lote ' + d.lote;
-    return Asistente.confirmar(`Le aviso al ${casa}, ${h.nombre}, que llegó ${d.nombre}. ¿Lo mando?`, `Avisar al ${casa}`, () => {
-      F['llegada']({ hostId:h.id, nombre:d.nombre, patente:'', motivo:'Visita' });
+    /* Le llega a todos los que viven en el lote (10-10-2026), no solo al primero. */
+    const h = hosts[0], casa = 'Lote ' + d.lote, quienes = hosts.map(x => x.nombre.split(' ')[0]);
+    const a = quienes.length > 1 ? quienes.slice(0, -1).join(', ') + ' y ' + quienes.at(-1) : quienes[0];
+    return Asistente.confirmar(`Le aviso al ${casa}, ${a}, que llegó ${d.nombre}. ¿Lo mando?`, `Avisar al ${casa}`, () => {
+      F['llegada']({ hostId:h.id, nombre:d.nombre, patente:'', motivo:'Visita', porLote:true });
       return `Listo, le pregunté al ${casa}. Cuando conteste, te aparece en la garita.`; });
   },
 

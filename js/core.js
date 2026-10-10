@@ -619,7 +619,7 @@ function codigoPase(){
    ========================================================= */
 const Automatico = { clave:null, n:0 };
 const idAutomatico = () => 'm-' + String(Automatico.clave).replace(/[.#$\[\]\/\s]/g, '_') + '-' + (++Automatico.n);
-function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '', mensId = '', vence = 0, postId = '' }){
+function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '', mensId = '', vence = 0, postId = '', llegadaId = '', ref = '' }){
   const auto = !!Automatico.clave, id = auto ? idAutomatico() : uid();
   /* Ya está (lo dio otro equipo y ya bajó): no se repite ni se le borra a
      nadie el "visto". */
@@ -630,6 +630,11 @@ function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand'
   if (mensId) n.mensId = mensId;
   /* El aviso de una publicación (una mascota perdida) se va con ella (10-10-2026). */
   if (postId) n.postId = postId;
+  /* "En la garita: Ana pregunta por vos" se va apenas alguien del lote contesta (10-10-2026). */
+  if (llegadaId) n.llegadaId = llegadaId;
+  /* Un aviso que pide una decisión queda atado a lo que pregunta ("pagos:<id>",
+     "solicitudesPase:<id>"…) y se va solo cuando se resuelve (ver AVISO_RESUELTO). */
+  if (ref || llegadaId) n.ref = ref || 'llegadas:' + llegadaId;
   if (vence) n.vence = vence;
   s.notifs.unshift(n);
   if (s.notifs.length > 400) s.notifs.length = 400;
@@ -675,7 +680,36 @@ function meToca(n, u = yo()){
    deja de existir para todos: antes quedaba en la campanita y a las 20 h un
    vecino abría la app y leía que el camión había entrado, cuando ya se había
    ido a la mañana. Confunde y no sirve para nada. */
+/* =========================================================
+   LOS AVISOS QUE PIDEN UNA DECISIÓN SE VAN SOLOS AL RESOLVERSE
+   (pedido de Claudio, 10-10-2026, sobre la idea de novu, 40.000★: cada
+   aviso atado a lo que pregunta). Si quedaban, se malinterpretaban:
+   "Te piden un pase" cuando ya lo había aprobado otro, "Pago por
+   acreditar" ya acreditado, "Llegó un paquete" ya retirado. El aviso lleva
+   `ref` ("colección:id") y desaparece de la campanita, de la Pizarra y de
+   la bandeja del teléfono (ver Push.arrancar) en todos los equipos apenas
+   alguien lo resuelve. Si lo que pregunta todavía no bajó a este equipo,
+   el aviso queda (no se lo da por resuelto a ciegas).
+   ========================================================= */
+const AVISO_RESUELTO = {
+  llegadas:        x => x.estado !== 'consultando',
+  solicitudesPase: x => x.estado !== 'pendiente',
+  paquetes:        x => !!x.retirado,
+  peticiones:      x => x.estado !== 'pendiente',
+  pagos:           x => x.estado !== 'informado',
+  users:           x => x.estado !== 'pendiente',
+  reclamos:        x => x.estado !== 'abierto',
+};
+const HORAS_AVISO_REF = { llegadas:6 };
+function avisoResuelto(n){
+  const [col, id] = String(n.ref || (n.llegadaId ? 'llegadas:' + n.llegadaId : '')).split(':');
+  const f = AVISO_RESUELTO[col]; if (!f || !id) return false;
+  if (HORAS_AVISO_REF[col] && Date.now() - (n.at || 0) > HORAS_AVISO_REF[col] * HORA) return true;
+  const x = aLista(Store.s[col]).find(z => z && z.id === id);
+  return !!(x && f(x));
+}
 function avisoCaduco(n){
+  if (n && (n.ref || n.llegadaId)) return avisoResuelto(n);
   /* "Un correo va a tu casa": lo mismo, mientras el correo está adentro. */
   if (n && n.mensId){
     if (Date.now() - (n.at || 0) > 4 * HORA) return true;
@@ -824,41 +858,117 @@ function cargarQR(){
   return qrLib;
 }
 /* =========================================================
-   EL PASE VIAJA CON SU QR (pedido de Claudio, 08-10-2026)
-   Antes el WhatsApp llevaba solo el código: el enlace "Tu pase con QR"
-   abría una página que no existía. Ahora se arma una IMAGEN con el QR
-   grande y el código debajo, y se manda en el MISMO mensaje que el texto:
-   en el celular, por el menú de compartir (WhatsApp → contacto: llega la
-   foto con el texto como epígrafe). En la computadora, que no puede
-   adjuntar desde la web, se baja la imagen y se abre WhatsApp con el
-   texto, que además trae un enlace que muestra el QR (#/qr/…).
+   LA TARJETA DEL PASE (rediseño, pedido de Claudio, 10-10-2026: "a la
+   visita le tiene que llegar el QR con el código abajo; los enlaces son
+   feos")
+   Una sola imagen, como una tarjeta de embarque: arriba el barrio y a quién
+   va a ver; en el medio el QR grande y el código debajo, en números
+   grandes y separados; abajo un mapita con el pin y "Cómo llegar".
+   WhatsApp no deja que una imagen sea un botón: el mapa de Google se abre
+   tocando el único enlace del mensaje, que va solo al final, con 📍.
+   `datos` (opcional): { nombre, espera, cuando, horario }.
    ========================================================= */
-async function imagenQR(contenido, codigo, titulo = '', sub = ''){
+const codigoEspaciado = c => String(c || '').replace(/^(\d{3})(\d{3})$/, '$1 $2');
+let logoPase = null;
+const cargarLogoPase = () => logoPase || (logoPase = new Promise(ok => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = 'icons/logo.png'; }));
+async function imagenQR(contenido, codigo, titulo = '', sub = '', datos = null){
   const q = await cargarQR(); if (!q) return null;
+  const logo = await cargarLogoPase();
   const qr = q(0, 'M'); qr.addData(contenido); qr.make();
-  const n = qr.getModuleCount(), cel = 12, lado = n * cel, W = Math.max(lado + 96, 520), H = lado + 300;
+  const n = qr.getModuleCount(), W = 1080, M = 54, CW = W - 2 * M;
+  const d = datos || {}, tieneInfo = !!(d.espera || d.cuando || d.horario);
+  const lado = 600, cel = lado / n;
+  const topH = 330, infoH = tieneInfo ? 170 : 0, qrY0 = M + topH + infoH + 70, codY = qrY0 + lado + 120, mapY = codY + 110, mapH = 230;
+  const H = mapY + mapH + M + 40;
   const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
-  g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
-  g.fillStyle = '#0d6b66'; g.fillRect(0, 0, W, 86);
-  g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.font = '700 26px system-ui, -apple-system, sans-serif';
-  g.fillText(titulo || ('Barrio ' + Store.s.config.nombre), W / 2, 40);
-  g.font = '18px system-ui, -apple-system, sans-serif'; g.fillText(sub || 'Pase de ingreso', W / 2, 68);
-  const x0 = (W - lado) / 2, y0 = 112; g.fillStyle = '#0f1f1e';
-  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) g.fillRect(x0 + k * cel, y0 + r * cel, cel, cel);
-  g.font = '800 46px ui-monospace, Menlo, monospace'; g.fillText(codigo, W / 2, y0 + lado + 70);
-  g.fillStyle = '#5b6b69'; g.font = '17px system-ui, -apple-system, sans-serif'; g.fillText('Mostrá el QR en la garita o decí el código', W / 2, y0 + lado + 110);
+  const F = (peso, px, fam = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif') => `${peso} ${px}px ${fam}`;
+  const redondo = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  /* fondo */
+  const bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, '#0b3c47'); bg.addColorStop(1, '#0d6b66'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  g.globalAlpha = .07; g.fillStyle = '#fff'; g.beginPath(); g.arc(W - 60, 80, 260, 0, 7); g.fill(); g.beginPath(); g.arc(40, H - 60, 220, 0, 7); g.fill(); g.globalAlpha = 1;
+  /* la tarjeta */
+  g.save(); g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = 40; g.shadowOffsetY = 14; redondo(M, M, CW, H - 2 * M, 44); g.fillStyle = '#ffffff'; g.fill(); g.restore();
+  g.save(); redondo(M, M, CW, H - 2 * M, 44); g.clip();
+  const tg = g.createLinearGradient(M, M, W - M, M + topH); tg.addColorStop(0, '#0d6b66'); tg.addColorStop(1, '#14968c'); g.fillStyle = tg; g.fillRect(M, M, CW, topH);
+  /* montañas suaves en la cabecera */
+  g.fillStyle = 'rgba(255,255,255,.10)'; g.beginPath(); g.moveTo(M, M + topH); g.lineTo(M + 170, M + topH - 120); g.lineTo(M + 300, M + topH - 50); g.lineTo(M + 470, M + topH - 170); g.lineTo(M + 650, M + topH - 40); g.lineTo(M + 820, M + topH - 140); g.lineTo(W - M, M + topH - 60); g.lineTo(W - M, M + topH); g.fill();
+  g.restore();
+  g.textAlign = 'left'; g.fillStyle = '#ffffff';
+  let tx = M + 48;
+  if (logo){ g.save(); g.beginPath(); g.arc(M + 48 + 42, M + 76, 42, 0, 7); g.fillStyle = '#fff'; g.fill(); g.clip(); g.drawImage(logo, M + 48, M + 34, 84, 84); g.restore(); tx = M + 48 + 84 + 22; }
+  g.fillStyle = '#ffffff'; g.font = F(800, 34); g.fillText(titulo || ('Barrio ' + Store.s.config.nombre), tx, M + 70);
+  g.globalAlpha = .85; g.font = F(600, 24); g.fillText(Store.s.config.ciudad || 'Ushuaia', tx, M + 104); g.globalAlpha = 1;
+  /* etiqueta */
+  g.font = F(800, 22); const et = 'PASE DE INGRESO', ew = g.measureText(et).width + 40;
+  redondo(W - M - 48 - ew, M + 46, ew, 46, 23); g.fillStyle = 'rgba(255,255,255,.18)'; g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(et, W - M - 48 - ew / 2, M + 77);
+  g.textAlign = 'left'; g.globalAlpha = .8; g.font = F(700, 22); g.fillText(d.nombre ? 'BIENVENIDO/A' : 'PASE', M + 48, M + 190); g.globalAlpha = 1;
+  g.font = F(800, 58); let nom = d.nombre || sub || 'Pase de ingreso'; while (g.measureText(nom).width > CW - 96 && nom.length > 4) nom = nom.slice(0, -2);
+  g.fillText(nom, M + 48, M + 258);
+  /* datos: a quién visita, el día y el horario */
+  if (tieneInfo){
+    const cols = [['TE ESPERA', d.espera], ['DÍA', d.cuando], ['HORARIO', d.horario]].filter(x => x[1]), cw = (CW - 96) / cols.length;
+    cols.forEach(([k, v], i) => { const x = M + 48 + i * cw;
+      g.fillStyle = '#667775'; g.font = F(800, 20); g.fillText(k, x, M + topH + 62);
+      g.fillStyle = '#0f1f1e'; g.font = F(700, 30); let t = String(v); while (g.measureText(t).width > cw - 20 && t.length > 4) t = t.slice(0, -2); g.fillText(t, x, M + topH + 104); });
+  }
+  /* línea troquelada, con las muescas a los costados */
+  const yT = M + topH + infoH + 20;
+  g.fillStyle = bg; [M, W - M].forEach(x => { g.beginPath(); g.arc(x, yT, 26, 0, 7); g.fill(); });
+  g.strokeStyle = '#c9d6d3'; g.lineWidth = 4; g.setLineDash([14, 12]); g.beginPath(); g.moveTo(M + 40, yT); g.lineTo(W - M - 40, yT); g.stroke(); g.setLineDash([]);
+  /* el QR */
+  const x0 = (W - lado) / 2;
+  redondo(x0 - 44, qrY0 - 44, lado + 88, lado + 88, 34); g.fillStyle = '#ffffff'; g.fill(); g.strokeStyle = '#e6eeec'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#0f1f1e';
+  for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) g.fillRect(Math.floor(x0 + k * cel), Math.floor(qrY0 + r * cel), Math.ceil(cel), Math.ceil(cel));
+  /* el código, debajo del QR */
+  g.textAlign = 'center'; g.fillStyle = '#667775'; g.font = F(800, 22); g.fillText('CÓDIGO DE INGRESO', W / 2, codY - 46);
+  g.fillStyle = '#0d6b66'; g.font = F(800, 92, 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'); g.fillText(codigoEspaciado(codigo), W / 2, codY + 40);
+  g.fillStyle = '#3d4f4d'; g.font = F(600, 24); g.fillText('Mostrá el QR en la garita o decí el código', W / 2, codY + 84);
+  /* el mapita */
+  const mx = M + 48, mw = 300, my = mapY;
+  g.save(); redondo(mx, my, mw, mapH - 30, 26); g.clip();
+  g.fillStyle = '#e4efe2'; g.fillRect(mx, my, mw, mapH);
+  g.fillStyle = '#bcdcf0'; g.beginPath(); g.moveTo(mx, my + 140); g.bezierCurveTo(mx + 90, my + 110, mx + 180, my + 175, mx + mw, my + 130); g.lineTo(mx + mw, my + mapH); g.lineTo(mx, my + mapH); g.fill();
+  g.strokeStyle = '#ffffff'; g.lineWidth = 12; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(mx - 10, my + 60); g.bezierCurveTo(mx + 90, my + 40, mx + 170, my + 100, mx + mw + 10, my + 70); g.stroke();
+  g.lineWidth = 8; g.beginPath(); g.moveTo(mx + 120, my - 10); g.lineTo(mx + 150, my + 120); g.stroke();
+  g.restore();
+  const px = mx + 150, py = my + 86;
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(px, py + 6, 18, 6, 0, 0, 7); g.fill();
+  g.fillStyle = '#d33a3a'; g.beginPath(); g.moveTo(px, py); g.bezierCurveTo(px - 34, py - 40, px - 30, py - 86, px, py - 86); g.bezierCurveTo(px + 30, py - 86, px + 34, py - 40, px, py); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(px, py - 58, 11, 0, 7); g.fill();
+  g.textAlign = 'left'; g.fillStyle = '#0f1f1e'; g.font = F(800, 36); g.fillText('Cómo llegar', mx + mw + 36, my + 72);
+  g.fillStyle = '#3d4f4d'; g.font = F(600, 25); g.fillText('Tocá el 📍 del mensaje', mx + mw + 36, my + 118); g.fillText('y se abre Google Maps.', mx + mw + 36, my + 152);
   return new Promise(ok => c.toBlob(ok, 'image/png'));
 }
-async function compartirPase({ texto, contenido, codigo, titulo = '', sub = '', tel = '', archivo = 'pase-barrio.png' }){
-  const blob = await imagenQR(contenido, codigo, titulo, sub).catch(() => null);
+/* Mandar el pase: la imagen con el texto como epígrafe. Si el teléfono no
+   deja mandar las dos cosas juntas, se manda la imagen sola (tiene todo) y
+   el texto queda copiado para pegarlo. En la computadora, que no adjunta
+   desde la web, se baja la imagen y se abre WhatsApp con el texto. */
+async function compartirPase({ texto, contenido, codigo, titulo = '', sub = '', tel = '', archivo = 'pase-barrio.png', datos = null }){
+  const blob = await imagenQR(contenido, codigo, titulo, sub, datos).catch(() => null);
   if (blob && navigator.canShare){
     const f = new File([blob], archivo, { type:'image/png' });
-    if (navigator.canShare({ files:[f] })){ try { await navigator.share({ files:[f], text:texto, title:titulo || 'Pase de ingreso' }); return; } catch(e){ if (e.name === 'AbortError') return; } }
+    if (navigator.canShare({ files:[f], text:texto })){ try { await navigator.share({ files:[f], text:texto, title:titulo || 'Pase de ingreso' }); return; } catch(e){ if (e.name === 'AbortError') return; } }
+    if (navigator.canShare({ files:[f] })){ try { await navigator.clipboard.writeText(texto).catch(() => {}); toast('El texto quedó copiado: pegalo debajo de la imagen', 'copy'); await navigator.share({ files:[f] }); return; } catch(e){ if (e.name === 'AbortError') return; } }
   }
   if (blob){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = archivo; document.body.appendChild(a); a.click(); a.remove();
-    toast('Se bajó la imagen del QR: adjuntala en el WhatsApp que se abre', 'download'); }
+    toast('Se bajó la imagen del pase: adjuntala en el WhatsApp que se abre', 'download'); }
   window.open(tel ? waLink(tel, texto) : 'https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
 }
+/* "Cómo llegar" como un mapita que se toca (10-10-2026): en vez de un
+   botón con texto o un enlace largo, un dibujo de mapa con el pin. */
+/* El enlace del mapa, legible: la búsqueda de Google Maps larga y llena de
+   %C3%AD pasa a "maps.google.com/?q=Barrio+Bahia+Cauquen+Ushuaia". Si la
+   Administración cargó otro enlace (uno corto de "Compartir"), va tal cual. */
+const mapaCorto = (u = Store.s.config.mapa) => { const m = String(u || '').match(/google\.[a-z.]+\/maps\/search\/\?api=1&query=([^&#]+)/);
+  if (!m) return u || ''; let q = m[1]; try { q = decodeURIComponent(q); } catch(e){}
+  return 'https://maps.google.com/?q=' + q.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9,.\-]+/g, '+').replace(/^\+|\+$/g, ''); };
+const botonMapa = () => `<a class="mapa-tile" href="${esc(mapaCorto())}" target="_blank" rel="noopener" aria-label="Cómo llegar: abre Google Maps">
+  <svg viewBox="0 0 120 84" aria-hidden="true"><rect width="120" height="84" fill="#e4efe2"/><path d="M0 60 C30 50 60 74 120 56 V84 H0Z" fill="#bcdcf0"/>
+  <path d="M-4 26 C36 16 66 42 124 28" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M48 -4 L60 52" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <ellipse cx="60" cy="42" rx="8" ry="3" fill="rgba(0,0,0,.18)"/><path d="M60 40 C46 24 47 6 60 6 C73 6 74 24 60 40Z" fill="#d33a3a"/><circle cx="60" cy="18" r="5" fill="#fff"/></svg>
+  <span><b>Cómo llegar</b><small>Tocá el mapa: se abre Google Maps</small></span></a>`;
 const enlaceQR = contenido => urlApp('qr/' + encodeURIComponent(contenido));
 async function pintarQR(el, texto){
   const q = await cargarQR();

@@ -360,14 +360,23 @@ const Saludo = {
     if (!('speechSynthesis' in window)) return;
     try {
       if (speechSynthesis.speaking){ speechSynthesis.cancel(); return; }
-      const d = new SpeechSynthesisUtterance(this.texto()), v = this.voz();
+      /* LA GARITA, SIN ESPERAR (10-10-2026: "tarda unos 15 segundos en
+         activarse"). No era el wifi: el micrófono se abría recién después
+         del saludo entero (hola, la hora y la temperatura, unos 8 s) y, si
+         el teléfono no avisaba que había terminado de hablar, a los 12 s.
+         En la garita dice solo "Hola, te escucho" (pedido de Claudio,
+         10-10-2026) y abre el micrófono enseguida; a los vecinos los sigue
+         saludando con la hora y el clima. Y el tope de espera ahora es el
+         largo de la frase, no 12 s fijos. */
+      const frase = esGuardia() ? 'Hola, te escucho.' : this.texto();
+      const d = new SpeechSynthesisUtterance(frase), v = this.voz();
       if (v){ d.voice = v; d.lang = v.lang; } else d.lang = 'es-ES';
       /* Velocidad y tono naturales: cambiarlos es lo que la hacía sonar a robot. */
       d.rate = 1; d.pitch = 1; d.volume = 1;
       /* Al terminar el saludo, el asistente por voz abre el micrófono
          (solo para vecinos y con su permiso: ver js/asistente.js). */
       let listo = false; const despues = () => { if (listo) return; listo = true; if (typeof Asistente !== 'undefined') Asistente.alSaludar(); };
-      d.onend = despues; setTimeout(despues, 12000);
+      d.onend = despues; setTimeout(despues, Math.min(12000, 900 + frase.length * 70));
       speechSynthesis.speak(d);
     } catch(e){}
   },
@@ -468,6 +477,7 @@ function refrescar(){
   if (def.noRefrescar) { pintarTop(); pintarAlarmas(); return; }
   const cuerpo = $('#cuerpo');
   const y = cuerpo.scrollTop;
+  chatAbajo.abrir = chatEstabaAbajo();
   const act = document.activeElement;
   const foco = act && cuerpo.contains(act) && act.id ? act.id : null;
   const sel = foco && 'selectionStart' in act ? [act.selectionStart, act.selectionEnd] : null;
@@ -642,7 +652,34 @@ const Conexion = {
     vivo:'Conectado con el barrio', caido:'Sin conexión con el barrio: se reintenta solo' }[this.estado] || ''; },
 };
 
+/* =========================================================
+   EL CHAT SE ABRE EN EL ÚLTIMO MENSAJE (pedido de Claudio, 10-10-2026:
+   "que siempre se abra en el último mensaje y no en cualquier parte")
+   Antes se bajaba solo #cuerpo, pero en el teléfono lo que se desliza
+   muchas veces es la página entera, y además "volver al mismo lugar"
+   (reponerScroll, a los 120 ms) lo devolvía a cualquier parte. Ahora, en
+   toda ventana con un chat (garita, Administración, hotel, vecinos,
+   supervisión), se baja al final al abrirla, varias veces mientras termina
+   de acomodarse. Cuando llega un mensaje nuevo, baja solo si la persona ya
+   estaba abajo (si subió a leer algo viejo, no se la mueve).
+   ========================================================= */
+const chatAbajo = { abrir:true };
+function chatAlFinal(){
+  const c = $('#cuerpo'); if (!c || !c.querySelector('.chat')) return;
+  const bajar = () => { const cc = $('#cuerpo'); if (!cc || !cc.querySelector('.chat')) return; cc.scrollTop = cc.scrollHeight;
+    const d = document.scrollingElement; if (d) d.scrollTop = d.scrollHeight; };
+  scrollPendiente = null; bajar(); requestAnimationFrame(bajar); [150, 400, 900].forEach(t => setTimeout(bajar, t));
+}
+function chatEstabaAbajo(){
+  const c = $('#cuerpo'), d = document.scrollingElement; if (!c || !c.querySelector('.chat')) return false;
+  /* Se mira el que de verdad se desliza: #cuerpo o, en el teléfono, la página. */
+  const resto = el => el && el.scrollHeight > el.clientHeight + 10 ? el.scrollHeight - el.clientHeight - el.scrollTop : 1e9;
+  const lejos = Math.min(resto(c), resto(d));
+  if (lejos === 1e9) return true;
+  return lejos < 160;
+}
 function despuesDePintar(){
+  if (chatAbajo.abrir) chatAlFinal(); chatAbajo.abrir = true;
   /* El buscador del "Más" de la garita sigue filtrando después de un redibujo. */
   if (typeof filtrarMas === 'function' && typeof masQ !== 'undefined' && masQ && document.getElementById('masBuscar')) filtrarMas();
   Fotos.hidratar($('#cuerpo') || document);
@@ -1201,11 +1238,24 @@ A['notif'] = el => {
   const link = typeof ICONOS_CLIMA !== 'undefined' && ICONOS_CLIMA.includes(n.icon) && (!n.link || n.link === 'inicio') ? 'ushuaia' : n.link;
   if (link && R[link.split(':')[0]] && link.split(':')[0] !== inicioId() && ventanaPermitida(link.split(':')[0])){ cerrarHoja(); const [id, p] = link.split(':'); abrir(id, p || ''); return; }
   const quedan = noLeidas().length + sosEnCampanita().length;
+  /* "En la garita: … ¿Lo dejamos pasar?" se contesta desde el mismo aviso
+     (10-10-2026: Mónica tocaba el aviso y solo tenía "Listo"; el aviso
+     quedaba y parecía que la visita seguía esperando). */
+  const lid = n.llegadaId || (/^llegadas:/.test(n.ref || '') ? n.ref.split(':')[1] : '');
+  const lleg = lid ? aLista(Store.s.llegadas).find(x => x && x.id === lid) : null;
+  const resp = !lleg ? '' : lleg.estado === 'consultando'
+    ? `<div class="btns" style="margin-top:14px"><button class="btn btn-ok grow" data-a="llegada-si" data-id="${lleg.id}">${I('check')}Que pase</button><button class="btn btn-danger-soft grow" data-a="llegada-no" data-id="${lleg.id}">No lo conozco</button></div>`
+    : `<p class="muted small" style="margin:12px 0 0">${I('check')} Ya contestó ${lleg.respondio === u.id ? 'vos' : esc(nombreDe(lleg.respondio).split(' ')[0] || 'alguien del lote')}: ${lleg.estado === 'autorizado' ? 'que pase' : 'no pasa'}.</p>`;
+  /* "Listo" no resolvía nada (Claudio, 10-10-2026: "¿para qué sirve?"):
+     en un aviso que pide contestar, los únicos botones son la respuesta;
+     en los demás, "Cerrar" dice lo que hace. */
+  const decide = !!(lleg && lleg.estado === 'consultando');
   hoja('Aviso', `<div class="aviso-leido"><span class="ic ic-${n.color || 'brand'}">${I(n.icon || 'bell')}</span>
       <div><b>${esc(n.titulo)}</b><time>${hace(n.at)}</time></div></div>
-    ${n.texto ? `<p class="aviso-leido-texto">${esc(n.texto)}</p>` : ''}
-    <div class="btns" style="margin-top:16px">${quedan ? `<button class="btn btn-sec" data-a="notifs">${I('left')}Ver ${plural(quedan, 'aviso más', 'avisos más')}</button>` : ''}
-      <button class="btn btn-pri grow" data-a="cerrar-hoja">Listo</button></div>`);
+    ${n.texto ? `<p class="aviso-leido-texto">${esc(n.texto)}</p>` : ''}${resp}
+    ${decide ? (quedan ? `<div class="btns" style="margin-top:12px"><button class="btn btn-sm btn-sec" data-a="notifs">${I('left')}Ver ${plural(quedan, 'aviso más', 'avisos más')}</button></div>` : '')
+      : `<div class="btns" style="margin-top:16px">${quedan ? `<button class="btn btn-sec" data-a="notifs">${I('left')}Ver ${plural(quedan, 'aviso más', 'avisos más')}</button>` : ''}
+      <button class="btn btn-pri grow" data-a="cerrar-hoja">Cerrar</button></div>`}`);
 };
 
 /* ---------------- SOS ----------------
@@ -1670,7 +1720,7 @@ F['registro'] = async d => {
     token, skills:'', consentimiento:Date.now(), createdAt:Date.now(), vehiculos:[], mascotas:[] };
   Store.cambiar(s => {
     s.users.push(nuevo);
-    notificar(s, { para:'rol:admin', titulo:'Nueva inscripción', texto:`${nuevo.nombre} · ${nuevo.casa} · DNI ${nuevo.dni}`, icon:'user', color:'accent', link:'admin:solicitudes' });
+    notificar(s, { para:'rol:admin', ref:'users:' + nuevo.id, titulo:'Nueva inscripción', texto:`${nuevo.nombre} · ${nuevo.casa} · DNI ${nuevo.dni}`, icon:'user', color:'accent', link:'admin:solicitudes' });
   });
   const salio = await Correo.enviar({ para:email, asunto:'Recibimos tu inscripción', tipo:'inscripcion',
     html:Correo.plantilla('Recibimos tu inscripción', `<p>Hola ${esc(nuevo.nombre.split(' ')[0])}:</p>
@@ -1835,6 +1885,25 @@ document.addEventListener('input', e => {
 }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.form && e.target.form.dataset.f === 'entrar') Ingreso.enter = Date.now(); }, true);
 
+/* =========================================================
+   LA CAJA DE ESCRIBIR CRECE COMO EN WHATSAPP (pedido de Claudio, 10-10-2026:
+   "en una sola línea queda en parte oculto lo que se está escribiendo")
+   En los chats y los comentarios, la caja (textarea.crece) se agranda con
+   el texto hasta 6 renglones; después se desliza adentro. En el teléfono,
+   Enter hace un renglón nuevo y se manda con el botón; en la computadora,
+   Enter manda y Mayúscula + Enter hace un renglón nuevo.
+   ========================================================= */
+const ajustarCaja = t => { if (!t || !t.classList || !t.classList.contains('crece')) return;
+  t.style.height = 'auto'; const max = 168, h = Math.min(t.scrollHeight + 2, max);
+  t.style.height = h + 'px'; t.style.overflowY = t.scrollHeight + 2 > max ? 'auto' : 'hidden'; };
+document.addEventListener('input', e => ajustarCaja(e.target));
+document.addEventListener('keydown', e => {
+  const t = e.target; if (e.key !== 'Enter' || e.shiftKey || e.isComposing || !t.classList || !t.classList.contains('crece')) return;
+  if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  e.preventDefault(); if (t.value.trim() && t.form) t.form.requestSubmit();
+});
+/* Al mandar, la caja vuelve a un renglón. */
+document.addEventListener('submit', e => { const t = e.target.querySelector && e.target.querySelector('textarea.crece'); if (t) setTimeout(() => ajustarCaja(t), 0); });
 document.addEventListener('submit', e => {
   const form = e.target.closest('form[data-f]');
   if (!form) return;

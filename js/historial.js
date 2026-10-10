@@ -322,4 +322,29 @@ A['hist-hilo'] = async el => {
       : vacio('chat', 'No hay mensajes archivados de esta conversación.'));
   } catch(e){ Historial.fallo(e); }
 };
+/* =========================================================
+   BORRAR LA CONVERSACIÓN, SOLO PARA MÍ (pedido de Claudio, 10-10-2026)
+   Cualquier chat (garita, Administración, hotel, vecinos, supervisión) se
+   puede borrar para empezar de cero. Se borra SOLO para quien lo borra: la
+   conversación guarda desde cuándo la ve cada lado (vaciado[lado] = hora)
+   y a ese lado se le muestran solo los mensajes posteriores. El otro lado
+   la sigue viendo entera hasta que la borre él. Lados: 'vecino' (el
+   vecino o el hotel), 'admin', 'guardia', 'supervisor', o el id de cada
+   vecino en los mensajes entre vecinos.
+   ========================================================= */
+const vaciadoDe = (h, lado) => (h && h.vaciado && +h.vaciado[lado]) || 0;
+const msgsVisibles = (h, lado) => { const t = vaciadoDe(h, lado), l = aLista(h && h.msgs); return t ? l.filter(m => m && (m.createdAt || m.at || 0) > t) : l; };
+const botonVaciar = (col, h, lado) => h && msgsVisibles(h, lado).length ? `<button type="button" class="chat-vaciar" data-a="hilo-vaciar" data-v="${col}|${esc(h.id)}|${esc(lado)}" title="Borrar esta conversación">${I('trash')}Borrar conversación</button>` : '';
+/* El encabezado del chat: archivo histórico (si no la borré) y "Borrar". */
+const barraHilo = (col, h, lado) => { const hist = vaciadoDe(h, lado) ? '' : botonHistHilo(col, h), borrar = botonVaciar(col, h, lado);
+  return hist || borrar ? `<div class="chat-barra">${hist}${borrar}</div>` : ''; };
+A['hilo-vaciar'] = async el => {
+  const [col, id, lado] = String(el.dataset.v || '').split('|');
+  if (!await confirmar('Borrar la conversación', 'Se borra solo para vos: empezás de cero. La otra persona la sigue viendo hasta que la borre ella.', { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { const h = aLista(s[col]).find(x => x && x.id === id); if (!h) return;
+    h.vaciado = Object.assign({}, h.vaciado || {}, { [lado]: Date.now() });
+    /* Lo que quedaba sin leer se da por leído: si no, seguiría contando. */
+    aLista(h.msgs).forEach(m => { if (m && (col === 'dms' ? m.de !== lado : m.from !== lado)) m.leido = true; }); });
+  toast('Conversación borrada para vos', 'trash');
+};
 const botonHistHilo = (col, h) => h && h.archivados ? `<button class="btn btn-sm btn-sec" style="align-self:center;margin:4px auto 10px" data-a="hist-hilo" data-v="${col}|${h.id}">${I('clock')}Ver ${plural(h.archivados, 'mensaje anterior', 'mensajes anteriores')}</button>` : '';

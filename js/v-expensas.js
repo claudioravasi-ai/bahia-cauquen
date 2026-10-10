@@ -828,7 +828,7 @@ F['informar-pago'] = async d => {
     s.pagos.unshift({ id, lote, userId:u.id, monto, fecha:d.fecha, medio:d.medio, nota:(d.nota || '').trim(),
       comp: comp ? { id:comp.id, tipo:comp.tipo, nombre:comp.nombre, kb:comp.kb, de:u.id, subido } : null, foto: comp && comp.mini ? { mini:comp.mini } : null,
       ...(H ? { reparto:repartoHotel(monto), hotel:true } : {}), estado:'informado', at:Date.now() });
-    notificar(s, { para:'rol:admin', titulo:`Pago por fuera de la app · ${H ? H.etiqueta : lote}`, texto:`${plata(monto)} · ${d.medio} · ${comp ? 'ya figura por acreditar: corroboralo con el comprobante' : 'sin comprobante: confirmalo con el banco (los centavos dicen el lote)'}`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas', sonido:true });
+    notificar(s, { para:'rol:admin', ref:'pagos:' + id, titulo:`Pago por fuera de la app · ${H ? H.etiqueta : lote}`, texto:`${plata(monto)} · ${d.medio} · ${comp ? 'ya figura por acreditar: corroboralo con el comprobante' : 'sin comprobante: confirmalo con el banco (los centavos dicen el lote)'}`, icon:'wallet', color:'wood', link:'cobranzas:cobranzas', sonido:true });
     auditar(s, 'Informó un pago por fuera de la app', `${lote} · ${plata(monto)} · ${d.medio}${comp ? ' · con comprobante' : ''}`);
   });
   cerrarHoja();

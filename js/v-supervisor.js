@@ -110,24 +110,24 @@ function chatSupervision(p){
   if (!supId){
     const sups = cuentasSupervision();
     if (sups.length === 1) supId = sups[0].id;
-    else return sups.length ? sups.map(x => { const nl = sinLeerSup(con, x.id), ult = aLista(hiloSup(con, x.id)?.msgs).at(-1);
+    else return sups.length ? sups.map(x => { const nl = sinLeerSup(con, x.id), ult = msgsVisibles(hiloSup(con, x.id), yoSoy).at(-1);
         return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${con}|${esc(x.id)}">${avatar(x)}<span class="txt"><b>${esc(x.nombre)}</b><small>${ult ? esc(ult.text.slice(0, 70)) + ' · ' + hace(ult.createdAt) : 'Sin mensajes'}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')
       : vacio('eye', esAdmin() ? 'Todavía no hay supervisión de la guardia. Se habilita en Gestión → Garita y seguridad → Supervisión de la guardia.' : 'Todavía no hay supervisión de la guardia.');
   }
   const sup = usuario(supId) || {};
-  const h = hiloSup(con, supId), msgs = aLista(h && h.msgs);
-  if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); h.msgs = msgs; Store.guardar(); setTimeout(pintarTop, 0); }
+  const h = hiloSup(con, supId), todos = aLista(h && h.msgs), msgs = msgsVisibles(h, yoSoy);
+  if (h && todos.some(m => m.from !== yoSoy && !m.leido)){ todos.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); h.msgs = todos; Store.guardar(); setTimeout(pintarTop, 0); }
   const de = m => m.from === 'supervisor' ? 'Supervisión · ' + esc(primerNombre(sup.nombre))
     : m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración';
   const chips = esSupervisor() ? `<div class="chips">${Object.entries(CANALES_SUP).map(([k, x]) => { const nl = k !== con ? sinLeerSup(k, u.id) : 0;
     return `<button class="chip ${k === con ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="${k}">${I(x.icon)}${x.t}${nl ? `<span class="n">${nl}</span>` : ''}</button>`; }).join('')}</div>` : '';
   const vacioTxt = esSupervisor() ? (con === 'supGarita' ? 'Escribile a la garita: le suena al instante. Lo leen solo la garita y vos.' : 'Escribile a la Administración. Lo leen solo la Administración y vos.')
     : `Mensajes con ${esc(sup.nombre || 'la supervisión')}. Ningún vecino los ve.`;
-  return `<div class="chat-wrap">${chips}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
+  return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
       <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${de(m)}</small>` : ''}${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
       : vacio('lock', vacioTxt)}</div>
-    <form class="chatbar" data-f="privado-sup" data-u="${esc(supId)}" data-con="${con}"><input name="text" id="privIn" required maxlength="800" autocomplete="off"
-      placeholder="${esSupervisor() ? 'Mensaje a ' + (con === 'supGarita' ? 'la garita' : 'la Administración') : 'Mensaje a la supervisión'}"><button class="btn btn-accent">${I('send')}</button></form></div>`;
+    <form class="chatbar" data-f="privado-sup" data-u="${esc(supId)}" data-con="${con}"><textarea name="text" id="privIn" required maxlength="800" rows="1" class="crece" enterkeyhint="send"
+      placeholder="${esSupervisor() ? 'Mensaje a ' + (con === 'supGarita' ? 'la garita' : 'la Administración') : 'Mensaje a la supervisión'}"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
 }
 /* R.privado ya existe (js/v-gestion.js): se le suman los dos canales. El
    supervisor, entre en el canal que entre, cae en uno de los suyos. */
