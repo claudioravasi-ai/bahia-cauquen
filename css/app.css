@@ -574,9 +574,6 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 textarea.crece{resize:none;overflow-y:hidden;min-height:48px;max-height:168px;line-height:1.4;border-radius:24px!important;padding:13px 18px!important;box-shadow:var(--sh-2);field-sizing:content}
 .linea-form textarea.crece{min-height:44px;padding:11px 16px!important;border-radius:22px!important;box-shadow:none}
 .msg .b,.cmt .burb{white-space:pre-wrap}
-.resp-rapidas{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;margin:0 -2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.resp-rapidas::-webkit-scrollbar{display:none}
-.resp-rapidas .chip{flex:none;white-space:nowrap}
 
 /* votaciones */
 .opcion{position:relative;display:flex;align-items:center;gap:10px;width:100%;border:1.5px solid var(--line-2);background:var(--surface);border-radius:14px;padding:12px 14px;margin-bottom:8px;text-align:left;font-weight:700;overflow:hidden}
@@ -2769,6 +2766,9 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 /* Encabezado del chat: archivo y "Borrar conversación" (10-10-2026) */
 .chat-barra{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
 .chat-barra .btn{margin:0!important}
-.chat-vaciar{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font:700 12.5px var(--body, inherit);padding:6px 12px;border-radius:999px;cursor:pointer}
-.chat-vaciar svg{width:15px;height:15px}
-.chat-vaciar:hover{color:var(--danger);border-color:var(--danger)}
+/* El cesto rojo en el título del chat (10-10-2026) */
+.cab-accion{display:flex;align-items:center;margin-left:auto}
+.cab-accion:empty{display:none}
+.cab-vaciar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 35%,transparent);background:var(--danger-soft);color:var(--danger);cursor:pointer;margin-right:6px}
+.cab-vaciar svg{width:20px;height:20px}
+.cab-vaciar:active{transform:scale(.94)}

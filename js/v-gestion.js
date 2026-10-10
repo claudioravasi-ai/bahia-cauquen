@@ -610,7 +610,6 @@ R.privado = {
     return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
         <div class="b">${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
         : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? (esHotel() ? 'Escribile a la garita. Solo la leen el hotel y la garita.' : 'Escribile a la guardia. Nadie más lo ve.') : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
-      ${miCanal === 'guardia' && !esHotel() ? respuestasRapidas(esStaff() ? RESP_GARITA : RESP_VECINO) : ''}
       <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}"><textarea name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'Mensaje a la Administración'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
   },
 };
@@ -654,17 +653,6 @@ F['privado'] = (d, form) => {
 const esCuentaDeLote = u => !!u && u.estado === 'aprobado' && (u.rol === 'vecino' || u.rol === 'admin') && /^Lote\s/i.test(u.casa || '');
 const lotesConCuentas = () => [...new Set(Store.s.users.filter(esCuentaDeLote).map(u => u.casa))]
   .sort((a, b) => a.localeCompare(b, 'es', { numeric:true }));
-/* =========================================================
-   RESPUESTAS RÁPIDAS GARITA ↔ VECINO (pedido de Claudio, 10-10-2026, idea
-   de react-native-gifted-chat, 14.400★: "quick replies")
-   Arriba de la caja de escribir, las frases de todos los días en botones:
-   un toque y sale el mensaje, sin tipear con la visita en la puerta.
-   ========================================================= */
-const RESP_VECINO = ['Ya bajo', 'Que espere, ya voy', 'Dejalo en la garita', 'Que pase', 'No conozco a nadie', 'Ahora no estoy en casa'];
-const RESP_GARITA = ['Llegó tu visita', 'Tenés un paquete en la garita', 'Ya pasó', 'Te llamo en un minuto', 'Recibido, gracias', '¿Lo dejamos pasar?'];
-const respuestasRapidas = frases => `<div class="resp-rapidas" role="group" aria-label="Respuestas rápidas">${frases.map(f => `<button type="button" class="chip" data-a="resp-rapida" data-v="${esc(f)}">${esc(f)}</button>`).join('')}</div>`;
-A['resp-rapida'] = el => { const f = el.closest('.chat-wrap')?.querySelector('form.chatbar'), t = f && f.querySelector('textarea, input[name="text"]'); if (!t) return;
-  t.value = el.dataset.v; f.requestSubmit(); };
 const cuentasPrivLote = casa => cuentasDelLote(casa).filter(esCuentaDeLote);
 function filasPrivLote(casa){
   const cs = cuentasPrivLote(casa);

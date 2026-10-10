@@ -445,12 +445,14 @@ function pintar(){
       <button class="volver-btn" data-a="cerrar-ventana" aria-label="Volver a ${esc(titulo(R[PILA[PILA.length - 2].id] || {}, PILA[PILA.length - 2].param) || 'atrás')}">${I('left')}</button>
       <span class="ic ic-${def.color || 'brand'}">${I(def.icon || 'grid')}</span>
       <div class="tit"><h2>${esc(titulo(def, activa.param))}</h2>${def.sub ? `<div class="sub">${esc(typeof def.sub === 'function' ? def.sub(activa.param) : def.sub)}</div>` : ''}</div>
-      <button class="cerrar" data-a="volver" data-i="0" aria-label="Cerrar e ir al inicio">${I('x')}</button></header>` : '';
+      <span class="cab-accion" id="cabAccion"></span><button class="cerrar" data-a="volver" data-i="0" aria-label="Cerrar e ir al inicio">${I('x')}</button></header>` : '';
   let html;
+  if (typeof accionCabecera !== 'undefined') accionCabecera = '';
   try { html = def.render(activa.param); }
   catch(err){ console.error(err); html = panelDeError(err); }
   lienzo.innerHTML = `<div class="lomos">${lomos}</div>` + `<section class="ventana ${PILA.length === 1 ? 'inicio' : ''} ${def.ancha ? 'ancha' : ''} ${ventanaNueva ? 'entra' : ''}" data-id="${activa.id}">${cab}<div class="cuerpo" id="cuerpo">${html}</div></section>`;
   lienzo.classList.toggle('apilado', PILA.length > 1);
+  { const ca = $('#cabAccion'); if (ca && typeof accionCabecera !== 'undefined') ca.innerHTML = accionCabecera; }
   if (!ventanaNueva && activa.scroll != null && pintar.ultimaPila > PILA.length) scrollPendiente = activa.scroll;
   pintar.ultimaPila = PILA.length;
   ventanaNueva = false;
@@ -490,7 +492,9 @@ function refrescar(){
   /* Los desplegables con nombre (data-k) quedan como los dejó la persona:
      antes, cada dato que llegaba los volvía a cerrar o a abrir. */
   const plegados = {}; $$('details[data-k]', cuerpo).forEach(d => { plegados[d.dataset.k] = d.open; });
+  if (typeof accionCabecera !== 'undefined') accionCabecera = '';
   try { cuerpo.innerHTML = def.render(activa.param); } catch(err){ console.error(err); cuerpo.innerHTML = panelDeError(err); }
+  { const ca = $('#cabAccion'); if (ca && typeof accionCabecera !== 'undefined') ca.innerHTML = accionCabecera; }
   $$('details[data-k]', cuerpo).forEach(d => { if (d.dataset.k in plegados) d.open = plegados[d.dataset.k]; });
   const fotoNueva = cuerpo.querySelector('.hero .foto');
   if (fotoVieja && fotoNueva && fotoVieja.style.backgroundImage === fotoNueva.style.backgroundImage)

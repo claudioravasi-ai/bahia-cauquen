@@ -334,10 +334,14 @@ A['hist-hilo'] = async el => {
    ========================================================= */
 const vaciadoDe = (h, lado) => (h && h.vaciado && +h.vaciado[lado]) || 0;
 const msgsVisibles = (h, lado) => { const t = vaciadoDe(h, lado), l = aLista(h && h.msgs); return t ? l.filter(m => m && (m.createdAt || m.at || 0) > t) : l; };
-const botonVaciar = (col, h, lado) => h && msgsVisibles(h, lado).length ? `<button type="button" class="chat-vaciar" data-a="hilo-vaciar" data-v="${col}|${esc(h.id)}|${esc(lado)}" title="Borrar esta conversación">${I('trash')}Borrar conversación</button>` : '';
-/* El encabezado del chat: archivo histórico (si no la borré) y "Borrar". */
-const barraHilo = (col, h, lado) => { const hist = vaciadoDe(h, lado) ? '' : botonHistHilo(col, h), borrar = botonVaciar(col, h, lado);
-  return hist || borrar ? `<div class="chat-barra">${hist}${borrar}</div>` : ''; };
+/* El cesto rojo va en el título de la ventana del chat (pedido de Claudio,
+   10-10-2026: "arriba de la conversación no se ve"): la conversación lo
+   deja en accionCabecera y pintar()/refrescar() lo ponen en #cabAccion. */
+let accionCabecera = '';
+const botonVaciar = (col, h, lado) => h && msgsVisibles(h, lado).length ? `<button type="button" class="cab-vaciar" data-a="hilo-vaciar" data-v="${col}|${esc(h.id)}|${esc(lado)}" title="Borrar esta conversación" aria-label="Borrar esta conversación">${I('trash')}</button>` : '';
+/* Arriba de la conversación queda solo el archivo histórico (si no la borré). */
+const barraHilo = (col, h, lado) => { accionCabecera = botonVaciar(col, h, lado); const hist = vaciadoDe(h, lado) ? '' : botonHistHilo(col, h);
+  return hist ? `<div class="chat-barra">${hist}</div>` : ''; };
 A['hilo-vaciar'] = async el => {
   const [col, id, lado] = String(el.dataset.v || '').split('|');
   if (!await confirmar('Borrar la conversación', 'Se borra solo para vos: empezás de cero. La otra persona la sigue viendo hasta que la borre ella.', { si:'Borrar', peligro:true })) return;

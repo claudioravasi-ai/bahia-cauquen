@@ -82,8 +82,8 @@ function tarjetaPase(p, { garita = false } = {}){
           ${p.vencidoAviso && p.vencidoAviso.fecha === hoyISO() ? `<span class="pill p-warn">Avisado al vecino ${hora(p.vencidoAviso.at)} h</span>` : ''}` : est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="pase-out" data-id="${p.id}">${I('logout')}Salió</button>` : '')
         : `${p.app && (est === 'esperado' || est === 'adentro') ? `<button class="btn btn-sm ${p.patente ? 'btn-sec' : 'btn-pri'}" data-a="pase-app-patente" data-id="${p.id}">${I('car')}${p.patente ? 'Cambiar la patente' : 'Agregar la patente'}</button>`
            : est === 'esperado' || est === 'futuro' || est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>
-           <button class="btn btn-sm btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar</button>` : ''}
-           <button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>
+           ${est === 'adentro' ? '' : `<button class="btn btn-sm btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar</button>`}` : ''}
+           ${/* Con la visita ya adentro, mandar el pase o editarlo no tiene sentido (Claudio, 10-10-2026): quedan "Ver pase" y borrar. */ est === 'adentro' ? '' : `<button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>`}
            ${est === 'esperado' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase">${I('x')}</button>` : ''}
            <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button>`}
     </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} El vecino la sacó de su lista ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
