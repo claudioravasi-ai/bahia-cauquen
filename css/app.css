@@ -2772,3 +2772,47 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 .cab-vaciar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;border:1px solid color-mix(in srgb,var(--danger) 35%,transparent);background:var(--danger-soft);color:var(--danger);cursor:pointer;margin-right:6px}
 .cab-vaciar svg{width:20px;height:20px}
 .cab-vaciar:active{transform:scale(.94)}
+/* Sacar foto / Elegir de la galería (10-10-2026) */
+.foto-botones{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px}
+.foto-in .grow{min-width:0;flex:1}
+/* Botón de prueba de Mercado Pago (10-10-2026) */
+.mp-prueba{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 12px;padding:12px 14px;border:0;border-radius:20px;cursor:pointer;text-align:left;color:#fff;
+  background:linear-gradient(135deg,#00b1ea 0%,#009ee3 55%,#0a74c9 100%);box-shadow:0 8px 22px rgba(0,158,227,.28);position:relative;overflow:hidden;transition:transform .15s}
+.mp-prueba::after{content:"";position:absolute;right:-30px;top:-40px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.10)}
+.mp-prueba:active{transform:scale(.985)}
+.mp-logo-caja{flex:none;width:58px;height:44px;display:grid;place-items:center;background:rgba(255,255,255,.18);border-radius:14px}
+.mp-logo{width:48px;height:33px}
+.mp-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;line-height:1.2}
+.mp-txt small{font-size:11px;font-weight:700;opacity:.95;display:flex;align-items:center;gap:6px}
+.mp-tag{background:#fff;color:#0a74c9;font-weight:900;font-size:10px;letter-spacing:.6px;padding:2px 7px;border-radius:999px}
+.mp-txt b{font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-monto{font-weight:900;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.mp-monto em{font-style:normal;font-weight:600;font-size:11.5px;opacity:.85}
+.mp-ir{flex:none;position:relative;z-index:1;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.2)}
+.mp-ir svg{width:18px;height:18px}
+@media (max-width:360px){.mp-monto em{display:none}}
+/* La ficha de la UF en Expensas (10-10-2026) */
+.uf-ficha{position:relative;overflow:hidden;display:grid;grid-template-columns:auto 1fr;gap:14px 16px;align-items:center;padding:16px;border-radius:22px;margin:0 0 12px;
+  background:linear-gradient(135deg,var(--brand-soft) 0%,var(--sky-soft) 100%);border:1px solid color-mix(in srgb,var(--brand) 18%,transparent)}
+.uf-ficha::before{content:"";position:absolute;right:-50px;top:-60px;width:170px;height:170px;border-radius:50%;background:color-mix(in srgb,var(--brand) 10%,transparent)}
+.uf-sello{position:relative;width:84px;height:84px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(160deg,var(--brand-2),var(--brand));box-shadow:0 8px 18px color-mix(in srgb,var(--brand) 35%,transparent)}
+.uf-sello small{font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;opacity:.85}
+.uf-sello b{font-size:30px;font-weight:900;line-height:1.05;letter-spacing:-.5px}
+.uf-sello span{font-size:10.5px;font-weight:800;background:rgba(255,255,255,.22);padding:1px 8px;border-radius:999px;margin-top:2px}
+.uf-datos{position:relative;min-width:0;display:flex;flex-direction:column;gap:2px}
+.uf-datos > small{font-size:11.5px;font-weight:700;color:var(--ink-2)}
+.uf-coef{font-size:32px;font-weight:900;color:var(--brand);letter-spacing:-.8px;line-height:1.05}
+.uf-coef em{font-style:normal;font-size:18px;font-weight:800}
+.uf-cada{display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px;font-size:12.5px;color:var(--ink-2)}
+.uf-cada b{color:var(--ink)}
+.uf-cada svg{width:14px;height:14px;color:var(--brand)}
+.uf-barra{grid-column:1 / -1;position:relative}
+.uf-riel{position:relative;height:10px;border-radius:999px;background:linear-gradient(90deg,var(--ok-soft),var(--brand-soft) 50%,var(--warn-soft));border:1px solid color-mix(in srgb,var(--ink) 8%,transparent)}
+.uf-riel i{position:absolute;top:50%;transform:translate(-50%,-50%);border-radius:50%}
+.uf-prom{width:4px!important;height:18px;border-radius:2px!important;background:var(--muted)}
+.uf-yo{width:20px;height:20px;background:var(--brand);border:3px solid var(--surface);box-shadow:0 2px 8px color-mix(in srgb,var(--brand) 45%,transparent)}
+.uf-leyenda{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:7px;font-size:10.5px;color:var(--muted);font-weight:700}
+.uf-leyenda > span:first-child,.uf-leyenda > span:last-child{white-space:nowrap;flex:none}
+.uf-leyenda .uf-tu{color:var(--ink-2);text-align:center;font-size:11.5px}
+

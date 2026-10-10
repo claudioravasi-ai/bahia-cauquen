@@ -481,9 +481,9 @@ function carpetaVecino(lote, { ajena = false } = {}){
       ${!alDia && !ajena && !cubierto ? `<span class="tp-pie">${I('right')}Tocá para pagar: tarjeta, Mercado Pago, billeteras, QR o transferencia</span>` : ''}
     </button>
     ${!alDia && !ajena && !cubierto ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagué por fuera de la app · adjuntar comprobante</button>` : ''}
-    ${puedeAdministrar() && !ajena && MercadoPago.activo() && montoDePrueba(lote) ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:0 0 12px" data-a="pago-mp" data-v="prueba">${I('wallet')}Probar el pago con Mercado Pago · <span style="white-space:nowrap">${plata(montoDePrueba(lote))}</span> (solo la Administración)</button>` : ''}
+    ${puedeAdministrar() && !ajena && MercadoPago.activo() && montoDePrueba(lote) ? botonPruebaMP(montoDePrueba(lote)) : ''}
 
-    ${L ? `<div class="card plana small" style="color:var(--ink-2)">${I('info')} ${esc(lote)} · UF ${L.uf} · coeficiente <b>${L.coef.toFixed(4)} %</b>. De cada $100 de gastos del barrio, a tu lote le corresponden $${L.coef.toFixed(2)}.</div>` : ''}
+    ${L ? fichaUF(L, lote) : ''}
     ${sec('Tus cupones')}
     ${emitidas.length ? emitidas.slice(0, 12).map(l => { const cu = cuotaDe(l, lote); if (!cu) return '';
       return `<button class="superficie" data-a="ver-cupon" data-v="${l.periodo}" data-p="${esc(lote)}"><span class="ic ic-wood">${I('file')}</span>
@@ -2066,3 +2066,48 @@ A['morosos-visibles'] = () => { if (!esAdmin()) return; Store.cambiar(s => { s.c
 /* El hotel (y la Administración) completan el reparto de un pago del hotel
    que anotó el aviso automático de Mercado Pago, apenas lo ven. */
 setInterval(() => { try { if (yo() && (esHotel() || esAdmin())) completarRepartos(); } catch(e){} }, 30 * 1000);
+
+/* =========================================================
+   EL BOTÓN DE PRUEBA DE MERCADO PAGO (rediseño, 10-10-2026: "está roto y
+   mal diseñado"). Antes era un botón gris con todo el texto amontonado,
+   que en el teléfono se partía en cinco renglones. Ahora es una tarjeta en
+   los colores de Mercado Pago, con su logo, el importe a la derecha y una
+   etiqueta "PRUEBA · solo Administración" que deja claro que no es un pago
+   real. El logo es un dibujo propio que imita la marca (el apretón de manos
+   en el óvalo celeste), solo para que se reconozca el medio de pago.
+   ========================================================= */
+const LOGO_MP = `<svg class="mp-logo" viewBox="0 0 64 44" aria-hidden="true"><ellipse cx="32" cy="22" rx="30" ry="20" fill="#fff"/><ellipse cx="32" cy="22" rx="26.5" ry="16.5" fill="#00b1ea"/>
+  <path d="M9 21c5-1 9-6 14-6 3 0 5 2 9 2s7-3 11-3c5 0 8 4 12 7" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M23 21l5 5c1 1 2.6 1 3.4 0M27 19l6 6c1 1 2.6 1 3.4 0M31 18l5 5c1 1 2.6 1 3.4 0M35 18l4 4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const botonPruebaMP = monto => `<button type="button" class="mp-prueba" data-a="pago-mp" data-v="prueba" aria-label="Probar el pago con Mercado Pago por ${plata(monto)} (solo la Administración)">
+  <span class="mp-logo-caja">${LOGO_MP}</span>
+  <span class="mp-txt"><small><span class="mp-tag">PRUEBA</span> solo Administración</small><b>Probar Mercado Pago</b><span class="mp-monto">${plata(monto)}<em> · no cambia tu saldo</em></span></span>
+  <span class="mp-ir">${I('right')}</span></button>`;
+
+/* =========================================================
+   LA FICHA DE LA UF (rediseño, 10-10-2026: "muy gris")
+   Antes era un renglón gris de letra chica. Ahora es una ficha en color:
+   el número de lote grande, el coeficiente bien visible, "de cada $100,
+   $0,57 son de tu lote" y una barra que muestra dónde queda el lote entre
+   todos los del barrio, con la marca del promedio. Mismos datos que antes
+   (el padrón), sin nada nuevo de la persona.
+   ========================================================= */
+const coma = (n, d) => Number(n).toLocaleString('es-AR', { minimumFractionDigits:d, maximumFractionDigits:d });
+function fichaUF(L, lote){
+  const cs = LOTES.map(x => +x.coef).filter(x => x > 0), min = Math.min(...cs), max = Math.max(...cs), prom = cs.reduce((a, b) => a + b, 0) / cs.length;
+  const pos = v => max > min ? Math.max(2, Math.min(98, (v - min) / (max - min) * 100)) : 50;
+  const dif = Math.round((L.coef / prom - 1) * 100);
+  const comp = Math.abs(dif) < 3 ? 'Tu lote paga casi lo mismo que el promedio' : `Tu lote paga un ${Math.abs(dif)} % ${dif < 0 ? 'menos' : 'más'} que el promedio`;
+  return `<div class="uf-ficha">
+    <div class="uf-sello"><small>Lote</small><b>${esc(String(L.lote))}</b><span>UF ${esc(String(L.uf))}</span></div>
+    <div class="uf-datos">
+      <small>Tu parte de los gastos del barrio</small>
+      <b class="uf-coef">${coma(L.coef, 4)}<em> %</em></b>
+      <span class="uf-cada">De cada <b>$100</b> ${I('right')} <b>$${coma(L.coef, 2)}</b> son de tu lote</span>
+    </div>
+    <div class="uf-barra" aria-label="${esc(comp)}">
+      <div class="uf-riel"><i class="uf-prom" style="left:${pos(prom)}%"></i><i class="uf-yo" style="left:${pos(L.coef)}%"></i></div>
+      <div class="uf-leyenda"><span>${coma(min, 3)} %</span><span class="uf-tu">${esc(comp)}</span><span>${coma(max, 3)} %</span></div>
+    </div></div>`;
+}
+

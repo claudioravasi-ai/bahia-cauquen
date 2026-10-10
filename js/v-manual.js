@@ -167,7 +167,7 @@ const MANUAL_CAPS = [
       'Si viene <b>varias veces</b> (empleada, jardinero, personal de una obra), marcá "Viene varias veces", elegí los días y hasta qué fecha: es <b>un solo QR</b> para todos esos días.',
       'Si querés, dejá una nota para la guardia (por ejemplo "deja la caja en la puerta").',
       'Tocá <b>"Crear el pase"</b>. Aparece el pase con un <b>código de 6 números</b> y un <b>QR</b>.',
-      'Tocá <b>"Enviar por WhatsApp"</b> y elegí el contacto: le llega <b>una tarjeta del pase</b>, como una tarjeta de embarque: su nombre, a quién viene a ver, el día y el horario, <b>el QR grande con el código debajo</b> y un mapita de "Cómo llegar". Con la tarjeta va un texto corto con los mismos datos y un solo enlace, el del mapa, al final con 📍: tocándolo se abre Google Maps. En la garita muestra el QR o dicta el código. (Si el teléfono no deja mandar la imagen y el texto juntos, manda la imagen y el texto queda copiado para pegarlo. Desde la computadora, la imagen se baja y la adjuntás en el WhatsApp que se abre.)',
+      'Tocá <b>"Enviar por WhatsApp"</b> y elegí el contacto: le llega <b>solo la tarjeta del pase</b>, como una tarjeta de embarque, sin texto ni enlaces: su nombre, a quién viene a ver, el día y el horario, <b>el QR grande con el código debajo</b> y un mapita que dice qué buscar en Google Maps. En la garita muestra el QR o dicta el código. (Desde la computadora, la tarjeta se baja y la adjuntás en el WhatsApp que se abre.)',
     ]],
     ['p', 'La garita lo ve al instante, con tu nombre como quien autorizó. Cuando la visita entra y cuando sale, te llega un aviso.'],
     ['h', 'Mis visitas'],
@@ -252,6 +252,7 @@ const MANUAL_CAPS = [
 
   { id:'expensas', icon:'wallet', color:'wood', para:'vecinos', t:'Tus expensas', s:'Ver, pagar y avisar un pago', b:[
     ['p', 'En <b>Tu casa → Mis expensas</b> está la cuenta de tu lote: el cupón del mes, el saldo, los vencimientos, los pagos y los recibos. Es la misma para todas las cuentas del lote.'],
+    ['p', 'Debajo está la <b>ficha de tu UF</b>: el número de lote, tu <b>coeficiente</b> (la parte de los gastos del barrio que le toca a tu lote; por ejemplo, de cada $100, $0,57) y una barra que muestra dónde queda tu lote entre el más chico y el más grande del barrio, con la marca del promedio.'],
     ['h', 'Los vencimientos'],
     ['p', 'La tarjeta de arriba muestra el <b>1.º y el 2.º vencimiento</b> y cuántos días faltan. En la Pizarra del día, en "Para vos", aparece un reloj con tus vencimientos: el día del 2.º vencimiento se pone rojo y titila. Solo lo ves vos (y los de tu lote).'],
     ['ojo', 'info', 'Los centavos son tu número de lote', 'El total de cada cupón termina en los centavos de tu lote{CENTAVOS}. Así la Administración reconoce tu transferencia aunque no pongas ninguna referencia.'],
@@ -314,7 +315,7 @@ const MANUAL_CAPS = [
       'Quiénes viven en la casa, la dirección y la ubicación exacta (sirve para "Cómo llegar" en una emergencia).',
       '<b>Tus autos</b> con la patente: la garita los reconoce.',
       '<b>Tus mascotas</b>, con foto.',
-      '<b>La foto del frente de tu casa</b>: la usa la garita para ubicar tu domicilio.',
+      '<b>La foto del frente de tu casa</b>: la usa la garita para ubicar tu domicilio. Tocá <b>"Sacar foto"</b> para usar la cámara o <b>"Elegir de la galería"</b> para subir una que ya tengas (JPG, PNG, HEIC del iPhone u otro formato de imagen). Lo mismo en todos los lugares donde se adjunta una foto.',
       '<b>Me voy de viaje</b>: tu casa entra en la lista de "casas solas" de la garita. La garita o el policía de la ronda nocturna la revisa <b>una vez por día</b> y te llega el aviso <b>"Tu casa está en orden"</b> (o la novedad, si hay una). Lo ven solo la garita, la Administración y las cuentas de tu lote. Si usás "Estoy bien", queda en pausa hasta que volvés. "Ya volví" termina el aviso.',
       '<b>Sé primeros auxilios / RCP o soy del equipo de salud</b>, y qué sos: te avisamos cuando un vecino pide ayuda médica o la garita sale con el DEA.',
     ]],
@@ -601,7 +602,7 @@ const MANUAL_CAPS = [
     ...(hayPaquetes() ? [['h', 'Paquetes'],
     ['pasos', ['<b>"Llegó un paquete"</b>: elegí para quién, la empresa, un detalle y sacale una foto a la etiqueta.', 'Al guardar, se avisa a todas las cuentas de ese lote.', 'Para entregar: <b>"Entregar"</b> → <b>"Leer el QR de retiro del vecino"</b>. Si la firma es válida, compará la persona con la foto y tildá los paquetes.', 'Sin teléfono: <b>"Sin teléfono: firma y DNI"</b>. Si retira otra persona, elegí "Otra persona" y anotá su nombre y DNI.']]] : [['ojo', 'info', 'La garita no recibe paquetes', 'El barrio no aprobó que la garita reciba correo ni paquetes de los vecinos. Si llega un correo, registralo con el botón <b>Correos</b> (abajo) y va a la casa. Un delivery se trata como cualquier ingreso: se consulta al vecino y pasa a su casa o no.']]),
     ['p', '<b>Escribir a un lote o a vecinos</b> (en Mensajes con vecinos): elegí el lote y tildá a todo el lote o solo a quién le escribís.'],
-    ['p', '<b>Ingresos frecuentes → QR → "Mandarlo por WhatsApp (QR y código)"</b>: le llega la tarjeta del pase (QR grande, código debajo, días y horario, y el mapita de "Cómo llegar").'],
+    ['p', '<b>Ingresos frecuentes → QR → "Mandarlo por WhatsApp (QR y código)"</b>: le llega solo la tarjeta del pase (QR grande, código debajo, días y horario, y el mapita), sin texto ni enlaces.'],
     ['h', 'El camión, los correos, el policía y la ronda'],
     ['lista', ['<b>Camión de la basura</b>: registrá la entrada (patente) y la salida. A todo el barrio le llega el aviso.',
       '<b>Correos</b> (justo abajo del camión): tocá el botón, elegí la empresa (Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u <b>Otro</b>, que pide el nombre) y <b>"Registrar la entrada"</b>. Si el correo te dice a qué casas va, escribí los lotes (por ejemplo "12, 40, 133A"): a esas casas les llega <b>"va a tu casa"</b> al celular. Si después va a otra casa más, <b>"Avisar a otro lote"</b>. Cuando se va, <b>"Registrar la salida"</b>: su camión deja de verse en todas las pantallas. Los lotes y la patente los ve solo la garita (y la Administración y la supervisión).', '<b>Bitácora</b>: el libro de guardia. Lo que se anota no se borra; si hace falta, marcá que le suene a la Administración.']],
@@ -773,7 +774,7 @@ const MANUAL_CAPS = [
     ['p', 'En <b>Automáticas → Mes contra mes</b> se compara un mes con el anterior: gastos, cuota promedio, cupones, banco y deuda; cada rubro y cada gasto con su cambio en %, cuál es <b>nuevo</b> y cuál <b>ya no está</b>. Se descarga en PDF. No muestra datos de ningún vecino.'],
     ['p', '<b>"Ya la pagué"</b>: mientras Mercado Pago no esté activado, los vecinos pueden marcar su expensa como pagada con un toque, sin comprobante. Te llega el aviso y el pago aparece en <b>Pagos</b> para confirmarlo con el resumen del banco (los centavos dicen el lote). Recién al confirmarlo se emite el recibo.'],
     ['p', '<b>El hotel (6 UF)</b>: sus cupones salen solos al emitir el mes, uno por UF, a su correo y a su ventana "Expensas del hotel". Paga el total de sus 6 UF en un solo pago: en "Por acreditar" aparece como <b>"Hotel Los Cauquenes · 6 UF"</b>, con cómo se reparte; al confirmarlo salen <b>6 recibos</b>, uno por UF. Los pagos con Mercado Pago del hotel se reparten y se pasan a recibo solos, como los de los vecinos. Para eso la app le deja al hotel una copia con solo sus cuotas: no ve las de nadie más.'],
-    ['p', '<b>Probar Mercado Pago</b>: en tu vista de vecino, en Expensas, el botón <b>"Probar el pago con Mercado Pago"</b> (solo lo ve quien administra) cobra el importe de tu último cupón aunque estés al día. Se paga con una tarjeta de prueba (titular APRO) y queda en <b>Pagos de PRUEBA</b>: no cambia tu saldo ni saca recibo, y se borra con un toque en Expensas → Pagos.'],
+    ['p', '<b>Probar Mercado Pago</b>: en tu vista de vecino, en Expensas, la tarjeta celeste <b>"Probar Mercado Pago"</b>, con el logo y la etiqueta PRUEBA (solo la ve quien administra), cobra el importe de tu último cupón aunque estés al día. Se paga con una tarjeta de prueba (titular APRO) y queda en <b>Pagos de PRUEBA</b>: no cambia tu saldo ni saca recibo, y se borra con un toque en Expensas → Pagos.'],
   ], ir:[['abrir', 'gestion', 'Gestión del barrio']] },
 ];
 

@@ -938,22 +938,27 @@ async function imagenQR(contenido, codigo, titulo = '', sub = '', datos = null){
   g.fillStyle = '#d33a3a'; g.beginPath(); g.moveTo(px, py); g.bezierCurveTo(px - 34, py - 40, px - 30, py - 86, px, py - 86); g.bezierCurveTo(px + 30, py - 86, px + 34, py - 40, px, py); g.fill();
   g.fillStyle = '#fff'; g.beginPath(); g.arc(px, py - 58, 11, 0, 7); g.fill();
   g.textAlign = 'left'; g.fillStyle = '#0f1f1e'; g.font = F(800, 36); g.fillText('Cómo llegar', mx + mw + 36, my + 72);
-  g.fillStyle = '#3d4f4d'; g.font = F(600, 25); g.fillText('Tocá el 📍 del mensaje', mx + mw + 36, my + 118); g.fillText('y se abre Google Maps.', mx + mw + 36, my + 152);
+  /* Va sola, sin texto ni enlace (10-10-2026): se dice qué buscar en el mapa. */
+  g.fillStyle = '#3d4f4d'; g.font = F(600, 25); g.fillText('Buscá en Google Maps:', mx + mw + 36, my + 118);
+  g.fillStyle = '#0d6b66'; g.font = F(800, 27); g.fillText('Barrio ' + (Store.s.config.nombre || 'Bahía Cauquén'), mx + mw + 36, my + 154);
   return new Promise(ok => c.toBlob(ok, 'image/png'));
 }
-/* Mandar el pase: la imagen con el texto como epígrafe. Si el teléfono no
-   deja mandar las dos cosas juntas, se manda la imagen sola (tiene todo) y
-   el texto queda copiado para pegarlo. En la computadora, que no adjunta
-   desde la web, se baja la imagen y se abre WhatsApp con el texto. */
+/* Mandar el pase: SOLO LA TARJETA (pedido de Claudio, 10-10-2026: "que
+   llegue la invitación tal cual, sin nada escrito ni enlaces; es más
+   elegante"). La imagen tiene todo: nombre, día, horario, QR, código y
+   qué buscar en el mapa. El texto queda solo para cuando no se puede
+   mandar la imagen (sin internet para dibujar el QR): ahí va el texto. En
+   la computadora, que no adjunta desde la web, se baja la imagen y se abre
+   WhatsApp vacío para adjuntarla. */
 async function compartirPase({ texto, contenido, codigo, titulo = '', sub = '', tel = '', archivo = 'pase-barrio.png', datos = null }){
   const blob = await imagenQR(contenido, codigo, titulo, sub, datos).catch(() => null);
   if (blob && navigator.canShare){
     const f = new File([blob], archivo, { type:'image/png' });
-    if (navigator.canShare({ files:[f], text:texto })){ try { await navigator.share({ files:[f], text:texto, title:titulo || 'Pase de ingreso' }); return; } catch(e){ if (e.name === 'AbortError') return; } }
-    if (navigator.canShare({ files:[f] })){ try { await navigator.clipboard.writeText(texto).catch(() => {}); toast('El texto quedó copiado: pegalo debajo de la imagen', 'copy'); await navigator.share({ files:[f] }); return; } catch(e){ if (e.name === 'AbortError') return; } }
+    if (navigator.canShare({ files:[f] })){ try { await navigator.share({ files:[f] }); return; } catch(e){ if (e.name === 'AbortError') return; } }
   }
   if (blob){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = archivo; document.body.appendChild(a); a.click(); a.remove();
-    toast('Se bajó la imagen del pase: adjuntala en el WhatsApp que se abre', 'download'); }
+    toast('Se bajó la tarjeta del pase: adjuntala en el WhatsApp que se abre', 'download');
+    window.open(tel ? waLink(tel, '') : 'https://web.whatsapp.com/', '_blank', 'noopener'); return; }
   window.open(tel ? waLink(tel, texto) : 'https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
 }
 /* "Cómo llegar" como un mapita que se toca (10-10-2026): en vez de un

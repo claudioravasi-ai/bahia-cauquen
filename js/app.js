@@ -1951,10 +1951,23 @@ const fotoParaOtros = (v, dias = 7) => {
   if (f && f.fotoId && typeof Nube !== 'undefined' && Nube.activa()) setTimeout(() => Nube.compartirDescarga(f.fotoId, dias), 200);
   return f;
 };
+/* =========================================================
+   SACAR O ELEGIR LA FOTO (pedido de Claudio, 10-10-2026: "en el móvil solo
+   me deja sacar la foto")
+   El campo tenía capture="environment": en el teléfono eso abre SIEMPRE la
+   cámara y no deja elegir una foto guardada. Ahora hay dos botones: "Sacar
+   foto" (la cámara) y "Elegir de la galería" (las fotos y archivos del
+   teléfono, en cualquier formato de imagen: JPG, PNG, WEBP, HEIC del
+   iPhone…). En la computadora, el segundo abre el explorador de archivos.
+   ========================================================= */
+const ACEPTA_FOTO = 'image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.heic,.heif,.avif';
+const botonesFoto = (id, cls = 'btn btn-sm btn-sec') => `<label class="${cls}">${I('camera')}Sacar foto<input type="file" accept="image/*" capture="environment" data-foto-in="${id}" hidden></label>
+  <label class="${cls}">${I('image')}Elegir de la galería<input type="file" accept="${ACEPTA_FOTO}" data-foto-in="${id}" hidden></label>`;
 const campoFoto = (id, etiqueta = 'Foto (opcional)') => `
   <div class="field"><label>${etiqueta}</label><div class="foto-in">
-    <label class="foto-prev" id="${id}Prev" style="cursor:pointer">${I('camera')}<input type="file" accept="image/*" capture="environment" data-foto-in="${id}" hidden></label>
-    <div class="muted small">A los demás les llega una vista previa; la foto buena la bajan al tocarla (queda para bajar unos días).</div>
+    <label class="foto-prev" id="${id}Prev" style="cursor:pointer">${I('image')}<input type="file" accept="${ACEPTA_FOTO}" data-foto-in="${id}" hidden></label>
+    <div class="grow"><div class="foto-botones">${botonesFoto(id)}</div>
+    <div class="muted small">A los demás les llega una vista previa; la foto buena la bajan al tocarla (queda para bajar unos días).</div></div>
     <input type="hidden" name="foto" id="${id}"></div></div>`;
 
 /* Un cambio de otra pestaña, o de otro vecino a través de la base del barrio. */
