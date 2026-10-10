@@ -643,6 +643,8 @@ const Conexion = {
 };
 
 function despuesDePintar(){
+  /* El buscador del "Más" de la garita sigue filtrando después de un redibujo. */
+  if (typeof filtrarMas === 'function' && typeof masQ !== 'undefined' && masQ && document.getElementById('masBuscar')) filtrarMas();
   Fotos.hidratar($('#cuerpo') || document);
   $$('[data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
   Tiras.arrancar();
@@ -1751,8 +1753,8 @@ const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
     'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'correo-menu', 'correo-elegir', 'correo-sale', 'correo-lotes', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
     'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno',
-    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hhuesped-ingreso', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar']),
-  formularios: new Set(['validar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
+    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer']),
+  formularios: new Set(['validar', 'patente-buscar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
     'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada']),
 };
 /* Paquetes en pausa (hayPaquetes, core.js): aunque quede un botón o un

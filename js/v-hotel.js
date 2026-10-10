@@ -539,6 +539,13 @@ A['hhuesped-ingreso'] = el => {
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Ingreso: huésped del hotel${h.patente ? ' · ' + h.patente : ''}`, at:Date.now() }); });
   cerrarHoja(); toast('Ingreso registrado', 'login');
 };
+/* El huésped que se va: queda en Ingresos de hoy y en el libro de guardia (10-10-2026). */
+A['hhuesped-salida'] = el => {
+  if (!soloGarita()) return;
+  Store.cambiar(s => { const h = aLista(s.hotelHuespedes).find(x => x.id === el.dataset.id); if (!h || h.salida) return; h.salida = Date.now();
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Egreso: huésped del hotel${h.patente ? ' · ' + h.patente : ''}`, at:Date.now() }); });
+  cerrarHoja(); toast('Salida registrada', 'logout');
+};
 
 /* =========================================================
    EVENTOS DEL HOTEL

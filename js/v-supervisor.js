@@ -162,6 +162,99 @@ F['privado-sup'] = (d, form) => {
    una emergencia? Después los números del día, lo último que pasó (en
    vivo, de la bitácora) y las puertas a cada cosa.
    ========================================================= */
+/* =========================================================
+   EL CENTRO DE CONTROL DEL SUPERVISOR (pedido de Claudio, 10-10-2026: "me
+   gusta, hazlo", sobre la propuesta; ideas de tabler, 41k★, y Glance,
+   37k★, en GitHub; el código es propio). En vez de una lista de estados y
+   cuatro números sueltos:
+     · un SEMÁFORO de cuatro tarjetas: la app de la garita, el turno, el
+       policía y los SOS, cada una en verde, amarillo o rojo;
+     · EL DÍA EN NÚMEROS: ingresos de hoy (contra el promedio de la semana),
+       quién está adentro, las rondas del policía y las casas solas;
+     · EN VIVO: el libro de guardia de hoy, con filtros (todo, ingresos,
+       rondas, novedades);
+     · ACCIONES a mano: escribirle a la garita o a la Administración, dar el
+       visto al parte y el informe del mes.
+   Todo sale de lo que el supervisor ya baja: no se pide nada nuevo a la base.
+   ========================================================= */
+let ccFiltro = 'todo';
+const CC_FILTROS = { todo:'Todo', ingresos:'Ingresos', rondas:'Rondas', novedades:'Novedades' };
+/* LAS SOLAPAS DE "EN VIVO" (Claudio, 10-10-2026: "están mal diseñadas, en
+   gris y no son atractivas, hacele un diseño innovador"). Ahora son un
+   selector de cuatro botones con ícono, color propio y cuántos registros
+   hay de cada cosa hoy; el elegido se llena con su color y la raya de
+   abajo se desliza hasta él. */
+const CC_ESTILO = { todo:['book', 'brand'], ingresos:['login', 'ok'], rondas:['shield', 'sky'], novedades:['info', 'accent'] };
+const ccTipo = b => b.tipo === 'acceso' && /^(Ingreso|Egreso|Salida)\b/i.test(String(b.texto || '')) ? 'ingresos' : b.tipo === 'ronda' || /\bronda/i.test(String(b.texto || '')) ? 'rondas' : 'novedades';
+function centroDeControl({ s, hoy, u, g, t, lista, adentro, esperados, petPend, solas, sos, deas, ps, bit, ult, hoyBit }){
+  const ahora = Date.now(), c = typeof cfgSup === 'function' ? cfgSup() : { rondaMin:90 };
+  const sem = (nivel, ic, tag, tt, x) => `<div class="cc-s n-${nivel}"><span class="cc-s-tag">${I(ic)}${tag}</span><b>${tt}</b><small>${x}</small></div>`;
+  /* 1 · el semáforo */
+  const sGarita = g === null ? sem('gris', 'wifi', 'Garita', 'Sin dato', 'modo de prueba, sin la base')
+    : g.conectada ? sem(g.activa ? 'ok' : 'warn', 'wifi', 'Garita', 'Conectada', g.activa ? 'la app está en pantalla' : 'minimizada o con la pantalla apagada')
+    : sem('mal', 'wifi', 'Garita', 'Desconectada', 'llamala o escribile');
+  const sTurno = t ? sem('ok', 'clock', `Turno ${esc(t.turno)}`, aLista(t.guardias).length ? esc(aLista(t.guardias).join(', ')) : 'Sin nombres', `desde las ${hora(t.at)} h`)
+    : sem('mal', 'clock', 'Turno', 'Sin turno abierto', 'la garita no anotó quién está');
+  const sPolicia = (() => {
+    if (!t || !ps.length) return sem('gris', 'shield', 'Policía', 'Sin policía ahora', 'si corresponde, lo registra la garita');
+    const p = ps[0], rc = typeof rondaEnCurso === 'function' ? rondaEnCurso(p) : null, rs = aLista(p.rondas);
+    if (rc) return sem('ok', 'shield', 'Policía', 'Ronda en curso', `${esc(p.nombre)} · ${plural(rs.length, 'ronda')} hoy`);
+    const ultR = Math.max(p.entra || 0, ...rs.map(r => r.fin || r.inicio || 0)), min = Math.max(0, Math.round((ahora - ultR) / MIN));
+    return sem(min > (c.rondaMin || 90) ? 'warn' : 'ok', 'shield', 'Policía', rs.length ? `Sin ronda hace ${min} min` : `Sin rondas · llegó hace ${min} min`, `${esc(p.nombre)} · ${plural(rs.length, 'ronda')}`);
+  })();
+  const nSos = sos.length + deas.length, sosHoy = aLista(s.sos).filter(x => x && x.at && isoDe(new Date(x.at)) === hoy).length;
+  const sSos = nSos ? sem('mal latido', 'siren', 'SOS', `${plural(nSos, 'abierto', 'abiertos')}`, 'mirá arriba el detalle') : sem('ok', 'siren', 'SOS', 'Ninguno abierto', `hoy: ${sosHoy}`);
+  /* 2 · el día en números */
+  const movs = typeof movimientosDeHoy === 'function' ? movimientosDeHoy() : [], ingHoy = movs.filter(m => !m.sale && !m.no).length;
+  const ini = new Date(hoy + 'T00:00').getTime();
+  const porDia = Array.from({ length:7 }, (_, k) => { const a = ini - (k + 1) * DIA, b = a + DIA; return aLista(s.bitacora).filter(x => x && x.tipo === 'acceso' && x.at >= a && x.at < b && /^Ingreso\b/i.test(String(x.texto || ''))).length; });
+  const prom = Math.round(porDia.reduce((a, b) => a + b, 0) / 7);
+  const largas = lista.filter(p => estadoPase(p) === 'adentro' && p.log?.[hoy]?.in && ahora - p.log[hoy].in > 4 * HORA).length;
+  const rondasHoy = registrosTurno().filter(r => (r.cerradoAt || ahora) >= ini).flatMap(r => policiasDe(r)).flatMap(p => aLista(p.rondas)).filter(r => r && (r.inicio || 0) >= ini);
+  const incompletas = rondasHoy.filter(r => r.incompleta).length;
+  const revisadas = solas.filter(a => typeof revisionDeHoy === 'function' && revisionDeHoy(a)).length;
+  const kpi = (lbl, v, x, tono = '') => `<div class="cc-k"><small>${lbl}</small><b>${v}</b><span class="${tono}">${x}</span></div>`;
+  const numeros = `<div class="cc-kpis">
+    ${kpi('Ingresos hoy', ingHoy, prom ? `promedio de la semana: ${prom} por día` : 'sin datos de la semana')}
+    ${kpi('Adentro ahora', adentro, largas ? `${plural(largas, 'hace más de 4 h')}` : `${plural(esperados, 'visita por llegar', 'visitas por llegar')}`, largas ? 't-warn' : '')}
+    ${kpi('Rondas del policía hoy', rondasHoy.length, incompletas ? `${plural(incompletas, 'incompleta', 'incompletas')}` : rondasHoy.length ? 'todas completas' : 'todavía ninguna', incompletas ? 't-warn' : '')}
+    ${kpi('Casas solas', solas.length ? `${revisadas} de ${solas.length}` : '0', solas.length ? (revisadas < solas.length ? `${solas.length - revisadas} sin revisar hoy` : 'todas revisadas') : 'nadie de viaje', solas.length && revisadas < solas.length ? 't-warn' : '')}
+  </div>${petPend ? `<p class="small cc-pet">${I('edit')} ${plural(petPend, 'pedido firmado de un vecino que la garita no recibió', 'pedidos firmados de vecinos que la garita no recibió')}. <button class="link" data-a="abrir" data-v="peticiones">Ver</button></p>` : ''}`;
+  /* 3 · en vivo */
+  const f = CC_FILTROS[ccFiltro] ? ccFiltro : 'todo', vivo = hoyBit.filter(b => f === 'todo' || ccTipo(b) === f).slice(0, 15);
+  const iconoDe = b => (TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad);
+  const cuantos = k => k === 'todo' ? hoyBit.length : hoyBit.filter(b => ccTipo(b) === k).length;
+  const pos = Object.keys(CC_FILTROS).indexOf(f);
+  const enVivo = `<div class="cc-seg" role="tablist" aria-label="Qué mostrar" style="--pos:${pos}">
+      <span class="cc-seg-raya" aria-hidden="true"></span>
+      ${Object.entries(CC_FILTROS).map(([k, tt]) => { const [ic, col] = CC_ESTILO[k], n = cuantos(k);
+        return `<button class="cc-tab t-${col} ${f === k ? 'on' : ''}" role="tab" aria-selected="${f === k}" data-a="cc-filtro" data-v="${k}">
+          <span class="cc-tab-ic">${I(ic)}</span><span class="cc-tab-t">${tt}</span><b class="cc-tab-n${n ? '' : ' cero'}">${n}</b></button>`; }).join('')}
+    </div>
+    ${vivo.length ? `<div class="cc-linea">${vivo.map(b => { const tb = iconoDe(b); return `<div class="cc-l"><time>${hora(b.at)}</time><span class="ic ic-${tb[2]}">${I(tb[1])}</span><span>${esc(b.texto)}</span></div>`; }).join('')}</div>`
+      : `<p class="muted small" style="margin:8px 2px">${hoyBit.length ? 'Hoy no hay registros de ese tipo.' : 'Hoy todavía no hay registros en el libro de guardia.'}</p>`}
+    <button class="cc-ver" data-a="abrir" data-v="bitacora">${I('book')}<span>Ver la bitácora completa del día</span>${I('right')}</button>`;
+  /* 4 · acciones */
+  const nlG = sinLeerSup('supGarita', u.id), nlA = sinLeerSup('supAdmin', u.id), partes = typeof partesSinVisto === 'function' ? partesSinVisto().length : 0;
+  const acciones = `<div class="cc-acciones">
+    <button class="btn btn-sec" data-a="abrir" data-v="privado" data-p="supGarita">${I('chat')}Escribirle a la garita${nlG ? ` <span class="dot-badge">${nlG}</span>` : ''}</button>
+    <button class="btn btn-sec" data-a="abrir" data-v="privado" data-p="supAdmin">${I('sliders')}A la Administración${nlA ? ` <span class="dot-badge">${nlA}</span>` : ''}</button>
+    ${partes ? `<button class="btn btn-pri" data-a="garita-ir" data-v="#ccPartes">${I('eye')}Dar el visto (${partes})</button>` : `<button class="btn btn-sec" data-a="abrir" data-v="turnos">${I('check')}Partes al día</button>`}
+    <button class="btn btn-sec" data-a="abrir" data-v="informe-servicio">${I('file')}Informe del mes</button></div>`;
+  return `<div class="cc-sem">${sGarita}${sTurno}${sPolicia}${sSos}</div>
+    <div class="cc-dos">
+      <section class="cc-caja"><h3>El día en números</h3>${numeros}</section>
+      <section class="cc-caja"><h3>En vivo <small>${ult ? `último registro ${hace(ult.at)}` : ''}</small></h3>${enVivo}</section>
+    </div>
+    ${acciones}`;
+}
+/* Al tocar una solapa, primero se pinta y se desliza la raya (un instante)
+   y después se redibuja la lista. */
+A['cc-filtro'] = el => { if (!CC_FILTROS[el.dataset.v]) return; ccFiltro = el.dataset.v;
+  const seg = el.closest && el.closest('.cc-seg');
+  if (seg){ seg.style.setProperty('--pos', Object.keys(CC_FILTROS).indexOf(ccFiltro));
+    seg.querySelectorAll('.cc-tab').forEach(b => { const on = b.dataset.v === ccFiltro; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+    setTimeout(refrescar, 220); } else refrescar(); };
 R.supervisor = {
   titulo:'Supervisión', icon:'eye', color:'brand', ancha:true, sub:() => fechaLarga(hoyISO()),
   render(){
@@ -177,32 +270,16 @@ R.supervisor = {
     const ps = t && typeof policiasAdentro === 'function' ? policiasAdentro(t) : [];
     const bit = aLista(s.bitacora).filter(b => b && b.at).sort((a, b) => b.at - a.at);
     const ult = bit[0];
-    const hoyBit = bit.filter(b => isoDe(new Date(b.at)) === hoy).slice(0, 15);
-    const estado = (ok, ic, tt, x) => `<div class="it"><span class="ic ic-${ok === true ? 'ok' : ok === false ? 'danger' : 'warn'}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(ic)}</span><div class="txt"><b>${tt}</b><span style="white-space:normal">${x}</span></div></div>`;
+    const hoyBit = bit.filter(b => isoDe(new Date(b.at)) === hoy);
     return `${PILA.length === 1 ? `<div class="titulo-vista"><h1>Supervisión de la guardia</h1><p>${fechaLarga(hoy)} · ${esc(primerNombre(u.nombre))}</p></div>` : ''}
-      <div class="garita-vivo">${I('eye')}<div class="grow"><b>Solo para mirar, en tiempo real</b><span>Ves lo mismo que la garita, al instante. Registrar, firmar o cambiar algo lo hace la garita; vos les escribís a la garita o a la Administración (en Mensajes elegís a quién), das el visto a cada parte de turno y recibís las alertas.</span></div>
-        ${(() => { const nl = sinLeerSup('supGarita', u.id) + sinLeerSup('supAdmin', u.id); return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${sinLeerSup('supAdmin', u.id) && !sinLeerSup('supGarita', u.id) ? 'supAdmin' : 'supGarita'}">${I('chat')}Mensajes${nl ? ` (${nl} sin leer)` : ''}</button>`; })()}</div>
+      <p class="muted small cc-solo">${I('eye')} Solo para mirar, en tiempo real: registrar, firmar o cambiar algo lo hace la garita. Vos les escribís, das el visto a cada parte y recibís las alertas.</p>
       ${deas.map(x => { const v = usuario(x.userId) || {}; return aviso('danger latido', 'heart', `PIDEN EL DEA · ${esc(v.casa || '')} · ${esc(apellidoDe(v.nombre) || '')}`, `${hace(x.at)} · la garita todavía no salió con el DEA`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="privado" data-p="supGarita">Escribirle a la garita</button>`); }).join('')}
       ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
       ${sos.map(x => { const v = usuario(x.userId) || {}, tp = TIPOS_SOS[x.tipo] || TIPOS_SOS.otra;
         return aviso(x.estado === 'activa' ? 'danger latido' : 'warn', 'siren', `SOS · ${esc(tp.nombre)} · ${esc(v.casa || '')}`, `${esc(v.nombre || '')} · ${hace(x.at)} · ${esc(SOS_ESTADO[x.estado] || x.estado)}`, `<button class="btn btn-xs btn-sec" data-a="sos-ver" data-id="${esc(x.id)}">Ver</button>`); }).join('')}
       ${alertasAct.map(a => aviso('warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, esc(a.zona || ''), `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`)).join('')}
-      ${sec('La garita ahora')}
-      <div class="card lista">
-        ${g === null ? estado(null, 'wifi', 'Conexión de la garita', 'Sin dato en este modo (la app no está conectada con la base del barrio).')
-          : estado(g.conectada ? (g.activa ? true : null) : false, 'wifi', g.conectada ? (g.activa ? 'La app de la garita está abierta' : 'La app de la garita está conectada, pero no en pantalla') : 'La app de la garita NO está conectada',
-            g.conectada ? (g.activa ? 'Lo que pasa en la entrada lo ven al instante.' : 'Puede estar minimizada o con la pantalla apagada: los avisos le llegan igual al celular.') : 'Ni abierta ni conectada. Llamá a la garita o escribile: el mensaje le queda.')}
-        ${estado(!!t, 'clock', t ? `Turno ${esc(t.turno)} · desde las ${hora(t.at)} h` : 'Sin turno abierto', t ? (aLista(t.guardias).length ? 'De guardia: ' + esc(aLista(t.guardias).join(', ')) : 'No anotaron quiénes están') : 'La garita todavía no anotó quiénes están de turno.')}
-        ${estado(ult ? (Date.now() - ult.at < 3 * HORA ? true : null) : null, 'book', ult ? `Último registro: ${hace(ult.at)}` : 'Sin registros en el libro', ult ? esc(ult.texto.slice(0, 110)) : 'Cuando la garita anote algo, aparece acá.')}
-        ${t ? estado(ps.length ? true : null, 'shield', ps.length ? `Policía de servicio: ${esc(ps.map(p => p.nombre).join(', '))}` : 'Sin policía de servicio ahora', ps.length ? ps.map(p => { const rc = typeof rondaEnCurso === 'function' ? rondaEnCurso(p) : null; return `${esc(p.nombre)}: ${plural(aLista(p.rondas).length, 'ronda')}${rc ? ' · ronda en curso' : ''}`; }).join(' · ') : 'Si hoy corresponde, lo registra la garita al llegar.') : ''}
-      </div>
-      ${sec('Hoy en la entrada')}
-      <div class="garita-kpis sup-kpis"><div class="kpi"><b>${esperados}</b><span>Visitas anunciadas que todavía no llegaron</span></div><div class="kpi"><b>${adentro}</b><span>Visitas que entraron y siguen en el barrio</span></div><div class="kpi"><b>${petPend}</b><span>Pedidos firmados de vecinos que la garita no recibió</span></div><div class="kpi"><b>${solas.length}</b><span>Casas de vecinos de viaje para revisar hoy</span></div></div>
-      <p class="muted tiny" style="margin:-4px 2px 12px">Las visitas son las que los vecinos anunciaron para hoy con su código o QR. Cuando la garita registra que una entra, pasa de "no llegaron" a "en el barrio"; cuando registra la salida, deja de contarse.</p>
-      ${sec('Lo último, en vivo', `<button class="link" data-a="abrir" data-v="bitacora">Libro completo</button>`)}
-      <div class="card">${hoyBit.length ? `<div class="lista">${hoyBit.map(b => { const tb = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad;
-        return `<div class="it"><span class="ic ic-${tb[2]}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(tb[1])}</span><div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(tb[0])}</span></div></div>`; }).join('')}</div>` : vacio('book', 'Hoy todavía no hay registros en el libro de guardia.')}</div>
-      ${(() => { const ps = typeof partesSinVisto === 'function' ? partesSinVisto() : []; return ps.length ? sec(`Partes de turno para dar el visto (${ps.length})`) + `<div class="card lista">${ps.slice(0, 8).map(r => `<div class="it"><div class="txt"><b>${esc(r.turno)} · ${relDia(isoDe(new Date(r.at)))}</b><span>${hora(r.at)} a ${hora(r.cerradoAt)} h · ${esc(aLista(r.guardias).join(', '))}</span></div>
+      ${centroDeControl({ s, hoy, u, g, t, lista, adentro, esperados, petPend, solas, sos, deas, ps, bit, ult, hoyBit })}
+      ${(() => { const ps = typeof partesSinVisto === 'function' ? partesSinVisto() : []; return ps.length ? '<span id="ccPartes" class="ancla"></span>' + sec(`Partes de turno para dar el visto (${ps.length})`) + `<div class="card lista">${ps.slice(0, 8).map(r => `<div class="it"><div class="txt"><b>${esc(r.turno)} · ${relDia(isoDe(new Date(r.at)))}</b><span>${hora(r.at)} a ${hora(r.cerradoAt)} h · ${esc(aLista(r.guardias).join(', '))}</span></div>
           <button class="btn btn-xs btn-sec" data-a="parte-ver" data-id="${esc(r.id)}">Leer</button><button class="btn btn-xs btn-pri" data-a="visto-parte" data-id="${esc(r.id)}">${I('eye')}Visto</button></div>`).join('')}</div>` : ''; })()}
       ${(() => { const as = aLista(s.alertasSup).filter(a => a && Date.now() - a.at < 7 * DIA).sort((a, b) => b.at - a.at).slice(0, 8); return as.length ? sec('Alertas de los últimos 7 días') + `<div class="card lista">${as.map(a => { const tt = (typeof TIPOS_ALERTA_SUP !== 'undefined' && TIPOS_ALERTA_SUP[a.tipo]) || ['Alerta', 'alert', 'warn'];
           return `<div class="it"><span class="ic ic-${tt[2]}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(tt[1])}</span><div class="txt"><b>${esc(a.titulo || tt[0])}</b><span style="white-space:normal">${esc(a.texto || '')} · ${relDia(isoDe(new Date(a.at))).toLowerCase()} ${hora(a.at)} h${a.hasta ? ' · volvió ' + hora(a.hasta) + ' h' : ''}</span></div></div>`; }).join('')}</div>` : ''; })()}

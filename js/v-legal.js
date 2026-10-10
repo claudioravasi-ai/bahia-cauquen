@@ -5,7 +5,7 @@
    Preguntas frecuentes. El texto está acá, en un solo lugar: si cambia,
    se cambia la fecha de VERSION_LEGAL y listo.
    ========================================================= */
-const VERSION_LEGAL = '8 de octubre de 2026';
+const VERSION_LEGAL = '10 de octubre de 2026';
 
 const LEGAL = [
   ['1. Partes y objeto', [
@@ -146,7 +146,8 @@ const RESPUESTAS_AAIP = () => {
     ['Publicidad', 'La app puede mostrar promociones y publicidad de comercios, pero no trata datos con fines de publicidad (art. 27): no comparte datos de los vecinos con los anunciantes, no arma perfiles ni elige los anuncios según quién mira, y no usa rastreadores publicitarios.'],
     ['Transferencia internacional', 'Sí: los datos se alojan en servidores de Google LLC (Firebase) en los Estados Unidos, que actúa como prestador de servicios (art. 25). La transferencia cuenta con el consentimiento expreso de los titulares (art. 12 de la Ley 25.326 y art. 12 del Decreto 1558/2001).'],
     ['Medidas de seguridad', 'Conexiones cifradas (HTTPS/TLS); almacenamiento cifrado por el proveedor; contraseñas guardadas solo como huella irreversible; reglas de acceso en el servidor por rol; cada vecino accede solo a sus datos; registro de auditoría; borrado automático de datos de visitas; compromiso de confidencialidad del personal con acceso.'],
-    ['Conservación', 'Datos de visitas: ' + (c.datosDias || 90) + ' días. Datos contables y de expensas: 10 años (art. 328 del Código Civil y Comercial). Avisos de "Estoy bien": 30 días. El resto, mientras el titular tenga cuenta.'],
+    ['Conservación', 'Datos de visitas: ' + (c.datosDias || 90) + ' días. Mensajes privados: 90 días. Publicaciones del pizarrón: de 2 a 30 días según su tipo. Datos contables y de expensas: 10 años (art. 328 del Código Civil y Comercial). Avisos de "Estoy bien": 30 días. El resto, mientras el titular tenga cuenta.'],
+    ['Lista de morosos', 'Lotes con deuda vencida, por número de lote y sin nombres: lo adeudado por mes, el total, si está en gestión judicial y la proyección por inflación. Finalidad: la transparencia del estado de cuentas entre copropietarios, como en la liquidación de expensas. La leen los vecinos aprobados y la Administración; no la garita, la supervisión ni el hotel. Se actualiza sola con cada liquidación y la Administración la puede dejar de mostrar. (Modelo a revisar por un abogado matriculado.)'],
     ['Derechos de los titulares', 'Acceso, rectificación, actualización y supresión, gratuitos, ante la Administración' + (cfgDatos().responsableArco ? ` (${cfgDatos().responsableArco})` : '') + '. Plazos: 10 días corridos para el acceso y 5 días hábiles para rectificar o suprimir.'],
   ];
 };

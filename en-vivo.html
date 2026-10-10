@@ -201,6 +201,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .camion{position:absolute;top:96px;left:-120px;width:110px;animation:cruza 5.5s linear infinite;z-index:4;pointer-events:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
 .camion svg{display:block;width:100%;height:auto;animation:rebota .5s ease-in-out infinite alternate}
 .camion .rueda{transform-box:fill-box;transform-origin:center;animation:gira .6s linear infinite}
+.camion.correo{width:124px;top:104px}
 @keyframes rebota{to{transform:translateY(-2px)}}
 @keyframes gira{to{transform:rotate(360deg)}}
 @keyframes cruza{to{left:110%}}
@@ -521,6 +522,15 @@ const CAMION = `<svg viewBox="0 0 150 80"><rect x="4" y="16" width="86" height="
   <g class="rueda"><circle cx="26" cy="63" r="10" fill="#23272b"/><circle cx="26" cy="63" r="4" fill="#bfc5ca"/></g><g class="rueda"><circle cx="110" cy="63" r="10" fill="#23272b"/><circle cx="110" cy="63" r="4" fill="#bfc5ca"/></g>
   <text x="47" y="46" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="10" font-weight="800" fill="#fff">RESIDUOS</text></svg>`;
 const camion = `<div class="camion" aria-hidden="true">${CAMION}</div>`;
+/* El camión de correos de Andreani, como en la app (10-10-2026: "no es la
+   moto, es el camión de correos Andreani, y va a un lote definido"). */
+const CAMION_CORREO = mia => `<svg viewBox="0 0 170 86"><rect x="4" y="6" width="118" height="56" rx="6" fill="#fff" stroke="rgba(0,0,0,.18)"/>
+  <text x="63" y="38" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="17" font-weight="800" fill="#d0080f">ANDREANI</text>
+  <path d="M122 16h16q4 0 6 4l12 20q2 3 2 7v15h-36z" fill="#fff" stroke="rgba(0,0,0,.18)"/><path d="M126 21h11q2 0 3 2l10 17h-24z" fill="#9fd3e8"/>
+  <rect x="4" y="54" width="154" height="7" fill="#d0080f"/><rect x="153" y="45" width="5" height="5" rx="1" fill="#ffd166"/><rect x="4" y="61" width="156" height="4" fill="#3d4246"/>
+  ${mia ? `<g transform="translate(96 0)"><rect width="66" height="13" rx="6.5" fill="#e8590c"/><text x="33" y="9.5" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="8" font-weight="800" fill="#fff">VA A TU CASA</text></g>` : ''}
+  <g class="rueda"><circle cx="32" cy="70" r="10" fill="#23272b"/><circle cx="32" cy="70" r="4" fill="#bfc5ca"/></g><g class="rueda"><circle cx="138" cy="70" r="10" fill="#23272b"/><circle cx="138" cy="70" r="4" fill="#bfc5ca"/></g></svg>`;
+const correoA = mia => `<div class="camion correo" aria-hidden="true">${CAMION_CORREO(mia)}</div>`;
 const AVION = `<div class="avion" aria-hidden="true"><svg viewBox="0 0 100 40"><path d="M4 22 L60 18 L78 4 L86 4 L76 18 L94 17 Q99 20 94 23 L76 23 L86 37 L78 37 L60 24 L4 24 Q0 23 4 22Z" fill="#2b6fb3"/><circle cx="66" cy="20" r="1.6" fill="#fff"/><circle cx="60" cy="20" r="1.6" fill="#fff"/><circle cx="54" cy="20" r="1.6" fill="#fff"/></svg></div>`;
 const etapas = n => `<div class="etapas">${[0, 1, 2, 3, 4].map(i => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</div>`;
 
@@ -747,27 +757,27 @@ const ESC = [
     c:() => adminInicio(card('Garita en vivo', it('👤', 'Marcos Díaz', 'Visita · Lote 42 · 16:32', 'Adentro', 'ok'), it('🧰', 'Jardines del Fin del Mundo', 'Proveedor · Lote 7', 'Adentro', 'ok')), { sinSalas:true }) },
   ], fin:'La visita no instala nada: entra con el QR de WhatsApp y la vecina se entera al instante.' },
 
-{ id:'correos', grupo:'La garita', e:'📮', t:'Correos en el barrio', s:'La garita anota la moto del correo y cada casa sabe si viene para ella',
+{ id:'correos', grupo:'La garita', e:'📮', t:'Correos en el barrio', s:'Entra el camión de Andreani y la casa a la que va lo sabe al instante',
   roles:{ a:LU, b:GA, c:AD, d:['Martín Soria', 'Vecino · Lote 63'] }, hora:'11:20',
   pasos:[
-  { lado:'b', txt:'Entra la moto de <b>Andreani</b>. El guardia toca la empresa, escribe a qué lotes va y toca <b>Entró</b>.',
+  { lado:'b', txt:'Entra el <b>camión de correos de Andreani</b>. El guardia toca Andreani, anota a qué lote va (<b>Lote 42</b>, el de Lucía) y toca <b>Entró</b>.',
     a:() => inicioV('lucia'), c:() => adminInicio(), d:() => inicioV('martin'),
-    b:() => garita() + ap(card('Correos', `<div class="seg"><span>OCA</span><span class="on">Andreani</span><span>Correo Arg.</span><span>Mercado Libre</span></div>`), campo('Va a los lotes', '42 · 63 · 118'), campo('Patente', 'A 041 KLM'), btn('Entró')) },
-  { lado:'a', txt:'<b>Todos</b> ven que Andreani está en el barrio. Lucía y Martín, además, reciben <b>"Va a tu casa"</b> (solo su lote). Lucía toca <b>Ya lo recibí</b>.',
-    al(){ avisar('ad', '📮', 'Andreani va a tu casa', 'Entró 11:20 · moto'); tiempo(() => push('c', '📮', 'Andreani está en el barrio', 'Entró 11:20'), 600); },
-    a:() => v('lucia', { campana:1 }) + ap(hola('lucia', 'Buen día,'), aviso('info', '📮', 'Andreani va a tu casa', 'Entró 11:20 · moto'), btn('Ya lo recibí', { cl:'ok' }), pizarra(it('📮', 'Andreani en el barrio', 'Desde las 11:20'))),
-    b:() => garita() + ap(card('Correos en el barrio', it('📮', 'Andreani · A 041 KLM', 'Lotes 42, 63 y 118 · 11:20', 'Adentro', 'warn'))),
-    c:() => adminInicio(card('Correos en el barrio', it('📮', 'Andreani', 'Entró 11:20 · 3 lotes', 'Adentro', 'warn')), { sinSalas:true }),
-    d:() => v('martin', { campana:1 }) + ap(hola('martin', 'Buen día,'), aviso('info', '📮', 'Andreani va a tu casa', 'Entró 11:20'), pizarra(it('📮', 'Andreani en el barrio', 'Desde las 11:20'))) },
-  { lado:'b', hora:'11:48', txt:'Andreani termina el recorrido. El guardia toca <b>Salió</b>.',
+    b:() => garita() + ap(card('Correos', `<div class="seg"><span>OCA</span><span class="on">Andreani</span><span>Correo Arg.</span><span>Mercado Libre</span></div>`), campo('Va al lote', '42 · Lucía Fernández'), campo('Patente del camión', 'AE 512 KT'), btn('Entró')) },
+  { lado:'a', txt:'A <b>Lucía</b> le llega <b>"Andreani va a tu casa"</b> y el camión cruza su pantalla con el cartel "VA A TU CASA". Martín solo ve que Andreani está en el barrio, no a qué casa va. Lucía toca <b>Ya lo recibí</b>.',
+    al(){ avisar('a', '📮', 'Andreani va a tu casa', 'Lote 42 · entró 11:20 · camión'); tiempo(() => push('cd', '📮', 'Andreani está en el barrio', 'Entró 11:20'), 600); },
+    a:() => v('lucia', { campana:1 }) + correoA(true) + ap(hola('lucia', 'Buen día,'), aviso('info', '📮', 'Andreani va a tu casa', 'Lote 42 · entró 11:20 · camión AE 512 KT'), btn('Ya lo recibí', { cl:'ok' }), pizarra(it('📮', 'Andreani va a tu casa', 'Desde las 11:20'))),
+    b:() => garita() + ap(card('Correos en el barrio', it('🚚', 'Andreani · AE 512 KT', 'Va al Lote 42 · 11:20', 'Adentro', 'warn'))),
+    c:() => adminInicio(card('Correos en el barrio', it('🚚', 'Andreani', 'Entró 11:20 · 1 lote', 'Adentro', 'warn')), { sinSalas:true }),
+    d:() => v('martin', { campana:1 }) + correoA(false) + ap(hola('martin', 'Buen día,'), aviso('info', '📮', 'Andreani está en el barrio', 'Entró 11:20 · no viene a tu casa'), pizarra(it('📮', 'Andreani en el barrio', 'Desde las 11:20'))) },
+  { lado:'b', hora:'11:34', txt:'Andreani entrega en el Lote 42 y sale del barrio. El guardia toca <b>Salió</b>.',
     a:() => inicioV('lucia', aviso('ok', '📮', 'Recibiste el envío', 'Andreani · 11:31'), { saludo:'Buen día,' }),
-    b:() => garita() + ap(card('Correos en el barrio', it('📮', 'Andreani · A 041 KLM', 'Lotes 42, 63 y 118 · 11:20', 'Adentro', 'warn')), btn('Salió')) },
-  { lado:'c', txt:'El aviso del correo <b>se va solo</b> de todas las apps y queda en el libro de guardia, con la hora de entrada y de salida.',
-    al(){ avisar('acd', '📮', 'Andreani salió del barrio', '11:48'); },
-    b:() => garitaInicio(card('Correos de hoy', it('📮', 'Andreani · A 041 KLM', '11:20 a 11:48 · 3 lotes', 'Salió'))),
-    c:() => adminInicio(card('Correos de hoy', it('📮', 'Andreani', '11:20 a 11:48 · 3 lotes', 'Salió')), { sinSalas:true }),
+    b:() => garita() + ap(card('Correos en el barrio', it('🚚', 'Andreani · AE 512 KT', 'Lote 42 · entró 11:20', 'Adentro', 'warn')), btn('Salió')) },
+  { lado:'c', txt:'El aviso del correo <b>se va solo</b> de todas las apps y queda en el libro de guardia y en <b>Ingresos de hoy</b>, con la hora de entrada y de salida.',
+    al(){ avisar('acd', '📮', 'Andreani salió del barrio', '11:34'); },
+    b:() => garitaInicio(card('Correos de hoy', it('🚚', 'Andreani · AE 512 KT', '11:20 a 11:34 · Lote 42', 'Salió'))),
+    c:() => adminInicio(card('Correos de hoy', it('🚚', 'Andreani', '11:20 a 11:34 · 1 lote', 'Salió')), { sinSalas:true }),
     d:() => inicioV('martin', '', { saludo:'Buen día,' }) },
-  ], fin:'Nadie espera en la puerta en vano: cada casa sabe si el correo viene para ella.' },
+  ], fin:'Nadie espera en la puerta en vano: la casa a la que va el correo lo sabe al instante, y nadie más se entera de a qué casa fue.' },
 
 { id:'camion', grupo:'La garita', e:'🚛', t:'Pasa el camión de residuos', s:'La garita marca la entrada y a todos les llega el aviso',
   roles:{ a:LU, b:['Garita', 'Turno mañana · Guardia Ruiz'], c:AD, d:['Elsa Romero', 'Vecina · Lote 110'] }, hora:'07:52',

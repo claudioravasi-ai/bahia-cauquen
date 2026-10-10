@@ -19,15 +19,16 @@
        permiso; la respuesta queda en ESTE equipo y se cambia desde Tu
        cuenta. La app no guarda el audio: usa solo el texto para hacer lo
        pedido.
-   Es para quien está como vecino: la garita y el hotel tienen el saludo,
-   no el asistente.
+   Es para quien está como vecino y, desde el 10-10-2026, también para la
+   GARITA (ver "LA GARITA POR VOZ", más abajo). El hotel y la supervisión
+   tienen el saludo, no el asistente.
    ========================================================= */
 const Asistente = {
   KEY:'bhc.asistente', rec:null, escuchando:false,
   soportado(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); },
   permiso(){ try { return localStorage.getItem(this.KEY); } catch(e){ return null; } },
   poner(v){ try { if (v) localStorage.setItem(this.KEY, v); else localStorage.removeItem(this.KEY); } catch(e){} },
-  paraMi(){ const u = yo(); return !!u && !esStaff() && !esHotel() && !esSupervisor() && u.estado === 'aprobado'; },
+  paraMi(){ const u = yo(); return !!u && (esGuardia() || !esStaff()) && !esHotel() && !esSupervisor() && u.estado === 'aprobado'; },
 
   /* Hablar con la misma voz del saludo; `luego` corre cuando termina. */
   decir(texto, luego){
@@ -74,6 +75,10 @@ const Asistente = {
     else if (!p) this.pedirPermiso();
   },
   pedirPermiso(){
+    if (esGuardia()) return hoja('La garita por voz', `<div class="asis-intro">${I('volume')}<div><b>¿Querés pedirle cosas a la app con la voz?</b>
+        <span>Tocás el escudo del barrio y decís, por ejemplo: "llegó una visita sin avisar" (la app te pregunta a qué lote y le avisa al vecino), "buscá la dirección de Ravasi" (para decirle al Uber o a la visita cómo llegar) o "¿Juan Pérez tiene pase?". Antes de avisarle a un lote, la app te lo repite y te pregunta.</span></div></div>
+      ${aviso('info', 'lock', 'La voz y los datos', 'El reconocimiento de voz lo hace este equipo: en Android y Chrome, el audio lo procesa Google; en iPhone y iPad, Apple. La app no guarda el audio: usa solo el texto. Las direcciones y los nombres salen de la guía del barrio, la misma que ves en "Buscar un vecino". Se apaga cuando quieras en Tu cuenta.')}
+      <div class="btns" style="margin-top:12px"><button class="btn btn-pri grow" data-a="asistente-si">${I('check')}Sí, activarlo</button><button class="btn btn-sec grow" data-a="asistente-no">Ahora no</button></div>`, { ancho:'480px' });
     hoja('Asistente por voz', `<div class="asis-intro">${I('volume')}<div><b>¿Querés pedirle cosas a la app con la voz?</b>
         <span>Después del saludo se abre el micrófono y podés decir, por ejemplo: "avisale a la garita que llego tarde" o "publicá en el pizarrón que hay zorros sueltos". Antes de mandar o publicar algo, la app te lo repite y te pregunta.</span></div></div>
       ${aviso('info', 'lock', 'Tu voz y tus datos', 'El reconocimiento de voz lo hace tu teléfono: en Android y Chrome, el audio lo procesa Google; en iPhone, Apple. La app del barrio no guarda el audio: usa solo el texto para hacer lo que pediste. Podés apagarlo cuando quieras en Tu cuenta.')}
@@ -85,9 +90,9 @@ const Asistente = {
     let el = $('#asistente');
     if (!el){ el = document.createElement('div'); el.id = 'asistente'; el.className = 'asistente'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Asistente por voz'); document.body.appendChild(el); }
     el.innerHTML = `<div class="asis-caja ${estado}"><button class="asis-mic" data-a="asistente-hablar" aria-label="Hablar">${I('volume')}</button>
-      <div class="asis-txt"><small>${estado === 'oye' ? 'Te escucho…' : estado === 'piensa' ? 'Entendí:' : estado === 'pregunta' ? '¿Lo hago?' : 'Asistente'}</small><b>${texto || 'Decime qué necesitás'}</b></div>
+      <div class="asis-txt"><small>${estado === 'oye' ? 'Te escucho…' : estado === 'piensa' ? 'Entendí:' : estado === 'pregunta' ? (this.pregunta ? 'Te pregunto:' : '¿Lo hago?') : 'Asistente'}</small><b>${texto || 'Decime qué necesitás'}</b></div>
       <button class="cerrar" data-a="asistente-cerrar" aria-label="Cerrar">${I('x')}</button>
-      ${botones ? `<div class="asis-btns">${botones}</div>` : ''}</div>`;
+      ${botones ? `<div class="asis-btns">${botones}</div>` : !estado && esGuardia() ? `<div class="asis-btns">${GaritaVoz.atajos()}</div>` : ''}</div>`;
   },
   /* Corta la escucha sin esperar nada del navegador. */
   cortar(msg){
@@ -96,8 +101,17 @@ const Asistente = {
     if (r){ r.onresult = r.onerror = r.onend = r.onaudiostart = null; try { r.abort(); } catch(e){} }
     if (msg && $('#asistente')) this.panel('', msg);
   },
-  cerrar(){ this.cortar(); try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch(e){} this.pendiente = null; $('#asistente')?.remove(); },
-  escuchar(alTerminar){
+  cerrar(){ this.cortar(); try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch(e){} this.pendiente = null; this.pregunta = null; $('#asistente')?.remove(); },
+  /* Pregunta algo y espera la respuesta: en Android el micrófono se abre
+     solo al terminar de hablar; en iPhone y iPad, tocando el micrófono
+     (ver A['asistente-hablar']). Lo usa la garita para ir paso a paso. */
+  preguntar(texto, alResponder, botones = ''){
+    this.pregunta = alResponder;
+    this.panel('pregunta', esc(texto), botones);
+    if (this.esApple()){ this.decir(texto); return; }
+    this.decir(texto, () => { if (this.pregunta !== alResponder || !$('#asistente')) return; this.escuchar(r => { this.pregunta = null; alResponder(r); }, texto); });
+  },
+  escuchar(alTerminar, ayuda = ''){
     if (!this.soportado()){ toast('Este navegador no tiene reconocimiento de voz', 'alert'); return; }
     this.cortar();
     /* Hablar y escuchar a la vez traba el audio en el iPhone y el iPad. */
@@ -107,7 +121,7 @@ const Asistente = {
     r.lang = this.idioma(); r.interimResults = true; r.maxAlternatives = 1; r.continuous = false;
     let final = '', parcial = '', termino = false, arranco = false;
     this.rec = r; this.escuchando = true;
-    this.panel('oye', alTerminar ? 'Decí "sí" o "no"' : '');
+    this.panel('oye', ayuda ? esc(ayuda) : alTerminar ? 'Decí "sí" o "no"' : '');
     const usar = () => { if (termino) return; termino = true; const t = (final || parcial).trim(); this.cortar(t ? '' : 'No te escuché. Tocá el micrófono para probar de nuevo.');
       if (t){ if (alTerminar) alTerminar(t); else this.interpretar(t); } };
     r.onaudiostart = () => { arranco = true; };
@@ -148,6 +162,8 @@ const Asistente = {
   interpretar(original){
     const t = normTxt(original), u = yo();
     this.panel('piensa', esc(original));
+    /* La garita tiene sus propios pedidos (js/asistente.js, GaritaVoz). */
+    if (esGuardia()) return GaritaVoz.interpretar(original);
     /* El SOS no se pide por voz. */
     if (/\b(sos|emergencia|auxilio|socorro|ambulancia|incendio|fuego)\b/.test(t) && !/telefono|numero/.test(t))
       return this.responder('Para una emergencia, mantené apretado el botón rojo SOS tres segundos, o llamá al 911. Te abro Emergencias.', () => abrir('emergencias'));
@@ -224,8 +240,136 @@ document.addEventListener('pointerdown', e => { if (Asistente.escuchando && !e.t
 document.addEventListener('visibilitychange', () => { if (document.hidden && $('#asistente')) Asistente.cerrar(); });
 A['asistente-si'] = () => { Asistente.poner('si'); cerrarHoja(); toast('Asistente por voz activado en este equipo', 'volume'); Asistente.escuchar(); };
 A['asistente-no'] = () => { Asistente.poner('no'); cerrarHoja(); toast('Listo. Lo podés activar cuando quieras en Tu cuenta.', 'check'); };
-A['asistente-hablar'] = () => { if (Asistente.permiso() !== 'si'){ Asistente.pedirPermiso(); return; } Asistente.escuchar(); };
+A['asistente-hablar'] = () => { if (Asistente.permiso() !== 'si'){ Asistente.pedirPermiso(); return; }
+  /* Si la app había preguntado algo (la garita, paso a paso), lo que se dice es la respuesta. */
+  const f = Asistente.pregunta;
+  if (f) Asistente.escuchar(r => { Asistente.pregunta = null; f(r); }, 'Te escucho…'); else Asistente.escuchar(); };
 A['asistente-cerrar'] = () => { try { speechSynthesis.cancel(); } catch(e){} Asistente.cerrar(); };
 A['asistente-confirmar'] = () => { const f = Asistente.pendiente; Asistente.pendiente = null; if (!f) return;
   try { const r = f(); Asistente.panel('', esc(r || 'Listo.')); Asistente.decir(r || 'Listo.'); setTimeout(() => Asistente.cerrar(), 4000); } catch(e){ avisarFalla(e, 'asistente'); } };
 A['asistente-ajuste'] = () => { const on = Asistente.permiso() === 'si'; Asistente.poner(on ? 'no' : 'si'); toast(on ? 'Asistente por voz apagado en este equipo' : 'Asistente por voz activado: tocá el escudo para hablarle', 'volume'); if (hojaAbierta()) A['mi-cuenta'](); };
+
+
+/* =========================================================
+   LA GARITA POR VOZ (pedido de Claudio, 10-10-2026)
+   La garita toca el escudo del barrio, escucha el saludo y le pide:
+     A · "Llegó una visita sin avisar" → la app pregunta "¿A qué lote?"
+         ("lote 42", "al hotel") y "¿Cómo se llama?", lo repite y, con el
+         "sí", le avisa al vecino igual que el formulario "Llegó sin aviso"
+         (al vecino le aparece "Que pase" / "No lo conozco"). Si va al
+         hotel, le llega al hotel en sus mensajes con la garita.
+     B · "Buscá la dirección de Ravasi" → "Claudio Ravasi: Lote 148,
+         calle De la Plaza 3340", para decirle al Uber, al DiDi o a la
+         visita cómo llegar sin buscar en el padrón. Sale de la misma guía
+         de "Buscar un vecino" (perdona errores: Rabasi → Ravasi).
+     C · "¿Juan Pérez tiene pase?" → busca entre los pases de hoy y, si
+         está, abre el pase con su botón "Ingresó".
+   Nada se le manda a un lote sin que la garita diga "sí" o lo toque. Si
+   hay mucho ruido, los mismos tres pedidos están como botones en el
+   cartel del asistente, y el formulario de siempre sigue igual.
+   ========================================================= */
+const NUM_HABLADO = { cero:0, un:1, uno:1, una:1, dos:2, tres:3, cuatro:4, cinco:5, seis:6, siete:7, ocho:8, nueve:9, diez:10, once:11, doce:12, trece:13, catorce:14, quince:15,
+  dieciseis:16, diecisiete:17, dieciocho:18, diecinueve:19, veinte:20, veintiun:21, veintiuno:21, veintidos:22, veintitres:23, veinticuatro:24, veinticinco:25, veintiseis:26, veintisiete:27,
+  veintiocho:28, veintinueve:29, treinta:30, cuarenta:40, cincuenta:50, sesenta:60, setenta:70, ochenta:80, noventa:90, cien:100, ciento:100 };
+const GaritaVoz = {
+  EJEMPLOS:['llegó una visita sin avisar', 'buscá la dirección de Ravasi', '¿Juan Pérez tiene pase?'],
+  atajos(){ return `<button class="btn btn-sm btn-sec" data-a="garita-voz" data-v="llegada">${I('gate')}Visita sin aviso</button><button class="btn btn-sm btn-sec" data-a="garita-voz" data-v="direccion">${I('pin')}Dirección de…</button><button class="btn btn-sm btn-sec" data-a="garita-voz" data-v="pase">${I('qr')}¿Tiene pase?</button>`; },
+  cancela(r){ const x = normTxt(r); if (/\b(cancel\w*|nada|deja|dejalo|olvidate|ninguno)\b/.test(x)){ Asistente.decir('Listo, no hago nada.'); Asistente.cerrar(); return true; } return false; },
+  /* "ciento cuarenta y ocho" → 148 */
+  numero(t){ const ws = normTxt(t).split(/[^a-z]+/).filter(w => w && w !== 'y'); let n = 0, hay = false;
+    for (const w of ws){ if (w in NUM_HABLADO){ n += NUM_HABLADO[w]; hay = true; } else if (hay) break; } return hay ? n : null; },
+  /* "lote 42", "al cuarenta y dos", "42" → "42" (o "hotel"). */
+  lote(t){
+    const x = normTxt(t);
+    if (/\bhotel\b/.test(x)) return 'hotel';
+    const m = x.match(/\blote\s*(?:numero\s*)?(\d{1,3}[a-z]?)\b/) || x.match(/\b(\d{1,3})\b/);
+    if (m) return m[1];
+    const i = x.search(/\blote\b/), n = this.numero(i >= 0 ? x.slice(i + 4) : x);
+    return n === null ? '' : String(n);
+  },
+  nombre(r){ const t = String(r || '').trim().replace(/^(se llama|es|soy|el nombre es|la visita es)\s+/i, '').replace(/[.?!]+$/, '');
+    if (!t || /^(no se|no dijo|ni idea|no sabe|no lo se|no tengo idea)\b/.test(normTxt(t))) return 'Una visita';
+    return t.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ').slice(0, 60); },
+  hotel(){ return Store.s.users.find(x => x.rol === 'hotel' && x.estado === 'aprobado'); },
+  interpretar(original){
+    const t = normTxt(original);
+    if (/(direcc|donde (vive|queda|esta)|como (llego|llega|se llega)|que calle)/.test(t)){
+      const lo = /\blote\b/.test(t) ? this.lote(t) : '';
+      const quien = (original.match(/(?:direcci[oó]n|vive|queda|est[aá]|llega|llego|calle)\s+(?:de[l]?\s+|la\s+|el\s+)?(?:propietari[oa]\s+|vecin[oa]\s+|señor[a]?\s+|familia\s+)?(.+)$/i) || [])[1] || '';
+      return this.direccion(lo ? 'lote ' + lo : quien.replace(/^(un|una)\s+propietari[oa]$/i, '').trim());
+    }
+    if (/\b(pase|anunciad|autorizad|figura)/.test(t)){
+      const quien = (original.match(/^(?:¿\s*)?(?:tiene\s+pase\s+|est[aá]\s+(?:anunciad[oa]|autorizad[oa])\s+|figura\s+)?(.+?)\s+(?:tiene|est[aá]|figura)\b/i) || original.match(/(?:pase|anunciad[oa]|autorizad[oa])\s+(?:de\s+|a\s+|para\s+)?(.+?)\??$/i) || [])[1] || '';
+      return this.pase(quien.replace(/^¿/, '').replace(/\b(un|el|la)\s+pase\b/i, '').trim());
+    }
+    if (/(sin avis|lleg|vino|esta en la garita|hay (una|un|alguien))/.test(t)){
+      const lo = /\blote\b|\bhotel\b/.test(t) ? this.lote(t) : '';
+      const n = (original.match(/(?:lleg[oó]|vino)\s+(.+?)\s+(?:para|al|a la|a)\s+(?:el\s+)?(?:lote|hotel)/i) || [])[1] || '';
+      return this.llegada({ lote:lo, nombre: n && !/visita|alguien|persona|se[nñ]or/i.test(n) ? this.nombre(n) : '' });
+    }
+    if (/(que (podes|puedes|sabes)|ayuda|como funciona)/.test(t)) return Asistente.responder(`Puedo, por ejemplo: ${this.EJEMPLOS.join('; ')}.`);
+    return Asistente.responder('No te entendí bien. Podés decir: llegó una visita sin avisar, buscá la dirección de Ravasi, o ¿Juan Pérez tiene pase?');
+  },
+
+  /* A · la visita que llegó sin avisar */
+  llegada(d = {}){
+    const form = `<button class="btn btn-sm btn-sec" data-a="llegada-nueva">${I('edit')}Mejor con el formulario</button>`;
+    if (!d.lote){
+      if ((d.intentos || 0) >= 2) return Asistente.responder('No te entiendo el lote. Te abro el formulario.', () => A['llegada-nueva']());
+      return Asistente.preguntar(d.intentos ? 'No entendí el lote. Decí, por ejemplo: lote 42, o hotel.' : '¿A qué lote va? Si va al hotel, decí hotel.',
+        r => { if (this.cancela(r)) return; this.llegada({ ...d, lote:this.lote(r), intentos:(d.intentos || 0) + 1 }); }, form);
+    }
+    const L = d.lote === 'hotel' ? null : LOTES.find(x => x.lote === d.lote);
+    if (d.lote !== 'hotel' && !L) return this.llegada({ ...d, lote:'', intentos:(d.intentos || 0) + 1 });
+    const alHotel = d.lote === 'hotel' || (L && L.grupo === 'hotel');
+    const ho = alHotel ? this.hotel() : null;
+    if (alHotel && !ho) return Asistente.responder('El hotel no tiene cuenta en la app. Llamalos por teléfono.');
+    const hosts = alHotel ? [] : vecinosAprobados().filter(u => u.casa === 'Lote ' + d.lote && !esPropDistancia(u));
+    if (!alHotel && !hosts.length) return Asistente.responder(`El lote ${d.lote} no tiene a nadie con la app. Te abro su ficha para que lo llames.`, () => abrir('vecinos', d.lote));
+    if (!d.nombre) return Asistente.preguntar('¿Cómo se llama la visita? Si no lo sabés, decí no sé.', r => { if (this.cancela(r)) return; this.llegada({ ...d, nombre:this.nombre(r) }); }, form);
+    if (alHotel) return Asistente.confirmar(`Le aviso al hotel que llegó ${d.nombre}. ¿Lo mando?`, 'Avisar al hotel', () => {
+      F['privado']({ text:`En la garita: llegó ${d.nombre}, que va al hotel. ¿Lo dejamos pasar?` }, { dataset:{ u:ho.id, con:'guardia' } });
+      return 'Listo, el hotel ya lo tiene en sus mensajes con la garita.'; });
+    const h = hosts[0], casa = 'Lote ' + d.lote;
+    return Asistente.confirmar(`Le aviso al ${casa}, ${h.nombre}, que llegó ${d.nombre}. ¿Lo mando?`, `Avisar al ${casa}`, () => {
+      F['llegada']({ hostId:h.id, nombre:d.nombre, patente:'', motivo:'Visita' });
+      return `Listo, le pregunté al ${casa}. Cuando conteste, te aparece en la garita.`; });
+  },
+
+  /* B · la dirección de un propietario (o de un lote) */
+  direccion(quien){
+    if (!quien) return Asistente.preguntar('¿De qué propietario? Decí el nombre y el apellido, o el lote.', r => { if (this.cancela(r)) return; this.direccion(/\blote\b/i.test(r) ? 'lote ' + this.lote(r) : r.trim()); });
+    const lo = /^lote\s/i.test(quien) ? quien.replace(/^lote\s*/i, '') : '';
+    const qq = normTxt(quien).replace(/\b(de|del|la|los|las|el|senor|senora|don|dona|propietario|propietaria|vecino|vecina|familia|lote)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    const fichas = typeof fichasDeVecinos === 'function' ? fichasDeVecinos() : [];
+    const hits = (lo ? fichas.filter(f => normTxt(f.lote) === normTxt(lo)).map(f => ({ f, p:3 }))
+      : fichas.map(f => ({ f, p: qq ? puntajeFicha(f, qq) : 0 })).filter(x => x.p > 0).sort((a, b) => b.p - a.p));
+    if (!hits.length) return Asistente.responder(`No encontré a ${quien} en la guía del barrio. Probá solo con el apellido, o con el lote.`);
+    const mejores = hits.filter(x => x.p === hits[0].p).slice(0, 3).map(x => x.f);
+    const linea = f => `${f.nombre ? f.nombre + ': ' : ''}${f.casa}${f.L && f.L.dir ? ', calle ' + f.L.dir : ''}`;
+    const extra = mejores.length === 1 && typeof comoLlegarLote === 'function' ? comoLlegarLote(mejores[0].lote) : '';
+    const dicho = mejores.length === 1 ? `${linea(mejores[0])}.${extra ? ' ' + extra : ''}` : `Encontré ${mejores.length}: ${mejores.map(linea).join('. ')}.`;
+    Asistente.panel('', esc(dicho), `<button class="btn btn-sm btn-sec" data-a="abrir" data-v="vecinos" data-p="${esc(lo || qq)}">${I('search')}Ver la ficha</button><button class="btn btn-sm btn-sec" data-a="asistente-hablar">${I('volume')}Otra cosa</button>`);
+    Asistente.decir(dicho);
+  },
+
+  /* C · ¿tiene pase para hoy? */
+  pase(quien){
+    if (!quien) return Asistente.preguntar('¿Cómo se llama? Te fijo si tiene pase para hoy.', r => { if (this.cancela(r)) return; this.pase(this.nombre(r)); });
+    const ws = normTxt(quien).split(/[^a-z0-9]+/).filter(w => w.length > 2 && !/^(pase|tiene|para|hoy|esta|anunciad|autorizad)/.test(w));
+    if (!ws.length) return this.pase('');
+    const hoy = hoyISO(), lista = pasesDelDia(hoy).filter(p => !p.cancelado);
+    const hits = lista.filter(p => { const pw = normTxt(p.nombre).split(/[^a-z0-9]+/).filter(Boolean), pf = pw.map(fonetica); return ws.every(w => coincidePalabra(w, pw, pf)); });
+    if (!hits.length){
+      Asistente.panel('', esc(`No hay ningún pase para hoy a nombre de ${quien}.`), `<button class="btn btn-sm btn-pri" data-a="garita-voz" data-v="llegada" data-p="${esc(this.nombre(quien))}">${I('gate')}Avisarle a un lote</button><button class="btn btn-sm btn-sec" data-a="asistente-cerrar">Listo</button>`);
+      return Asistente.decir(`No hay ningún pase para hoy a nombre de ${quien}. Si dice que va a un lote, tocá Avisarle a un lote.`);
+    }
+    const p = hits[0], casa = usuario(p.hostId)?.casa || '', e = estadoPase(p, hoy), l = (p.log || {})[hoy] || {};
+    const est = e === 'adentro' ? `Ya entró a las ${hora(l.in)}.` : e === 'salio' ? `Ya entró y salió.` : e === 'vencido' ? 'Pero el horario del pase ya pasó.' : 'Todavía no entró.';
+    const dicho = `${hits.length > 1 ? `Hay ${hits.length} pases parecidos. El primero: ` : 'Sí. '}${p.nombre} tiene pase para hoy, de ${p.desde} a ${p.hasta}, al ${casa}. ${est}`;
+    Asistente.responder(dicho, () => { if (typeof validar === 'function') validar(p.codigo); });
+  },
+};
+A['garita-voz'] = el => { if (!esGuardia()) return; const v = el.dataset.v, nom = el.dataset.p || '';
+  if (Asistente.permiso() !== 'si'){ Asistente.pedirPermiso(); return; }
+  if (v === 'llegada') GaritaVoz.llegada(nom ? { nombre:nom } : {}); else if (v === 'direccion') GaritaVoz.direccion(''); else if (v === 'pase') GaritaVoz.pase(''); };

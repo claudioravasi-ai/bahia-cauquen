@@ -11,8 +11,9 @@
           personal fijo vigente;
         · libro de guardia (bitácora): 60 días;
         · auditoría: 90 días;
-        · conversaciones privadas: los mensajes de los últimos 120 días
-          (y siempre los 30 últimos de cada una).
+        · conversaciones privadas: los mensajes de los últimos 90 días.
+          Desde el 10-10-2026 (pedido de Claudio) los de más de 3 meses SE
+          BORRAN de la base, no van al archivo: así no ocupan lugar.
    2. Lo más viejo NO se borra: pasa al ARCHIVO HISTÓRICO de la base
       (hist/<carpeta>/<dueño>/<id>, con las mismas reglas de lectura que la
       carpeta privada: cada vecino ve solo lo suyo; la garita y la
@@ -38,6 +39,8 @@ const Historial = {
   /* Lo que baja al abrir, en días. */
   VENTANA: { bitacora:['at', 60], auditoria:['at', 90] },
   HILO_DIAS: 120, HILO_MIN: 30,
+  /* Los mensajes privados viven 90 días y después se borran (10-10-2026). */
+  MSG_DIAS: 90,
   diasVisitas: () => Math.max(30, +(Store.s.config.datosDias || 90)),
 
   /* Consulta con ventana para las colecciones planas (la usa Nube). */
@@ -56,9 +59,13 @@ const Historial = {
     let n = 0;
     try {
       if (u.rol === 'admin' && await Nube.reclamarMarca('archivo-' + hoy)) n += await this.archivarVisitas();
-      if (u.rol === 'admin') n += await this.archivarHilos('privados', h => (h.con || 'admin') === 'admin' || h.con === 'interno');
-      if (u.rol === 'guardia') n += await this.archivarHilos('privados', h => h.con === 'guardia');
-      n += await this.archivarHilos('dms', h => h.a === u.id || h.b === u.id);
+      /* Los mensajes de más de 90 días se borran (10-10-2026). Cada uno poda
+         las conversaciones que le toca escribir: la Administración las suyas
+         (con vecinos, con la garita y con la supervisión), la garita las
+         suyas, y cada vecino sus mensajes con otros vecinos. */
+      if (u.rol === 'admin') n += this.podarHilos('privados', h => ['admin', 'interno', 'supAdmin'].includes(h.con || 'admin'));
+      if (u.rol === 'guardia') n += this.podarHilos('privados', h => h.con === 'guardia' || h.con === 'supGarita');
+      n += this.podarHilos('dms', h => h.a === u.id || h.b === u.id);
       try { localStorage.setItem(clave, hoy); } catch(e){}
       if (n) console.info(`Archivo histórico: ${n} registros pasaron al archivo`);
     } catch(e){ console.warn('Archivo histórico: no se completó (¿faltan publicar las reglas?)', e.message); }
@@ -101,10 +108,20 @@ const Historial = {
     }
     return n;
   },
-  /* Una conversación larga deja en la base del día a día solo lo reciente;
-     lo viejo va al archivo en un paquete con clave fija (hilo + último
-     mensaje archivado), así dos equipos que lo hacen a la vez escriben lo
-     mismo en el mismo lugar. */
+  /* Borra de cada conversación los mensajes de más de 90 días. No hay copia
+     en el archivo: el vecino lo sabe (Preguntas frecuentes, Mis datos). */
+  podarHilos(col, mio){
+    const lim = Date.now() - this.MSG_DIAS * DIA, cuando = m => (m && (m.createdAt || m.at)) || 0;
+    const viejos = aLista(Store.s[col]).filter(h => h && h.id && mio(h) && aLista(h.msgs).some(m => cuando(m) && cuando(m) < lim));
+    if (!viejos.length) return 0;
+    let n = 0; const ids = new Set(viejos.map(h => h.id));
+    Store.cambiar(st => aLista(st[col]).filter(h => h && ids.has(h.id)).forEach(h => { const antes = aLista(h.msgs).length;
+      h.msgs = aLista(h.msgs).filter(m => !cuando(m) || cuando(m) >= lim); n += antes - h.msgs.length; }));
+    return n;
+  },
+  /* (Hasta el 10-10-2026: una conversación larga dejaba en la base solo lo reciente;
+     lo viejo iba al archivo en un paquete con clave fija. Queda por si hay
+     que volver a usarlo; la app ya no lo llama.) */
   async archivarHilos(col, mio){
     const lim = Date.now() - this.HILO_DIAS * DIA, cuando = m => m.createdAt || m.at || 0;
     const hilos = aLista(Store.s[col]).filter(h => h && h.id && mio(h) && aLista(h.msgs).length > this.HILO_MIN);
@@ -233,6 +250,46 @@ function pintarHistBitacora(q){
 }
 F['hist-bitacora-buscar'] = d => pintarHistBitacora(d.q || '');
 A['hist-bitacora-csv'] = () => csvDe([['fecha','tipo','texto','autor'], ...histBitacora.map(b => [new Date(b.at).toISOString(), b.tipo, b.texto, autorVisible(b.autor).nombre])], `libro-de-guardia-${hoyISO()}.csv`);
+
+/* ---------- El libro de guardia de otro día (10-10-2026) ----------
+   La bitácora muestra solo hoy. Un día anterior (o varios, hasta 31) se
+   pide a la base con una consulta por fecha: baja solo eso, no el libro
+   entero. Lo usan la garita, la Administración y la supervisión. */
+A['bit-otro-dia'] = () => {
+  if (!veGarita()) return;
+  const ayer = sumarDias(hoyISO(), -1);
+  hoja('Ver otro día del libro', `<form data-f="bit-dias">
+    <div class="grid2"><div class="field"><label>Desde</label><input type="date" name="desde" value="${ayer}" max="${hoyISO()}" required></div>
+      <div class="field"><label>Hasta (opcional)</label><input type="date" name="hasta" max="${hoyISO()}"></div></div>
+    <div class="field"><label>Buscar una palabra (opcional)</label><input name="q" maxlength="40" placeholder="Nombre, lote, patente, camión…"></div>
+    <button class="btn btn-pri btn-block">${I('search')}Traer de la base</button>
+    <p class="muted tiny" style="margin:10px 0 0">Se trae solo lo de esas fechas (hasta 31 días juntos) y no queda guardado en el equipo.</p></form>`, { ancho:'460px' });
+};
+let bitDias = { ls:[], titulo:'' };
+F['bit-dias'] = async d => {
+  if (!veGarita()) return;
+  let desde = d.desde, hasta = d.hasta && d.hasta >= d.desde ? d.hasta : d.desde;
+  if (sumarDias(desde, 31) < hasta) hasta = sumarDias(desde, 30);
+  const ini = new Date(desde + 'T00:00').getTime(), fin = new Date(sumarDias(hasta, 1) + 'T00:00').getTime() - 1;
+  const titulo = desde === hasta ? `Libro de guardia · ${fechaLarga(desde)}` : `Libro de guardia · ${fechaCorta(desde)} al ${fechaCorta(hasta)}`;
+  Historial.cargando(titulo);
+  try {
+    let v = null;
+    if (Historial.hayNube()) v = (await Nube.db.ref('staff/bitacora').orderByChild('at').startAt(ini).endAt(fin).get()).val() || {};
+    const qq = normTxt(d.q || '');
+    const ls = (v ? Object.values(v) : aLista(Store.s.bitacora)).filter(b => b && b.at >= ini && b.at <= fin)
+      .filter(b => !qq || normTxt(`${b.texto} ${autorVisible(b.autor).nombre}`).includes(qq)).sort((a, b) => b.at - a.at);
+    bitDias = { ls, titulo };
+    let dia = '';
+    hoja(titulo, `<p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'registro')}${qq ? ` con "${esc(d.q)}"` : ''}. ${v ? 'Traído de la base recién.' : 'Modo de prueba: lo que hay en este equipo.'}</p>
+      <div class="card lista">${ls.slice(0, 500).map(b => { const t = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad, dd = isoDe(new Date(b.at));
+        const cab = dd !== dia ? (dia = dd, `<div class="lbl" style="margin:10px 0 4px">${esc(fechaLarga(dd))}</div>`) : '';
+        return `${cab}<div class="it"><span class="ic ic-${t[2]}" style="width:30px;height:30px;border-radius:10px;display:grid;place-items:center">${I(t[1])}</span><div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(autorVisible(b.autor).nombre)}</span></div></div>`; }).join('') || '<p class="muted small">No hay registros en esas fechas.</p>'}</div>
+      ${ls.length > 500 ? '<p class="muted tiny">Se muestran los 500 más recientes: achicá las fechas o bajá la planilla.</p>' : ''}
+      <div class="btns" style="margin-top:12px"><button class="btn btn-sec" data-a="bit-otro-dia">${I('calendar')}Otras fechas</button>${ls.length ? `<button class="btn btn-sec grow" data-a="bit-dias-csv">${I('download')}Planilla (CSV)</button>` : ''}</div>`);
+  } catch(e){ Historial.fallo(e); }
+};
+A['bit-dias-csv'] = () => csvDe([['fecha','tipo','texto','autor'], ...bitDias.ls.map(b => [new Date(b.at).toISOString(), b.tipo, b.texto, autorVisible(b.autor).nombre])], `libro-de-guardia-${hoyISO()}.csv`);
 
 /* ---------- La auditoría completa (solo la Administración) ---------- */
 A['hist-auditoria'] = async () => {

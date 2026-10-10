@@ -20,6 +20,63 @@ const TIPOS_POST = {
   busco:   { n:'Busco', icon:'search', c:'wood' },
   mercado: { n:'Vendo / regalo', icon:'cart', c:'wood' },
 };
+/* =========================================================
+   CUÁNTO DURA CADA PUBLICACIÓN (pedido de Claudio, 10-10-2026: "¿cuánto
+   duran los avisos de la pizarra? ¿se borran solos?")
+   Hasta ahora lo del pizarrón quedaba para siempre (en la Pizarra del día
+   de la portada se veía 24 horas, pero en el Pizarrón seguía). Ahora cada
+   publicación se borra sola según qué es y quién la publicó:
+     · Alerta: 2 días · Aviso de la guardia: 3 días
+     · Aviso de un vecino: 7 días (de la Administración: 15)
+     · Evento: el día siguiente al evento (sin fecha: 7 días)
+     · Mascota o algo perdido: 30 días, o cuando el dueño toca "¡Apareció!"
+     · Ofrezco y Busco: 30 días · Vendo o regalo: 15 días
+     · Lo que publica el sistema solo (el viento, una votación): 2 días
+     · Lo FIJADO por la Administración no se borra mientras siga fijado.
+   Al publicar, la app le dice a cada uno cuándo se borra y cómo sacarlo
+   antes (el tachito); cuando se borra solo, le llega el aviso. Lo que dura
+   30 días se puede renovar desde la misma publicación los últimos 3 días.
+   El borrado lo hace el motor (regla "pizarron-vence", js/admin.js) una
+   sola vez para todo el barrio; mientras tanto, lo vencido ya no se muestra.
+   ========================================================= */
+const DURA_POST = { alerta:2, guardia:3, aviso:7, perdido:30, ofrezco:30, busco:30, mercado:15 };
+const RENOVABLES = ['perdido', 'ofrezco', 'busco', 'mercado'];
+function diasDelPost(p){
+  if (p.autor === 'sistema') return 2;
+  if (p.type === 'aviso' && usuario(p.autor)?.rol === 'admin') return 15;
+  return DURA_POST[p.type] || 7;
+}
+/* Cuándo se borra (0 = no se borra solo). */
+function venceDelPost(p){
+  if (!p) return 0;
+  if (p.resuelto) return p.resuelto + DIA;
+  if (p.fijado) return 0;
+  if (p.type === 'evento' && p.fecha) return new Date(sumarDias(p.fecha, 1) + 'T23:59').getTime();
+  return (p.renovado || p.createdAt || 0) + diasDelPost(p) * DIA;
+}
+const postVencido = p => { const v = venceDelPost(p); return !!v && Date.now() >= v; };
+function textoVencePost(p){
+  const v = venceDelPost(p);
+  if (!v) return 'Queda fijado arriba: no se borra solo mientras la Administración no lo desfije.';
+  const d = new Date(v), dia = `${DIAS_L[d.getDay()].toLowerCase()} ${d.getDate()} de ${MESES_LARGO[d.getMonth() + 1] || MESES[d.getMonth()]}`;
+  return `Se borra solo el ${dia}${p.type === 'evento' && p.fecha ? ' (el día siguiente al evento)' : ` (a los ${plural(diasDelPost(p), 'día')})`}`;
+}
+/* Los avisos de la campanita de una publicación (el "Se busca a Toby") se van con ella. */
+function quitarAvisosDePost(s, p){
+  const nom = String(p.title || '').replace(/^Se perdi[oó]\s+/i, '');
+  const suyo = n => n && (n.postId === p.id || (!n.postId && aLista(n.para).includes('todos') && (n.titulo === `Se busca a ${nom}` || n.titulo === `${(TIPOS_POST[p.type] || {}).n}: ${p.title}`)));
+  s.notifs = aLista(s.notifs).filter(n => !suyo(n));
+}
+/* La foto de un aviso de mascota es la misma de su ficha: borrar el aviso no la borra. */
+const fotoDeMascota = id => !!id && Store.s.users.some(u => aLista(u.mascotas).some(m => m && m.foto && m.foto.fotoId === id));
+/* El motor borra lo vencido (una sola vez para todo el barrio) y le avisa a quien lo publicó. */
+function borrarPostVencido(s, id){
+  const p = aLista(s.posts).find(x => x && x.id === id); if (!p) return;
+  s.posts = s.posts.filter(x => x.id !== id);
+  quitarAvisosDePost(s, p);
+  if (p.autor && p.autor !== 'sistema' && usuario(p.autor))
+    notificar(s, { para:p.autor, titulo:'Se borró solo tu publicación del pizarrón', texto:`"${String(p.title || '').slice(0, 70)}" · ${p.resuelto ? 'ya había aparecido' : 'cumplió su tiempo'}`, icon:'trash', color:'sky', link:'pizarron', push:false });
+}
 const REACCIONES = ['👍','❤️','🙏','😮','😂'];
 const CATEGORIAS = ['Plomería','Electricidad','Gas','Carpintería','Jardinería','Limpieza','Niñera','Clases particulares','Mascotas','Fletes / mudanza','Leña','Tecnología','Préstamos','Otro'];
 const tiposQuePuedo = () => {
@@ -34,7 +91,7 @@ R.pizarron = {
     /* Al verlo, lo que avisaba el pizarrón deja de contar en la campanita. */
     marcarVisto('pizarron');
     const f = filtro || 'todo';
-    let ps = s.posts.slice();
+    let ps = s.posts.filter(p => p && !p.resuelto && !postVencido(p));
     if (f === 'servicios') ps = ps.filter(p => p.type === 'ofrezco' || p.type === 'busco' || p.type === 'mercado');
     else if (f !== 'todo') ps = ps.filter(p => p.type === f);
     ps.sort((a, b) => (!!b.fijado - !!a.fijado) || b.createdAt - a.createdAt);
@@ -42,7 +99,8 @@ R.pizarron = {
     return `
       ${superficie({ a:'nuevo-post', icon:'plus', t: u.rol === 'guardia' ? 'Escribir un aviso de la guardia' : 'Publicar en el pizarrón', s: u.rol === 'guardia' ? 'Les suena y les llega a todos los vecinos' : 'Aviso, evento, perdido, ofrezco, busco…', cls:'acento' })}
       <div class="chips">${chip('todo','Todo')}${chip('guardia','Guardia')}${chip('aviso','Avisos')}${chip('alerta','Alertas')}${chip('evento','Eventos')}${chip('perdido','Perdidos')}${chip('servicios','Ofrezco / busco')}</div>
-      <div class="muro-cols">${ps.length ? ps.map(cardPost).join('') : vacio('muro', 'Todavía no hay nada acá.')}</div>`;
+      <div class="muro-cols">${ps.length ? ps.map(cardPost).join('') : vacio('muro', 'Todavía no hay nada acá.')}</div>
+      <p class="muted tiny" style="margin:10px 2px 0">${I('clock')} Cada publicación se borra sola a su tiempo: alertas 2 días, guardia 3, avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, y los eventos al día siguiente. Lo fijado queda. Quien publica la puede borrar antes con el tachito.</p>`;
   },
 };
 function cardPost(p){
@@ -74,10 +132,12 @@ function cardPost(p){
       <button class="accion" data-a="comentarios" data-id="${p.id}">${I('chat')}${cm.length ? cm.length : 'Comentar'}</button>
       ${(() => { const au = usuario(p.autor); return au && au.tel && au.mostrarTel && au.id !== u.id ? `<a class="accion wa" href="${waLink(au.tel)}" target="_blank" rel="noopener">${I('phone')}WhatsApp</a>` : ''; })()}
       <span class="grow"></span>
-      ${p.type === 'perdido' && p.autor === u.id && !p.resuelto ? `<button class="accion" data-a="post-resuelto" data-id="${p.id}">${I('check')}Apareció</button>` : ''}
+      ${p.type === 'perdido' && p.autor === u.id && !p.resuelto ? `<button class="accion" data-a="post-resuelto" data-id="${p.id}">${I('check')}¡Apareció!</button>` : ''}
       ${esAdmin() ? `<button class="accion" data-a="fijar" data-id="${p.id}" title="${p.fijado ? 'Desfijar' : 'Fijar arriba'}">${I('tack')}</button>` : ''}
       ${puedoBorrar ? `<button class="accion" data-a="borrar-post" data-id="${p.id}" title="Borrar">${I('trash')}</button>` : ''}
     </div>
+    ${puedoBorrar && p.autor !== 'sistema' ? (() => { const v = venceDelPost(p), falta = v ? v - Date.now() : 0;
+      return `<div class="post-vence">${I('clock')}<span>${esc(textoVencePost(p))}${p.autor === u.id ? '. Para sacarlo antes, tocá el tachito.' : ''}</span>${p.autor === u.id && RENOVABLES.includes(p.type) && v && falta < 3 * DIA ? `<button class="link" data-a="post-renovar" data-id="${p.id}">Renovar ${plural(diasDelPost(p), 'día')} más</button>` : ''}</div>`; })() : ''}
     ${abiertos ? `<div class="comentarios">${cm.map(c => `<div class="cmt">${avatar(usuario(c.autor), 'sm')}<div><div class="burb"><b>${esc(autorVisible(c.autor).nombre)}</b>${esc(c.text)}</div><time>${hace(c.createdAt)}</time></div></div>`).join('')}
       <form class="linea-form" data-f="comentar" data-id="${p.id}"><input name="text" id="cm-${p.id}" required maxlength="300" placeholder="Escribí un comentario…" autocomplete="off"><button class="btn btn-pri">${I('send')}</button></form></div>` : ''}
   </article>`;
@@ -98,10 +158,29 @@ A['react'] = el => {
 };
 A['voy'] = el => { const u = yo(); Store.cambiar(s => { const p = s.posts.find(x => x.id === el.dataset.id); if (!p) return; p.voy = p.voy || []; const i = p.voy.indexOf(u.id); i >= 0 ? p.voy.splice(i, 1) : p.voy.push(u.id); }); };
 A['fijar'] = el => Store.cambiar(s => { const p = s.posts.find(x => x.id === el.dataset.id); if (p) p.fijado = !p.fijado; });
-A['post-resuelto'] = el => Store.cambiar(s => { const p = s.posts.find(x => x.id === el.dataset.id); if (p){ p.resuelto = Date.now(); notificar(s, { para:'todos', titulo:'¡Apareció!', texto:p.title, icon:'heart', color:'ok', link:'pizarron' }); } });
+/* "¡APARECIÓ!" BORRA EL AVISO (Claudio, 10-10-2026: "al borrar el aviso
+   porque se encontró, no se borra y sigue apareciendo 'se perdió'", en su
+   portal y en el pizarrón de la garita). Antes "Apareció" solo lo marcaba
+   como resuelto: salía de Mascotas pero seguía en el Pizarrón para todos,
+   y el "Se busca a…" quedaba en la campanita. Ahora se borra el aviso, se
+   van sus avisos de la campanita y al barrio le llega "¡Apareció!". */
+A['post-resuelto'] = async el => {
+  const p0 = Store.s.posts.find(x => x.id === el.dataset.id); if (!p0) return;
+  const nom = String(p0.title || '').replace(/^Se perdi[oó]\s+/i, '');
+  if (!await confirmar(`¿Apareció ${esc(nom)}?`, 'Se borra el aviso del pizarrón y de la campanita, y le contamos al barrio que apareció.', { si:'¡Sí, apareció!' })) return;
+  Store.cambiar(s => { const p = s.posts.find(x => x.id === p0.id); if (!p) return;
+    s.posts = s.posts.filter(x => x.id !== p.id); quitarAvisosDePost(s, p);
+    notificar(s, { para:'todos', titulo:`¡Apareció ${nom}!`, texto:'Gracias a todos por estar atentos', icon:'heart', color:'ok', link:'mascotas' }); });
+  toast(`¡Qué bueno! Avisamos que apareció ${nom}`, 'heart');
+};
+A['post-renovar'] = el => { Store.cambiar(s => { const p = s.posts.find(x => x.id === el.dataset.id); if (p && p.autor === yo().id) p.renovado = Date.now(); });
+  const p = Store.s.posts.find(x => x.id === el.dataset.id); if (p) toast(textoVencePost(p), 'clock'); };
 A['borrar-post'] = async el => {
   if (!await confirmar('Borrar publicación', 'Se borra para todos los vecinos.', { si:'Borrar', peligro:true })) return;
-  Store.cambiar(s => { const p = s.posts.find(x => x.id === el.dataset.id); if (p?.foto?.fotoId) Fotos.borrar(p.foto.fotoId); s.posts = s.posts.filter(x => x.id !== el.dataset.id); });
+  Store.cambiar(s => { const p = s.posts.find(x => x.id === el.dataset.id); if (!p) return;
+    /* La foto de una mascota es la de su ficha en Mi casa: esa no se toca. */
+    if (p.foto?.fotoId && !fotoDeMascota(p.foto.fotoId)) Fotos.borrar(p.foto.fotoId);
+    s.posts = s.posts.filter(x => x.id !== p.id); quitarAvisosDePost(s, p); });
   toast('Publicación borrada', 'trash');
 };
 A['nuevo-post'] = (el) => {
@@ -155,10 +234,13 @@ F['nuevo-post'] = d => {
       notificar(s, { para:'todos', titulo: d.type === 'guardia' ? `Guardia: ${p.title}` : d.type === 'alerta' ? `Alerta: ${p.title}` : p.title,
         texto:p.body.slice(0, 100), icon:TIPOS_POST[d.type].icon, color:TIPOS_POST[d.type].c, link:'pizarron', sonido:true });
     else if (d.type === 'perdido' || d.type === 'evento')
-      notificar(s, { para:'todos', titulo:`${TIPOS_POST[d.type].n}: ${p.title}`, texto:`${u.casa}`, icon:TIPOS_POST[d.type].icon, color:TIPOS_POST[d.type].c, link:'pizarron' });
+      notificar(s, { para:'todos', titulo:`${TIPOS_POST[d.type].n}: ${p.title}`, texto:`${u.casa}`, icon:TIPOS_POST[d.type].icon, color:TIPOS_POST[d.type].c, link:'pizarron', postId:p.id });
   });
   cerrarHoja(); if (PILA[PILA.length - 1]?.id !== 'pizarron') abrir('pizarron');
-  toast('Publicado', 'check');
+  /* Cada uno sabe desde el primer momento cuándo se borra y cómo sacarlo antes (10-10-2026). */
+  hoja('Publicado', `${aviso('ok', 'check', 'Ya está en el pizarrón', esc(p.title))}
+    <div class="card plana small" style="display:flex;gap:10px;align-items:flex-start">${I('clock')}<span><b>${esc(textoVencePost(p))}.</b> Te avisamos cuando se borre. Si querés sacarlo antes, tocá el tachito ${I('trash')} de tu publicación en el Pizarrón.${RENOVABLES.includes(p.type) ? ' Los últimos 3 días lo podés renovar desde ahí mismo.' : ''}</span></div>
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja" style="margin-top:12px">Entendido</button>`, { ancho:'460px' });
 };
 /* Marca como leídos los avisos que llevan a esta ventana. */
 function marcarVisto(link){
@@ -214,7 +296,9 @@ R.mascotas = {
   titulo: 'Mascotas', icon: 'paw', color: 'ok', sub: 'Del barrio, perdidas y encontradas',
   render(){
     const u = yo(), s = Store.s;
-    const perdidas = s.posts.filter(p => p.type === 'perdido' && !p.resuelto);
+    const perdidas = s.posts.filter(p => p.type === 'perdido' && !p.resuelto && !postVencido(p));
+    /* El aviso de "se perdió" de cada mascota, si está vigente. */
+    const avisoDe = (m, d) => perdidas.find(p => p.autor === d.id && (p.mascotaId === m.id || (!p.mascotaId && p.title === `Se perdió ${m.nombre}`)));
     const todas = s.users.filter(x => x.estado === 'aprobado').flatMap(x => (x.mascotas || []).map(m => ({ ...m, dueno:x })));
     return `${perdidas.length ? sec('Se buscan') + perdidas.map(cardPost).join('') : ''}
       ${sec('Las mascotas del barrio', `<button class="link" data-a="abrir" data-v="perfil">Sumar la mía</button>`)}
@@ -222,19 +306,23 @@ R.mascotas = {
       ${todas.length ? `<div class="hoy">${todas.map(m => `<div class="card">
         ${m.foto ? `<span class="masc-foto">${fotoHTML(m.foto, 'mini-foto', { aPedido: m.dueno.id !== u.id })}${m.dueno.id !== u.id ? `<i>${I('eye')}</i>` : ''}</span>` : `<span class="ic ic-ok" style="width:56px;height:56px;border-radius:12px;display:grid;place-items:center;flex:none">${I('paw')}</span>`}
         <div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.dueno.casa)}</span><span style="margin-top:4px;color:var(--ink-2)">${esc(m.desc || '')}</span>
-        <div class="btns" style="margin-top:8px">${m.dueno.id === u.id
-          ? `<button class="btn btn-xs btn-danger-soft" data-a="se-perdio" data-v="${m.id}">${I('alert')}Se perdió</button>`
-          : `<button class="btn btn-xs btn-sec" data-a="la-vi" data-v="${m.id}" data-id="${m.dueno.id}">${I('eye')}La vi suelta</button>`}</div></div></div>`).join('')}</div>` : vacio('paw', 'Todavía nadie sumó su mascota.')}
+        <div class="btns" style="margin-top:8px">${(() => { const av = avisoDe(m, m.dueno);
+          if (m.dueno.id === u.id) return av ? `<span class="pill p-warn">${I('alert')}Perdida · avisado al barrio</span><button class="btn btn-xs btn-ok" data-a="post-resuelto" data-id="${av.id}">${I('check')}¡Apareció!</button>`
+            : `<button class="btn btn-xs btn-danger-soft" data-a="se-perdio" data-v="${m.id}">${I('alert')}Avisar que se perdió</button>`;
+          return `${av ? `<span class="pill p-warn">${I('alert')}Se busca</span>` : ''}<button class="btn btn-xs btn-sec" data-a="la-vi" data-v="${m.id}" data-id="${m.dueno.id}">${I('eye')}La vi suelta</button>`; })()}</div></div></div>`).join('')}</div>` : vacio('paw', 'Todavía nadie sumó su mascota.')}
       ${sec('Normas')}<div class="card small" style="color:var(--ink-2)">En espacios comunes, siempre con correa. Vacuna antirrábica al día e identificación. Se levantan los desechos. Queda prohibido el maltrato o el abandono (Ley 14.346).</div>`;
   },
 };
 A['se-perdio'] = el => {
   const u = yo(), m = (u.mascotas || []).find(x => x.id === el.dataset.v); if (!m) return;
+  /* Una sola vez: si ya está avisada, no se repite el aviso. */
+  if (Store.s.posts.some(p => p.type === 'perdido' && !p.resuelto && !postVencido(p) && p.autor === u.id && (p.mascotaId === m.id || p.title === `Se perdió ${m.nombre}`))){ toast(`${m.nombre} ya está avisada en el pizarrón`, 'paw'); return; }
+  const id = uid();
   Store.cambiar(s => {
-    s.posts.unshift({ id:uid(), type:'perdido', title:`Se perdió ${m.nombre}`, body:`${m.especie || ''}. ${m.desc || ''}\nSi la ven, avisen a ${u.casa}.`, autor:u.id, createdAt:Date.now(), reactions:{}, comments:[], foto:m.foto || null });
-    notificar(s, { para:'todos', titulo:`Se busca a ${m.nombre}`, texto:`${m.especie || ''} de ${u.casa}`, icon:'paw', color:'warn', link:'mascotas', sonido:true });
+    s.posts.unshift({ id, type:'perdido', mascotaId:m.id, title:`Se perdió ${m.nombre}`, body:`${m.especie || ''}. ${m.desc || ''}\nSi la ven, avisen a ${u.casa}.`, autor:u.id, createdAt:Date.now(), reactions:{}, comments:[], foto:m.foto || null });
+    notificar(s, { para:'todos', titulo:`Se busca a ${m.nombre}`, texto:`${m.especie || ''} de ${u.casa}`, icon:'paw', color:'warn', link:'mascotas', sonido:true, postId:id });
   });
-  toast('Avisamos a todo el barrio', 'paw');
+  toast(`Avisamos a todo el barrio. Cuando aparezca, tocá "¡Apareció!" y se borra el aviso (si no, se borra solo a los 30 días).`, 'paw');
 };
 A['la-vi'] = el => hoja('¿Dónde la viste?', `<form data-f="la-vi" data-m="${el.dataset.v}" data-id="${el.dataset.id}"><div class="field"><label>Lugar</label><input name="lugar" required maxlength="80" placeholder="Ej: calle 3, cerca de los contenedores"></div><button class="btn btn-pri btn-block">${I('send')}Avisar al dueño</button></form>`);
 F['la-vi'] = (d, form) => {
@@ -311,7 +399,7 @@ const FAQ = [
   ['¿Cómo pago las expensas?', 'En Tu casa → Mis expensas ves el saldo y el cupón del mes. Tocá la tarjeta para pagar por transferencia (alias y CBU a mano) y avisá el pago con el comprobante: la Administración lo confirma y te llega el recibo. Mientras no esté el pago online con Mercado Pago, si ya transferiste alcanza con tocar "Ya la pagué · marcarla como pagada": queda pagada y la Administración la confirma con el banco.', 'abrir', 'expensas', 'Mis expensas'],
   ['¿Para qué sirve Mi credencial?', 'Para que la garita sepa en un segundo que sos del barrio y de qué lote, sin que tengas que mostrar el DNI. Sirve sobre todo cuando la guardia no te reconoce: si llegás en un auto que no es el tuyo (taxi, remís, Uber, uno prestado, alquilado o del taller) o caminando; si sos nuevo, inquilino o familiar y todavía no te conocen; o si en la garita hay un guardia de reemplazo. Mostrás el QR en el celular, la garita lo escanea y ve solo tu nombre, tu lote, las patentes de tus autos y, si la cargaste, la foto del frente de tu casa. No abre el portón, no anota tus entradas ni tus salidas. Cada cuenta tiene la suya; si alguien la copió, generá una nueva y la anterior deja de valer.', 'mi-credencial', '', 'Mi credencial'],
   ['¿Cómo hago un reclamo a la Administración?', 'En Tu casa → Mis reclamos. Es privado: lo ven solo vos y la Administración, que te contesta por ahí. Si otros vecinos tienen el mismo problema, la Administración puede publicarlo en el pizarrón.', 'abrir', 'reclamos', 'Mis reclamos'],
-  ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el buscador de Vecinos y en lo que publicás en el pizarrón. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Tus mensajes privados y tus reclamos no los ve ningún otro vecino. Más abajo, en "Tus datos: privacidad y seguridad", está todo el detalle.', 'abrir', 'perfil', 'Mi casa'],
+  ['¿Qué ven los otros vecinos de mí?', 'Tu nombre y tu lote en el buscador de Vecinos y en lo que publicás en el pizarrón. Tu teléfono, tu profesión u oficio y tu dirección, solo si vos marcás compartirlos en Mi casa. Tus mensajes privados y tus reclamos no los ve ningún otro vecino. Si tu lote tiene deuda vencida, figura en "Morosos del barrio" (Mis expensas) por número de lote, sin tu nombre. Más abajo, en "Tus datos: privacidad y seguridad", está todo el detalle.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Cómo aparezco en la agenda como profesional u oficio?', 'En Mi casa cargá tu profesión u oficio y tu celular, y marcá que se muestre al barrio. Aparecés solo en Profesionales y oficios y en la Agenda, con botón de WhatsApp.', 'abrir', 'perfil', 'Mi casa'],
   ['¿Dónde están las normas del barrio?', 'En El barrio → Manual y normas, solapa "Normas y reglamentos", con un buscador ("¿hasta qué hora puedo hacer obra?"). Ahí también están la ordenanza municipal de barrios cerrados y lo que dice el Código Civil, y cada una se puede descargar (o todas juntas) para imprimir o guardar en PDF.', 'abrir', 'documentos', 'Normas y reglamentos'],
   ['¿Dónde veo quiénes de mi casa están en la app?', 'En Tu casa → Mi casa, al final: "Quiénes están en tu lote", con la relación de cada uno con el lote y si tiene la app abierta. Si aparece alguien que no vive en tu casa (o alguien que no conocés pide entrar en tu lote), tocá "No es de mi lote" y la Administración lo revisa.', 'abrir', 'perfil', 'Mi casa'],
@@ -366,9 +454,15 @@ const FAQ_DATOS = [
     '• Calidad y minimización (art. 4 inc. 1): los datos obligatorios son nombre y apellido, lote, correo y DNI (este último, para verificar que sos del barrio antes de aprobar la cuenta). Teléfono, profesión u oficio, vehículos, mascotas y foto del frente de la casa son optativos.',
     '• Finalidad (art. 4 inc. 3): comunicación, seguridad, administración y convivencia del barrio. Ningún dato se usa para publicidad ni para un fin distinto o incompatible (art. 27). La app puede mostrar promociones y publicidad de comercios, pero no les pasa datos, no elige los anuncios según quién mira y no tiene herramientas de seguimiento o de estadística de terceros.',
     '• Exactitud (art. 4 inc. 4 y 5): cada vecino corrige sus propios datos en Mi casa, en cualquier momento.',
-    '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran. Pasado ese plazo, la visita queda solo en el archivo histórico del barrio (quién vino, a qué lote y cuándo), sin DNI ni patente, con las mismas reglas de acceso que el resto: cada vecino ve solo las suyas.',
+    '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran; los mensajes privados se borran solos a los 90 días; lo publicado en el pizarrón se borra solo a su tiempo (de 2 a 30 días según qué es, o cuando su autor lo borra). Pasado ese plazo, la visita queda solo en el archivo histórico del barrio (quién vino, a qué lote y cuándo), sin DNI ni patente, con las mismas reglas de acceso que el resto: cada vecino ve solo las suyas.',
     '• Privacidad por defecto: lo optativo nace oculto. Tu teléfono y tu oficio se muestran a otros vecinos solo si vos lo marcás, y lo podés quitar cuando quieras. La dirección del lote (calle y altura) sí figura en la guía del barrio, como en cualquier barrio.',
-    '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, el hotel no puede leer ninguna carpeta ni lista de vecinos (ve solo la dirección de cada lote, que no dice de quién es), los teléfonos de cada lote los leen solo la garita, la Administración y la supervisión, el padrón de expensas (DNI, correo y deuda) y la liquidación completa (la cuota, los intereses, las multas y la deuda de cada lote) solo la Administración, a cada vecino le llegan solo las cuotas de su propio lote, la garita no puede leer expensas, pagos, reclamos ni las conversaciones de los vecinos con la Administración, la Administración no puede leer las conversaciones de un vecino con la garita, y el supervisor de la guardia solo puede mirar lo de la garita (y dar el visto a los partes de turno), sin poder cambiar nada ni leer las conversaciones de los vecinos.',
+    '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, el hotel no puede leer ninguna carpeta ni lista de vecinos (ve solo la dirección de cada lote, que no dice de quién es), los teléfonos de cada lote los leen solo la garita, la Administración y la supervisión, el padrón de expensas (DNI, correo y deuda) y la liquidación completa (la cuota, los intereses, las multas y la deuda de cada lote) solo la Administración, a cada vecino le llegan solo las cuotas de su propio lote (la única excepción es la lista de morosos: los lotes con deuda vencida, por número de lote y sin nombres, que leen los vecinos y la Administración pero no la garita, la supervisión ni el hotel, y que la Administración puede apagar), la garita no puede leer expensas, pagos, reclamos ni las conversaciones de los vecinos con la Administración, la Administración no puede leer las conversaciones de un vecino con la garita, y el supervisor de la guardia solo puede mirar lo de la garita (y dar el visto a los partes de turno), sin poder cambiar nada ni leer las conversaciones de los vecinos.',
+  ]],
+  ['¿Qué pasa con mi voz si uso el asistente por voz? ¿Y la cámara de la garita?', [
+    'En simple: lo que decís lo entiende tu propio teléfono; la app usa solo el texto para hacer lo que pediste y no guarda el audio.',
+    '• El asistente por voz es optativo y se activa por equipo (vecinos y garita); se apaga en Tu cuenta. El reconocimiento lo hace el navegador del teléfono: en Android y Chrome el audio lo procesa Google; en iPhone y iPad, Apple. La app no graba ni guarda el audio.',
+    '• La garita también puede leer una patente con la cámara: la foto se procesa en su mismo teléfono (con un programa que se baja una vez) y no se guarda ni se manda a ningún lado; queda solo el texto de la patente para buscar el pase.',
+    '• La garita lo usa para avisarle a un lote que llegó una visita, para buscar la dirección de un lote en la guía del barrio y para fijarse si alguien tiene pase: son los mismos datos que ya ve en su pantalla. Antes de avisarle a un vecino, la app repite lo que entendió y espera el "sí".',
   ]],
   ['¿Está todo cifrado (encriptado)? ¿Qué medidas de seguridad hay?', [
     'En simple: sí, en el viaje y en el guardado. Y además el servidor decide quién puede leer cada cosa.',

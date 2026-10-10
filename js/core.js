@@ -163,7 +163,7 @@ function migrar(s){
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], mensajeria:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
     hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[],
     /* 08-10: el resumen de cada liquidación y las cuotas de cada lote (ExpLote, js/v-expensas.js) */
-    liqResumen:[], cuotasLote:[],
+    liqResumen:[], cuotasLote:[], morosos:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[],
     /* 07-10: supervisión de la guardia (js/v-supervisor.js) */
     alertasSup:[], vistos:[] };
@@ -619,7 +619,7 @@ function codigoPase(){
    ========================================================= */
 const Automatico = { clave:null, n:0 };
 const idAutomatico = () => 'm-' + String(Automatico.clave).replace(/[.#$\[\]\/\s]/g, '_') + '-' + (++Automatico.n);
-function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '', mensId = '', vence = 0 }){
+function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand', link = '', urgente = false, sonido = false, push = true, camionId = '', mensId = '', vence = 0, postId = '' }){
   const auto = !!Automatico.clave, id = auto ? idAutomatico() : uid();
   /* Ya está (lo dio otro equipo y ya bajó): no se repite ni se le borra a
      nadie el "visto". */
@@ -628,6 +628,8 @@ function notificar(s, { para, titulo, texto = '', icon = 'bell', color = 'brand'
   if (camionId) n.camionId = camionId;
   /* "Andreani va a tu casa" queda atado a ese correo (js/v-servicio.js). */
   if (mensId) n.mensId = mensId;
+  /* El aviso de una publicación (una mascota perdida) se va con ella (10-10-2026). */
+  if (postId) n.postId = postId;
   if (vence) n.vence = vence;
   s.notifs.unshift(n);
   if (s.notifs.length > 400) s.notifs.length = 400;

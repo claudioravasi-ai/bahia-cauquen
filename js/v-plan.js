@@ -28,6 +28,13 @@
    ========================================================= */
 
 const MESES_LARGO = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+/* EL ÚLTIMO IPC PUBLICADO POR EL INDEC (para la proyección de los morosos,
+   10-10-2026). Agosto de 2026: 1,7 % mensual (nivel general; Patagonia,
+   1,8 %), publicado el 10-09-2026. El de septiembre sale a mediados de
+   octubre: cuando salga, se actualiza acá (o la Administración pone su
+   número en Plan → Cómo se calcula → "IPC para la proyección"). */
+const IPC_INDEC = { periodo:'2026-08', pct:1.7, publicado:'2026-09-10', fuente:'INDEC' };
+const ipcProyeccion = () => { const p = Store.s?.config?.plan || {}; return +p.ipcProyeccion > 0 ? { pct:+p.ipcProyeccion, periodo:p.ipcPeriodo || '', fuente:'Administración' } : IPC_INDEC; };
 const MESES_CORTO = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const periodoSiguiente = p => { const [a, m] = p.split('-').map(Number); return m === 12 ? `${a + 1}-01` : `${a}-${pad(m + 1)}`; };
 const mesesEntre = (a, b) => { const [y1, m1] = a.split('-').map(Number), [y2, m2] = b.split('-').map(Number); return (y2 - y1) * 12 + (m2 - m1); };
@@ -584,7 +591,7 @@ document.addEventListener('change', async e => {
       notificar(s, { para:'todos', titulo:`Expensas de ${nombrePeriodo(b.periodo)}`, texto:`Ya podés ver tu cupón en la app. Primer vencimiento: ${fechaCorta(b.vto1 || vtoDe(b.periodo, 1))}.`, icon:'wallet', color:'wood', link:'expensas', sonido:true });
       auditar(s, 'Trajo la liquidación real', `${nombrePeriodo(b.periodo)} · ${b.lotes.length} cupones · ${plata(tot)} · ${res.pagos} cobros por ${plata(res.cobrado)} · ${res.malos.length ? res.malos.length + ' lotes no coinciden' : 'todos coinciden con el PDF'}`);
     });
-    HotelExp.publicar(); ExpLote.publicar();
+    HotelExp.publicar(); ExpLote.publicar(); Morosos.publicar();
     hoja(`${nombrePeriodo(b.periodo)}, real`, `${res.malos.length ? aviso('danger', 'alert', `${plural(res.malos.length, 'lote no coincide', 'lotes no coinciden')} con el PDF`, res.malos.slice(0, 12).map(esc).join('<br>'))
         : aviso('ok', 'check', `Listo: los ${res.lotes} lotes coinciden al centavo con el PDF`, `Cada vecino ya ve su cupón de ${nombrePeriodo(b.periodo)} por pagar (${plata(res.totalCupones)} entre todos).`)}
       <div class="garita-kpis"><div class="kpi"><b>${res.pagos}</b><span>Cobros de ${MESES_LARGO[+b.anterior.slice(5)]}</span></div><div class="kpi"><b>${plataCorta(res.cobrado)}</b><span>Cobrado</span></div>

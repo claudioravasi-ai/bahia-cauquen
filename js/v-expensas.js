@@ -511,6 +511,7 @@ function carpetaVecino(lote, { ajena = false } = {}){
       <div class="it"><div class="txt"><b>CBU</b><span class="mono">${esc(Store.s.config.cbu || '—')}</span></div><button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(Store.s.config.cbu || '')}">${I('copy')}</button></div>
       <div class="it"><div class="txt"><b>Titular</b><span>Barrio ${esc(Store.s.config.nombre)} · CUIT ${esc(Store.s.config.cuit || '')}</span></div></div></div>
     ${superficie({ a:'abrir', v:'privado', p:'admin|expensas', icon:'lock', color:'accent', t:'Consultar a la Administración', s:'Planes de pago, diferencias, dudas' })}
+    ${ajena ? '' : seccionMorosos()}
     <p class="muted tiny">El vencimiento se te recuerda solo: tres días antes, el día del primer vencimiento y si queda saldo impago.</p>`;
 }
 /* =========================================================
@@ -1127,7 +1128,11 @@ const COBRO = {
     const informados = Store.s.pagos.filter(porAcreditar).sort((a, b) => b.at - a.at);
     const mpAprob = Store.s.pagos.filter(p => p.estado === 'informado' && esPagoMP(p) && !esPrueba(p)).sort((a, b) => b.at - a.at);
     const pruebas = Store.s.pagos.filter(esPrueba).sort((a, b) => b.at - a.at);
-    const confirmados = Store.s.pagos.filter(p => p.estado === 'confirmado').sort((a, b) => b.at - a.at).slice(0, 20);
+    /* SOLO LOS DEL MES EN CURSO (pedido de Claudio, 10-10-2026). Los de
+       otras fechas se piden con "Ver pagos de otras fechas" y se traen de la
+       base en ese momento (incluido el archivo). */
+    const delMes = periodoHoy() + '-01';
+    const confirmados = Store.s.pagos.filter(p => p.estado === 'confirmado' && !esPrueba(p) && String(p.fecha || '') >= delMes).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || b.at - a.at);
     const mes = Store.s.pagos.filter(p => p.estado === 'confirmado' && p.fecha >= periodoHoy() + '-01').reduce((a, p) => a + p.monto, 0);
     return `<div class="card"><div class="row" style="justify-content:space-between"><b>Cobrado en ${nombrePeriodo(periodoHoy())}</b><b class="num" style="font-size:18px">${plata(mes)}</b></div></div>
       ${typeof lotesCargaInicial === 'function' && cfgPlan().base && !cfgPlan().cargaInicial && lotesCargaInicial().length > 20 ? aviso('warn', 'zap', `Falta registrar los cobros del cupón de ${nombrePeriodo(cfgPlan().base)}`,
@@ -1157,9 +1162,9 @@ const COBRO = {
           <button class="btn btn-sm btn-ok" data-a="confirmar-pago" data-id="${p.id}">${I('check')}Confirmar y emitir recibo</button>
           <button class="btn btn-sm btn-danger-soft" data-a="rechazar-pago" data-id="${p.id}">Rechazar</button></div></div>`).join('')
         : vacio('check', 'No hay pagos esperando que los corroboren.')}
-      ${sec('Últimos pagos confirmados')}
-      <div class="card lista">${confirmados.map(p => `<div class="it"><span class="ic ic-ok" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('check')}</span>
-        <div class="txt"><b>${esc(etiquetaPago(p))}</b><span>${fechaCorta(p.fecha)} · ${esc(p.medio)}${p.recibo ? ' · recibo ' + esc(p.recibo) : ''}</span></div><b class="num">${plata(p.monto)}</b></div>`).join('') || '<p class="muted small" style="margin:6px 0">Todavía no hay pagos confirmados.</p>'}</div>`;
+      ${sec(`Pagos confirmados de ${nombrePeriodo(periodoHoy())} (${confirmados.length})`, `<button class="link" data-a="pagos-fechas">${I('calendar')}Otras fechas</button>`)}
+      <div class="card lista">${confirmados.map(filaPagoConfirmado).join('') || `<p class="muted small" style="margin:6px 0">Todavía no hay pagos confirmados en ${nombrePeriodo(periodoHoy())}.</p>`}</div>
+      <button class="btn btn-sec btn-block" data-a="pagos-fechas" style="margin-top:10px">${I('calendar')}Ver pagos de otras fechas (de tal fecha a tal fecha)</button>`;
   },
 
   morosos(){
@@ -1167,6 +1172,8 @@ const COBRO = {
     const total = filas.reduce((a, x) => a + x.saldo, 0);
     return `<div class="card"><div class="row" style="justify-content:space-between"><b>Deuda total del barrio</b><b class="num" style="font-size:18px;color:var(--danger)">${plata(total)}</b></div>
         <div class="muted small">${plural(filas.length, 'lote con deuda', 'lotes con deuda')} de ${LOTES.length}</div></div>
+      ${superficie({ a:'morosos-visibles', icon:'lock', color: Morosos.visibles() ? 'ok' : 'wood', t: Morosos.visibles() ? 'Los vecinos ven la lista de morosos' : 'Los vecinos NO ven la lista de morosos', s: Morosos.visibles() ? 'En Mis expensas: por lote, sin nombres (deuda por mes, total, judicial y proyección). Tocá para dejar de mostrarla.' : 'Tocá para mostrarla en Mis expensas, por lote y sin nombres.' })}
+      ${Morosos.visibles() ? `<button class="btn btn-sec btn-block" data-a="morosos-barrio" style="margin:-4px 0 12px">${I('eye')}Ver la lista como la ven los vecinos</button>` : ''}
       ${filas.map(x => { const m = cuentaLote(x.lote).movs.filter(v => v.debe), desde = m.length ? m[0].fecha : Date.now();
         const meses = Math.max(1, Math.round((Date.now() - desde) / (30 * DIA)));
         return `<div class="card"><div class="row"><span class="ic ic-${x.saldo > 1000000 ? 'danger' : 'warn'}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I('alert')}</span>
@@ -1179,6 +1186,47 @@ const COBRO = {
   },
 
 };
+
+/* Un pago confirmado, en una fila. */
+const filaPagoConfirmado = p => `<div class="it"><span class="ic ic-ok" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('check')}</span>
+  <div class="txt"><b>${esc(etiquetaPago(p))}</b><span>${fechaCorta(p.fecha)} · ${esc(p.medio || '')}${p.recibo ? ' · recibo ' + esc(p.recibo) : ''}</span></div><b class="num">${plata(p.monto)}</b></div>`;
+/* LOS PAGOS DE OTRAS FECHAS, A PEDIDO (10-10-2026). Se traen de la base
+   recién cuando la Administración elige las fechas: la carpeta de pagos
+   (pv/pagos) y el archivo (hist/pagos). Sin conexión, lo que hay en el equipo. */
+A['pagos-fechas'] = () => {
+  if (!esAdmin()) return;
+  const hoy = hoyISO(), ini = sumarDias(periodoHoy() + '-01', -1).slice(0, 7) + '-01';
+  hoja('Pagos de otras fechas', `<form data-f="pagos-fechas">
+    <div class="grid2"><div class="field"><label>Desde</label><input type="date" name="desde" value="${ini}" max="${hoy}" required></div>
+      <div class="field"><label>Hasta</label><input type="date" name="hasta" value="${hoy}" max="${hoy}" required></div></div>
+    <div class="field"><label>Lote (opcional)</label><input name="lote" maxlength="10" inputmode="numeric" placeholder="Todos"></div>
+    <button class="btn btn-pri btn-block">${I('search')}Traer de la base</button>
+    <p class="muted tiny" style="margin:10px 0 0">Se traen solo ahora, para mirar o bajar la planilla. No cambian nada de las cuentas.</p></form>`, { ancho:'460px' });
+};
+let pagosFechas = [];
+F['pagos-fechas'] = async d => {
+  if (!esAdmin()) return;
+  const desde = d.desde, hasta = d.hasta >= d.desde ? d.hasta : d.desde, lote = d.lote ? 'Lote ' + String(d.lote).replace(/^lote\s*/i, '').trim() : '';
+  const titulo = `Pagos del ${fechaCorta(desde)} al ${fechaCorta(hasta)}${lote ? ' · ' + lote : ''}`;
+  hoja(titulo, `<div class="card plana small" style="display:flex;gap:10px;align-items:center">${I('refresh')} Trayendo los pagos de la base del barrio…</div>`);
+  try {
+    let todos = Store.s.pagos.slice(), deLaBase = false;
+    if (typeof Historial !== 'undefined' && Historial.hayNube()){
+      const junta = v => { const out = []; Object.values(v || {}).forEach(dueno => Object.values(dueno || {}).forEach(x => { if (x && x.id) out.push(x); })); return out; };
+      const [vivos, arch] = await Promise.all([Historial.traer('pv/pagos'), Historial.traer('hist/pagos').catch(() => ({}))]);
+      const vistos = new Map(); [...junta(vivos), ...junta(arch)].forEach(x => vistos.set(x.id, x)); todos = [...vistos.values()]; deLaBase = true;
+    }
+    pagosFechas = todos.filter(p => p && p.estado === 'confirmado' && !esPrueba(p) && String(p.fecha || '') >= desde && String(p.fecha || '') <= hasta && (!lote || pagoDelLote(p, lote)))
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)) || (b.at || 0) - (a.at || 0));
+    const total = pagosFechas.reduce((a, p) => a + (+p.monto || 0), 0);
+    hoja(titulo, `<div class="card"><div class="row" style="justify-content:space-between"><b>${plural(pagosFechas.length, 'pago confirmado', 'pagos confirmados')}</b><b class="num" style="font-size:18px">${plata(total)}</b></div>
+        <div class="muted small">${deLaBase ? 'Traídos de la base recién (incluye el archivo).' : 'Modo de prueba: lo que hay en este equipo.'}</div></div>
+      <div class="card lista">${pagosFechas.slice(0, 400).map(filaPagoConfirmado).join('') || '<p class="muted small" style="margin:6px 0">No hay pagos confirmados en esas fechas.</p>'}</div>
+      ${pagosFechas.length > 400 ? '<p class="muted tiny">Se muestran 400: bajá la planilla para verlos todos.</p>' : ''}
+      <div class="btns" style="margin-top:12px"><button class="btn btn-sec" data-a="pagos-fechas">${I('calendar')}Otras fechas</button>${pagosFechas.length ? `<button class="btn btn-sec grow" data-a="pagos-fechas-csv">${I('download')}Planilla (CSV)</button>` : ''}</div>`);
+  } catch(e){ hoja('No se pudieron traer los pagos', aviso('danger', 'alert', 'La base no los entregó', esc(e && e.message || 'Revisá la conexión.'))); }
+};
+A['pagos-fechas-csv'] = () => { if (typeof csvDe === 'function') csvDe([['fecha', 'lote', 'importe', 'medio', 'recibo'], ...pagosFechas.map(p => [p.fecha, p.lote || '', p.monto, p.medio || '', p.recibo || ''])], `pagos-${hoyISO()}.csv`); };
 
 /* Presentaciones mensuales. Las fechas exactas las fija ARCA según la
    terminación de CUIT: acá se usa una estimación y la Administración la
@@ -1290,14 +1338,14 @@ function emitirLiquidacion(periodo, { auto = false } = {}){
     auditar(s, auto ? 'Emitió sola la liquidación (cierre automático)' : 'Emitió la liquidación', `${nombrePeriodo(periodo)} · ${plata(calc.totalCuotas)} · ${calc.cuotas.length} cupones`);
   });
   toast('Liquidación emitida', 'check');
-  HotelExp.publicar(); ExpLote.publicar();
+  HotelExp.publicar(); ExpLote.publicar(); Morosos.publicar();
   mandarCupones(periodo);
 }
 A['reabrir-liquidacion'] = async el => {
   if (!await confirmar('Reabrir el período', 'Los cupones dejan de estar emitidos hasta que lo vuelvas a cerrar. Los pagos ya registrados no se tocan.', { si:'Reabrir', peligro:true })) return;
   Store.cambiar(s => { const l = s.liquidaciones.find(x => x.periodo === el.dataset.v); if (l) l.estado = 'borrador';
     auditar(s, 'Reabrió un período', el.dataset.v); });
-  HotelExp.publicar(); ExpLote.publicar();
+  HotelExp.publicar(); ExpLote.publicar(); Morosos.publicar();
 };
 A['ver-liquidacion'] = el => imprimir(`Liquidación ${nombrePeriodo(el.dataset.v)}`, liquidacionHTML(el.dataset.v));
 /* REENVIAR CUPONES: a todos, a un lote (eligiendo a cuál de sus correos)
@@ -1929,6 +1977,92 @@ const ExpLote = {
     return (this._v = R.map(r => ({ ...r, cuotas: mias.filter(c => c.periodo === r.periodo) })));
   },
 };
+/* =========================================================
+   LOS MOROSOS DEL BARRIO, POR LOTE (pedido de Claudio, 10-10-2026)
+   En Mis expensas, una sección con cada lote que debe: lo adeudado mes por
+   mes, el total, si está en gestión judicial y cuánto sería esa deuda en
+   3, 6 y 12 meses actualizada por inflación (el último IPC del INDEC, ver
+   IPC_INDEC en js/v-plan.js). Sale de la última liquidación y de los
+   pagos confirmados: lo arma sola la app de la Administración.
+   PROTECCIÓN DE DATOS (Ley 25.326): por LOTE, sin nombres de propietarios,
+   como el estado de cuentas de cada unidad que trae una liquidación de
+   expensas. Lo leen solo los vecinos y la Administración (/barrio/morosos):
+   ni la garita, ni la supervisión, ni el hotel; nunca va en avisos push,
+   correos ni en el pizarrón. La Administración lo puede apagar ("Mostrar a
+   los vecinos", en Expensas y cobranzas → Morosos). Modelo a revisar por un
+   abogado matriculado: conviene que la asamblea o el reglamento lo prevean.
+   ========================================================= */
+const Morosos = {
+  visibles: () => Store.s.config.morososVisibles !== false,
+  /* La deuda VENCIDA de un lote, mes por mes: los pagos cubren primero lo
+     más viejo. Un mes está vencido cuando pasó su segundo vencimiento; el
+     saldo que el lote traía de antes de la primera liquidación, siempre. */
+  deudaPorMes(lote){
+    const c = cuentaLote(lote), hoy = hoyISO();
+    const cargos = c.movs.filter(m => m.debe && m.periodo).map(m => ({ periodo:m.periodo, tipo:m.tipo, resta:+m.debe || 0, vencido: m.tipo === 'saldo' || vtoDe(m.periodo, 2) < hoy }));
+    let credito = c.movs.filter(m => m.haber && !m.pendiente).reduce((a, m) => a + (+m.haber || 0), 0);
+    for (const k of cargos){ if (credito <= 0) break; const u = Math.min(k.resta, credito); k.resta -= u; credito -= u; }
+    const porMes = {};
+    cargos.filter(k => k.vencido && k.resta > 0.5).forEach(k => { const key = k.tipo === 'saldo' ? 'antes-' + k.periodo : k.periodo; porMes[key] = (porMes[key] || 0) + k.resta; });
+    const orden = x => x.startsWith('antes-') ? '0' + x.slice(6) : '1' + x;
+    const meses = Object.entries(porMes).map(([p, m]) => ({ p, m:Math.round(m * 100) / 100 })).sort((a, b) => orden(a.p).localeCompare(orden(b.p)));
+    return { meses, total:Math.round(meses.reduce((a, x) => a + x.m, 0) * 100) / 100 };
+  },
+  armar(){
+    const ult = liquidacionesEmitidas().slice(-1)[0]; if (!ult || typeof LOTES === 'undefined') return [];
+    const ipc = typeof ipcProyeccion === 'function' ? ipcProyeccion() : { pct:0, periodo:'' }, i = (+ipc.pct || 0) / 100;
+    return LOTES.map(L => {
+      const lote = 'Lote ' + L.lote, d = this.deudaPorMes(lote); if (d.total <= 1) return null;
+      const cu = cuotaDe(ult, lote);
+      return { id:'mor-' + L.lote, lote, meses:d.meses, total:d.total, judicial: !!(cu && cu.judicial), interes: cu ? Math.round((+cu.interes || 0) * 100) / 100 : 0,
+        periodo:ult.periodo, ipc:+ipc.pct || 0, ipcPeriodo:ipc.periodo || '', proyeccion:[3, 6, 12].map(n => ({ n, m:Math.round(d.total * Math.pow(1 + i, n)) })) };
+    }).filter(Boolean).sort((a, b) => b.total - a.total);
+  },
+  /* La Administración lo publica solo si algo cambió (como ExpLote). */
+  publicar(){
+    if (yo()?.rol !== 'admin') return 0;
+    if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listoParaMotor && Nube.listoParaMotor())) return 0;
+    const arr = this.visibles() ? this.armar() : [];
+    const orden = a => aLista(a).slice().sort((x, y) => String(x.id).localeCompare(String(y.id)));
+    if (ExpLote.canon(orden(arr)) === ExpLote.canon(orden(Store.s.morosos))) return 0;
+    Store.cambiar(st => { st.morosos = arr; });
+    return 1;
+  },
+  /* Lo que ve cada uno: la Administración, lo de su equipo; los vecinos, lo
+     publicado (en la demo, sin la base, se arma en el momento). */
+  lista(){
+    if (!this.visibles()) return [];
+    if (esAdmin()) return this.armar();
+    if (typeof Nube !== 'undefined' && Nube.activa()) return aLista(Store.s.morosos);
+    return aLista(Store.s.morosos).length ? aLista(Store.s.morosos) : this.armar();
+  },
+  mes: p => p.startsWith('antes-') ? `Antes de ${nombrePeriodo(p.slice(6))}` : nombrePeriodo(p),
+};
+/* La sección en Mis expensas: un resumen y la lista en una hoja. */
+function seccionMorosos(){
+  if (esHotel() || esGuardia() || esSupervisor()) return '';
+  const ls = Morosos.lista(); if (!ls.length) return '';
+  const total = ls.reduce((a, x) => a + x.total, 0), jud = ls.filter(x => x.judicial).length;
+  return `${sec('Morosos del barrio')}
+    <button class="superficie mor-resumen" data-a="morosos-barrio"><span class="ic ic-danger">${I('alert')}</span>
+      <span class="txt"><b>${plural(ls.length, 'lote debe', 'lotes deben')} ${plataCorta(total)}</b><small>${jud ? plural(jud, 'en gestión judicial', 'en gestión judicial') + ' · ' : ''}deuda por mes, total y proyección a 12 meses · por lote, sin nombres</small></span>${I('right')}</button>`;
+}
+A['morosos-barrio'] = () => {
+  if (esHotel() || esGuardia() || esSupervisor()) return;
+  const ls = Morosos.lista(); if (!ls.length){ toast('No hay lotes con deuda vencida', 'check'); return; }
+  const total = ls.reduce((a, x) => a + x.total, 0), x0 = ls[0], ipcTxt = `${(x0.ipc || 0).toLocaleString('es-AR')} % mensual${x0.ipcPeriodo ? ` (IPC del INDEC de ${nombrePeriodo(x0.ipcPeriodo).toLowerCase()}, el último publicado)` : ''}`;
+  const anual = x0.ipc ? Math.round((Math.pow(1 + x0.ipc / 100, 12) - 1) * 1000) / 10 : 0;
+  hoja('Morosos del barrio', `<div class="garita-kpis"><div class="kpi"><b>${ls.length}</b><span>Lotes con deuda vencida</span></div><div class="kpi"><b>${plataCorta(total)}</b><span>Deuda vencida total</span></div><div class="kpi"><b>${ls.filter(x => x.judicial).length}</b><span>En gestión judicial</span></div></div>
+    <p class="muted small" style="margin:0 0 10px">Según la liquidación de ${nombrePeriodo(x0.periodo).toLowerCase()} y los pagos confirmados. La proyección actualiza la deuda por inflación: ${esc(ipcTxt)}, un ${anual.toLocaleString('es-AR')} % en 12 meses, sin contar el interés por mora (${tasaMoraPct().toLocaleString('es-AR')} % mensual).</p>
+    ${ls.map(x => `<div class="card mor-lote${x.judicial ? ' judicial' : ''}"><div class="row"><b class="grow" style="white-space:nowrap">${esc(x.lote)}</b>${x.judicial ? `<span class="pill p-accent">${I('file')}En gestión judicial</span>` : ''}<b class="num" style="color:var(--danger)">${plata(x.total)}</b></div>
+      <div class="mor-meses">${aLista(x.meses).map(m => `<span><small>${esc(Morosos.mes(m.p))}</small><b>${plata(m.m)}</b></span>`).join('')}</div>
+      ${x.interes ? `<div class="muted tiny">Interés por mora en el último cupón: ${plata(x.interes)}</div>` : ''}
+      <div class="mor-proy">${aLista(x.proyeccion).map(p => `<span><small>En ${p.n} meses</small><b>${plata(p.m)}</b></span>`).join('')}</div></div>`).join('')}
+    ${aviso('info', 'lock', 'Por lote y sin nombres', 'Esta lista la ven solo los vecinos del barrio y la Administración, como el estado de cuentas de una liquidación de expensas. No la ven la garita, la supervisión ni el hotel, y nunca sale en avisos, correos ni en el pizarrón. Si tu lote figura y no corresponde, escribile a la Administración.')}`, { ancho:'620px' });
+};
+A['morosos-visibles'] = () => { if (!esAdmin()) return; Store.cambiar(s => { s.config.morososVisibles = !(s.config.morososVisibles !== false); });
+  Morosos.publicar(); toast(Morosos.visibles() ? 'Los vecinos ven la lista de morosos (por lote, sin nombres)' : 'La lista de morosos ya no se muestra a los vecinos', 'lock'); refrescar(); };
+
 /* El hotel (y la Administración) completan el reparto de un pago del hotel
    que anotó el aviso automático de Mercado Pago, apenas lo ven. */
 setInterval(() => { try { if (yo() && (esHotel() || esAdmin())) completarRepartos(); } catch(e){} }, 30 * 1000);

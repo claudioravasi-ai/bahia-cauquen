@@ -1688,11 +1688,19 @@ function informeMisDatos(){
   out.push(bloque(`4. Expensas del lote: pagos y recibos de ${anio}`, `Los pagos de ${x(u.casa)} de este año y sus recibos. Los ven las cuentas de tu lote y la Administración; se conservan 10 años (art. 328 del Código Civil y Comercial). Los de años anteriores están en Mis expensas. Los comprobantes que subiste se borran 30 días después de confirmados.`,
     tabla(['Fecha', 'Importe', 'Medio', 'Estado', 'Informó'], pagos.map(p => [fc(p.fecha), typeof plata === 'function' ? plata(p.monto) : x(p.monto), x(p.medio), estadoPago(p), cuentasLote.has(p.userId) ? nom(p.userId) : 'La Administración']))
     + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa && delAnio(r.fecha)).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))));
-  /* 5 · mensajes */
-  const hilo = (titulo, msgs, quien) => `<div class="caja"><b>${titulo}</b>${msgs.length ? `<table style="margin-top:6px">${msgs.map(m => `<tr><td style="width:120px;white-space:nowrap">${fh(m.createdAt || m.at)}</td><td style="width:90px">${quien(m)}</td><td>${x(m.text)}</td></tr>`).join('')}</table>` : '<br><span style="color:#666">Sin mensajes.</span>'}</div>`;
+  /* 5 · mensajes
+     SOLO LOS DE LA SEMANA (pedido de Claudio, 10-10-2026: "se hace muy
+     largo todo"). Los de los últimos 7 días van completos; de los más
+     viejos se dice cuántos hay y dónde verlos (en Mensajes de la app, hasta
+     90 días: después se borran solos). La Ley 25.326 pide informar la
+     totalidad de lo que hay: por eso se cuenta lo que no se transcribe. */
+  const semana = Date.now() - 7 * DIA, cuando = m => (m && (m.createdAt || m.at)) || 0;
+  const hilo = (titulo, todos, quien) => { const msgs = todos.filter(m => cuando(m) >= semana), resto = todos.length - msgs.length;
+    return `<div class="caja"><b>${titulo}</b>${msgs.length ? `<table style="margin-top:6px">${msgs.map(m => `<tr><td style="width:120px;white-space:nowrap">${fh(cuando(m))}</td><td style="width:90px">${quien(m)}</td><td>${x(m.text)}</td></tr>`).join('')}</table>` : '<br><span style="color:#666">Sin mensajes en los últimos 7 días.</span>'}
+      ${resto ? `<p style="font-size:11px;color:#666;margin:6px 0 0">Además hay ${plural(resto, 'mensaje anterior', 'mensajes anteriores')} (de hasta 90 días): los ves completos en Mensajes de la app.</p>` : ''}</div>`; };
   const privs = s.privados.filter(h => h.userId === u.id);
-  out.push(bloque('5. Mensajes privados', 'Con la Administración: solo vos y la Administración. Con la garita: solo vos y la garita. Con otro vecino: solo ustedes dos. Los mensajes de más de 120 días pasan al archivo histórico (quedan siempre los 30 últimos).',
-    privs.map(h => hilo(h.con === 'guardia' ? 'Con la garita' : 'Con la Administración', aLista(h.msgs), m => m.from === 'vecino' ? 'Vos' : h.con === 'guardia' ? 'Garita' : 'Administración') + (h.archivados ? `<p style="font-size:11px;color:#666">${plural(h.archivados, 'mensaje anterior en el archivo', 'mensajes anteriores en el archivo')}.</p>` : '')).join('')
+  out.push(bloque('5. Mensajes privados (de los últimos 7 días)', 'Con la Administración: solo vos y la Administración. Con la garita: solo vos y la garita. Con otro vecino: solo ustedes dos. Acá van los de los últimos 7 días; todos los demás los ves en Mensajes de la app. Los mensajes se borran solos de la base del barrio a los 90 días.',
+    privs.map(h => hilo(h.con === 'guardia' ? 'Con la garita' : 'Con la Administración', aLista(h.msgs), m => m.from === 'vecino' ? 'Vos' : h.con === 'guardia' ? 'Garita' : 'Administración')).join('')
     + aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)).map(h => { const otro = h.a === u.id ? h.b : h.a; return hilo(`Con ${esc(primerNombre(nombreDe(otro)))} (${x(usuario(otro)?.casa || '')})`, aLista(h.msgs), m => m.de === u.id ? 'Vos' : esc(primerNombre(nombreDe(m.de)))); }).join('')
     || '<p style="color:#666">No hay conversaciones.</p>'));
   /* 6 · reclamos y peticiones */
@@ -1889,10 +1897,13 @@ const Promos = {
 };
 Promos.leer();
 
-/* La tira de promociones de la portada: una debajo de la foto, se cambia
-   sola cada tanto y se puede arrastrar con el dedo. No es un cartel
-   parpadeante: avanza despacio, se frena cuando la tocás y se queda
-   quieta si el equipo pide menos movimiento. */
+/* LA POSTAL DEL HOTEL (pedido de Claudio, 10-10-2026: opción B de las
+   propuestas). Antes era una cinta de promociones que pasaba sola. Ahora es
+   una tarjeta como una postal: el descuento bien grande a la izquierda, la
+   promoción a la derecha y, si hay varias, cambia sola cada 7 segundos
+   ("1 de 4", con sus puntitos). Se frena con el mouse encima y queda quieta
+   si el equipo pide menos movimiento. Tocarla abre la promoción. */
+let postalI = 0;
 function tiraPromos(){
   const ps = Promos.vigentes();
   if (!ps.length) return '';
@@ -1903,17 +1914,26 @@ function tiraPromos(){
     ? `<div class="card plana small" style="margin:8px 0 0">${I('info')} Estas son promociones <b>de ejemplo</b>.
         Las reales las cargan el hotel desde su cuenta o la Administración en <b>Día a día → Hotel Los Cauquenes → Promociones del hotel</b>.</div>`
     : '';
-  const chips = ps.map(p => `<button class="promo-chip" data-a="ver-promo" data-id="${esc(p.id)}">
-      ${p.descuento ? `<span class="promo-desc">${esc(p.descuento)}</span>` : `<span class="ic ic-wood">${I('star')}</span>`}
-      <span class="txt"><b>${esc(p.titulo)}</b>${p.detalle ? `<small>${esc(p.detalle)}</small>` : ''}</span></button>`);
-  return `<div class="tira-promos">
+  const i = postalI % ps.length;
+  return `<div class="tira-promos hotel-postal" data-postal="${ps.length}">
     <div class="tira-cab"><img class="tira-logo" src="img/logo-noche.png" alt="" width="26" height="26"><b>Hotel Los Cauquenes · esta semana</b>
-
-      ${ps[0] && ps[0].muestra ? `<span class="muted small">ejemplos</span>` : ps.length > 1 ? `<span class="muted small">${ps.length} propuestas</span>` : ''}</div>
-    ${marquesina(chips, 'promo-tira')}
+      ${ps[0] && ps[0].muestra ? `<span class="muted small">ejemplos</span>` : ps.length > 1 ? `<span class="muted small hp-cuenta">${i + 1} de ${ps.length}</span>` : ''}</div>
+    <div class="hp-slides">${ps.map((p, k) => `<button class="hp-slide ${k === i ? 'on' : ''}" data-a="ver-promo" data-id="${esc(p.id)}" ${k === i ? '' : 'tabindex="-1" aria-hidden="true"'}>
+      <span class="hp-desc">${p.descuento ? esc(p.descuento) : I('star')}</span>
+      <span class="txt"><small>Para los vecinos del barrio</small><b>${esc(p.titulo)}</b>${p.detalle ? `<span>${esc(p.detalle)}</span>` : ''}</span>${I('right')}</button>`).join('')}</div>
+    ${ps.length > 1 ? `<div class="hp-puntos" aria-hidden="true">${ps.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>` : ''}
     ${aviso}
   </div>`;
 }
+/* Cambia de promoción sola, sin redibujar la portada. */
+setInterval(() => {
+  const el = document.querySelector('[data-postal]'); if (!el) return;
+  const n = +el.dataset.postal || 0; if (n < 2 || el.matches(':hover') || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  postalI = (postalI + 1) % n;
+  el.querySelectorAll('.hp-slide').forEach((b, k) => { const on = k === postalI; b.classList.toggle('on', on); if (on){ b.removeAttribute('tabindex'); b.removeAttribute('aria-hidden'); } else { b.setAttribute('tabindex', '-1'); b.setAttribute('aria-hidden', 'true'); } });
+  el.querySelectorAll('.hp-puntos i').forEach((p, k) => p.classList.toggle('on', k === postalI));
+  const c = el.querySelector('.hp-cuenta'); if (c) c.textContent = `${postalI + 1} de ${n}`;
+}, 7000);
 A['ver-promo'] = el => {
   const p = Promos.vigentes().find(x => x.id === el.dataset.id); if (!p) return;
   hoja(p.titulo, `

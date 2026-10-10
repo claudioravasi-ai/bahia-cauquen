@@ -1803,6 +1803,19 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
    angostas, empujaban hacia afuera. */
 .grid2 > *,.grid3 > *{min-width:0}
 .field input,.field select,.field textarea{max-width:100%;min-width:0}
+/* FECHA Y HORA EN EL CELULAR (pedido de Claudio, 10-10-2026: "al invitar
+   una visita la fecha y hora sale rota"). Día, Desde y Hasta en tres
+   columnas de 105 px cortaban la fecha ("10/10/2") y en el iPhone, que la
+   escribe "10 oct 2026", se salía del cuadro. En pantallas angostas el día
+   va solo en su renglón y las dos horas, debajo, una al lado de la otra.
+   Además, en Safari los campos de fecha y hora no respetan el ancho ni
+   alinean el texto como los demás si no se les saca el aspecto de fábrica. */
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;display:block;min-height:48px;line-height:1.2}
+input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and-time-value{text-align:left;margin:0}
+@media (max-width:520px){
+  .grid3:not(.dia-turno-hora):has(> .field:first-child input[type=date]){grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .grid3:not(.dia-turno-hora):has(> .field:first-child input[type=date]) > .field:first-child{grid-column:1 / -1}
+}
 @media (max-width:480px){
   .turno-edit{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .turno-edit > .field:first-child{grid-column:1 / -1}
@@ -2018,10 +2031,13 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 /* Manual de uso por solapas (26-09): cada capítulo se abre y se cierra,
    con su número, su ícono y una línea de qué trata. */
 .man-intro{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;margin:0 0 12px;border-radius:18px;background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 12%,var(--surface)),var(--surface));border:1px solid var(--line)}
-.man-intro-ic{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--accent);color:#fff}
-.man-intro-ic svg{width:22px;height:22px}
+.man-intro-ic{width:56px;height:56px;border-radius:17px;display:block;flex:none;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent)}
+.man-intro-ic svg{width:56px;height:56px;display:block}
 .man-intro b{display:block;font-size:15.5px}
-.man-intro span{display:block;font-size:13px;color:var(--ink-2);line-height:1.45;margin-top:2px}
+/* Solo el texto: antes la regla tomaba también el ícono (que es un span) y
+   lo dejaba sin centrar, con el dibujo gris sobre violeta: "una mancha
+   violeta" (Claudio, 10-10-2026). */
+.man-intro > div > span{display:block;font-size:13px;color:var(--ink-2);line-height:1.45;margin-top:2px}
 details.man-cap{padding:0;margin:0 0 10px;overflow:hidden}
 details.man-cap>summary{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;list-style:none}
 details.man-cap>summary::-webkit-details-marker{display:none}
@@ -2548,3 +2564,184 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 .ficha-tel.dudoso{border-style:dashed;color:var(--muted)}
 .ficha-nota{color:var(--muted)!important}
 .ficha-tel>span{white-space:nowrap}
+
+/* El aviso rápido a la guardia, ya escrito (10-10-2026). */
+.aviso-escrito{display:flex;gap:12px;align-items:flex-start;padding:14px;margin:0 0 14px;border-radius:16px;background:color-mix(in srgb,var(--brand) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--brand) 22%,var(--line))}
+.aviso-escrito .ic{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none}
+.aviso-escrito p{margin:0;font-size:15px;line-height:1.45;font-weight:600;color:var(--ink)}
+/* Cuándo se borra sola una publicación del pizarrón (10-10-2026). */
+.post-vence{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0 0;padding:8px 10px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);font-size:12.5px;color:var(--ink-2)}
+.post-vence svg{width:15px;height:15px;flex:none;color:var(--muted)}
+.post-vence span{flex:1 1 180px;min-width:0}
+.post-vence .link{font-size:12.5px;font-weight:800}
+/* La bitácora del día (10-10-2026). */
+.bit-hoy{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 14px;margin:0 0 10px;border-radius:16px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1)}
+.bit-hoy .grow{min-width:150px}
+.bit-hoy b{display:block;font-size:15px}
+.bit-hoy small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.bit-hoy-dia{width:46px;height:50px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;background:var(--wood-soft);color:var(--wood);border:1px solid color-mix(in srgb,var(--wood) 25%,transparent)}
+.bit-hoy-dia small{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:0;color:inherit}
+.bit-hoy-dia b{font-size:20px;line-height:1}
+/* Ingresos de hoy en la garita: todo lo que entra y sale (10-10-2026). */
+.ing-cats{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 0 10px;padding:2px 0 4px}
+.ing-cats::-webkit-scrollbar{display:none}
+.ing-cat{flex:none;display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13px;box-shadow:var(--sh-1)}
+.ing-cat svg{width:16px;height:16px}
+.ing-cat b{font-size:15px}
+.ing-cat small{color:var(--ink-2);font-size:12px;white-space:nowrap}
+.ing-cat.c-sky svg{color:var(--sky)} .ing-cat.c-warn svg{color:var(--warn)} .ing-cat.c-ok svg{color:var(--ok)} .ing-cat.c-accent svg{color:var(--accent)} .ing-cat.c-wood svg{color:var(--wood)} .ing-cat.c-brand svg{color:var(--brand)}
+.ing-sub{margin:12px 2px 6px}
+.ing-linea .ing-mov{align-items:center}
+.ing-mov time{flex:none;width:44px;font-size:12.5px;font-weight:800;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.ing-mov .ic{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none}
+.ing-mov.sale .txt span{color:var(--muted)}
+.ing-mov.entra .txt span{color:var(--ok)}
+.ing-mov.no .txt b{text-decoration:line-through;color:var(--muted)}
+.ing-mov.no .txt span{color:var(--danger)}
+.ing-mas summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--brand);margin:8px 2px}
+/* Los morosos del barrio, por lote (10-10-2026). */
+.mor-lote{padding:12px 14px}
+.mor-lote.judicial{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+.mor-lote .row{gap:8px;flex-wrap:wrap;align-items:center}
+.mor-meses,.mor-proy{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px}
+.mor-meses span,.mor-proy span{display:flex;flex-direction:column;padding:6px 9px;border-radius:10px;background:var(--danger-soft);min-width:96px}
+.mor-proy span{background:var(--surface-2);border:1px solid var(--line)}
+.mor-meses small,.mor-proy small{font-size:11px;color:var(--ink-2)}
+.mor-meses b,.mor-proy b{font-size:13.5px;font-variant-numeric:tabular-nums}
+
+/* =========================================================
+   USHUAIA HOY EN MOSAICO Y LA POSTAL DEL HOTEL (10-10-2026, opción B)
+   ========================================================= */
+.uh-bento-caja{padding:12px 0 12px}
+.uh-bento-caja .uh-cab .link{margin-left:auto;font-size:13px}
+.uh-bento{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 12px}
+.uhb{border:1px solid transparent;border-radius:16px;padding:12px;text-align:left;display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:0;color:var(--ink);transition:transform .15s}
+.uhb:hover{transform:translateY(-2px)}
+.uhb:active{transform:scale(.98)}
+.uhb.t-sky{background:var(--sky-soft)} .uhb.t-ok{background:var(--ok-soft)} .uhb.t-warn{background:var(--warn-soft)}
+.uhb.t-accent{background:var(--accent-soft)} .uhb.t-wood{background:var(--wood-soft)} .uhb.t-brand{background:var(--brand-soft)}
+.uhb.t-sky svg{color:var(--sky)} .uhb.t-ok svg{color:var(--ok)} .uhb.t-warn svg{color:var(--warn)} .uhb.t-accent svg{color:var(--accent)} .uhb.t-wood svg{color:var(--wood)} .uhb.t-brand svg{color:var(--brand)}
+.uhb-fila{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+.uhb-fila svg{width:18px;height:18px;flex:none;margin-top:3px}
+.uhb-v{font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1.1;overflow-wrap:anywhere}
+.uhb-l{font-size:12px;color:var(--ink-2);line-height:1.3;overflow-wrap:anywhere}
+.uhb-grande{grid-column:1 / -1;flex-direction:row;align-items:center;gap:12px;padding:14px}
+.uhb-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--surface)}
+.uhb-ic svg{width:24px;height:24px}
+.uhb-txt{min-width:0;display:flex;flex-direction:column;gap:1px}
+.uhb-txt small{font-size:11.5px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.4px}
+.uhb-txt b{font-size:17px;line-height:1.2;overflow-wrap:anywhere}
+.uhb-txt span{font-size:12.5px;color:var(--ink-2)}
+@media (min-width:760px){
+  .uh-bento{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .uhb-grande{grid-column:span 2;grid-row:span 2;flex-direction:column;align-items:flex-start;justify-content:space-between}
+}
+.hotel-postal{padding:12px 12px 10px}
+.hotel-postal .tira-cab{padding:0 2px 10px}
+.hp-slides{display:grid}
+.hp-slide{grid-area:1 / 1;display:flex;align-items:center;gap:12px;border:0;border-radius:16px;padding:12px;background:var(--wood-soft);color:var(--ink);text-align:left;cursor:pointer;
+  opacity:0;visibility:hidden;transform:translateX(12px);transition:opacity .45s,transform .45s,visibility .45s;min-width:0}
+.hp-slide.on{opacity:1;visibility:visible;transform:none}
+.hp-slide > svg{width:18px;height:18px;flex:none;color:var(--wood);margin-left:auto}
+.hp-desc{flex:none;width:62px;height:62px;border-radius:14px;background:var(--wood);color:#fff;display:grid;place-items:center;font-size:17px;font-weight:800;letter-spacing:-.5px;text-align:center;line-height:1.05;padding:4px}
+.hp-desc svg{width:26px;height:26px}
+.hp-slide .txt{min-width:0;display:flex;flex-direction:column;gap:1px}
+.hp-slide .txt small{font-size:11px;font-weight:700;color:var(--wood);text-transform:uppercase;letter-spacing:.4px}
+.hp-slide .txt b{font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.hp-slide .txt span{font-size:12.5px;color:var(--ink-2);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hp-puntos{display:flex;justify-content:center;gap:6px;margin-top:9px}
+.hp-puntos i{width:6px;height:6px;border-radius:50%;background:var(--line-2);transition:width .3s,background .3s}
+.hp-puntos i.on{width:18px;border-radius:3px;background:var(--wood)}
+@media (prefers-reduced-motion:reduce){ .hp-slide{transition:none} }
+/* El "Más" de la garita, por urgencia (10-10-2026, opción A). */
+.mas-garita [hidden]{display:none!important}
+.mas-busca{display:flex;align-items:center;gap:8px;padding:0 14px;margin:0 0 12px;border:1.5px solid var(--line-2);border-radius:14px;background:var(--surface)}
+.mas-busca:focus-within{border-color:var(--brand-2);box-shadow:0 0 0 4px color-mix(in srgb,var(--brand-2) 18%,transparent)}
+.mas-busca svg{width:18px;height:18px;color:var(--muted);flex:none}
+.mas-busca input{border:0!important;box-shadow:none!important;padding:12px 0!important;background:transparent!important}
+.mas-grupo{margin:0 0 14px}
+.mas-tit{display:flex;align-items:center;gap:8px;margin:0 2px 8px;font-size:13px;color:var(--ink-2)}
+.mas-tit svg{width:16px;height:16px;color:var(--muted)}
+.mas-tit b{font-size:13px;text-transform:uppercase;letter-spacing:.5px}
+.mas-tit .pill{margin-left:auto}
+.g-atender .mosaico{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:700px){ .g-atender .mosaico{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))} }
+.g-atender .teja{min-height:92px;padding:12px}
+.g-atender.hay{padding:12px;border-radius:20px;background:color-mix(in srgb,var(--warn) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--warn) 30%,var(--line))}
+.g-registros .teja,.g-consultar .teja{min-height:96px}
+.uh-cab .link{border:0;background:none;padding:2px 0;color:var(--brand);font-weight:800}
+
+/* =========================================================
+   EL CENTRO DE CONTROL DEL SUPERVISOR (10-10-2026)
+   ========================================================= */
+.cc-solo{display:flex;gap:8px;align-items:flex-start;margin:0 2px 12px}
+.cc-solo svg{width:16px;height:16px;flex:none;margin-top:2px}
+.cc-sem{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}
+@media (min-width:760px){ .cc-sem{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.cc-s{border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0;border:1px solid transparent}
+.cc-s-tag{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.cc-s-tag svg{width:15px;height:15px}
+.cc-s b{font-size:16px;line-height:1.2;overflow-wrap:anywhere}
+.cc-s small{font-size:12px;line-height:1.3}
+.cc-s.n-ok{background:var(--ok-soft)} .cc-s.n-ok .cc-s-tag,.cc-s.n-ok small{color:var(--ok)}
+.cc-s.n-warn{background:var(--warn-soft)} .cc-s.n-warn .cc-s-tag,.cc-s.n-warn small{color:var(--warn)}
+.cc-s.n-mal{background:var(--danger-soft);border-color:color-mix(in srgb,var(--danger) 35%,transparent)} .cc-s.n-mal .cc-s-tag,.cc-s.n-mal small{color:var(--danger)}
+.cc-s.n-gris{background:var(--surface-2);border-color:var(--line)} .cc-s.n-gris .cc-s-tag,.cc-s.n-gris small{color:var(--muted)}
+.cc-s.latido{animation:latido-borde 1.6s ease-in-out infinite}
+@keyframes latido-borde{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--danger) 25%,transparent)}}
+.cc-dos{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:0 0 12px}
+@media (min-width:900px){ .cc-dos{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+.cc-caja{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;box-shadow:var(--sh-1);min-width:0}
+.cc-caja h3{margin:0 0 10px;font-size:15px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.cc-caja h3 small{font-size:12px;font-weight:600;color:var(--muted)}
+.cc-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cc-k{background:var(--surface-2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.cc-k small{font-size:12px;color:var(--ink-2)}
+.cc-k b{font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+.cc-k span{font-size:12px;color:var(--muted);line-height:1.3}
+.cc-k span.t-warn{color:var(--warn);font-weight:700}
+.cc-pet{margin:10px 2px 0;color:var(--warn)}
+.cc-filtros{margin:0 0 8px}
+/* Las solapas de "En vivo" (10-10-2026): un selector con ícono, color y cuántos hay de cada cosa. */
+.cc-seg{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:4px 4px 8px;margin:0 0 10px;border-radius:18px;background:var(--surface-2);border:1px solid var(--line)}
+.cc-tab{--c:var(--brand);--cs:var(--brand-soft);position:relative;border:0;background:transparent;border-radius:14px;padding:9px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:4px;
+  cursor:pointer;color:var(--ink-2);min-width:0;transition:background .25s,box-shadow .25s,transform .15s}
+.cc-tab.t-ok{--c:var(--ok);--cs:var(--ok-soft)} .cc-tab.t-sky{--c:var(--sky);--cs:var(--sky-soft)} .cc-tab.t-accent{--c:var(--accent);--cs:var(--accent-soft)}
+.cc-tab:hover{transform:translateY(-1px)}
+.cc-tab:active{transform:scale(.97)}
+.cc-tab-ic{width:32px;height:32px;border-radius:11px;display:grid;place-items:center;background:var(--cs);color:var(--c);transition:background .25s,color .25s,transform .25s}
+.cc-tab-ic svg{width:17px;height:17px}
+.cc-tab-t{font-size:11.5px;font-weight:800;letter-spacing:.1px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-tab-n{position:absolute;top:3px;right:calc(50% - 30px);min-width:19px;height:19px;padding:0 5px;border-radius:10px;font-size:11px;line-height:19px;font-weight:800;text-align:center;
+  background:var(--c);color:var(--surface);box-shadow:0 0 0 2px var(--surface-2);transition:box-shadow .25s}
+.cc-tab-n.cero{background:var(--line-2);color:var(--ink-2)}
+.cc-tab.on{background:var(--surface);box-shadow:inset 0 0 0 2px var(--c),0 4px 12px color-mix(in srgb,var(--c) 22%,transparent)}
+.cc-tab.on .cc-tab-ic{background:var(--c);color:var(--surface);transform:scale(1.06)}
+.cc-tab.on .cc-tab-t{color:var(--ink)}
+.cc-tab.on .cc-tab-n{box-shadow:0 0 0 2px var(--surface)}
+.cc-seg-raya{position:absolute;bottom:3px;height:3px;border-radius:2px;width:calc((100% - 20px) / 4 - 16px);left:calc(4px + 8px + var(--pos,0) * ((100% - 20px) / 4 + 4px));
+  background:var(--ink-2);opacity:.35;transition:left .22s ease}
+@media (prefers-reduced-motion:reduce){ .cc-seg-raya,.cc-tab,.cc-tab-ic{transition:none} }
+@media (max-width:370px){ .cc-seg{gap:2px;padding:3px 3px 8px} .cc-tab{padding:8px 0 6px} .cc-tab-t{font-size:10.5px;letter-spacing:-.25px}
+  .cc-seg-raya{width:calc((100% - 12px) / 4 - 16px);left:calc(3px + 8px + var(--pos,0) * ((100% - 12px) / 4 + 2px))} }
+.cc-ver{display:flex;align-items:center;gap:10px;width:100%;margin-top:10px;padding:12px 14px;border:0;border-radius:14px;background:var(--brand-soft);color:var(--brand);font-weight:800;font-size:13.5px;cursor:pointer;text-align:left;transition:transform .15s}
+.cc-ver:hover{transform:translateY(-1px)}
+.cc-ver span{flex:1}
+.cc-ver svg{width:18px;height:18px;flex:none}
+.cc-linea{display:flex;flex-direction:column}
+.cc-l{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.35}
+.cc-l:last-child{border-bottom:0}
+.cc-l time{flex:none;width:42px;font-weight:800;color:var(--ink-2);font-variant-numeric:tabular-nums;font-size:12.5px;padding-top:2px}
+.cc-l .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none}
+.cc-l .ic svg{width:15px;height:15px}
+.cc-l > span:last-child{min-width:0;overflow-wrap:anywhere}
+.cc-acciones{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.cc-acciones .btn{flex:1 1 160px}
+.cc-acciones .dot-badge{position:static;margin-left:4px}
+/* Leer la patente con la cámara (10-10-2026). */
+.pat-cam{position:relative;border-radius:16px;overflow:hidden;background:#000}
+.pat-cam video{display:block;width:100%;height:auto}
+.pat-guia{position:absolute;left:8%;top:34%;width:84%;height:32%;border:3px solid #ffd166;border-radius:10px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.pat-leida{display:flex;align-items:center;justify-content:center;gap:10px;margin:4px 0 14px;padding:14px;border-radius:14px;background:var(--surface-2);border:2px solid var(--ink)}
+.pat-leida svg{width:24px;height:24px;color:var(--muted)}
+.pat-leida b{font-size:26px;letter-spacing:2px;font-weight:800}

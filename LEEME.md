@@ -87,7 +87,7 @@ La persona también puede forzarlo desde **Tu cuenta → Actualizar la app**.
   la opción.
 - Las fotos viven en el equipo de cada uno (IndexedDB); a la base solo va una
   miniatura de 48 px.
-- **22 reglas automáticas** que corren solas: clima, recolección, temporadas,
+- **20 reglas automáticas** que corren solas (entre ellas, el pizarrón que se limpia solo): clima, recolección, temporadas,
   feriados, el calendario completo de las expensas y la privacidad de los datos.
 - Modo día y modo noche: en automático siguen la salida y la puesta del sol en
   Ushuaia, no el reloj ni el ajuste del sistema.

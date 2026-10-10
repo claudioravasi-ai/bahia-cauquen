@@ -156,6 +156,10 @@ const REGLAS = [
      dejaron las versiones anteriores, cuando cada equipo repetía los avisos. */
   { id:'avisos-limpieza', n:'Avisos repetidos o vencidos → se juntan y se borran', d:'Una vez por día: los avisos iguales quedan en uno solo y se borran los vencidos (el tiempo de otro día, el camión que ya pasó) y los de más de 60 días.',
     run(s, hoy){ return marca(s, 'limpia-avisos-' + hoy, () => limpiarAvisos(s)); } },
+  /* 10-10-2026 (pedido de Claudio): lo del pizarrón ya no queda para siempre (ver DURA_POST en js/v-comunidad.js). */
+  { id:'pizarron-vence', n:'Pizarrón → cada publicación se borra sola a su tiempo', d:'Alertas 2 días, guardia 3, avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, eventos al día siguiente; lo fijado queda. A quien la publicó le llega el aviso.',
+    run(s){ let n = 0; if (typeof postVencido !== 'function') return 0;
+      aLista(s.posts).filter(p => p && p.id && postVencido(p)).forEach(p => { n += marca(s, 'pzv-' + p.id, () => borrarPostVencido(s, p.id)); }); return n; } },
   { id:'privacidad', n:`Datos de visitas → borrar a los N días`, d:'Borra DNI y patente de pases y llegadas viejas (Ley 25.326, principio de finalidad).',
     run(s){ const lim = Date.now() - (s.config.datosDias || 90) * DIA; let n = 0;
       s.pases.forEach(p => { if (p.createdAt < lim && (p.dni || p.patente) && !(p.dias && (p.fechaFin || '') >= hoyISO())){ p.dni = ''; p.patente = ''; n++; } });
@@ -831,7 +835,7 @@ R.padron = {
       'Sin padrón, la app conoce los 152 lotes y sus coeficientes pero no sabe de quién es cada uno. Se carga una sola vez y se actualiza cuando cambia un propietario.')}
       ${cajaImportarPadron()}
       ${superficie({ a:'padron-modelo', icon:'download', color:'sky', t:'Bajar el modelo de planilla', s:'Un CSV con las columnas que espera la app, ya con los 152 lotes' })}
-      ${sec('Guía del barrio')}${cajaImportarGuia()}`;
+      ${sec('Guía del barrio')}${cajaImportarGuia()}${botonCorregirGuia()}`;
     const ls = buscarPadron(q || '');
     const conCuenta = s.padron.filter(cuentaDeApp).length;
     const conMail = s.padron.filter(p => p.email).length;
@@ -855,9 +859,13 @@ R.padron = {
       ${sec('Guía del barrio')}
       <p class="muted small" style="margin:0 2px 8px">Quién vive en cada lote (propietario o inquilino) y sus teléfonos. La garita la usa en "Buscar un vecino". El padrón de arriba es el de expensas: lo ve solo la Administración.</p>
       ${cajaImportarGuia()}
+      ${botonCorregirGuia()}
       ${aLista(Store.s.guia).length ? superficie({ a:'exportar-guia', icon:'download', color:'sky', t:'Descargar la guía (CSV)', s:'Para corregirla en Excel y volver a subirla · tiene teléfonos' }) : ''}`;
   },
 };
+/* En modo Administración no hay otra puerta al buscador de Vecinos, que es
+   donde está "Editar" de cada lote (09-10-2026: cambio de dueños del Lote 51). */
+const botonCorregirGuia = () => aLista(Store.s.guia).length ? superficie({ a:'abrir', v:'vecinos', icon:'edit', color:'brand', t:'Corregir un lote de la guía', s:'Buscalo por número, apellido o calle y tocá "Editar": quién vive y sus teléfonos' }) : '';
 const cajaImportarPadron = () => `<label class="superficie acento"><span class="ic">${I('upload')}</span>
   <span class="txt"><b>${Store.s.padron.length ? 'Actualizar el padrón' : 'Cargar el padrón'}</b>
   <small>Archivo CSV (Excel → Guardar como CSV) o JSON. Los nombres quedan solo en la base del barrio.</small></span>

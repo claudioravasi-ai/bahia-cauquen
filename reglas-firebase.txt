@@ -218,6 +218,12 @@ PEGAR DESDE ACÁ
          demás leen el resumen del mes (liqResumen) y las cuotas de su lote
          (pv/cuotasLote). */
       "liquidaciones": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 10-10-2026: los MOROSOS, por lote y SIN NOMBRES (deuda por mes, total,
+         gestión judicial y la proyección a 12 meses). Los lee quien es
+         vecino del barrio y la Administración; NO la garita, la supervisión
+         ni el hotel. Los escribe solo la Administración (la app los arma
+         sola con la última liquidación). */
+      "morosos":       { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'vecino' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       "liqResumen":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
 
       "posts":         { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },

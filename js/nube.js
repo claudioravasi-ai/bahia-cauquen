@@ -56,7 +56,9 @@ const Nube = {
              /* 08-10: la guía del barrio: quién vive en cada lote, sin teléfonos (js/v-vecinos.js) */
              'guia',
              /* 08-10: el resumen de cada liquidación, sin las cuotas de los lotes (js/v-expensas.js, ExpLote) */
-             'liqResumen'],
+             'liqResumen',
+             /* 10-10: los morosos por lote, sin nombres (js/v-expensas.js, Morosos): vecinos y Administración */
+             'morosos'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
@@ -130,6 +132,7 @@ const Nube = {
     padron:          { listas:['titulares'] },
     guia:            { listas:['propietarios','inquilinos'] },
     cuotasLote:      { listas:['para','porPeriodo'] },
+    morosos:         { listas:['meses','proyeccion'] },
     telefonos:       { listas:['tels'] },
     cruceros:        { listas:['escalas'] },
     descargas:       { listas:[] },
@@ -305,7 +308,9 @@ const Nube = {
     /* La liquidación completa (las cuotas, intereses y deudas de todos los
        lotes) también, solo la Administración: los demás bajan el resumen y
        las cuotas de su lote (ExpLote, 08-10-2026). */
-    this.escucharColeccion('barrio', (lee.barrio || this.ZONAS.barrio).filter(c => (c !== 'padron' && c !== 'liquidaciones') || mio.rol === 'admin'));
+    this.escucharColeccion('barrio', (lee.barrio || this.ZONAS.barrio).filter(c => ((c !== 'padron' && c !== 'liquidaciones') || mio.rol === 'admin')
+      /* Los morosos los bajan solo los vecinos y la Administración (10-10-2026). */
+      && (c !== 'morosos' || mio.rol === 'vecino' || mio.rol === 'admin')));
     this.escucharConfig();
     const sup = mio.rol === 'supervisor';
     if (staff) this.escucharColeccion('staff', this.ZONAS.staff);
@@ -476,7 +481,7 @@ const Nube = {
   tanda: null,
 
   /* Colecciones nuevas: si al abrir la app las reglas todavía no las permitían, se reintenta. */
-  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen'],
+  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen', 'morosos'],
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
       /* Bitácora y auditoría bajan solo lo reciente (ver js/historial.js). */
@@ -593,6 +598,7 @@ const Nube = {
     if (!this.db || yo()?.rol !== 'admin' || !this.listoParaMotor || !this.listoParaMotor()) return 0;
     try { if (typeof HotelExp !== 'undefined') HotelExp.publicar(); } catch(e){ console.warn('Copia de expensas del hotel', e.message); }
     try { if (typeof ExpLote !== 'undefined') ExpLote.publicar(); } catch(e){ console.warn('Cuotas de cada lote', e.message); }
+    try { if (typeof Morosos !== 'undefined') Morosos.publicar(); } catch(e){ console.warn('Morosos', e.message); }
     if (!Store.s.users.some(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || ''))) return 0;
     const cambios = {};
     /* Los paquetes también: uno que llegó antes de que el otro vecino del
@@ -788,7 +794,7 @@ const Nube = {
       if (col === 'notifsTodos') return;
       if (sup && !['notifs', 'users', 'privados', 'vistos'].includes(col)) return;
       /* El padrón, la guía y los teléfonos los escribe solo la Administración. */
-      if (['padron', 'guia', 'telefonos', 'liquidaciones', 'liqResumen', 'cuotasLote'].includes(col) && yo()?.rol !== 'admin') return;
+      if (['padron', 'guia', 'telefonos', 'liquidaciones', 'liqResumen', 'cuotasLote', 'morosos'].includes(col) && yo()?.rol !== 'admin') return;
       const arr = s[col]; if (!Array.isArray(arr)) return;
       const antes = this.ultimo[col] || {}, ahora = {};
       arr.forEach(x => {
