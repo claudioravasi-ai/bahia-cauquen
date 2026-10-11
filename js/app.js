@@ -702,6 +702,8 @@ function despuesDePintar(){
   const def = R[PILA[PILA.length - 1]?.id];
   if (def && def.alPintar) def.alPintar(PILA[PILA.length - 1].param);
   if (typeof Servicio !== 'undefined') conRed('servicio', () => Servicio.despues());
+  /* El recorrido de bienvenida, la primera vez (js/recorrido.js). */
+  if (typeof Recorrido !== 'undefined') conRed('recorrido', () => Recorrido.quizas());
 }
 
 /* =========================================================
@@ -2053,6 +2055,9 @@ const PIEZAS = [
   ['js/v-hotel.js',    () => typeof HotelMotor],
   ['js/v-cuidados.js', () => typeof Cuidado],
   ['js/v-casa.js',     () => typeof TAREAS_INVIERNO],
+  ['js/mapa.js',      () => typeof mapaBarrio],
+  ['js/recorrido.js', () => typeof Recorrido],
+  ['js/reglas.js',    () => typeof DISPAROS],
   ['js/asistente.js',  () => typeof Asistente],
   ['js/push.js',       () => typeof Push],
   ['js/sismos.js',     () => typeof Sismos],

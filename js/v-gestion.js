@@ -157,19 +157,9 @@ const EST_RECL = { abierto:['Reportado','warn'], asignado:['Asignado','accent'],
 const PASOS_RECL = ['abierto', 'asignado', 'en_curso', 'resuelto'];
 const pasosReclamo = r => { const i = Math.max(0, PASOS_RECL.indexOf(r.estado));
   return `<div class="pasos-recl">${PASOS_RECL.map((k, j) => `<span class="${j < i ? 'hecho' : j === i ? 'ahora' : ''}"><i></i>${EST_RECL[k][0]}</span>`).join('')}</div>`; };
-R.reclamos = {
-  titulo: 'Reclamos', icon: 'clipboard', color: 'warn', sub: () => esAdmin() ? 'Todos los reclamos del barrio' : 'Privados entre vos y la Administración',
-  render(f){
-    const u = yo(), s = Store.s;
-    let ls = esAdmin() ? s.reclamos.slice() : s.reclamos.filter(r => r.userId === u.id || r.publico);
-    const filtro = f || 'activos';
-    if (filtro === 'activos') ls = ls.filter(r => r.estado !== 'resuelto'); else if (filtro === 'resuelto') ls = ls.filter(r => r.estado === 'resuelto');
-    ls.sort((a, b) => (b.apoyos?.length || 0) - (a.apoyos?.length || 0) || b.createdAt - a.createdAt);
-    return `${!esStaff() ? superficie({ a:'nuevo-reclamo', icon:'plus', t:'Hacer un reclamo', s:'Solo lo ven vos y la Administración', cls:'acento' }) : ''}
-      ${!esStaff() ? superficie({ a:'avistamiento', icon:'eye', color:'ok', t:'Vi un zorro, perros sueltos…', s:'Aviso rápido de avistamiento' }) : ''}
-      <div class="chips">${[['activos','Activos'],['resuelto','Resueltos'],['todos','Todos']].map(([k, t]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="reclamos" data-p="${k}">${t}</button>`).join('')}</div>
-      ${ls.length ? ls.map(r => { const c = CAT_RECL[r.categoria] || CAT_RECL.otro, e = EST_RECL[r.estado], dias = Math.floor((Date.now() - r.createdAt) / DIA);
-        return `<div class="card"><div class="row" style="align-items:flex-start"><span class="ic ic-${e[1]}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none">${I(c[1])}</span>
+function tarjetaReclamo(r){
+  const u = yo(), c = CAT_RECL[r.categoria] || CAT_RECL.otro, e = EST_RECL[r.estado] || EST_RECL.abierto, dias = Math.floor((Date.now() - r.createdAt) / DIA);
+  return `<div class="card"><div class="row" style="align-items:flex-start"><span class="ic ic-${e[1]}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none">${I(c[1])}</span>
           <div class="grow"><b style="font-size:15px">${esc(r.titulo)}</b><div class="muted small">${c[0]}${esAdmin() ? ' · ' + esc(r.anonimo ? 'Anónimo para los vecinos' : autorVisible(r.userId).casa) : ''} · ${dias ? `hace ${dias} d` : 'hoy'}${r.publico ? ' · Publicado en el pizarrón' : ''}</div></div>
           <span class="pill p-${e[1]}">${e[0]}</span></div>
           ${pasosReclamo(r)}
@@ -177,8 +167,29 @@ R.reclamos = {
           ${r.lugar ? `<div class="small" style="margin-top:8px">${I('pin')} ${r.coords ? `<a href="https://www.google.com/maps?q=${esc(r.coords)}" target="_blank" rel="noopener">${esc(r.lugar)}</a>` : esc(r.lugar)}</div>` : ''}
           <p class="small" style="margin:8px 0 0;color:var(--ink-2)">${esc(r.detalle)}</p>${fotoHTML(r.foto, 'post-foto')}
           <div class="timeline">${(r.historial || []).map(h => `<div class="ev"><b>${EST_RECL[h.estado]?.[0] || ''}</b> · ${esc(h.texto)}<small>${esc(autorVisible(h.por).nombre)} · ${hace(h.at)}</small></div>`).join('')}</div>
+          ${/* EL VECINO CONFIRMA (11-10-2026): si quedó resuelto, "Sí, gracias"; si no, "Sigue igual" lo vuelve a abrir solo y le avisa a la Administración. */
+            r.estado === 'resuelto' && r.userId === u.id && !r.confirmado && !esStaff() ? `<div class="recl-confirma"><b>¿Quedó resuelto?</b><div class="btns"><button class="btn btn-sm btn-ok" data-a="recl-ok" data-id="${r.id}">${I('check')}Sí, gracias</button><button class="btn btn-sm btn-danger-soft" data-a="recl-sigue" data-id="${r.id}">${I('alert')}Sigue igual</button></div></div>`
+            : r.estado === 'resuelto' && r.confirmado ? `<p class="small" style="margin:10px 0 0;color:var(--ok)">${I('check')} ${r.userId === u.id ? 'Confirmaste' : 'El vecino confirmó'} que quedó resuelto</p>` : ''}
           <div class="btns" style="margin-top:12px">${r.publico && r.userId !== u.id && !esStaff() ? `<button class="btn btn-sm ${r.apoyos?.includes(u.id) ? 'btn-accent' : 'btn-sec'}" data-a="apoyar" data-id="${r.id}">${I('users')}Me pasa también · ${r.apoyos?.length || 0}</button>` : r.apoyos?.length ? `<span class="pill">${I('users')}${plural(r.apoyos.length, 'vecino más', 'vecinos más')}</span>` : ''}
-            ${esAdmin() ? `<button class="btn btn-sm btn-pri" data-a="gestionar-reclamo" data-id="${r.id}">${I('edit')}Actualizar</button>` : ''}</div></div>`; }).join('') : vacio('clipboard', 'No hay reclamos acá.')}`;
+            ${esAdmin() ? `<button class="btn btn-sm btn-pri" data-a="gestionar-reclamo" data-id="${r.id}">${I('edit')}Actualizar</button>` : ''}</div></div>`;
+}
+R.reclamos = {
+  titulo: 'Reclamos', icon: 'clipboard', color: 'warn', sub: () => esAdmin() ? 'Todos los reclamos del barrio' : 'Privados entre vos y la Administración',
+  get ancha(){ return esAdmin() && reclVista !== 'lista'; },
+  render(f){
+    const u = yo(), s = Store.s;
+    if (esAdmin() && reclVista !== 'lista') return vistaReclamos() + tableroReclamos();
+    let ls = esAdmin() ? s.reclamos.slice() : s.reclamos.filter(r => r.userId === u.id || r.publico);
+    const filtro = f || 'activos';
+    /* Un reclamo resuelto sigue en "Activos" hasta que el vecino que lo hizo confirma si quedó bien. */
+    const espera = r => r.estado === 'resuelto' && !r.confirmado && r.userId === u.id && !esStaff();
+    if (filtro === 'activos') ls = ls.filter(r => r.estado !== 'resuelto' || espera(r)); else if (filtro === 'resuelto') ls = ls.filter(r => r.estado === 'resuelto');
+    ls.sort((a, b) => (b.apoyos?.length || 0) - (a.apoyos?.length || 0) || b.createdAt - a.createdAt);
+    return `${!esStaff() ? superficie({ a:'nuevo-reclamo', icon:'plus', t:'Hacer un reclamo', s:'Solo lo ven vos y la Administración', cls:'acento' }) : ''}
+      ${!esStaff() ? superficie({ a:'avistamiento', icon:'eye', color:'ok', t:'Vi un zorro, perros sueltos…', s:'Aviso rápido de avistamiento' }) : ''}
+      ${esAdmin() ? vistaReclamos() : ''}
+      <div class="chips">${[['activos','Activos'],['resuelto','Resueltos'],['todos','Todos']].map(([k, t]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="reclamos" data-p="${k}">${t}</button>`).join('')}</div>
+      ${ls.length ? ls.map(tarjetaReclamo).join('') : vacio('clipboard', 'No hay reclamos acá.')}`;
   },
 };
 A['nuevo-reclamo'] = () => hoja('Nuevo reclamo', `<form data-f="reclamo">
@@ -215,17 +226,24 @@ A['recl-ubicacion'] = () => {
 A['apoyar'] = el => { const u = yo(); Store.cambiar(s => { const r = s.reclamos.find(x => x.id === el.dataset.id); if (!r) return; r.apoyos = r.apoyos || []; const i = r.apoyos.indexOf(u.id); i >= 0 ? r.apoyos.splice(i, 1) : r.apoyos.push(u.id); }); };
 A['gestionar-reclamo'] = el => {
   const r = Store.s.reclamos.find(x => x.id === el.dataset.id); if (!r) return;
-  hoja('Actualizar reclamo', `<form data-f="gestionar-reclamo" data-id="${r.id}">
-    <div class="field"><label>Estado</label><div class="seg">${Object.entries(EST_RECL).map(([k, e]) => `<label><input type="radio" name="estado" value="${k}" ${r.estado === k ? 'checked' : ''}><span>${e[0]}</span></label>`).join('')}</div></div>
+  /* Desde el tablero llega con el estado nuevo ya elegido y el mensaje para el vecino escrito (se puede cambiar). */
+  const nuevo = EST_RECL[el.dataset.estado] ? el.dataset.estado : r.estado;
+  hoja(nuevo !== r.estado ? `Pasar a «${EST_RECL[nuevo][0]}»` : 'Actualizar reclamo', `<form data-f="gestionar-reclamo" data-id="${r.id}">
+    <p class="muted small" style="margin:0 0 10px">${esc(r.titulo)} · ${esc(r.anonimo ? 'Anónimo' : autorVisible(r.userId).casa)}</p>
+    <div class="field"><label>Estado</label><div class="seg" id="reclSeg">${Object.entries(EST_RECL).map(([k, e]) => `<label><input type="radio" name="estado" value="${k}" ${nuevo === k ? 'checked' : ''}><span>${e[0]}</span></label>`).join('')}</div></div>
     <div class="grid2"><div class="field"><label>Responsable</label><input name="responsable" maxlength="60" list="reclResp" value="${esc(r.responsable || '')}" placeholder="Quién lo resuelve"></div>
       <div class="field"><label>Fecha estimada</label><input name="fechaEstimada" type="date" value="${esc(r.fechaEstimada || '')}"></div></div>
     <datalist id="reclResp">${aLista(Store.s.proveedores).map(p => `<option>${esc(p.empresa)}${p.rubro ? ' (' + esc(p.rubro) + ')' : ''}</option>`).join('')}<option>Mantenimiento del barrio</option><option>Garita</option><option>Administración</option></datalist>
-    <div class="field"><label>Mensaje para el vecino</label><textarea name="texto" required maxlength="400" placeholder="Ej: El electricista viene el viernes."></textarea></div>
+    <div class="field"><label>Mensaje para el vecino</label><textarea name="texto" id="reclTexto" required maxlength="400" placeholder="Ej: El electricista viene el viernes.">${nuevo !== r.estado ? esc(RECL_MSJ[nuevo] || '') : ''}</textarea>
+      <div class="ayuda">${nuevo !== r.estado ? 'Ya viene escrito: cambialo si querés y tocá "Guardar y avisar".' : 'Al elegir otro estado se escribe solo un mensaje de ejemplo.'}</div></div>
     <label class="check"><input type="checkbox" name="publico" ${r.publico ? 'checked' : ''}><span>Es de interés general: publicarlo en el pizarrón (sin el nombre del vecino)</span></label>
     ${r.categoria === 'convivencia' ? `<hr class="sep"><div class="field"><label>Recordatorio amable a una casa (opcional)</label><select name="casaAviso"><option value="">No mandar</option>${opcionesLotes()}</select>
       <div class="ayuda">Le llega un aviso cordial con la norma de convivencia, sin decir quién reclamó.</div></div>` : ''}
     <button class="btn btn-pri btn-block">${I('check')}Guardar y avisar</button></form>`);
 };
+/* Al cambiar el estado en la hoja, si el mensaje está vacío o es uno automático, se escribe el del estado nuevo. */
+document.addEventListener('change', e => { if (e.target.name !== 'estado' || !e.target.closest('#reclSeg')) return;
+  const t = $('#reclTexto'); if (t && (!t.value.trim() || Object.values(RECL_MSJ).includes(t.value.trim()))) t.value = RECL_MSJ[e.target.value] || ''; });
 F['gestionar-reclamo'] = (d, form) => {
   Store.cambiar(s => {
     const r = s.reclamos.find(x => x.id === form.dataset.id); if (!r) return;
@@ -245,6 +263,127 @@ F['gestionar-reclamo'] = (d, form) => {
   });
   cerrarHoja(); toast('Reclamo actualizado', 'check');
 };
+
+/* =========================================================
+   TABLERO DE RECLAMOS (pedido de Claudio, 11-10-2026; idea de uvdesk,
+   19.6k★, zammad, 6k★, y nullboard, 4.1k★, en GitHub: el código es propio)
+   La Administración ve los reclamos como tarjetas en cuatro columnas
+   (Reportado → Asignado → En curso → Resuelto). Arrastrando una tarjeta a
+   otra columna (con el mouse, o con la manija ⋮⋮ en el celular), o con el
+   botón "→ siguiente paso", se abre la hoja con el mensaje para el vecino
+   ya escrito: un toque y le llega el aviso.
+   Automático:
+     · cada tarjeta dice hace cuánto no se mueve (verde, amarillo, rojo);
+     · a los 5 días sin movimiento (RECL_TRABADO_DIAS) queda "trabado", sube arriba de su
+       columna y a la Administración le llega un aviso (regla
+       "reclamo-trabado" del motor, en js/admin.js); igual si se pasó la
+       fecha estimada;
+     · al pasar a "Resuelto", el vecino confirma con "Sí, gracias" o
+       "Sigue igual" (vuelve a "En curso" solo y avisa).
+   PRIVACIDAD: lo mismo de siempre. Los reclamos los ven solo el vecino que
+   lo hizo y la Administración.
+   ========================================================= */
+const RECL_MSJ = {
+  abierto: 'Volvimos a abrir tu reclamo para revisarlo de nuevo.',
+  asignado: 'Ya tomamos tu reclamo y tiene un responsable. Te avisamos cuando empiece el trabajo.',
+  en_curso: 'Ya estamos trabajando en tu reclamo.',
+  resuelto: 'Tu reclamo quedó resuelto. Si no es así, tocá "Sigue igual" en Mis reclamos y lo volvemos a abrir.',
+};
+const RECL_TRABADO_DIAS = 5;
+const reclUltimo = r => (aLista(r.historial).at(-1) || {}).at || r.createdAt;
+const reclDiasQuieto = r => Math.floor((Date.now() - reclUltimo(r)) / DIA);
+const reclTrabado = r => r.estado !== 'resuelto' && reclDiasQuieto(r) >= RECL_TRABADO_DIAS;
+const reclAtrasado = r => r.estado !== 'resuelto' && !!r.fechaEstimada && r.fechaEstimada < hoyISO();
+let reclVista = '';
+const vistaReclamos = () => `<div class="seg recl-vista" role="tablist">${[['tablero', 'clipboard', 'Tablero'], ['lista', 'list', 'Lista']].map(([k, ic, t]) =>
+  `<label><input type="radio" name="reclVista" value="${k}" ${(reclVista || 'tablero') === k ? 'checked' : ''} data-a="recl-vista" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>`;
+A['recl-vista'] = el => { reclVista = el.dataset.v; pintar(); };
+function tarjetaTablero(r){
+  const c = CAT_RECL[r.categoria] || CAT_RECL.otro, quieto = reclDiasQuieto(r), i = PASOS_RECL.indexOf(r.estado), sig = PASOS_RECL[i + 1];
+  const nivel = r.estado === 'resuelto' ? 'ok' : quieto >= RECL_TRABADO_DIAS ? 'mal' : quieto >= 2 ? 'medio' : 'ok';
+  return `<article class="rk-card ${reclTrabado(r) ? 'trabado' : ''}" data-id="${r.id}" tabindex="0" aria-label="${esc(r.titulo)}">
+    <div class="rk-top"><span class="rk-cat ic-${(EST_RECL[r.estado] || EST_RECL.abierto)[1]}">${I(c[1])}</span>
+      <span class="rk-casa">${esc(r.anonimo ? 'Anónimo' : autorVisible(r.userId).casa || '')}</span>
+      <span class="rk-asa" aria-hidden="true" title="Arrastrar a otra columna">${I('grip')}</span></div>
+    <b class="rk-tit">${esc(r.titulo)}</b>
+    ${r.responsable || r.fechaEstimada ? `<span class="rk-meta">${r.responsable ? `${I('user')}${esc(r.responsable)}` : ''}${r.fechaEstimada ? `${I('calendar')}${esc(fechaCorta(r.fechaEstimada))}` : ''}</span>` : ''}
+    <span class="rk-demora d-${nivel}"><i></i>${r.estado === 'resuelto' ? (r.confirmado ? 'El vecino confirmó' : 'Resuelto ' + hace(reclUltimo(r))) : quieto ? `Sin movimiento hace ${plural(quieto, 'día')}` : 'Movido hoy'}</span>
+    <span class="rk-pills">${reclTrabado(r) ? `<em class="p-mal">${I('alert')}Trabado</em>` : ''}${reclAtrasado(r) ? `<em class="p-mal">${I('clock')}Atrasado</em>` : ''}${r.apoyos?.length ? `<em>${I('users')}+${r.apoyos.length}</em>` : ''}${r.publico ? `<em>${I('muro')}Pizarrón</em>` : ''}</span>
+    <div class="rk-acc">${sig ? `<button class="btn btn-xs btn-pri" data-a="gestionar-reclamo" data-id="${r.id}" data-estado="${sig}">${I('right')}${EST_RECL[sig][0]}</button>` : ''}
+      <button class="btn btn-xs btn-sec" data-a="recl-ver" data-id="${r.id}">Ver</button></div>
+  </article>`;
+}
+function tableroReclamos(){
+  const s = Store.s, hace30 = Date.now() - 30 * DIA;
+  const activos = s.reclamos.filter(r => r.estado !== 'resuelto'), res30 = s.reclamos.filter(r => r.estado === 'resuelto' && reclUltimo(r) >= hace30);
+  const prom = res30.length ? (res30.reduce((n, r) => n + (reclUltimo(r) - r.createdAt), 0) / res30.length / DIA) : null;
+  const kpi = (n, t, c, ic) => `<div class="rk-kpi" style="--c:var(--${c})"><span>${I(ic)}</span><b>${n}</b><small>${t}</small></div>`;
+  const orden = (a, b) => reclTrabado(b) - reclTrabado(a) || reclAtrasado(b) - reclAtrasado(a) || (b.apoyos?.length || 0) - (a.apoyos?.length || 0) || reclUltimo(a) - reclUltimo(b);
+  return `<div class="rk-kpis">
+      ${kpi(activos.length, 'Abiertos', 'warn', 'clipboard')}
+      ${kpi(activos.filter(reclTrabado).length, `Trabados (${RECL_TRABADO_DIAS}+ días quietos)`, 'danger', 'alert')}
+      ${kpi(activos.filter(reclAtrasado).length, 'Pasados de la fecha', 'accent', 'clock')}
+      ${kpi(prom === null ? '—' : prom.toFixed(1).replace('.', ',') + ' d', `Para resolver (${plural(res30.length, 'resuelto', 'resueltos')} en 30 días)`, 'ok', 'check')}
+    </div>
+    <p class="muted small rk-ayuda">${I('info')} Arrastrá una tarjeta a otra columna (en el celular, desde ${I('grip')}) o tocá el botón del paso siguiente: se abre el mensaje para el vecino ya escrito.</p>
+    <div class="rk-tablero" id="rkTablero">${PASOS_RECL.map(k => { const ls = (k === 'resuelto' ? res30 : activos.filter(r => (PASOS_RECL.includes(r.estado) ? r.estado : 'abierto') === k)).sort(orden);
+      return `<section class="rk-col c-${EST_RECL[k][1]}" data-estado="${k}"><header><i></i><b>${EST_RECL[k][0]}</b><span>${ls.length}</span></header>
+        <div class="rk-lista">${ls.length ? ls.map(tarjetaTablero).join('') : `<p class="rk-vacia">${k === 'resuelto' ? 'Nada resuelto en los últimos 30 días' : 'Sin reclamos'}</p>`}</div>
+        ${k === 'resuelto' ? `<button class="link rk-mas" data-a="recl-vista" data-v="lista">Ver todos en la lista</button>` : ''}</section>`; }).join('')}
+    </div>`;
+}
+A['recl-ver'] = el => { const r = Store.s.reclamos.find(x => x.id === el.dataset.id); if (r) hoja('Reclamo', `<div class="recl-hoja">${tarjetaReclamo(r)}</div>`); };
+A['recl-ok'] = el => { const u = yo();
+  Store.cambiar(s => { const r = s.reclamos.find(x => x.id === el.dataset.id); if (!r || r.userId !== u.id) return;
+    r.confirmado = Date.now(); r.historial.push({ at:Date.now(), por:u.id, estado:'resuelto', texto:'El vecino confirmó que quedó resuelto' }); });
+  toast('¡Gracias! Le avisamos a la Administración', 'check'); };
+A['recl-sigue'] = el => { const u = yo();
+  Store.cambiar(s => { const r = s.reclamos.find(x => x.id === el.dataset.id); if (!r || r.userId !== u.id) return;
+    r.estado = 'en_curso'; r.historial.push({ at:Date.now(), por:u.id, estado:'en_curso', texto:'El vecino avisó que sigue igual: se volvió a abrir' });
+    notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:`Reclamo reabierto: ${r.titulo}`, texto:`${u.casa} avisó que sigue igual`, icon:'clipboard', color:'danger', link:'reclamos' }); });
+  toast('Lo volvimos a abrir y le avisamos a la Administración', 'clipboard'); };
+
+/* Arrastrar tarjetas entre columnas: con el mouse desde cualquier parte de
+   la tarjeta; con el dedo, desde la manija (así se puede desplazar el
+   tablero con el dedo sin mover tarjetas). */
+let rkArrastre = null, rkSolto = 0;
+document.addEventListener('pointerdown', e => {
+  const card = e.target.closest && e.target.closest('.rk-card'); if (!card || e.button > 0) return;
+  if (e.target.closest('button, a')) return;
+  if (e.pointerType !== 'mouse' && !e.target.closest('.rk-asa')) return;
+  rkArrastre = { card, id:card.dataset.id, x0:e.clientX, y0:e.clientY, activo:false, fantasma:null, col:null };
+  if (e.pointerType !== 'mouse') e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  const a = rkArrastre; if (!a) return;
+  if (!a.activo){ if (Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 6) return;
+    a.activo = true; const r = a.card.getBoundingClientRect();
+    a.dx = e.clientX - r.left; a.dy = e.clientY - r.top;
+    a.fantasma = a.card.cloneNode(true); a.fantasma.classList.add('rk-fantasma'); a.fantasma.style.width = r.width + 'px';
+    document.body.appendChild(a.fantasma); a.card.classList.add('rk-origen'); document.body.classList.add('rk-arrastrando'); }
+  a.fantasma.style.transform = `translate(${e.clientX - a.dx}px, ${e.clientY - a.dy}px) rotate(2deg)`;
+  a.fantasma.style.visibility = 'hidden';
+  const bajo = document.elementFromPoint(e.clientX, e.clientY); a.fantasma.style.visibility = '';
+  const col = bajo && bajo.closest('.rk-col');
+  document.querySelectorAll('.rk-col.sobre').forEach(c => { if (c !== col) c.classList.remove('sobre'); });
+  if (col) col.classList.add('sobre'); a.col = col;
+  /* Cerca del borde, el tablero se corre solo (en el celular las columnas no entran todas). */
+  const t = document.getElementById('rkTablero');
+  if (t){ const r = t.getBoundingClientRect(); if (e.clientX < r.left + 40) t.scrollLeft -= 14; else if (e.clientX > r.right - 40) t.scrollLeft += 14; }
+});
+const rkSoltar = () => {
+  const a = rkArrastre; rkArrastre = null; if (!a) return;
+  document.querySelectorAll('.rk-col.sobre').forEach(c => c.classList.remove('sobre'));
+  document.body.classList.remove('rk-arrastrando');
+  if (!a.activo) return;
+  rkSolto = Date.now(); a.fantasma.remove(); a.card.classList.remove('rk-origen');
+  const r = Store.s.reclamos.find(x => x.id === a.id), k = a.col && a.col.dataset.estado;
+  if (r && k && k !== r.estado) A['gestionar-reclamo']({ dataset:{ id:a.id, estado:k } });
+};
+document.addEventListener('pointerup', rkSoltar);
+document.addEventListener('pointercancel', rkSoltar);
+/* Después de arrastrar no se "toca" la tarjeta sin querer. */
+document.addEventListener('click', e => { if (Date.now() - rkSolto < 300 && e.target.closest && e.target.closest('.rk-card')){ e.stopPropagation(); e.preventDefault(); } }, true);
 
 /* ---------- VOTACIONES (un voto por casa, secreto) ---------- */
 /* =========================================================
@@ -1626,7 +1765,7 @@ A['mis-datos'] = () => {
      una persona como los de un vecino, así que no tienen este informe (28-09). */
   if (esGuardia() || esHotel()){ toast('Es una cuenta institucional: no tiene datos personales de vecino', 'info'); return; }
   const u = yo(), s = Store.s;
-  const tecnico = { emitido:new Date().toISOString(), usuario:MisDatos.sinSecretos(u), pases:s.pases.filter(p => p.hostId === u.id).map(p => ({ ...p, dni:p.dni ? '***' + String(p.dni).slice(-3) : '' })),
+  const tecnico = { emitido:new Date().toISOString(), usuario:MisDatos.sinSecretos(u), pases:s.pases.filter(p => p.hostId === u.id).map(p => ({ ...p, dni:p.dni ? '***' + String(p.dni).slice(-3) : '', tel:p.tel ? '***' + String(p.tel).replace(/\D/g, '').slice(-3) : '' })),
     reclamos:s.reclamos.filter(r => r.userId === u.id).map(r => ({ ...r, foto:r.foto ? '[foto]' : null })),
     peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
     mensajes:s.privados.filter(h => h.userId === u.id), conversacionesConVecinos:aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)),
@@ -1669,7 +1808,7 @@ function informeMisDatos(){
   const vivos = s.pases.filter(p => p.hostId === u.id), idsV = new Set(vivos.map(p => p.id));
   const pases = [...vivos, ...aLista(H.pases).filter(p => p && !idsV.has(p.id))].sort((a, b) => String(b.fechaFin || b.fecha).localeCompare(String(a.fechaFin || a.fecha)));
   const mov = p => { const l = p.log || {}, d = Object.keys(l).sort(); return d.length ? d.slice(-3).map(k => `${fc(k)}${l[k].in ? ' entró ' + hora(l[k].in) : ''}${l[k].out ? ', salió ' + hora(l[k].out) : ''}`).join('<br>') + (d.length > 3 ? `<br>(+${d.length - 3} días)` : '') : (p.cancelado ? 'Cancelado' : 'No vino'); };
-  out.push(bloque('2. Visitas que autorizaste', `Las ven vos, la garita y la Administración. Los datos de la visita (DNI y patente) se borran a los ${typeof Historial !== 'undefined' ? Historial.diasVisitas() : 90} días; después queda solo en el archivo histórico (quién vino y cuándo). El DNI de las visitas va tapado en este informe.`,
+  out.push(bloque('2. Visitas que autorizaste', `Las ven vos, la garita y la Administración. Los datos de la visita (DNI, celular y patente) se borran a los ${typeof Historial !== 'undefined' ? Historial.diasVisitas() : 90} días; después queda solo en el archivo histórico (quién vino y cuándo). El DNI y el celular de las visitas van tapados en este informe.`,
     tabla(['Fecha', 'Tipo', 'Quién', 'Patente', 'DNI', 'Movimientos'], pases.map(p => [p.dias?.length ? `${aLista(p.dias).map(d => DIAS[d]).join(' ')} hasta ${fc(p.fechaFin)}` : fc(p.fecha) + (p.desde ? ' ' + x(p.desde) + '–' + x(p.hasta) : ''),
       x((TIPOS_PASE[p.tipo] || TIPOS_PASE.visita).n), x(p.nombre), x(p.patente), p.dni ? '***' + x(String(p.dni).slice(-3)) : '', mov(p) + (p.archivadoAt ? '<br><i>archivo histórico</i>' : '')]))
     + tabla(['Llegó sin aviso', 'Motivo', 'Cuándo', 'Tu respuesta'], s.llegadas.filter(l => llegadaDeMiLote(l, u)).map(l => [x(l.nombre), x(l.motivo), fh(l.at), x({ consultando:'Sin responder', autorizado:'Que pase', rechazado:'No lo conozco' }[l.estado] || l.estado)]))));

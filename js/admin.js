@@ -43,6 +43,16 @@ const REGLAS = [
   { id:'reclamo-72h', n:'Reclamo sin respuesta 72 h → recordar a la Administración', d:'Evita que un reclamo quede olvidado.',
     run(s){ let n = 0; s.reclamos.filter(r => r.estado === 'abierto' && Date.now() - (r.historial.at(-1)?.at || r.createdAt) > 72 * HORA)
       .forEach(r => n += marca(s, 'r72-' + r.id, () => notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:'Reclamo sin respuesta hace 3 días', texto:r.titulo, icon:'clipboard', color:'danger', link:'reclamos' }))); return n; } },
+  /* Tablero de reclamos (11-10-2026): un reclamo sin movimiento 5 días, o
+     pasado de su fecha estimada, le avisa a la Administración una vez por
+     cada vez que se traba (si se mueve y se vuelve a trabar, avisa de nuevo). */
+  { id:'reclamo-trabado', n:'Reclamo trabado 5 días o pasado de fecha → avisar a la Administración', d:'En el tablero queda arriba de su columna con la marca "Trabado" o "Atrasado".',
+    run(s){ let n = 0; s.reclamos.filter(r => r && r.estado !== 'resuelto').forEach(r => {
+      if (typeof reclTrabado === 'function' && reclTrabado(r))
+        n += marca(s, 'rtrab-' + r.id + '-' + reclUltimo(r), () => notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:`Reclamo trabado hace ${reclDiasQuieto(r)} días`, texto:`${r.titulo} · ${EST_RECL[r.estado]?.[0] || ''}`, icon:'clipboard', color:'danger', link:'reclamos' }));
+      if (typeof reclAtrasado === 'function' && reclAtrasado(r))
+        n += marca(s, 'ratr-' + r.id + '-' + r.fechaEstimada, () => notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:'Reclamo pasado de la fecha estimada', texto:`${r.titulo} · era para el ${fechaCorta(r.fechaEstimada)}. ¿Le avisás al vecino la fecha nueva?`, icon:'clock', color:'warn', link:'reclamos' }));
+    }); return n; } },
   { id:'votacion-cierre', n:'Votación cerrada → publicar el resultado', d:'Al cerrar, publica el resultado en el pizarrón y avisa a todos.',
     run(s){ let n = 0; s.votaciones.filter(v => v.cierra <= Date.now()).forEach(v => n += marca(s, 'vot-' + v.id, () => {
       const votos = Object.values(v.votos), cuenta = v.opciones.map((_, i) => votos.filter(x => x === i).length), max = Math.max(...cuenta, 0);
@@ -160,11 +170,11 @@ const REGLAS = [
   { id:'pizarron-vence', n:'Pizarrón → cada publicación se borra sola a su tiempo', d:'Alertas 2 días, guardia 3, avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, eventos al día siguiente; lo fijado queda. A quien la publicó le llega el aviso.',
     run(s){ let n = 0; if (typeof postVencido !== 'function') return 0;
       aLista(s.posts).filter(p => p && p.id && postVencido(p)).forEach(p => { n += marca(s, 'pzv-' + p.id, () => borrarPostVencido(s, p.id)); }); return n; } },
-  { id:'privacidad', n:`Datos de visitas → borrar a los N días`, d:'Borra DNI y patente de pases y llegadas viejas (Ley 25.326, principio de finalidad).',
+  { id:'privacidad', n:`Datos de visitas → borrar a los N días`, d:'Borra DNI, celular y patente de pases y llegadas viejas (Ley 25.326, principio de finalidad).',
     run(s){ const lim = Date.now() - (s.config.datosDias || 90) * DIA; let n = 0;
-      s.pases.forEach(p => { if (p.createdAt < lim && (p.dni || p.patente) && !(p.dias && (p.fechaFin || '') >= hoyISO())){ p.dni = ''; p.patente = ''; n++; } });
+      s.pases.forEach(p => { if (p.createdAt < lim && (p.dni || p.patente || p.tel) && !(p.dias && (p.fechaFin || '') >= hoyISO())){ p.dni = ''; p.patente = ''; p.tel = ''; n++; } });
       s.llegadas.forEach(l => { if (l.at < lim && (l.patente || l.nombre !== '—')){ l.patente = ''; l.nombre = '—'; n++; } });
-      s.solicitudesPase.forEach(r => { if (r.at < lim && r.dni){ r.dni = ''; r.patente = ''; n++; } });
+      s.solicitudesPase.forEach(r => { if (r.at < lim && (r.dni || r.tel)){ r.dni = ''; r.patente = ''; r.tel = ''; n++; } });
       return n; } },
 ];
 const motorActivo = id => Store.s?.config?.motor?.[id] !== false;
@@ -416,6 +426,7 @@ const ADMIN_TABS = {
   motor(){
     const s = Store.s;
     return `<p class="muted small" style="margin-top:0">Reglas que la app aplica sola. Hoy corren mientras la app está abierta en algún equipo del barrio; con servidor corren siempre.</p>
+      ${typeof reglasPropiasHTML === 'function' ? reglasPropiasHTML() : ''}
       ${REGLAS.filter(r => hayPaquetes() || !/^paq/.test(r.id)).map(r => `<div class="card" style="padding:13px 14px"><div class="row"><span class="ic ic-${motorActivo(r.id) ? 'accent' : 'brand'}" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;opacity:${motorActivo(r.id) ? 1 : .4}">${I('zap')}</span>
         <div class="grow"><b style="font-size:14px">${esc(r.n.replace('N días', (s.config.datosDias || 90) + ' días'))}</b>${r.d ? `<div class="muted small">${esc(r.d)}</div>` : ''}<div class="tiny muted">${s.motorCuenta?.[r.id] ? `Actuó ${plural(s.motorCuenta[r.id], 'vez', 'veces')}` : 'Todavía no actuó'}</div></div>
         <label class="check" style="margin:0"><input type="checkbox" data-a="regla" data-v="${r.id}" ${motorActivo(r.id) ? 'checked' : ''}></label></div></div>`).join('')}

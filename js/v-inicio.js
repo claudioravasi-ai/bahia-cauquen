@@ -86,6 +86,8 @@ function tarjetaPase(p, { garita = false } = {}){
            ${/* Con la visita ya adentro, mandar el pase o editarlo no tiene sentido (Claudio, 10-10-2026): quedan "Ver pase" y borrar. */ est === 'adentro' ? '' : `<button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>`}
            ${est === 'esperado' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase">${I('x')}</button>` : ''}
            <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button>`}
+      ${/* El celular que la visita dejó en el enlace: la garita y el vecino que la espera la pueden llamar (si se demora, si no la encuentran). */
+        p.tel && ['esperado', 'vencido', 'futuro', 'adentro'].includes(est) && (garita ? esGuardia() || esAdmin() : p.hostId === yo()?.id) ? `<a class="btn btn-sm btn-sec" href="${telLink(p.tel)}">${I('phone')}Llamar</a>` : ''}
     </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} ${p.borrado.admin ? 'La Administración la borró' : 'El vecino la sacó de su lista'} ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
 }
 
@@ -998,7 +1000,7 @@ R.visitas = {
       ${superficie({ a:'aviso-guardia', icon:'shield', color:'brand', t:'Aviso rápido a la guardia', s:'Viene una visita sin aviso ni QR: que me avisen cuando llegue' })}
       ${sec('Historial')}
       ${superficie({ a:'hist-mis-visitas', icon:'clock', color:'sky', t:'Ver mi historial completo', s:'Todas tus visitas desde el primer día. Se trae de la base solo cuando lo pedís.' })}
-      <p class="muted tiny" style="margin-top:14px">En la app quedan las visitas de los últimos ${Historial.diasVisitas()} días; las anteriores pasan al archivo histórico del barrio, sin DNI ni patente (Ley 25.326), y las ves con el botón de arriba.</p>`;
+      <p class="muted tiny" style="margin-top:14px">En la app quedan las visitas de los últimos ${Historial.diasVisitas()} días; las anteriores pasan al archivo histórico del barrio, sin DNI, celular ni patente (Ley 25.326), y las ves con el botón de arriba.</p>`;
   },
 };
 /* =========================================================
@@ -1258,7 +1260,7 @@ function pasarPedidosListos(){
   Store.cambiar(s => listos.forEach(r0 => {
     const r = s.solicitudesPase.find(x => x.id === r0.id); if (!r || r.paseId) return;
     const host = usuario(r.hostId) || {}, id = 'sp' + r.id;
-    if (!s.pases.some(p => p.id === id)) s.pases.unshift({ id, hostId:r.hostId, tipo:'visita', nombre:r.nombre, dni:r.dni || '', patente:normPatente(r.patente), fecha:r.fecha, desde:r.desde, hasta:r.hasta,
+    if (!s.pases.some(p => p.id === id)) s.pases.unshift({ id, hostId:r.hostId, tipo:'visita', nombre:r.nombre, dni:r.dni || '', tel:r.tel || '', patente:normPatente(r.patente), fecha:r.fecha, desde:r.desde, hasta:r.hasta,
       codigo:r.codigo, log:{}, createdAt:r.at || Date.now(), autoriza:host.nombre || '', porEnlace:true });
     r.estado = 'aprobado'; r.paseId = id;
     Motor.conMarca('pedido-' + r.id, () => notificar(s, { para:r.hostId, titulo:`${r.nombre} completó sus datos: ya tiene su QR`, texto:`${fechaCorta(r.fecha)} · ${r.desde} a ${r.hasta} h${r.patente ? ' · ' + normPatente(r.patente) : ''}. Si no lo esperabas, cancelalo en Mis visitas.`, icon:'qr', color:'sky', link:'visitas' }));
@@ -1271,7 +1273,7 @@ A['sol-pase-si'] = el => {
   const u = yo(); let nuevo;
   Store.cambiar(s => {
     const r = s.solicitudesPase.find(x => x.id === el.dataset.id); if (!r) return;
-    nuevo = { id:uid(), hostId:u.id, tipo:'visita', nombre:r.nombre, dni:r.dni, patente:r.patente, fecha:r.fecha, desde:r.desde, hasta:r.hasta, codigo:codigoPase(), log:{}, createdAt:Date.now(), autoriza:u.nombre };
+    nuevo = { id:uid(), hostId:u.id, tipo:'visita', nombre:r.nombre, dni:r.dni, tel:r.tel || '', patente:r.patente, fecha:r.fecha, desde:r.desde, hasta:r.hasta, codigo:codigoPase(), log:{}, createdAt:Date.now(), autoriza:u.nombre };
     s.pases.unshift(nuevo); r.estado = 'aprobado'; r.paseId = nuevo.id;
   });
   toast('Aprobado. Su QR ya aparece en su celular.', 'check');
@@ -2520,6 +2522,7 @@ R.garita = {
       </form>` : `<div class="btns" style="margin:0 0 12px"><button type="button" class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('clock')}Historial de visitas</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="bitacora">${I('book')}Bitácora</button>
           <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button></div>`}
+      ${typeof mapaBarrio === 'function' ? mapaBarrio() : ''}
       ${s.peticiones.filter(p => p.estado === 'pendiente').map(p => aviso('warn latido', 'edit', `Petición de ${esc(p.casa)} sin recibir`, esc(TIPOS_PET[p.tipo]?.n || '') + (opera ? '' : ' · la recibe y la firma la garita'), `<button class="btn btn-xs btn-sec" data-a="ver-peticion" data-id="${p.id}">${opera ? 'Leer y firmar' : 'Ver'}</button>`)).join('')}
       ${s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => aviso('info', 'truck', `Obra en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h · ${esc(o.empresa || '')}` : esc(o.empresa || ''))).join('')}
       ${(() => { const rs = s.peticiones.filter(p => p.tipo === 'nopasar' && p.estado === 'en_funciones' && (!p.hasta || p.hasta >= hoy)); return rs.length ? sec('Restricciones de ingreso vigentes') + rs.map(p => `<button class="superficie peligro" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-danger">${I('x')}</span><span class="txt"><b>${esc(p.casa)}</b><small>${esc(p.texto.slice(0, 90))}</small></span>${I('right')}</button>`).join('') : ''; })()}
@@ -2577,6 +2580,7 @@ function masGarita(s, u){
   ].filter(Boolean);
   const consultar = [
     teja({ v:'vecinos', icon:'search', color:'brand', t:'Buscar un vecino', s:'Dirección y teléfonos', busca:'apellido lote calle guia padron' }),
+    teja({ v:'mapa', icon:'map', color:'sky', t:'Mapa del barrio', s:'Lotes y calles en vivo', busca:'mapa plano lotes calles donde queda' }),
     teja({ v:'pizarron', icon:'muro', t:'Pizarrón', s:'Avisos del barrio', badge:pizNuevos, busca:'aviso guardia publicar' }),
     teja({ v:'vuelos', icon:'send', color:'accent', t:'Vuelos USH', s:'Arribos y partidas', n: typeof Vuelos !== 'undefined' && Vuelos.cuantosHoy ? Vuelos.cuantosHoy() || '' : '', busca:'avion aeropuerto' }),
     teja({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'Teléfonos y DEA', busca:'telefonos dea 911 bomberos' }),
@@ -3013,9 +3017,10 @@ function pintarPedirPase(arg){
   else if (vencido) panel = aviso('warn', 'clock', 'Este enlace venció', `Pedile a ${esc(host.nombre || 'quien te invitó')} que te mande uno nuevo.`);
   else panel = `<form data-f="pedir-pase" data-host="${esc(hostId)}" data-espera="${esc([host.nombre, host.casa].filter(Boolean).join(' · '))}">
     <p style="margin:0 0 12px">Vas a ver a <b>${esc(host.nombre || 'un vecino')}</b>${host.casa ? ` (${esc(host.casa)})` : ''}. Completá tus datos y te sale tu pase con el QR.</p>
-    <div class="field"><label ${blanco}>Tu nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="name"></div>
-    <div class="grid2"><div class="field"><label ${blanco}>DNI</label><input name="dni" inputmode="numeric" maxlength="11"></div>
-      <div class="field"><label ${blanco}>Patente (si venís en auto)</label><input name="patente" maxlength="10" style="text-transform:uppercase" placeholder="AB 123 CD"></div></div>
+    <div class="field"><label ${blanco}>Tu nombre y apellido</label><input name="nombre" required minlength="3" maxlength="60" autocomplete="name" placeholder="Ej: Juan Pérez"></div>
+    <div class="grid2"><div class="field"><label ${blanco}>DNI</label><input name="dni" required inputmode="numeric" maxlength="11" placeholder="Solo números"></div>
+      <div class="field"><label ${blanco}>Tu celular</label><input name="tel" type="tel" required inputmode="tel" maxlength="20" autocomplete="tel" placeholder="Ej: 2901 551234"></div></div>
+    <div class="field"><label ${blanco}>Patente (si venís en auto)</label><input name="patente" maxlength="10" style="text-transform:uppercase" placeholder="AB 123 CD"></div>
     <div class="grid3"><div class="field"><label ${blanco}>Día</label><input type="date" name="fecha" value="${hoyISO()}" min="${hoyISO()}" required></div>
       <div class="field"><label ${blanco}>Llego</label><input type="time" name="desde" required value="18:00"></div>
       <div class="field"><label ${blanco}>Me voy</label><input type="time" name="hasta" required value="23:00"></div></div>
@@ -3024,14 +3029,21 @@ function pintarPedirPase(arg){
   $('#app').innerHTML = `<section class="bienvenida" id="pedidoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b><div class="tiny" style="opacity:.85">${esc(Store.s.config.ciudad)}</div></div></div>
     <h1 style="font-size:34px">Tu pase de ingreso</h1><div class="panel">${panel}</div>
-    ${yo() ? `<p class="small" style="margin:14px 0 0"><button type="button" class="link" style="color:#fff" data-a="pedido-salir">${I('left')}Volver a mi app</button></p>` : ''}</section>`;
+    </section>`;
   $$('#pedidoPublico [data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
 }
 F['pedir-pase'] = async (d, form) => {
   const hostId = form.dataset.host, id = uid();
   if (minutosDe(d.hasta) <= minutosDe(d.desde) && d.hasta !== '00:00') return toast('La hora de salida tiene que ser después de la de llegada', 'clock');
   if (d.fecha < hoyISO()) return toast('Elegí hoy o un día que venga', 'calendar');
-  const r = { id, hostId, nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:normPatente(d.patente), fecha:d.fecha, desde:d.desde, hasta:d.hasta,
+  /* Nombre, DNI y celular son obligatorios (pedido de Claudio, 11-10-2026):
+     se revisan acá también, por si el teléfono no frena el envío solo. */
+  const nombre = String(d.nombre || '').trim().replace(/\s+/g, ' '), dni = soloDigitos(d.dni), tel = String(d.tel || '').trim();
+  const falta = c => form.querySelector(`[name=${c}]`)?.focus();
+  if (nombre.length < 3){ falta('nombre'); return toast('Escribí tu nombre y apellido', 'user'); }
+  if (dni.length < 7 || dni.length > 8){ falta('dni'); return toast('Escribí tu DNI: 7 u 8 números', 'user'); }
+  if (soloDigitos(tel).length < 8){ falta('tel'); return toast('Escribí tu celular con la característica (ej: 2901 15 123456)', 'phone'); }
+  const r = { id, hostId, nombre, dni, tel, patente:normPatente(d.patente), fecha:d.fecha, desde:d.desde, hasta:d.hasta,
     estado:'listo', codigo:codigoPase(), porEnlace:true, at:Date.now() };
   const boton = form.querySelector('button'); if (boton){ boton.disabled = true; boton.textContent = 'Generando tu pase…'; }
   try {
@@ -3070,7 +3082,7 @@ A['pedido-wa'] = el => {
     datos:{ nombre:x.nombre, espera:x.espera || '', cuando:fechaCorta(x.fecha), horario:`${x.desde} a ${x.hasta} h` } });
 };
 A['pedido-otro'] = el => { try { localStorage.removeItem(PEDIDO_KEY(el.dataset.v)); sessionStorage.removeItem('bhc.pedidoTmp'); } catch(e){} pintarPedirPase(location.hash.slice(8)); };
-A['pedido-salir'] = () => { history.replaceState(null, '', location.pathname + location.search); PILA.length = 0; pintar(); };
+/* Sin "Volver a mi app" (Claudio, 11-10-2026): la página es de la visita, que no tiene la app. */
 function pintarPaseQR(id){
   const p = Store.s.pases.find(x => x.id === id), u = p && usuario(p.hostId);
   $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>

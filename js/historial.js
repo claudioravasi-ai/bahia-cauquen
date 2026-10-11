@@ -70,7 +70,7 @@ const Historial = {
       if (n) console.info(`Archivo histórico: ${n} registros pasaron al archivo`);
     } catch(e){ console.warn('Archivo histórico: no se completó (¿faltan publicar las reglas?)', e.message); }
   },
-  sinDatos(x){ const c = JSON.parse(JSON.stringify(x)); ['dni', 'patente'].forEach(k => { if (k in c) c[k] = ''; }); c.archivadoAt = Date.now(); return c; },
+  sinDatos(x){ const c = JSON.parse(JSON.stringify(x)); ['dni', 'patente', 'tel'].forEach(k => { if (k in c) c[k] = ''; }); c.archivadoAt = Date.now(); return c; },
   /* Un paquete archivado guarda qué llegó, para quién, cuándo y quién lo
      retiró, con el sello de la entrega; sin la foto, sin la firma dibujada,
      sin la firma del QR y sin los dígitos del DNI. */
@@ -220,7 +220,7 @@ function pintarHistVisitas(titulo, conCasa, q = ''){
   const ls = qq ? histVisitas.filter(p => normTxt(`${p.nombre} ${(usuario(p.hostId) || {}).casa || ''} ${p.autoriza || ''} ${p.fecha}`).includes(qq)) : histVisitas;
   hoja(titulo, `<form class="linea-form" data-f="hist-visitas-buscar" data-t="${esc(titulo)}" data-c="${conCasa ? 1 : ''}" style="margin-bottom:10px">
       <input name="q" value="${esc(q)}" placeholder="${conCasa ? 'Nombre, lote o fecha (2026-09)…' : 'Nombre o fecha (2026-09)…'}"><button class="btn btn-pri">${I('search')}</button></form>
-    <p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'visita')}${qq ? ' encontradas' : ' en total'}. Las de más de ${Historial.diasVisitas()} días vienen del archivo histórico, sin DNI ni patente.</p>
+    <p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'visita')}${qq ? ' encontradas' : ' en total'}. Las de más de ${Historial.diasVisitas()} días vienen del archivo histórico, sin DNI, celular ni patente.</p>
     <div class="card lista">${ls.length ? ls.slice(0, 400).map(p => filaHistVisita(p, conCasa)).join('') : '<p class="muted small">No hay visitas.</p>'}</div>
     ${ls.length > 400 ? `<p class="muted tiny">Se muestran las 400 más recientes. Buscá por nombre, lote o mes para ver otras, o bajá la planilla.</p>` : ''}
     <button class="btn btn-sec btn-block" data-a="hist-visitas-csv">${I('download')}Descargar la planilla (CSV)</button>`);
