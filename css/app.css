@@ -2816,3 +2816,55 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 .uf-leyenda > span:first-child,.uf-leyenda > span:last-child{white-space:nowrap;flex:none}
 .uf-leyenda .uf-tu{color:var(--ink-2);text-align:center;font-size:11.5px}
 
+
+/* Fotos y archivos en los mensajes (11-10-2026, js/adjuntos.js) */
+.chat-clip{flex:none;width:44px;height:48px;border:0;background:none;color:var(--muted);display:grid;place-items:center;border-radius:50%;cursor:pointer}
+.chat-clip svg{width:22px;height:22px}
+.chat-clip:hover,.chat-clip:focus-visible{color:var(--brand);background:var(--surface)}
+.chat-clip.bajando{opacity:.5;animation:adjPulso 1s infinite}
+.msg-foto{display:block;width:min(220px,52vw);max-width:100%;aspect-ratio:4/3;border:0;border-radius:12px;background:var(--line) center/cover no-repeat;position:relative;cursor:pointer;margin:2px 0 4px;padding:0}
+.msg-foto span{position:absolute;right:6px;bottom:6px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center}
+.msg-foto span svg{width:16px;height:16px}
+.msg-foto.bajado span{display:none}
+.msg-foto.bajando,.msg-arch.bajando{opacity:.6;animation:adjPulso 1s infinite}
+.msg-arch{display:flex;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:12px;padding:9px 12px;margin:2px 0 4px;cursor:pointer;max-width:260px;font:inherit}
+.msg-arch svg{width:24px;height:24px;flex:none;color:var(--brand)}
+.msg-arch b{display:block;font-size:13.5px;overflow-wrap:anywhere}
+.msg-arch small{display:block;font-size:11.5px;color:var(--muted)}
+.msg.mia .msg-arch{background:rgba(255,255,255,.14);color:inherit;border-color:rgba(255,255,255,.3)}
+.msg.mia .msg-arch svg,.msg.mia .msg-arch small{color:inherit}
+.msg-pie{display:block}
+@keyframes adjPulso{0%,100%{opacity:.45}50%{opacity:.85}}
+
+/* Cortes de luz, agua y gas (11-10-2026): el ícono titila en su color. */
+.srv-ic{display:inline-grid;place-items:center}
+.srv-ic svg{animation:srvTitila 1.6s ease-in-out infinite}
+.srv-luz svg{color:#e0a100}
+.srv-agua svg{color:#1e88e5}
+.srv-gas svg{color:#f4511e;animation-name:srvLlama;animation-duration:.9s}
+/* Sobre el círculo de color lleno (la tarjeta grande de la pizarra) va en blanco. */
+.pzd .srv-ic svg{color:#fff}
+.pill .srv-ic svg{width:15px;height:15px;margin-right:4px;vertical-align:-2px}
+@keyframes srvTitila{0%,100%{opacity:1;filter:drop-shadow(0 0 0 transparent)}50%{opacity:.35;filter:drop-shadow(0 0 6px currentColor)}}
+@keyframes srvLlama{0%,100%{opacity:1;transform:scale(1)}30%{opacity:.6;transform:scale(.92) rotate(-4deg)}60%{opacity:.9;transform:scale(1.06) rotate(3deg)}}
+@media (prefers-reduced-motion:reduce){.srv-ic svg{animation:none}}
+
+/* Estado de los servicios (11-10-2026): luz, agua y gas cuando el pizarrón está vacío. */
+.srv-estado{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 14px 10px;margin:4px 0 12px;box-shadow:var(--sh-1)}
+.srv-cab{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.srv-cab>svg{width:22px;height:22px;color:var(--brand);flex:none}
+.srv-cab b{display:block;font-size:15px}.srv-cab small{display:block;font-size:12px;color:var(--muted)}
+.srv-filas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.srv-fila{position:relative;display:flex;flex-direction:column;gap:6px;align-items:flex-start;border-radius:14px;padding:10px 10px 10px 12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;text-align:left;min-width:0}
+button.srv-fila{cursor:pointer}
+.srv-fila .srv-ic svg{width:22px;height:22px}
+.srv-fila .srv-ic.quieto svg{animation:none}
+.srv-txt{flex:1;min-width:0}.srv-txt b{display:block;font-size:14px}.srv-txt small{display:block;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.srv-fila>svg:last-child{position:absolute;top:10px;right:9px;width:17px;height:17px}
+.srv-fila.e-ok{border-color:color-mix(in srgb,var(--ok) 40%,var(--line));background:color-mix(in srgb,var(--ok) 8%,var(--bg))}
+.srv-fila.e-ok>svg:last-child{color:var(--ok)}
+.srv-fila.e-anunciado{border-color:color-mix(in srgb,var(--warn) 55%,var(--line));background:color-mix(in srgb,var(--warn) 12%,var(--bg))}
+.srv-fila.e-ahora{border-color:color-mix(in srgb,var(--danger) 55%,var(--line));background:color-mix(in srgb,var(--danger) 10%,var(--bg))}
+.srv-fila.e-sin .srv-ic svg{color:var(--muted)}
+.srv-pie{margin:8px 2px 0;font-size:11.5px;color:var(--muted)}
+.pzv-nada+.srv-estado{margin-top:10px}

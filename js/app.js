@@ -2046,6 +2046,7 @@ const PIEZAS = [
   ['js/push.js',       () => typeof Push],
   ['js/sismos.js',     () => typeof Sismos],
   ['js/nube.js',       () => typeof Nube],
+  ['js/adjuntos.js',   () => typeof Adjuntos],
   ['js/historial.js',  () => typeof Historial],
   ['js/v-supervisor.js', () => typeof Supervisor],
 ];

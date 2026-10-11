@@ -93,7 +93,8 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 11;  /* 11 (07-10-2026): equipos con la sesión cerrada reciben solo "un correo va a tu casa"; un equipo vale para la cuenta más nueva */
+var VERSION_SCRIPT = 12;  /* 12 (11-10-2026): cortes de luz, agua y gas a las 6 y a las 23; se borran las fotos y archivos de los mensajes vencidos */
+/* 11 (07-10-2026): equipos con la sesión cerrada reciben solo "un correo va a tu casa"; un equipo vale para la cuenta más nueva */
 
 function doPost(e) {
   try {
@@ -122,6 +123,7 @@ function doPost(e) {
 
       case 'mp-verificar': return responder(mpVerificar(datos.pago));
       case 'mp-recientes': return responder(mpRecientes(datos.dias || 10));
+      case 'servicios':    return responder(serviciosAhora());
       case 'correo':       return responder(mandarCorreo(datos));
     }
     return responder({ok: false, error: 'acción desconocida: ' + datos.accion});
@@ -161,7 +163,7 @@ function doGet(e) {
   var props = PropertiesService.getScriptProperties();
   return responder({ok: true, estado: 'activo', version: VERSION_SCRIPT, enviadosHoy: contarHoy(), tope: TOPE_DIARIO, cruceros: true,
     frase: !!claveDelScript(), push: !!props.getProperty('FCM_CUENTA'), mercadoPago: !!props.getProperty('MP_ACCESS_TOKEN'),
-    relojCuidados: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'revisarCuidados'; }),
+    servicios: true, relojCuidados: ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'revisarCuidados'; }),
     mpPrueba: /^TEST-/.test(String(props.getProperty('MP_ACCESS_TOKEN') || '').trim()) || /^s[ií]$/i.test(String(props.getProperty('MP_PRUEBA') || '').trim())});
 }
 
@@ -412,6 +414,9 @@ function revisarCuidados() {
     });
     /* La supervisión de la guardia (versión 10): mismo reloj. */
     try { revisarSupervision(base, acceso); } catch (err) { registrar('SUPERVISION-ERROR', 'reloj', String(err).slice(0, 200)); }
+    /* Los cortes de luz, agua y gas (versión 12): solo a las 6 y a las 23. */
+    try { revisarServicios(base, acceso, false); } catch (err) { registrar('SERVICIOS-ERROR', 'reloj', String(err).slice(0, 200)); }
+    try { limpiarAdjuntos(base, acceso); } catch (err) { registrar('ADJUNTOS-ERROR', 'reloj', String(err).slice(0, 200)); }
   } finally { lock.releaseLock(); }
 }
 
@@ -739,6 +744,203 @@ function leerCronograma(html) {
   }
   var act = (html.match(/Datos actualizados al d[ií]a ([^.<]+)/) || [])[1] || '';
   return {barcos: barcos, actualizado: limpio(act)};
+}
+
+/**
+ * CORTES DE LUZ, AGUA Y GAS (pedido de Claudio, 11-10-2026, versión 12)
+ * ---------------------------------------------------------------------------
+ * Todos los días a las 6 y a las 23 (con el mismo reloj de cada 10 minutos,
+ * instalarRelojCuidados), este programa lee:
+ *   · las reparaciones y cortes de agua de la DPOSS (dposs.gob.ar/reparaciones);
+ *   · las noticias de los diarios de Ushuaia que publican los comunicados de
+ *     la DPE (luz) y de Camuzzi (gas): NotiTDF, Radio Fueguina y Tiempo
+ *     Fueguino, por su lista pública de notas (wp-json).
+ * Facebook no se puede leer: pide iniciar sesión y no deja que un programa
+ * lea las páginas. Los comunicados de la DPE que salen ahí los repiten esos
+ * diarios.
+ * De todo eso queda SOLO lo que sirve al barrio: un corte (o falta de
+ * suministro o baja presión) en Ushuaia que nombra al barrio o a una de las
+ * zonas que la Administración anotó en Ajustes ("Bahía Cauquén", "Los
+ * Cauquenes"…), o que es para toda la ciudad (cortes rotativos, corte
+ * general). Lo que no, no se publica.
+ * Lo que sirve va al pizarrón y a la Pizarra del día como aviso del sistema
+ * (lamparita, llamita o gotita que titila) y se borra solo cuando termina
+ * el corte; si no se sabe hasta cuándo, a las 24 horas. Cada nota se
+ * publica una sola vez (barrio/posts/srv-…).
+ * Se apaga en la app: Administración → Ajustes → Cortes de luz, agua y gas.
+ */
+var SERVICIOS_HORAS = [6, 23];
+var SERVICIOS_DIARIOS = [
+  {nombre: 'NotiTDF', url: 'https://www.notitdf.com'},
+  {nombre: 'Radio Fueguina', url: 'https://www.radiofueguina.com'},
+  {nombre: 'Tiempo Fueguino', url: 'https://www.tiempofueguino.com'}
+];
+var SERVICIOS_ZONAS = 'Bahía Cauquén, Los Cauquenes';
+var SERVICIOS_GENERAL = /(toda la ciudad|todos los barrios|toda ushuaia|en toda la localidad|corte general|cortes? rotativ|toda la provincia)/;
+var MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+var DIAS_ES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+
+function sinTildes(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+function textoPlano(h) {
+  return String(h || '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<br\s*\/?>|<\/p>|<\/li>/gi, '\n').replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#8211;|&#8212;/g, '-').replace(/&#8220;|&#8221;/g, '"').replace(/&#8217;|&#8216;/g, "'")
+    .replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(+n); }).replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
+}
+/* Una fecha y hora de Ushuaia (UTC-3, sin horario de verano) → milisegundos. */
+function msBarrio(y, m, d, h, min) { return Date.UTC(y, m, d, (h || 0) + 3, min || 0); }
+function partesBarrio(ms) { var x = new Date(ms - 3 * 3600000); return {y: x.getUTCFullYear(), m: x.getUTCMonth(), d: x.getUTCDate(), dow: x.getUTCDay()}; }
+
+/* Las reparaciones de la DPOSS: cada una trae fecha, horario y sector. */
+function leerDposs(html) {
+  var out = [];
+  String(html || '').split('class="single_department"').slice(1).forEach(function (b) {
+    var t = textoPlano(b);
+    var pub = t.match(/Publicada el:\s*(\d{2})\/(\d{2})\/(\d{4})\s+(\d{1,2}):(\d{2})/);
+    if (!pub) return;
+    var f = t.match(/Fecha:\s*El\s*(\d{2})\/(\d{2})\/(\d{4})\s*de\s*(\d{1,2}):(\d{2})\s*a\s*(\d{1,2}):(\d{2})/);
+    var g = function (k) { var m = t.match(new RegExp(k + ':\\s*([^\\n]+)')); return m ? m[1].trim() : ''; };
+    out.push({
+      fuente: 'DPOSS', url: 'https://dposs.gob.ar/reparaciones/', servicio: 'agua',
+      at: msBarrio(+pub[3], +pub[2] - 1, +pub[1], +pub[4], +pub[5]),
+      titulo: 'Corte de agua ' + (/programado/i.test(g('Tipo de corte')) ? 'programado' : 'por reparación') + (g('Dirección aproximada') ? ' · ' + g('Dirección aproximada') : ''),
+      texto: t.replace(/^[\s\S]*?Fecha:[^\n]*\n?/, ''), localidad: g('Localidad'),
+      programado: /programado/i.test(g('Tipo de corte')),
+      desde: f ? msBarrio(+f[3], +f[2] - 1, +f[1], +f[4], +f[5]) : 0,
+      hasta: f ? msBarrio(+f[3], +f[2] - 1, +f[1], +f[6], +f[7]) : 0
+    });
+  });
+  return out;
+}
+/* Las notas de un diario (WordPress): título, fecha, enlace y texto. */
+function leerDiario(json, nombre) {
+  var lista = [];
+  try { lista = JSON.parse(json || '[]'); } catch (e) { return []; }
+  if (!Array.isArray(lista)) return [];
+  return lista.map(function (p) {
+    var d = String(p.date || '').match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    return {fuente: nombre, url: p.link || '', at: d ? msBarrio(+d[1], +d[2] - 1, +d[3], +d[4], +d[5]) : 0,
+      titulo: textoPlano(p.title && p.title.rendered), texto: textoPlano(p.content && p.content.rendered)};
+  });
+}
+function servicioDe(t) {
+  var x = sinTildes(t);
+  if (/\b(gas|camuzzi)\b/.test(x)) return 'gas';
+  if (/\b(agua|dposs|cloaca\w*)\b/.test(x)) return 'agua';
+  if (/(energia|electric|\bluz\b|\bdpe\b|alimentador|cooperativa electrica)/.test(x)) return 'luz';
+  return '';
+}
+/* Cuándo es el corte, leído del texto: el día ("domingo 12", "el 15 de
+   octubre", "mañana") y el horario ("de 08:15 a 13:00 hs"). Solo vale un día
+   cercano a la nota (de la víspera a tres semanas después): así "Bomberos
+   Voluntarios 2 de Abril" no se toma por una fecha. Primero se busca en el
+   título. */
+function cuandoEs(texto, at, titulo) {
+  var p = partesBarrio(at), dia = null;
+  var cerca = function (y, m, d) { var ms = msBarrio(y, m, d, 12, 0); if (ms < at - 1.5 * 86400000) { ms = msBarrio(y + 1, m, d, 12, 0); y++; } return ms <= at + 21 * 86400000 ? {y: y, m: m, d: d} : null; };
+  var buscar = function (x) {
+    var re = /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/g, k;
+    while ((k = re.exec(x))) { var c = cerca(p.y, MESES_ES.indexOf(k[2] === 'setiembre' ? 'septiembre' : k[2]), +k[1]); if (c) return c; }
+    re = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/g;
+    while ((k = re.exec(x))) { if (+k[2] < 1 || +k[2] > 12 || +k[1] > 31) continue; var c2 = cerca(k[3] ? (+k[3] < 100 ? 2000 + +k[3] : +k[3]) : p.y, +k[2] - 1, +k[1]); if (c2) return c2; }
+    var s = x.match(/\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/);
+    if (s) { var q = partesBarrio(at + ((DIAS_ES.indexOf(s[1]) - p.dow + 7) % 7) * 86400000); return {y: q.y, m: q.m, d: q.d}; }
+    if (/\bmanana\b/.test(x)) { var r = partesBarrio(at + 86400000); return {y: r.y, m: r.m, d: r.d}; }
+    if (/\bhoy\b/.test(x)) return {y: p.y, m: p.m, d: p.d};
+    return null;
+  };
+  var x = sinTildes(texto);
+  dia = buscar(sinTildes(titulo || '')) || buscar(x);
+  var y = dia ? dia.y : p.y, m = dia ? dia.m : p.m, d = dia ? dia.d : p.d;
+  var h = x.match(/(?:de|desde las?|entre las?)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:h(?:s|oras)?\.?\s*)?(?:a|hasta las?|y las?)\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:h|hs|horas)\b/)
+    || x.match(/(?:de|desde las?|entre las?)\s*(\d{1,2})[:.](\d{2})\s*(?:a|hasta las?|y las?)\s*(\d{1,2})[:.](\d{2})/);
+  if (h && (+h[1] > 23 || +h[3] > 24)) h = null;
+  if (!dia) return {hay: false, horario: false, desde: 0, hasta: 0};
+  var desde = h ? msBarrio(y, m, d, +h[1], +(h[2] || 0)) : msBarrio(y, m, d, 0, 0);
+  var hasta = h ? msBarrio(y, m, d, +h[3], +(h[4] || 0)) : msBarrio(y, m, d, 23, 59);
+  if (h && hasta <= desde) hasta = desde + 4 * 3600000;
+  return {hay: true, horario: !!h, desde: desde, hasta: hasta};
+}
+/* ¿Le sirve al barrio? Devuelve el aviso listo, o el motivo por el que no. */
+function analizarCorte(it, zonas, ahora) {
+  var todo = (it.titulo || '') + '\n' + (it.texto || ''), x = sinTildes(todo);
+  var srv = it.servicio || servicioDe(it.titulo) || servicioDe(todo);
+  if (!srv) return {no: 'no es de luz, agua ni gas'};
+  if (!/(corte|interrupci|falta de suministro|baja presion|sin servicio|sin suministro|rotativ)/.test(x)) return {no: 'no habla de un corte'};
+  if (/suspend/.test(sinTildes(it.titulo))) return {no: 'es la suspensión de un corte'};
+  if (it.localidad ? !/ushuaia/i.test(it.localidad) : !/ushuaia/.test(x)) return {no: 'no es en Ushuaia'};
+  if (!it.at || ahora - it.at > 4 * 86400000) return {no: 'es viejo'};
+  var zona = (zonas || []).filter(function (z) { return z && x.indexOf(sinTildes(z)) >= 0; })[0] || '';
+  var general = (x.match(SERVICIOS_GENERAL) || [])[0] || '';
+  if (!zona && !general) return {no: 'no nombra al barrio ni es para toda la ciudad'};
+  var c = it.desde ? {hay: true, horario: true, desde: it.desde, hasta: it.hasta} : cuandoEs(it.texto || '', it.at, it.titulo);
+  var hasta = c.hay ? c.hasta : it.at + 86400000;
+  if (hasta <= ahora) return {no: 'ya terminó'};
+  /* El párrafo que nombra al barrio (o a toda la ciudad), para que se entienda de un vistazo. */
+  var i = x.indexOf(sinTildes(zona || general)), parrafo = '';
+  if (i >= 0) { var a = todo.lastIndexOf('\n', i), b = todo.indexOf('\n', i); parrafo = todo.slice(a < 0 ? 0 : a + 1, b < 0 ? todo.length : b).trim(); }
+  var dia = '';
+  if (c.hay) { var p = partesBarrio(c.desde), hh = function (ms) { return Utilities.formatDate(new Date(ms), ZONA_BARRIO, 'HH:mm'); };
+    dia = DIAS_ES[p.dow].replace('miercoles', 'miércoles').replace('sabado', 'sábado') + ' ' + p.d + '/' + (p.m + 1) + (c.horario ? ', de ' + hh(c.desde) + ' a ' + hh(c.hasta) + ' h' : ''); }
+  var nombre = {luz: 'luz', agua: 'agua', gas: 'gas'}[srv];
+  return {post: {
+    type: 'servicio', servicio: srv, autor: 'sistema',
+    title: 'Corte de ' + nombre + (it.programado || /programad/.test(x) ? ' programado' : '') + (dia ? ' · ' + dia : ''),
+    body: ((parrafo && parrafo.length < 600 ? parrafo : (zona ? 'Nombra a ' + zona + '.' : 'Es para toda la ciudad.')) + '\n\n' + (it.titulo || '')).slice(0, 900),
+    fuente: it.fuente, url: it.url || '', desde: c.hay ? c.desde : 0, hasta: hasta, zona: zona || 'toda la ciudad'
+  }};
+}
+function idCorte(it) {
+  var dig = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, (it.url || '') + '|' + (it.titulo || '') + '|' + (it.at || ''));
+  return 'srv-' + dig.slice(0, 6).map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+}
+/* Lee las fuentes, publica lo que sirve y devuelve qué encontró. `forzar`: ahora, sin esperar la hora. */
+function revisarServicios(base, acceso, forzar) {
+  var hoy = Utilities.formatDate(new Date(), ZONA_BARRIO, 'yyyy-MM-dd'), h = +Utilities.formatDate(new Date(), ZONA_BARRIO, 'H');
+  var cfg = leerBase(base, acceso, 'barrio/config') || {};
+  if (cfg.serviciosActivo === false && !forzar) return {ok: true, apagado: true};
+  if (!forzar) {
+    if (SERVICIOS_HORAS.indexOf(h) < 0) return null;
+    if (!reclamarEnBase(base, acceso, 'barrio/motorLog/servicios-' + hoy + '-' + h, Date.now())) return null;
+  } else reclamarEnBase(base, acceso, 'barrio/motorLog/servicios-ahora-' + Utilities.formatDate(new Date(), ZONA_BARRIO, 'yyyy-MM-dd-HHmm'), Date.now());
+  /* (La app lee la hora de la última marca "servicios-…" para decir "Sin cortes anunciados · revisado hoy a las 6".) */
+  var zonas = String(cfg.serviciosZonas || SERVICIOS_ZONAS).split(/[,;\n]+/).map(function (z) { return z.trim(); }).filter(function (z) { return z.length >= 4; });
+  var items = [], fallas = [], hace = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 19);
+  try { items = items.concat(leerDposs(UrlFetchApp.fetch('https://dposs.gob.ar/reparaciones/', {muteHttpExceptions: true}).getContentText('UTF-8'))); }
+  catch (e) { fallas.push('DPOSS: ' + String(e).slice(0, 80)); }
+  SERVICIOS_DIARIOS.forEach(function (dia) {
+    ['corte', 'Camuzzi'].forEach(function (q) {
+      try {
+        var r = UrlFetchApp.fetch(dia.url + '/wp-json/wp/v2/posts?search=' + encodeURIComponent(q) + '&after=' + hace + '&per_page=20&_fields=date,link,title,content', {muteHttpExceptions: true});
+        if (r.getResponseCode() === 200) items = items.concat(leerDiario(r.getContentText('UTF-8'), dia.nombre));
+        else fallas.push(dia.nombre + ': respondió ' + r.getResponseCode());
+      } catch (e) { fallas.push(dia.nombre + ': ' + String(e).slice(0, 80)); }
+    });
+  });
+  var vistos = {}, publicados = [], descartados = [], ahora = Date.now();
+  items.forEach(function (it) {
+    if (vistos[it.url + it.titulo]) return; vistos[it.url + it.titulo] = 1;
+    var r = analizarCorte(it, zonas, ahora);
+    if (!r.post) { descartados.push({titulo: it.titulo.slice(0, 90), fuente: it.fuente, motivo: r.no}); return; }
+    var id = idCorte(it), post = r.post; post.id = id; post.createdAt = ahora;
+    var nuevo = reclamarEnBase(base, acceso, 'barrio/posts/' + id, post);
+    publicados.push({id: id, titulo: post.title, fuente: it.fuente, nuevo: nuevo});
+  });
+  if (publicados.some(function (p) { return p.nuevo; })) registrar('SERVICIOS', 'barrio', publicados.map(function (p) { return p.titulo; }).join(' | ').slice(0, 300));
+  return {ok: true, leidos: items.length, publicados: publicados, descartados: descartados.slice(0, 40), fallas: fallas, zonas: zonas};
+}
+/* Las fotos y los archivos de los mensajes que ya vencieron (js/adjuntos.js). */
+function limpiarAdjuntos(base, acceso) {
+  var idx = leerBase(base, acceso, 'barrio/adjuntosIdx') || {}, ahora = Date.now(), cambios = {}, n = 0;
+  Object.keys(idx).forEach(function (id) { var x = idx[id]; if (!x || !x.vence || x.vence < ahora) { cambios['barrio/adjuntos/' + id] = null; cambios['barrio/adjuntosIdx/' + id] = null; n++; } });
+  if (n) UrlFetchApp.fetch(base + '/.json?access_token=' + encodeURIComponent(acceso), {method: 'patch', contentType: 'application/json', payload: JSON.stringify(cambios), muteHttpExceptions: true});
+  return n;
+}
+/* "Buscar ahora", desde Administración → Ajustes: lo mismo que a las 6 y a las 23, en el momento. */
+function serviciosAhora() {
+  var props = PropertiesService.getScriptProperties(), base = baseValida(props.getProperty('BASE_URL'));
+  if (!base || !props.getProperty('FCM_CUENTA')) return {ok: false, error: 'Falta la cuenta de servicio (FCM_CUENTA) o todavía no se conoce la base: ver AVISOS.md (es la misma configuración de los avisos al celular).'};
+  var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email');
+  return revisarServicios(base, acceso, true);
 }
 
 function responder(obj) {

@@ -388,6 +388,12 @@ const ADMIN_TABS = {
         <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-correo">${I('send')}Probar el envío</button></div>
         <div id="probarCorreo"></div>
         <label class="check" style="margin:12px 0 0"><input type="checkbox" name="parteTurno" ${c.parteTurno !== false ? 'checked' : ''}><span>Al cerrarse cada turno de la garita, mandar el parte (guardias, novedades, policía, rondas y bitácora) al correo de la Administración</span></label></div>
+      <div class="card"><h3>Cortes de luz, agua y gas</h3>
+        <p class="muted small" style="margin-top:0">Todos los días a las 6 y a las 23, el Apps Script lee los cortes de agua de la DPOSS y los comunicados de la DPE (luz) y de Camuzzi (gas) que publican NotiTDF, Radio Fueguina y Tiempo Fueguino. Si un corte nombra al barrio (o a una de las zonas de abajo) o es para toda la ciudad, sale solo en la pizarra y el pizarrón con su lamparita, gotita o llamita titilando, y se borra cuando termina el corte (o a las 24 horas). Lo demás no se publica. Facebook no se puede leer desde un programa.</p>
+        <div class="field"><label>Zonas que cuentan (separadas por coma)</label><input name="serviciosZonas" value="${esc(c.serviciosZonas || 'Bahía Cauquén, Los Cauquenes')}" maxlength="300">
+          <div class="ayuda">El nombre del barrio y, si querés, los barrios vecinos que comparten la misma línea de luz o de agua. No pongas palabras sueltas como "Bahía": aparece en muchos barrios.</div></div>
+        <label class="check" style="margin:0 0 10px"><input type="checkbox" name="serviciosActivo" ${c.serviciosActivo !== false ? 'checked' : ''}><span>Buscar y publicar los cortes solos</span></label>
+        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="servicios-buscar">${I('search')}Buscar ahora</button></div><div id="serviciosRes"></div></div>
       <div class="card"><h3>Promociones del Hotel Los Cauquenes (opcional)</h3>
         <p class="muted small" style="margin-top:0">Las promociones se cargan a mano en <b>Contenido → Promociones</b> y eso ya funciona. Esto es solo si querés que se lean solas del sitio del Hotel Los Cauquenes: hace falta un programita propio que las devuelva en JSON (está explicado en CONECTAR.md), porque el navegador no puede leer otra web directamente.</p>
         ${campo('promosUrl', 'Dirección del lector de promociones', 'url')}</div>
@@ -458,7 +464,8 @@ F['ajustes'] = d => {
   }
   Store.cambiar(s => {
     const c = s.config;
-    ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminososDetalle','silencio','obraHorario','correoUrl','correoClave','vuelosProxy','promosUrl'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
+    ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminososDetalle','silencio','obraHorario','correoUrl','correoClave','vuelosProxy','promosUrl','serviciosZonas'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
+    c.serviciosActivo = !!d.serviciosActivo;
     /* La clave de avisos se pega desde la consola de Firebase y a veces viene
        con espacios o saltos de línea en el medio. Vacía no borra la que ya
        está: se reemplaza pegando otra. */
@@ -482,6 +489,29 @@ A['probar-push'] = async () => {
     caja.innerHTML = `<div style="margin-top:10px">${aviso(ok ? 'ok' : 'warn', ok ? 'check' : 'alert', ok ? 'El Apps Script puede mandar avisos' : 'Al Apps Script le falta un paso',
       ok ? (Store.s.config.pushVapid ? 'Ahora cada vecino activa los avisos en su equipo (Tu cuenta → Avisos en este equipo).' : 'Falta pegar acá la clave pública y Guardar.') + (j.version < 4 ? ' Conviene pegar el Codigo.gs nuevo (versión 4) y hacer "Nueva versión": manda los avisos con prioridad alta, para que Android no los demore con la pantalla apagada.' : '') : j.version >= 3 ? 'Falta la propiedad FCM_CUENTA (ver AVISOS.md).' : 'Tiene la versión vieja del código: pegá el Codigo.gs nuevo y hacé "Nueva versión".')}</div>`;
   } catch(e){ caja.innerHTML = `<div style="margin-top:10px">${aviso('danger', 'alert', 'No se pudo consultar', esc(Correo.motivo(e)))}</div>`; }
+};
+/* "Buscar ahora" los cortes de luz, agua y gas (11-10-2026): hace lo mismo
+   que el Apps Script a las 6 y a las 23 y muestra qué encontró y qué dejó
+   afuera (y por qué). Lo que sirve al barrio queda publicado. */
+const resultadoServicios = j => {
+  const pub = aLista(j.publicados), des = aLista(j.descartados);
+  return `${aviso(pub.length ? 'warn' : 'ok', pub.length ? 'bolt' : 'check', pub.length ? `${plural(pub.length, 'corte que toca al barrio', 'cortes que tocan al barrio')}` : 'Ningún corte anunciado para el barrio',
+      `Leyó ${plural(j.leidos || 0, 'nota')} de la DPOSS y los diarios. Zonas: ${esc(aLista(j.zonas).join(', '))}.`)}
+    ${pub.length ? `<div class="lista" style="margin-top:8px">${pub.map(x => `<div class="small" style="padding:6px 0">${I('check')} <b>${esc(x.titulo)}</b> · ${esc(x.fuente)}${x.nuevo ? ' · <b>publicado ahora</b>' : ' · ya estaba publicado'}</div>`).join('')}</div>` : ''}
+    ${des.length ? `<details style="margin-top:8px"><summary class="small">Lo que leyó y no publicó (${des.length})</summary>${des.map(x => `<div class="tiny muted" style="padding:4px 0">${esc(x.fuente)} · ${esc(x.titulo)} → ${esc(x.motivo)}</div>`).join('')}</details>` : ''}
+    ${aLista(j.fallas).length ? `<p class="tiny muted">No se pudo leer: ${esc(aLista(j.fallas).join(' · '))}</p>` : ''}`;
+};
+A['servicios-buscar'] = async () => {
+  const caja = $('#serviciosRes'), d = Correo.datos();
+  if (!caja) return;
+  if (!d){ caja.innerHTML = `<div style="margin-top:10px">${aviso('warn', 'alert', 'Primero configurá el Apps Script', 'La búsqueda la hace el mismo Apps Script del correo.')}</div>`; return; }
+  caja.innerHTML = `<div class="card plana small" style="margin:10px 0 0">${I('refresh')} Leyendo la DPOSS y los diarios… (tarda unos segundos)</div>`;
+  try {
+    const r = await fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ accion:'servicios', clave:d.clave }) });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error(j && /desconocida/.test(j.error || '') ? 'El Apps Script tiene una versión vieja: pegá el Codigo.gs nuevo (versión 12) y hacé "Nueva versión".' : (j && j.error) || 'El Apps Script contestó que no');
+    caja.innerHTML = `<div style="margin-top:10px">${resultadoServicios(j)}</div>`;
+  } catch(e){ caja.innerHTML = `<div style="margin-top:10px">${aviso('danger', 'alert', 'No se pudo buscar', esc(Correo.motivo(e)))}</div>`; }
 };
 A['frase-ver'] = el => { const i = el.closest('form')?.correoClave; if (i) i.classList.toggle('frase-oculta', !el.checked); };
 A['correos-reintentar'] = async () => {

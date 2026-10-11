@@ -318,7 +318,7 @@ A['hist-hilo'] = async el => {
     const paquetes = (await Historial.archivo(carpeta, dueno) || []).filter(p => p.hilo === id);
     const msgs = paquetes.flatMap(p => aLista(p.msgs)).sort((a, b) => (a.createdAt || a.at) - (b.createdAt || b.at));
     const mio = m => col === 'dms' ? m.de === yo().id : (esStaff() ? m.from !== 'vecino' : m.from === 'vecino');
-    hoja('Mensajes anteriores', msgs.length ? `<div class="chat">${msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}"><div class="b">${esc(m.text)}<time>${fechaHora(m.createdAt || m.at)}</time></div></div>`).join('')}</div>`
+    hoja('Mensajes anteriores', msgs.length ? `<div class="chat">${msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}"><div class="b">${cuerpoMsg(m)}<time>${fechaHora(m.createdAt || m.at)}</time></div></div>`).join('')}</div>`
       : vacio('chat', 'No hay mensajes archivados de esta conversación.'));
   } catch(e){ Historial.fallo(e); }
 };

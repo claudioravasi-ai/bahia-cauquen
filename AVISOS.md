@@ -44,7 +44,7 @@ La misma cuenta de servicio le permite al Apps Script leer la lista de equipos a
 **aunque todos los teléfonos estén bloqueados**. Lo hace un reloj del Apps Script que
 revisa cada 10 minutos.
 
-1. Pegá el `apps-script/Codigo.gs` nuevo (**versión 11**, del 07-10-2026: no le manda a la supervisión los avisos de todo el barrio, vigila que la garita esté conectada y que los SOS tengan respuesta, y a un equipo con la sesión cerrada le manda solo "un correo va a tu casa") → **Guardar** →
+1. Pegá el `apps-script/Codigo.gs` nuevo (**versión 12**, del 11-10-2026: además de lo de la versión 11, busca los cortes de luz, agua y gas a las 6 y a las 23, y borra las fotos y archivos de los mensajes que ya vencieron) → **Guardar** →
    **Implementar → Gestionar implementaciones → editar → Nueva versión → Implementar**.
 2. Arriba, en el menú de funciones, elegí **`instalarRelojCuidados`** y tocá **Ejecutar**.
    Google pide permiso ("activadores" y "servicio externo"): aceptalo.
@@ -54,6 +54,20 @@ Usa la misma `FCM_CUENTA` del paso 2 y la dirección de la base (`BASE_URL`), qu
 sola la primera vez que la app manda un aviso push (por ejemplo, **Ajustes → Avisos al celular → Probar**).
 Sin el reloj, "Estoy bien" igual avisa, pero recién cuando alguna app de un contacto o de la
 garita está abierta; la garita, que está abierta las 24 horas, lo cubre si el vecino la eligió.
+
+## Cortes de luz, agua y gas y fotos de los mensajes (11-10-2026, versión 12)
+
+Con el mismo reloj de cada 10 minutos (no hay que instalar nada más):
+
+- **A las 6 y a las 23** lee los cortes de agua de la DPOSS (dposs.gob.ar/reparaciones) y los
+  comunicados de la DPE (luz) y de Camuzzi (gas) que publican NotiTDF, Radio Fueguina y Tiempo
+  Fueguino. Publica en el pizarrón **solo** los que nombran al barrio (o una zona anotada en
+  **Ajustes → Cortes de luz, agua y gas**) o son para toda la ciudad. Facebook no se puede leer.
+- **Cada 10 minutos** borra de la base las fotos y archivos de los mensajes que ya vencieron
+  (una hora después de que los bajó quien los recibió, o a los 3 días).
+
+Para probarlo sin esperar: en la app, **Ajustes → Cortes de luz, agua y gas → Buscar ahora**.
+Las fotos de los mensajes necesitan las **reglas de Firebase** nuevas (`adjuntos` y `adjuntosIdx`).
 
 ## La supervisión de la guardia (07-10-2026)
 

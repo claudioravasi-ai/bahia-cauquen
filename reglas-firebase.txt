@@ -166,6 +166,19 @@ PEGAR DESDE ACÁ
         "$id": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" }
       },
 
+      /* Fotos y archivos de los mensajes privados (11-10-2026, js/adjuntos.js).
+         Se leen de a uno, sabiendo el id (que está solo en el mensaje); nadie
+         puede listarlos. Los usan todas las cuentas aprobadas (también el
+         hotel y la supervisión, que tienen sus conversaciones). Hasta 5 MB.
+         Se borran una hora después de bajarlos, o a los 3 días. */
+      "adjuntos": {
+        "$id": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 7200000 && newData.child('vence').isNumber()))" }
+      },
+      "adjuntosIdx": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+      },
+
       /* Los equipos anotados para recibir avisos push. NADIE los lee desde la
          app: solo el Apps Script, con la cuenta de servicio. Cada uno escribe
          los suyos. */

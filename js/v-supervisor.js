@@ -124,9 +124,9 @@ function chatSupervision(p){
   const vacioTxt = esSupervisor() ? (con === 'supGarita' ? 'Escribile a la garita: le suena al instante. Lo leen solo la garita y vos.' : 'Escribile a la Administración. Lo leen solo la Administración y vos.')
     : `Mensajes con ${esc(sup.nombre || 'la supervisión')}. Ningún vecino los ve.`;
   return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
-      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${de(m)}</small>` : ''}${esc(m.text)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
+      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${de(m)}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
       : vacio('lock', vacioTxt)}</div>
-    <form class="chatbar" data-f="privado-sup" data-u="${esc(supId)}" data-con="${con}"><textarea name="text" id="privIn" required maxlength="800" rows="1" class="crece" enterkeyhint="send"
+    <form class="chatbar" data-f="privado-sup" data-u="${esc(supId)}" data-con="${con}">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" rows="1" class="crece" enterkeyhint="send"
       placeholder="${esSupervisor() ? 'Mensaje a ' + (con === 'supGarita' ? 'la garita' : 'la Administración') : 'Mensaje a la supervisión'}"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
 }
 /* R.privado ya existe (js/v-gestion.js): se le suman los dos canales. El
@@ -142,14 +142,14 @@ function chatSupervision(p){
     return c === 'supAdmin' ? 'Supervisión y Administración · no lo ve ningún vecino' : 'Supervisión y garita · no lo ve ningún vecino'; };
 })();
 F['privado-sup'] = (d, form) => {
-  const con = form.dataset.con, supId = form.dataset.u, texto = String(d.text || '').trim(), u = yo();
+  const con = form.dataset.con, supId = form.dataset.u, { text:texto, extra } = mensajeConAdj(d), u = yo();
   if (!CANALES_SUP[con] || !texto || !u || !puedeCanalSup(con) || (esSupervisor() && supId !== u.id)) return;
   const yoSoy = quienSoySup();
   const para = yoSoy === 'supervisor' ? (con === 'supGarita' ? cuentasGarita() : cuentasAdministracion()) : [supId];
   Store.cambiar(s => {
     let h = s.privados.find(x => x.userId === supId && x.con === con);
     if (!h){ h = { id:`${con}-${supId}`, userId:supId, con, msgs:[] }; s.privados.push(h); }
-    listaDe(h, 'msgs').push({ id:uid(), from:yoSoy, text:texto, createdAt:Date.now() });
+    listaDe(h, 'msgs').push({ id:uid(), from:yoSoy, text:texto, createdAt:Date.now(), ...extra });
     if (para.length) notificar(s, { para, titulo: yoSoy === 'supervisor' ? `Mensaje de la supervisión (${primerNombre(u.nombre)})` : yoSoy === 'guardia' ? 'Mensaje de la garita' : 'Mensaje de la Administración',
       texto:texto.slice(0, 90), icon:'eye', color:'brand', link: yoSoy === 'supervisor' ? `privado:${con}|${supId}` : `privado:${con}`, sonido:true });
   });

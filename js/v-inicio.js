@@ -593,9 +593,12 @@ function avisosGenerales(){
      votación…) no dura 24 horas: se renueva a las 00 h de cada día, así la
      pizarra de hoy no arrastra los avisos automáticos de ayer. */
   aLista(s.posts).filter(p => p && (TIPOS_PIZARRA.includes(p.type) || p.autor === 'sistema' || usuario(p.autor)?.rol === 'admin') && !p.resuelto && !(typeof postVencido === 'function' && postVencido(p))
-      && (p.autor === 'sistema' ? p.createdAt >= medianoche
+      && (p.type === 'servicio' ? true : p.autor === 'sistema' ? p.createdAt >= medianoche
         : (p.fijado || ahora - p.createdAt < DIA || (p.type === 'evento' && p.fecha && p.fecha >= hoy)))).forEach(p => {
-    const t = TIPOS_POST[p.type] || TIPOS_POST.aviso, au = autorVisible(p.autor);
+    const t = TIPOS_POST[p.type] || TIPOS_POST.aviso, au = autorVisible(p.autor), c = typeof corteDe === 'function' ? corteDe(p) : null;
+    /* Un corte de luz, agua o gas: rojo mientras dura, amarillo antes; el ícono titila (srv). */
+    if (c) return poner({ k:'post-' + p.id, nivel: p.desde && p.desde <= ahora ? 'rojo' : 'amarillo', icon:c.icon, srv:p.servicio, tag: p.desde && p.desde <= ahora ? c.n + ' · ahora' : c.n, at:p.createdAt, titulo:p.title, texto:p.body,
+      de:`Automático · ${p.fuente || ''}`, a:'ver-novedad', v:'post', id:p.id });
     poner({ k:'post-' + p.id, nivel: NIVEL_POST[p.type] || 'verde', icon:t.icon, tag:t.n, at:p.createdAt, titulo:p.title, texto:p.body,
       de:`${au.nombre}${au.casa && au.casa !== au.nombre ? ' · ' + au.casa : ''}`, fijo:p.fijado, a:'ver-novedad', v:'post', id:p.id });
   });
@@ -664,7 +667,7 @@ function avisosPersonales(){
     .sort((a, b) => (!!b.siempre - !!a.siempre) || (ORDEN_NIVEL[a.nivel] - ORDEN_NIVEL[b.nivel]) || b.at - a.at);
 }
 const ventanita = x => `<button class="pz nv-${x.nivel} ${x.nuevo ? 'titila' : ''}" data-k="${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
-    <span class="pz-cab"><span class="pz-ic">${I(x.icon)}</span><span class="pz-tag">${esc(x.tag)}</span>${x.fijo ? `<span class="nov-fijo">${I('tack')}</span>` : ''}${x.nuevo ? '<span class="pz-nueva">Nuevo</span>' : ''}<time>${cuandoFue(x.at)}</time></span>
+    <span class="pz-cab"><span class="pz-ic${x.srv ? ' srv-ic srv-' + esc(x.srv) : ''}">${I(x.icon)}</span><span class="pz-tag">${esc(x.tag)}</span>${x.fijo ? `<span class="nov-fijo">${I('tack')}</span>` : ''}${x.nuevo ? '<span class="pz-nueva">Nuevo</span>' : ''}<time>${cuandoFue(x.at)}</time></span>
     <b>${esc(x.titulo)}</b>${x.texto ? `<span class="pz-txt">${esc(x.texto)}</span>` : ''}${x.de ? `<span class="pz-de">${esc(x.de)}</span>` : ''}</button>`;
 
 /* =========================================================
@@ -690,7 +693,7 @@ function itemsPizarra(){
 }
 const renglonPz = x => `<button class="pzr nv-${x.nivel} ${x.nuevo ? 'titila' : 'leido'}${x.siempre ? ' siempre' : ''}" data-k=
 "${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
-    <span class="pzr-ic">${I(x.icon)}</span>
+    <span class="pzr-ic${x.srv ? ' srv-ic srv-' + esc(x.srv) : ''}">${I(x.icon)}</span>
     <span class="pzr-txt"><small>${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</small><b>${esc(x.titulo)}</b></span>
     <time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></button>`;
 /* Las acciones de lo personal que sí o sí tienen que estar a mano. */
@@ -710,8 +713,8 @@ function decisionesPendientes(){
    Ocupa más o menos lo mismo que la lista de renglones. */
 const MAX_TARJETAS_PZ = 8;
 const tarjetaPz = (x, grande) => `<button class="pzt ${grande ? 'pzd' : ''} nv-${x.nivel} ${x.nuevo ? 'titila' : 'leido'}${x.siempre ? ' siempre' : ''}" data-k="${esc(x.k)}" data-a="${x.a}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" data-id="${esc(x.id || '')}" title="${NIVELES_PZ[x.nivel]}">
-    ${grande ? `<span class="pzt-arr"><span class="pzt-ic">${I(x.icon)}</span><span class="pzt-tag">${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</span>${x.nuevo ? '<span class="pzt-nuevo"><i></i>Nuevo</span>' : ''}<time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></span>`
-      : `<span class="pzt-arr"><span class="pzt-ic">${I(x.icon)}${x.nuevo ? '<i class="pzt-punto" title="Nuevo"></i>' : ''}</span><time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></span><span class="pzt-tag">${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</span>`}
+    ${grande ? `<span class="pzt-arr"><span class="pzt-ic${x.srv ? ' srv-ic srv-' + esc(x.srv) : ''}">${I(x.icon)}</span><span class="pzt-tag">${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</span>${x.nuevo ? '<span class="pzt-nuevo"><i></i>Nuevo</span>' : ''}<time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></span>`
+      : `<span class="pzt-arr"><span class="pzt-ic${x.srv ? ' srv-ic srv-' + esc(x.srv) : ''}">${I(x.icon)}${x.nuevo ? '<i class="pzt-punto" title="Nuevo"></i>' : ''}</span><time>${cuandoFue(x.at).replace(/^Hoy /, '')}</time></span><span class="pzt-tag">${esc(x.tag)}${x.fijo ? ' · fijado' : ''}</span>`}
     <b>${esc(x.titulo)}</b>${grande && x.texto ? `<span class="pzt-txt">${esc(x.texto)}</span>` : ''}
     ${grande ? `<span class="pzt-pie">${x.de ? `<span>${esc(x.de)}</span>` : '<span></span>'}<span class="pzt-abrir">Abrir${I('right')}</span></span>` : ''}</button>`;
 function pizarraDelDia(){
@@ -733,7 +736,7 @@ function pizarraDelDia(){
       ${items.length ? `<button class="pzv-todo" data-a="pizarra-toda">Ver todo${I('right')}</button>` : ''}</div>
     ${medidor}
     ${dec.length ? `<div class="pz-decisiones">${dec.join('')}</div>` : ''}
-    ${top ? tarjetaPz(top, true) : `<div class="pzv-nada"><span class="pzv-sol">${I('check')}</span><span><b>Hoy no hay avisos</b><small>Lo que llegue para vos o para el barrio aparece acá, con su color.</small></span></div>`}
+    ${top ? tarjetaPz(top, true) : `<div class="pzv-nada"><span class="pzv-sol">${I('check')}</span><span><b>Hoy no hay avisos</b><small>Lo que llegue para vos o para el barrio aparece acá, con su color.</small></span></div>${typeof tarjetaServicios === 'function' ? tarjetaServicios() : ''}`}
     ${carrusel.length ? `<div class="pzv-carrusel">${carrusel.map(x => tarjetaPz(x, false)).join('')}${faltan > 0 ? `<button class="pzt pzv-mas" data-a="pizarra-toda"><b>+${faltan}</b><span>${faltan > 1 ? 'avisos más' : 'aviso más'}</span>${I('right')}</button>` : ''}</div>` : ''}
   </div>`;
 }
@@ -763,8 +766,10 @@ A['ver-novedad'] = el => {
   }
   const p = aLista(s.posts).find(x => x.id === id); if (!p) return;
   const t = TIPOS_POST[p.type] || TIPOS_POST.aviso, a = autorVisible(p.autor);
-  hoja(t.n, `<div class="novedad-leer"><span class="pill p-${t.c}">${I(t.icon)}${t.n}</span><time>${cuandoFue(p.createdAt)} · ${esc(a.nombre)}${a.casa && a.casa !== a.nombre ? ' · ' + esc(a.casa) : ''}</time>
+  const cs = typeof corteDe === 'function' ? corteDe(p) : null;
+  hoja(cs ? cs.n : t.n, `<div class="novedad-leer"><span class="pill p-${t.c}">${cs ? icCorte(p) + esc(cs.n) : I(t.icon) + t.n}</span><time>${cuandoFue(p.createdAt)} · ${esc(a.nombre)}${a.casa && a.casa !== a.nombre ? ' · ' + esc(a.casa) : ''}</time>
     <h3>${esc(p.title)}</h3>${p.body ? `<p>${esc(p.body)}</p>` : ''}
+    ${cs ? `<p class="muted small">${I('clock')} Se borra solo ${p.hasta ? 'cuando termina el corte (' + esc(cuandoFue(p.hasta)) + ')' : 'a las 24 horas'}. Fuente: ${esc(p.fuente || '')}${p.url ? ` · <a href="${esc(p.url)}" target="_blank" rel="noopener">ver la nota</a>` : ''}. Lo publicó la app sola: revisá la fuente ante cualquier duda.</p>` : ''}
     ${p.type === 'evento' && p.fecha ? `<div class="card plana small">${I('calendar')} ${fechaLarga(p.fecha)}${p.horaEv ? ' · ' + esc(p.horaEv) + ' h' : ''}${p.lugar ? ' · ' + esc(p.lugar) : ''}</div>` : ''}</div>
     <div class="btns" style="margin-top:14px"><button class="btn btn-sec" data-a="novedad-al-pizarron">${I('muro')}Ver en el pizarrón</button>
       <button class="btn btn-pri grow" data-a="cerrar-hoja">Listo</button></div>`);

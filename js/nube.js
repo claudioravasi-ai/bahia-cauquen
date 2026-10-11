@@ -348,7 +348,7 @@ const Nube = {
     /* La cuenta de la garita se reconoce por el correo: si quedó como vecino
        (se inscribió por el portal común), la Administración la corrige sola. */
     if (mio.rol === 'admin'){ setTimeout(() => this.corregirGarita(), 5000); setInterval(() => this.corregirGarita(), 60000); }
-    if (mio.rol === 'admin') setTimeout(() => this.limpiarFotos(), 20000);
+    if (mio.rol === 'admin') setTimeout(() => { this.limpiarFotos(); if (typeof Adjuntos !== 'undefined') Adjuntos.limpiar(); }, 20000);
     if (mio.rol === 'admin' && !this.repartiendo){ this.repartiendo = true; setTimeout(() => this.repartirPagos(), 30000); setInterval(() => this.repartirPagos(), 10 * MIN); }
 
     /* Lo viejo pasa al archivo histórico una vez por día (js/historial.js). */

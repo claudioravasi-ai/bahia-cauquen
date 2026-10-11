@@ -19,7 +19,54 @@ const TIPOS_POST = {
   ofrezco: { n:'Ofrezco', icon:'wrench', c:'ok' },
   busco:   { n:'Busco', icon:'search', c:'wood' },
   mercado: { n:'Vendo / regalo', icon:'cart', c:'wood' },
+  servicio:{ n:'Corte de servicio', icon:'bolt', c:'warn' },
 };
+/* CORTES DE LUZ, AGUA Y GAS (pedido de Claudio, 11-10-2026): los publica
+   solo el Apps Script a las 6 y a las 23, cuando la DPE, la DPOSS o Camuzzi
+   anuncian un corte que nombra al barrio o es para toda la ciudad (ver
+   revisarServicios en apps-script/Codigo.gs). Llevan su ícono titilando:
+   lamparita, gotita o llamita. Se borran solos cuando termina el corte
+   (`hasta`), o a las 24 horas si no se sabe. Nadie más publica este tipo. */
+const SERVICIOS_CORTE = { luz:{ n:'Corte de luz', icon:'lamp' }, agua:{ n:'Corte de agua', icon:'drop' }, gas:{ n:'Corte de gas', icon:'flame' } };
+const corteDe = p => p && p.type === 'servicio' ? (SERVICIOS_CORTE[p.servicio] || SERVICIOS_CORTE.luz) : null;
+/* =========================================================
+   ESTADO DE LOS SERVICIOS (pedido de Claudio, 11-10-2026, idea de gatus y
+   openstatus en GitHub): cuando el pizarrón o la Pizarra del día están
+   vacíos, en vez de un cartel sin nada se ve una tarjeta con la luz, el agua
+   y el gas del barrio:
+     · en verde, "Sin cortes anunciados", si el Apps Script revisó en las
+       últimas 20 horas (a las 6 y a las 23) y no encontró nada para el barrio;
+     · en amarillo, "Corte anunciado" con el día, o en rojo, "Corte ahora",
+       si hay un aviso de corte (se toca y se abre);
+     · en gris, "Sin revisar", si no hubo revisión reciente: la app no
+       promete que no hay cortes si no se fijó.
+   La hora de la última revisión sale de las marcas barrio/motorLog/
+   servicios-… que deja el Apps Script. Si la Administración apagó la
+   búsqueda (Ajustes), la tarjeta no aparece.
+   ========================================================= */
+function estadoServicios(){
+  const ahora = Date.now(), log = Store.s.motorLog || {};
+  const ult = Math.max(0, ...Object.entries(log).filter(([k]) => /^servicios-/.test(k)).map(([, v]) => +v || 0));
+  const revisado = !!ult && ahora - ult < 20 * HORA;
+  const cortes = aLista(Store.s.posts).filter(p => p && p.type === 'servicio' && !postVencido(p));
+  return { ult, revisado, filas: Object.entries(SERVICIOS_CORTE).map(([k, c]) => {
+    const p = cortes.filter(x => x.servicio === k).sort((a, b) => (a.desde || a.createdAt) - (b.desde || b.createdAt))[0];
+    const est = p ? (p.desde && p.desde <= ahora ? 'ahora' : 'anunciado') : revisado ? 'ok' : 'sin';
+    return { k, n: c.n.replace('Corte de ', ''), icon: c.icon, est, p };
+  }) };
+}
+function tarjetaServicios(){
+  if (Store.s.config.serviciosActivo === false) return '';
+  const e = estadoServicios(), TXT = { ok:'Sin cortes anunciados', anunciado:'Corte anunciado', ahora:'Corte ahora', sin:'Sin revisar' };
+  const cuando = e.ult ? `Revisado ${cuandoFue(e.ult).replace(/^Hoy /, 'hoy a las ').replace(/^Ayer /, 'ayer a las ')} h` : 'Todavía no se revisó';
+  const fila = f => { const sub = f.p ? esc(f.p.title.replace(/^Corte de \w+( programado)?\s*·?\s*/i, '') || (f.est === 'ahora' ? 'En curso' : 'Tocá para ver')) : TXT[f.est];
+    const dentro = `<span class="srv-ic srv-${f.k} ${f.p ? '' : 'quieto'}">${I(f.icon)}</span><span class="srv-txt"><b>${esc(f.n.charAt(0).toUpperCase() + f.n.slice(1))}</b><small>${f.p ? TXT[f.est] + (sub ? ' · ' + sub : '') : sub}</small></span>`;
+    return f.p ? `<button class="srv-fila e-${f.est}" data-a="ver-novedad" data-v="post" data-id="${esc(f.p.id)}">${dentro}${I('right')}</button>` : `<div class="srv-fila e-${f.est}">${dentro}${f.est === 'ok' ? I('check') : ''}</div>`; };
+  return `<div class="srv-estado"><div class="srv-cab">${I('zap')}<span><b>Servicios del barrio</b><small>${cuando} · DPOSS, DPE y Camuzzi</small></span></div>
+    <div class="srv-filas">${e.filas.map(fila).join('')}</div>
+    <p class="srv-pie">${e.revisado ? 'La app busca los cortes anunciados todos los días a las 6 y a las 23.' : 'La app busca los cortes a las 6 y a las 23; todavía no hay una revisión reciente, así que no se puede asegurar que no haya cortes.'}</p></div>`;
+}
+const icCorte = (p, cls = '') => { const c = corteDe(p); return c ? `<span class="srv-ic srv-${esc(p.servicio)} ${cls}" aria-hidden="true">${I(c.icon)}</span>` : ''; };
 /* =========================================================
    CUÁNTO DURA CADA PUBLICACIÓN (pedido de Claudio, 10-10-2026: "¿cuánto
    duran los avisos de la pizarra? ¿se borran solos?")
@@ -49,6 +96,7 @@ function diasDelPost(p){
 /* Cuándo se borra (0 = no se borra solo). */
 function venceDelPost(p){
   if (!p) return 0;
+  if (p.type === 'servicio') return p.hasta || (p.createdAt || 0) + DIA;
   if (p.resuelto) return p.resuelto + DIA;
   if (p.fijado) return 0;
   if (p.type === 'evento' && p.fecha) return new Date(sumarDias(p.fecha, 1) + 'T23:59').getTime();
@@ -81,7 +129,7 @@ const REACCIONES = ['👍','❤️','🙏','😮','😂'];
 const CATEGORIAS = ['Plomería','Electricidad','Gas','Carpintería','Jardinería','Limpieza','Niñera','Clases particulares','Mascotas','Fletes / mudanza','Leña','Tecnología','Préstamos','Otro'];
 const tiposQuePuedo = () => {
   const r = yo()?.rol;
-  return Object.keys(TIPOS_POST).filter(k => k !== 'guardia' || r === 'guardia' || r === 'admin');
+  return Object.keys(TIPOS_POST).filter(k => k !== 'servicio' && (k !== 'guardia' || r === 'guardia' || r === 'admin'));
 };
 
 R.pizarron = {
@@ -99,7 +147,7 @@ R.pizarron = {
     return `
       ${superficie({ a:'nuevo-post', icon:'plus', t: u.rol === 'guardia' ? 'Escribir un aviso de la guardia' : 'Publicar en el pizarrón', s: u.rol === 'guardia' ? 'Les suena y les llega a todos los vecinos' : 'Aviso, evento, perdido, ofrezco, busco…', cls:'acento' })}
       <div class="chips">${chip('todo','Todo')}${chip('guardia','Guardia')}${chip('aviso','Avisos')}${chip('alerta','Alertas')}${chip('evento','Eventos')}${chip('perdido','Perdidos')}${chip('servicios','Ofrezco / busco')}</div>
-      <div class="muro-cols">${ps.length ? ps.map(cardPost).join('') : vacio('muro', 'Todavía no hay nada acá.')}</div>
+      ${ps.length ? `<div class="muro-cols">${ps.map(cardPost).join('')}</div>` : f === 'todo' ? `${tarjetaServicios()}${vacio('muro', 'Por ahora no hay publicaciones. Si tenés algo para contar, prestar o avisar, tocá "Publicar en el pizarrón".')}` : `<div class="muro-cols">${vacio('muro', 'Todavía no hay nada acá.')}</div>`}
       <p class="muted tiny" style="margin:10px 2px 0">${I('clock')} Cada publicación se borra sola a su tiempo: alertas 2 días, guardia 3, avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, y los eventos al día siguiente. Lo fijado queda. Quien publica la puede borrar antes con el tachito.</p>`;
   },
 };
@@ -121,8 +169,9 @@ function cardPost(p){
     <div class="post-head">${p.autor === 'sistema' ? `<span class="avatar" style="background:var(--accent)">${I('sparkle')}</span>` : p.type === 'guardia' ? `<span class="avatar" style="background:var(--brand)">${I('shield')}</span>` : avatar(usuario(p.autor))}
       <div class="who"><b>${esc(a.nombre)}</b><span>${esc(a.casa || '')} · ${hace(p.createdAt)}</span></div>
       ${p.fijado ? `<span class="pill p-brand">${I('tack')}Fijado</span>` : ''}</div>
-    <span class="pill p-${t.c}">${I(t.icon)}${t.n}${p.category ? ' · ' + esc(p.category) : ''}${p.resuelto ? ' · Resuelto' : ''}</span>
+    <span class="pill p-${t.c}">${corteDe(p) ? icCorte(p) + esc(corteDe(p).n) : I(t.icon) + t.n}${p.category ? ' · ' + esc(p.category) : ''}${p.resuelto ? ' · Resuelto' : ''}</span>
     <h3>${esc(p.title)}</h3>
+    ${corteDe(p) ? `<p class="muted tiny" style="margin:-2px 0 6px">${I('clock')} Se borra solo ${p.hasta ? 'cuando termina el corte (' + esc(cuandoFue(p.hasta)) + ')' : 'a las 24 horas'} · Fuente: ${esc(p.fuente || '')}${p.url ? ` · <a href="${esc(p.url)}" target="_blank" rel="noopener">ver la nota</a>` : ''}</p>` : ''}
     ${p.body ? `<p class="post-texto">${esc(p.body)}</p>` : ''}
     ${p.price ? `<div class="precio">${esc(p.price)}</div>` : ''}
     ${ev}
@@ -454,13 +503,13 @@ const FAQ_DATOS = [
     '• Calidad y minimización (art. 4 inc. 1): los datos obligatorios son nombre y apellido, lote, correo y DNI (este último, para verificar que sos del barrio antes de aprobar la cuenta). Teléfono, profesión u oficio, vehículos, mascotas y foto del frente de la casa son optativos.',
     '• Finalidad (art. 4 inc. 3): comunicación, seguridad, administración y convivencia del barrio. Ningún dato se usa para publicidad ni para un fin distinto o incompatible (art. 27). La app puede mostrar promociones y publicidad de comercios, pero no les pasa datos, no elige los anuncios según quién mira y no tiene herramientas de seguimiento o de estadística de terceros.',
     '• Exactitud (art. 4 inc. 4 y 5): cada vecino corrige sus propios datos en Mi casa, en cualquier momento.',
-    '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran; los mensajes privados se borran solos a los 90 días; lo publicado en el pizarrón se borra solo a su tiempo (de 2 a 30 días según qué es, o cuando su autor lo borra). Pasado ese plazo, la visita queda solo en el archivo histórico del barrio (quién vino, a qué lote y cuándo), sin DNI ni patente, con las mismas reglas de acceso que el resto: cada vecino ve solo las suyas.',
+    '• Conservación limitada (art. 4 inc. 7): los datos de las visitas (DNI y patente) se borran solos a los {DIAS} días; las copias de fotos para descargar vencen y se borran; las fotos y archivos de los mensajes privados se borran de la base una hora después de que los baja quien los recibe (o a los 3 días); los mensajes privados se borran solos a los 90 días; lo publicado en el pizarrón se borra solo a su tiempo (de 2 a 30 días según qué es, o cuando su autor lo borra). Pasado ese plazo, la visita queda solo en el archivo histórico del barrio (quién vino, a qué lote y cuándo), sin DNI ni patente, con las mismas reglas de acceso que el resto: cada vecino ve solo las suyas.',
     '• Privacidad por defecto: lo optativo nace oculto. Tu teléfono y tu oficio se muestran a otros vecinos solo si vos lo marcás, y lo podés quitar cuando quieras. La dirección del lote (calle y altura) sí figura en la guía del barrio, como en cualquier barrio.',
     '• Minimización por rol: la base está ordenada en carpetas y el servidor le abre a cada rol solo las que necesita. Por ejemplo, el hotel no puede leer ninguna carpeta ni lista de vecinos (ve solo la dirección de cada lote, que no dice de quién es), los teléfonos de cada lote los leen solo la garita, la Administración y la supervisión, el padrón de expensas (DNI, correo y deuda) y la liquidación completa (la cuota, los intereses, las multas y la deuda de cada lote) solo la Administración, a cada vecino le llegan solo las cuotas de su propio lote (la única excepción es la lista de morosos: los lotes con deuda vencida, por número de lote y sin nombres, que leen los vecinos y la Administración pero no la garita, la supervisión ni el hotel, y que la Administración puede apagar), la garita no puede leer expensas, pagos, reclamos ni las conversaciones de los vecinos con la Administración, la Administración no puede leer las conversaciones de un vecino con la garita, y el supervisor de la guardia solo puede mirar lo de la garita (y dar el visto a los partes de turno), sin poder cambiar nada ni leer las conversaciones de los vecinos.',
   ]],
   ['¿Qué pasa con mi voz si uso el asistente por voz? ¿Y la cámara de la garita?', [
     'En simple: lo que decís lo entiende tu propio teléfono; la app usa solo el texto para hacer lo que pediste y no guarda el audio.',
-    '• El asistente por voz es optativo y se activa por equipo (vecinos y garita); se apaga en Tu cuenta. El reconocimiento lo hace el navegador del teléfono: en Android y Chrome el audio lo procesa Google; en iPhone y iPad, Apple. La app no graba ni guarda el audio.',
+    '• El asistente por voz es optativo y se activa por equipo (vecinos y garita); se apaga en Tu cuenta. El reconocimiento lo hace el navegador del teléfono: en Android y Chrome el audio lo procesa Google; en iPhone y iPad, Apple. La app no graba ni guarda el audio. Cuando la garita dice a qué lote va una visita, el asistente dice en voz alta el nombre del propietario o del inquilino, tal como figura en la guía del barrio que la garita ya ve en "Buscar un vecino".',
     '• La garita también puede leer una patente con la cámara: la foto se procesa en su mismo teléfono (con un programa que se baja una vez) y no se guarda ni se manda a ningún lado; queda solo el texto de la patente para buscar el pase.',
     '• La garita lo usa para avisarle a un lote que llegó una visita, para buscar la dirección de un lote en la guía del barrio y para fijarse si alguien tiene pase: son los mismos datos que ya ve en su pantalla. Antes de avisarle a un vecino, la app repite lo que entendió y espera el "sí".',
   ]],
