@@ -490,7 +490,7 @@ R.frecuentes = {
           <div class="btns" style="margin-top:10px">
             ${!f.baja && esGuardia() ? `<button class="btn btn-xs btn-ok" data-a="frec-mov" data-id="${f.id}" data-v="in">${I('login')}Entra</button><button class="btn btn-xs btn-sec" data-a="frec-mov" data-id="${f.id}" data-v="out">${I('logout')}Sale</button>` : ''}
             <button class="btn btn-xs btn-sec" data-a="frec-qr" data-id="${f.id}">${I('qr')}QR</button>
-            ${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="frec-editar" data-id="${f.id}">${I('edit')}Editar</button>` : ''}</div></div>`; }).join('')
+            ${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="frec-editar" data-id="${f.id}">${I('edit')}Editar</button><button class="btn btn-xs btn-danger-soft" data-a="frec-borrar" data-id="${f.id}">${I('trash')}Borrar</button>` : ''}</div></div>`; }).join('')
         : vacio('qr', q ? 'Nadie coincide con esa búsqueda.' : 'Todavía no hay ingresos frecuentes cargados.')}`;
   },
 };
@@ -531,6 +531,16 @@ F['frec'] = (d, form) => {
   });
   toast('Guardado', 'check');
   A['frec-qr']({ dataset:{ id:guardado.id } });
+};
+/* Borrar un ingreso frecuente (pedido de Claudio, 11-10-2026). Su QR deja
+   de valer; los ingresos y salidas que ya tuvo quedan en la bitácora. Para
+   suspenderlo un tiempo sin perderlo, está "Dado de baja" en Editar. */
+A['frec-borrar'] = async el => {
+  if (!esAdmin()) return;
+  const f = frecuentes().find(x => x.id === el.dataset.id); if (!f) return;
+  if (!await confirmar('Borrar el ingreso frecuente', `${esc(f.nombre)}${f.empresa ? ' · ' + esc(f.empresa) : ''}. Su QR deja de servir en la garita. Lo que ya entró y salió queda en la bitácora. Si solo querés suspenderlo un tiempo, usá "Editar" → "Dado de baja".`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { s.frecuentes = aLista(s.frecuentes).filter(x => x && x.id !== f.id); auditar(s, 'Borró un ingreso frecuente', `${f.nombre} → ${f.destino || 'Barrio'}`, f.id); });
+  toast('Ingreso frecuente borrado', 'trash');
 };
 A['frec-qr'] = el => {
   const f = frecuentes().find(x => x.id === el.dataset.id); if (!f) return;

@@ -517,11 +517,12 @@ R.proveedores = {
     const qq = normTxt(q);
     const ls = Store.s.proveedores.filter(p => !qq || normTxt(p.empresa + ' ' + p.rubro + ' ' + (p.personal || '')).includes(qq)).sort((a, b) => a.empresa.localeCompare(b.empresa));
     return `<form data-f="buscar-prov" class="linea-form" style="margin-bottom:12px"><input name="q" id="qProv" value="${esc(q || '')}" placeholder="Empresa, rubro o nombre de un operario"><button class="btn btn-pri">${I('search')}</button></form>
-      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido|proveedores', icon:'edit', color:'accent', t:'Editar proveedores', s:'Desde Administración → Contenido' }) : ''}
+      ${esAdmin() ? superficie({ a:'lista-editar', v:'proveedores', icon:'plus', color:'accent', t:'Agregar un proveedor', s:'Empresa, rubro, ART, seguro y personal. Cada uno se edita o borra desde su tarjeta.' }) : ''}
       ${ls.length ? ls.map(p => { const [t, c] = artEstado(p);
         return `<div class="card"><div class="row"><div class="grow"><b>${esc(p.empresa)}</b><div class="muted small">${esc(p.rubro || '')}${p.tel ? ' · ' + esc(p.tel) : ''}</div></div><span class="pill p-${c}">${t}</span></div>
           ${p.personal ? `<div class="small" style="margin-top:8px;color:var(--ink-2)">${I('users')} ${esc(String(p.personal).split('\n').join(', '))}</div>` : ''}
-          ${p.seguroVence ? `<div class="tiny muted" style="margin-top:4px">Seguro hasta ${fechaCorta(p.seguroVence)}</div>` : ''}</div>`; }).join('') : vacio('box', 'No hay proveedores cargados.')}`;
+          ${p.seguroVence ? `<div class="tiny muted" style="margin-top:4px">Seguro hasta ${fechaCorta(p.seguroVence)}</div>` : ''}
+          ${esAdmin() ? `<div class="btns" style="margin-top:10px"><button class="btn btn-xs btn-sec" data-a="lista-editar" data-v="proveedores" data-id="${esc(p.id)}">${I('edit')}Editar</button><button class="btn btn-xs btn-danger-soft" data-a="lista-borrar" data-v="proveedores" data-id="${esc(p.id)}">${I('trash')}Borrar</button></div>` : ''}</div>`; }).join('') : vacio('box', 'No hay proveedores cargados.')}`;
   },
 };
 F['buscar-prov'] = d => abrir('proveedores', d.q || '');

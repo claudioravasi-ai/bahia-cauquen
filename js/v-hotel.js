@@ -832,15 +832,18 @@ R['hotel-proveedores'] = {
         return `<div class="card"><div class="row" style="align-items:flex-start;gap:10px"><span class="ic ic-${c === 'ok' ? 'ok' : c === 'warn' ? 'warn' : 'danger'}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none">${I('box')}</span>
           <div class="grow"><b>${esc(p.empresa)}</b><div class="muted small">${esc(p.rubro || '')}${aLista(p.dias).length ? ' · ' + aLista(p.dias).map(d => DIAS[d]).join(' ') : ''}${p.desde ? ` · ${esc(p.desde)} a ${esc(p.hasta)} h` : ''}${p.patentes ? ' · ' + esc(p.patentes) : ''}</div>
             <div class="hv-pills"><span class="pill p-${c === 'ok' ? 'ok' : c === 'warn' ? 'warn' : 'danger'}">${esc(t)}</span>${p.revisado ? `<span class="pill">${I('check')}Revisado</span>` : ''}</div></div></div>
-          <div class="btns" style="margin-top:8px">${esHotel() ? `<button class="btn btn-xs btn-sec" data-a="hprov-qr" data-id="${esc(p.id)}">${I('qr')}QR</button><button class="btn btn-xs btn-sec" data-a="hprov-editar" data-id="${esc(p.id)}">${I('edit')}Editar</button>` : ''}
+          <div class="btns" style="margin-top:8px">${esHotel() ? `<button class="btn btn-xs btn-sec" data-a="hprov-qr" data-id="${esc(p.id)}">${I('qr')}QR</button>` : ''}${esHotel() || esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="hprov-editar" data-id="${esc(p.id)}">${I('edit')}Editar</button><button class="btn btn-xs btn-danger-soft" data-a="hprov-borrar" data-id="${esc(p.id)}">${I('trash')}Borrar</button>` : ''}
             ${esGuardia() && c !== 'danger' ? `<button class="btn btn-xs btn-ok" data-a="hprov-mov" data-id="${esc(p.id)}" data-v="in">${I('login')}Entra</button><button class="btn btn-xs btn-sec" data-a="hprov-mov" data-id="${esc(p.id)}" data-v="out">${I('logout')}Sale</button>` : ''}
             ${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="hprov-revisar" data-id="${esc(p.id)}">${I('check')}${p.revisado ? 'Quitar revisión' : 'Marcar revisado'}</button><button class="btn btn-xs ${p.estado === 'suspendido' ? 'btn-ok' : 'btn-danger-soft'}" data-a="hprov-suspender" data-id="${esc(p.id)}">${p.estado === 'suspendido' ? 'Rehabilitar' : 'Suspender'}</button>` : ''}</div></div>`; }).join('')
         : vacio('box', 'El hotel todavía no cargó proveedores.')}
       <p class="muted tiny" style="margin-top:12px">${I('info')} Con la ART vencida o sin cargar, la garita ve el proveedor en rojo y no lo deja pasar. La Administración puede suspenderlo.</p>`;
   },
 };
+/* La Administración también edita y borra los proveedores del hotel
+   (pedido de Claudio, 11-10-2026); el hotel, además, los borra. */
+const hotelOAdmin = () => esAdmin() || soloHotel();
 A['hprov-editar'] = el => {
-  if (!soloHotel()) return;
+  if (!hotelOAdmin()) return;
   const p = hotelProvs().find(x => x.id === el?.dataset?.id) || { dias:[1, 2, 3, 4, 5] };
   hoja(p.id ? 'Editar proveedor' : 'Nuevo proveedor', `<form data-f="hprov" data-id="${esc(p.id || '')}">
     <div class="grid2"><div class="field"><label>Empresa</label><input name="empresa" required maxlength="50" value="${esc(p.empresa || '')}"></div>
@@ -855,15 +858,26 @@ A['hprov-editar'] = el => {
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`);
 };
 F['hprov'] = (d, form) => {
-  if (!soloHotel()) return;
+  if (!hotelOAdmin()) return;
   const id = form.dataset.id;
   Store.cambiar(s => { s.hotelProv = aLista(s.hotelProv);
     const datos = { empresa:d.empresa.trim(), rubro:(d.rubro || '').trim(), personal:(d.personal || '').trim(), patentes:String(d.patentes || '').toUpperCase().trim(), tel:(d.tel || '').trim(),
       dias:[].concat(d.dias || []).map(Number), desde:d.desde || '', hasta:d.hasta || '', artVence:d.artVence || '', seguroVence:d.seguroVence || '' };
     const x = id && s.hotelProv.find(p => p.id === id);
-    if (x){ Object.assign(x, datos); x.revisado = false; } else s.hotelProv.push({ id:'hp' + uid(), codigo:codigoLargo('H'), estado:'activo', at:Date.now(), ...datos });
-    auditar(s, id ? 'El hotel editó un proveedor' : 'El hotel cargó un proveedor', datos.empresa); });
+    if (x){ Object.assign(x, datos); if (!esAdmin()) x.revisado = false; } else s.hotelProv.push({ id:'hp' + uid(), codigo:codigoLargo('H'), estado:'activo', at:Date.now(), ...datos });
+    const quien = esAdmin() ? 'La Administración' : 'El hotel';
+    auditar(s, id ? `${quien} editó un proveedor del hotel` : `${quien} cargó un proveedor del hotel`, datos.empresa);
+    const h = hotelId(); if (esAdmin() && h) notificar(s, { para:[h], titulo:`La Administración ${id ? 'editó' : 'cargó'} a ${datos.empresa}`, texto:'Proveedores del hotel', icon:'box', color:'sky', link:'hotel-proveedores' }); });
   cerrarHoja(); toast('Proveedor guardado', 'box');
+};
+A['hprov-borrar'] = async el => {
+  if (!hotelOAdmin()) return;
+  const p = hotelProvs().find(x => x.id === el.dataset.id); if (!p) return;
+  if (!await confirmar('Borrar el proveedor', `${esc(p.empresa)}. Su QR deja de servir en la garita. Los ingresos que ya tuvo quedan en la bitácora.`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { s.hotelProv = aLista(s.hotelProv).filter(x => x && x.id !== p.id);
+    auditar(s, esAdmin() ? 'La Administración borró un proveedor del hotel' : 'El hotel borró un proveedor', p.empresa);
+    const h = hotelId(); if (esAdmin() && h) notificar(s, { para:[h], titulo:`La Administración borró a ${p.empresa}`, texto:'Proveedores del hotel: su QR ya no sirve en la garita.', icon:'trash', color:'warn', link:'hotel-proveedores' }); });
+  toast('Proveedor borrado', 'trash');
 };
 A['hprov-qr'] = el => { const p = hotelProvs().find(x => x.id === el.dataset.id); if (p) hojaQRHotel('QR del proveedor', p.empresa, p.codigo, 'Se lo mandás al proveedor: lo muestra en la garita. Vale solo con la ART al día, los días y en el horario cargados.'); };
 A['hprov-revisar'] = el => { if (!esAdmin()) return; Store.cambiar(s => { const p = aLista(s.hotelProv).find(x => x.id === el.dataset.id); if (p){ p.revisado = !p.revisado; auditar(s, p.revisado ? 'Revisó un proveedor del hotel' : 'Quitó la revisión de un proveedor del hotel', p.empresa); } }); };

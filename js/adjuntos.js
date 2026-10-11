@@ -122,6 +122,34 @@ function cuerpoMsg(m){
    Ahora se anota a qué conversación iba y se manda directo a esa. */
 const formDelChat = ({ f, u, con }) => [...document.querySelectorAll('form.chatbar[data-f]')]
   .find(x => x.dataset.f === f && (x.dataset.u || '') === u && (x.dataset.con || '') === con) || null;
+/* VISTA PREVIA ANTES DE MANDAR (pedido de Claudio, 11-10-2026: "las fotos
+   y archivos, antes de enviarse directamente, tener la posibilidad de
+   borrarlos"). Al elegir la foto o el archivo NO sale nada: se abre una
+   ventanita con la foto (o el nombre y el peso del archivo), una caja para
+   escribirle algo y dos botones, "Borrar" y "Mandar". Recién con "Mandar"
+   se achica, se guarda y se sube. Con "Borrar" (o tocando afuera, o con la
+   tecla Esc) se descarta y no queda nada, ni en la base ni en el equipo.
+   Es un <dialog> propio, aparte de la hoja de la app: si la conversación se
+   vuelve a dibujar mientras se mira la foto, la vista previa sigue ahí. */
+function previaAdjunto(file, escrito){
+  return new Promise(ok => {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'adj-previa';
+    const foto = Adjuntos.esFoto(file), url = foto ? URL.createObjectURL(file) : '';
+    dlg.innerHTML = `<div class="adj-previa-cab"><b>${foto ? 'Foto para mandar' : 'Archivo para mandar'}</b><button type="button" class="icon-btn" data-r="no" aria-label="Cerrar sin mandar">${I('x')}</button></div>
+      ${foto ? `<div class="adj-previa-foto"><img alt="La foto que vas a mandar"><span class="adj-previa-sin" hidden>${I('image')}<small>${esc(file.name || 'Foto')}</small></span></div>`
+        : `<div class="adj-previa-arch">${I('file')}<span><b>${esc(String(file.name || 'Archivo'))}</b><small>${pesoTexto(file.size)}</small></span></div>`}
+      <textarea class="adj-previa-txt" maxlength="1000" rows="2" placeholder="Escribí algo (opcional)">${esc(escrito || '')}</textarea>
+      <div class="btns adj-previa-btns"><button type="button" class="btn btn-danger-soft" data-r="no">${I('trash')}Borrar</button><button type="button" class="btn btn-pri grow" data-r="si">${I('send')}Mandar</button></div>`;
+    document.body.appendChild(dlg);
+    if (foto){ const img = dlg.querySelector('img'); img.onerror = () => { img.hidden = true; dlg.querySelector('.adj-previa-sin').hidden = false; }; img.src = url; }
+    let listo = false;
+    const fin = r => { if (listo) return; listo = true; const texto = dlg.querySelector('textarea').value; try { dlg.close(); } catch(e){} dlg.remove(); if (url) URL.revokeObjectURL(url); ok(r ? { texto } : null); };
+    dlg.addEventListener('click', e => { const b = e.target.closest('[data-r]'); if (b) return fin(b.dataset.r === 'si'); if (e.target === dlg) fin(false); });
+    dlg.addEventListener('cancel', e => { e.preventDefault(); fin(false); });
+    try { dlg.showModal(); } catch(e){ dlg.setAttribute('open', ''); }
+  });
+}
 A['adjuntar'] = el => {
   const form = el.closest('form'); if (!form || !F[form.dataset.f]) return;
   const destino = { f: form.dataset.f, u: form.dataset.u || '', con: form.dataset.con || '' };
@@ -132,6 +160,9 @@ A['adjuntar'] = el => {
   document.body.appendChild(inp);
   inp.addEventListener('change', async () => {
     const file = inp.files && inp.files[0]; inp.remove(); if (!file) return;
+    if (!Adjuntos.esFoto(file) && file.size > ADJ.maxArchivo){ toast(`Ese archivo pesa ${pesoTexto(file.size)}. El máximo es 5 MB.`, 'alert'); return; }
+    const elegido = await previaAdjunto(file, escrito);
+    if (!elegido){ toast(Adjuntos.esFoto(file) ? 'Foto borrada: no se mandó' : 'Archivo borrado: no se mandó', 'trash'); return; }
     const boton = () => { const f = formDelChat(destino); return f && f.querySelector('.chat-clip'); };
     const ocupado = si => { const b = boton(); if (b){ b.disabled = si; b.classList.toggle('bajando', si); } };
     ocupado(true);
@@ -139,7 +170,7 @@ A['adjuntar'] = el => {
       toast(Adjuntos.esFoto(file) ? 'Subiendo la foto…' : 'Subiendo el archivo…', 'upload');
       const adj = await Adjuntos.preparar(file);
       const vivo = formDelChat(destino), t = vivo && vivo.querySelector('textarea[name="text"]');
-      const d = { text: (t && t.value.trim()) ? t.value : escrito, adj: JSON.stringify(adj) };
+      const d = { text: elegido.texto, adj: JSON.stringify(adj) };
       const r = F[destino.f](d, vivo || { dataset: { ...destino } });
       if (r && r.then) await r;
       if (t){ t.value = ''; if (typeof ajustarCaja === 'function') ajustarCaja(t); }

@@ -72,7 +72,7 @@ function tarjetaPase(p, { garita = false } = {}){
       ${garita ? `<span class="autoriza">${I('check')}Autorizó: <b>${esc(p.autoriza || host.nombre || 'vecino')}</b>${host.casa ? ' · ' + esc(host.casa) : ''}</span>` : ''}</div>
     <span class="estado e-${est}">${ESTADO_TXT[est]}</span></div>
     <div class="btns" style="margin-top:10px">
-      ${garita ? (!esGuardia() ? '' : est === 'esperado' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>`
+      ${garita ? (!esGuardia() ? (esAdmin() ? botonesAdminPase(p, est) : '') : est === 'esperado' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>`
         /* PASE VENCIDO (pedido de Claudio, 26-09): pasada la hora, "Ingresó"
            queda deshabilitado y la garita tiene "Pase vencido", que le avisa
            al vecino que lo autorizó (y, si la persona está en la garita, le
@@ -86,8 +86,16 @@ function tarjetaPase(p, { garita = false } = {}){
            ${/* Con la visita ya adentro, mandar el pase o editarlo no tiene sentido (Claudio, 10-10-2026): quedan "Ver pase" y borrar. */ est === 'adentro' ? '' : `<button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>`}
            ${est === 'esperado' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase">${I('x')}</button>` : ''}
            <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button>`}
-    </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} El vecino la sacó de su lista ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
+    </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} ${p.borrado.admin ? 'La Administración la borró' : 'El vecino la sacó de su lista'} ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
 }
+
+/* LA ADMINISTRACIÓN EDITA Y BORRA CUALQUIER VISITA (pedido de Claudio,
+   11-10-2026). En "Visitas del barrio" y en la garita en vivo: ver el
+   pase, editarlo y borrarlo. Lo que hace queda en la auditoría y al vecino
+   que la anunció le llega el aviso. */
+const botonesAdminPase = (p, est) => `${est === 'cancelado' ? '' : `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>`}
+  <button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}">${I('edit')}Editar</button>
+  <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar la visita">${I('trash')}Borrar</button>`;
 
 /* ---------- avisos urgentes del inicio ---------- */
 function urgentesVecino(){
@@ -341,6 +349,7 @@ function diaADia(u, s){
       linea: `${t ? `Turno ${esc(t.turno)} · ${esc(aLista(t.guardias).join(', ')) || 'sin guardias anotados'}` : 'Sin turno abierto'} · ${plural(ingresos, 'ingreso', 'ingresos')} hoy`,
       items:[
         { v:'garita', icon:'eye', t:'Garita en vivo', s:`Ingresos, camión${hayPaquetes() ? ' y paquetes' : ''} · solo para mirar`, n:ingresos },
+        { v:'visitas-barrio', icon:'users', t:'Visitas del barrio', s:'Todas las anunciadas: ver, editar o borrar' },
         { v:'bitacora', icon:'book', t:'Bitácora', s:'Libro de guardia · lo escribe la garita, acá se lee' },
         { v:'turnos', icon:'clock', t:'Turnos de la garita', s: t ? 'Abierto ahora · horarios y policías' : 'Horarios, guardias y policías' },
         { v:'privado', p:'interno', icon:'shield', t:'Mensajes con la garita', s:'Chat con la garita y los pedidos firmados de los vecinos', badge: msgGarita + petPend },
@@ -968,7 +977,7 @@ R.visitas = {
     const pedidos = s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente');
     const mes = hoy.slice(0, 7);
     return `
-      ${superficie({ a:'link-pedir', icon:'share', color:'accent', t:'Pasale un enlace a tu visita', s:'Completa sus datos desde su celular y vos lo aprobás con un toque' })}
+      ${superficie({ a:'link-pedir', icon:'share', color:'accent', t:'Pasale un enlace a tu visita', s:'Completa sus datos desde su celular y le sale su QR al instante' })}
       ${pedidos.map(r => aviso('info', 'qr', `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}`, `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)).join('')}
       ${sec('Hoy')}${deHoy.length ? deHoy.map(p => tarjetaPase(p)).join('') : vacio('users', 'No anunciaste a nadie para hoy.')}
       ${futuros.length ? sec('Próximas') + futuros.map(p => tarjetaPase(p)).join('') : ''}
@@ -992,6 +1001,35 @@ R.visitas = {
       <p class="muted tiny" style="margin-top:14px">En la app quedan las visitas de los últimos ${Historial.diasVisitas()} días; las anteriores pasan al archivo histórico del barrio, sin DNI ni patente (Ley 25.326), y las ves con el botón de arriba.</p>`;
   },
 };
+/* =========================================================
+   VISITAS DEL BARRIO (Administración, pedido de Claudio, 11-10-2026)
+   Todas las visitas anunciadas por los vecinos: hoy, las próximas, el
+   personal fijo y las de la última semana. Cada una se puede ver, editar o
+   borrar (botonesAdminPase). Las que borró el vecino no aparecen; la
+   garita las sigue viendo en su historial del día.
+   ========================================================= */
+R['visitas-barrio'] = {
+  titulo:'Visitas del barrio', icon:'users', color:'sky', ancha:true, sub:'Las anunciadas por los vecinos: ver, editar o borrar',
+  render(q){
+    if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
+    const s = Store.s, hoy = hoyISO(), qq = normTxt(q || '');
+    const todas = s.pases.filter(p => p && !p.borrado && (!qq || normTxt([p.nombre, p.patente, p.dni, usuario(p.hostId)?.casa, usuario(p.hostId)?.nombre, p.autoriza].join(' ')).includes(qq)));
+    const fijos = todas.filter(p => p.dias?.length && (p.fechaFin || '') >= hoy && !p.cancelado);
+    const deHoy = todas.filter(p => !fijos.includes(p) && (paseValidoEn(p, hoy) || p.log?.[hoy])).sort((a, b) => String(a.desde).localeCompare(String(b.desde)));
+    const futuras = todas.filter(p => !p.dias?.length && p.fecha > hoy && !p.cancelado).sort((a, b) => (a.fecha + a.desde).localeCompare(b.fecha + b.desde));
+    const pasadas = todas.filter(p => !fijos.includes(p) && !deHoy.includes(p) && !futuras.includes(p) && (p.fechaFin || p.fecha) >= sumarDias(hoy, -7) && (p.fechaFin || p.fecha) <= hoy)
+      .sort((a, b) => (b.fechaFin || b.fecha).localeCompare(a.fechaFin || a.fecha));
+    const lista = ls => ls.map(p => tarjetaPase(p, { garita:true })).join('');
+    return `<form data-f="buscar-vis-barrio" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVisB" value="${esc(q || '')}" placeholder="Nombre, patente, DNI, lote o vecino"><button class="btn btn-pri">${I('search')}</button></form>
+      ${sec('Hoy', `<span class="muted small">${deHoy.length}</span>`)}${deHoy.length ? lista(deHoy) : vacio('users', qq ? 'Nadie de hoy coincide con la búsqueda.' : 'No hay visitas anunciadas para hoy.')}
+      ${futuras.length ? sec('Próximas', `<span class="muted small">${futuras.length}</span>`) + lista(futuras) : ''}
+      ${fijos.length ? sec('Personal fijo', `<span class="muted small">${fijos.length}</span>`) + lista(fijos) : ''}
+      ${pasadas.length ? sec('Última semana', `<span class="muted small">${pasadas.length}</span>`) + lista(pasadas.slice(0, 40)) : ''}
+      <p class="muted tiny" style="margin-top:14px">${I('info')} Al editar o borrar una visita, al vecino que la anunció le llega el aviso y queda anotado en la auditoría. Lo que ya pasó por la garita queda en su historial.</p>`;
+  },
+};
+F['buscar-vis-barrio'] = d => abrir('visitas-barrio', d.q || '');
+
 A['nuevo-pase'] = (el) => {
   const tipo0 = el?.dataset?.v && TIPOS_PASE[el.dataset.v] ? el.dataset.v : 'visita';
   const hoy = hoyISO(), h = new Date(); h.setMinutes(0);
@@ -1153,29 +1191,82 @@ F['editar-pase'] = (d, form) => {
     const antes = resumenPase(p);
     Object.assign(p, nuevo);
     p.editado = { at:Date.now(), por:yo().id };
-    auditar(s, 'Editó una visita', `${yo().casa} · ${antes} · cambió: ${cambios.map(k => nombres[k]).join(', ')}`, p.id);
+    const ajena = p.hostId !== yo().id, casa = usuario(p.hostId)?.casa || '';
+    auditar(s, ajena ? 'La Administración editó una visita' : 'Editó una visita', `${ajena ? casa : yo().casa} · ${antes} · cambió: ${cambios.map(k => nombres[k]).join(', ')}`, p.id);
+    if (ajena) notificar(s, { para:p.hostId, titulo:`La Administración cambió la visita de ${p.nombre}`, texto:`Cambió: ${cambios.map(k => nombres[k]).join(', ')}`, icon:'edit', color:'sky', link:'visitas' });
   });
   cerrarHoja(); toast('Visita actualizada', 'check');
 };
 A['borrar-pase'] = async el => {
   const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
-  const est = estadoPase(p);
-  if (!await confirmar('Borrar la visita', `Sale de tu lista.${est === 'esperado' || est === 'futuro' ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`, { si:'Borrar', peligro:true })) return;
+  const est = estadoPase(p), ajena = p.hostId !== yo().id && esAdmin(), vale = est === 'esperado' || est === 'futuro' || (p.dias?.length && !p.cancelado);
+  const texto = ajena ? `${esc(p.nombre)} · ${esc(usuario(p.hostId)?.casa || '')}. Sale de la lista del vecino y de las visitas del barrio.${vale ? ' El código deja de servir en la garita.' : ''} Lo que ya pasó queda en el historial de la garita y en la auditoría. Al vecino le llega el aviso.`
+    : `Sale de tu lista.${est === 'esperado' || est === 'futuro' ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`;
+  if (!await confirmar('Borrar la visita', texto, { si:'Borrar', peligro:true })) return;
   Store.cambiar(s => {
     const x = s.pases.find(z => z.id === p.id); if (!x) return;
-    if (est === 'esperado' || est === 'futuro') x.cancelado = Date.now();
-    x.borrado = { at:Date.now(), por:yo().id };
-    auditar(s, 'Borró una visita de su lista', `${yo().casa} · ${resumenPase(x)}`, x.id);
+    if (ajena ? vale : est === 'esperado' || est === 'futuro') x.cancelado = Date.now();
+    x.borrado = { at:Date.now(), por:yo().id, ...(ajena ? { admin:true } : {}) };
+    if (ajena){
+      auditar(s, 'La Administración borró una visita', `${usuario(x.hostId)?.casa || ''} · ${resumenPase(x)}`, x.id);
+      notificar(s, { para:x.hostId, titulo:`La Administración borró la visita de ${x.nombre}`, texto: vale ? 'El código ya no sirve en la garita.' : 'Ya no está en tu lista.', icon:'trash', color:'warn', link:'visitas' });
+    } else auditar(s, 'Borró una visita de su lista', `${yo().casa} · ${resumenPase(x)}`, x.id);
   });
-  toast('Visita borrada de tu lista', 'trash');
+  toast(ajena ? 'Visita borrada' : 'Visita borrada de tu lista', 'trash');
+};
+/* EL ENLACE PARA LA VISITA (arreglo del 11-10-2026, pedido de Claudio: "no
+   abre la sección; tiene que completar sus datos y que le salga el QR
+   solo, guardado en su WhatsApp").
+   Qué fallaba: la visita no tiene cuenta, así que (1) la app no sabía a
+   quién iba a ver (la lista de vecinos no se lee sin cuenta) y decía
+   "Enlace no válido"; (2) su pedido no llegaba nunca a la base (la app solo
+   guarda con una sesión abierta); y (3) en un teléfono con la app abierta
+   el enlace mostraba la app y no el formulario.
+   Ahora:
+     · el enlace lleva el nombre de pila y el lote de quien invita (los que
+       la visita igual va a ver) y vence a los 30 días;
+     · la visita completa sus datos y en el momento le aparece el QR con el
+       código, con el botón "Guardarlo en mi WhatsApp" (la tarjeta del pase,
+       como la que manda la app), y queda guardado en su teléfono: si vuelve
+       a abrir el enlace, lo ve otra vez;
+     · el pedido se escribe directo en la carpeta del vecino (las reglas de
+       la base dejan CREAR ahí sin cuenta, nada más) ya con su código;
+     · la app de la garita, la de la Administración o la del propio vecino,
+       la primera que lo ve, lo convierte en un pase de verdad y al vecino
+       le llega "Fulano completó sus datos: ya tiene su QR". Si no lo
+       quiere, lo cancela desde Mis visitas.
+   Sirve para varias visitas: cada una completa lo suyo desde su celular. */
+const ENLACE_DIAS = 30;
+const datosEnlace = arg => {
+  const [id, q = ''] = String(arg || '').split('?'), pr = new URLSearchParams(q);
+  return { hostId:decodeURIComponent(id || ''), nombre:pr.get('n') || '', casa:pr.get('c') || '', vence:+pr.get('v') || 0 };
 };
 A['link-pedir'] = () => {
-  const link = urlApp('pedir/' + yo().id);
-  hoja('Enlace para tu visita', `<p style="margin:0 0 12px;color:var(--ink-2)">Tu visita abre este enlace, completa su nombre, patente y horario, y a vos te llega el pedido para aprobarlo con un toque. Cuando lo aprobás, en su celular aparece el QR.</p>
+  const u = yo(), vence = sumarDias(hoyISO(), ENLACE_DIAS);
+  const link = urlApp('pedir/' + u.id + '?' + new URLSearchParams({ n:(u.nombre || '').split(' ')[0], c:u.casa || '', v:vence.replace(/-/g, '') }).toString());
+  hoja('Enlace para tu visita', `<p style="margin:0 0 12px;color:var(--ink-2)">Tu visita abre este enlace, completa su nombre, DNI, patente, día y horario, y <b>en el momento le aparece su QR</b>, con el botón para guardarlo en su WhatsApp. A vos te llega el aviso con sus datos; si no la esperabas, la cancelás desde Mis visitas. Sirve para varias visitas hasta el ${fechaCorta(vence)}.</p>
     <div class="card plana mono small" style="word-break:break-all">${esc(link)}</div>
     <div class="btns"><button class="btn btn-wa" data-a="compartir-link" data-v="${esc(link)}">${I('share')}Enviar</button><button class="btn btn-sec" data-a="copiar" data-v="${esc(link)}">${I('copy')}Copiar</button></div>`);
 };
-A['compartir-link'] = el => compartir(`Para entrar al barrio ${Store.s.config.nombre}, completá tus datos acá y te mando el pase: ${el.dataset.v}`);
+A['compartir-link'] = el => compartir(`Para entrar al barrio ${Store.s.config.nombre}, completá tus datos acá y te sale tu pase con el QR: ${el.dataset.v}`);
+/* El pedido completado por la visita se convierte en un pase (ver arriba).
+   Id fijo ("sp" + pedido): si dos equipos lo hacen a la vez, queda uno. */
+function pasarPedidosListos(){
+  const u = yo(); if (!u || !Store.s) return;
+  const listos = aLista(Store.s.solicitudesPase).filter(r => r && r.estado === 'listo' && !r.paseId && r.codigo && (r.hostId === u.id || esGuardia() || esAdmin()));
+  if (!listos.length) return;
+  Store.cambiar(s => listos.forEach(r0 => {
+    const r = s.solicitudesPase.find(x => x.id === r0.id); if (!r || r.paseId) return;
+    const host = usuario(r.hostId) || {}, id = 'sp' + r.id;
+    if (!s.pases.some(p => p.id === id)) s.pases.unshift({ id, hostId:r.hostId, tipo:'visita', nombre:r.nombre, dni:r.dni || '', patente:normPatente(r.patente), fecha:r.fecha, desde:r.desde, hasta:r.hasta,
+      codigo:r.codigo, log:{}, createdAt:r.at || Date.now(), autoriza:host.nombre || '', porEnlace:true });
+    r.estado = 'aprobado'; r.paseId = id;
+    Motor.conMarca('pedido-' + r.id, () => notificar(s, { para:r.hostId, titulo:`${r.nombre} completó sus datos: ya tiene su QR`, texto:`${fechaCorta(r.fecha)} · ${r.desde} a ${r.hasta} h${r.patente ? ' · ' + normPatente(r.patente) : ''}. Si no lo esperabas, cancelalo en Mis visitas.`, icon:'qr', color:'sky', link:'visitas' }));
+    if (r.fecha === hoyISO() && !esGuardia()) Motor.conMarca('pedido-g-' + r.id, () => notificar(s, { para:'rol:guardia', titulo:'Nueva visita anunciada', texto:`${r.nombre} → ${host.casa || ''} · ${r.desde}–${r.hasta} (completó el enlace del vecino)`, icon:'users', color:'sky', link:'garita' }));
+  }));
+}
+Store.alCambiar(() => setTimeout(pasarPedidosListos, 0));
+setInterval(() => { try { pasarPedidosListos(); } catch(e){ console.warn('Pedidos de pase', e); } }, 20000);
 A['sol-pase-si'] = el => {
   const u = yo(); let nuevo;
   Store.cambiar(s => {
@@ -2903,43 +2994,83 @@ F['bitacora'] = (d, form) => {
 };
 
 /* ---------- Páginas públicas: la visita pide su pase / ve su QR ---------- */
-function pintarPedirPase(hostId){
-  const host = usuario(hostId);
-  const miPedido = sessionStorage.getItem('bhc.pedido');
-  const r = miPedido && Store.s.solicitudesPase.find(x => x.id === miPedido);
+const PEDIDO_KEY = h => 'bhc.pedido.' + h;
+const pedidoGuardado = h => { try { const x = JSON.parse(localStorage.getItem(PEDIDO_KEY(h)) || 'null'); return x && x.codigo && (x.fecha || '') >= hoyISO() ? x : null; } catch(e){ return null; } };
+function pintarPedirPase(arg){
+  const e = datosEnlace(arg), hostId = e.hostId, u = usuario(hostId);
+  const host = { nombre:(u?.nombre || e.nombre || '').split(' ')[0], casa:u?.casa || e.casa };
+  const vencido = e.vence && String(e.vence) < hoyISO().replace(/-/g, '');
+  const mio = hostId && pedidoGuardado(hostId);
+  const blanco = 'style="color:#fff"';
   let panel;
-  if (!host) panel = aviso('danger', 'alert', 'Enlace no válido', 'Pedile a quien te invitó que te mande uno nuevo.');
-  else if (r && r.estado === 'aprobado'){
-    const p = Store.s.pases.find(x => x.id === r.paseId);
-    panel = p ? `<div class="ticket" style="color:var(--ink)"><div class="tk-top"><small>Pase aprobado</small><h3>${esc(p.nombre)}</h3><div style="opacity:.85;font-size:13px">${esc(host.casa)} · ${relDia(p.fecha)} · ${p.desde}–${p.hasta}</div></div>
-      <div class="bottom"><div class="qr-box" data-qr="BHC:${p.codigo}"></div><div class="codigo-grande">${codigoEspaciado(p.codigo)}</div><div class="muted small">Mostrá el QR en la garita o decí el código</div></div></div>
-      ${botonMapa()}` : '';
-  } else if (r && r.estado === 'rechazado') panel = aviso('danger', 'x', 'El pedido no fue aprobado', 'Comunicate con quien te invitó.');
-  else if (r) panel = aviso('warn latido', 'clock', 'Esperando que te aprueben…', `Le avisamos a ${esc(host.nombre.split(' ')[0])}. Esta pantalla se actualiza sola.`);
-  else panel = `<form data-f="pedir-pase" data-host="${esc(hostId)}">
-    <p style="margin:0 0 12px">Vas a ver a <b>${esc(host.nombre.split(' ')[0])}</b> (${esc(host.casa)}).</p>
-    <div class="field"><label style="color:#fff">Tu nombre</label><input name="nombre" required maxlength="60"></div>
-    <div class="grid2"><div class="field"><label style="color:#fff">DNI</label><input name="dni" inputmode="numeric" maxlength="11"></div>
-      <div class="field"><label style="color:#fff">Patente</label><input name="patente" maxlength="10" style="text-transform:uppercase"></div></div>
-    <div class="grid3"><div class="field"><label style="color:#fff">Día</label><input type="date" name="fecha" value="${hoyISO()}" min="${hoyISO()}" required></div>
-      <div class="field"><label style="color:#fff">Llego</label><input type="time" name="desde" required value="18:00"></div>
-      <div class="field"><label style="color:#fff">Me voy</label><input type="time" name="hasta" required value="23:00"></div></div>
+  if (!hostId) panel = aviso('danger', 'alert', 'Enlace no válido', 'Pedile a quien te invitó que te mande uno nuevo desde la app (Mis visitas → Pasale un enlace a tu visita).');
+  else if (mio) panel = `<div class="ticket" style="color:var(--ink)"><div class="tk-top"><small>Tu pase de ingreso</small><h3>${esc(mio.nombre)}</h3><div style="opacity:.85;font-size:13px">Te espera ${esc(mio.espera || '')} · ${relDia(mio.fecha)} · ${esc(mio.desde)}–${esc(mio.hasta)}</div></div>
+      <div class="bottom"><div class="qr-box" data-qr="BHC:${esc(mio.codigo)}"></div><div class="codigo-grande">${codigoEspaciado(mio.codigo)}</div><div class="muted small">Mostrá el QR en la garita o decí el código</div></div></div>
+    <button class="btn btn-wa btn-block" style="margin-top:12px" data-a="pedido-wa" data-v="${esc(hostId)}">${I('share')}Guardarlo en mi WhatsApp</button>
+    <p class="tiny" style="margin:8px 2px 0;opacity:.9">Elegí tu propio chat ("Yo" o "Mensaje a mí mismo") y queda guardado. También queda en este teléfono: si volvés a abrir el enlace, lo ves acá.</p>
+    ${botonMapa()}
+    <p class="small" style="margin:12px 0 0"><button type="button" class="link" style="color:#fff" data-a="pedido-otro" data-v="${esc(hostId)}">Pedir un pase para otra persona u otro día</button></p>`;
+  else if (vencido) panel = aviso('warn', 'clock', 'Este enlace venció', `Pedile a ${esc(host.nombre || 'quien te invitó')} que te mande uno nuevo.`);
+  else panel = `<form data-f="pedir-pase" data-host="${esc(hostId)}" data-espera="${esc([host.nombre, host.casa].filter(Boolean).join(' · '))}">
+    <p style="margin:0 0 12px">Vas a ver a <b>${esc(host.nombre || 'un vecino')}</b>${host.casa ? ` (${esc(host.casa)})` : ''}. Completá tus datos y te sale tu pase con el QR.</p>
+    <div class="field"><label ${blanco}>Tu nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="name"></div>
+    <div class="grid2"><div class="field"><label ${blanco}>DNI</label><input name="dni" inputmode="numeric" maxlength="11"></div>
+      <div class="field"><label ${blanco}>Patente (si venís en auto)</label><input name="patente" maxlength="10" style="text-transform:uppercase" placeholder="AB 123 CD"></div></div>
+    <div class="grid3"><div class="field"><label ${blanco}>Día</label><input type="date" name="fecha" value="${hoyISO()}" min="${hoyISO()}" required></div>
+      <div class="field"><label ${blanco}>Llego</label><input type="time" name="desde" required value="18:00"></div>
+      <div class="field"><label ${blanco}>Me voy</label><input type="time" name="hasta" required value="23:00"></div></div>
     <label class="check" style="color:#fff;font-size:12px"><input type="checkbox" required><span>Mis datos se usan solo para el ingreso al barrio y se borran a los ${Store.s.config.datosDias} días (Ley 25.326).</span></label>
-    <button class="btn btn-pri btn-block" style="margin-top:8px">${I('send')}Pedir mi pase</button></form>`;
-  $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+    <button class="btn btn-pri btn-block" style="margin-top:8px">${I('qr')}Generar mi pase</button></form>`;
+  $('#app').innerHTML = `<section class="bienvenida" id="pedidoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b><div class="tiny" style="opacity:.85">${esc(Store.s.config.ciudad)}</div></div></div>
-    <h1 style="font-size:34px">Tu pase de ingreso</h1><div class="panel">${panel}</div></section>`;
-  $$('[data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
+    <h1 style="font-size:34px">Tu pase de ingreso</h1><div class="panel">${panel}</div>
+    ${yo() ? `<p class="small" style="margin:14px 0 0"><button type="button" class="link" style="color:#fff" data-a="pedido-salir">${I('left')}Volver a mi app</button></p>` : ''}</section>`;
+  $$('#pedidoPublico [data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
 }
-F['pedir-pase'] = (d, form) => {
+F['pedir-pase'] = async (d, form) => {
   const hostId = form.dataset.host, id = uid();
-  Store.cambiar(s => {
-    s.solicitudesPase.unshift({ id, hostId, nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:(d.patente || '').toUpperCase(), fecha:d.fecha, desde:d.desde, hasta:d.hasta, estado:'pendiente', at:Date.now() });
-    notificar(s, { para:hostId, ref:'solicitudesPase:' + id, titulo:`${d.nombre.trim()} te pide un pase`, texto:`${fechaCorta(d.fecha)} · ${d.desde}`, icon:'qr', color:'sky', urgente:true, link:'visitas' });
-  });
-  sessionStorage.setItem('bhc.pedido', id);
-  pintarPedirPase(hostId);
+  if (minutosDe(d.hasta) <= minutosDe(d.desde) && d.hasta !== '00:00') return toast('La hora de salida tiene que ser después de la de llegada', 'clock');
+  if (d.fecha < hoyISO()) return toast('Elegí hoy o un día que venga', 'calendar');
+  const r = { id, hostId, nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:normPatente(d.patente), fecha:d.fecha, desde:d.desde, hasta:d.hasta,
+    estado:'listo', codigo:codigoPase(), porEnlace:true, at:Date.now() };
+  const boton = form.querySelector('button'); if (boton){ boton.disabled = true; boton.textContent = 'Generando tu pase…'; }
+  try {
+    if (Nube.activa()){
+      if (!Nube.db) throw new Error('Todavía se está conectando. Probá de nuevo en unos segundos.');
+      /* Directo a la carpeta del vecino: sin cuenta, la app no guarda nada por su cuenta. */
+      await Promise.race([Nube.db.ref(`pv/solicitudesPase/${hostId}/${id}`).set(r),
+        new Promise((_, mal) => setTimeout(() => mal(new Error('No hay conexión. Revisá internet y probá de nuevo.')), 15000))]);
+    } else Store.cambiar(s => { s.solicitudesPase.unshift(r); });
+  } catch(e){
+    if (boton){ boton.disabled = false; boton.innerHTML = `${I('qr')}Generar mi pase`; }
+    return toast(e.message || 'No se pudo generar el pase. Probá de nuevo.', 'alert');
+  }
+  try { localStorage.setItem(PEDIDO_KEY(hostId), JSON.stringify({ id, codigo:r.codigo, nombre:r.nombre, fecha:r.fecha, desde:r.desde, hasta:r.hasta, espera:form.dataset.espera || '' })); } catch(e){}
+  try { sessionStorage.setItem('bhc.pedidoTmp', JSON.stringify({ hostId, codigo:r.codigo, nombre:r.nombre, fecha:r.fecha, desde:r.desde, hasta:r.hasta, espera:form.dataset.espera || '' })); } catch(e){}
+  pintarPedirPase(location.hash.slice(8));
+  if (!pedidoGuardado(hostId)) pintarPedidoSinMemoria();
+  toast('¡Listo! Ya tenés tu pase', 'check');
 };
+/* Sin almacenamiento en el teléfono (modo privado): se muestra igual. */
+function pintarPedidoSinMemoria(){
+  let x = null; try { x = JSON.parse(sessionStorage.getItem('bhc.pedidoTmp') || 'null'); } catch(e){}
+  if (!x) return;
+  const panel = $('#pedidoPublico .panel'); if (!panel) return;
+  panel.innerHTML = `<div class="ticket" style="color:var(--ink)"><div class="tk-top"><small>Tu pase de ingreso</small><h3>${esc(x.nombre)}</h3><div style="opacity:.85;font-size:13px">Te espera ${esc(x.espera || '')} · ${relDia(x.fecha)} · ${esc(x.desde)}–${esc(x.hasta)}</div></div>
+    <div class="bottom"><div class="qr-box" data-qr="BHC:${esc(x.codigo)}"></div><div class="codigo-grande">${codigoEspaciado(x.codigo)}</div></div></div>
+    <button class="btn btn-wa btn-block" style="margin-top:12px" data-a="pedido-wa" data-v="${esc(x.hostId)}">${I('share')}Guardarlo en mi WhatsApp</button>${botonMapa()}`;
+  $$('#pedidoPublico [data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
+}
+A['pedido-wa'] = el => {
+  let x = pedidoGuardado(el.dataset.v); if (!x){ try { x = JSON.parse(sessionStorage.getItem('bhc.pedidoTmp') || 'null'); } catch(e){} }
+  if (!x) return;
+  const c = Store.s.config, cuando = `${fechaLarga(x.fecha)}, de ${x.desde} a ${x.hasta} h`;
+  const texto = `🎟️ *Mi pase para el Barrio ${c.nombre}*\n\n${x.espera ? 'Me espera ' + x.espera + '.\n' : ''}📅 ${cuando}\n🔑 Código: *${codigoEspaciado(x.codigo)}*\n\nEn la garita mostrar el QR o decir el código.\n\n📍 *Cómo llegar:* ${mapaCorto(c.mapa)}`;
+  compartirPase({ texto, contenido:'BHC:' + x.codigo, codigo:x.codigo, sub:`Pase de ${x.nombre}`, archivo:`pase-${x.codigo}.png`,
+    datos:{ nombre:x.nombre, espera:x.espera || '', cuando:fechaCorta(x.fecha), horario:`${x.desde} a ${x.hasta} h` } });
+};
+A['pedido-otro'] = el => { try { localStorage.removeItem(PEDIDO_KEY(el.dataset.v)); sessionStorage.removeItem('bhc.pedidoTmp'); } catch(e){} pintarPedirPase(location.hash.slice(8)); };
+A['pedido-salir'] = () => { history.replaceState(null, '', location.pathname + location.search); PILA.length = 0; pintar(); };
 function pintarPaseQR(id){
   const p = Store.s.pases.find(x => x.id === id), u = p && usuario(p.hostId);
   $('#app').innerHTML = `<section class="bienvenida"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
@@ -2951,5 +3082,5 @@ function pintarPaseQR(id){
       : aviso('danger', 'x', 'Este pase no existe o fue cancelado', '')}</div></section>`;
   $$('[data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
 }
-/* La página pública se actualiza sola cuando el vecino aprueba. */
-Store.alCambiar(() => { const h = location.hash; if (!yo() && h.startsWith('#/pedir/')) pintarPedirPase(decodeURIComponent(h.slice(8))); });
+/* La página pública ya no se vuelve a dibujar con cada cambio: el pase sale
+   en el momento (antes esperaba la aprobación y borraba lo que se escribía). */

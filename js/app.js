@@ -425,7 +425,7 @@ function pintar(){
   aplicarTema();
   /* El QR de un punto de ronda abre su pantallita aunque el teléfono tenga
      una sesión abierta: nada la tapa hasta que se cierra. */
-  if (/^#\/(punto|ronda|qr)\//.test(location.hash)){ rutaPublica(); return; }
+  if (/^#\/(punto|ronda|qr|pedir)\//.test(location.hash)){ rutaPublica(); return; }
   const u = yo();
   if (!u){ PILA.length = 0; return pintarBienvenida(); }
   if (!$('#lienzo')){
@@ -1997,7 +1997,7 @@ Store.alCambiar(remoto => {
    ========================================================= */
 function rutaPublica(){
   const h = location.hash;
-  if (h.startsWith('#/pedir/')){ pintarPedirPase(decodeURIComponent(h.slice(8))); return true; }
+  if (h.startsWith('#/pedir/')){ if (!$('#pedidoPublico form')) pintarPedirPase(h.slice(8)); return true; }
   if (h.startsWith('#/qr/')){ if (!$('#qrPublico')) pintarQRPublico(h.slice(5)); return true; }
   if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return true; }
   if (h.startsWith('#/punto/')){ if (!$('#puntoPublico')) pintarPunto(h.slice(8)); return true; }
