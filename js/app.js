@@ -248,9 +248,20 @@ const Estirar = {
     setTimeout(() => { if (this.el){ this.el.classList.remove('ver', 'listo', 'sosteniendo', 'girando', 'hecho'); } }, demora);
   },
   arriba(){ const c = $('#cuerpo'); return !!c && c.scrollTop <= 0 && (document.scrollingElement?.scrollTop || 0) <= 0; },
+  /* DESLIZAR PARA ACTUALIZAR, SIN TRABARSE (11-10-2026, "a veces se queda
+     bloqueada la actualización"): si algo fallaba después de empezar (por
+     ejemplo, el teléfono sin lugar para guardar), el indicador quedaba
+     girando para siempre y los siguientes tirones no hacían nada. Ahora pase
+     lo que pase se suelta (finally), y como mucho a los 8 segundos. Si entra
+     una versión nueva de la app mientras tanto, lo dice antes de recargar. */
   async actualizar(){
     if (this.girando) return;
     this.girando = true;
+    try { await this.actualizarTodo(); }
+    catch(e){ console.warn('Actualizar', e); }
+    finally { this.girando = false; this.esconder(1400); }
+  },
+  async actualizarTodo(){
     const el = this.indicador();
     el.classList.add('ver', 'girando'); el.classList.remove('listo', 'sosteniendo');
     el.style.setProperty('--estirar', '64px');
@@ -272,11 +283,9 @@ const Estirar = {
     try { if ('serviceWorker' in navigator) tareas.push(navigator.serviceWorker.getRegistration().then(r => r && r.update())); } catch(e){}
     await Promise.race([Promise.allSettled(tareas), new Promise(ok => setTimeout(ok, 8000))]);
     try { refrescar(); } catch(e){}
-    Store.sesion.actualizadoAt = Date.now(); Store.guardarSesion();
+    try { Store.sesion.actualizadoAt = Date.now(); Store.guardarSesion(); } catch(e){}
     el.classList.remove('girando'); el.classList.add('hecho');
     el.querySelector('b').textContent = `Todo al día · ${new Date().toLocaleTimeString('es-AR', { hourCycle:'h23' })}`;
-    this.girando = false;
-    this.esconder(1400);
   },
 };
 document.addEventListener('touchstart', e => {
@@ -2229,7 +2238,9 @@ function registrarServiceWorker(){
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!habia || recargando) return;            /* la primera instalación no recarga */
     recargando = true;
-    location.reload();
+    /* Que se entienda por qué la pantalla se recarga (no es que se trabó). */
+    try { const el = Estirar.indicador(); el.classList.add('ver', 'girando'); el.querySelector('b').textContent = 'Llegó una versión nueva de la app: abriéndola…'; } catch(e){}
+    setTimeout(() => location.reload(), 300);
   });
   navigator.serviceWorker.register('sw.js', { updateViaCache:'none' }).then(reg => {
     reg.update().catch(() => {});

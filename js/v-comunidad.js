@@ -147,7 +147,8 @@ R.pizarron = {
     return `
       ${superficie({ a:'nuevo-post', icon:'plus', t: u.rol === 'guardia' ? 'Escribir un aviso de la guardia' : 'Publicar en el pizarrón', s: u.rol === 'guardia' ? 'Les suena y les llega a todos los vecinos' : 'Aviso, evento, perdido, ofrezco, busco…', cls:'acento' })}
       <div class="chips">${chip('todo','Todo')}${chip('guardia','Guardia')}${chip('aviso','Avisos')}${chip('alerta','Alertas')}${chip('evento','Eventos')}${chip('perdido','Perdidos')}${chip('servicios','Ofrezco / busco')}</div>
-      ${ps.length ? `<div class="muro-cols">${ps.map(cardPost).join('')}</div>` : f === 'todo' ? `${tarjetaServicios()}${vacio('muro', 'Por ahora no hay publicaciones. Si tenés algo para contar, prestar o avisar, tocá "Publicar en el pizarrón".')}` : `<div class="muro-cols">${vacio('muro', 'Todavía no hay nada acá.')}</div>`}
+      ${f === 'todo' ? tarjetaServicios() : ''}
+      ${ps.length ? `<div class="muro-cols">${ps.map(cardPost).join('')}</div>` : f === 'todo' ? vacio('muro', 'Por ahora no hay publicaciones. Si tenés algo para contar, prestar o avisar, tocá "Publicar en el pizarrón".') : `<div class="muro-cols">${vacio('muro', 'Todavía no hay nada acá.')}</div>`}
       <p class="muted tiny" style="margin:10px 2px 0">${I('clock')} Cada publicación se borra sola a su tiempo: alertas 2 días, guardia 3, avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, y los eventos al día siguiente. Lo fijado queda. Quien publica la puede borrar antes con el tachito.</p>`;
   },
 };

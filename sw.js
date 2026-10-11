@@ -1,22 +1,44 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261011-102805';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261011-102805',
-  './js/firebase-config.js?v=20261011-102805', './js/icons.js?v=20261011-102805', './js/agenda.js?v=20261011-102805', './js/padron.js?v=20261011-102805', './js/core.js?v=20261011-102805', './js/seed.js?v=20261011-102805', './js/clima.js?v=20261011-102805', './js/calendario.js?v=20261011-102805',
-  './js/v-inicio.js?v=20261011-102805', './js/v-comunidad.js?v=20261011-102805', './js/v-gestion.js?v=20261011-102805', './js/admin.js?v=20261011-102805', './js/v-vecinos.js?v=20261011-102805', './js/v-expensas.js?v=20261011-102805', './js/v-plan.js?v=20261011-102805', './js/v-contable.js?v=20261011-102805', './js/v-servicio.js?v=20261011-102805', './js/v-legal.js?v=20261011-102805', './js/v-hotel.js?v=20261011-102805', './js/v-cuidados.js?v=20261011-102805', './js/v-casa.js?v=20261011-102805', './js/asistente.js?v=20261011-102805', './js/v-manual.js?v=20261011-102805', './js/push.js?v=20261011-102805', './js/sismos.js?v=20261011-102805', './js/nube.js?v=20261011-102805', './js/adjuntos.js?v=20261011-102805', './js/historial.js?v=20261011-102805', './js/v-supervisor.js?v=20261011-102805', './js/app.js?v=20261011-102805',
+const CACHE = 'bhc-20261011-104356';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261011-104356',
+  './js/firebase-config.js?v=20261011-104356', './js/icons.js?v=20261011-104356', './js/agenda.js?v=20261011-104356', './js/padron.js?v=20261011-104356', './js/core.js?v=20261011-104356', './js/seed.js?v=20261011-104356', './js/clima.js?v=20261011-104356', './js/calendario.js?v=20261011-104356',
+  './js/v-inicio.js?v=20261011-104356', './js/v-comunidad.js?v=20261011-104356', './js/v-gestion.js?v=20261011-104356', './js/admin.js?v=20261011-104356', './js/v-vecinos.js?v=20261011-104356', './js/v-expensas.js?v=20261011-104356', './js/v-plan.js?v=20261011-104356', './js/v-contable.js?v=20261011-104356', './js/v-servicio.js?v=20261011-104356', './js/v-legal.js?v=20261011-104356', './js/v-hotel.js?v=20261011-104356', './js/v-cuidados.js?v=20261011-104356', './js/v-casa.js?v=20261011-104356', './js/asistente.js?v=20261011-104356', './js/v-manual.js?v=20261011-104356', './js/push.js?v=20261011-104356', './js/sismos.js?v=20261011-104356', './js/nube.js?v=20261011-104356', './js/adjuntos.js?v=20261011-104356', './js/historial.js?v=20261011-104356', './js/v-supervisor.js?v=20261011-104356', './js/app.js?v=20261011-104356',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
+/* LA APP ABRE AUNQUE LA SEÑAL SEA MALA (pedido de Claudio, 11-10-2026: "a veces
+   en iPhone y Android tarda en abrirse, es como si se trabara"). Antes cada
+   pieza del programa (el index y unos 30 archivos) se pedía primero a internet
+   y recién si internet fallaba se usaba la guardada: con señal floja (4G débil,
+   Wi-Fi que "anda pero no anda") cada pedido quedaba esperando y la app tardaba
+   en abrir o se quedaba en blanco. Ahora:
+     · los archivos con versión (los .js y el .css llevan ?v=…) no cambian
+       nunca: se usan directo de lo guardado, sin preguntar a internet;
+     · el index (y lo demás del programa) se pide a internet, pero si en 3
+       segundos no contestó, se usa el guardado y la versión nueva llega en
+       el próximo arranque. */
+const ESPERA_RED = 3000;
+const guardar = (req, r) => { if (r && r.ok){ const c = r.clone(); caches.open(CACHE).then(k => k.put(req, c)).catch(() => {}); } return r; };
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;   /* clima, vuelos, QR: siempre en vivo */
+  if (url.searchParams.has('v') && /\.(js|css)$/.test(url.pathname)){
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => guardar(e.request, x))));
+    return;
+  }
   const programa = e.request.mode === 'navigate' || url.pathname.endsWith('/') || /\.(html|js|css)$/.test(url.pathname);
-  e.respondWith(fetch(programa ? new Request(e.request, { cache:'reload' }) : e.request)
-    .then(r => { const c = r.clone(); caches.open(CACHE).then(k => k.put(e.request, c)).catch(() => {}); return r; })
-    .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html'))));
+  const red = fetch(programa ? new Request(e.request, { cache:'reload' }) : e.request).then(r => guardar(e.request, r));
+  const guardada = () => caches.match(e.request).then(r => r || (e.request.mode === 'navigate' ? caches.match('./index.html') : null));
+  if (!programa){ e.respondWith(red.catch(() => guardada())); return; }
+  e.respondWith(new Promise(ok => {
+    let listo = false; const dar = r => { if (!listo && r){ listo = true; ok(r); } };
+    const reloj = setTimeout(() => guardada().then(dar), ESPERA_RED);
+    red.then(r => { clearTimeout(reloj); dar(r); }).catch(() => { clearTimeout(reloj); guardada().then(r => r ? dar(r) : dar(Response.error())); });
+  }));
 });
 
 /* =========================================================

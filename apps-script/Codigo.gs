@@ -775,7 +775,26 @@ var SERVICIOS_DIARIOS = [
   {nombre: 'Radio Fueguina', url: 'https://www.radiofueguina.com'},
   {nombre: 'Tiempo Fueguino', url: 'https://www.tiempofueguino.com'}
 ];
-var SERVICIOS_ZONAS = 'Bahía Cauquén, Los Cauquenes';
+/* EL ALIMENTADOR 11 (dato de Claudio, 11-10-2026, confirmado en los avisos de la DPE de
+   oct-2024, nov-2024 y mar-2025): la DPE no escribe "Bahía Cauquén" sino "Urbanización
+   Cauquén", "Alto del Cauquén", "Terraza I y II", "Ushuaia Chico" y "Costa Susana", todos
+   bajo el "Alimentador 11". Por eso las zonas de fábrica son "Cauquén" (como palabra: vale
+   para Bahía Cauquén, Urbanización Cauquén y Alto del Cauquén) y "Alimentador 11" (escrito
+   "Alimentador 11", "Alimentador N.º 11", "Nº 11" o en una lista "alimentadores 10, 11 y 12").
+   Si la Administración tenía guardada la lista vieja de fábrica, se usa la nueva. */
+var SERVICIOS_ZONAS = 'Cauquén, Los Cauquenes, Alimentador 11';
+var SERVICIOS_ZONAS_VIEJA = 'Bahía Cauquén, Los Cauquenes';
+/* El texto, listo para buscar zonas: sin tildes y con cada alimentador escrito igual. */
+function textoZonas(t) {
+  return sinTildes(t).replace(/alimentador(?:es)?\s*((?:n\s*[.º°o]*\s*)?\d+(?:\s*(?:,|y|e)\s*(?:n\s*[.º°o]*\s*)?\d+)*)/g, function (m, lista) {
+    return (lista.match(/\d+/g) || []).map(function (n) { return 'alimentador ' + n; }).join(', ');
+  });
+}
+/* ¿Nombra esa zona? Como palabra entera: "Alimentador 11" no es el 110, "Cauquén" no es "Cauquenes". */
+function nombraZona(xz, z) {
+  var q = textoZonas(z).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return !!q && new RegExp('(^|[^a-z0-9])' + q + '($|[^a-z0-9])').test(xz);
+}
 var SERVICIOS_GENERAL = /(toda la ciudad|todos los barrios|toda ushuaia|en toda la localidad|corte general|cortes? rotativ|toda la provincia)/;
 var MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 var DIAS_ES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
@@ -822,12 +841,13 @@ function leerDiario(json, nombre) {
       titulo: textoPlano(p.title && p.title.rendered), texto: textoPlano(p.content && p.content.rendered)};
   });
 }
+/* De qué servicio habla: gana el que más se nombra, mirando primero el título.
+   ("Planta Cloacal Río Pipo" en una lista de barrios sin luz no la vuelve de agua.) */
 function servicioDe(t) {
-  var x = sinTildes(t);
-  if (/\b(gas|camuzzi)\b/.test(x)) return 'gas';
-  if (/\b(agua|dposs|cloaca\w*)\b/.test(x)) return 'agua';
-  if (/(energia|electric|\bluz\b|\bdpe\b|alimentador|cooperativa electrica)/.test(x)) return 'luz';
-  return '';
+  var x = sinTildes(t), n = function (re) { return (x.match(re) || []).length; };
+  var p = {luz: n(/energia|electric|\bluz\b|\bdpe\b|alimentador|media tension|cooperativa electrica/g), agua: n(/\bagua\b|\bdposs\b/g), gas: n(/\bgas\b|camuzzi/g)};
+  var mejor = Object.keys(p).sort(function (a, b) { return p[b] - p[a]; })[0];
+  return p[mejor] ? mejor : '';
 }
 /* Cuándo es el corte, leído del texto: el día ("domingo 12", "el 15 de
    octubre", "mañana") y el horario ("de 08:15 a 13:00 hs"). Solo vale un día
@@ -867,17 +887,28 @@ function analizarCorte(it, zonas, ahora) {
   if (!srv) return {no: 'no es de luz, agua ni gas'};
   if (!/(corte|interrupci|falta de suministro|baja presion|sin servicio|sin suministro|rotativ)/.test(x)) return {no: 'no habla de un corte'};
   if (/suspend/.test(sinTildes(it.titulo))) return {no: 'es la suspensión de un corte'};
+  /* De los diarios, solo lo que avisa un corte que VIENE (programado, "se realizará"); no la
+     crónica de uno que ya pasó ("esta mañana tuvimos un corte", "concluyeron los trabajos"). */
+  if (it.fuente !== 'DPOSS') {
+    if (/(concluy|finaliz|con exito|se restablec|restableci|normaliz|balance)/.test(sinTildes(it.titulo))) return {no: 'cuenta algo que ya pasó'};
+    if (!/(programad|se realizar|realizaran|realizara|habra (un )?corte|cortes? previsto|interrupcion prevista|informa (un )?corte|rotativ)/.test(x)) return {no: 'no anuncia un corte que viene'};
+  }
   if (it.localidad ? !/ushuaia/i.test(it.localidad) : !/ushuaia/.test(x)) return {no: 'no es en Ushuaia'};
   if (!it.at || ahora - it.at > 4 * 86400000) return {no: 'es viejo'};
-  var zona = (zonas || []).filter(function (z) { return z && x.indexOf(sinTildes(z)) >= 0; })[0] || '';
+  var xz = textoZonas(todo), zona = (zonas || []).filter(function (z) { return z && nombraZona(xz, z); })[0] || '';
   var general = (x.match(SERVICIOS_GENERAL) || [])[0] || '';
   if (!zona && !general) return {no: 'no nombra al barrio ni es para toda la ciudad'};
   var c = it.desde ? {hay: true, horario: true, desde: it.desde, hasta: it.hasta} : cuandoEs(it.texto || '', it.at, it.titulo);
   var hasta = c.hay ? c.hasta : it.at + 86400000;
   if (hasta <= ahora) return {no: 'ya terminó'};
   /* El párrafo que nombra al barrio (o a toda la ciudad), para que se entienda de un vistazo. */
-  var i = x.indexOf(sinTildes(zona || general)), parrafo = '';
-  if (i >= 0) { var a = todo.lastIndexOf('\n', i), b = todo.indexOf('\n', i); parrafo = todo.slice(a < 0 ? 0 : a + 1, b < 0 ? todo.length : b).trim(); }
+  var lineas = todo.split('\n'), j = -1;
+  lineas.some(function (l, k) { if (zona ? nombraZona(textoZonas(l), zona) : sinTildes(l).indexOf(general) >= 0) { j = k; return true; } return false; });
+  var parrafo = j >= 0 ? lineas[j].trim() : '';
+  /* En las listas de a un barrio por renglón, se suma el título de la lista ("Alimentador 11:", "Zonas afectadas"). */
+  if (j > 0 && parrafo.length < 80) for (var k2 = j - 1; k2 >= 0 && k2 >= j - 30; k2--) { if (/alimentador|zonas? afectad|sectores? afectad/.test(sinTildes(lineas[k2]))) { parrafo = lineas[k2].trim().replace(/[.:]?$/, ':') + ' … ' + parrafo; break; } }
+  /* Una lista larga de barrios ("Alimentador 11: … Urbanización Cauquén …"): se recorta alrededor de la zona. */
+  if (parrafo.length > 600) { var k = Math.max(0, sinTildes(parrafo).indexOf(textoZonas(zona || general).trim().split(/\s+/)[0])); parrafo = (k > 250 ? '…' : '') + parrafo.slice(Math.max(0, k - 250), k + 330).trim() + '…'; }
   var dia = '';
   if (c.hay) { var p = partesBarrio(c.desde), hh = function (ms) { return Utilities.formatDate(new Date(ms), ZONA_BARRIO, 'HH:mm'); };
     dia = DIAS_ES[p.dow].replace('miercoles', 'miércoles').replace('sabado', 'sábado') + ' ' + p.d + '/' + (p.m + 1) + (c.horario ? ', de ' + hh(c.desde) + ' a ' + hh(c.hasta) + ' h' : ''); }
@@ -903,7 +934,7 @@ function revisarServicios(base, acceso, forzar) {
     if (!reclamarEnBase(base, acceso, 'barrio/motorLog/servicios-' + hoy + '-' + h, Date.now())) return null;
   } else reclamarEnBase(base, acceso, 'barrio/motorLog/servicios-ahora-' + Utilities.formatDate(new Date(), ZONA_BARRIO, 'yyyy-MM-dd-HHmm'), Date.now());
   /* (La app lee la hora de la última marca "servicios-…" para decir "Sin cortes anunciados · revisado hoy a las 6".) */
-  var zonas = String(cfg.serviciosZonas || SERVICIOS_ZONAS).split(/[,;\n]+/).map(function (z) { return z.trim(); }).filter(function (z) { return z.length >= 4; });
+  var zonas = String(!cfg.serviciosZonas || cfg.serviciosZonas.trim() === SERVICIOS_ZONAS_VIEJA ? SERVICIOS_ZONAS : cfg.serviciosZonas).split(/[,;\n]+/).map(function (z) { return z.trim(); }).filter(function (z) { return z.length >= 4; });
   var items = [], fallas = [], hace = new Date(Date.now() - 4 * 86400000).toISOString().slice(0, 19);
   try { items = items.concat(leerDposs(UrlFetchApp.fetch('https://dposs.gob.ar/reparaciones/', {muteHttpExceptions: true}).getContentText('UTF-8'))); }
   catch (e) { fallas.push('DPOSS: ' + String(e).slice(0, 80)); }
