@@ -124,7 +124,7 @@ function chatSupervision(p){
   const vacioTxt = esSupervisor() ? (con === 'supGarita' ? 'Escribile a la garita: le suena al instante. Lo leen solo la garita y vos.' : 'Escribile a la Administración. Lo leen solo la Administración y vos.')
     : `Mensajes con ${esc(sup.nombre || 'la supervisión')}. Ningún vecino los ve.`;
   return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
-      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${de(m)}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
+      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${de(m)}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
       : vacio('lock', vacioTxt)}</div>
     <form class="chatbar" data-f="privado-sup" data-u="${esc(supId)}" data-con="${con}">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" rows="1" class="crece" enterkeyhint="send"
       placeholder="${esSupervisor() ? 'Mensaje a ' + (con === 'supGarita' ? 'la garita' : 'la Administración') : 'Mensaje a la supervisión'}"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
@@ -146,13 +146,15 @@ F['privado-sup'] = (d, form) => {
   if (!CANALES_SUP[con] || !texto || !u || !puedeCanalSup(con) || (esSupervisor() && supId !== u.id)) return;
   const yoSoy = quienSoySup();
   const para = yoSoy === 'supervisor' ? (con === 'supGarita' ? cuentasGarita() : cuentasAdministracion()) : [supId];
-  Store.cambiar(s => {
+  let nuevo = null;
+  Salida.vigilar('privados', () => (Store.cambiar(s => {
     let h = s.privados.find(x => x.userId === supId && x.con === con);
     if (!h){ h = { id:`${con}-${supId}`, userId:supId, con, msgs:[] }; s.privados.push(h); }
-    listaDe(h, 'msgs').push({ id:uid(), from:yoSoy, text:texto, createdAt:Date.now(), ...extra });
+    const m = { id:uid(), from:yoSoy, text:texto, createdAt:Date.now(), ...extra };
+    listaDe(h, 'msgs').push(m); nuevo = { h, m };
     if (para.length) notificar(s, { para, titulo: yoSoy === 'supervisor' ? `Mensaje de la supervisión (${primerNombre(u.nombre)})` : yoSoy === 'guardia' ? 'Mensaje de la garita' : 'Mensaje de la Administración',
       texto:texto.slice(0, 90), icon:'eye', color:'brand', link: yoSoy === 'supervisor' ? `privado:${con}|${supId}` : `privado:${con}`, sonido:true });
-  });
+  }), nuevo));
   const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
 };
 

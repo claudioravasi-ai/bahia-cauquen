@@ -548,7 +548,7 @@ function chatInterno(idP){
   const barraPet = esAdmin() ? `<button class="chat-pet" data-a="abrir" data-v="peticiones">${I('edit')}<span><b>Pedidos por escrito de los vecinos a la garita</b><small>${pet ? `${plural(pet, 'pedido', 'pedidos')} que la garita todavía no recibió · ` : ''}No dejar pasar a alguien, aviso de viaje, llaves, paquetes… Los firma la garita; acá solo se miran.</small></span>${pet ? `<span class="n">${pet}</span>` : ''}${I('right')}</button>` : '';
   return `<div class="chat-wrap">${barraPet}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
 
-      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
+      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
       : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
     <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
 }
@@ -608,7 +608,7 @@ R.privado = {
       <button class="chip ${con === 'admin' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="admin">${I('sliders')}Administración</button>
       <button class="chip ${con === 'guardia' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="guardia">${I('shield')}Guardia</button></div>`;
     return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
-        <div class="b">${cuerpoMsg(m)}<time>${hora(m.createdAt)}</time></div></div>`).join('')
+        <div class="b">${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
         : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? (esHotel() ? 'Escribile a la garita. Solo la leen el hotel y la garita.' : 'Escribile a la guardia. Nadie más lo ve.') : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
       <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'Mensaje a la Administración'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
   },
@@ -619,27 +619,31 @@ F['privado'] = (d, form) => {
   if (form.dataset.con === 'interno'){
     if (!esStaff()) return;
     const from = esGuardia() ? 'guardia' : 'admin';
-    Store.cambiar(s => {
+    let nuevo = null;
+    Salida.vigilar('privados', () => (Store.cambiar(s => {
       let h = s.privados.find(x => x.userId === para && x.con === 'interno');
       if (!h){ h = { id:uid(), userId:para, con:'interno', msgs:[] }; s.privados.push(h); }
-      listaDe(h, 'msgs').push({ id:uid(), from, text, createdAt:Date.now(), ...extra });
+      const m = { id:uid(), from, text, createdAt:Date.now(), ...extra };
+      listaDe(h, 'msgs').push(m); nuevo = { h, m };
       notificar(s, from === 'guardia'
         ? { para:'rol:admin', titulo:'Mensaje de la garita', texto:text.slice(0, 90), icon:'shield', color:'brand', link:'privado:interno|' + para, sonido:true }
         : { para, titulo:'Mensaje de la Administración', texto:text.slice(0, 90), icon:'sliders', color:'accent', link:'privado:interno', sonido:true });
-    });
+    }), nuevo));
     const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
     return;
   }
   const con = form.dataset.con === 'guardia' ? 'guardia' : 'admin';
   const from = esStaff() ? con : 'vecino';
-  Store.cambiar(s => {
+  let nuevo = null;
+  Salida.vigilar('privados', () => (Store.cambiar(s => {
     let h = s.privados.find(x => x.userId === para && (x.con || 'admin') === con);
     if (!h){ h = { id:uid(), userId:para, con, msgs:[] }; s.privados.push(h); }
-    h.msgs.push({ id:uid(), from, text, createdAt:Date.now(), ...extra });
+    const m = { id:uid(), from, text, createdAt:Date.now(), ...extra };
+    listaDe(h, 'msgs').push(m); nuevo = { h, m };
     notificar(s, from !== 'vecino'
       ? { para, titulo: con === 'guardia' ? 'Mensaje de la guardia' : 'Mensaje de la Administración', texto:text.slice(0, 90), icon:'lock', color:'accent', link:'privado:' + con, sonido:true }
       : { para: con === 'guardia' ? 'rol:guardia' : 'rol:admin', titulo:`Mensaje de ${u.casa}`, texto:text.slice(0, 90), icon:'lock', color:'accent', link:'privado:' + con + '|' + u.id });
-  });
+  }), nuevo));
   const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
 };
 

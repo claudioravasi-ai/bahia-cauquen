@@ -211,7 +211,7 @@ R.dm = {
     let dia = '';
     const vis = msgsVisibles(h, u.id);
     return `<div class="chat-wrap">${barraHilo('dms', h, u.id)}<div class="chat">${vis.length ? vis.map(m => { const d = isoDe(new Date(m.at)); const sep = d !== dia ? (dia = d, `<div class="dia-sep">${relDia(d)}</div>`) : '';
-        return `${sep}<div class="msg ${m.de === u.id ? 'mia' : ''}"><div class="b">${cuerpoMsg(m)}<time>${hora(m.at)}${m.de === u.id && m.leido ? ' ✓✓' : ''}</time></div></div>`; }).join('')
+        return `${sep}<div class="msg ${m.de === u.id ? 'mia' : ''}"><div class="b">${cuerpoMsg(m)}<time>${hora(m.at)}${m.de === u.id && m.leido ? ' ✓✓' : ''}${relojMsg(m)}</time></div></div>`; }).join('')
         : vacio('chat', `Escribile a ${esc(otro.nombre.split(' ')[0])}. Nadie más ve esta conversación.`)}</div>
       <form class="chatbar" data-f="dm" data-u="${esc(p)}">${clipChat()}<textarea name="text" id="dmIn" required maxlength="800" placeholder="Mensaje privado…" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
   },
@@ -219,12 +219,14 @@ R.dm = {
 F['dm'] = (d, form) => {
   const u = yo(), para = form.dataset.u, { text, extra } = mensajeConAdj(d);
   if (!text) return;
-  Store.cambiar(s => {
+  let nuevo = null;
+  Salida.vigilar('dms', () => (Store.cambiar(s => {
     let h = s.dms.find(x => (x.a === u.id && x.b === para) || (x.a === para && x.b === u.id));
     if (!h){ h = { id:uid(), a:u.id, b:para, msgs:[] }; s.dms.push(h); }
-    h.msgs.push({ id:uid(), de:u.id, text, at:Date.now(), ...extra });
+    const m = { id:uid(), de:u.id, text, at:Date.now(), ...extra };
+    listaDe(h, 'msgs').push(m); nuevo = { h, m };
     notificar(s, { para, titulo:`Mensaje de ${u.nombre.split(' ')[0]} (${u.casa})`, texto:text.slice(0, 90), icon:'chat', color:'accent', link:'dm:' + u.id });
-  });
+  }), nuevo));
   const i = $('#dmIn'); if (i){ i.value = ''; i.focus(); }
 };
 /* =========================================================

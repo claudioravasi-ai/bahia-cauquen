@@ -1769,6 +1769,8 @@ async function cerrarSesion({ seguirCorreos = false } = {}){
   /* La llave para retirar paquetes se borra del equipo: en un equipo
      prestado no puede quedar nada que firme a tu nombre. */
   if (typeof Retiro !== 'undefined') await Retiro.olvidar();
+  /* Los mensajes que esperaban señal tampoco quedan en el equipo. */
+  if (typeof Salida !== 'undefined') Salida.borrarTodo();
   /* Los camiones que estaban cruzando la pantalla se van con la sesión. */
   if (typeof Camion !== 'undefined') Camion.quitar();
   if (typeof Mensajeria !== 'undefined') Mensajeria.quitar();

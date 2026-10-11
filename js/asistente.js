@@ -291,7 +291,8 @@ A['asistente-ajuste'] = () => { const on = Asistente.permiso() === 'si'; Asisten
    ========================================================= */
 const NUM_HABLADO = { cero:0, un:1, uno:1, una:1, dos:2, tres:3, cuatro:4, cinco:5, seis:6, siete:7, ocho:8, nueve:9, diez:10, once:11, doce:12, trece:13, catorce:14, quince:15,
   dieciseis:16, diecisiete:17, dieciocho:18, diecinueve:19, veinte:20, veintiun:21, veintiuno:21, veintidos:22, veintitres:23, veinticuatro:24, veinticinco:25, veintiseis:26, veintisiete:27,
-  veintiocho:28, veintinueve:29, treinta:30, cuarenta:40, cincuenta:50, sesenta:60, setenta:70, ochenta:80, noventa:90, cien:100, ciento:100 };
+  veintiocho:28, veintinueve:29, treinta:30, cuarenta:40, cincuenta:50, sesenta:60, setenta:70, ochenta:80, noventa:90, cien:100, ciento:100,
+  doscientos:200, doscientas:200, trescientos:300, trescientas:300, cuatrocientos:400, quinientos:500, seiscientos:600, setecientos:700, ochocientos:800, novecientos:900 };
 const GaritaVoz = {
   EJEMPLOS:['llegó una visita sin avisar', 'buscá la dirección de Ravasi', '¿Juan Pérez tiene pase?'],
   atajos(){ return `<button class="btn btn-sm btn-sec" data-a="garita-voz" data-v="llegada">${I('gate')}Visita sin aviso</button><button class="btn btn-sm btn-sec" data-a="garita-voz" data-v="direccion">${I('pin')}Dirección de…</button><button class="btn btn-sm btn-sec" data-a="garita-voz" data-v="pase">${I('qr')}¿Tiene pase?</button>`; },
@@ -299,6 +300,69 @@ const GaritaVoz = {
   /* "ciento cuarenta y ocho" → 148 */
   numero(t){ const ws = normTxt(t).split(/[^a-z]+/).filter(w => w && w !== 'y'); let n = 0, hay = false;
     for (const w of ws){ if (w in NUM_HABLADO){ n += NUM_HABLADO[w]; hay = true; } else if (hay) break; } return hay ? n : null; },
+  /* =========================================================
+     LA DIRECCIÓN DICHA → EL LOTE (pedido de Claudio, 11-10-2026: "viene
+     una visita sin avisar, le pregunto adónde va y me dice la dirección:
+     que la reconozca rápido, con el lote y el nombre, para no hacerla
+     esperar en la barrera"). "De la Plaza 3340" → Lote 148. Sale de las
+     152 direcciones del padrón (LOTES, js/padron.js). Perdona lo que el
+     reconocimiento escribe distinto: "3.340", "tres mil trescientos
+     cuarenta", "de la plasa", "Salecianos". Si solo se entendió la altura
+     y es de un único lote, alcanza; si se entendió la calle sin altura,
+     no adivina.
+     ========================================================= */
+  VACIAS: new Set(['de', 'del', 'la', 'las', 'los', 'el', 'calle', 'avenida', 'pasaje', 'al', 'a', 'en', 'va', 'numero', 'nro', 'altura', 'y', 'lote']),
+  /* "tres mil trescientos cuarenta" → "3340"; "3.340" → "3340". */
+  conCifras(t){
+    let x = normTxt(t).replace(/(\d)[.,](\d{3})\b/g, '$1$2');
+    const ws = x.split(/\s+/), out = [];
+    for (let i = 0; i < ws.length; i++){
+      const w = ws[i];
+      if (!(w in NUM_HABLADO) && w !== 'mil'){ out.push(w); continue; }
+      let total = 0, cur = 0, j = i;
+      for (; j < ws.length; j++){ const v = ws[j];
+        if (v === 'y' && j + 1 < ws.length && ws[j + 1] in NUM_HABLADO) continue;
+        if (v === 'mil'){ total += (cur || 1) * 1000; cur = 0; continue; }
+        if (v in NUM_HABLADO){ cur += NUM_HABLADO[v]; continue; }
+        break; }
+      out.push(String(total + cur)); i = j - 1;
+    }
+    return out.join(' ');
+  },
+  calles(){
+    if (this._calles) return this._calles;
+    return (this._calles = (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => L.dir).map(L => {
+      const calle = normTxt(L.dir.replace(/\s*\d.*$/, '')), pal = calle.split(/[^a-z]+/).filter(w => w && !this.VACIAS.has(w));
+      return { L, pal, nums:(L.dir.match(/\d+/g) || []) };
+    }));
+  },
+  /* ¿Lo dicho tiene una calle del barrio? (para cortar el micrófono enseguida) */
+  nombraCalle(t){ const ws = normTxt(t).split(/[^a-z]+/).filter(w => w.length > 2 && !this.VACIAS.has(w)), fw = ws.map(fonetica);
+    return !!ws.length && this.calles().some(c => c.pal.length && c.pal.every(p => coincidePalabra(p, ws, fw))); },
+  loteDeDireccion(r){
+    const x = this.conCifras(r), ws = x.split(/[^a-z0-9]+/).filter(w => w && !this.VACIAS.has(w)), fw = ws.map(fonetica);
+    const nums = ws.filter(w => /^\d{2,4}$/.test(w)), letras = ws.filter(w => !/\d/.test(w));
+    if (!nums.length && !letras.length) return '';
+    const hits = this.calles().map(c => {
+      const calle = c.pal.length > 0 && letras.length > 0 && c.pal.every(p => coincidePalabra(p, letras, letras.map(fonetica)));
+      const altura = nums.some(n => c.nums.includes(n));
+      return { c, p: calle && altura ? 3 : altura && nums.some(n => n.length >= 3) && !letras.length ? 2 : 0 };
+    }).filter(h => h.p > 0).sort((a, b) => b.p - a.p);
+    if (!hits.length){ this.empatados = []; return ''; }
+    const top = hits.filter(h => h.p === hits[0].p);
+    /* Dos lotes con la misma dirección en el padrón (Los Salesianos 3630
+       es del 22 y del 91; De la Plaza 3448, del 133 y del 133A): no se
+       adivina, se pregunta cuál (ver llegada). */
+    this.empatados = top.length > 1 && top.length <= 3 && hits[0].p === 3 ? top.map(h => h.c.L.lote) : [];
+    return top.length === 1 ? top[0].c.L.lote : '';
+  },
+  /* Lo que contestó la garita a "¿adónde va?": la dirección primero (así
+     "De la Cuesta 66" es el lote 13 y no el 66), después el lote o el
+     hotel, y si no, el apellido. */
+  loteDe(r){
+    if (this.nombraCalle(r)){ const d = this.loteDeDireccion(r); if (d) return d; }
+    return this.lote(r) || this.loteDeDireccion(r) || this.loteDeApellido(r);
+  },
   /* "lote 42", "al cuarenta y dos", "42" → "42" (o "hotel"). */
   lote(t){
     const x = normTxt(t);
@@ -321,11 +385,15 @@ const GaritaVoz = {
     const casa = 'Lote ' + lote, f = (typeof fichasDeVecinos === 'function' ? fichasDeVecinos() : []).find(x => normTxt(x.lote) === normTxt(lote));
     const cs = vecinosAprobados().filter(u => u.casa === casa);
     const inq = f && f.inq.length ? f.inq : inquilinosDe(casa).map(u => u.nombre);
-    if (inq.length) return { texto:`${casa}, alquilado a ${listaNombres(inq)}`, rel: inq.length > 1 ? 'Inquilinos' : 'Inquilino/a' };
+    /* Nombres primero, como lo diría la garita (11-10-2026): "Claudio Ravasi
+       y Monica Ponzio, Lote 148", y el sector o para dónde queda, si se sabe. */
+    const L = (typeof LOTES === 'undefined' ? [] : LOTES).find(x => x.lote === String(lote)), zona = L ? (L.sector || (typeof comoLlegarLote === 'function' ? comoLlegarLote(L.lote).toLowerCase() : '')) : '';
+    const fin = zona ? `, ${zona}` : '';
+    if (inq.length) return { texto:`${listaNombres(inq)}, ${inq.length > 1 ? 'inquilinos' : 'inquilino'} del ${casa}${fin}`, rel: inq.length > 1 ? 'Inquilinos' : 'Inquilino/a' };
     const prop = f && f.prop.length ? f.prop : cs.filter(esDuenoDelLote).map(u => u.nombre);
-    if (prop.length) return { texto:`${casa}, de ${listaNombres(prop)}`, rel: prop.length > 1 ? 'Propietarios' : 'Propietario/a' };
-    if (f && f.estado === 'baldio') return { texto:`${casa}, baldío`, rel:'' };
-    return { texto: cs.length ? `${casa}, de ${listaNombres(cs.map(u => u.nombre))}` : casa, rel:'' };
+    if (prop.length) return { texto:`${listaNombres(prop)}, ${casa}${fin}`, rel: prop.length > 1 ? 'Propietarios' : 'Propietario/a' };
+    if (f && f.estado === 'baldio') return { texto:`${casa}, baldío${fin}`, rel:'' };
+    return { texto: cs.length ? `${listaNombres(cs.map(u => u.nombre))}, ${casa}${fin}` : casa + fin, rel:'' };
   },
   /* "a lo de Ravasi", "va a lo de Pérez" → el lote de esa familia (si es uno solo). */
   loteDeApellido(r){
@@ -336,6 +404,9 @@ const GaritaVoz = {
   },
   interpretar(original){
     const t = normTxt(original);
+    /* "¿De quién es De la Plaza 3340?", "¿quién vive en De la Cuesta 66?" */
+    const deQuien = original.match(/(?:de qui[eé]n es|qui[eé]n vive en|a qui[eé]n va en)\s+(.+?)\??$/i);
+    if (deQuien) return this.direccion(deQuien[1].trim());
     if (/(direcc|donde (vive|queda|esta)|como (llego|llega|se llega)|que calle)/.test(t)){
       const lo = /\blote\b/.test(t) ? this.lote(t) : '';
       const quien = (original.match(/(?:direcci[oó]n|vive|queda|est[aá]|llega|llego|calle)\s+(?:de[l]?\s+|la\s+|el\s+)?(?:propietari[oa]\s+|vecin[oa]\s+|señor[a]?\s+|familia\s+)?(.+)$/i) || [])[1] || '';
@@ -346,7 +417,7 @@ const GaritaVoz = {
       return this.pase(quien.replace(/^¿/, '').replace(/\b(un|el|la)\s+pase\b/i, '').trim());
     }
     if (/(sin avis|lleg|vino|esta en la garita|hay (una|un|alguien))/.test(t)){
-      const lo = /\blote\b|\bhotel\b/.test(t) ? this.lote(t) : '';
+      const lo = /\blote\b|\bhotel\b/.test(t) ? this.lote(t) : this.nombraCalle(original) ? this.loteDeDireccion(original) : '';
       const n = (original.match(/(?:lleg[oó]|vino)\s+(.+?)\s+(?:para|al|a la|a)\s+(?:el\s+)?(?:lote|hotel)/i) || [])[1] || '';
       return this.llegada({ lote:lo, nombre: n && !/visita|alguien|persona|se[nñ]or/i.test(n) ? this.nombre(n) : '' });
     }
@@ -359,9 +430,16 @@ const GaritaVoz = {
     const form = `<button class="btn btn-sm btn-sec" data-a="llegada-nueva">${I('edit')}Mejor con el formulario</button>`;
     if (!d.lote){
       if ((d.intentos || 0) >= 2) return Asistente.responder('No te entiendo el lote. Te abro el formulario.', () => A['llegada-nueva']());
-      return Asistente.preguntar(d.intentos ? 'No entendí el lote. Decí, por ejemplo: lote 42, hotel, o el apellido.' : '¿A qué lote va? Si va al hotel, decí hotel.',
-        r => { if (this.cancela(r)) return; this.llegada({ ...d, lote:this.lote(r) || this.loteDeApellido(r), intentos:(d.intentos || 0) + 1 }); }, form,
-        t => /\bhotel\b/i.test(t) || /\b\d{1,3}\s*$/.test(t.trim()));
+      return Asistente.preguntar(d.intentos ? 'No lo encontré. Decí, por ejemplo: De la Plaza 3340, lote 42, hotel o el apellido.' : 'Decime hotel, lote, dirección o apellido.',
+        r => { if (this.cancela(r)) return;
+          /* "Bien, buscando…" se ve en pantalla pero no se dice: la búsqueda es
+             instantánea y decirlo haría esperar a la visita un segundo más. */
+          Asistente.panel('piensa', `${esc(r)}<br><small class="asis-busca">Bien, buscando…</small>`);
+          this.empatados = [];
+          const lo = this.loteDe(r);
+          if (!lo && this.empatados.length) return this.cualDeEstos(this.empatados, d);
+          this.llegada({ ...d, lote:lo, intentos:(d.intentos || 0) + 1 }); }, form,
+        t => /\bhotel\b/i.test(t) || /\b\d{1,4}\s*$/.test(this.conCifras(t).trim()) && (this.nombraCalle(t) || /\b\d{1,3}\s*$/.test(t.trim())));
     }
     const L = d.lote === 'hotel' ? null : LOTES.find(x => x.lote === d.lote);
     if (d.lote !== 'hotel' && !L) return this.llegada({ ...d, lote:'', intentos:(d.intentos || 0) + 1 });
@@ -390,10 +468,22 @@ const GaritaVoz = {
       return `Listo, le pregunté al ${casa}. Cuando conteste, te aparece en la garita.`; });
   },
 
+  /* Misma dirección, dos lotes: "En Los Salesianos 3630 hay dos lotes:
+     Pérez, lote 22, o Gómez, lote 91. ¿Cuál?" Se contesta con la voz
+     ("el 91") o tocando el botón. */
+  cualDeEstos(lotes, d = {}){
+    const dir = (LOTES.find(x => x.lote === lotes[0]) || {}).dir || 'esa dirección';
+    const qs = lotes.map(l => ({ l, q:this.quienEs(l) }));
+    const dicho = `En ${dir} hay ${lotes.length === 2 ? 'dos' : lotes.length} lotes: ${qs.map(x => x.q.texto).join('; o ')}. ¿Cuál?`;
+    const btns = qs.map(x => `<button class="btn btn-sm btn-pri" data-a="garita-voz-lote" data-v="${esc(x.l)}" data-p="${esc(d.nombre || '')}">${I('pin')}Lote ${esc(x.l)}</button>`).join('');
+    Asistente.preguntar(dicho, r => { if (this.cancela(r)) return; const n = this.lote(r), elegido = lotes.find(l => normTxt(l) === normTxt(n)) || lotes.find(l => normTxt(r).includes(normTxt(l)));
+      this.llegada({ ...d, lote:elegido || '', intentos:(d.intentos || 0) + 1 }); }, btns, t => /\b\d{1,3}[a-z]?\s*$/i.test(t.trim()));
+  },
+
   /* B · la dirección de un propietario (o de un lote) */
   direccion(quien){
     if (!quien) return Asistente.preguntar('¿De qué propietario? Decí el nombre y el apellido, o el lote.', r => { if (this.cancela(r)) return; this.direccion(/\blote\b/i.test(r) ? 'lote ' + this.lote(r) : r.trim()); });
-    const lo = /^lote\s/i.test(quien) ? quien.replace(/^lote\s*/i, '') : '';
+    const lo = /^lote\s/i.test(quien) ? quien.replace(/^lote\s*/i, '') : this.nombraCalle(quien) ? this.loteDeDireccion(quien) : '';
     const qq = normTxt(quien).replace(/\b(de|del|la|los|las|el|senor|senora|don|dona|propietario|propietaria|vecino|vecina|familia|lote)\b/g, ' ').replace(/\s+/g, ' ').trim();
     const fichas = typeof fichasDeVecinos === 'function' ? fichasDeVecinos() : [];
     const hits = (lo ? fichas.filter(f => normTxt(f.lote) === normTxt(lo)).map(f => ({ f, p:3 }))
@@ -424,6 +514,7 @@ const GaritaVoz = {
     Asistente.responder(dicho, () => { if (typeof validar === 'function') validar(p.codigo); });
   },
 };
+A['garita-voz-lote'] = el => { if (!esGuardia()) return; Asistente.cortar(); Asistente.pregunta = null; GaritaVoz.llegada({ lote:el.dataset.v, ...(el.dataset.p ? { nombre:el.dataset.p } : {}) }); };
 A['garita-voz'] = el => { if (!esGuardia()) return; const v = el.dataset.v, nom = el.dataset.p || '';
   if (Asistente.permiso() !== 'si'){ Asistente.pedirPermiso(); return; }
   if (v === 'llegada') GaritaVoz.llegada(nom ? { nombre:nom } : {}); else if (v === 'direccion') GaritaVoz.direccion(''); else if (v === 'pase') GaritaVoz.pase(''); };

@@ -223,31 +223,178 @@ function filaViaje(x, { acciones = false } = {}){
     <span class="pill ${e[1] ? 'p-' + e[1] : ''}">${e[0]}</span>
     ${acciones && esHotel() ? `<button class="icon-btn" data-a="hviaje-editar" data-id="${esc(x.id)}" aria-label="Editar el traslado">${I('edit')}</button>` : ''}</div>`;
 }
-/* Lo que pasa hoy en Ushuaia que le importa al hotel: vuelos, cruceros y
-   eventos, con el botón para programar el traslado ya calculado. */
+/* =========================================================
+   LA PORTADA DEL HOTEL, REDISEÑADA (pedido de Claudio, 11-10-2026: "más
+   innovador, agradable a la vista y de fácil interpretación"; las ideas,
+   de tabler, 41.8k★ — tarjetas de estado —, react-chrono, 4.2k★ — línea
+   de tiempo — y packery, 4.3k★ — grilla bento —; el código es propio).
+     · El encabezado trae el PULSO del día: cuatro números que se tocan.
+     · "Lo próximo": la van que sale después, con la cuenta regresiva.
+     · Vans ahora: cada van dibujada, con su chapa y una franja verde
+       (adentro) o naranja (afuera), cuánto hace y su próximo traslado.
+     · Traslados: un RIEL del día (de 6 a 24 h, con la marca de ahora y un
+       punto por traslado que se toca), filtros y una línea de tiempo donde
+       cada traslado se abre con sus detalles y botones.
+     · Hoy en Ushuaia: pestañas Vuelos / Cruceros / Eventos; los vuelos en
+       un tablero como el del aeropuerto, con el botón de la van ya
+       calculado.
+   ========================================================= */
+const HotelVista = { hoyTab:'vuelos', filtro:'todos', abierto:'' };
+/* "en 1 h 20 min", "en 5 min", "ahora", "hace 10 min". */
+function faltaTexto(hhmm){
+  const t = minDe(hhmm); if (t == null) return '';
+  const d = t - ahoraMin(), a = Math.abs(d), txt = a >= 60 ? `${Math.floor(a / 60)} h${a % 60 ? ' ' + (a % 60) : ''}` : `${a} min`;
+  return a < 2 ? 'ahora' : d > 0 ? 'en ' + txt : 'hace ' + txt;
+}
+function pulsoHotel(prox, hsHoy, hsSalen, info){
+  const k = (v, n, t, ic, cls) => `<button type="button" class="hp-kpi ${cls}" data-a="abrir" data-v="${v}">${I(ic)}<b>${n}</b><span>${t}</span></button>`;
+  return `<div class="hp-pulso">${k('hotel-traslados', prox, prox === 1 ? 'traslado por hacer' : 'traslados por hacer', 'car', 'k-wood')}
+    ${k('hotel-huespedes', hsHoy, 'llegan hoy', 'login', 'k-sky')}${k('hotel-huespedes', hsSalen, 'se van hoy', 'logout', 'k-accent')}
+    ${k('hotel-ficha', info.huespedesHoy || 0, 'huéspedes', 'users', 'k-ok')}</div>`;
+}
+/* La van que sale después: grande, con cuenta regresiva. */
+function proximaVan(vs){
+  const ahora = ahoraMin(), x = vs.find(v => v.estado === 'en_curso') || vs.find(v => v.estado === 'programado' && (minDe(v.sale) ?? 9999) >= ahora - 15);
+  if (!x) return `<div class="hp-prox tranqui">${I('check')}<div><b>Sin vans por salir</b><small>No quedan traslados pendientes hoy.</small></div>
+    ${esHotel() ? `<button class="hp-prox-btn" data-a="hviaje-nuevo">${I('plus')}Traslado</button>` : ''}</div>`;
+  const d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro, van = hotelVans().find(v => v.id === x.vanId), enViaje = x.estado === 'en_curso';
+  const t = minDe(x.sale), falta = t == null ? null : t - ahora, pct = falta == null ? 0 : Math.max(4, Math.min(100, 100 - falta / 1.8));
+  return `<button type="button" class="hp-prox ${enViaje ? 'viaje' : falta != null && falta <= 30 ? 'pronto' : ''}" data-a="hviaje-ver" data-id="${esc(x.id)}">
+    <span class="hp-prox-ic">${I(d[1])}</span>
+    <span class="grow"><small>${enViaje ? 'En viaje ahora' : 'Lo próximo'}</small><b>${esc(textoViaje(x))}</b>
+      <span class="hp-prox-sub">${van ? esc(van.nombre) : '<em>sin van asignada</em>'} · ${plural(+x.pax || 0, 'pasajero')}</span>
+      ${enViaje ? '' : `<span class="hp-barra"><i style="width:${pct}%"></i></span>`}</span>
+    <span class="hp-prox-hora"><b>${esc(x.sale || '—')}</b><small>${enViaje ? 'salió' : esc(faltaTexto(x.sale))}</small></span></button>`;
+}
+/* Una van, dibujada, con su chapa y su estado. */
+function vanViva(v, { acciones = false } = {}){
+  const e = estadoVan(v), prox = viajesDelDia().find(x => x.vanId === v.id && x.estado === 'programado');
+  const hace = e.sin ? 'sin pasos registrados' : `${e.adentro ? 'adentro' : 'afuera'} desde las ${hora(e.desde)}`;
+  return `<div class="hp-van ${e.adentro ? 'adentro' : 'afuera'}">
+    <div class="hp-van-arte">${VAN_SVG}<span class="hp-van-luz">${e.adentro ? 'Adentro' : 'Afuera'}</span></div>
+    <div class="hp-van-txt"><b>${esc(v.nombre)}</b><span class="hp-chapa">${esc(chapaTexto(v.patente || ''))}</span>
+      <small>${esc(hace)}${v.chofer ? ' · ' + esc(v.chofer) : ''}</small>
+      <small class="hp-van-prox">${prox ? `${I('clock')} Próximo: ${esc(prox.sale || '—')} · ${esc((DESTINOS_HOTEL[prox.destino] || DESTINOS_HOTEL.otro)[0])}` : `${I('check')} Sin traslados pendientes`}</small></div>
+    ${acciones && esHotel() ? `<div class="hp-van-acc"><button class="btn btn-xs btn-sec" data-a="hvan-qr" data-id="${esc(v.id)}">${I('qr')}QR</button><button class="btn btn-xs btn-sec" data-a="hvan-editar" data-id="${esc(v.id)}">${I('edit')}Editar</button>${v.telChofer ? `<a class="btn btn-xs btn-sec" href="tel:${esc(String(v.telChofer).replace(/[^\d+]/g, ''))}">${I('phone')}Chofer</a>` : ''}</div>` : ''}</div>`;
+}
+/* El riel del día: de 6 a 24 h, la marca de ahora y un punto por traslado. */
+function rielDia(vs, dia){
+  const desde = 6 * 60, hasta = 24 * 60, pos = m => Math.max(0, Math.min(100, (m - desde) / (hasta - desde) * 100));
+  const ahora = dia === hoyISO() ? `<span class="hr-ahora" style="left:${pos(ahoraMin())}%"><small>ahora</small></span>` : '';
+  const puntos = vs.filter(x => minDe(x.sale) != null).map(x => { const e = ESTADO_VIAJE[x.estado] || ESTADO_VIAJE.programado;
+    return `<button type="button" class="hr-punto e-${esc(x.estado)}" style="left:${pos(minDe(x.sale))}%" data-a="hviaje-ver" data-id="${esc(x.id)}" title="${esc(x.sale)} · ${esc(textoViaje(x))} · ${e[0]}" aria-label="${esc(x.sale)} ${esc(textoViaje(x))}">${I((DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro)[1])}</button>`; }).join('');
+  const marcas = [6, 9, 12, 15, 18, 21, 24].map(h => `<i style="left:${pos(h * 60)}%"><small>${h}</small></i>`).join('');
+  return `<div class="hr-riel" role="group" aria-label="Los traslados del día en una línea de 6 a 24 horas"><div class="hr-pista">${marcas}${ahora}${puntos}</div></div>`;
+}
+/* La línea de tiempo: cada traslado se toca y se abre. */
+function lineaTraslados(vs, { dia = hoyISO(), acciones = false, max = 99 } = {}){
+  const F = { todos:() => true, pendientes:x => x.estado === 'programado', viaje:x => x.estado === 'en_curso', hechos:x => x.estado === 'hecho' };
+  const n = k => vs.filter(F[k]).length, f = F[HotelVista.filtro] ? HotelVista.filtro : 'todos', lista = vs.filter(F[f]).slice(0, max);
+  const chips = `<div class="hl-filtros" role="tablist">${[['todos', 'Todos'], ['pendientes', 'Pendientes'], ['viaje', 'En viaje'], ['hechos', 'Hechos']].map(([k, t]) =>
+    `<button type="button" role="tab" aria-selected="${k === f}" class="hl-f ${k === f ? 'on' : ''}" data-a="htras-filtro" data-v="${k}">${t}<span>${n(k)}</span></button>`).join('')}</div>`;
+  const ahora = ahoraMin(), esHoy = dia === hoyISO();
+  let marcoAhora = !esHoy;
+  const filas = lista.map(x => {
+    const d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro, e = ESTADO_VIAJE[x.estado] || ESTADO_VIAJE.programado, van = hotelVans().find(v => v.id === x.vanId), aj = ajusteViaje(x);
+    let linea = '';
+    if (!marcoAhora && (minDe(x.sale) ?? 0) > ahora){ marcoAhora = true; linea = `<li class="hl-ahora"><span>${I('clock')} Ahora · ${hhmmDe(ahora)}</span></li>`; }
+    const abierto = HotelVista.abierto === x.id;
+    return `${linea}<li class="hl-item e-${esc(x.estado)} ${abierto ? 'abierto' : ''}" id="tras-${esc(x.id)}">
+      <span class="hl-hora"><b>${esc(x.sale || '—')}</b><small>${esHoy && x.estado === 'programado' ? esc(faltaTexto(x.sale)) : e[0]}</small></span>
+      <span class="hl-nodo">${I(d[1])}</span>
+      <div class="hl-card"><button type="button" class="hl-cab" data-a="hviaje-ver" data-id="${esc(x.id)}" aria-expanded="${abierto}">
+          <span class="grow"><b>${esc(textoViaje(x))}</b><small>${plural(+x.pax || 0, 'pasajero')} · ${van ? esc(van.nombre) : '<em>sin van</em>'}</small></span>
+          <span class="pill ${e[1] ? 'p-' + e[1] : ''}">${e[0]}</span></button>
+        ${aj ? `<span class="hv-alerta">${I(aj.cancelado ? 'alert' : 'clock')} ${aj.cancelado ? 'El vuelo figura CANCELADO' : `${esc(aj.v.estado || 'Nuevo horario')} ${esc(aj.v.real || aj.v.hora)} h: conviene salir ${esc(aj.sale)}`}${!aj.cancelado && esHotel() ? ` <button class="link" data-a="hviaje-ajustar" data-id="${esc(x.id)}" data-v="${esc(aj.sale)}">Ajustar</button>` : ''}</span>` : ''}
+        ${abierto ? `<div class="hl-det">
+          <span>${I('car')} ${van ? `${esc(van.nombre)} · <span class="hp-chapa chica">${esc(chapaTexto(van.patente || ''))}</span>${van.chofer ? ' · ' + esc(van.chofer) : ''}` : 'Todavía sin van: asignala al editar'}</span>
+          ${x.auto ? `<span>${I('users')} Armado solo con los huéspedes del vuelo</span>` : ''}
+          ${x.nota ? `<span>${I('edit')} ${esc(x.nota)}</span>` : ''}
+          <span>${I('calendar')} ${x.fecha === hoyISO() ? 'Hoy' : fechaCorta(x.fecha)} · sale ${esc(x.sale || '—')} h</span>
+          ${esHotel() ? `<div class="btns"><button class="btn btn-xs btn-pri" data-a="hviaje-editar" data-id="${esc(x.id)}">${I('edit')}Editar</button>${van ? `<button class="btn btn-xs btn-sec" data-a="hvan-qr" data-id="${esc(van.id)}">${I('qr')}QR de la van</button>` : ''}</div>` : ''}</div>` : ''}</div></li>`;
+  }).join('');
+  const fin = !marcoAhora && lista.length ? `<li class="hl-ahora"><span>${I('clock')} Ahora · ${hhmmDe(ahora)}</span></li>` : '';
+  return `${chips}${lista.length ? `<ol class="hl-linea">${filas}${fin}</ol>` : `<div class="hl-vacio">${I('check')} ${vs.length ? 'Nada con ese filtro.' : 'No hay traslados ese día.'}${esHotel() ? ` <button class="link" data-a="hviaje-nuevo">Programar uno</button>` : ''}</div>`}`;
+}
+/* PASOS POR LA GARITA (pedido de Claudio, 11-10-2026: "hacele un diseño
+   más innovador"). Un PORTÓN: arriba, cuántas salidas y entradas hubo y
+   dónde está cada van; abajo, una línea central (el portón) con las
+   salidas a la izquierda y las entradas a la derecha, cada paso con su
+   hora, la van, su chapa, el traslado y hace cuánto. En el teléfono, una
+   sola columna con la flecha de para dónde fue. */
+function portonHotel(movs){
+  const vans = hotelVans(), sal = movs.filter(m => m.tipo !== 'in').length, ent = movs.length - sal;
+  const haceTxt = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'recién' : m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}`; };
+  const cab = `<div class="pt-cab"><div class="pt-num sale">${I('logout')}<b>${sal}</b><span>${sal === 1 ? 'salida' : 'salidas'}</span></div>
+      <div class="pt-porton" aria-hidden="true"><span class="pt-poste"></span><span class="pt-brazo"></span><span class="pt-poste"></span></div>
+      <div class="pt-num entra">${I('login')}<b>${ent}</b><span>${ent === 1 ? 'entrada' : 'entradas'}</span></div></div>
+    ${vans.length ? `<div class="pt-vans">${vans.map(v => { const e = estadoVan(v); return `<span class="pt-van ${e.adentro ? 'adentro' : 'afuera'}"><i></i>${esc(v.nombre)} · ${e.adentro ? 'adentro' : 'afuera'}</span>`; }).join('')}</div>` : ''}`;
+  if (!movs.length) return `<div class="pt-caja">${cab}<p class="pt-nada">${I('shield')} Ninguna van pasó por la garita en las últimas 24 horas. Cuando la garita marque una salida o una entrada (con un toque o leyendo el QR), aparece acá al instante.</p></div>`;
+  return `<div class="pt-caja">${cab}<ol class="pt-linea">${movs.map(m => { const v = vans.find(x => x.id === m.vanId) || hotelVans().find(x => x.id === m.vanId) || {}, entra = m.tipo === 'in';
+    return `<li class="pt-paso ${entra ? 'entra' : 'sale'}"><span class="pt-nodo">${I(entra ? 'login' : 'logout')}</span>
+      <div class="pt-tarj"><span class="pt-hora">${hora(m.at)}</span><span class="grow"><b>${esc(v.nombre || 'Van')} ${entra ? 'entró al barrio' : 'salió del barrio'}</b>
+        <small>${v.patente ? `<span class="hp-chapa chica">${esc(chapaTexto(v.patente))}</span> ` : ''}${m.viaje ? esc(m.viaje) + ' · ' : ''}${haceTxt(m.at)}</small></span>
+        <span class="pt-flecha" aria-hidden="true">${entra ? '→' : '←'}</span></div></li>`; }).join('')}</ol></div>`;
+}
+A['htras-filtro'] = el => { HotelVista.filtro = el.dataset.v || 'todos'; refrescar(); };
+A['hviaje-ver'] = el => {
+  const id = el.dataset.id; HotelVista.abierto = HotelVista.abierto === id ? '' : id;
+  /* El filtro no puede esconder el que se quiere ver. */
+  const x = hotelViajes().find(v => v.id === id);
+  if (x && HotelVista.abierto && !({ todos:1, pendientes:x.estado === 'programado', viaje:x.estado === 'en_curso', hechos:x.estado === 'hecho' })[HotelVista.filtro]) HotelVista.filtro = 'todos';
+  refrescar();
+  setTimeout(() => { const li = document.getElementById('tras-' + id); if (li) li.scrollIntoView({ block:'nearest', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' }); }, 60);
+};
+/* Hoy en Ushuaia, en pestañas. */
 function hoyEnUshuaiaHotel(){
   const d = Vuelos.d, ahora = ahoraMin(), hoy = hoyISO();
-  const prox = (lista, tipo) => aLista(lista).map(v => ({ ...v, tipo })).filter(v => !/cancel/i.test(v.estado) && (Vuelos.minutos(v.real || v.hora) ?? 0) >= ahora - 20).slice(0, 5);
+  const prox = (lista, tipo) => aLista(lista).map(v => ({ ...v, tipo })).filter(v => !/cancel/i.test(v.estado) && (Vuelos.minutos(v.real || v.hora) ?? 0) >= ahora - 20).slice(0, 4);
   const filaVuelo = v => { const sale = salidaVuelo(v), ya = viajesDelDia().some(x => x.ref && x.ref.tipo === 'vuelo' && normVuelo(x.ref.nro) === normVuelo(v.nro));
-    return `<div class="hv-mini"><span class="mono"><b>${esc(v.real || v.hora)}</b></span><span class="grow">${esc(v.nro)} · ${esc(v.lugar)}${v.estado ? ` <small>${esc(v.estado)}</small>` : ''}</span>
-      ${esHotel() ? (ya ? `<span class="pill p-ok">${I('check')}Traslado</span>` : `<button class="btn btn-xs btn-sec" data-a="hviaje-nuevo" data-v="vuelo|${esc(v.nro)}|${v.tipo}|${esc(v.real || v.hora)}|${esc(sale)}" title="La van tendría que salir a las ${esc(sale)}">${I('plus')}Van ${esc(sale)}</button>`) : ''}</div>`; };
+    return `<div class="hb-fila"><span class="hb-hora">${esc(v.real || v.hora)}</span><span class="hb-vuelo">${esc(v.nro)}</span><span class="hb-lugar">${esc(v.lugar)}${v.estado ? `<small>${esc(v.estado)}</small>` : ''}</span>
+      ${esHotel() ? (ya ? `<span class="hb-ok">${I('check')}Van</span>` : `<button class="hb-van" data-a="hviaje-nuevo" data-v="vuelo|${esc(v.nro)}|${v.tipo}|${esc(v.real || v.hora)}|${esc(sale)}" title="La van tendría que salir a las ${esc(sale)}">${I('plus')}Van ${esc(sale)}</button>`) : ''}</div>`; };
   const cr = Cruceros.lista().filter(c => c.fecha >= hoy && c.fecha <= sumarDias(hoy, 2)).slice(0, 6);
   const ev = aLista(Store.s.eventosCiudad).filter(e => e && e.fecha >= hoy && e.fecha <= sumarDias(hoy, 7)).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 5);
-  return `<div class="hv-hoy">
-    <div class="card"><div class="hv-cab">${I('send')}<b>Salen del aeropuerto</b><button class="link" data-a="abrir" data-v="vuelos">Todos</button></div>
-      ${d ? prox(d.dep, 'D').map(filaVuelo).join('') || '<p class="muted small">No quedan partidas hoy.</p>' : '<p class="muted small">Leyendo el tablero del aeropuerto…</p>'}
-      <div class="hv-cab" style="margin-top:10px">${I('send')}<b>Llegan al aeropuerto</b></div>
-      ${d ? prox(d.arr, 'A').map(filaVuelo).join('') || '<p class="muted small">No quedan arribos hoy.</p>' : ''}
-      <p class="muted tiny" style="margin:8px 0 0">"Van 14:10" = cuándo tendría que salir la van según la ficha del hotel (${hotelInfo().checkin} min de check-in, ${hotelInfo().trayAero} min al aeropuerto).</p></div>
-    <div class="card"><div class="hv-cab">${I('drop')}<b>Cruceros</b><button class="link" data-a="abrir" data-v="cruceros">Todos</button></div>
-      ${cr.length ? cr.map(c => `<div class="hv-mini"><span class="grow"><b>${esc(conMayusculasBarco(c.barco))}</b><small>${c.fecha === hoy ? 'hoy' : relDia(c.fecha)} · llega ${horaDe(c.llega) || '—'} · sale ${horaDe(c.sale) || '—'}</small></span>
-        ${esHotel() ? `<button class="btn btn-xs btn-sec" data-a="hviaje-nuevo" data-v="crucero|${esc(c.barco)}|buscar|${esc(c.fecha)}|${esc(salidaCrucero(c, 'buscar'))}">${I('plus')}Buscar</button><button class="btn btn-xs btn-sec" data-a="hviaje-nuevo" data-v="crucero|${esc(c.barco)}|llevar|${esc(c.sale.slice(0, 10))}|${esc(salidaCrucero(c, 'llevar'))}">${I('plus')}Llevar</button>` : ''}</div>`).join('')
-        : `<p class="muted small">${Cruceros.url() ? 'No hay recaladas en los próximos tres días.' : 'El cronograma de cruceros todavía no está conectado.'}</p>`}</div>
-    <div class="card"><div class="hv-cab">${I('calendar')}<b>Eventos en la ciudad</b><button class="link" data-a="abrir" data-v="ushuaia">Ushuaia hoy</button></div>
-      ${ev.length ? ev.map(e => `<div class="hv-mini"><span class="grow"><b>${esc(e.titulo)}</b><small>${e.fecha === hoy ? 'hoy' : relDia(e.fecha)}${e.hora ? ' · ' + esc(e.hora) + ' h' : ''}${e.lugar ? ' · ' + esc(e.lugar) : ''}</small></span>
-        ${esHotel() ? `<button class="btn btn-xs btn-sec" data-a="hviaje-nuevo" data-v="evento|${esc(e.titulo)}|llevar|${esc(e.fecha)}|${esc(e.hora || '')}">${I('plus')}Van</button>` : ''}</div>`).join('') : '<p class="muted small">Sin eventos cargados para esta semana.</p>'}</div>
-  </div>`;
+  const dep = d ? prox(d.dep, 'D') : [], arr = d ? prox(d.arr, 'A') : [];
+  const tabs = [['vuelos', 'send', 'Vuelos', dep.length + arr.length], ['cruceros', 'drop', 'Cruceros', cr.length], ['eventos', 'calendar', 'Eventos', ev.length]];
+  const tab = tabs.some(t => t[0] === HotelVista.hoyTab) ? HotelVista.hoyTab : 'vuelos';
+  const cuerpo = tab === 'vuelos' ? `<div class="hb-tablero">
+      <div class="hb-titulo">${I('send')}Salen del aeropuerto<button class="hb-todos" data-a="abrir" data-v="vuelos">Ver todos${I('right')}</button></div>
+      ${d ? dep.map(filaVuelo).join('') || '<p class="hb-nada">No quedan partidas hoy.</p>' : '<p class="hb-nada">Leyendo el tablero del aeropuerto…</p>'}
+      <div class="hb-titulo">${I('login')}Llegan al aeropuerto</div>
+      ${d ? arr.map(filaVuelo).join('') || '<p class="hb-nada">No quedan arribos hoy.</p>' : ''}
+      <p class="hb-pie">"Van 14:10" = cuándo tendría que salir la van (${hotelInfo().checkin} min de check-in, ${hotelInfo().trayAero} min al aeropuerto).</p></div>`
+    : tab === 'cruceros' ? `<div class="hc-lista">${cr.length ? cr.map(tarjetaCrucero).join('')
+        : `<p class="hu-nada">${I('drop')} ${Cruceros.url() ? 'No hay recaladas en los próximos tres días.' : 'El cronograma de cruceros todavía no está conectado.'}</p>`}
+        <button class="hu-todos" data-a="abrir" data-v="cruceros">${I('drop')}Ver todos los cruceros${I('right')}</button></div>`
+    : `<div class="he-lista">${ev.length ? ev.map(tarjetaEventoCiudad).join('') : `<p class="hu-nada">${I('calendar')} Sin eventos cargados para esta semana.</p>`}
+        <button class="hu-todos" data-a="abrir" data-v="ushuaia">${I('calendar')}Ushuaia hoy: agenda completa${I('right')}</button></div>`;
+  return `<div class="hu-caja"><div class="hu-tabs" role="tablist">${tabs.map(([k, ic, t, n]) => `<button type="button" role="tab" aria-selected="${k === tab}" class="hu-tab ${k === tab ? 'on' : ''}" data-a="hhoy-tab" data-v="${k}">${I(ic)}${t}${n ? `<span>${n}</span>` : ''}</button>`).join('')}</div>${cuerpo}</div>`;
 }
+/* Un crucero: el barco, su día, la estadía en el puerto (llega → sale) y
+   los dos botones con la hora de la van ya calculada. */
+const BARCO_SVG = `<svg viewBox="0 0 64 32" aria-hidden="true"><path d="M4 20h56l-6 9H11Z" fill="currentColor"/><path d="M12 20v-6h36l6 6Z" fill="currentColor" opacity=".75"/><path d="M20 14V9h20v5Z" fill="currentColor" opacity=".55"/><rect x="26" y="3" width="5" height="6" rx="1" fill="currentColor" opacity=".55"/><path d="M15 17h3M22 17h3M29 17h3M36 17h3M43 17h3" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+function tarjetaCrucero(c){
+  const hoy = hoyISO(), ll = horaDe(c.llega) || '', sa = horaDe(c.sale) || '', mL = minDe(ll), mS = minDe(sa);
+  const pos = m => m == null ? 0 : Math.max(0, Math.min(100, m / 1440 * 100));
+  const enPuerto = c.fecha === hoy && mL != null && mS != null && ahoraMin() >= mL && ahoraMin() <= mS;
+  const sB = salidaCrucero(c, 'buscar'), sL = salidaCrucero(c, 'llevar');
+  return `<div class="hc-barco ${enPuerto ? 'en-puerto' : ''}"><div class="hc-cab"><span class="hc-ic">${BARCO_SVG}</span>
+      <span class="grow"><b>${esc(conMayusculasBarco(c.barco))}</b><small>${enPuerto ? '<em>En el puerto ahora</em>' : c.fecha === hoy ? 'Hoy' : esc(relDia(c.fecha))}</small></span></div>
+    <div class="hc-estadia"><span class="hc-t"><small>Llega</small><b>${esc(ll || '—')}</b></span>
+      <span class="hc-barra"><i style="left:${pos(mL)}%;right:${100 - (mS != null && mS > (mL ?? 0) ? pos(mS) : 100)}%"></i>${c.fecha === hoy ? `<u style="left:${pos(ahoraMin())}%"></u>` : ''}</span>
+      <span class="hc-t"><small>Sale</small><b>${esc(sa || '—')}</b></span></div>
+    ${esHotel() ? `<div class="hc-acc"><button class="hc-btn buscar" data-a="hviaje-nuevo" data-v="crucero|${esc(c.barco)}|buscar|${esc(c.fecha)}|${esc(sB)}">${I('login')}<span><b>Buscar pasajeros</b><small>${sB ? 'la van sale ' + esc(sB) : 'programar'}</small></span></button>
+      <button class="hc-btn llevar" data-a="hviaje-nuevo" data-v="crucero|${esc(c.barco)}|llevar|${esc(String(c.sale || '').slice(0, 10))}|${esc(sL)}">${I('logout')}<span><b>Llevar al barco</b><small>${sL ? 'la van sale ' + esc(sL) : 'programar'}</small></span></button></div>` : ''}</div>`;
+}
+/* Un evento de la ciudad, como una entrada con su talón. */
+function tarjetaEventoCiudad(e){
+  const f = new Date(e.fecha + 'T12:00:00'), hoy = hoyISO();
+  const mes = f.toLocaleDateString('es-AR', { month:'short' }).replace('.', ''), sem = e.fecha === hoy ? 'hoy' : f.toLocaleDateString('es-AR', { weekday:'short' }).replace('.', '');
+  return `<div class="he-ticket"><span class="he-talon"><small>${esc(sem)}</small><b>${f.getDate()}</b><small>${esc(mes)}</small></span>
+    <span class="he-cuerpo"><b>${esc(e.titulo)}</b><small>${e.hora ? `${I('clock')} ${esc(e.hora)} h` : ''}${e.lugar ? ` ${I('pin')} ${esc(e.lugar)}` : ''}</small></span>
+    ${esHotel() ? `<button class="he-van" data-a="hviaje-nuevo" data-v="evento|${esc(e.titulo)}|llevar|${esc(e.fecha)}|${esc(e.hora || '')}" aria-label="Programar una van para ${esc(e.titulo)}">${I('car')}<span>Van</span></button>` : ''}</div>`;
+}
+A['hhoy-tab'] = el => { HotelVista.hoyTab = el.dataset.v || 'vuelos'; refrescar(); };
 R.hotel = {
   titulo: HOTEL_NOMBRE, icon:'star', color:'wood', ancha:true,
   render(){
@@ -259,19 +406,20 @@ R.hotel = {
     const hsHoy = hotelHuespedes().filter(h => h.desde === hoy), hsSalen = hotelHuespedes().filter(h => h.hasta === hoy);
     const promosPend = promosViejasPend().length;
     const sinLeer = aLista(Store.s.privados).reduce((a, h) => a + aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length, 0);
-    return `<div class="hotel-hero"><img src="img/logo-noche.png" alt="" width="54" height="54">
+    return `<div class="hotel-hero hp-hero"><img src="img/logo-noche.png" alt="" width="54" height="54">
         <div class="grow"><small>${fechaLarga(hoy)}</small><h1>${HOTEL_NOMBRE}</h1><span>Recepción${info.responsable ? ' · responsable: ' + esc(info.responsable) : ''}</span></div>
         ${c ? `<div class="hotel-temp"><b>${Math.round(c.temperature_2m)}°</b><small>${Clima.cod(c.weather_code)[0]}</small></div>` : ''}</div>
+      ${pulsoHotel(prox.length, hsHoy.length, hsSalen.length, info)}
       <div class="inicio-lienzo">
         ${ajustes.length || evHoy.length ? `<section class="bloque">${ajustes.map(x => { const aj = ajusteViaje(x); return aviso(aj.cancelado ? 'danger latido' : 'warn', 'clock', aj.cancelado ? `Vuelo ${esc(x.ref.nro)} cancelado` : `Cambió el ${esc(x.ref.nro)}: la van conviene que salga ${esc(aj.sale)}`, esc(textoViaje(x)), aj.cancelado ? '' : `<button class="btn btn-xs btn-pri" data-a="hviaje-ajustar" data-id="${esc(x.id)}" data-v="${esc(aj.sale)}">Ajustar a las ${esc(aj.sale)}</button>`); }).join('')}
           ${evHoy.map(e => aviso('info', 'star', `Hoy: ${esc(e.titulo)}`, `${esc(e.desde || '')}${e.hasta ? '–' + esc(e.hasta) : ''} h · ${plural(+e.asistentes || 0, 'invitado')}${e.publicado ? ' · avisado a los vecinos' : ''}`)).join('')}</section>` : ''}
+        <section class="bloque">${proximaVan(vs)}</section>
         <section class="bloque hv-dos">
           <div>${sec('Vans ahora', `<button class="link" data-a="abrir" data-v="hotel-traslados">Vans y traslados</button>`)}
-            ${vans.length ? `<div class="hv-vans">${vans.map(v => tarjetaVan(v)).join('')}</div>` : `<div class="card plana small">${I('car')} Cargá las vans del hotel (patente y chofer): cada una tiene su QR para la garita. <button class="link" data-a="hvan-editar">Cargar una van</button></div>`}</div>
-          <div>${sec(`Traslados de hoy (${prox.length})`, `<button class="link" data-a="hviaje-nuevo">+ Traslado</button>`)}
-            ${prox.length ? `<div class="card lista">${prox.slice(0, 6).map(x => filaViaje(x)).join('')}</div>` : `<div class="card plana small">${I('check')} No hay traslados pendientes hoy.</div>`}</div>
+            ${vans.length ? `<div class="hp-vans">${vans.map(v => vanViva(v)).join('')}</div>` : garajeVacio()}</div>
+          <div>${sec(`Traslados de hoy`, `<button class="link" data-a="hviaje-nuevo">+ Traslado</button>`)}
+            <div class="card hl-caja">${rielDia(vs, hoy)}${lineaTraslados(vs, { dia:hoy, max:8 })}</div></div>
         </section>
-        <section class="bloque"><div class="garita-kpis"><div class="kpi"><b>${hsHoy.length}</b><span>Llegan hoy</span></div><div class="kpi"><b>${hsSalen.length}</b><span>Se van hoy</span></div><div class="kpi"><b>${info.huespedesHoy || 0}</b><span>Huéspedes</span></div></div></section>
         <section class="bloque">${sec('Hoy en Ushuaia, para el hotel')}${hoyEnUshuaiaHotel()}</section>
         <section class="bloque">${sec('El hotel en la app')}<div class="mosaico">
           ${tejaHotel('hotel-traslados', 'car', 'wood', 'Vans y traslados', 'Aeropuerto, puerto, excursiones · con el QR de cada van', { destaca:true, n: prox.length || '' })}
@@ -308,30 +456,81 @@ R['hotel-traslados'] = {
     const vs = hotelViajes().filter(x => x.fecha === dia).sort((a, b) => (a.sale || '99').localeCompare(b.sale || '99'));
     const dias = [0, 1, 2, 3].map(i => sumarDias(hoy, i));
     const movs = hotelMovs().filter(m => m.vanId && Date.now() - m.at < DIA).slice(0, 12);
-    return `${sec('Vans', esHotel() ? `<button class="link" data-a="hvan-editar">+ Van</button>` : '')}
-      ${vans.length ? `<div class="hv-vans">${vans.map(v => `${tarjetaVan(v, { garita:true })}${esHotel() ? `<div class="btns hv-van-acc"><button class="btn btn-xs btn-sec" data-a="hvan-qr" data-id="${esc(v.id)}">${I('qr')}QR para la garita</button><button class="btn btn-xs btn-sec" data-a="hvan-editar" data-id="${esc(v.id)}">${I('edit')}Editar</button></div>` : ''}`).join('')}</div>`
-        : vacio('car', esHotel() ? 'Todavía no cargaste ninguna van.' : 'El hotel todavía no cargó sus vans.')}
-      ${sec('Traslados', esHotel() ? `<button class="link" data-a="hviaje-nuevo">+ Traslado</button>` : '')}
-      <div class="chips">${dias.map(d => `<button class="chip ${d === dia ? 'on' : ''}" data-a="abrir" data-v="hotel-traslados" data-p="${d}">${d === hoy ? 'Hoy' : relDia(d)}</button>`).join('')}</div>
-      ${vs.length ? `<div class="card lista">${vs.map(x => filaViaje(x, { acciones:true })).join('')}</div>` : vacio('calendar', 'No hay traslados ese día.')}
-      ${movs.length ? sec('Pasos por la garita (últimas 24 h)') + `<div class="card lista">${movs.map(m => { const v = hotelVans().find(x => x.id === m.vanId) || {};
-        return `<div class="it"><div class="txt"><b>${esc(v.nombre || 'Van')} · ${m.tipo === 'in' ? 'entró' : 'salió'}</b><span>${hora(m.at)} h${m.viaje ? ' · ' + esc(m.viaje) : ''}</span></div></div>`; }).join('')}</div>` : ''}
+    const diaTxt = iso => { const f = new Date(iso + 'T12:00:00'); return { sem: iso === hoy ? 'Hoy' : f.toLocaleDateString('es-AR', { weekday:'short' }).replace('.', ''), n: f.getDate() }; };
+    const cuantos = iso => viajesDelDia(iso).length;
+    return `<div class="ht-cab"><div class="grow"><small>${vans.length ? `${plural(vans.length, 'van')} · ${vans.filter(v => estadoVan(v).adentro).length} adentro` : 'Sin vans cargadas'}</small>
+        <b>${dia === hoy ? 'Traslados de hoy' : 'Traslados del ' + fechaCorta(dia)}</b></div>
+        ${esHotel() ? `<button class="btn btn-sm btn-pri" data-a="hviaje-nuevo">${I('plus')}Traslado</button>` : ''}</div>
+      <div class="ht-dias" role="tablist">${[0, 1, 2, 3, 4, 5, 6].map(i => sumarDias(hoy, i)).map(d => { const t = diaTxt(d), n = cuantos(d);
+        return `<button type="button" role="tab" aria-selected="${d === dia}" class="ht-dia ${d === dia ? 'on' : ''}" data-a="abrir" data-v="hotel-traslados" data-p="${d}"><small>${esc(t.sem)}</small><b>${t.n}</b>${n ? `<span>${n}</span>` : '<i></i>'}</button>`; }).join('')}</div>
+      <div class="card hl-caja">${rielDia(vs.filter(x => x.estado !== 'cancelado'), dia)}${lineaTraslados(vs.filter(x => x.estado !== 'cancelado'), { dia, acciones:true })}</div>
+      ${sec('Vans', esHotel() ? `<button class="link" data-a="hvan-editar">+ Van</button>` : '')}
+      ${vans.length ? `<div class="hp-vans">${vans.map(v => vanViva(v, { acciones:true })).join('')}</div>`
+        : esHotel() ? garajeVacio() : vacio('car', 'El hotel todavía no cargó sus vans.')}
+      ${sec('Pasos por la garita', '<span class="muted small">últimas 24 h</span>')}${portonHotel(movs)}
       <p class="muted tiny" style="margin-top:12px">${I('info')} Cuando la garita registra que una van sale (con un toque o leyendo su QR), el traslado que le tocaba pasa a "En viaje"; cuando vuelve, a "Hecho". Si el vuelo de un traslado cambia de horario en el aeropuerto, la app avisa cuándo conviene salir.</p>`;
   },
 };
+/* =========================================================
+   LA COCHERA DEL HOTEL (pedido de Claudio, 11-10-2026: "la ventana Carga
+   las vans del hotel es gris y mal diseñada, hacele un diseño innovador").
+   Sin vans, en vez de un cartel gris con un botón gris: una cochera de
+   noche con la van que entra por la ruta, los tres pasos (cargarla,
+   imprimir su QR, la garita la deja pasar con un toque) y un botón grande.
+   Al cargarla, arriba del formulario se arma EN VIVO su credencial: la
+   patente como la chapa de verdad, el nombre, el modelo, las plazas y el
+   chofer, igual a como la va a ver la garita.
+   ========================================================= */
+const VAN_SVG = `<svg class="cv-van" viewBox="0 0 120 56" aria-hidden="true"><path d="M6 40V18a8 8 0 0 1 8-8h62c4 0 7 1.6 9.6 4.4L104 30l8 3.2c2.4 1 4 3.3 4 5.9V40a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#fff"/><path d="M80 15h-8v14h26L86 17.6A6 6 0 0 0 80 15Z" fill="#9fd6ec"/><rect x="14" y="15" width="16" height="12" rx="2.5" fill="#9fd6ec"/><rect x="34" y="15" width="16" height="12" rx="2.5" fill="#9fd6ec"/><rect x="54" y="15" width="14" height="12" rx="2.5" fill="#9fd6ec"/><path d="M6 33h110" stroke="var(--wood)" stroke-width="3"/><circle cx="28" cy="44" r="8" fill="#1d2430"/><circle cx="28" cy="44" r="3.4" fill="#cfd6df"/><circle cx="92" cy="44" r="8" fill="#1d2430"/><circle cx="92" cy="44" r="3.4" fill="#cfd6df"/><rect x="108" y="34" width="6" height="3" rx="1.5" fill="#ffd36b"/></svg>`;
+function garajeVacio(){
+  if (!esHotel()) return vacio('car', 'El hotel todavía no cargó sus vans.');
+  const paso = (n, ic, t, x) => `<li><span class="cv-n">${n}</span>${I(ic)}<span><b>${t}</b><small>${x}</small></span></li>`;
+  return `<div class="cochera"><div class="cv-cielo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="cv-cab"><small>${I('car')} Cochera del hotel</small><h3>Cargá tus vans y que pasen solas</h3>
+      <p>Cada van tiene su QR en el parabrisas: la garita la reconoce al instante y vos ves desde acá si está adentro o afuera.</p></div>
+    <div class="cv-ruta" aria-hidden="true">${VAN_SVG}<span class="cv-barrera"><i></i></span></div>
+    <ol class="cv-pasos">${paso(1, 'edit', 'Patente y chofer', 'Un minuto por van')}${paso(2, 'qr', 'Imprimí su QR', 'Para el parabrisas')}${paso(3, 'shield', 'Pasa con un toque', 'La garita anota todo')}</ol>
+    <button class="cv-btn" data-a="hvan-editar">${I('plus')}Cargar la primera van</button></div>`;
+}
+/* La credencial de la van, la misma arriba del formulario y en vivo. */
+/* AB123CD → "AB 123 CD" (Mercosur); ABC123 → "ABC 123" (la vieja). */
+const chapaTexto = t => { const p = normPatente(t); return /^[A-Z]{2}\d{3}[A-Z]{2}$/.test(p) ? `${p.slice(0, 2)} ${p.slice(2, 5)} ${p.slice(5)}` : /^[A-Z]{3}\d{3}$/.test(p) ? `${p.slice(0, 3)} ${p.slice(3)}` : p; };
+function credVan(v){
+  const pat = chapaTexto(v.patente || '') || 'AB 123 CD', pl = Math.max(0, Math.min(60, +v.plazas || 0));
+  return `<div class="cv-cred" id="cvCred"><div class="cv-cred-top"><span class="cv-cred-ic">${VAN_SVG}</span>
+      <span class="grow"><small>${HOTEL_NOMBRE}</small><b data-cv="nombre">${esc(v.nombre || 'Van 1')}</b><span data-cv="modelo">${esc(v.modelo || 'Modelo y color')}</span></span></div>
+    <div class="cv-chapa"><small>REPÚBLICA ARGENTINA</small><b data-cv="patente">${esc(pat)}</b></div>
+    <div class="cv-cred-pie"><span>${I('users')}<b data-cv="plazas">${pl || '—'}</b> plazas</span><span>${I('user')}<b data-cv="chofer">${esc(v.chofer || 'Sin chofer habitual')}</b></span></div></div>`;
+}
 A['hvan-editar'] = el => {
   if (!soloHotel()) return;
   const v = hotelVans().find(x => x.id === el.dataset.id) || {};
-  hoja(v.id ? 'Editar van' : 'Nueva van', `<form data-f="hvan" data-id="${esc(v.id || '')}">
-    <div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="30" value="${esc(v.nombre || '')}" placeholder="Van 1"></div>
-      <div class="field"><label>Patente</label><input name="patente" required maxlength="10" style="text-transform:uppercase" value="${esc(v.patente || '')}" placeholder="AB 123 CD"></div></div>
-    <div class="grid2"><div class="field"><label>Modelo y color</label><input name="modelo" maxlength="40" value="${esc(v.modelo || '')}" placeholder="Mercedes Sprinter blanca"></div>
-      <div class="field"><label>Plazas</label><input name="plazas" type="number" min="1" max="60" value="${esc(v.plazas || 15)}"></div></div>
-    <div class="grid2"><div class="field"><label>Chofer habitual</label><input name="chofer" maxlength="40" value="${esc(v.chofer || '')}"></div>
+  hoja(v.id ? 'Editar van' : 'Nueva van', `<form data-f="hvan" class="cv-form" data-id="${esc(v.id || '')}">
+    ${credVan(v)}
+    <p class="cv-sec">${I('car')} La van</p>
+    <div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="30" value="${esc(v.nombre || '')}" placeholder="Van 1" data-cv-in="nombre"></div>
+      <div class="field"><label>Patente</label><input name="patente" required maxlength="10" class="cv-pat-in" value="${esc(v.patente || '')}" placeholder="AB 123 CD" autocapitalize="characters" data-cv-in="patente"></div></div>
+    <div class="grid2"><div class="field"><label>Modelo y color</label><input name="modelo" maxlength="40" value="${esc(v.modelo || '')}" placeholder="Mercedes Sprinter blanca" data-cv-in="modelo"></div>
+      <div class="field"><label>Plazas</label><div class="cv-plazas"><button type="button" class="icon-btn" data-a="hvan-plazas" data-v="-1" aria-label="Una plaza menos">−</button><input name="plazas" type="number" min="1" max="60" value="${esc(v.plazas || 15)}" data-cv-in="plazas" inputmode="numeric"><button type="button" class="icon-btn" data-a="hvan-plazas" data-v="1" aria-label="Una plaza más">+</button></div></div></div>
+    <p class="cv-sec">${I('user')} El chofer</p>
+    <div class="grid2"><div class="field"><label>Chofer habitual</label><input name="chofer" maxlength="40" value="${esc(v.chofer || '')}" data-cv-in="chofer"></div>
       <div class="field"><label>Celular del chofer</label><input name="telChofer" inputmode="tel" maxlength="20" value="${esc(v.telChofer || '')}"></div></div>
-    <button class="btn btn-pri btn-block">${I('check')}Guardar</button>
+    <p class="muted tiny" style="margin:4px 2px 12px">${I('qr')} Al guardarla se arma su QR para el parabrisas: lo imprimís desde "Vans y traslados".</p>
+    <button class="btn btn-pri btn-block">${I('check')}${v.id ? 'Guardar los cambios' : 'Guardar la van'}</button>
     ${v.id ? `<button type="button" class="btn btn-danger-soft btn-block" style="margin-top:8px" data-a="hvan-baja" data-id="${esc(v.id)}">${I('trash')}Dar de baja esta van (su QR deja de valer)</button>` : ''}</form>`);
 };
+A['hvan-plazas'] = el => {
+  const i = el.closest('.cv-plazas')?.querySelector('input'); if (!i) return;
+  i.value = Math.max(1, Math.min(60, (+i.value || 0) + (+el.dataset.v || 0))); i.dispatchEvent(new Event('input', { bubbles:true }));
+};
+/* La credencial se arma mientras se escribe. */
+document.addEventListener('input', e => {
+  const i = e.target.closest && e.target.closest('[data-cv-in]'); if (!i) return;
+  const k = i.dataset.cvIn, c = document.getElementById('cvCred'), out = c && c.querySelector(`[data-cv="${k}"]`); if (!out) return;
+  const v = String(i.value || '').trim();
+  out.textContent = k === 'patente' ? (chapaTexto(v) || 'AB 123 CD') : k === 'plazas' ? (v || '—') : k === 'nombre' ? (v || 'Van 1') : k === 'modelo' ? (v || 'Modelo y color') : (v || 'Sin chofer habitual');
+  if (k === 'patente') out.parentElement.classList.toggle('lista', !!v);
+});
 F['hvan'] = (d, form) => {
   if (!soloHotel()) return;
   const id = form.dataset.id;

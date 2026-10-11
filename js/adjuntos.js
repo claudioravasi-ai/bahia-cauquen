@@ -46,11 +46,18 @@ const Adjuntos = {
     }
     await Fotos.poner(id, d);
     const vence = at + ADJ.diasSinBajar * DIA;
-    if (this.nube()){
-      await Nube.db.ref('barrio/adjuntos/' + id).set({ d, nombre, tipo, at, vence, de:Nube.uid });
-      await Nube.db.ref('barrio/adjuntosIdx/' + id).set({ at, vence, de:Nube.uid }).catch(() => {});
-    }
+    /* No se espera a que suba: sin señal, la subida queda en la cola y el
+       mensaje sale con su relojito (ver Salida, más abajo). */
+    if (this.nube()) this.subir(id, d, { nombre, tipo, at, vence });
     return { id, nombre, tipo, peso: Math.round(d.length * .75), vence, ...(mini ? { mini } : {}) };
+  },
+  /* Sube la foto o el archivo a la base. Firebase manda las escrituras en
+     orden: la del archivo sale antes que la del mensaje que lo nombra. */
+  subiendo: {},
+  subir(id, d, { nombre, tipo, at, vence }){
+    const p = Nube.db.ref('barrio/adjuntos/' + id).set({ d, nombre, tipo, at, vence, de:Nube.uid });
+    Nube.db.ref('barrio/adjuntosIdx/' + id).set({ at, vence, de:Nube.uid }).catch(() => {});
+    return this.subiendo[id] = p.then(() => ({ ok:true }), e => ({ ok:false, msg:e.message }));
   },
   /* Lo trae a este equipo. La primera vez que lo baja alguien que no lo
      mandó, le queda una hora en la base. */
@@ -107,25 +114,38 @@ function cuerpoMsg(m){
   return caja + (txt ? `<span class="msg-pie">${txt}</span>` : '');
 }
 
+/* Arreglo del 11-10-2026 ("no se suben ni las fotos ni los archivos"):
+   mientras se elige la foto o se sube, la conversación se vuelve a dibujar
+   (llega un dato de la nube, se vuelve de la cámara, etc.) y el formulario
+   del clic ya no está en la pantalla. Antes se lo "enviaba" igual, y un
+   formulario que ya no está no envía nada: el adjunto se perdía sin aviso.
+   Ahora se anota a qué conversación iba y se manda directo a esa. */
+const formDelChat = ({ f, u, con }) => [...document.querySelectorAll('form.chatbar[data-f]')]
+  .find(x => x.dataset.f === f && (x.dataset.u || '') === u && (x.dataset.con || '') === con) || null;
 A['adjuntar'] = el => {
-  const form = el.closest('form'); if (!form) return;
+  const form = el.closest('form'); if (!form || !F[form.dataset.f]) return;
+  const destino = { f: form.dataset.f, u: form.dataset.u || '', con: form.dataset.con || '' };
+  const escrito = (form.querySelector('textarea[name="text"]') || {}).value || '';
   const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'image/*,.heic,.heif,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.odt,.ods'; inp.style.display = 'none';
+  inp.type = 'file'; inp.accept = 'image/*,.heic,.heif,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.odt,.ods';
+  inp.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
   document.body.appendChild(inp);
   inp.addEventListener('change', async () => {
     const file = inp.files && inp.files[0]; inp.remove(); if (!file) return;
-    el.disabled = true; el.classList.add('bajando');
+    const boton = () => { const f = formDelChat(destino); return f && f.querySelector('.chat-clip'); };
+    const ocupado = si => { const b = boton(); if (b){ b.disabled = si; b.classList.toggle('bajando', si); } };
+    ocupado(true);
     try {
-      toast(Adjuntos.esFoto(file) ? 'Preparando la foto…' : 'Preparando el archivo…', 'upload');
+      toast(Adjuntos.esFoto(file) ? 'Subiendo la foto…' : 'Subiendo el archivo…', 'upload');
       const adj = await Adjuntos.preparar(file);
-      let h = form.querySelector('input[name="adj"]');
-      if (!h){ h = document.createElement('input'); h.type = 'hidden'; h.name = 'adj'; form.appendChild(h); }
-      h.value = JSON.stringify(adj);
-      const t = form.querySelector('textarea[name="text"]'); if (t) t.required = false;
-      form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable:true, bubbles:true }));
-      h.remove(); if (t) t.required = true;
+      const vivo = formDelChat(destino), t = vivo && vivo.querySelector('textarea[name="text"]');
+      const d = { text: (t && t.value.trim()) ? t.value : escrito, adj: JSON.stringify(adj) };
+      const r = F[destino.f](d, vivo || { dataset: { ...destino } });
+      if (r && r.then) await r;
+      if (t){ t.value = ''; if (typeof ajustarCaja === 'function') ajustarCaja(t); }
+      if (!Salida.sinSenal()) toast(adj.mini ? 'Foto enviada' : 'Archivo enviado', 'check');
     } catch(e){ toast(e.message || 'No se pudo mandar el archivo', 'alert'); }
-    finally { el.disabled = false; el.classList.remove('bajando'); }
+    finally { ocupado(false); }
   }, { once:true });
   inp.click();
 };
@@ -146,3 +166,106 @@ A['adj-abrir'] = async el => {
   if (await guardarArchivoEnEquipo(v, adjAbierto.nombre, tipo)) toast('Archivo guardado en este equipo', 'download');
 };
 A['adj-guardar'] = async () => { if (adjAbierto && await guardarArchivoEnEquipo(adjAbierto.v, adjAbierto.nombre, adjAbierto.tipo)) toast('Guardado en este equipo', 'download'); };
+
+/* =========================================================
+   MENSAJES QUE SALEN SOLOS AL VOLVER LA SEÑAL (pedido de Claudio,
+   11-10-2026; la idea, de resumable.js, 4.7k★ en GitHub; el código es
+   propio). Como en WhatsApp: sin internet, el mensaje se ve igual en la
+   conversación, con un RELOJITO al lado de la hora, y sale solo cuando
+   vuelve la señal; ahí el relojito desaparece.
+     · Con la app abierta, Firebase guarda lo que no pudo mandar y lo manda
+       al reconectar. Acá solo se mira cuándo llegó, para sacar el relojito.
+     · Si la app se cierra antes, lo que estaba esperando queda anotado en
+       este equipo (bhc.salida.v1; la foto o el archivo, en el almacén de
+       fotos del equipo). Al volver a abrirla, cuando ya llegaron las
+       conversaciones de la base, lo que no está se vuelve a mandar solo.
+     · Lo que la base rechaza (no por falta de señal) no se reintenta: se
+       avisa, como cualquier otro guardado.
+     · Lo anotado guarda solo lo que ya iba en el mensaje, y es de quien lo
+       escribió: al cerrar sesión se borra, y a los 3 días también.
+   ========================================================= */
+const Salida = {
+  KEY: 'bhc.salida.v1', lista: null, enCurso: new Set(), conectado: null, oyendo: false, revisando: false,
+  CARPETAS: { privados: /^pv\/privados/, dms: /^pv\/dms\// },
+  cargar(){ if (this.lista) return this.lista; try { this.lista = JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch(e){ this.lista = {}; } return this.lista; },
+  grabar(){ try { localStorage.setItem(this.KEY, JSON.stringify(this.lista || {})); } catch(e){} },
+  nube: () => typeof Nube !== 'undefined' && Nube.activa() && !!Nube.db && !!Nube.uid,
+  pendiente(id){ return !!(id && this.cargar()[id]); },
+  sinSenal(){ return this.conectado === false || (typeof navigator !== 'undefined' && navigator.onLine === false); },
+  oir(){
+    if (this.oyendo || !this.nube()) return; this.oyendo = true;
+    Nube.db.ref('.info/connected').on('value', snap => { this.conectado = snap.val() === true; if (this.conectado) setTimeout(() => this.revisar(), 1500); });
+  },
+  /* fn hace el Store.cambiar y devuelve { h, m }: la conversación y el mensaje nuevo. */
+  vigilar(col, fn){
+    const antes = Object.assign({}, (typeof Nube !== 'undefined' && Nube.enviado) || {});
+    const r = fn();
+    if (!r || !r.m || !r.h || !this.nube()) return r;
+    this.oir();
+    const promesas = Object.entries(Nube.enviado || {}).filter(([g, p]) => antes[g] !== p && this.CARPETAS[col].test(g)).map(([, p]) => p);
+    const a = leerAdj(r.m.adj);
+    if (a && Adjuntos.subiendo[a.id]) promesas.unshift(Adjuntos.subiendo[a.id]);
+    const { msgs, ...hilo } = r.h;
+    this.cargar()[r.m.id] = { col, hilo, msg:r.m, de:Nube.uid, at:Date.now() };
+    this.grabar();
+    /* Sin nada en viaje (la app todavía no terminó de conectarse), queda
+       anotado y lo manda revisar() cuando llegan las conversaciones. */
+    if (promesas.length) this.esperar(r.m.id, promesas);
+    if (this.sinSenal()) toast(a ? 'Sin señal: queda esperando y sale sola cuando vuelva la conexión' : 'Sin señal: el mensaje sale solo cuando vuelva la conexión', 'clock');
+    return r;
+  },
+  esperar(id, promesas){
+    this.enCurso.add(id);
+    Promise.all(promesas).then(rs => {
+      this.enCurso.delete(id);
+      const mal = rs.find(x => x && x.ok === false);
+      if (mal && this.cargar()[id]) toast('Un mensaje no se pudo mandar: ' + mal.msg, 'alert');
+      delete this.cargar()[id]; this.grabar();
+      if (typeof refrescarPronto === 'function') refrescarPronto();
+    });
+  },
+  /* Al abrir la app (y al volver la señal): lo que quedó de antes. */
+  listas(){
+    if (!this.nube() || !Nube.arrancada || !Nube.esperados || !Nube.listos) return false;
+    return [...Nube.esperados].filter(k => /^pv\/(privados|dms)/.test(k)).every(k => Nube.listos.has(k));
+  },
+  async revisar(){
+    const L = this.cargar(), ahora = Date.now();
+    if (this.revisando || !Object.keys(L).length || !this.listas()) return;
+    this.revisando = true;
+    try {
+      for (const [id, e] of Object.entries(L)){
+        if (this.enCurso.has(id)) continue;
+        if (!e || e.de !== Nube.uid){ if (!e || ahora - (e.at || 0) > 3 * DIA){ delete L[id]; this.grabar(); } continue; }
+        if (ahora - (e.at || 0) > 3 * DIA){ delete L[id]; this.grabar(); continue; }
+        const lista = Store.s[e.col] || [], h = lista.find(x => x && x.id === e.hilo.id);
+        /* Ya está en la base: llegó antes de que se cerrara la app. */
+        if (h && aLista(h.msgs).some(m => m && m.id === id)){ delete L[id]; this.grabar(); continue; }
+        const a = leerAdj(e.msg.adj);
+        if (a){
+          const d = await Fotos.sacar(a.id, false);
+          if (d) Adjuntos.subir(a.id, d, { nombre:a.nombre, tipo:a.tipo, at:e.at, vence:a.vence || e.at + ADJ.diasSinBajar * DIA });
+        }
+        this.vigilar(e.col, () => {
+          let r = null;
+          Store.cambiar(s => {
+            let hh = (s[e.col] = s[e.col] || []).find(x => x && x.id === e.hilo.id);
+            if (!hh){ hh = { ...e.hilo, msgs:[] }; s[e.col].push(hh); }
+            const ms = listaDe(hh, 'msgs');
+            if (!ms.some(m => m && m.id === id)){ ms.push(e.msg); ms.sort((x, y) => (x.createdAt || x.at || 0) - (y.createdAt || y.at || 0)); }
+            r = { h:hh, m:e.msg };
+          });
+          return r;
+        });
+      }
+    } finally { this.revisando = false; }
+  },
+  borrarTodo(){ this.lista = {}; this.enCurso.clear(); try { localStorage.removeItem(this.KEY); } catch(e){} },
+};
+/* El relojito, al lado de la hora del mensaje que todavía no salió. */
+const relojMsg = m => m && Salida.pendiente(m.id) ? `<span class="msg-reloj" title="Sin señal: sale solo cuando vuelva la conexión" aria-label="Esperando señal">${I('clock')}</span>` : '';
+/* Se revisa al cambiar algo, al volver la señal y, mientras quede algo
+   esperando, cada 4 segundos (así arranca solo al abrir la app). */
+Store.alCambiar(() => { if (Object.keys(Salida.cargar()).length) setTimeout(() => Salida.revisar(), 0); });
+setInterval(() => { Salida.oir(); if (Object.keys(Salida.cargar()).length) Salida.revisar(); }, 4000);
+window.addEventListener('online', () => setTimeout(() => Salida.revisar(), 2000));
