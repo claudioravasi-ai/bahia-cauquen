@@ -64,7 +64,9 @@ const VENTANAS_SUPERVISOR = new Set(['supervisor', 'garita', 'bitacora', 'turnos
   'hotel-vivo', 'hotel-traslados', 'hotel-eventos', 'obras', 'proveedores', 'vuelos', 'cruceros', 'agenda', 'documentos',
   'recoleccion', 'mensajeria', 'sismos', 'ushuaia', 'municipio', 'manual', 'legal', 'informe-servicio',
   /* 08-10: buscar un vecino (lote, dirección y teléfonos), igual que la garita */
-  'vecinos']);
+  'vecinos',
+  /* 12-10: los ingresos frecuentes, solo para mirar (sin el código ni el QR) */
+  'frecuentes']);
 /* EL PROPIETARIO A DISTANCIA (07-10-2026): su lote está alquilado (o no vive
    en el barrio). Ve lo que le toca como dueño; el día a día es del inquilino
    (ver esPropDistancia en core.js). */
@@ -1424,34 +1426,51 @@ A['volver'] = el => { const i = +el.dataset.i; if (i === 0 && PILA.length === 1)
 A['cerrar-ventana'] = () => cerrarVentana();
 A['cerrar-hoja'] = () => cerrarHoja();
 A['bienvenida'] = el => { pintarBienvenida(el.dataset.v); window.scrollTo({ top:0 }); };
+/* TU CUENTA (rediseño, pedido de Claudio, 12-10-2026: "muy monocromática;
+   los avisos en este equipo ocupan un espacio grande y central y debería ser
+   al revés; los botones, más innovadores e intuitivos"). Ideas de los
+   paneles de ajustes de iOS y de shadcn/ui (80k★, MIT), código propio:
+     · arriba una tarjeta de color con la foto, el nombre, el lote y el rol;
+     · los ajustes de ESTE equipo en tres renglones finitos: la pantalla
+       (sol, auto y luna), los avisos (un renglón con su estado y un botón)
+       y el sonido (un interruptor);
+     · las acciones como fichas de colores en dos columnas, con su ícono que
+       se mueve al tocarlas;
+     · "Cerrar sesión" aparte, abajo, en rojo. */
+const ROL_CUENTA = { vecino:['Vecino/a', 'home', 'ok'], hotel:['Hotel · recepción', 'star', 'wood'], supervisor:['Supervisión de la guardia', 'eye', 'accent'], admin:['Administración', 'sliders', 'accent'], guardia:['Garita', 'shield', 'brand'] };
 A['mi-cuenta'] = () => { const u = yo(); Cuenta.enSub = false;
   setTimeout(() => { const d = $('#hoja'); if (d && $('#hojaTitulo')?.textContent === 'Tu cuenta') d.dataset.origen = 'cuenta'; }, 0);
-  hoja('Tu cuenta', `<div class="row" style="margin-bottom:14px">${avatar(u, 'lg')}<div class="grow"><b style="font-size:16px">${esc(u.nombre)}</b>
-      <div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
-      <div class="muted tiny">${{ vecino:'Vecino/a', hotel:'Cuenta institucional del hotel · la usa la recepción', supervisor:'Supervisión de la guardia · solo para mirar la garita', admin:'Administración', guardia:'Garita' + (turnoAbierto() ? ' · turno ' + esc(turnoAbierto().turno) + ': ' + esc(aLista(turnoAbierto().guardias).join(', ')) : '') }[modoActivo()]}${modoActivo() === 'vecino' ? ' · la app es personal; el voto y las expensas son del lote' : ''}</div></div></div>
-    ${puedeAdministrar() ? superficie({ a:'cambiar-modo', icon: modoActivo() === 'admin' ? 'sliders' : 'home', color: modoActivo() === 'admin' ? 'accent' : 'ok',
-      t: modoActivo() === 'admin' ? 'Estás como Administración' : 'Estás como vecino/a',
-      s: modoActivo() === 'admin' ? 'Tocá para pasar a tu vista de vecino/a' : 'Tocá para volver al panel de administración', cls:'acento' }) : ''}
-    <div class="card" style="margin-bottom:8px"><div class="lbl">Modo de pantalla · ahora está en ${modoActual()}</div>
-      <div class="seg">${[['auto', 'Automático', 'sunrise'], ['light', 'Día', 'sun'], ['dark', 'Noche', 'moon']].map(([k, t, ic]) =>
-        `<label><input type="radio" name="temaRapido" ${(Store.sesion.tema || 'auto') === k ? 'checked' : ''} data-a="tema" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>
-      <div class="ayuda">En automático sigue la salida y la puesta del sol en Ushuaia (hoy: ${Clima.sol().sale} a ${Clima.sol().pone}).</div></div>
-    ${(() => { const notif = 'Notification' in window ? Notification.permission : 'no';
-      /* Los avisos del celular y el sonido pasaron de "Mi casa" a acá (28-09): todo lo de ESTE equipo, en un solo lugar. */
-      return `<div class="card" style="margin-bottom:8px"><div class="lbl">Avisos en este equipo</div>
-        ${typeof Push !== 'undefined' && Push.estado() !== 'demo' ? tarjetaPush(false) : notif === 'granted' ? '<p class="small" style="margin:0">Activados.</p>' : notif === 'no' ? '<p class="small muted" style="margin:0">Este navegador no los permite.</p>' : `<button class="btn btn-sm btn-sec" data-a="pedir-notifs">${I('bell')}Activar avisos</button>`}
-        <label class="check" style="margin-top:10px"><input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span>Sonido cuando escribe la guardia o la Administración</span></label></div>`; })()}
-    ${(() => { const otros = esGuardia() || esHotel() || esSupervisor() ? [] : Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id);
-      return otros.length ? `<div class="card plana small" style="margin-bottom:8px">${I('users')} En ${esc(u.casa)} también tienen cuenta: ${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}. Entre todos son un solo lote: un voto y una expensa. <button class="link" data-a="abrir" data-v="perfil">Ver quiénes</button></div>` : ''; })()}
-    ${superficie({ a:'cambiar-clave', icon:'key', color:'brand', t: Nube.activa() ? 'Cambiar mi contraseña' : 'Cambiar mi clave', s:'Cuando quieras, desde acá' })}
-    ${esGuardia() ? '' : superficie({ a:'cambiar-email', icon:'mail', color:'sky', t:'Cambiar mi correo', s:esc(u.email) })}
-    ${superficie({ a:'abrir-manual', icon:'book', color:'accent', t:'Manual de uso', s:'Paso a paso, por capítulos' })}
-    ${typeof Asistente !== 'undefined' && Asistente.paraMi() && Asistente.soportado() ? superficie({ a:'asistente-ajuste', icon:'volume', color:'sky', t: Asistente.permiso() === 'si' ? 'Asistente por voz: activado' : 'Asistente por voz: apagado', s: Asistente.permiso() === 'si' ? 'Tocá el escudo y pedile algo. Tocá acá para apagarlo en este equipo.' : 'Pedirle cosas a la app con la voz. Tocá para activarlo en este equipo.' }) : ''}
-    ${esGuardia() || esHotel() || esSupervisor() ? '' : superficie({ a:'abrir-ayuda', icon:'info', color:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa en la app' })}
-    ${esGuardia() || esHotel() || esSupervisor() ? '' : superficie({ a:'mis-datos', icon:'download', color:'sky', t:'Mis datos personales', s:'Ver todo lo que la app guarda de vos, en PDF, o pedir que se borre (Ley 25.326)' })}
-
-    ${superficie({ a:'actualizar-app', icon:'refresh', color:'warn', t:'Actualizar la app', s:'Si algo quedó raro: baja todo de nuevo. No borra datos.' })}
-    ${superficie({ a:'salir', icon:'logout', color:'danger', t:'Cerrar sesión', s:'Salís de esta app en este equipo', cls:'peligro' })}`); };
+  const modo = modoActivo(), [rolT, rolI, rolC] = ROL_CUENTA[modo] || ROL_CUENTA.vecino, t = turnoAbierto();
+  const nota = { vecino:'La app es personal; el voto y las expensas son del lote', hotel:'Cuenta institucional: la usa la recepción', supervisor:'Solo para mirar la garita', admin:'', guardia: t ? `Turno ${esc(t.turno)}: ${esc(aLista(t.guardias).join(', '))}` : '' }[modo] || '';
+  const ficha = ({ a, v = '', ic, c, t:tt, s:ss = '' }) => `<button type="button" class="cu-f c-${c}" data-a="${a}"${v ? ` data-v="${v}"` : ''}><span class="cu-fi">${I(ic)}</span><span class="cu-ft"><b>${tt}</b>${ss ? `<small>${ss}</small>` : ''}</span></button>`;
+  const vozOk = typeof Asistente !== 'undefined' && Asistente.paraMi() && Asistente.soportado(), vozSi = vozOk && Asistente.permiso() === 'si';
+  const deVecino = !(esGuardia() || esHotel() || esSupervisor());
+  const otros = deVecino ? Store.s.users.filter(x => x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id) : [];
+  hoja('Tu cuenta', `<div class="cu-hero r-${rolC}">
+      <span class="cu-av">${avatar(u, 'lg')}</span>
+      <div class="cu-quien"><b>${esc(u.nombre)}</b><span>${esc(u.casa)}${u.email ? ' · ' + esc(u.email) : ''}</span>
+        <em class="cu-rol">${I(rolI)}${rolT}</em>${nota ? `<small>${nota}</small>` : ''}</div></div>
+    ${puedeAdministrar() ? `<button type="button" class="cu-modo ${modo === 'admin' ? 'es-admin' : 'es-vecino'}" data-a="cambiar-modo">
+        <span class="cu-modo-sw" aria-hidden="true"><i>${I('home')}</i><i>${I('sliders')}</i></span>
+        <span class="cu-ft"><b>${modo === 'admin' ? 'Estás como Administración' : 'Estás como vecino/a'}</b><small>Tocá para pasar a ${modo === 'admin' ? 'tu vista de vecino/a' : 'la Administración'}</small></span></button>` : ''}
+    <div class="cu-equipo"><div class="cu-et">${I('smartphone')}En este equipo</div>
+      <div class="cu-r"><span class="cu-ri c-sky">${I(modoActual() === 'noche' ? 'moon' : 'sun')}</span><span class="cu-rt"><b>Pantalla</b><small>Ahora en ${modoActual()} · el sol de hoy: ${Clima.sol().sale} a ${Clima.sol().pone}</small></span>
+        <span class="cu-tema" role="radiogroup" aria-label="Modo de pantalla">${[['light', 'Día', 'sun'], ['auto', 'Automático', 'sunrise'], ['dark', 'Noche', 'moon']].map(([k, tt, ic]) =>
+          `<label title="${tt}"><input type="radio" name="temaRapido" ${(Store.sesion.tema || 'auto') === k ? 'checked' : ''} data-a="tema" data-v="${k}" aria-label="${tt}"><span>${I(ic)}</span></label>`).join('')}</span></div>
+      ${pushCuenta()}
+      <label class="cu-r cu-sw"><span class="cu-ri c-accent">${I('volume')}</span><span class="cu-rt"><b>Sonido</b><small>Cuando escribe la guardia o la Administración</small></span>
+        <input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span class="cu-int" aria-hidden="true"></span></label></div>
+    ${otros.length ? `<div class="cu-lote">${I('users')}<span>En ${esc(u.casa)} también tienen cuenta: <b>${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}</b>. Un solo lote: un voto y una expensa. <button class="link" data-a="abrir" data-v="perfil">Ver quiénes</button></span></div>` : ''}
+    <div class="cu-fichas">
+      ${ficha({ a:'cambiar-clave', ic:'key', c:'brand', t: Nube.activa() ? 'Contraseña' : 'Mi clave', s:'Cambiarla' })}
+      ${esGuardia() ? '' : ficha({ a:'cambiar-email', ic:'mail', c:'sky', t:'Mi correo', s:'Cambiarlo' })}
+      ${ficha({ a:'abrir-manual', ic:'book', c:'accent', t:'Manual de uso', s:'Paso a paso' })}
+      ${vozOk ? ficha({ a:'asistente-ajuste', ic:'volume', c: vozSi ? 'ok' : 'wood', t:'Asistente por voz', s: vozSi ? 'Activado · tocá para apagar' : 'Apagado · tocá para activar' }) : ''}
+      ${deVecino ? ficha({ a:'abrir-ayuda', ic:'info', c:'ok', t:'Preguntas frecuentes', s:'Cómo se hace cada cosa' }) : ''}
+      ${deVecino ? ficha({ a:'mis-datos', ic:'download', c:'sky', t:'Mis datos', s:'Verlos, en PDF, o pedir que se borren' }) : ''}
+      ${ficha({ a:'actualizar-app', ic:'refresh', c:'warn', t:'Actualizar la app', s:'Si algo quedó raro · no borra datos' })}
+    </div>
+    <button type="button" class="cu-salir" data-a="salir">${I('logout')}<span><b>Cerrar sesión</b><small>Salís de la app en este equipo</small></span></button>`); };
 
 /* Una pantalla chica con todo lo que hace falta para entender un problema sin
    tener que adivinar: quién sos para la app, en qué modo estás, qué versión

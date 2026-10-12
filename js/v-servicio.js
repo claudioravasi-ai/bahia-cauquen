@@ -414,11 +414,12 @@ A['correo-sale'] = async el => {
 A['correo-aviso'] = () => { Mensajeria.prender(!Mensajeria.encendido()); Mensajeria.revisar(); refrescar(); toast(Mensajeria.encendido() ? 'Los camiones de correo se van a ver cuando entren' : 'Listo: solo vas a ver los que van a tu casa', 'mail'); };
 A['correo-probar'] = el => { if (el.dataset.v === 'timbre') Mensajeria.timbre(); else Mensajeria.bocina(); };
 /* En la garita, justo abajo del camión de la basura: el botón y los que están adentro. */
-function bandaCorreos(garita = false){
+/* sinBoton: en la portada de la garita el botón lo pone la tira de arriba (tiraGarita, 12-10-2026). */
+function bandaCorreos(garita = false, sinBoton = false){
   const ls = Mensajeria.adentro().slice().reverse();
   const sinReglas = typeof Nube !== 'undefined' && Nube.activa() && Nube.sinPermiso && Nube.sinPermiso.has('mensajeria');
   const alerta = sinReglas ? aviso('danger', 'alert', 'Los correos no se guardan en la base del barrio', 'Falta publicar las reglas nuevas de Firebase (reglas-firebase.txt, paso 2 de PASO-A-PASO). Hasta entonces el camión de correo no les llega a los vecinos y se pierde al recargar. Si ya las publicaste, la app lo vuelve a probar sola cada minuto, o tocá Recargar.', `<button class="btn btn-xs btn-sec" onclick="location.reload()">${I('refresh')}Recargar</button>`) : '';
-  const boton = alerta + (garita ? `<button class="superficie" data-a="correo-menu"><span class="ic ic-sky">${I('mail')}</span><span class="txt"><b>Correos</b><small>Registrar la entrada: Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro</small></span>${I('right')}</button>` : '');
+  const boton = alerta + (garita && !sinBoton ? `<button class="superficie" data-a="correo-menu"><span class="ic ic-sky">${I('mail')}</span><span class="txt"><b>Correos</b><small>Registrar la entrada: Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro</small></span>${I('right')}</button>` : '');
   if (!ls.length) return boton;
   return `${boton}<span id="garCorreos" class="ancla"></span>${ls.map(v => {
     const d = veGarita() ? Mensajeria.detalle(v.id) : { lotes:[], patente:'' }, min = Math.max(1, Math.round((Date.now() - v.entra) / MIN));
@@ -475,7 +476,7 @@ const ultimoMovFrec = f => aLista(Store.s.bitacora).find(b => b && b.frecId === 
 R.frecuentes = {
   titulo:'Ingresos frecuentes', icon:'qr', color:'brand', ancha:true, sub:'Proveedores y personal que entran siempre, con QR fijo',
   render(q){
-    if (!esStaff()) return vacio('lock', 'Solo para la garita y la Administración.');
+    if (!esStaff() && !esSupervisor()) return vacio('lock', 'Solo para la garita, la Administración y la supervisión.');
     const qq = normTxt(q || '');
     const ls = frecuentes().filter(f => !qq || normTxt([f.nombre, f.empresa, f.destino, f.patente, TIPOS_FREC[f.tipo]?.n].join(' ')).includes(qq))
       .sort((a, b) => (!!a.baja - !!b.baja) || a.nombre.localeCompare(b.nombre));
@@ -486,10 +487,10 @@ R.frecuentes = {
         return `<div class="card" style="padding:13px 14px${f.baja ? ';opacity:.55' : ''}"><div class="pase"><span class="ic ic-${v.ok && !v.aviso ? 'ok' : v.ok ? 'warn' : 'danger'}">${I(t.icon)}</span>
           <div class="datos"><b>${esc(f.nombre)}${f.empresa ? ' · ' + esc(f.empresa) : ''}</b>
             <span>${esc(t.n)} → ${esc(f.destino || 'Barrio')}${f.patente ? ' · ' + esc(f.patente) : ''}${aLista(f.dias).length ? ' · ' + aLista(f.dias).map(d => DIAS[d]).join(' ') : ''}${f.desde ? ` · ${f.desde}–${f.hasta}` : ''}</span>
-            <span class="tiny muted">${esc(f.codigo)}${f.vence ? ' · vence ' + fechaCorta(f.vence) : ''}${ult ? ' · último movimiento ' + hace(ult.at) : ''}${v.motivo ? ' · ' + esc(v.motivo) : ''}</span></div></div>
+            <span class="tiny muted">${esSupervisor() ? 'Ingreso frecuente' : esc(f.codigo)}${f.vence ? ' · vence ' + fechaCorta(f.vence) : ''}${ult ? ' · último movimiento ' + hace(ult.at) : ''}${v.motivo ? ' · ' + esc(v.motivo) : ''}</span></div></div>
           <div class="btns" style="margin-top:10px">
             ${!f.baja && esGuardia() ? `<button class="btn btn-xs btn-ok" data-a="frec-mov" data-id="${f.id}" data-v="in">${I('login')}Entra</button><button class="btn btn-xs btn-sec" data-a="frec-mov" data-id="${f.id}" data-v="out">${I('logout')}Sale</button>` : ''}
-            <button class="btn btn-xs btn-sec" data-a="frec-qr" data-id="${f.id}">${I('qr')}QR</button>
+            ${esSupervisor() ? '' : `<button class="btn btn-xs btn-sec" data-a="frec-qr" data-id="${f.id}">${I('qr')}QR</button>`}
             ${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="frec-editar" data-id="${f.id}">${I('edit')}Editar</button><button class="btn btn-xs btn-danger-soft" data-a="frec-borrar" data-id="${f.id}">${I('trash')}Borrar</button>` : ''}</div></div>`; }).join('')
         : vacio('qr', q ? 'Nadie coincide con esa búsqueda.' : 'Todavía no hay ingresos frecuentes cargados.')}`;
   },
@@ -1071,6 +1072,26 @@ REGLAS.push({ id:'llegada-3min', n:'Llegó sin aviso → se insiste a los 3 min'
       const casa = l.lote || usuario(l.hostId)?.casa || '';
       n += marca(s, `lleg3-${l.id}`, () => notificar(s, { para:paraElLote(casa, l.hostId), titulo:`Sigue esperando en la garita: ${l.nombre}`,
         texto:`${l.motivo || 'Visita'}${casa ? ' · ' + casa : ''} · hace ${Math.floor((ahora - l.at) / MIN)} minutos · ¿Lo dejamos pasar?`, icon:'gate', color:'danger', urgente:true, link:'llegada:' + l.id, ref:'llegadas:' + l.id }));
+    }); return n; } });
+/* =========================================================
+   LA VISITA ANUNCIADA QUE NO VINO (pedido de Claudio, 12-10-2026)
+   El estado lo calcula estadoPase con la hora (js/v-inicio.js): a las 2 h
+   de la hora anunciada "No ingresó"; pasada la hora de salida "Cancelado ·
+   no ingresó" y sale de la pantalla. Esta regla deja la constancia en el
+   libro de guardia, una sola vez por visita y por día, aunque haya varios
+   equipos abiertos (la marca la reclama uno solo).
+   ========================================================= */
+REGLAS.push({ id:'visita-no-ingreso', n:'Visita anunciada que no vino → "No ingresó" y a la bitácora', d:'A las 2 horas de la hora anunciada, la visita que no llegó pasa sola a "No ingresó". Pasada la hora de salida queda cancelada, se anota en la bitácora ("Visita anunciada que no ingresó") y sale de la pantalla de la garita.',
+  run(s, hoy){ let n = 0;
+    pasesDelDia(hoy).filter(p => estadoPase(p, hoy) === 'nollego').forEach(p => { const casa = usuario(p.hostId)?.casa || p.casa || '';
+      n += marca(s, `noing-${p.id}-${hoy}`, () => s.bitacora.unshift({ id:idAutomatico(), autor:'sistema', tipo:'novedad',
+        texto:`Visita anunciada que no ingresó: ${p.nombre || 'visita'}${casa ? ' → ' + casa : ''} (anunciada de ${p.desde} a ${p.hasta} h). El pase de hoy quedó cancelado.`, at:Date.now() }));
+    }); return n; } });
+REGLAS.push({ id:'visita-no-ingreso-aviso', n:'Visita que no llegó → aviso al vecino con "Cambiar el horario" o "Ya no viene"', d:'A las 2 horas de la hora anunciada, si la visita no entró, al vecino que la anunció le llega el aviso con los dos botones (también en la notificación del celular). Se va solo si la visita entra, se cancela o pasa la hora de salida.',
+  run(s, hoy){ let n = 0;
+    pasesDelDia(hoy).filter(p => p.hostId && !p.borrado && estadoPase(p, hoy) === 'noingreso').forEach(p => {
+      n += marca(s, `noingav-${p.id}-${hoy}`, () => notificar(s, { para:p.hostId, ref:'pases:' + p.id, titulo:`${p.nombre || 'Tu visita'} todavía no llegó`,
+        texto:`La esperabas desde las ${p.desde} h. ¿Le cambiás el horario o ya no viene?`, icon:'clock', color:'warn', link:'visitas:no~' + p.id, sonido:true }));
     }); return n; } });
 REGLAS.push({ id:'paquetes-24h', n:'Paquetes → aviso si pasan 24 h sin retirar', d:'Push al lote cada 8 h (de 9 a 21 h) hasta que alguien del lote abre Mis paquetes o lo retira.',
   run(s){ let n = 0; const ahora = Date.now(), h = new Date().getHours();

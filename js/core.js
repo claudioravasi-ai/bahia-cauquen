@@ -699,6 +699,8 @@ const AVISO_RESUELTO = {
   pagos:           x => x.estado !== 'informado',
   users:           x => x.estado !== 'pendiente',
   reclamos:        x => x.estado !== 'abierto',
+  /* "… todavía no llegó" (12-10-2026): se va si entró, se canceló, la borraron o pasó la hora. */
+  pases:           x => !!x.cancelado || !!x.borrado || (typeof estadoPase === 'function' && estadoPase(x) !== 'noingreso'),
 };
 const HORAS_AVISO_REF = { llegadas:6 };
 function avisoResuelto(n){

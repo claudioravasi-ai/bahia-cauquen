@@ -215,12 +215,34 @@ function centroDeControl({ s, hoy, u, g, t, lista, adentro, esperados, petPend, 
   const rondasHoy = registrosTurno().filter(r => (r.cerradoAt || ahora) >= ini).flatMap(r => policiasDe(r)).flatMap(p => aLista(p.rondas)).filter(r => r && (r.inicio || 0) >= ini);
   const incompletas = rondasHoy.filter(r => r.incompleta).length;
   const revisadas = solas.filter(a => typeof revisionDeHoy === 'function' && revisionDeHoy(a)).length;
-  const kpi = (lbl, v, x, tono = '') => `<div class="cc-k"><small>${lbl}</small><b>${v}</b><span class="${tono}">${x}</span></div>`;
-  const numeros = `<div class="cc-kpis">
-    ${kpi('Ingresos hoy', ingHoy, prom ? `promedio de la semana: ${prom} por día` : 'sin datos de la semana')}
-    ${kpi('Adentro ahora', adentro, largas ? `${plural(largas, 'hace más de 4 h')}` : `${plural(esperados, 'visita por llegar', 'visitas por llegar')}`, largas ? 't-warn' : '')}
-    ${kpi('Rondas del policía hoy', rondasHoy.length, incompletas ? `${plural(incompletas, 'incompleta', 'incompletas')}` : rondasHoy.length ? 'todas completas' : 'todavía ninguna', incompletas ? 't-warn' : '')}
-    ${kpi('Casas solas', solas.length ? `${revisadas} de ${solas.length}` : '0', solas.length ? (revisadas < solas.length ? `${solas.length - revisadas} sin revisar hoy` : 'todas revisadas') : 'nadie de viaje', solas.length && revisadas < solas.length ? 't-warn' : '')}
+  /* EL DÍA EN NÚMEROS, INTERACTIVO (pedido de Claudio, 12-10-2026: "más
+     innovador e interactivo, con gestos de los íconos como las vans";
+     ideas de tremor, 16k★, y de los íconos animados de meteocons, 1.6k★,
+     en GitHub; el código es propio). Cuatro tarjetas que se tocan: cada
+     una lleva a donde está el detalle, su ícono hace un gesto (la puerta
+     se empuja, la gente respira, el escudo gira, la llave se mueve), los
+     números suben contando y cada una trae su dibujito: las barras de la
+     semana, el anillo de quién está adentro, un punto por ronda y la barra
+     de las casas revisadas. */
+  const semana = [...porDia].reverse().concat(ingHoy), tope = Math.max(1, ...semana);
+  const dif = ingHoy - prom;
+  const barras = `<span class="dn-barras" aria-hidden="true">${semana.map((n, i) => `<i class="${i === semana.length - 1 ? 'hoy' : ''}" style="--h:${Math.max(8, Math.round(n / tope * 100))}%"></i>`).join('')}</span>`;
+  const anillo = p => `<svg class="dn-anillo" viewBox="0 0 36 36" aria-hidden="true"><circle class="f" cx="18" cy="18" r="15.5"/><circle class="v" cx="18" cy="18" r="15.5" pathLength="100" style="--p:${Math.max(0, Math.min(100, p))}"/></svg>`;
+  const puntos = rondasHoy.length ? `<span class="dn-puntos" aria-hidden="true">${rondasHoy.slice(0, 10).map(r => `<i class="${r.incompleta ? 'mal' : r.fin ? 'ok' : 'va'}"></i>`).join('')}</span>` : `<span class="dn-puntos vacio" aria-hidden="true"><i></i><i></i><i></i></span>`;
+  const barra = (a, b) => `<span class="dn-prog" aria-hidden="true"><i style="--p:${b ? Math.round(a / b * 100) : 0}%"></i></span>`;
+  const tarjeta = ({ k, c, ic, gesto, lbl, n, de = '', x, tono = '', dibujo, ir, vivo = false }) => `<button class="dn-t c-${c}${vivo ? ' vivo' : ''}" data-a="sup-ir" data-v="${ir[0]}" data-p="${ir[1] || ''}" aria-label="${esc(lbl)}: ${n}${de ? ' de ' + de : ''}. ${esc(x.replace(/<[^>]+>/g, ''))}">
+      <span class="dn-cab"><span class="dn-ic g-${gesto}">${I(ic)}</span>${I('right')}</span><small class="dn-lbl">${lbl}</small>
+      <span class="dn-medio"><b class="dn-num" data-n="${n}" data-k="dn-${k}">${n}</b>${de !== '' ? `<em>de ${de}</em>` : ''}${dibujo}</span>
+      <span class="dn-pie ${tono}">${x}</span></button>`;
+  const numeros = `<div class="dn">
+    ${tarjeta({ k:'ing', c:'sky', ic:'login', gesto:'empuja', lbl:'Ingresos hoy', n:ingHoy, dibujo:barras, ir:['garita', '#garIngresos'],
+      x: prom ? (dif > 0 ? `<b>▲ ${dif}</b> sobre el promedio (${prom})` : dif < 0 ? `<b>▼ ${-dif}</b> bajo el promedio (${prom})` : `igual al promedio (${prom})`) : 'sin datos de la semana' })}
+    ${tarjeta({ k:'adn', c:'ok', ic:'users', gesto:'respira', lbl:'Adentro ahora', n:adentro, dibujo:anillo(adentro + esperados ? adentro / (adentro + esperados) * 100 : 0), ir:['garita', '#garIngresos'], vivo: adentro > 0,
+      x: largas ? `<b>${plural(largas, 'hace más de 4 h')}</b>` : plural(esperados, 'visita por llegar', 'visitas por llegar'), tono: largas ? 't-warn' : '' })}
+    ${tarjeta({ k:'ron', c:'brand', ic:'shield', gesto:'gira', lbl:'Rondas del policía', n:rondasHoy.length, dibujo:puntos, ir:['turnos'],
+      x: incompletas ? `<b>${plural(incompletas, 'incompleta', 'incompletas')}</b>` : rondasHoy.length ? 'todas completas' : 'todavía ninguna hoy', tono: incompletas ? 't-warn' : '' })}
+    ${tarjeta({ k:'cas', c:'wood', ic:'lock', gesto:'llave', lbl:'Casas solas', n: solas.length ? revisadas : 0, de: solas.length ? solas.length : '', dibujo: barra(revisadas, solas.length), ir:['garita', '#garCasas'],
+      x: solas.length ? (revisadas < solas.length ? `<b>${solas.length - revisadas} sin revisar hoy</b>` : 'todas revisadas') : 'nadie de viaje', tono: solas.length && revisadas < solas.length ? 't-warn' : '' })}
   </div>${petPend ? `<p class="small cc-pet">${I('edit')} ${plural(petPend, 'pedido firmado de un vecino que la garita no recibió', 'pedidos firmados de vecinos que la garita no recibió')}. <button class="link" data-a="abrir" data-v="peticiones">Ver</button></p>` : ''}`;
   /* 3 · en vivo */
   const f = CC_FILTROS[ccFiltro] ? ccFiltro : 'todo', vivo = hoyBit.filter(b => f === 'todo' || ccTipo(b) === f).slice(0, 15);
@@ -257,13 +279,107 @@ A['cc-filtro'] = el => { if (!CC_FILTROS[el.dataset.v]) return; ccFiltro = el.da
   if (seg){ seg.style.setProperty('--pos', Object.keys(CC_FILTROS).indexOf(ccFiltro));
     seg.querySelectorAll('.cc-tab').forEach(b => { const on = b.dataset.v === ccFiltro; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
     setTimeout(refrescar, 220); } else refrescar(); };
+/* Tocar una tarjeta del día: abre la ventana y baja hasta lo que cuenta. */
+A['sup-ir'] = el => { const v = el.dataset.v, p = el.dataset.p; abrir(v);
+  if (p) setTimeout(() => { const d = document.querySelector(p); if (d) d.scrollIntoView({ behavior:'smooth', block:'start' }); }, 380); };
+/* Los números suben contando, solo cuando cambian (no en cada refresco). */
+const NUM_ANTES = {};
+function animarNumeros(raiz = document){
+  const quieto = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  raiz.querySelectorAll('.dn-num[data-k]').forEach(el => {
+    const k = el.dataset.k, n = +el.dataset.n || 0, de = NUM_ANTES[k] ?? 0; NUM_ANTES[k] = n;
+    if (quieto || de === n) return;
+    const t0 = performance.now(), dur = 650;
+    el.classList.add('cambia');
+    const paso = t => { const f = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - f, 3);
+      el.textContent = Math.round(de + (n - de) * e); if (f < 1) requestAnimationFrame(paso); else setTimeout(() => el.classList.remove('cambia'), 300); };
+    requestAnimationFrame(paso);
+  });
+}
+/* =========================================================
+   PARTES DE TURNO PARA DAR EL VISTO (rediseño, pedido de Claudio,
+   12-10-2026). Antes era una lista de renglones grises. Ahora, arriba,
+   cuántos partes de la semana ya tienen el visto (con su barra) y, abajo,
+   una tarjeta por parte: el sol o la luna según el turno, la franja
+   horaria dibujada, los guardias con sus iniciales, lo que pasó en ese
+   turno (incidentes, novedades y rondas) y el botón grande "Dar el visto"
+   con el ojo que parpadea. Ideas de react-chrono (4.2k★) y tabler (41k★),
+   código propio.
+   ========================================================= */
+function partesParaElVisto(){
+  const ps = typeof partesSinVisto === 'function' ? partesSinVisto() : []; if (!ps.length) return '';
+  const semana = registrosTurno().filter(t => t.cerradoAt && Date.now() - t.cerradoAt < 7 * DIA), hechos = Math.max(0, semana.length - ps.length);
+  const bit = aLista(Store.s.bitacora).filter(b => b && b.at);
+  const inic = n => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+  const tarjeta = r => {
+    const noche = typeof turnoEsNoche === 'function' && turnoEsNoche(r.turno), dur = Math.max(0, (r.cerradoAt - r.at) / HORA);
+    const del = bit.filter(b => b.at >= r.at && b.at <= r.cerradoAt && b.id !== r.id);
+    const inc = del.filter(b => b.tipo === 'incidente').length, nov = del.filter(b => b.tipo === 'novedad' && b.autor !== 'sistema').length;
+    const ron = policiasDe(r).reduce((n, p) => n + p.rondas.length, 0), gs = aLista(r.guardias);
+    const chip = (cls, ic, t) => `<span class="pv-chip ${cls}">${I(ic)}${t}</span>`;
+    return `<article class="pv-t ${noche ? 'noche' : 'dia'}">
+      <span class="pv-astro" aria-hidden="true">${I(noche ? 'moon' : 'sun')}</span>
+      <div class="pv-cuerpo">
+        <div class="pv-tit"><b>Turno ${esc(r.turno)}</b><small>${esc(relDia(isoDe(new Date(r.at))))}</small></div>
+        <div class="pv-reloj"><time>${hora(r.at)}</time><span class="pv-franja"><i style="--d:${Math.min(100, Math.round(dur / 12 * 100))}%"></i></span><time>${hora(r.cerradoAt)}</time><em>${dur >= 1 ? dur.toFixed(1).replace('.', ',').replace(',0', '') + ' h' : Math.round(dur * 60) + ' min'}</em></div>
+        <div class="pv-gente">${gs.map(n => `<span class="pv-av" title="${esc(n)}">${esc(inic(n))}</span>`).join('')}<span class="pv-nombres">${esc(gs.join(', ') || 'Sin nombres')}</span></div>
+        <div class="pv-chips">${chip(inc ? 'mal' : 'ok', inc ? 'alert' : 'check', inc ? plural(inc, 'incidente') : 'Sin incidentes')}${chip('', 'info', plural(nov, 'novedad', 'novedades'))}${ron ? chip('', 'shield', plural(ron, 'ronda')) : ''}</div>
+      </div>
+      <div class="pv-acc"><button class="btn btn-sm btn-sec" data-a="parte-ver" data-id="${esc(r.id)}">${I('file')}Leer</button>
+        <button class="pv-visto" data-a="visto-parte" data-id="${esc(r.id)}"><span class="pv-ojo">${I('eye')}</span>Dar el visto</button></div>
+    </article>`; };
+  return `<span id="ccPartes" class="ancla"></span><section class="pv">
+    <div class="pv-cab"><span class="pv-cab-ic" aria-hidden="true">${I('eye')}</span><div class="grow"><b>Partes de turno para dar el visto</b>
+      <small>${plural(ps.length, 'parte espera', 'partes esperan')} tu visto · ${hechos} de ${semana.length} visados esta semana</small>
+      <span class="pv-avance" aria-hidden="true"><i style="--p:${semana.length ? Math.round(hechos / semana.length * 100) : 0}%"></i></span></div>
+      <span class="pv-n">${ps.length}</span></div>
+    <div class="pv-lista">${ps.slice(0, 8).map(tarjeta).join('')}</div>
+    ${ps.length > 8 ? `<button class="cc-ver" data-a="abrir" data-v="turnos">${I('clock')}<span>Ver los ${ps.length - 8} partes más en Turnos</span>${I('right')}</button>` : ''}</section>`;
+}
+/* =========================================================
+   MIRAR (rediseño, pedido de Claudio, 12-10-2026). Antes eran diez tejas
+   iguales. Ahora: arriba la garita en vivo, grande, con lo que está
+   pasando; abajo tres grupos con su color (Seguridad, El barrio, Informes
+   y ayuda), cada puerta con su ícono que se mueve al tocarla. Se suman el
+   Historial de visitas y los Ingresos frecuentes, que ahora andan para la
+   supervisión. Ideas de homepage (23k★) y dashy (26k★), código propio.
+   ========================================================= */
+function mirarSupervision({ lista, adentro, esperados, petPend }){
+  const ingHoy = typeof movimientosDeHoy === 'function' ? movimientosDeHoy().filter(m => !m.sale && !m.no).length : 0;
+  const puerta = ({ v = '', a = 'abrir', ic, c, t, s, n = 0, alerta = false }) => `<button class="mi-p c-${c}${alerta ? ' alerta' : ''}" data-a="${a}" data-v="${v}">
+      <span class="mi-ic">${I(ic)}</span><span class="mi-txt"><b>${t}</b><small>${s}</small></span>${n ? `<span class="mi-n">${n > 99 ? '99+' : n}</span>` : I('right')}</button>`;
+  const grupo = (t, ic, puertas) => `<div class="mi-g"><div class="mi-gt">${I(ic)}${t}</div><div class="mi-ps">${puertas.join('')}</div></div>`;
+  return `${sec('Mirar')}<div class="mirar">
+    <button class="mi-hero" data-a="abrir" data-v="garita">
+      <span class="mi-vivo"><i></i>En vivo</span>
+      <span class="mi-hero-ic" aria-hidden="true">${I('gate')}</span>
+      <span class="mi-hero-txt"><b>Garita en vivo</b><small>Ingresos, avisos, camión, correos y policía, tal cual los ve la guardia</small></span>
+      <span class="mi-hero-nums"><span><b>${adentro}</b>adentro</span><span><b>${esperados}</b>por llegar</span><span><b>${ingHoy}</b>ingresos hoy</span></span>
+      <span class="mi-hero-ir">Abrir ${I('right')}</span></button>
+    ${grupo('Seguridad', 'shield', [
+      puerta({ v:'bitacora', ic:'book', c:'wood', t:'Bitácora', s:'El libro de guardia' }),
+      puerta({ v:'turnos', ic:'clock', c:'sky', t:'Turnos y policía', s:'Quién trabajó, rondas y servicios' }),
+      puerta({ v:'peticiones', ic:'edit', c:'warn', t:'Peticiones', s:'Pedidos firmados de los vecinos', n:petPend, alerta: petPend > 0 }),
+      puerta({ a:'hist-visitas-todo', ic:'users', c:'brand', t:'Historial de visitas', s:'Quién vino, cuándo y a qué lote' }),
+      puerta({ v:'frecuentes', ic:'qr', c:'accent', t:'Ingresos frecuentes', s:'Personal y proveedores de siempre' }) ])}
+    ${grupo('El barrio', 'home', [
+      puerta({ v:'vecinos', ic:'search', c:'sky', t:'Buscar un vecino', s:'Lote, dirección y teléfonos' }),
+      puerta({ v:'obras', ic:'wrench', c:'wood', t:'Obras', s:'Las del día y en curso' }),
+      puerta({ v:'proveedores', ic:'box', c:'accent', t:'Proveedores', s:'ART y seguro al día' }),
+      puerta({ v:'hotel-vivo', ic:'star', c:'wood', t:HOTEL_NOMBRE, s:'Vans, traslados y eventos (sin huéspedes)' }) ])}
+    ${grupo('Informes y ayuda', 'file', [
+      puerta({ v:'informe-servicio', ic:'file', c:'ok', t:'Informe mensual', s:'Turnos, rondas, emergencias y alertas' }),
+      puerta({ v:'manual', ic:'book', c:'accent', t:'Manual de uso', s:'El capítulo de la supervisión' }) ])}
+  </div>`;
+}
 R.supervisor = {
   titulo:'Supervisión', icon:'eye', color:'brand', ancha:true, sub:() => fechaLarga(hoyISO()),
+  alPintar(){ animarNumeros(); },
   render(){
     if (!esSupervisor()) return vacio('lock', 'Solo para la supervisión de la guardia.');
     const s = Store.s, hoy = hoyISO(), u = yo();
     const g = garitaEnLinea(), t = turnoAbierto();
-    const lista = pasesDelDia(hoy), adentro = lista.filter(p => estadoPase(p) === 'adentro').length, esperados = lista.filter(p => estadoPase(p) === 'esperado').length;
+    const lista = pasesEnPantalla(hoy), adentro = lista.filter(p => estadoPase(p) === 'adentro').length, esperados = lista.filter(p => estadoPase(p) === 'esperado').length;
     const petPend = aLista(s.peticiones).filter(p => p && p.estado === 'pendiente').length;
     const solas = typeof casasSolas === 'function' ? casasSolas(hoy) : [];
     const sos = typeof sosAbiertas === 'function' ? sosAbiertas() : [];
@@ -281,23 +397,10 @@ R.supervisor = {
         return aviso(x.estado === 'activa' ? 'danger latido' : 'warn', 'siren', `SOS · ${esc(tp.nombre)} · ${esc(v.casa || '')}`, `${esc(v.nombre || '')} · ${hace(x.at)} · ${esc(SOS_ESTADO[x.estado] || x.estado)}`, `<button class="btn btn-xs btn-sec" data-a="sos-ver" data-id="${esc(x.id)}">Ver</button>`); }).join('')}
       ${alertasAct.map(a => aviso('warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, esc(a.zona || ''), `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`)).join('')}
       ${centroDeControl({ s, hoy, u, g, t, lista, adentro, esperados, petPend, solas, sos, deas, ps, bit, ult, hoyBit })}
-      ${(() => { const ps = typeof partesSinVisto === 'function' ? partesSinVisto() : []; return ps.length ? '<span id="ccPartes" class="ancla"></span>' + sec(`Partes de turno para dar el visto (${ps.length})`) + `<div class="card lista">${ps.slice(0, 8).map(r => `<div class="it"><div class="txt"><b>${esc(r.turno)} · ${relDia(isoDe(new Date(r.at)))}</b><span>${hora(r.at)} a ${hora(r.cerradoAt)} h · ${esc(aLista(r.guardias).join(', '))}</span></div>
-          <button class="btn btn-xs btn-sec" data-a="parte-ver" data-id="${esc(r.id)}">Leer</button><button class="btn btn-xs btn-pri" data-a="visto-parte" data-id="${esc(r.id)}">${I('eye')}Visto</button></div>`).join('')}</div>` : ''; })()}
+      ${partesParaElVisto()}
       ${(() => { const as = aLista(s.alertasSup).filter(a => a && Date.now() - a.at < 7 * DIA).sort((a, b) => b.at - a.at).slice(0, 8); return as.length ? sec('Alertas de los últimos 7 días') + `<div class="card lista">${as.map(a => { const tt = (typeof TIPOS_ALERTA_SUP !== 'undefined' && TIPOS_ALERTA_SUP[a.tipo]) || ['Alerta', 'alert', 'warn'];
           return `<div class="it"><span class="ic ic-${tt[2]}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(tt[1])}</span><div class="txt"><b>${esc(a.titulo || tt[0])}</b><span style="white-space:normal">${esc(a.texto || '')} · ${relDia(isoDe(new Date(a.at))).toLowerCase()} ${hora(a.at)} h${a.hasta ? ' · volvió ' + hora(a.hasta) + ' h' : ''}</span></div></div>`; }).join('')}</div>` : ''; })()}
-      ${sec('Mirar')}
-      <div class="mosaico">
-        ${teja({ v:'garita', icon:'gate', color:'brand', t:'Garita en vivo', s:'Ingresos, avisos, camión, policía', n: lista.length || '' })}
-        ${teja({ v:'vecinos', icon:'search', color:'sky', t:'Buscar un vecino', s:'Lote, dirección y teléfonos' })}
-        ${teja({ v:'bitacora', icon:'book', color:'wood', t:'Bitácora', s:'El libro de guardia' })}
-        ${teja({ v:'turnos', icon:'clock', color:'sky', t:'Turnos y policía', s:'Quién trabajó, rondas y servicios' })}
-        ${teja({ v:'peticiones', icon:'edit', color:'warn', t:'Peticiones', s:'Pedidos firmados de los vecinos', badge: petPend })}
-        ${teja({ v:'hotel-vivo', icon:'star', color:'wood', t:HOTEL_NOMBRE, s:'Vans, traslados y eventos (sin huéspedes)' })}
-        ${teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:'Las del día y en curso' })}
-        ${teja({ v:'proveedores', icon:'box', color:'accent', t:'Proveedores', s:'ART y seguro al día' })}
-        ${teja({ v:'informe-servicio', icon:'file', color:'ok', t:'Informe mensual', s:'Turnos, rondas, emergencias y alertas del mes' })}
-        ${teja({ v:'manual', icon:'book', color:'accent', t:'Manual de uso', s:'El capítulo de la supervisión' })}
-      </div>
+      ${mirarSupervision({ lista, adentro, esperados, petPend })}
       <p class="muted tiny" style="margin-top:12px">${I('lock')} Estás obligado/a a guardar secreto sobre lo que ves (art. 10 de la Ley 25.326). <button class="link" data-a="compromiso-imprimir" data-id="${esc(u.id)}">Mi compromiso de confidencialidad</button></p>`;
   },
 };

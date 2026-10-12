@@ -509,7 +509,7 @@ const GaritaVoz = {
       return Asistente.decir(`No hay ningún pase para hoy a nombre de ${quien}. Si dice que va a un lote, tocá Avisarle a un lote.`);
     }
     const p = hits[0], casa = usuario(p.hostId)?.casa || '', e = estadoPase(p, hoy), l = (p.log || {})[hoy] || {};
-    const est = e === 'adentro' ? `Ya entró a las ${hora(l.in)}.` : e === 'salio' ? `Ya entró y salió.` : e === 'vencido' ? 'Pero el horario del pase ya pasó.' : 'Todavía no entró.';
+    const est = e === 'adentro' ? `Ya entró a las ${hora(l.in)}.` : e === 'salio' ? `Ya entró y salió.` : e === 'vencido' || e === 'nollego' ? 'Pero el horario del pase ya pasó.' : 'Todavía no entró.';
     const dicho = `${hits.length > 1 ? `Hay ${hits.length} pases parecidos. El primero: ` : 'Sí. '}${p.nombre} tiene pase para hoy, de ${p.desde} a ${p.hasta}, al ${casa}. ${est}`;
     Asistente.responder(dicho, () => { if (typeof validar === 'function') validar(p.codigo); });
   },

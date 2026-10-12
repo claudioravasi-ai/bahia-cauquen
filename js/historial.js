@@ -206,7 +206,8 @@ A['hist-mis-visitas'] = async () => {
 };
 /* La garita y la Administración: todas las visitas del barrio. */
 A['hist-visitas-todo'] = async () => {
-  if (!esStaff()) return;
+  /* 12-10-2026: también la supervisión (ve las visitas igual que la garita; antes el botón no hacía nada). */
+  if (!esStaff() && !esSupervisor()) return;
   Historial.cargando('Historial de visitas');
   try {
     const arch = await Historial.archivo('pases') || [];

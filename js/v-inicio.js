@@ -24,7 +24,7 @@ const TIPOS_PASE = {
   remis:     { n:'Uber, DiDi o taxi', icon:'car', c:'warn' },
   invitado:  { n:'Invitado a evento', icon:'flame', c:'wood' },
 };
-const ESTADO_TXT = { esperado:'Esperado', adentro:'Adentro', salio:'Salió', vencido:'Vencido', cancelado:'Cancelado', futuro:'Próximo' };
+const ESTADO_TXT = { esperado:'Esperado', adentro:'Adentro', salio:'Salió', vencido:'Vencido', cancelado:'Cancelado', futuro:'Próximo', noingreso:'No ingresó', nollego:'Cancelado · no ingresó' };
 function paseValidoEn(p, iso){
   if (p.cancelado) return false;
   if (p.dias && p.dias.length) return iso >= p.fecha && iso <= (p.fechaFin || p.fecha) && p.dias.includes(fechaDe(iso).getDay());
@@ -37,11 +37,21 @@ function estadoPase(p, iso = hoyISO()){
   if (l && l.in) return 'adentro';
   if (!p.dias?.length && p.fecha > iso) return 'futuro';
   if (!paseValidoEn(p, iso)) return p.dias?.length && iso < p.fecha ? 'futuro' : 'vencido';
+  /* LA VISITA QUE NO VINO (pedido de Claudio, 12-10-2026): a las 2 horas
+     de la hora anunciada pasa sola a "No ingresó" (todavía puede llegar:
+     "Ingresó" sigue andando); pasada la hora de salida queda "Cancelado ·
+     no ingresó", se anota en la bitácora (regla visita-no-ingreso) y sale
+     de la pantalla de la garita y de la supervisión (pasesEnPantalla). Si
+     igual aparece, la garita la busca y tiene "Pase vencido". */
   const d = minutosDe(p.desde), h = minutosDe(p.hasta);
-  if (iso === hoyISO() && h > d && ahoraMin() > h + 60) return 'vencido';
+  if (iso === hoyISO() && h > d){ const m = ahoraMin();
+    if (m > h) return 'nollego';
+    if (m > d + 120) return 'noingreso'; }
   return 'esperado';
 }
 const pasesDelDia = (iso = hoyISO()) => Store.s.pases.filter(p => paseValidoEn(p, iso) || (p.log && p.log[iso]));
+/* Lo que se ve en la garita: sin las visitas que ya no van a venir. */
+const pasesEnPantalla = (iso = hoyISO()) => pasesDelDia(iso).filter(p => estadoPase(p, iso) !== 'nollego');
 const normPatente = t => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 /* EL MENSAJE DEL PASE (rediseño 10-10-2026): el QR y el código van en la
    imagen (imagenQR, js/core.js); el texto es corto, con los datos en
@@ -71,23 +81,24 @@ function tarjetaPase(p, { garita = false } = {}){
       <span>${garita ? `<b style="display:inline;color:var(--ink)">${esc(host.casa || '')}</b> · ` : ''}${t.n} · ${franja}${p.patente ? ' · ' + esc(p.patente) : p.app ? ' · <b>patente a confirmar</b>' : ''}${p.app && p.nota ? ' · ' + esc(p.nota.toLowerCase()) : ''}</span>
       ${garita ? `<span class="autoriza">${I('check')}Autorizó: <b>${esc(p.autoriza || host.nombre || 'vecino')}</b>${host.casa ? ' · ' + esc(host.casa) : ''}</span>` : ''}</div>
     <span class="estado e-${est}">${ESTADO_TXT[est]}</span></div>
+    ${!garita && est === 'noingreso' && p.hostId === yo()?.id ? `<div class="vnl-franja">${I('clock')}<span>Todavía no llegó.</span><button class="btn btn-xs btn-sec" data-a="editar-pase" data-id="${p.id}">Cambiar el horario</button><button class="btn btn-xs btn-danger-soft" data-a="visita-no-viene" data-id="${p.id}">Ya no viene</button></div>` : ''}
     <div class="btns" style="margin-top:10px">
-      ${garita ? (!esGuardia() ? (esAdmin() ? botonesAdminPase(p, est) : '') : est === 'esperado' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>`
+      ${garita ? (!esGuardia() ? (esAdmin() ? botonesAdminPase(p, est) : '') : est === 'esperado' || est === 'noingreso' ? `<button class="btn btn-sm btn-ok" data-a="pase-in" data-id="${p.id}">${I('login')}Ingresó</button>`
         /* PASE VENCIDO (pedido de Claudio, 26-09): pasada la hora, "Ingresó"
            queda deshabilitado y la garita tiene "Pase vencido", que le avisa
            al vecino que lo autorizó (y, si la persona está en la garita, le
            pregunta si la deja pasar). */
-        : est === 'vencido' ? `<button class="btn btn-sm btn-sec" disabled title="El pase venció: no se puede registrar el ingreso">${I('login')}Ingresó</button>
+        : est === 'vencido' || est === 'nollego' ? `<button class="btn btn-sm btn-sec" disabled title="El pase venció: no se puede registrar el ingreso">${I('login')}Ingresó</button>
           <button class="btn btn-sm btn-danger-soft" data-a="pase-vencido" data-id="${p.id}">${I('clock')}Pase vencido</button>
           ${p.vencidoAviso && p.vencidoAviso.fecha === hoyISO() ? `<span class="pill p-warn">Avisado al vecino ${hora(p.vencidoAviso.at)} h</span>` : ''}` : est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="pase-out" data-id="${p.id}">${I('logout')}Salió</button>` : '')
-        : `${p.app && (est === 'esperado' || est === 'adentro') ? `<button class="btn btn-sm ${p.patente ? 'btn-sec' : 'btn-pri'}" data-a="pase-app-patente" data-id="${p.id}">${I('car')}${p.patente ? 'Cambiar la patente' : 'Agregar la patente'}</button>`
-           : est === 'esperado' || est === 'futuro' || est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>
+        : `${p.app && (est === 'esperado' || est === 'noingreso' || est === 'adentro') ? `<button class="btn btn-sm ${p.patente ? 'btn-sec' : 'btn-pri'}" data-a="pase-app-patente" data-id="${p.id}">${I('car')}${p.patente ? 'Cambiar la patente' : 'Agregar la patente'}</button>`
+           : est === 'esperado' || est === 'noingreso' || est === 'futuro' || est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>
            ${est === 'adentro' ? '' : `<button class="btn btn-sm btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar</button>`}` : ''}
            ${/* Con la visita ya adentro, mandar el pase o editarlo no tiene sentido (Claudio, 10-10-2026): quedan "Ver pase" y borrar. */ est === 'adentro' ? '' : `<button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>`}
-           ${est === 'esperado' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase">${I('x')}</button>` : ''}
+           ${est === 'esperado' || est === 'noingreso' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase">${I('x')}</button>` : ''}
            <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button>`}
       ${/* El celular que la visita dejó en el enlace: la garita y el vecino que la espera la pueden llamar (si se demora, si no la encuentran). */
-        p.tel && ['esperado', 'vencido', 'futuro', 'adentro'].includes(est) && (garita ? esGuardia() || esAdmin() : p.hostId === yo()?.id) ? `<a class="btn btn-sm btn-sec" href="${telLink(p.tel)}">${I('phone')}Llamar</a>` : ''}
+        p.tel && ['esperado', 'noingreso', 'vencido', 'nollego', 'futuro', 'adentro'].includes(est) && (garita ? esGuardia() || esAdmin() : p.hostId === yo()?.id) ? `<a class="btn btn-sm btn-sec" href="${telLink(p.tel)}">${I('phone')}Llamar</a>` : ''}
     </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} ${p.borrado.admin ? 'La Administración la borró' : 'El vecino la sacó de su lista'} ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
 }
 
@@ -967,8 +978,44 @@ function proxRecoleccion(){
 }
 
 /* ---------- VISITAS del vecino ---------- */
+/* =========================================================
+   TU VISITA NO LLEGÓ (pedido de Claudio, 12-10-2026, idea de novu, 40k★:
+   el aviso trae la respuesta). A las 2 horas de la hora anunciada, si la
+   visita no entró, al vecino que la anunció le llega "… todavía no llegó"
+   (regla visita-no-ingreso-aviso) con dos botones, en la app y en la
+   notificación del celular (Android): "Cambiar el horario" abre la
+   edición del pase con el día y el horario, y "Ya no viene" lo cancela
+   (con confirmación) y le avisa a la garita en la bitácora. El aviso se va
+   solo si la visita entra, si se cancela o si pasa la hora de salida.
+   ========================================================= */
+A['visita-no-llego'] = el => {
+  const p = aLista(Store.s.pases).find(x => x && x.id === el.dataset.id), u = yo();
+  if (!p || !u || p.hostId !== u.id) return;
+  const est = estadoPase(p);
+  if (est !== 'noingreso' && est !== 'esperado'){ toast(est === 'adentro' || est === 'salio' ? `${p.nombre} ya entró` : est === 'cancelado' ? 'Esa visita ya estaba cancelada' : 'Ya pasó el horario de esa visita', 'check'); return; }
+  hoja('Tu visita no llegó', `${aviso('warn', 'clock', `${esc(p.nombre)} todavía no llegó`, `La esperabas ${p.dias?.length ? 'hoy' : relDia(p.fecha).toLowerCase()} de ${esc(p.desde)} a ${esc(p.hasta)} h. Si viene más tarde, cambiale el horario; si ya no viene, cancelá el pase así la garita no la espera.`)}
+    <div class="vnl">
+      <button class="vnl-b c-sky" data-a="editar-pase" data-id="${esc(p.id)}"><span class="vnl-i">${I('clock')}</span><span><b>Cambiar el horario</b><small>El día y la hora en que viene</small></span></button>
+      <button class="vnl-b c-danger" data-a="visita-no-viene" data-id="${esc(p.id)}"><span class="vnl-i">${I('x')}</span><span><b>Ya no viene</b><small>Se cancela el pase y la garita lo sabe</small></span></button>
+    </div>
+    <button class="btn btn-sec btn-block" style="margin-top:10px" data-a="cerrar-hoja">Todavía viene: dejarlo así</button>`);
+};
+A['visita-no-viene'] = async el => {
+  const p0 = aLista(Store.s.pases).find(x => x && x.id === el.dataset.id), u = yo(); if (!p0 || !u || p0.hostId !== u.id) return;
+  if (!await confirmar('Ya no viene', `Se cancela el pase de ${esc(p0.nombre)}: el código deja de servir en la garita.`, { si:'Cancelar el pase', peligro:true })) return;
+  Store.cambiar(s => { const p = s.pases.find(x => x.id === p0.id); if (!p) return; p.cancelado = Date.now();
+    s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'novedad', texto:`Visita anunciada que ya no viene: ${p.nombre} → ${u.casa || ''} (lo avisó el vecino; era de ${p.desde} a ${p.hasta} h). Pase cancelado.`, at:Date.now() }); });
+  cerrarHoja(); toast('Listo: el pase quedó cancelado y la garita ya no la espera', 'check');
+};
 R.visitas = {
   titulo: 'Mis visitas', icon: 'users', color: 'sky', sub: 'Pases con código y QR para la garita',
+  /* Desde el aviso "… todavía no llegó": visitas:no~<id>[~cambiar|~nollega]. */
+  alPintar(param){
+    const m = /^no~([^~]+)(?:~(\w+))?$/.exec(param || ''); if (!m) return;
+    const top = PILA[PILA.length - 1]; if (top && top.id === 'visitas') top.param = '';
+    setTimeout(() => { const el = { dataset:{ id:m[1] } };
+      if (m[2] === 'cambiar') A['editar-pase'](el); else if (m[2] === 'nollega') A['visita-no-viene'](el); else A['visita-no-llego'](el); }, 120);
+  },
   render(){
     const u = yo(), s = Store.s, hoy = hoyISO();
     const mios = s.pases.filter(p => p.hostId === u.id && !p.cancelado && !p.borrado);
@@ -1201,7 +1248,7 @@ F['editar-pase'] = (d, form) => {
 };
 A['borrar-pase'] = async el => {
   const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
-  const est = estadoPase(p), ajena = p.hostId !== yo().id && esAdmin(), vale = est === 'esperado' || est === 'futuro' || (p.dias?.length && !p.cancelado);
+  const est = estadoPase(p), ajena = p.hostId !== yo().id && esAdmin(), vale = est === 'esperado' || est === 'noingreso' || est === 'futuro' || (p.dias?.length && !p.cancelado);
   const texto = ajena ? `${esc(p.nombre)} · ${esc(usuario(p.hostId)?.casa || '')}. Sale de la lista del vecino y de las visitas del barrio.${vale ? ' El código deja de servir en la garita.' : ''} Lo que ya pasó queda en el historial de la garita y en la auditoría. Al vecino le llega el aviso.`
     : `Sale de tu lista.${est === 'esperado' || est === 'futuro' ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`;
   if (!await confirmar('Borrar la visita', texto, { si:'Borrar', peligro:true })) return;
@@ -1645,7 +1692,8 @@ function bandaPolicia(){
   const avisoSueltos = sueltos.length ? `<div class="aviso a-warn" style="margin:10px 0 0">${I('qr')}<div class="txt"><b>${plural(sueltos.length, 'paso escaneado', 'pasos escaneados')} sin asignar</b>${sueltos.slice(0, 4).map(x => `${esc(nombrePunto(x.punto))} · ${esc(x.nombre)} · ${hora(x.at)} h`).join('<br>')}<br>Son de un código que ya no corresponde a ningún policía de este turno (por ejemplo, se registró la salida antes).</div></div>` : '';
   const cab = `<div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="row" style="gap:8px">${I('shield')}Policía contratada${ps.length ? '' : `<span class="muted small" style="font-weight:600">· nadie de servicio ahora</span>`}</b>
       ${guardia ? `<button class="btn btn-xs btn-sec" data-a="policia-nuevo">${I('plus')}Registrar ingreso</button>` : ''}</div>`;
-  if (!ps.length) return `<div class="card policia-card policia-solapa">${cab}${avisoSueltos}</div>`;
+  /* Sin nadie de servicio, el botón "Registrar ingreso" está en la tira de arriba (tiraGarita, 12-10-2026). */
+  if (!ps.length) return avisoSueltos ? `<div class="card policia-card policia-solapa">${cab}${avisoSueltos}</div>` : '';
   return `<div class="card policia-card">${cab}
     ${ps.map(p => { const rc = rondaEnCurso(p), dur = rc ? minutos(rc.inicio, ahora) : 0;
       return `<div class="policia">
@@ -2372,11 +2420,29 @@ function tareasGarita(){
   const pend = orden.filter(x => !x.info && x.prio < 3).length;
   const opera = esGuardia();
   const attrs = x => x.ir.a && opera ? `data-a="${x.ir.a}"` : x.ir.v ? `data-a="abrir" data-v="${x.ir.v}"${x.ir.p ? ` data-p="${esc(x.ir.p)}"` : ''}` : x.ir.ir ? `data-a="garita-ir" data-v="${esc(x.ir.ir)}"` : 'disabled';
-  return `<details class="tareas-dia card" data-k="tareas-dia" open>
-    <summary><b>${I('clipboard')}Hoy la garita no puede olvidar</b><span class="pill ${pend ? 'p-warn' : 'p-ok'}">${pend ? plural(pend, 'para hacer', 'para hacer') : 'todo al día'}</span></summary>
-    <div class="td-lista">${orden.map(x => `<button type="button" class="td-item td-${x.prio === 0 ? 'urge' : x.prio === 3 ? 'turno' : x.info ? 'info' : 'pend'}" ${attrs(x)}><span class="td-ic">${I(x.icon)}</span><span class="td-txt"><b>${x.titulo}</b><small>${x.det}</small></span></button>`).join('')}</div>
-    ${hechas.length ? `<p class="td-hecho-hoy">${I('check')} <b>Hecho hoy:</b> ${hechas.join(' · ')}</p>` : ''}
-    <p class="muted tiny" style="margin:8px 2px 0">Se arma sola con lo pedido, lo programado y lo pendiente de hoy; lo que no hay, no aparece. Cada cosa sale de la lista cuando la app ve que está hecha.</p></details>`;
+  /* EL DISEÑO (rehecho a pedido de Claudio, 12-10-2026: "que de un vistazo
+     se entienda lo que hay que hacer"; ideas de todoist y de los tableros
+     de tabler, 41k★, código propio). Arriba un anillo con lo que falta y
+     lo hecho del día, y una leyenda de colores (rojo urgente, naranja con
+     hora, azul del día, gris de cada turno). Cada tarea es una tarjeta con
+     su color a la izquierda, la hora grande si tiene, una etiqueta que dice
+     qué clase de tarea es, y una flecha: tocarla lleva a donde se hace. Lo
+     urgente late. Lo hecho queda en fichitas verdes. */
+  const clase = x => x.prio === 0 ? 'urge' : x.info ? 'info' : x.prio === 1 ? 'hora' : x.prio === 3 ? 'turno' : 'pend';
+  const ETQ = { urge:'Urgente', hora:'Programado', pend:'Del día', turno:'Cada turno', info:'Vigente' };
+  const cuenta = k => orden.filter(x => clase(x) === k).length;
+  const total = pend + hechas.length, pct = total ? Math.round(hechas.length / total * 100) : 100;
+  const leyenda = [['urge', 'urgente', 'urgentes'], ['hora', 'programada', 'programadas'], ['pend', 'del día', 'del día']].map(([k, a, b]) => { const n = cuenta(k); return n ? `<i class="l-${k}">${n} ${n === 1 ? a : b}</i>` : ''; }).join('');
+  return `<details class="tareas-dia card td2${cuenta('urge') ? ' hay-urge' : ''}" data-k="tareas-dia" open>
+    <summary>
+      <span class="td2-anillo${pend ? '' : ' listo'}" style="--p:${pct}" aria-hidden="true">${pend ? `<b>${pend}</b><small>${pend === 1 ? 'falta' : 'faltan'}</small>` : I('check')}</span>
+      <span class="td2-tit"><b>Hoy la garita no puede olvidar</b><span class="td2-ley">${pend ? leyenda : '<i class="l-ok">Todo al día</i>'}${hechas.length ? `<i class="l-hecho">${plural(hechas.length, 'hecha', 'hechas')}</i>` : ''}</span></span>
+      ${I('right')}</summary>
+    <div class="td-lista">${orden.map(x => { const k = clase(x); return `<button type="button" class="td-item td-${k === 'hora' ? 'pend' : k}${k === 'hora' ? ' td-hora' : ''}" ${attrs(x)}>
+      ${x.hora ? `<span class="td-reloj"><b>${esc(x.hora)}</b><small>h</small></span>` : `<span class="td-ic">${I(x.icon)}</span>`}
+      <span class="td-txt"><em class="td-etq">${k === 'hora' && x.hora ? 'Con hora' : ETQ[k]}</em><b>${x.titulo}</b><small>${x.det}</small></span>${attrs(x) === 'disabled' ? '' : `<span class="td-ir">${I('right')}</span>`}</button>`; }).join('')}</div>
+    ${hechas.length ? `<div class="td2-hechos"><b>${I('check')}Hecho hoy</b>${hechas.map(h => `<span>${h}</span>`).join('')}</div>` : ''}
+    <p class="muted tiny" style="margin:10px 2px 0">Se arma sola con lo pedido, lo programado y lo pendiente de hoy; lo que no hay, no aparece. Cada cosa sale de la lista cuando la app ve que está hecha.</p></details>`;
 }
 /* VISITAS DE HOY EN LA GARITA (pedido de Claudio, 08-10-2026)
    Antes eran dos cuadros con un número ("Esperados" y "Adentro") que no
@@ -2446,24 +2512,101 @@ function movimientosDeHoy(){
   return out.sort((a, b) => b.at - a.at);
 }
 const filaMov = m => { const c = CAT_MOV[m.cat] || CAT_MOV.visita;
-  return `<div class="it ing-mov ${m.sale ? 'sale' : 'entra'}${m.no ? ' no' : ''}"><time>${hora(m.at)}</time><span class="ic ic-${c.c}">${I(c.icon)}</span>
-    <div class="txt"><b>${esc(m.texto)}</b><span>${m.no ? 'No entró' : m.sale ? 'Salió' : 'Entró'} · ${esc(c.n)}</span></div></div>`; };
+  return `<div class="ing2-mov ${m.sale ? 'sale' : 'entra'}${m.no ? ' no' : ''}"><time>${hora(m.at)}</time><span class="ing2-pt ic-${c.c}">${I(c.icon)}</span>
+    <div class="txt"><b>${esc(m.texto)}</b><span><em class="ing2-dir">${I(m.no ? 'x' : m.sale ? 'logout' : 'login')}${m.no ? 'No entró' : m.sale ? 'Salió' : 'Entró'}</em>${esc(c.n)}</span></div></div>`; };
+/* El autito de la escena de Ingresos de hoy (propio, como la van del hotel). */
+const AUTO_SVG = `<svg class="ing2-auto" viewBox="0 0 92 40" aria-hidden="true"><path d="M8 28v-6c0-2 1.4-3.6 3.3-4l9-1.8L30 7.6C31.6 6.3 33.6 5.6 35.7 5.6h18c2.4 0 4.6 1 6.2 2.7l8.3 8.9 12 2.3c2.6.5 4.3 2.7 4.3 5.3V28a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3Z" fill="var(--auto,#f2a46c)"/><path d="M32 16.5 38 9.5h9v7Zm19 0v-7h4c1.4 0 2.6.6 3.5 1.6l4.8 5.4Z" fill="#cfe9f5"/><circle cx="24" cy="31" r="6.4" fill="#1d2430"/><circle cx="24" cy="31" r="2.6" fill="#cfd6df"/><circle cx="70" cy="31" r="6.4" fill="#1d2430"/><circle cx="70" cy="31" r="2.6" fill="#cfd6df"/><rect x="80" y="21" width="5" height="3" rx="1.5" fill="#ffe28a"/></svg>`;
 function bloqueIngresosHoy(lista, opera){
   const s = Store.s, hoy = hoyISO(), movs = movimientosDeHoy(), entradas = movs.filter(m => !m.sale && !m.no);
   const cuenta = Object.keys(CAT_MOV).map(k => [k, entradas.filter(m => m.cat === k).length]).filter(([, n]) => n);
   /* Los huéspedes del hotel de hoy: los que llegan y los que se van. */
   const hs = esGuardia() ? aLista(s.hotelHuespedes).filter(h => h && ((h.desde === hoy && !h.ingreso) || (h.hasta === hoy && h.ingreso && !h.salida))) : [];
   const nAnun = lista.length;
-  return `<span id="garIngresos" class="ancla"></span>${sec('Ingresos de hoy', `<span class="muted small">${plural(entradas.length, 'ingreso')}</span>`)}
-    ${cuenta.length ? `<div class="ing-cats">${cuenta.map(([k, n]) => `<span class="ing-cat c-${CAT_MOV[k].c}">${I(CAT_MOV[k].icon)}<b>${n}</b><small>${esc(CAT_MOV[k].n)}</small></span>`).join('')}</div>` : ''}
+  /* INGRESOS DE HOY CON SU BARRERA (rediseño, pedido de Claudio,
+     12-10-2026): arriba una escena con la ruta, la barrera que se abre y se
+     cierra cuando pasa el autito, y los totales del día (entraron,
+     salieron, adentro); las cuentas por tipo en fichas de color, y la línea
+     del día con una flecha verde para lo que entra y gris para lo que sale. */
+  const salidas = movs.filter(m => m.sale).length, adn = lista.filter(p => estadoPase(p) === 'adentro').length;
+  return `<span id="garIngresos" class="ancla"></span><section class="ing2">
+    <div class="ing2-cab">
+      <div class="ing2-escena${movs.length ? ' anda' : ''}" aria-hidden="true"><span class="ing2-ruta"></span>${AUTO_SVG}<span class="ing2-poste"></span><span class="ing2-brazo"></span></div>
+      <div class="ing2-tit"><small>${I('gate')}En vivo, de 00 a 24 h</small><b>Ingresos de hoy</b></div>
+      <div class="ing2-tot"><span class="in"><b>${entradas.length}</b>${I('login')}entraron</span><span class="out"><b>${salidas}</b>${I('logout')}salieron</span><span class="adn"><b>${adn}</b>${I('users')}visitas adentro</span></div>
+    </div>
+    ${cuenta.length ? `<div class="ing-cats ing2-cats">${cuenta.map(([k, n]) => `<span class="ing-cat c-${CAT_MOV[k].c}"><span class="ing2-ci">${I(CAT_MOV[k].icon)}</span><b>${n}</b><small>${esc(CAT_MOV[k].n)}</small></span>`).join('')}</div>` : ''}
     ${nAnun ? `<div class="lbl ing-sub">Visitas anunciadas (${nAnun})</div>${lista.map(p => tarjetaPase(p, { garita:true })).join('')}` : ''}
     ${hs.length ? `<div class="lbl ing-sub">Huéspedes del hotel hoy (${hs.length})</div><div class="card lista">${hs.map(h => { const va = !(h.desde === hoy && !h.ingreso);
       return `<div class="it"><span class="ic ic-wood" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('star')}</span><div class="txt"><b>${esc(h.nombre || 'Huésped')}</b><span>${h.patente ? esc(h.patente) + ' · ' : ''}${plural(+h.pax || 1, 'persona')} · ${va ? 'se va hoy' : 'llega hoy'}</span></div>
         ${opera ? `<button class="btn btn-xs ${va ? 'btn-sec' : 'btn-ok'}" data-a="${va ? 'hhuesped-salida' : 'hhuesped-ingreso'}" data-id="${esc(h.id)}">${I(va ? 'logout' : 'login')}${va ? 'Salió' : 'Ingresó'}</button>` : `<span class="pill p-sky">${va ? 'Se va hoy' : 'Llega hoy'}</span>`}</div>`; }).join('')}</div>` : ''}
     <div class="lbl ing-sub">Todo lo que entró y salió hoy</div>
-    ${movs.length ? `<div class="card lista ing-linea">${movs.slice(0, 30).map(filaMov).join('')}</div>
-      ${movs.length > 30 ? `<details class="ing-mas" data-k="ing-mas"><summary>Ver los ${movs.length - 30} anteriores</summary><div class="card lista ing-linea">${movs.slice(30).map(filaMov).join('')}</div></details>` : ''}`
-      : vacio('gate', nAnun ? 'Todavía no entró ni salió nadie hoy.' : 'Nadie anunciado y todavía no entró ni salió nadie hoy.')}`;
+    ${movs.length ? `<div class="ing2-linea">${movs.slice(0, 30).map(filaMov).join('')}</div>
+      ${movs.length > 30 ? `<details class="ing-mas" data-k="ing-mas"><summary>Ver los ${movs.length - 30} anteriores</summary><div class="ing2-linea">${movs.slice(30).map(filaMov).join('')}</div></details>` : ''}`
+      : vacio('gate', nAnun ? 'Todavía no entró ni salió nadie hoy.' : 'Nadie anunciado y todavía no entró ni salió nadie hoy.')}</section>`;
+}
+/* =========================================================
+   LA TIRA DE LA GARITA (rediseño, pedido de Claudio, 12-10-2026: "turno
+   mañana, policía, camión de basura y correos, con un diseño innovador,
+   interactivo, fácil y con colores vivos"). Cuatro tarjetas de color, una
+   por cosa, que dicen cómo está cada una y se tocan para hacerla:
+     · el TURNO (sol de día, que gira despacio; luna de noche) con quiénes
+       están y desde qué hora;
+     · el POLICÍA: "nadie de servicio · registrar el ingreso" o, si está,
+       sus rondas (tocarla baja a su tarjeta con todos los botones);
+     · el CAMIÓN DE LA BASURA: si hoy pasa, lo dice; adentro, se pone verde,
+       las ruedas giran y se toca para registrar la salida;
+     · los CORREOS: registrar la entrada y cuántos hay adentro.
+   Para la Administración y la supervisión es lo mismo, solo para mirar.
+   Ideas de los paneles de homepage (23k★) y de meteocons (1.6k★, íconos
+   que se mueven); el código es propio.
+   ========================================================= */
+function tiraGarita(opera){
+  const t = turnoAbierto(), ahora = Date.now();
+  const tarjeta = ({ cls, ic, tag, t:tt, x, a = '', v = '', id = '', on = false, n = '' }) => {
+    const tagName = a ? 'button' : 'div', attrs = a ? ` type="button" data-a="${a}"${v ? ` data-v="${esc(v)}"` : ''}${id ? ` data-id="${esc(id)}"` : ''}` : '';
+    return `<${tagName} class="tg-t ${cls}${on ? ' on' : ''}${a ? ' toca' : ''}"${attrs}><span class="tg-ic">${I(ic)}</span>${n !== '' ? `<span class="tg-n">${n}</span>` : ''}
+      <span class="tg-txt"><small>${tag}</small><b>${tt}</b><em>${x}</em></span>${a ? `<span class="tg-ir">${I('right')}</span>` : ''}</${tagName}>`; };
+  /* turno */
+  const noche = t && turnoEsNoche(t.turno);
+  const tTurno = t ? tarjeta({ cls:'tg-turno ' + (noche ? 'noche' : 'dia'), ic: noche ? 'moon' : 'sun', tag:'Turno', t:esc(t.turno), x:`${esc(aLista(t.guardias).join(' · ') || 'Sin nombres')} · desde las ${hora(t.at)} h`, on:true })
+    : tarjeta({ cls:'tg-turno sin', ic:'clock', tag:'Turno', t:'Sin turno abierto', x:'La garita todavía no anotó quién está' });
+  /* policía */
+  const ps = t ? policiasAdentro(t) : [], rondas = ps.reduce((k, p) => k + p.rondas.length, 0), enRonda = ps.map(rondaEnCurso).find(Boolean);
+  const tPol = ps.length ? tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t: enRonda ? 'En ronda' : 'De servicio', x:`${esc(ps.map(p => p.nombre).join(', '))} · ${enRonda ? 'desde las ' + hora(enRonda.inicio) + ' h' : plural(rondas, 'ronda') + ' hoy'}`, a:'garita-ir', v:'.policia-card', on:true, n: rondas || '' })
+    : tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t:'Nadie de servicio', x: opera ? (t && turnoEsNoche(t.turno) ? 'Turno de noche: tocá cuando llegue' : 'Tocá para registrar el ingreso') : 'Si viene, lo registra la garita', a: opera && t ? 'policia-nuevo' : '' });
+  /* camión */
+  const c = typeof Camion !== 'undefined' ? Camion.adentro() : null, dh = recoleccionDias()[new Date().getDay()];
+  const paso = typeof camionPasoHoy === 'function' ? camionPasoHoy() : null;
+  const tCam = c ? tarjeta({ cls:'tg-cam', ic:'tacho', tag:'Camión de la basura', t:'En el barrio', x:`${esc(c.patente || '')}${c.patente ? ' · ' : ''}entró ${hora(c.entra)} h · hace ${Math.max(1, Math.round((ahora - c.entra) / MIN))} min${opera ? ' · tocá al salir' : ''}`, a: opera ? 'camion-sale' : '', on:true })
+    : tarjeta({ cls:'tg-cam', ic:'tacho', tag:'Camión de la basura', t: paso ? 'Ya pasó hoy' : dh ? 'Hoy pasa' : 'Hoy no pasa', x: paso ? `Entró a las ${hora(paso.entra)} h` : opera ? 'Tocá para registrar la entrada' : dh ? 'Todavía no entró' : 'Si viene igual, se registra', a: opera ? 'camion-entra' : '' });
+  /* correos */
+  const cor = typeof Mensajeria !== 'undefined' ? Mensajeria.adentro() : [];
+  const tCor = tarjeta({ cls:'tg-cor', ic:'mail', tag:'Correos', t: cor.length ? plural(cor.length, 'adentro', 'adentro') : 'Ninguno adentro', x: cor.length ? esc(cor.map(nombreCorreo).join(', ')) : opera ? 'Tocá para registrar la entrada' : 'Andreani, OCA, Correo Argentino…', a: opera ? 'correo-menu' : cor.length ? 'garita-ir' : '', v: opera ? '' : '#garCorreos', on: cor.length > 0, n: cor.length || '' });
+  return `<div class="tg" role="group" aria-label="Turno, policía, camión y correos">${tTurno}${tPol}${tCam}${tCor}</div>`;
+}
+/* EL CONTROL DE ACCESO (rediseño, pedido de Claudio, 12-10-2026: "con
+   colores vivos, algo como el ingreso de las vans, con una barrera que se
+   abre y se cierra"). La casilla parece una patente argentina; al tocarla
+   la barrera de la escena se levanta y el semáforo pasa a verde, y al
+   salir de la casilla baja. Debajo, los botones de siempre como fichas de
+   color. El campo sigue siendo #qValidar (lo usan el lector de patentes y
+   el recorrido guiado). Idea de las animaciones de la cochera del hotel. */
+const botonVal = ({ a, v = '', ic, c, t }) => `<button type="button" class="val2-b c-${c}" data-a="${a}"${v ? ` data-v="${v}"` : ''}><span class="val2-bi">${I(ic)}</span><span>${t}</span></button>`;
+function validadorGarita(){
+  return `<form data-f="validar" class="val2">
+    <div class="val2-escena" aria-hidden="true"><span class="val2-luz"><i></i><i></i></span><span class="val2-poste"></span><span class="val2-brazo"></span><span class="val2-piso"></span></div>
+    <div class="val2-cab"><small>${I('gate')}Control de acceso</small><b>Código, patente o DNI</b><span>Escribilo y tocá la lupa: dice si tiene pase y a qué casa va.</span></div>
+    <div class="val2-chapa"><span class="val2-pais"><i></i>AR</span><input name="q" id="qValidar" autocomplete="off" placeholder="482913" maxlength="12" inputmode="text" aria-label="Código, patente o DNI">
+      <button class="val2-ir" aria-label="Buscar">${I('search')}</button></div>
+    <div class="val2-acc">
+      ${botonVal({ a:'escanear', ic:'scan', c:'brand', t:'Escanear QR' })}
+      ${botonVal({ a:'patente-camara', ic:'camera', c:'sky', t:'Leer patente' })}
+      ${botonVal({ a:'llegada-nueva', ic:'gate', c:'warn', t:'Llegó sin aviso' })}
+      ${hayPaquetes() ? botonVal({ a:'paquete-nuevo', ic:'box', c:'wood', t:'Llegó un paquete' }) : ''}
+      ${botonVal({ a:'abrir', v:'frecuentes', ic:'qr', c:'accent', t:'Ingresos frecuentes' })}
+      ${botonVal({ a:'hist-visitas-todo', ic:'clock', c:'ok', t:'Historial de visitas' })}
+      ${botonVal({ a:'alerta-nueva', ic:'siren', c:'danger', t:'Aviso urgente' })}</div>
+  </form>`;
 }
 A['garita-ir'] = el => { const d = document.querySelector(el.dataset.v); if (d) d.scrollIntoView({ behavior:'smooth', block:'start' }); else toast('Ahora no hay nada de eso en la garita', 'check'); };
 
@@ -2474,7 +2617,7 @@ R.garita = {
     if (!veGarita()) return vacio('lock', 'La garita es solo para la guardia, la Administración y la supervisión.');
     if (esGuardia() && !turnoListo()) return formularioTurno();
     const s = Store.s, hoy = hoyISO();
-    const lista = pasesDelDia(hoy).sort((a, b) => a.desde.localeCompare(b.desde));
+    const lista = pasesEnPantalla(hoy).sort((a, b) => a.desde.localeCompare(b.desde));
     const adentro = lista.filter(p => estadoPase(p) === 'adentro').length;
     const esperados = lista.filter(p => estadoPase(p) === 'esperado').length;
     const paq = hayPaquetes() ? s.paquetes.filter(p => !p.retirado) : [];
@@ -2496,10 +2639,9 @@ R.garita = {
       <div class="garita-main">
       ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos${hayPaquetes() ? ', paquetes' : ''}, el camión, los correos, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
         <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esSupervisor() ? 'supGarita' : 'interno'}">${I('chat')}Escribirle a la garita</button></div>`}
-      ${bandaTurno()}
+      ${tiraGarita(opera)}
       ${bandaPolicia()}
-      ${bandaCamion(opera)}
-      ${typeof bandaCorreos === 'function' ? bandaCorreos(opera) : ''}
+      ${typeof bandaCorreos === 'function' ? bandaCorreos(opera, true) : ''}
       ${typeof bandaVansGarita === 'function' ? bandaVansGarita(opera) : ''}
       ${typeof bandaHotel === 'function' ? bandaHotel(opera) : ''}
       ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
@@ -2508,20 +2650,10 @@ R.garita = {
         return aviso(ay ? 'danger latido' : 'warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, `${esc(a.zona)} · ${ay ? plural(ay, 'casa pide', 'casas piden') + ' ayuda' : 'nadie pidió ayuda'}`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`); }).join('')}
       ${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
       ${tableroVisitas(lista, paq.length)}
-      ${opera ? `<form data-f="validar" class="card">
-        <div class="lbl">Código, patente o DNI</div>
-        <div class="validador"><input name="q" id="qValidar" autocomplete="off" placeholder="482913" maxlength="12" inputmode="text">
-          <button class="btn btn-pri">${I('search')}</button></div>
-        <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-sm btn-sec" data-a="escanear">${I('scan')}Escanear QR</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="patente-camara">${I('camera')}Leer patente</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="llegada-nueva">${I('gate')}Llegó sin aviso</button>
-          ${hayPaquetes() ? `<button type="button" class="btn btn-sm btn-sec" data-a="paquete-nuevo">${I('box')}Llegó un paquete</button>` : ''}
-          <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('clock')}Historial de visitas</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="alerta-nueva">${I('siren')}Aviso urgente</button></div>
-      </form>` : `<div class="btns" style="margin:0 0 12px"><button type="button" class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('clock')}Historial de visitas</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="bitacora">${I('book')}Bitácora</button>
-          <button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="frecuentes">${I('qr')}Ingresos frecuentes</button></div>`}
+      ${opera ? validadorGarita() : `<div class="val2-acc solo-mirar">
+          ${botonVal({ a:'hist-visitas-todo', ic:'clock', c:'ok', t:'Historial de visitas' })}
+          ${botonVal({ a:'abrir', v:'bitacora', ic:'book', c:'wood', t:'Bitácora' })}
+          ${botonVal({ a:'abrir', v:'frecuentes', ic:'qr', c:'accent', t:'Ingresos frecuentes' })}</div>`}
       ${typeof mapaBarrio === 'function' ? mapaBarrio() : ''}
       ${s.peticiones.filter(p => p.estado === 'pendiente').map(p => aviso('warn latido', 'edit', `Petición de ${esc(p.casa)} sin recibir`, esc(TIPOS_PET[p.tipo]?.n || '') + (opera ? '' : ' · la recibe y la firma la garita'), `<button class="btn btn-xs btn-sec" data-a="ver-peticion" data-id="${p.id}">${opera ? 'Leer y firmar' : 'Ver'}</button>`)).join('')}
       ${s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => aviso('info', 'truck', `Obra en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h · ${esc(o.empresa || '')}` : esc(o.empresa || ''))).join('')}
@@ -2564,6 +2696,12 @@ R.garita = {
    Arriba, un buscador: "bit" deja solo la Bitácora y con Enter la abre.
    ========================================================= */
 let masQ = '';
+/* "AL DÍA" (pedido de Claudio, 12-10-2026: "que sea más convincente, con un
+   acabado innovador"). Un sello verde con la tilde que se dibuja sola, un
+   brillo que lo cruza y un anillo que respira: se entiende de lejos que no
+   hay nada esperando. Con algo pendiente, en su lugar va el número en rojo
+   que late y la campanita se mueve. */
+const selloAlDia = () => `<span class="al-dia" role="status"><svg class="al-dia-ck" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7 12.4l3.3 3.3L17.2 8.8"/></svg><b>Al día</b><small>nada esperando</small></span>`;
 function masGarita(s, u){
   const petPend = s.peticiones.filter(p => p.estado === 'pendiente').length;
   const msjVec = s.privados.filter(h => (h.con || 'admin') === 'guardia').reduce((n, h) => n + aLista(h.msgs).filter(m => m.from === 'vecino' && !m.leido).length, 0);
@@ -2599,7 +2737,7 @@ function masGarita(s, u){
   const grupo = (cls, ic, t, extra, tejas) => `<div class="mas-grupo ${cls}"><div class="mas-tit">${I(ic)}<b>${t}</b>${extra}</div><div class="mosaico">${tejas.join('')}</div></div>`;
   const html = `${sec('Más')}<div class="mas-garita">
     <div class="mas-busca">${I('search')}<input id="masBuscar" type="search" value="${esc(masQ)}" placeholder="¿Qué buscás? bitácora, vuelos, hotel…" autocomplete="off" aria-label="Buscar en Más" enterkeyhint="go"></div>
-    ${grupo('g-atender' + (nAt ? ' hay' : ''), 'bell', 'Para atender ahora', nAt ? `<span class="pill p-danger">${nAt}</span>` : `<span class="pill p-ok">${I('check')}Al día</span>`, atender)}
+    ${grupo('g-atender' + (nAt ? ' hay' : ' al-dia-g'), 'bell', 'Para atender ahora', nAt ? `<span class="at-n" role="status">${nAt}<small>${nAt === 1 ? 'espera' : 'esperan'}</small></span>` : selloAlDia(), atender)}
     ${grupo('g-consultar', 'search', 'Consultar', '', consultar)}
     ${grupo('g-registros', 'book', 'Registros y control', '', registros)}
     <p class="muted small mas-nada" hidden>No hay nada con esa palabra. Probá con otra.</p></div>`;
@@ -2660,7 +2798,7 @@ function validar(q){
     }).join('')}`);
 }
 A['pase-in'] = el => { const p = Store.s.pases.find(x => x.id === el.dataset.id);
-  if (p && estadoPase(p) === 'vencido'){ toast('El pase venció: usá "Pase vencido" para avisarle al vecino', 'clock'); return; }
+  if (p && ['vencido', 'nollego'].includes(estadoPase(p))){ toast('El pase venció: usá "Pase vencido" para avisarle al vecino', 'clock'); return; }
   movimiento(el.dataset.id, 'in'); };
 A['pase-vencido'] = el => {
   const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;

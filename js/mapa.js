@@ -119,7 +119,7 @@ function mapaEstados(){
   aLista(s.sos).filter(x => x && x.estado !== 'resuelta').forEach(x => de(mapaLoteDe(usuario(x.userId)?.casa))?.sos.push(x));
   aLista(s.llegadas).filter(x => x && x.estado === 'consultando').forEach(x => de(mapaLoteDe(x.lote || usuario(x.hostId)?.casa))?.cons.push(x));
   pasesDelDia(hoy).forEach(p => { const e = estadoPase(p), d = de(mapaLoteDe(usuario(p.hostId)?.casa)); if (!d) return;
-    if (e === 'adentro') d.adn.push(p); else if (e === 'esperado' || e === 'vencido') d.esp.push(p); });
+    if (e === 'adentro') d.adn.push(p); else if (e === 'esperado' || e === 'noingreso') d.esp.push(p); });
   if (hayPaquetes()) aLista(s.paquetes).filter(p => p && !p.retirado).forEach(p => de(mapaLoteDe(loteDelPaquete(p)))?.paq.push(p));
   if (typeof casasSolas === 'function') casasSolas(hoy).forEach(a => { const d = de(mapaLoteDe(a.casa)); if (d) d.sola = a; });
   aLista(s.obras).filter(o => o && o.estado === 'activa').forEach(o => { const d = de(mapaLoteDe(o.casa)); if (d) d.obra = o; });

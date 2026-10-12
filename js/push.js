@@ -267,3 +267,18 @@ A['push-grupo'] = async el => {
   } catch(e){ caja.innerHTML = `<div style="margin-top:8px">${aviso('danger', 'alert', 'No salió', esc(e.message))}</div>`; }
   el.disabled = false;
 };
+/* El renglón de los avisos en Tu cuenta (12-10-2026): finito, con el estado
+   y un solo botón. La explicación larga aparece solo si hace falta (al
+   tocar "Ver cómo", Push.activar la muestra). */
+function pushCuenta(){
+  const est = typeof Push !== 'undefined' ? Push.estado() : 'demo', notif = 'Notification' in window ? Notification.permission : 'no';
+  let txt, cls, btn = '';
+  if (est === 'demo'){ cls = notif === 'granted' ? 'ok' : notif === 'default' ? 'off' : 'warn';
+    txt = notif === 'granted' ? 'Activados' : notif === 'no' ? 'Este navegador no los permite' : notif === 'denied' ? 'Bloqueados en este navegador (se permiten en los ajustes del sitio)' : 'Apagados';
+    if (notif === 'default') btn = `<button type="button" class="btn btn-xs btn-pri" data-a="pedir-notifs">${I('bell')}Activar</button>`; }
+  else if (est === 'activo'){ cls = 'ok'; txt = 'Activados: te llegan con el celular bloqueado';
+    btn = `<button type="button" class="btn btn-xs btn-sec" data-a="push-probar">${I('send')}Probar</button><button type="button" class="btn btn-xs btn-sec" data-a="push-desactivar" title="Desactivar en este equipo">Apagar</button>`; }
+  else if (est === 'apagado'){ cls = 'off'; txt = 'Apagados: activalos para enterarte con el celular bloqueado'; btn = `<button type="button" class="btn btn-xs btn-pri" data-a="push-activar">${I('bell')}Activar</button>`; }
+  else { cls = 'warn'; txt = (Push.TEXTOS[est] || ['No disponibles'])[0]; btn = `<button type="button" class="btn btn-xs btn-sec" data-a="push-activar">Ver cómo</button>`; }
+  return `<div class="cu-r cu-push e-${cls}"><span class="cu-ri c-${cls === 'ok' ? 'ok' : cls === 'warn' ? 'warn' : 'brand'}">${I('bell')}</span><span class="cu-rt"><b>Avisos</b><small>${txt}</small></span><span class="cu-ra">${btn}</span></div>${est === 'activo' ? '<div id="pushProbarRes"></div>' : ''}`;
+}

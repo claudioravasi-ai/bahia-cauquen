@@ -91,7 +91,7 @@ const Nube = {
        comunicados ni lo del hotel que no es de la garita (los huéspedes). */
     supervisor: { barrio:['users','guia','agenda','temporadas','feriados','eventosCiudad','contactos','documentos','obras','proveedores',
                           'avistamientos','cruceros','camion','mensajeria','alertas'],
-                  staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos','telefonos'],
+                  staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos','telefonos','frecuentes'],
                   hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv'] },
   },
 

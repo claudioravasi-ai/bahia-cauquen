@@ -117,10 +117,15 @@ F['recibir-peticion'] = async (d, form) => {
   if (!firma){ toast('Falta la firma de recepción', 'edit'); return; }
   const id = form.dataset.id, g = yo(), at = Date.now();
   const p0 = Store.s.peticiones.find(x => x.id === id); if (!p0 || p0.estado !== 'pendiente') return;
-  const s2 = await sello({ id, selloVecino:p0.selloVecino, recibe:g.id, recibidaAt:at, obs:d.obs || '', firma });
+  /* La observación se sella igual que se guarda (sin espacios al final).
+     Antes se sellaba tal cual se escribió y se guardaba recortada: el
+     teclado del celular deja un espacio al final y "Verificar sellos" decía
+     que los datos no coincidían (Claudio, 12-10-2026). */
+  const obs = String(d.obs || '').trim();
+  const s2 = await sello({ id, selloVecino:p0.selloVecino, recibe:g.id, recibidaAt:at, obs, firma });
   Store.cambiar(s => {
     const p = s.peticiones.find(x => x.id === id); if (!p) return;
-    Object.assign(p, { estado:'en_funciones', recibe:g.id, recibidaAt:at, firmaGuardia:firma, selloGuardia:s2, obs:(d.obs || '').trim() });
+    Object.assign(p, { estado:'en_funciones', recibe:g.id, recibidaAt:at, firmaGuardia:firma, selloGuardia:s2, obs });
     auditar(s, 'Petición recibida y firmada por la guardia', `${TIPOS_PET[p.tipo].n} · ${p.casa} · ${g.nombre}`, p.id);
     s.bitacora.unshift({ id:uid(), autor:g.id, tipo:'novedad', texto:`Petición de ${p.casa} recibida: ${TIPOS_PET[p.tipo].n}.`, at });
     notificar(s, { para:p.userId, titulo:'La guardia recibió tu petición', texto:`${TIPOS_PET[p.tipo].n} · ya está en funciones`, icon:'check', color:'ok', link:'peticiones' });
@@ -140,7 +145,12 @@ A['verificar-peticion'] = async el => {
   const v = await sello({ id:p.id, userId:p.userId, casa:p.casa, tipo:p.tipo, texto:p.texto, desde:p.desde, hasta:p.hasta, at:p.at, firma:p.firmaVecino });
   const okV = v === p.selloVecino;
   let okG = true;
-  if (p.firmaGuardia) okG = (await sello({ id:p.id, selloVecino:p.selloVecino, recibe:p.recibe, recibidaAt:p.recibidaAt, obs:p.obs || '', firma:p.firmaGuardia })) === p.selloGuardia;
+  /* Las firmadas antes del 12-10-2026 pudieron sellarse con espacios
+     alrededor de la observación (ver recibir-peticion): se prueban esas
+     variantes, que no cambian lo que dice. */
+  if (p.firmaGuardia){ const o = p.obs || ''; okG = false;
+    for (const v of [o, o + ' ', ' ' + o, o + '  ', ' ' + o + ' ', o + '\n'])
+      if ((await sello({ id:p.id, selloVecino:p.selloVecino, recibe:p.recibe, recibidaAt:p.recibidaAt, obs:v, firma:p.firmaGuardia })) === p.selloGuardia){ okG = true; break; } }
   toast(okV && okG ? 'Sellos correctos: la petición no fue modificada' : 'ATENCIÓN: los datos no coinciden con el sello', okV && okG ? 'shield' : 'alert');
 };
 
