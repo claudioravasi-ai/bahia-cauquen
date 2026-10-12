@@ -93,7 +93,7 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 12;  /* 12 (11-10-2026): cortes de luz, agua y gas a las 6 y a las 23; se borran las fotos y archivos de los mensajes vencidos */
+var VERSION_SCRIPT = 13;  /* 13 (12-10-2026): más avisos por día (1500) y los urgentes (SOS, "llegó sin aviso") no se frenan hasta 4000; 12: cortes de luz, agua y gas a las 6 y a las 23; se borran las fotos y archivos de los mensajes vencidos */
 /* 11 (07-10-2026): equipos con la sesión cerrada reciben solo "un correo va a tu casa"; un equipo vale para la cuenta más nueva */
 
 function doPost(e) {
@@ -258,7 +258,12 @@ function mandarPush(d) {
   if (!cuenta.project_id) return {ok: false, error: 'Los avisos push no están configurados (falta FCM_CUENTA, ver AVISOS.md)'};
   var db = baseValida(d.db);
   if (!db) return {ok: false, error: 'Falta la dirección de la base'};
-  if (contarHoy('PUSH') >= 400) return {ok: false, error: 'tope diario de avisos push alcanzado'};
+  /* "Llegó sin aviso" se reenvía cada 45 s mientras nadie del lote contesta
+     (12-10-2026): el tope sube a 1500 por día, y lo urgente (SOS, DEA, la
+     garita preguntando por una visita) recién se frena en 4000, para que un
+     día movido no deje a nadie sin el aviso de un SOS. */
+  var urgente = d.urgente === true || d.urgente === '1' || /^llegada/.test(String(d.link || '')) || String(d.sonido || '') === 'sos';
+  if (contarHoy('PUSH') >= (urgente ? 4000 : 1500)) return {ok: false, error: 'tope diario de avisos push alcanzado'};
   /* La dirección de la base queda guardada: la usa el reloj de "Estoy bien". */
   if (props.getProperty('BASE_URL') !== db) props.setProperty('BASE_URL', db);
   var destino = tokensDe(db, d.para, d.excluir, String(d.sonido || ''), d.link, d.titulo);

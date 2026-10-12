@@ -473,6 +473,24 @@ function frecuenteVigente(f, iso = hoyISO()){
   return { ok:true };
 }
 const ultimoMovFrec = f => aLista(Store.s.bitacora).find(b => b && b.frecId === f.id);
+/* EL PERSONAL FIJO DE LOS VECINOS TAMBIÉN ES UN INGRESO FRECUENTE (pedido
+   de Claudio, 12-10-2026: "¿por qué en Visitas frecuentes la garita, el
+   supervisor y la Administración no tienen a mi empleada doméstica?").
+   Lo que el vecino carga en "Autorizar una visita" con "Viene varias
+   veces" (empleada, jardinero, personal de obra) es un pase con días: vale
+   solo, cada uno de esos días, hasta su fecha final, y la garita lo ve en
+   "Ingresos de hoy" el día que le toca. Ahora se ve además acá, junto a los
+   que carga la Administración, con el lote, los días, el horario y si hoy
+   le toca. La supervisión lo ve sin el código ni el QR. */
+const personalFijoVecinos = (iso = hoyISO()) => aLista(Store.s.pases).filter(p => p && aLista(p.dias).length && !p.cancelado && !p.borrado && (p.fechaFin || p.fecha || '') >= iso);
+const hoyLeToca = (p, iso = hoyISO()) => paseValidoEn(p, iso);
+function cartelFijo(p){
+  const hoy = hoyISO(), l = p.log && p.log[hoy];
+  if (!hoyLeToca(p)) return `${I('calendar')}Hoy no le toca · viene ${aLista(p.dias).map(d => DIAS[d]).join(', ')}`;
+  if (l && l.in) return `${I('check')}Hoy entró ${hora(l.in)} h${l.out ? ' · salió ' + hora(l.out) + ' h' : ''}`;
+  /* Un fijo que hoy no vino sigue vigente: no es "Cancelado" (el cartel lo dice; el estado del pase de hoy no se muestra acá). */
+  return ahoraMin() > minutosDe(p.hasta) ? `${I('clock')}Hoy le tocaba · ${esc(p.desde)} a ${esc(p.hasta)} h · no vino` : `${I('clock')}Hoy le toca · ${esc(p.desde)} a ${esc(p.hasta)} h`;
+}
 R.frecuentes = {
   titulo:'Ingresos frecuentes', icon:'qr', color:'brand', ancha:true, sub:'Proveedores y personal que entran siempre, con QR fijo',
   render(q){
@@ -480,9 +498,16 @@ R.frecuentes = {
     const qq = normTxt(q || '');
     const ls = frecuentes().filter(f => !qq || normTxt([f.nombre, f.empresa, f.destino, f.patente, TIPOS_FREC[f.tipo]?.n].join(' ')).includes(qq))
       .sort((a, b) => (!!a.baja - !!b.baja) || a.nombre.localeCompare(b.nombre));
-    return `<p class="muted small" style="margin:0 0 12px">Para quien entra todas las semanas: la Administración lo carga una vez y le manda su QR. En la garita se escanea o se escribe el código, y queda anotado el ingreso y la salida. Los que entran de vez en cuando (Uber, DiDi, taxis) no van acá: entran con su patente por "Llegó sin aviso", o con el pase que les manda el vecino. Los correos, con el botón "Correos" de la garita.</p>
+    const fijos = personalFijoVecinos().filter(p => !qq || normTxt([p.nombre, p.patente, usuario(p.hostId)?.casa, usuario(p.hostId)?.nombre, p.autoriza, (TIPOS_PASE[p.tipo] || {}).n].join(' ')).includes(qq))
+      .sort((a, b) => (hoyLeToca(b) - hoyLeToca(a)) || String(usuario(a.hostId)?.casa || '').localeCompare(String(usuario(b.hostId)?.casa || ''), 'es', { numeric:true }) || String(a.desde).localeCompare(String(b.desde)));
+    const tocaHoy = fijos.filter(p => hoyLeToca(p)).length;
+    return `<p class="muted small" style="margin:0 0 12px">Quien entra todas las semanas, en un solo lugar: los que carga la Administración con su QR fijo y el <b>personal fijo de cada vecino</b> (empleadas, jardineros, personal de obra), que el vecino autoriza una vez con "Viene varias veces" y sirve solo todos esos días. Los que entran de vez en cuando (Uber, DiDi, taxis) no van acá: entran con su patente por "Llegó sin aviso", o con el pase que les manda el vecino. Los correos, con el botón "Correos" de la garita.</p>
       ${esAdmin() ? superficie({ a:'frec-editar', icon:'plus', color:'brand', t:'Agregar un ingreso frecuente', s:'Nombre, a dónde va, días y horario: la app arma su QR', cls:'acento' }) : ''}
-      <form data-f="buscar-frec" class="linea-form" style="margin:12px 0"><input name="q" id="qFrec" value="${esc(q || '')}" placeholder="Nombre, empresa, patente o destino"><button class="btn btn-pri">${I('search')}</button></form>
+      <form data-f="buscar-frec" class="linea-form" style="margin:12px 0"><input name="q" id="qFrec" value="${esc(q || '')}" placeholder="Nombre, empresa, patente, lote o destino"><button class="btn btn-pri">${I('search')}</button></form>
+      ${sec('Personal fijo de los vecinos', `<span class="muted small">${fijos.length}${tocaHoy ? ` · ${plural(tocaHoy, 'viene hoy', 'vienen hoy')}` : ''}</span>`)}
+      ${fijos.length ? fijos.map(p => `<div class="frec-fijo ${hoyLeToca(p) ? 'frec-toca' : ''}"><span class="frec-hoy">${cartelFijo(p)}</span>${tarjetaPase(p, { garita:true })}</div>`).join('')
+        : vacio('user', qq ? 'Nadie del personal fijo coincide con la búsqueda.' : 'Ningún vecino cargó personal fijo todavía.')}
+      ${sec('Cargados por la Administración', `<span class="muted small">${ls.length}</span>`)}
       ${ls.length ? ls.map(f => { const t = TIPOS_FREC[f.tipo] || TIPOS_FREC.otro, v = frecuenteVigente(f), ult = ultimoMovFrec(f);
         return `<div class="card" style="padding:13px 14px${f.baja ? ';opacity:.55' : ''}"><div class="pase"><span class="ic ic-${v.ok && !v.aviso ? 'ok' : v.ok ? 'warn' : 'danger'}">${I(t.icon)}</span>
           <div class="datos"><b>${esc(f.nombre)}${f.empresa ? ' · ' + esc(f.empresa) : ''}</b>
@@ -492,7 +517,7 @@ R.frecuentes = {
             ${!f.baja && esGuardia() ? `<button class="btn btn-xs btn-ok" data-a="frec-mov" data-id="${f.id}" data-v="in">${I('login')}Entra</button><button class="btn btn-xs btn-sec" data-a="frec-mov" data-id="${f.id}" data-v="out">${I('logout')}Sale</button>` : ''}
             ${esSupervisor() ? '' : `<button class="btn btn-xs btn-sec" data-a="frec-qr" data-id="${f.id}">${I('qr')}QR</button>`}
             ${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="frec-editar" data-id="${f.id}">${I('edit')}Editar</button><button class="btn btn-xs btn-danger-soft" data-a="frec-borrar" data-id="${f.id}">${I('trash')}Borrar</button>` : ''}</div></div>`; }).join('')
-        : vacio('qr', q ? 'Nadie coincide con esa búsqueda.' : 'Todavía no hay ingresos frecuentes cargados.')}`;
+        : vacio('qr', q ? 'Nadie coincide con esa búsqueda.' : 'La Administración todavía no cargó ingresos frecuentes.')}`;
   },
 };
 F['buscar-frec'] = d => abrir('frecuentes', d.q || '');
@@ -1092,6 +1117,19 @@ REGLAS.push({ id:'visita-no-ingreso-aviso', n:'Visita que no llegó → aviso al
     pasesDelDia(hoy).filter(p => p.hostId && !p.borrado && estadoPase(p, hoy) === 'noingreso').forEach(p => {
       n += marca(s, `noingav-${p.id}-${hoy}`, () => notificar(s, { para:p.hostId, ref:'pases:' + p.id, titulo:`${p.nombre || 'Tu visita'} todavía no llegó`,
         texto:`La esperabas desde las ${p.desde} h. ¿Le cambiás el horario o ya no viene?`, icon:'clock', color:'warn', link:'visitas:no~' + p.id, sonido:true }));
+    }); return n; } });
+/* EL RECORDATORIO DE UNA HORA ANTES (pedido de Claudio, 12-10-2026; ver
+   textoRecordatorio en js/v-inicio.js). Una vez por visita y por día, al
+   vecino que la anunció, con el mensaje de WhatsApp listo. No sale si el
+   pase se hizo dentro de esa hora (la visita ya está avisada), si es un
+   Uber/DiDi/taxi, si el vecino lo apagó para esa visita o si ya entró. */
+REGLAS.push({ id:'visita-recordatorio-1h', n:'Una hora antes de cada visita → al vecino, el WhatsApp para recordarle el QR', d:'Una hora antes de la hora anunciada (cada día que viene, también el personal fijo), al vecino que la autorizó le llega el aviso con el mensaje listo: "Hoy vas al barrio, a lo de …, tené preparado el QR". Con un toque se abre WhatsApp. Cada vecino lo puede apagar en cada visita.',
+  run(s, hoy){ let n = 0; const ahora = ahoraMin(), base = fechaDe(hoy).getTime();
+    pasesDelDia(hoy).filter(p => p && p.hostId && !p.borrado && !p.app && p.tipo !== 'remis' && p.recordar !== false && estadoPase(p, hoy) === 'esperado').forEach(p => {
+      const d = minutosDe(p.desde); if (!(ahora >= d - 60 && ahora < d)) return;
+      if ((p.createdAt || 0) > base + (d - 60) * MIN) return;
+      n += marca(s, `rec1h-${p.id}-${hoy}`, () => notificar(s, { para:p.hostId, ref:'pasesRec:' + p.id, titulo:`${p.nombre || 'Tu visita'} viene hoy a las ${p.desde} h`,
+        texto:'Mandale el recordatorio por WhatsApp: que tenga el QR a mano en la barrera.', icon:'chat', color:'ok', link:'visitas:rec~' + p.id, sonido:true }));
     }); return n; } });
 REGLAS.push({ id:'paquetes-24h', n:'Paquetes → aviso si pasan 24 h sin retirar', d:'Push al lote cada 8 h (de 9 a 21 h) hasta que alguien del lote abre Mis paquetes o lo retira.',
   run(s){ let n = 0; const ahora = Date.now(), h = new Date().getHours();

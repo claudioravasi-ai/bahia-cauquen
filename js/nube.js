@@ -125,8 +125,8 @@ const Nube = {
     comunicados:     { listas:['vistos'], objetos:['respuestas'] },
     compras:         { listas:['anotados'] },
     viajes:          { listas:['anotados'] },
-    obras:           { listas:['historial'], objetos:['avisoHoy'] },
-    infracciones:    { listas:['historial'] },
+    obras:           { listas:['historial','maq'], objetos:['avisoHoy'] },
+    infracciones:    { listas:['historial','pruebas'] },
     liquidaciones:   { listas:['filas'] },
     documentos:      { listas:['versiones'] },
     padron:          { listas:['titulares'] },
@@ -138,7 +138,7 @@ const Nube = {
     descargas:       { listas:[] },
     alertas:         { listas:['lotes'], objetos:['respuestas'] },
     frecuentes:      { listas:['dias'] },
-    hotelViajes:     { listas:['huespedes'] },
+    hotelViajes:     { listas:['huespedes','dias'] },
     hotelProv:       { listas:['dias'] },
     camion:          { listas:[] },
     mensajeria:      { listas:[] },
@@ -162,7 +162,18 @@ const Nube = {
       case 'privados': return [x.userId];
       case 'dms': return [x.a, x.b];
       case 'reclamos': case 'peticiones': return [x.userId];
-      case 'pases': case 'solicitudesPase': return [x.hostId];
+      /* LAS VISITAS SON DEL LOTE (pedido de Claudio, 12-10-2026: "Estela, que
+         es frecuente del lote 148, le debe aparecer a Claudio y a Mónica"). El
+         pase va a la carpeta de todos los que viven en el lote (no al
+         propietario a distancia), además de quien lo autorizó. El pedido que
+         completa la visita por el enlace sigue siendo de quien lo mandó. */
+      case 'pases': {
+        const lote = usuario(x.hostId)?.casa;
+        const us = lote && /^Lote\s/i.test(lote) ? residentesDelLote(lote).map(u => u.id) : [];
+        if (x.hostId && !us.includes(x.hostId)) us.push(x.hostId);
+        return us;
+      }
+      case 'solicitudesPase': return [x.hostId];
       /* LLEGÓ SIN AVISO, A TODO EL LOTE (10-10-2026): la garita preguntó
          por el lote 148 y solo le llegó a Mónica; Claudio, que vive ahí, no
          se enteró. Ahora va a todas las cuentas que viven en el lote (no al
@@ -613,12 +624,13 @@ const Nube = {
     const cambios = {};
     /* Los paquetes también: uno que llegó antes de que el otro vecino del
        lote tuviera cuenta pasa a su carpeta cuando se inscribe. */
-    ['pagos', 'recibos', 'paquetes'].forEach(f => {
+    /* Las visitas también (12-10-2026): las de antes pasan a las carpetas de los demás del lote. */
+    ['pagos', 'recibos', 'paquetes', 'pases'].forEach(f => {
       const donde = this.pvDonde[f] || {};
       aLista(Store.s[f]).forEach(x => {
         if (!x || !x.id) return;
         const quiero = this.duenos(f, x), hay = donde[x.id] || [];
-        const lote = f === 'paquetes' ? (x.lote || usuario(x.hostId)?.casa) : (x.lote || x.casa);
+        const lote = f === 'paquetes' || f === 'pases' ? (x.lote || usuario(x.hostId)?.casa) : (x.lote || x.casa);
         quiero.filter(d => !hay.includes(d)).forEach(d => { cambios[`pv/${f}/${d}/${x.id}`] = x; });
         hay.filter(d => !quiero.includes(d) && d !== x.hostId && (d.startsWith('lote-') || (usuario(d) && usuario(d).casa !== lote) || !usuario(d)))
           .forEach(d => { cambios[`pv/${f}/${d}/${x.id}`] = null; });
@@ -895,6 +907,10 @@ const Nube = {
            si no llega, no se lo asusta con un cartel. */
         /* Los correos (08-10-2026): si las reglas nuevas no están publicadas, se dice qué hacer. */
         if (g === 'barrio/mensajeria'){ (this.sinPermiso = this.sinPermiso || new Set()).add('mensajeria'); toast('El correo no se guardó en la base del barrio: falta publicar las reglas nuevas de Firebase (reglas-firebase.txt). Hasta entonces el camión no llega a los demás.', 'alert'); return; }
+        /* La copia de una visita en la carpeta de OTRO del lote (12-10-2026): si
+           las reglas nuevas todavía no se publicaron, la reparte la
+           Administración; la del propio vecino viaja aparte y llega igual. */
+        if (g.startsWith('pv/pases/') && g !== 'pv/pases/' + this.uid) return;
         if (!/^staff\/(bitacora|auditoria)$/.test(g)) toast('No se pudo guardar en la nube (' + g.split('/')[1] + '): ' + e.message, 'alert');
       });
     });

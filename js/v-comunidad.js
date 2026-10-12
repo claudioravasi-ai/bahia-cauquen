@@ -237,9 +237,7 @@ A['nuevo-post'] = (el) => {
   const tipos = tiposQuePuedo(), pre = el?.dataset?.v && tipos.includes(el.dataset.v) ? el.dataset.v : (yo().rol === 'guardia' ? 'guardia' : 'aviso');
   hoja(yo().rol === 'guardia' ? 'Aviso de la guardia' : 'Publicar en el pizarrón', `<form data-f="nuevo-post">
     <div class="field"><label>Tipo</label><div class="seg">${tipos.map(k => `<label><input type="radio" name="type" value="${k}" ${k === pre ? 'checked' : ''}><span>${I(TIPOS_POST[k].icon)}${TIPOS_POST[k].n}</span></label>`).join('')}</div></div>
-    ${esStaff() ? `<div class="field"><label>¿Para quién?</label><select name="destino" id="postDestino">
-      <option value="todos">Todo el barrio (va al pizarrón)</option>${opcionesLotes()}</select>
-      <div class="ayuda">Si elegís un lote, no se publica: le llega solo a ese vecino, como mensaje privado con sonido.</div></div>` : ''}
+    ${esStaff() ? `<p class="muted tiny" style="margin:-4px 0 12px">${I('users')} Va al pizarrón, para todo el barrio. Si es para un lote solo, <button type="button" class="link" data-a="priv-lote">escribile en privado</button>: le llega a cada cuenta del lote con aviso al celular.</p>` : ''}
     <div class="field"><label>Título</label><input name="title" required maxlength="90" placeholder="${pre === 'guardia' ? 'Ej: Portón de servicio cerrado por mantenimiento' : 'Ej: Corte de luz en la calle 2'}"></div>
     <div class="field"><label>Detalle</label><textarea name="body" maxlength="800" placeholder="Contá un poco más…"></textarea></div>
     <div id="extraEvento" ${pre === 'evento' ? '' : 'hidden'} class="grid3"><div class="field"><label>Fecha</label><input type="date" name="fecha" min="${hoyISO()}"></div>
@@ -260,20 +258,7 @@ document.addEventListener('change', e => {
 F['nuevo-post'] = d => {
   const u = yo();
   if (!tiposQuePuedo().includes(d.type)) return;
-  /* Aviso dirigido a un solo lote: no va al pizarrón, va a su bandeja privada. */
-  if (esStaff() && d.destino && d.destino !== 'todos'){
-    const dest = Store.s.users.filter(x => x.casa === d.destino && x.estado === 'aprobado');
-    if (!dest.length){ toast(`${d.destino} todavía no tiene vecinos con cuenta en la app`, 'alert'); return; }
-    const texto = `${d.title.trim()}${d.body ? '\n' + d.body.trim() : ''}`;
-    Store.cambiar(s => {
-      const canal = u.rol === 'guardia' ? 'guardia' : 'admin';
-      dest.forEach(x => { let h = s.privados.find(z => z.userId === x.id && (z.con || 'admin') === canal);
-        if (!h){ h = { id:uid(), userId:x.id, con:canal, msgs:[] }; s.privados.push(h); }
-        h.msgs.push({ id:uid(), from:canal, text:texto, createdAt:Date.now() }); });
-      notificar(s, { para:dest.map(x => x.id), titulo: u.rol === 'guardia' ? 'Aviso de la guardia' : 'Aviso de la Administración', texto:d.title.trim(), icon: u.rol === 'guardia' ? 'shield' : 'tack', color:'brand', link:'privado:' + (u.rol === 'guardia' ? 'guardia' : 'admin'), sonido:true });
-    });
-    cerrarHoja(); toast(`Aviso enviado a ${d.destino}`, 'send'); return;
-  }
+  /* El aviso a un solo lote ya no sale de acá (12-10-2026): va por "Escribir a un lote" (priv-lote, js/v-gestion.js). */
   const p = { id:uid(), type:d.type, title:d.title.trim(), body:(d.body || '').trim(), autor:u.id, createdAt:Date.now(), reactions:{}, comments:[], foto:fotoParaOtros(d.foto, 7) };
   if (d.type === 'evento'){ p.fecha = d.fecha || ''; p.horaEv = d.horaEv || ''; p.lugar = d.lugar || ''; p.voy = [u.id]; }
   if (d.type === 'ofrezco' || d.type === 'busco'){ p.category = d.category; p.price = (d.price || '').trim(); }
@@ -528,7 +513,7 @@ const FAQ_DATOS = [
   ['¿Quién puede ver cada cosa?', [
     '• Los otros vecinos: tu nombre, tu lote, la dirección del lote y si sos propietario o inquilino, en el buscador de Vecinos (la guía del barrio), y lo que publicás en el pizarrón; tu teléfono u oficio solo si vos lo autorizás. Nunca tu DNI, tu correo, tus expensas, tus reclamos, tus visitas ni tus mensajes.',
     '• La garita (y la supervisión): además, los teléfonos de tu lote que tiene la Administración, para ubicarte o avisarte cuando alguien te busca en la entrada. Son para el servicio y no se pasan a nadie.',
-    '• Las otras cuentas de tu mismo lote (por ejemplo, tu pareja): las expensas del lote, porque son de todos los que viven ahí, y lo de la casa (Tu casa en invierno y en verano, la mochila y el plan ante un sismo con sus sugerencias). En Mi casa → "Quiénes están en tu lote" ven tu nombre, tu relación con el lote y si tenés la app abierta; nunca tu DNI, tu correo ni tu teléfono. Tus mensajes, reclamos y visitas siguen siendo solo tuyos.',
+    '• Las otras cuentas de tu mismo lote (por ejemplo, tu pareja): las expensas del lote, porque son de todos los que viven ahí, y lo de la casa (Tu casa en invierno y en verano, la mochila y el plan ante un sismo con sus sugerencias). En Mi casa → "Quiénes están en tu lote" y en Tu cuenta ven tu nombre, tu relación con el lote, si tenés la app abierta y, si lo elegiste, cómo aparecés en el dibujo del lote (mujer, hombre u otra forma: es optativo y sirve solo para ese dibujo); nunca tu DNI, tu correo ni tu teléfono. También ven las visitas que autorizás (desde el 12-10-2026 las visitas son del lote: quién la autorizó y cuándo, cuándo entró y salió), y si contestás "No estoy en casa" a una llegada sin aviso. Tus mensajes y reclamos siguen siendo solo tuyos.',
     '• "No es de mi lote": si alguien de tu lote avisa que no vivís ahí, a la Administración le llega un aviso privado con los dos nombres para revisarlo; a vos te llega un aviso sin el nombre de quien lo mandó.',
     '• El chat vecinal y las reservas de espacios comunes: la app ya no los tiene (se sacaron el 29 de septiembre de 2026). Lo que había quedado guardado de antes no lo puede leer ningún vecino, ni la garita, ni el hotel; solo la Administración, para borrarlo desde Protección de datos.',
     '• El Hotel Los Cauquenes: nada tuyo. Tiene una cuenta institucional separada que solo ve lo suyo (sus vans, traslados, huéspedes, eventos, proveedores y promociones) y lo público de la ciudad (vuelos, cruceros, agenda, normas del barrio). No puede leer el padrón, las fichas de los vecinos, el pizarrón, tus visitas, la bitácora de la garita ni los SOS.',
@@ -546,6 +531,11 @@ const FAQ_DATOS = [
     '• El policía contratado deja en la garita su nombre, matrícula, celular y correo. Al terminar su servicio le llega a SU correo la constancia (ingreso, salida, guardias, rondas con la hora de cada QR). Nadie más que la garita y la Administración ve esos datos.',
     '• Si le mandás a tu visita el enlace para que complete sus datos: el enlace lleva tu nombre de pila y tu lote (para que sepa a quién va a ver). Lo que escribe la visita (nombre, DNI, celular, patente, día y horario) va directo a tu carpeta privada, la garita lo convierte en un pase y te llega el aviso; se borra a los mismos días que cualquier visita. Su pase queda guardado solo en SU teléfono, y si lo guarda en su WhatsApp, en su propio chat.',
     '• La Administración puede editar o borrar una visita anunciada (por ejemplo, si quedó mal cargada): te llega el aviso y queda anotado en la auditoría, sin copiar el DNI ni la patente.',
+    '• Si cargás el celular de tu visita (es optativo), lo ven vos, la garita y la Administración para llamarla si se demora, y queda guardado con la visita; cuando la visita pasa al archivo histórico, se va sin el celular. El recordatorio de una hora antes te llega solo a vos: el mensaje lo mandás vos desde tu WhatsApp, la app no le escribe a nadie ni le pasa el número a WhatsApp.',
+    '• Tu personal fijo (la empleada, el jardinero, el personal de una obra que autorizás con "Viene varias veces") aparece también en "Ingresos frecuentes": lo ven la garita, la Administración y la supervisión (esta última sin el código ni el QR), con tu lote, los días y el horario.',
+    '• Si la Administración te notifica una infracción con fotos o archivos de prueba: los ven solo la Administración y las cuentas de tu lote. Cada uno ve una vista previa liviana y baja el archivo si lo toca. A los 90 días se borran de la base del barrio; en la infracción queda la constancia de quién los subió, quién los bajó y cuándo se borraron.',
+    '• Recordatorio en el calendario de tu visita: si se lo mandás, el enlace lleva escritos adentro su nombre de pila, a lo de quién va, el lote, los días y el horario (sin DNI, patente ni código del pase). No se guarda en ningún servidor: lo abre tu visita y lo agrega a su propio calendario.',
+    '• Llegó sin aviso: la ventana con "Que pase" / "No estoy en casa" les aparece a todas las cuentas de tu lote y suena hasta que alguien contesta. La garita ve la respuesta; "No estoy en casa" lo ven solo la garita y tu lote.',
     '• Si una visita que anunciaste no llega en 2 horas, el aviso "… todavía no llegó" te llega solo a vos (la cuenta que la anunció). Si tocás "Ya no viene", el pase se cancela y en el libro de guardia queda su nombre, tu lote y el horario, sin DNI ni patente.',
     '• Si una visita que anunciaste no llega, pasada la hora de salida del pase queda "Cancelado · no ingresó" y en el libro de guardia (que leen solo la garita, la Administración y la supervisión) se anota su nombre, tu lote y el horario anunciado, sin DNI ni patente. Ese renglón se guarda como el resto del libro.',
     '• Si avisás que viene un Uber, DiDi o taxi: la garita ve la app, la patente, el nombre del chofer si lo anotás y el horario, solo para reconocerlo al entrar. El aviso vence solo, como cualquier pase de visita.',
@@ -568,6 +558,7 @@ const FAQ_DATOS = [
     '• Sus expensas: el hotel ve solo las de sus 6 unidades (UF 000 a 005). La Administración le deja cada mes una copia con únicamente esas cuotas; el hotel no puede leer la liquidación del barrio ni lo que paga ningún vecino.',
     '• Si hay una emergencia médica en el barrio, la garita puede pedirle al hotel su desfibrilador o su personal con primeros auxilios: al hotel le llega solo el lote al que tiene que ir.',
     '• Lo demás que tiene que ver con el hotel (acceso, eventos, ruidos, estacionamiento) se ordena con un convenio de convivencia y servicios a aprobar en asamblea.',
+    '• Mientras el hotel no cargó nada propio, el hotel y la Administración ven un "hotel de ejemplo" con datos inventados (vans, traslados, huéspedes ficticios). Se arma en cada equipo, no se guarda en la base, la garita no lo ve y desaparece apenas el hotel carga lo suyo.',
   ]],
   ['¿Y "Estoy bien"? ¿Quién sabe que vivo solo?', [
     'En simple: la garita, la Administración, tus familiares y las personas del barrio que vos elegís. La app guarda la hora a la que avisás cada día, nada de salud, y lo borra cuando dejás de usarlo.',

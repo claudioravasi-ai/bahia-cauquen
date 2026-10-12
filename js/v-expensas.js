@@ -896,6 +896,7 @@ const CONTA = {
           <div class="kpi"><b>${calc.gastos}</b><span>Comprobantes</span></div>
           <div class="kpi"><b>${LOTES.length}</b><span>Lotes a prorratear</span></div></div></div>
       ${ant ? `<div class="card plana small">Mes anterior (${nombrePeriodo(ant.periodo)}): ${plata(ant.totalGastos)} · variación ${(((calc.totalGastos - ant.totalGastos) / (ant.totalGastos || 1)) * 100).toFixed(1)} %</div>` : ''}
+      ${/* 12-10-2026: la práctica guiada de las expensas (expensas.html), con la app en modo prueba. */ superficie({ a:'link', v:'expensas.html', icon:'book', color:'sky', t:'Practicar el mes paso a paso', s:'De cero a los cupones de cada propietario, con la app en modo prueba: no toca la base del barrio' })}
       ${typeof cfgPlan === 'function' ? (cfgPlan().base
         ? superficie({ a:'abrir', v:'cobranzas', p:'plan', icon:'zap', color:'wood', t:`Expensas automáticas: ${nombrePeriodo(per)} estimado en ${plata(mesPlan(per).total)}`, s:'El año desarrollado mes a mes desde la última liquidación', cls:'acento' })
         : superficie({ a:'abrir', v:'cobranzas', p:'plan', icon:'zap', color:'wood', t:'Activar las expensas automáticas', s:'Traer una vez la liquidación de agosto y la app desarrolla sola los meses siguientes', cls:'acento' })) : ''}
@@ -1168,21 +1169,18 @@ const COBRO = {
   },
 
   morosos(){
-    const filas = LOTES.map(L => ({ L, lote:'Lote ' + L.lote, saldo:saldoLote('Lote ' + L.lote) })).filter(x => x.saldo > 0.5).sort((a, b) => b.saldo - a.saldo);
-    const total = filas.reduce((a, x) => a + x.saldo, 0);
-    return `<div class="card"><div class="row" style="justify-content:space-between"><b>Deuda total del barrio</b><b class="num" style="font-size:18px;color:var(--danger)">${plata(total)}</b></div>
-        <div class="muted small">${plural(filas.length, 'lote con deuda', 'lotes con deuda')} de ${LOTES.length}</div></div>
-      ${superficie({ a:'morosos-visibles', icon:'lock', color: Morosos.visibles() ? 'ok' : 'wood', t: Morosos.visibles() ? 'Los vecinos ven la lista de morosos' : 'Los vecinos NO ven la lista de morosos', s: Morosos.visibles() ? 'En Mis expensas: por lote, sin nombres (deuda por mes, total, judicial y proyección). Tocá para dejar de mostrarla.' : 'Tocá para mostrarla en Mis expensas, por lote y sin nombres.' })}
-      ${Morosos.visibles() ? `<button class="btn btn-sec btn-block" data-a="morosos-barrio" style="margin:-4px 0 12px">${I('eye')}Ver la lista como la ven los vecinos</button>` : ''}
-      ${filas.map(x => { const m = cuentaLote(x.lote).movs.filter(v => v.debe), desde = m.length ? m[0].fecha : Date.now();
-        const meses = Math.max(1, Math.round((Date.now() - desde) / (30 * DIA)));
-        return `<div class="card"><div class="row"><span class="ic ic-${x.saldo > 1000000 ? 'danger' : 'warn'}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I('alert')}</span>
-          <div class="grow"><b>${esc(x.lote)}</b><div class="muted small">${esc(propietarioDe(x.lote) || 'Sin propietario cargado')}</div>
-            <div class="muted small">Arrastra ${plural(meses, 'mes', 'meses')}</div></div><b class="num" style="color:var(--danger)">${plata(x.saldo)}</b></div>
-          <div class="btns" style="margin-top:10px">
-            <button class="btn btn-sm btn-sec" data-a="ver-cuenta" data-v="${esc(x.lote)}">${I('eye')}Ver cuenta</button>
-            <button class="btn btn-sm btn-sec" data-a="certificado-deuda" data-v="${esc(x.lote)}">${I('file')}Certificado</button>
-            <button class="btn btn-sm btn-pri" data-a="reclamar-deuda" data-v="${esc(x.lote)}">${I('send')}Reclamar</button></div></div>`; }).join('') || vacio('check', '¡Nadie debe nada!')}`;
+    /* Mismo diseño que ven los vecinos (12-10-2026), con el nombre del propietario y los botones. Siempre, aunque la lista no se muestre a los vecinos. */
+    const ult = liquidacionesEmitidas().slice(-1)[0], ipc = typeof ipcProyeccion === 'function' ? ipcProyeccion() : { pct:0 }, i = (+ipc.pct || 0) / 100;
+    const ls = LOTES.map(L => { const lote = 'Lote ' + L.lote, d = Morosos.deudaPorMes(lote); if (d.total <= 1) return null; const cu = ult ? cuotaDe(ult, lote) : null;
+      return { lote, meses:d.meses, total:d.total, judicial: !!(cu && cu.judicial), interes: cu ? Math.round((+cu.interes || 0) * 100) / 100 : 0, proyeccion:[3, 6, 12].map(n => ({ n, m:Math.round(d.total * Math.pow(1 + i, n)) })) }; })
+      .filter(Boolean).sort(ordenMorosos);
+    const alDia = LOTES.filter(L => saldoLote('Lote ' + L.lote) > 0.5 && !ls.some(x => x.lote === 'Lote ' + L.lote)).length;
+    if (ls.length && typeof animarNumeros === 'function') setTimeout(() => animarNumeros(), 60);
+    return `${ls.length ? cabezaMorosos(ls) : ''}
+      ${superficie({ a:'morosos-visibles', icon:'lock', color: Morosos.visibles() ? 'ok' : 'wood', t: Morosos.visibles() ? 'Los vecinos ven la lista de morosos' : 'Los vecinos NO ven la lista de morosos', s: Morosos.visibles() ? 'En Mis expensas: por lote, sin nombres. Tocá para dejar de mostrarla.' : 'Tocá para mostrarla en Mis expensas (por lote, sin nombres).' })}
+      ${Morosos.visibles() && ls.length ? `<button class="btn btn-sec btn-block" data-a="morosos-barrio" style="margin:-4px 0 12px">${I('eye')}Ver la lista como la ven los vecinos</button>` : ''}
+      ${ls.length ? listaMorosos(ls, true) : vacio('check', '¡Nadie tiene expensas vencidas sin pagar!')}
+      ${alDia ? `<p class="muted small" style="margin-top:10px">${I('clock')} Además, ${plural(alDia, 'lote tiene', 'lotes tienen')} el cupón del mes sin pagar, pero todavía no venció: no son morosos.</p>` : ''}`;
   },
 
 };
@@ -2016,7 +2014,7 @@ const Morosos = {
       const cu = cuotaDe(ult, lote);
       return { id:'mor-' + L.lote, lote, meses:d.meses, total:d.total, judicial: !!(cu && cu.judicial), interes: cu ? Math.round((+cu.interes || 0) * 100) / 100 : 0,
         periodo:ult.periodo, ipc:+ipc.pct || 0, ipcPeriodo:ipc.periodo || '', proyeccion:[3, 6, 12].map(n => ({ n, m:Math.round(d.total * Math.pow(1 + i, n)) })) };
-    }).filter(Boolean).sort((a, b) => b.total - a.total);
+    }).filter(Boolean).sort(ordenMorosos);
   },
   /* La Administración lo publica solo si algo cambió (como ExpLote). */
   publicar(){
@@ -2038,27 +2036,115 @@ const Morosos = {
   },
   mes: p => p.startsWith('antes-') ? `Antes de ${nombrePeriodo(p.slice(6))}` : nombrePeriodo(p),
 };
+/* =========================================================
+   LOS MOROSOS, MÁS CLAROS (pedido de Claudio, 12-10-2026: "no entiendo la
+   descripción; rediseñalo, en orden decreciente de antigüedad de la deuda").
+     · Primero la deuda MÁS VIEJA: el lote que debe desde hace más tiempo va
+       arriba; a igual antigüedad, el que debe más.
+     · Cada lote dice en palabras simples cuántas expensas debe, desde
+       cuándo, y una tira de meses (de la más vieja a la más nueva) con un
+       color por antigüedad: amarillo 1 mes, naranja 2 a 3, rojo 4 a 6,
+       bordó 7 o más.
+     · "Si sigue sin pagar": lo que sería la deuda con la inflación, en 3,
+       6 y 12 meses, con una barrita que crece.
+   ========================================================= */
+const claveMes = p => p.startsWith('antes-') ? '0' + p.slice(6) : '1' + p;
+const ordenMorosos = (a, b) => claveMes(aLista(a.meses)[0]?.p || '9').localeCompare(claveMes(aLista(b.meses)[0]?.p || '9')) || (b.total - a.total);
+/* Cuántos meses hace que vence la más vieja (lo de antes de la primera liquidación cuenta como "más de"). */
+function antiguedadDeuda(x){
+  const p = aLista(x.meses)[0]?.p; if (!p) return { meses:0, desde:'', mas:false };
+  const per = p.startsWith('antes-') ? p.slice(6) : p, n = Math.max(1, typeof mesesEntre === 'function' ? mesesEntre(per, periodoHoy()) : 1);
+  return { meses:n + (p.startsWith('antes-') ? 1 : 0), desde:per, mas:p.startsWith('antes-') };
+}
+const mesCortoMor = p => { const per = p.startsWith('antes-') ? p.slice(6) : p; return (p.startsWith('antes-') ? '<' : '') + (MESES[+per.slice(5, 7) - 1] || ''); };
+const nivelAntiguedad = n => n >= 7 ? 4 : n >= 4 ? 3 : n >= 2 ? 2 : 1;
+const NIVEL_MOR = ['', 'Hace 1 mes', 'De 2 a 3 meses', 'De 4 a 6 meses', '7 meses o más'];
+const NIVEL_CORTO = ['', '1 mes', '2 a 3', '4 a 6', '7 o más'];
+/* =========================================================
+   MOROSOS 2.0 (pedido de Claudio, 12-10-2026: "más innovador e interactivo,
+   con colores más vivos"). Arriba, una rueda de colores con cuántos lotes
+   deben según la antigüedad y una barra que se toca para filtrar; chips de
+   colores para filtrar; un buscador de lote; y cada lote en una fila con su
+   puesto en el ranking (primero la deuda más vieja), su antigüedad, los
+   cuadraditos de cada expensa que debe y el total. Al tocarla se abre y
+   muestra mes por mes, el ajuste, cuánto sería si sigue sin pagar y (para
+   la Administración) los botones. Todo en el mismo lugar, sin recargar.
+   ========================================================= */
+function tarjetaMoroso(x, { admin = false, i = 0 } = {}){
+  const a = antiguedadDeuda(x), nv = nivelAntiguedad(a.meses), ms = aLista(x.meses);
+  const proy = aLista(x.proyeccion), tope = Math.max(x.total, ...proy.map(p => p.m), 1);
+  const cuadros = ms.map(m => { const e = typeof mesesEntre === 'function' ? mesesEntre(m.p.startsWith('antes-') ? m.p.slice(6) : m.p, periodoHoy()) : 1; return `<i class="nv-${nivelAntiguedad(Math.max(1, e))}" title="${esc(Morosos.mes(m.p))}: ${plata(m.m)}"></i>`; }).join('');
+  return `<article class="mr-c nv-${nv}${x.judicial ? ' judicial' : ''}" data-nv="${nv}" data-lote="${esc(normTxt(x.lote + ' ' + String(x.lote).replace(/\D/g, '')))}" style="--i:${Math.min(i, 12)}">
+    <button type="button" class="mr-fila" data-a="mor-abrir" aria-expanded="false">
+      <span class="mr-rank">${i + 1}</span>
+      <span class="mr-edad"><b>${a.meses}${a.mas ? '+' : ''}</b><small>${a.meses === 1 && !a.mas ? 'mes' : 'meses'}</small></span>
+      <span class="mr-info"><b>${esc(x.lote)}${x.judicial ? ` <em class="mr-jud">${I('file')}judicial</em>` : ''}</b>
+        ${admin && propietarioDe(x.lote) ? `<small>${esc(propietarioDe(x.lote))}</small>` : `<small>${plural(ms.length, 'impaga', 'impagas')} · desde ${esc(String(Morosos.mes(ms[0]?.p || '')).toLowerCase().replace(/^(\w{3})\w*/, '$1.'))}</small>`}
+        <span class="mr-cuadros" aria-hidden="true">${cuadros}</span></span>
+      <span class="mr-monto"><b>${plata(x.total)}</b><small>${admin && propietarioDe(x.lote) ? plural(ms.length, 'expensa', 'expensas') : 'ver detalle'}</small></span>
+      <span class="mr-flecha">${I('right')}</span></button>
+    <div class="mr-det"><div class="mr-det-in">
+      <div class="mr-meses">${ms.map(m => { const e = typeof mesesEntre === 'function' ? mesesEntre(m.p.startsWith('antes-') ? m.p.slice(6) : m.p, periodoHoy()) : 1; return `<span class="nv-${nivelAntiguedad(Math.max(1, e))}"><small>${esc(Morosos.mes(m.p))}</small><b>${plata(m.m)}</b></span>`; }).join('')}</div>
+      ${x.interes ? `<p class="mr-nota">${I('clock')}<span>En su último cupón se le sumaron <b>${plata(x.interes)}</b> de ajuste por lo que no pagó.</span></p>` : ''}
+      ${proy.length ? `<div class="mr-proy"><small>Si sigue sin pagar, con la inflación:</small>${proy.map(p => `<span><i style="--w:${Math.round(p.m / tope * 100)}%"></i><em>En ${p.n === 12 ? '1 año' : p.n + ' meses'}</em><b>${plata(p.m)}</b></span>`).join('')}</div>` : ''}
+      ${admin ? `<div class="btns"><button class="btn btn-sm btn-sec" data-a="ver-cuenta" data-v="${esc(x.lote)}">${I('eye')}Ver cuenta</button>
+        <button class="btn btn-sm btn-sec" data-a="certificado-deuda" data-v="${esc(x.lote)}">${I('file')}Certificado</button>
+        <button class="btn btn-sm btn-pri" data-a="reclamar-deuda" data-v="${esc(x.lote)}">${I('send')}Reclamar</button></div>` : ''}</div></div></article>`;
+}
+/* Arriba de la lista: la rueda, la barra que filtra, los chips y el buscador. */
+function cabezaMorosos(ls){
+  const total = ls.reduce((a, x) => a + x.total, 0), a0 = ls.length ? antiguedadDeuda(ls[0]) : { meses:0 };
+  const cuenta = [0, 0, 0, 0, 0]; ls.forEach(x => { cuenta[nivelAntiguedad(antiguedadDeuda(x).meses)]++; });
+  const alDia = Math.max(0, (typeof LOTES !== 'undefined' ? LOTES.length : 0) - ls.length), todos = ls.length + alDia || 1;
+  let ac = 0; const arcos = [4, 3, 2, 1].map(n => { const p = cuenta[n] / todos * 100, seg = `<circle class="mr-arco nv-${n}" cx="21" cy="21" r="15.9" pathLength="100" style="--a:${p.toFixed(2)};--o:${(-ac).toFixed(2)}"/>`; ac += p; return p ? seg : ''; }).join('');
+  return `<div class="mr-hero">
+      <div class="mr-rueda"><svg viewBox="0 0 42 42" aria-hidden="true"><circle class="mr-pista" cx="21" cy="21" r="15.9" pathLength="100"/>${arcos}</svg>
+        <span><b class="dn-num" data-k="mor-n" data-n="${ls.length}">${ls.length}</b><small>de ${todos} lotes deben</small></span></div>
+      <div class="mr-hero-txt"><small>Deuda vencida</small><b>${plata(total)}</b>
+        <span>${I('clock')} La más vieja: <b>${a0.meses}${a0.mas ? '+' : ''} ${a0.meses === 1 && !a0.mas ? 'mes' : 'meses'}</b></span>
+        <span>${I('check')} Al día: <b>${alDia} ${alDia === 1 ? 'lote' : 'lotes'}</b></span></div></div>
+    <div class="mr-termo" role="group" aria-label="Lotes que deben, según la antigüedad">${[4, 3, 2, 1].filter(n => cuenta[n]).map(n => `<button type="button" class="nv-${n}" data-a="mor-filtro" data-v="${n}" style="flex:${cuenta[n]}" title="${NIVEL_MOR[n]}: ${cuenta[n]}"><span>${cuenta[n]}</span></button>`).join('')}</div>
+    <div class="mr-chips" role="tablist"><button type="button" class="on" data-a="mor-filtro" data-v="todos">Todos <b>${ls.length}</b></button>${[4, 3, 2, 1].map(n => `<button type="button" class="nv-${n}" data-a="mor-filtro" data-v="${n}" ${cuenta[n] ? '' : 'disabled'}>${NIVEL_CORTO[n]}<small> ${n === 1 ? '' : 'meses'}</small> <b>${cuenta[n]}</b></button>`).join('')}</div>
+    <label class="mr-buscar">${I('search')}<input type="search" data-mor-buscar placeholder="Buscar un lote (ej: 148)" autocomplete="off" inputmode="search"></label>
+    <details class="mr-que"><summary>${I('info')} ¿Qué es esta lista?</summary><p>Los lotes que tienen expensas <b>vencidas</b> sin pagar (pasado el 2º vencimiento). Van primero los que deben <b>desde hace más tiempo</b>; a igual antigüedad, el que debe más. Cada cuadradito es una expensa que deben, de la más vieja a la más nueva, con el color de su antigüedad. Tocá un lote para ver el detalle.</p></details>`;
+}
+const listaMorosos = (ls, admin) => `<div class="mr-lista" data-f="todos">${ls.map((x, i) => tarjetaMoroso(x, { admin, i })).join('')}<p class="mr-nada" hidden>${I('search')} Ningún lote coincide.</p></div>`;
+/* Filtrar, buscar y abrir, sin volver a dibujar (en la hoja y en la pestaña). */
+A['mor-filtro'] = el => {
+  const caja = el.closest('.hoja-cuerpo, #cuerpo') || document, lista = caja.querySelector('.mr-lista'); if (!lista) return;
+  const v = lista.dataset.f === el.dataset.v && el.dataset.v !== 'todos' ? 'todos' : el.dataset.v; lista.dataset.f = v;
+  caja.querySelectorAll('.mr-chips button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  caja.querySelectorAll('.mr-termo button').forEach(b => b.classList.toggle('apagado', v !== 'todos' && b.dataset.v !== v));
+  filtrarMorosos(caja);
+};
+function filtrarMorosos(caja){
+  const lista = caja.querySelector('.mr-lista'); if (!lista) return;
+  const q = normTxt(caja.querySelector('[data-mor-buscar]')?.value || '').replace(/^lote\s*/, ''), f = lista.dataset.f || 'todos';
+  let n = 0;
+  lista.querySelectorAll('.mr-c').forEach(c => { const ok = (f === 'todos' || c.dataset.nv === f) && (!q || c.dataset.lote.split(' ').some(w => w.startsWith(q)) || c.dataset.lote.includes(q)); c.hidden = !ok; if (ok) n++; });
+  const nada = lista.querySelector('.mr-nada'); if (nada) nada.hidden = n > 0;
+}
+document.addEventListener('input', e => { if (e.target.matches && e.target.matches('[data-mor-buscar]')) filtrarMorosos(e.target.closest('.hoja-cuerpo, #cuerpo') || document); });
+A['mor-abrir'] = el => { const c = el.closest('.mr-c'); if (!c) return; const abierta = c.classList.toggle('abierta'); el.setAttribute('aria-expanded', abierta); };
 /* La sección en Mis expensas: un resumen y la lista en una hoja. */
 function seccionMorosos(){
   if (esHotel() || esGuardia() || esSupervisor()) return '';
   const ls = Morosos.lista(); if (!ls.length) return '';
-  const total = ls.reduce((a, x) => a + x.total, 0), jud = ls.filter(x => x.judicial).length;
+  const total = ls.reduce((a, x) => a + x.total, 0), jud = ls.filter(x => x.judicial).length, a0 = antiguedadDeuda(ls[0]);
   return `${sec('Morosos del barrio')}
     <button class="superficie mor-resumen" data-a="morosos-barrio"><span class="ic ic-danger">${I('alert')}</span>
-      <span class="txt"><b>${plural(ls.length, 'lote debe', 'lotes deben')} ${plataCorta(total)}</b><small>${jud ? plural(jud, 'en gestión judicial', 'en gestión judicial') + ' · ' : ''}deuda por mes, total y proyección a 12 meses · por lote, sin nombres</small></span>${I('right')}</button>`;
+      <span class="txt"><b>${plural(ls.length, 'lote debe', 'lotes deben')} ${plataCorta(total)}</b><small>La deuda más vieja es de hace ${a0.meses}${a0.mas ? ' o más' : ''} ${a0.meses === 1 && !a0.mas ? 'mes' : 'meses'}${jud ? ' · ' + plural(jud, 'en gestión judicial', 'en gestión judicial') : ''} · por lote, sin nombres</small></span>${I('right')}</button>`;
 }
 A['morosos-barrio'] = () => {
   if (esHotel() || esGuardia() || esSupervisor()) return;
   const ls = Morosos.lista(); if (!ls.length){ toast('No hay lotes con deuda vencida', 'check'); return; }
   const total = ls.reduce((a, x) => a + x.total, 0), x0 = ls[0], ipcTxt = `${(x0.ipc || 0).toLocaleString('es-AR')} % mensual${x0.ipcPeriodo ? ` (IPC del INDEC de ${nombrePeriodo(x0.ipcPeriodo).toLowerCase()}, el último publicado)` : ''}`;
   const anual = x0.ipc ? Math.round((Math.pow(1 + x0.ipc / 100, 12) - 1) * 1000) / 10 : 0;
-  hoja('Morosos del barrio', `<div class="garita-kpis"><div class="kpi"><b>${ls.length}</b><span>Lotes con deuda vencida</span></div><div class="kpi"><b>${plataCorta(total)}</b><span>Deuda vencida total</span></div><div class="kpi"><b>${ls.filter(x => x.judicial).length}</b><span>En gestión judicial</span></div></div>
-    <p class="muted small" style="margin:0 0 10px">Según la liquidación de ${nombrePeriodo(x0.periodo).toLowerCase()} y los pagos confirmados. La proyección actualiza la deuda por inflación: ${esc(ipcTxt)}, un ${anual.toLocaleString('es-AR')} % en 12 meses, sin contar el interés por mora (${tasaMoraPct().toLocaleString('es-AR')} % mensual).</p>
-    ${ls.map(x => `<div class="card mor-lote${x.judicial ? ' judicial' : ''}"><div class="row"><b class="grow" style="white-space:nowrap">${esc(x.lote)}</b>${x.judicial ? `<span class="pill p-accent">${I('file')}En gestión judicial</span>` : ''}<b class="num" style="color:var(--danger)">${plata(x.total)}</b></div>
-      <div class="mor-meses">${aLista(x.meses).map(m => `<span><small>${esc(Morosos.mes(m.p))}</small><b>${plata(m.m)}</b></span>`).join('')}</div>
-      ${x.interes ? `<div class="muted tiny">Interés por mora en el último cupón: ${plata(x.interes)}</div>` : ''}
-      <div class="mor-proy">${aLista(x.proyeccion).map(p => `<span><small>En ${p.n} meses</small><b>${plata(p.m)}</b></span>`).join('')}</div></div>`).join('')}
+  hoja('Morosos del barrio', `${cabezaMorosos(ls)}
+    ${listaMorosos(ls, false)}
+    <p class="muted tiny" style="margin:8px 2px 12px">Según la liquidación de ${nombrePeriodo(x0.periodo).toLowerCase()} y los pagos confirmados. "Si sigue sin pagar" usa la inflación: ${esc(ipcTxt)} (un ${anual.toLocaleString('es-AR')} % en un año), sin contar el ajuste por mora.</p>
     ${aviso('info', 'lock', 'Por lote y sin nombres', 'Esta lista la ven solo los vecinos del barrio y la Administración, como el estado de cuentas de una liquidación de expensas. No la ven la garita, la supervisión ni el hotel, y nunca sale en avisos, correos ni en el pizarrón. Si tu lote figura y no corresponde, escribile a la Administración.')}`, { ancho:'620px' });
+  if (typeof animarNumeros === 'function') setTimeout(() => animarNumeros(), 80);
 };
 A['morosos-visibles'] = () => { if (!esAdmin()) return; Store.cambiar(s => { s.config.morososVisibles = !(s.config.morososVisibles !== false); });
   Morosos.publicar(); toast(Morosos.visibles() ? 'Los vecinos ven la lista de morosos (por lote, sin nombres)' : 'La lista de morosos ya no se muestra a los vecinos', 'lock'); refrescar(); };

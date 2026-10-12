@@ -735,8 +735,13 @@ R.privado = {
          tarde): tiene su lugar propio ("Mensajes con la garita" en el Día a
          día de la Administración; "Administración" en las tejas de la
          garita). Esta lista es solo de conversaciones con vecinos. */
-      return `${superficie({ a:'priv-lote', icon:'chat', color:'accent', t:'Escribir a un lote o a vecinos', s:'A todo el lote o a quienes elijas · en privado, a cada uno por separado', cls:'acento' })}
-        ${superficie({ a:'nuevo-post', v:'aviso', icon:'send', color:'brand', t:'Avisar algo a un lote en el pizarrón', s:'Elegí el lote en "¿Para quién?"' })}
+      /* UN SOLO BOTÓN (pedido de Claudio, 12-10-2026: "tienen dos botones que
+         son para lo mismo, depurá todo en un mismo botón"). "Avisar algo a un
+         lote en el pizarrón" hacía lo mismo que este: el aviso a un lote no
+         va al pizarrón, le llega a cada cuenta en privado. Quedó este, que
+         además deja elegir a quiénes del lote. Lo que es para todo el barrio
+         va por el pizarrón o un comunicado. */
+      return `${superficie({ a:'priv-lote', icon:'chat', color:'accent', t:'Escribir a un lote o a vecinos', s:'A todo el lote o a quienes elijas · le llega a cada uno en privado, con aviso al celular', cls:'acento' })}
         ${hilos.length ? hilos.map(h => { const v = usuario(h.userId) || {}, vis = msgsVisibles(h, miCanal), ult = vis.at(-1), nl = vis.filter(m => m.from === 'vecino' && !m.leido).length;
           return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${miCanal}|${h.userId}">${v.fotoCasa ? fotoHTML(v.fotoCasa, 'casa-foto chica') : avatar(v)}<span class="txt"><b>${esc(v.nombre || '')} · ${esc(v.casa || '')}</b><small>${ult ? esc(ult.text.slice(0, 70)) + ' · ' + hace(ult.createdAt) : 'Sin mensajes'}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')
           : vacio('lock', 'No hay conversaciones.')}`;
@@ -1560,9 +1565,201 @@ R.perfil = {
 const cuentasDeMiLote = u => Store.s.users.filter(x => x && x.casa === u.casa && (x.estado === 'aprobado' || x.estado === 'pendiente') && x.rol !== 'hotel' && x.rol !== 'guardia')
   .sort((a, b) => (b.id === u.id) - (a.id === u.id) || (a.estado === 'pendiente') - (b.estado === 'pendiente') || String(a.nombre).localeCompare(String(b.nombre)));
 const conAppAbierta = id => typeof Presencia !== 'undefined' && Presencia.d ? !!Presencia.d[id] : id === yo()?.id;
+/* =========================================================
+   QUIÉNES VIVEN EN EL LOTE, DIBUJADOS (pedido de Claudio, 12-10-2026: "un
+   dibujito de parejas, familias, amigos, lo que corresponda, y animado").
+   Sale de lo que cada cuenta dijo que es del lote:
+     · dos titulares (propietario/cotitular) → pareja, con un corazón;
+     · tres o más, o algún "familiar o conviviente" → familia, bajo un techo
+       con la chimenea humeando;
+     · inquilinos que comparten → compañeros de casa, con una charla;
+     · y las mascotas que cargaron en Mi casa (perro o gato) moviendo la cola.
+   Cada uno con su color y su nombre; el que mira saluda con la mano. Con
+   "reducir movimiento", quieto. No muestra nada que el lote no sepa ya.
+   ========================================================= */
+/* Lo que no cambia de una persona entre una pantalla y otra (sale de su nombre). */
+const hashTxt = t => { let h = 0; for (const c of String(t || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+const PIEL = ['#f5d3b3', '#eabf98', '#d9a47a', '#c08356', '#a06a44', '#7c4f31'];
+/* Sin gris: el color sale al azar del nombre y no sabemos la edad de nadie. */
+const PELO = ['#2b2118', '#4a3122', '#6b4426', '#a8723f', '#d9b26b', '#1a1a1f', '#3b2a20'];
+const PANTALON = ['#2f3e5c', '#3b3b45', '#5a4636', '#24324a', '#46505e'];
+function tipoDeLote(ps){
+  const rel = ps.map(x => x.relacion || '');
+  if (ps.length >= 3 || rel.includes('familiar')) return ['familia', 'Familia'];
+  if (ps.length === 2 && rel.every(r => !r || r === 'propietario' || r === 'cotitular')) return ['pareja', 'Pareja'];
+  if (ps.length >= 2) return ['amigos', 'Compañeros de casa'];
+  return ['solo', ''];
+}
+/* Una persona de frente, con proporciones de verdad (la cabeza es un
+   séptimo del cuerpo), pelo, cara, ropa y zapatos. Los pies en (0, 0).
+   brazoD / brazoI: 'baja' (al costado), 'mano' (le da la mano al de al
+   lado) o 'saluda' (el que mira la pantalla saluda).
+   Mujer u hombre lo elige CADA UNO en Tu cuenta (x.figura), no se adivina
+   por el nombre (pedido de Claudio, 12-10-2026: "Mónica es mujer y Claudio
+   hombre y salen al revés"). Mujer: siempre pelo largo (lacio o con rulos) y
+   casi siempre pollera. Hombre: pelo corto o rulos cortos, y a veces barba. Sin
+   elegir: una figura neutra (melena a la altura del mentón). */
+const FIGURAS = { mujer:'Mujer', hombre:'Hombre', neutra:'Otra forma' };
+const FALDA = ['#3f51b5', '#8e2c48', '#2e7d6b', '#6a4fb3', '#b5562f'];
+const figuraDe = x => x && (x.figura === 'mujer' || x.figura === 'hombre') ? x.figura : 'neutra';
+function svgPersona(x, { brazoD = 'baja', brazoI = 'baja', escala = 1, d = 0 } = {}){
+  const h = hashTxt(x.nombre), piel = PIEL[h % PIEL.length], pelos = PELO, pelo = pelos[(h >>> 3) % pelos.length], ropa = colorDe(x.nombre), pant = PANTALON[(h >>> 5) % PANTALON.length];
+  const fig = figuraDe(x);
+  const estilo = fig === 'mujer' ? ['largo', 'rulosL', 'largo'][(h >>> 7) % 3] : fig === 'hombre' ? ['corto', 'corto', 'rulos', 'corto'][(h >>> 7) % 4] : 'melena';
+  const falda = fig === 'mujer' && (h >>> 9) % 3 !== 0, colFalda = FALDA[(h >>> 11) % FALDA.length], barba = fig === 'hombre' && escala >= 1 && (h >>> 9) % 3 === 0;
+  const brazo = (lado, modo) => { const s = lado === 'd' ? 1 : -1, hx = s * 11, mano = modo === 'mano' ? `M${hx} -59 q${s * 7} 6 ${s * 15} 12` : modo === 'saluda' ? `M${hx} -59 q${s * 7} -6 ${s * 8} -18` : `M${hx} -59 q${s * 4} 8 ${s * 4} 20`;
+    const fin = modo === 'mano' ? [hx + s * 15, -47] : modo === 'saluda' ? [hx + s * 8, -77] : [hx + s * 4, -39];
+    return `<g class="dl-brazo ${modo}"><path d="${mano}" stroke="${ropa}" stroke-width="5.4" fill="none" stroke-linecap="round"/><circle cx="${fin[0]}" cy="${fin[1]}" r="2.7" fill="${piel}"/></g>`; };
+  const detras = estilo === 'largo' ? `<path d="M-11 -79 q0 -15 11 -15 q11 0 11 15 v15.6 q0 3.4 -3.6 3.4 q-2.8 0 -3.2 -3.4 v-11 h-8.4 v11 q-.4 3.4 -3.2 3.4 q-3.6 0 -3.6 -3.4z" fill="${pelo}"/>`
+    : estilo === 'rulosL' ? `<g fill="${pelo}"><circle cx="-10" cy="-78" r="3.8"/><circle cx="10" cy="-78" r="3.8"/><circle cx="-10.6" cy="-72" r="3.8"/><circle cx="10.6" cy="-72" r="3.8"/><circle cx="-10" cy="-66" r="3.6"/><circle cx="10" cy="-66" r="3.6"/><circle cx="-8.6" cy="-61" r="3.2"/><circle cx="8.6" cy="-61" r="3.2"/></g>`
+    : estilo === 'melena' ? `<path d="M-10.2 -79 q0 -14 10.2 -14 q10.2 0 10.2 14 v8 q-1.8 2.2 -3.8 0 v-5 h-12.8 v5 q-2 2.2 -3.8 0z" fill="${pelo}"/>` : '';
+  const arriba = estilo === 'rulos' || estilo === 'rulosL' ? `<g fill="${pelo}"><circle cx="-6.5" cy="-83" r="4"/><circle cx="-2" cy="-86.5" r="4.4"/><circle cx="3.2" cy="-86" r="4.3"/><circle cx="7" cy="-82" r="3.8"/><circle cx="-8.2" cy="-78.5" r="2.8"/><circle cx="8.6" cy="-78" r="2.6"/></g>`
+    : estilo === 'corto' ? `<path d="M-8.6 -78.5 q-.8 -11.4 8.6 -11.6 q9.4 .2 8.6 11.6 q-1.2 -4.2 -3 -5.4 q-6 1.4 -11.6 -.6 q-1.6 1.6 -2.6 6z" fill="${pelo}"/>`
+    : `<path d="M-8.6 -77.5 q-.6 -12 8.6 -12.3 q9.2 .3 8.6 12.3 q-1.8 -5.6 -7.4 -6.6 q-2.6 2.4 -9.8 6.6z" fill="${pelo}"/>`;
+  const piernas = falda
+    ? `<rect x="-6.6" y="-24" width="4.4" height="21" rx="2" fill="${piel}"/><rect x="2.2" y="-24" width="4.4" height="21" rx="2" fill="${piel}"/>`
+    : `<rect x="-8" y="-38" width="7.4" height="35" rx="3.2" fill="${pant}"/><rect x=".6" y="-38" width="7.4" height="35" rx="3.2" fill="${pant}"/>`;
+  const torso = fig === 'mujer' ? `M-11 -37 q1.2 -8 -.6 -16.6 q.4 -10 9 -11 h5.2 q8.6 1 9 11 q-1.8 8.6 -.6 16.6 q-11 3 -22 0z` : `M-12 -37 v-17 q0 -9.6 9.4 -10.6 h5.2 q9.4 1 9.4 10.6 v17 q-12 3 -24 0z`;
+  return `<g class="dl-p dl-${fig}" style="--d:${d}s" transform="scale(${escala})">
+    <ellipse cx="0" cy="0" rx="13" ry="2.4" fill="rgba(0,0,0,.14)"/>
+    <g class="dl-cuerpo">
+      ${piernas}
+      <path d="M-9.6 -4.5 h8.4 v3.4 h-9.2 q-1.8 0 -1.4 -1.8z M1.2 -4.5 h8.4 q2.2 1.6 1.2 3.4 h-9.6z" fill="#2a2a30"/>
+      ${falda ? `<path d="M-10.4 -40 h20.8 l4 17.4 q-14.4 3 -28.8 0z" fill="${colFalda}"/><path d="M-3 -39 l-2 16 M3 -39 l2 16" stroke="rgba(0,0,0,.1)" stroke-width="1"/>` : ''}
+      ${brazo('i', brazoI)}
+      <path d="${torso}" fill="${ropa}"/>
+      <path d="M3 -64.6 q9 1 9 10.6 v17 q-4 1 -9 1.2z" fill="rgba(0,0,0,.09)"/>
+      <path d="M-3.4 -64.8 l3.4 4.6 l3.4 -4.6z" fill="${piel}"/>
+      ${detras}
+      ${brazo('d', brazoD)}
+      <rect x="-2.6" y="-69" width="5.2" height="6" rx="2" fill="${piel}"/>
+      <ellipse cx="-8.3" cy="-76.5" rx="1.7" ry="2.4" fill="${piel}"/><ellipse cx="8.3" cy="-76.5" rx="1.7" ry="2.4" fill="${piel}"/>
+      <ellipse cx="0" cy="-77" rx="8.3" ry="9.6" fill="${piel}"/>
+      <path d="M2 -86 q6 2.6 6.2 9.6 q-2 -6 -6.2 -9.6z" fill="rgba(0,0,0,.06)"/>
+      ${barba ? `<path d="M-8.2 -77 q-.4 10.4 8.2 11 q8.6 -.6 8.2 -11 q-1.6 4.6 -8.2 5 q-6.6 -.4 -8.2 -5z" fill="${pelo}"/>` : ''}
+      ${arriba}
+      <path d="M-5.4 -80.2 q1.6 -1 3.2 0 M2.2 -80.2 q1.6 -1 3.2 0" stroke="${pelo}" stroke-width="${fig === 'hombre' ? 1.2 : .9}" fill="none" stroke-linecap="round"/>
+      <g class="dl-ojos"><ellipse cx="-3.2" cy="-77.4" rx="1" ry="1.35" fill="#24242c"/><ellipse cx="3.2" cy="-77.4" rx="1" ry="1.35" fill="#24242c"/>${fig === 'mujer' ? '<path d="M-4.6 -78.4 l-1.1 -.9 M4.6 -78.4 l1.1 -.9" stroke="#24242c" stroke-width=".6" stroke-linecap="round"/>' : ''}</g>
+      <path d="M.2 -76 q.9 2 -.7 2.5" stroke="rgba(0,0,0,.22)" stroke-width=".8" fill="none" stroke-linecap="round"/>
+      <circle cx="-5" cy="-73.6" r="1.5" fill="rgba(255,110,110,${fig === 'mujer' ? .34 : .22})"/><circle cx="5" cy="-73.6" r="1.5" fill="rgba(255,110,110,${fig === 'mujer' ? .34 : .22})"/>
+      <path d="M-2.8 -72 q2.8 2.2 5.6 0" stroke="${fig === 'mujer' ? '#c2455a' : barba ? '#5e2b22' : '#8a3b2e'}" stroke-width="${fig === 'mujer' ? 1.3 : 1}" fill="none" stroke-linecap="round"/></g></g>`;
+}
+/* Un perro de costado y un gato sentado, con la cola que se mueve. */
+const svgPerro = m => { const c = /negr/i.test(m.desc || '') ? '#2f2a28' : /blanc/i.test(m.desc || '') ? '#efe9e0' : '#b98250', o = '#7a4f2c';
+  return `<g class="dl-perro"><ellipse cx="0" cy="0" rx="15" ry="2.2" fill="rgba(0,0,0,.14)"/>
+    <path class="dl-cola" d="M11 -17 q7 -4 6 -12" stroke="${c}" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    <rect x="-10" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/><rect x="-5" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/><rect x="4" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/><rect x="8.6" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/>
+    <ellipse cx="1" cy="-15" rx="12.5" ry="6.4" fill="${c}"/>
+    <path d="M-9 -18 q-3 -6 -6.5 -9 l3 -2 q5 3 8 8z" fill="${c}"/>
+    <ellipse cx="-15" cy="-28" rx="5.6" ry="5" fill="${c}"/><ellipse cx="-20.4" cy="-26.4" rx="3.8" ry="2.6" fill="${c}"/>
+    <path class="dl-oreja" d="M-13.4 -32.6 q3.6 1 3 7.4 q-3.4 -1.6 -3 -7.4z" fill="${o}"/>
+    <circle cx="-23.6" cy="-27" r="1.3" fill="#1d1d22"/><circle cx="-16" cy="-29.4" r="1" fill="#1d1d22"/>
+    <path d="M-12 -23.6 q2 1.4 3.4 0" stroke="#d33a3a" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>`; };
+const svgGato = m => { const c = /negr/i.test(m.desc || '') ? '#2b2b30' : /naranj|atig/i.test(m.desc || '') ? '#d68a3c' : '#7d7f8c';
+  return `<g class="dl-gato"><ellipse cx="0" cy="0" rx="11" ry="2" fill="rgba(0,0,0,.14)"/>
+    <path class="dl-cola" d="M7 -3 q11 0 9 -12 q-1 -5 -4 -4" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M-8 0 q-2 -15 7 -19 q9 4 7 19z" fill="${c}"/>
+    <circle cx="0" cy="-23" r="6.6" fill="${c}"/><path d="M-6 -26 l-.6 -7 l4.6 3.6z M6 -26 l.6 -7 l-4.6 3.6z" fill="${c}"/>
+    <g class="dl-ojos"><ellipse cx="-2.4" cy="-23.6" rx="1.2" ry="1.5" fill="#cddc39"/><ellipse cx="2.4" cy="-23.6" rx="1.2" ry="1.5" fill="#cddc39"/></g>
+    <path d="M-.8 -21.2 h1.6 l-.8 1z" fill="#f5a3a3"/><path d="M-7 -21 h-4 M-7 -20 l-4 1.2 M7 -21 h4 M7 -20 l4 1.2" stroke="rgba(255,255,255,.55)" stroke-width=".5"/></g>`; };
+/* Perro con perro y gato con gato: se mira la especie que cargaron en Mi
+   casa. Otro animal (un loro, un conejo) no se dibuja: mejor nada que un
+   perro que no es. */
+const especieDibujo = m => { const e = normTxt(m && m.especie || ''); return /gat|cat|mich|felin|minin/.test(e) ? 'gato' : /perr|dog|can[ie]|cachorr|pich/.test(e) ? 'perro' : ''; };
+/* El dibujo del lote: solo quienes viven ahí (el propietario a distancia no
+   sale) y solo las mascotas cargadas en "Mi casa". Dos personas sin mascotas
+   = dos personas sin mascotas. Cada persona lleva su número (data-i): al
+   tocarla, o tocar su nombre en la tarjeta, salta y muestra su nombre. */
+function escenaLote(u){
+  if (!u || !/^Lote\s/i.test(u.casa || '')) return null;
+  const ps = [u, ...Store.s.users.filter(x => x && x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id && !esPropDistancia(x))].slice(0, 6);
+  if (ps.length < 2) return null;
+  const [tipo, etiqueta] = tipoDeLote(ps);
+  /* En familia, los "familiares o convivientes" van al medio, un poco más chicos. */
+  const orden = tipo === 'familia' ? [...ps.filter(x => x.relacion !== 'familiar').slice(0, 1), ...ps.filter(x => x.relacion === 'familiar'), ...ps.filter(x => x.relacion !== 'familiar').slice(1)] : ps;
+  const pets = [...new Map(ps.flatMap(x => aLista(x.mascotas)).filter(m => m && m.nombre && especieDibujo(m)).map(m => [m.nombre + '|' + (m.especie || ''), m])).values()].slice(0, 2);
+  const paso = tipo === 'pareja' ? 27 : 30, x0 = 22, H = 112, W = x0 * 2 + (orden.length - 1) * paso + pets.length * 34 + (pets.length ? 6 : 0);
+  const personas = orden.map((x, i) => {
+    const chico = tipo === 'familia' && x.relacion === 'familiar', yo = x.id === u.id, nom = x.nombre.split(' ')[0], an = nom.length * 4.9 + 10, alto = chico ? 72 : 96;
+    const brazoD = tipo === 'pareja' && i === 0 ? 'mano' : yo && !(tipo === 'pareja' && i === 0) ? 'saluda' : 'baja';
+    const brazoI = tipo === 'pareja' && i === 1 ? 'mano' : 'baja';
+    return `<g transform="translate(${x0 + i * paso} ${H - 6})" data-a="lote-saluda" data-i="${i}"><g class="dl-salto">${svgPersona(x, { brazoD, brazoI, escala: chico ? .78 : 1, d:(i * .4).toFixed(1) })}
+      <g class="dl-nom" transform="translate(0 ${-alto - 8})"><rect x="${-an / 2}" y="-8" width="${an}" height="12" rx="6" fill="${colorDe(x.nombre)}"/><text x="0" y="1.4" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${esc(nom)}</text></g></g></g>`; }).join('');
+  const xp = x0 + (orden.length - 1) * paso + 30;
+  const mascotas = pets.map((m, j) => `<g transform="translate(${xp + j * 34 + 8} ${H - 6})">${especieDibujo(m) === 'gato' ? svgGato(m) : svgPerro(m)}</g>`).join('');
+  const cx = x0 + (orden.length - 1) * paso / 2, ancho = (orden.length - 1) * paso;
+  const adorno = tipo === 'pareja' ? `<path class="dl-corazon" d="M${cx} 22 c-3.4 -4.6 -10.4 -1.2 -5.8 4.6 l5.8 5.2 l5.8 -5.2 c4.6 -5.8 -2.4 -9.2 -5.8 -4.6z" fill="#ff5a7a"/>`
+    : tipo === 'familia' ? `<path d="M${cx - ancho / 2 - 18} 34 L${cx} 6 L${cx + ancho / 2 + 18} 34" stroke="#b85f24" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
+        <rect x="${cx + ancho / 4 + 2}" y="8" width="6" height="12" rx="1" fill="#b85f24" opacity=".85"/><g class="dl-humo"><circle cx="${cx + ancho / 4 + 5}" cy="4" r="2.6" fill="#cfd6df"/><circle cx="${cx + ancho / 4 + 8}" cy="-1" r="3.2" fill="#dfe5ec"/></g>`
+    : `<g class="dl-charla"><rect x="${cx - 13}" y="8" width="26" height="13" rx="6.5" fill="#fff" stroke="#cfd6df" stroke-width=".8"/><circle class="c1" cx="${cx - 6}" cy="14.5" r="1.8" fill="#7445c0"/><circle class="c2" cx="${cx}" cy="14.5" r="1.8" fill="#7445c0"/><circle class="c3" cx="${cx + 6}" cy="14.5" r="1.8" fill="#7445c0"/></g>`;
+  const nombres = orden.map(x => x.nombre.split(' ')[0]), quien = `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}`;
+  const svg = `<svg class="dl-svg" viewBox="0 -14 ${W} ${H + 14}" role="img" aria-label="${esc(etiqueta)} en ${esc(u.casa)}: ${esc(quien)}${pets.length ? ', con ' + esc(pets.map(m => m.nombre).join(' y ')) : ''}">
+      <ellipse cx="${W / 2}" cy="${H - 5}" rx="${W / 2 - 4}" ry="5" fill="rgba(46,125,50,.12)"/>${adorno}${personas}${mascotas}</svg>`;
+  return { svg, tipo, etiqueta, orden, pets };
+}
+function dibujoLote(u){
+  const e = escenaLote(u); if (!e) return '';
+  return `<div class="dl-caja dl-${e.tipo}">${e.svg}
+    <div class="dl-txt"><b>${esc(e.etiqueta)}</b><small>${esc(u.casa)}</small><span>${e.orden.map((x, i) => `<i style="--c:${colorDe(x.nombre)}" data-a="lote-saluda" data-i="${i}">${esc(x.nombre.split(' ')[0])}${x.id === u.id ? ' (vos)' : ''}</i>`).join('')}${e.pets.map(m => `<i class="mas">${I('paw')}${esc(m.nombre)}</i>`).join('')}</span></div></div>`;
+}
+/* TU CUENTA → la tarjeta del lote (pedido de Claudio, 12-10-2026: "tiene un
+   diseño muy básico, hacele un diseño más innovador"). Una escena con el
+   cielo de la hora (sol o luna y estrellas), la casa y quienes viven; abajo,
+   cada persona con su rol y si tiene la app abierta (al tocarla, salta en
+   el dibujo), lo que comparten como lote y los botones. */
+function tarjetaLote(u){
+  const todos = Store.s.users.filter(x => x && x.estado === 'aprobado' && x.casa === u.casa), otros = todos.filter(x => x.id !== u.id);
+  if (!otros.length) return '';
+  const e = escenaLote(u), idx = id => e ? e.orden.findIndex(x => x.id === id) : -1;
+  const { sale, pone } = Clima.sol(), ahora = new Date().toTimeString().slice(0, 5), noche = ahora < sale || ahora >= pone;
+  const gente = [u, ...otros].map(x => { const i = idx(x.id), abierta = x.id !== u.id && conAppAbierta(x.id), lejos = esPropDistancia(x);
+    return `<button type="button" class="tl-p" style="--c:${colorDe(x.nombre)}" ${i >= 0 ? `data-a="lote-saluda" data-i="${i}"` : 'disabled'}>
+      <span class="tl-av">${avatar(x)}${abierta ? '<i class="tl-on" title="Tiene la app abierta"></i>' : ''}</span>
+      <span class="tl-pt"><b>${esc(x.nombre.split(' ')[0])}${x.id === u.id ? ' <em>vos</em>' : ''}</b><small>${esc(RELACIONES[x.relacion] || 'Del lote')}${lejos ? ' · no vive ahí' : abierta ? ' · app abierta' : ''}</small></span></button>`; }).join('');
+  const comp = [['vote', 'accent', 'Un voto', 'en las votaciones'], ['wallet', 'wood', 'Una expensa', 'un solo cupón'], ['users', 'sky', 'Las visitas', 'las ven todos'], ['shield', 'ok', 'La garita', 'les avisa a todos']]
+    .map(([ic, c, t, s2], k) => `<span class="tl-c c-${c}" style="--k:${k}">${I(ic)}<b>${t}</b><small>${s2}</small></span>`).join('');
+  const uno = otros.length === 1 ? otros[0] : null;
+  return `<section class="tl ${e ? 'tl-' + e.tipo : 'tl-solo'} ${noche ? 'tl-noche' : 'tl-dia'}" aria-label="Tu lote">
+    <div class="tl-escena">
+      <i class="tl-astro"></i>${noche ? '<i class="tl-estrella s1"></i><i class="tl-estrella s2"></i><i class="tl-estrella s3"></i>' : '<i class="tl-nube n1"></i><i class="tl-nube n2"></i>'}
+      <svg class="tl-casa" viewBox="0 0 120 80" aria-hidden="true"><path d="M8 40 L60 6 L112 40 V80 H8z"/><rect x="50" y="50" width="20" height="30" rx="2"/><rect x="20" y="46" width="18" height="14" rx="2"/><rect x="82" y="46" width="18" height="14" rx="2"/></svg>
+      ${e ? e.svg : ''}
+      <span class="tl-chapa">${I('home')}${esc(u.casa)}</span>
+      ${e ? `<span class="tl-tipo">${esc(e.etiqueta)}${e.pets.length ? ` · ${I('paw')}${esc(e.pets.map(m => m.nombre).join(' y '))}` : ''}</span>` : ''}
+    </div>
+    <div class="tl-cuerpo">
+      <div class="tl-tit"><b>Son ${todos.length} en la app</b><small>Cada uno con su cuenta, un solo lote. Tocá a alguien.</small></div>
+      <div class="tl-gente">${gente}</div>
+      ${e ? eligeFigura(u) : ''}
+      <div class="tl-comp">${comp}</div>
+      <div class="tl-acc"><button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="perfil">${I('users')}Ver quiénes</button>
+        ${uno ? `<button type="button" class="btn btn-sm" data-a="abrir" data-v="dm" data-p="${esc(uno.id)}">${I('chat')}Escribirle a ${esc(uno.nombre.split(' ')[0])}</button>` : ''}</div>
+    </div></section>`;
+}
+/* Cada uno elige cómo aparece en el dibujo; se ve su propio muñequito en
+   cada opción. Se guarda en su cuenta (figura) y lo ven los de su lote. */
+const eligeFigura = u => `<div class="tl-fig${u.figura ? ' cerrado' : ''}">
+    ${u.figura ? `<button type="button" class="link tl-fig-abre" data-a="mi-figura-ver">${I('edit')}Cambiar cómo aparezco en el dibujo</button>` : `<b>${I('user')}¿Cómo querés aparecer en el dibujo?</b>`}
+    <div class="tl-fig-op">${Object.entries(FIGURAS).map(([k, t]) => `<button type="button" class="${u.figura === k ? 'on' : ''}" data-a="mi-figura" data-v="${k}" aria-pressed="${u.figura === k}"><svg viewBox="-17 -100 34 104" aria-hidden="true">${svgPersona({ ...u, figura:k })}</svg><span>${t}</span></button>`).join('')}</div></div>`;
+A['mi-figura'] = el => {
+  const u = yo(), v = el.dataset.v; if (!u || !FIGURAS[v]) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x) x.figura = v; });
+  const t = el.closest('.tl'); if (t) t.outerHTML = tarjetaLote(yo());
+  setTimeout(() => { const b = document.querySelector('.tl .tl-p[data-i]'); if (b) A['lote-saluda'](b); }, 120);
+  toast(v === 'neutra' ? 'Listo: en el dibujo aparecés con una figura neutra' : `Listo: en el dibujo aparecés como ${FIGURAS[v].toLowerCase()}`, 'check');
+};
+A['mi-figura-ver'] = el => el.closest('.tl-fig')?.classList.toggle('cerrado');
+A['lote-saluda'] = el => {
+  const caja = el.closest('.tl, .dl-caja'), i = el.dataset.i, g = caja?.querySelector(`.dl-svg g[data-i="${i}"]`); if (!g) return;
+  caja.querySelectorAll('.tl-p.on, .dl-txt i.on').forEach(b => b.classList.remove('on'));
+  caja.querySelectorAll(`.tl-p[data-i="${i}"], .dl-txt i[data-i="${i}"]`).forEach(b => b.classList.add('on'));
+  g.classList.remove('salta'); void caja.offsetWidth; g.classList.add('salta');
+  clearTimeout(g._t); g._t = setTimeout(() => { g.classList.remove('salta'); caja.querySelectorAll('.on').forEach(b => b.classList.remove('on')); }, 1800);
+};
 function familiaDelLote(u){
   const ls = cuentasDeMiLote(u), otros = ls.filter(x => x.id !== u.id);
   return `${sec(`Quiénes están en ${esc(u.casa)}`, `<span class="muted small">${plural(ls.length, 'cuenta')}</span>`)}
+    ${dibujoLote(u)}
     <div class="card lista familia-lote">${ls.map(x => `<div class="it">${avatar(x)}<div class="txt"><b>${esc(x.nombre)}${x.id === u.id ? ' <span class="muted small">(vos)</span>' : ''}</b>
         <span>${esc(RELACIONES[x.relacion] || 'Relación con el lote sin indicar')}${esPropDistancia(x) ? ' · no vive en el lote' : ''}${x.representante ? ' · representante del lote' : ''}</span></div>
       ${x.estado === 'pendiente' ? '<span class="pill p-warn">Esperando aprobación</span>' : conAppAbierta(x.id) ? `<span class="pill p-ok">${I('check')}App abierta</span>` : ''}

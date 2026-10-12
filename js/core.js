@@ -44,7 +44,21 @@ function hace(ts){
 }
 const plural = (n, s, p) => `${n} ${n === 1 ? s : (p || s + 's')}`;
 const soloDigitos = t => String(t || '').replace(/\D/g, '');
-const waLink = (tel, texto) => `https://wa.me/${soloDigitos(tel)}${texto ? '?text=' + encodeURIComponent(texto) : ''}`;
+/* WhatsApp necesita el número internacional (549 + característica sin 0 +
+   número sin 15). Antes se mandaba tal cual se escribió ("2901 15 123456")
+   y WhatsApp no encontraba el chat. Un número con "+" adelante (de otro
+   país) va como está; uno de 6 a 8 cifras se toma de Ushuaia (2901). */
+function waNumero(tel){
+  const t = String(tel || '').trim(); let d = soloDigitos(t);
+  if (!d || t.startsWith('+') && !d.startsWith('54')) return d;
+  if (d.startsWith('549')) return d;
+  if (d.startsWith('54')) d = d.slice(2);
+  d = d.replace(/^0+/, '');
+  if (d.length === 12) for (const k of [4, 3, 2]) if (d.slice(k, k + 2) === '15'){ d = d.slice(0, k) + d.slice(k + 2); break; }
+  if (d.length >= 6 && d.length <= 8) d = '2901' + (d.length === 8 && d.startsWith('15') ? d.slice(2) : d);
+  return d.length === 10 ? '549' + d : d;
+}
+const waLink = (tel, texto) => `https://wa.me/${waNumero(tel)}${texto ? '?text=' + encodeURIComponent(texto) : ''}`;
 const telLink = t => 'tel:' + String(t).replace(/[^0-9+]/g, '');
 
 const COLORES = ['#0d6b66','#2b6fb3','#7445c0','#b8325a','#b85f24','#1b8f5a','#8a5a12','#3b4fb8'];
@@ -57,6 +71,18 @@ function avatar(u, cls = ''){
 }
 
 /* Achica una foto antes de guardarla: el almacenamiento del navegador es chico. */
+/* FOTOS MÁS LIVIANAS (pedido de Claudio, 12-10-2026; idea de
+   browser-image-compression, 1.7k★, MIT: solo la idea, el código es propio).
+   Donde el navegador sabe guardar en WebP (Chrome, Android, Edge, Firefox y
+   los iPhone nuevos), las fotos se guardan en WebP: con la misma calidad a la
+   vista pesan cerca de la mitad que en JPG, suben rápido con poca señal y la
+   base dura más. Donde no sabe, siguen en JPG como siempre. Todos los
+   teléfonos que pueden abrir la app pueden mostrar WebP. */
+const WEBP_OK = (() => { try { const c = document.createElement('canvas'); c.width = c.height = 2; return c.toDataURL('image/webp', .8).startsWith('data:image/webp'); } catch(e){ return false; } })();
+const aImagen = (c, q) => WEBP_OK ? c.toDataURL('image/webp', Math.min(.86, q)) : c.toDataURL('image/jpeg', q);
+/* Qué es una foto guardada, para el nombre del archivo al bajarla. */
+const tipoDeDato = d => (/^data:([^;,]+)/.exec(String(d || '')) || [])[1] || 'image/jpeg';
+const extDeTipo = t => ({ 'image/webp':'webp', 'image/png':'png', 'image/jpeg':'jpg', 'application/pdf':'pdf' })[t] || 'jpg';
 function comprimir(file, max = 1000, q = .72){
   return new Promise((ok, mal) => {
     const r = new FileReader();
@@ -69,7 +95,7 @@ function comprimir(file, max = 1000, q = .72){
         const c = document.createElement('canvas');
         c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        ok(c.toDataURL('image/jpeg', q));
+        ok(aImagen(c, q));
       };
       img.src = e.target.result;
     };
@@ -86,12 +112,19 @@ function comprimir(file, max = 1000, q = .72){
    se reemplaza por uno de Firebase con la misma forma
    (ver CONECTAR.md).
    ========================================================= */
+/* LA PRUEBA (?local) GUARDA APARTE (12-10-2026). La app de prueba y la de
+   verdad usaban el mismo lugar del navegador: abrir la prueba (o
+   expensas.html, que la lleva adentro) en el mismo teléfono donde se usa la
+   app real podía mezclar los datos de ejemplo con la sesión y la copia de
+   la app real. Ahora la prueba tiene sus propias llaves y su propio canal. */
+const MODO_PRUEBA = /[?&]local\b/.test(location.search);
+const llavePrueba = k => MODO_PRUEBA ? k.replace(/^bhc\./, 'bhc.prueba.') : k;
 const Store = {
-  KEY: 'bhc.datos.v3', SKEY: 'bhc.sesion.v3',
+  KEY: llavePrueba('bhc.datos.v3'), SKEY: llavePrueba('bhc.sesion.v3'),
   s: null,           /* el estado compartido del barrio */
   sesion: null,      /* lo de este dispositivo: quién soy, preferencias */
   oyentes: [],
-  bc: ('BroadcastChannel' in window) ? new BroadcastChannel('bhc') : null,
+  bc: ('BroadcastChannel' in window) ? new BroadcastChannel(MODO_PRUEBA ? 'bhc-prueba' : 'bhc') : null,
 
   cargar(){
     try { this.s = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){ this.s = null; }
@@ -101,8 +134,8 @@ const Store = {
     if (!this.sesion) this.sesion = { userId:null, ultimaVisita:0, tema:'auto', notifsVistas:0, pendienteEmail:'' };
     /* Cada pestaña recuerda quién entró en ella: así se puede tener la
        garita en una y un vecino en otra, en el mismo equipo. */
-    try { const t = sessionStorage.getItem('bhc.pestana'); if (t !== null) this.sesion.userId = t || null; } catch(e){}
-    try { const m = sessionStorage.getItem('bhc.modo'); if (m !== null) this.sesion.modo = m || ''; } catch(e){}
+    try { const t = sessionStorage.getItem(llavePrueba('bhc.pestana')); if (t !== null) this.sesion.userId = t || null; } catch(e){}
+    try { const m = sessionStorage.getItem(llavePrueba('bhc.modo')); if (m !== null) this.sesion.modo = m || ''; } catch(e){}
     if (this.bc) this.bc.onmessage = e => {
       if (e.data === 'cambio'){
         try { this.deOtraPestana(JSON.parse(localStorage.getItem(this.KEY))); } catch(err){}
@@ -145,10 +178,10 @@ const Store = {
     return true;
   },
   guardarSesion(){
-    try { sessionStorage.setItem('bhc.pestana', this.sesion.userId || ''); } catch(e){}
+    try { sessionStorage.setItem(llavePrueba('bhc.pestana'), this.sesion.userId || ''); } catch(e){}
     /* El modo también es de la pestaña: así se puede tener abierta la
        Administración en una y el mismo usuario como vecino en otra. */
-    try { sessionStorage.setItem('bhc.modo', this.sesion.modo || ''); } catch(e){}
+    try { sessionStorage.setItem(llavePrueba('bhc.modo'), this.sesion.modo || ''); } catch(e){}
     try { localStorage.setItem(this.SKEY, JSON.stringify(this.sesion)); } catch(e){}
   },
   /* Toda escritura pasa por acá: cambia, guarda y redibuja. */
@@ -701,13 +734,18 @@ const AVISO_RESUELTO = {
   reclamos:        x => x.estado !== 'abierto',
   /* "… todavía no llegó" (12-10-2026): se va si entró, se canceló, la borraron o pasó la hora. */
   pases:           x => !!x.cancelado || !!x.borrado || (typeof estadoPase === 'function' && estadoPase(x) !== 'noingreso'),
+  /* El recordatorio de una hora antes (12-10-2026): se va cuando la visita
+     entra, se cancela o la borran, o media hora después de su hora. */
+  pasesRec:        x => !!x.cancelado || !!x.borrado || (typeof estadoPase === 'function' && estadoPase(x) !== 'esperado') || ahoraMin() > minutosDe(x.desde) + 30,
 };
-const HORAS_AVISO_REF = { llegadas:6 };
+const HORAS_AVISO_REF = { llegadas:6, pasesRec:3 };
+/* Un mismo registro puede tener avisos que se resuelven distinto. */
+const COL_DEL_REF = { pasesRec:'pases' };
 function avisoResuelto(n){
   const [col, id] = String(n.ref || (n.llegadaId ? 'llegadas:' + n.llegadaId : '')).split(':');
   const f = AVISO_RESUELTO[col]; if (!f || !id) return false;
   if (HORAS_AVISO_REF[col] && Date.now() - (n.at || 0) > HORAS_AVISO_REF[col] * HORA) return true;
-  const x = aLista(Store.s[col]).find(z => z && z.id === id);
+  const x = aLista(Store.s[COL_DEL_REF[col] || col]).find(z => z && z.id === id);
   return !!(x && f(x));
 }
 function avisoCaduco(n){
@@ -1060,7 +1098,7 @@ function achicarDato(dato, max, q){
       const c = document.createElement('canvas');
       c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      ok(c.toDataURL('image/jpeg', q));
+      ok(aImagen(c, q));
     };
     img.onerror = () => ok('');
     img.src = dato;
@@ -1077,6 +1115,8 @@ const fotoHTML = (f, cls = 'foto', { aPedido = false } = {}) => f && f.fotoId
 async function guardarFotoEnEquipo(dato, nombre = 'foto-barrio.jpg'){
   try {
     const blob = await (await fetch(dato)).blob();
+    /* El nombre lleva la extensión de lo que es de verdad (una foto WebP no se guarda como .jpg). */
+    nombre = String(nombre).replace(/\.(jpe?g|png|webp)$/i, '') + '.' + extDeTipo(blob.type || tipoDeDato(dato));
     const archivo = new File([blob], nombre, { type: blob.type || 'image/jpeg' });
     const tactil = matchMedia('(pointer:coarse)').matches;
     if (tactil && navigator.canShare && navigator.canShare({ files:[archivo] })){

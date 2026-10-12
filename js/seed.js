@@ -141,11 +141,14 @@ function seed(){
     auditoria: [ { id:uid(), at:n - 30*DIA, por:'u_admin', accion:'Aprobó una inscripción', detalle:'Lucía Fernández · Lote 42', ref:'u_lucia' } ],
     obras: [
       { id:uid(), userId:'u_martin', casa:'Lote 23', tipo:'Ampliación', etapa:3, empresa:'Construcciones del Beagle', tel:'', inicio:D(-40), finEstimado:D(60),
-        detalle:'Ampliación de 40 m² en madera y steel frame.', estado:'activa', createdAt:n - 40*DIA, ultima:n - 2*DIA,
+        detalle:'Ampliación de 40 m² en madera y steel frame.', estado:'activa', createdAt:n - 40*DIA, ultima:n - 2*DIA, maq:['obreros','herramientas','camiones'],
         historial:[ { at:n - 40*DIA, etapa:0, texto:'Obra registrada', por:'u_martin' }, { at:n - 2*DIA, etapa:3, texto:'Se levantó la estructura de la planta alta.', por:'u_martin' } ],
-        avisoHoy:{ fecha:h, texto:'Entra un camión con placas de OSB', hora:'10:00' } },
+        avisoHoy:{ fecha:h, texto:'Entra un camión con placas de OSB', hora:'10:00', maq:['camiones'] } },
+      { id:uid(), userId:'u_admin', casa:'Barrio', porAdmin:true, tipo:'Obra del barrio', etapa:1, empresa:'Movimientos Fueguinos', tel:'', inicio:D(-3), finEstimado:D(20),
+        detalle:'Ensanche de la calle 3 y cordón cuneta.', estado:'activa', createdAt:n - 3*DIA, ultima:n - DIA, maq:['pesada','camiones'],
+        historial:[ { at:n - 3*DIA, etapa:0, texto:'Obra registrada', por:'u_admin' }, { at:n - DIA, etapa:1, texto:'La retroexcavadora terminó el primer tramo.', por:'u_admin' } ] },
       { id:uid(), userId:'u_diego', casa:'Lote 18', tipo:'Quincho / pileta', etapa:0, empresa:'', tel:'', inicio:D(10), finEstimado:D(90),
-        detalle:'Quincho de 25 m² en el fondo.', estado:'pendiente', createdAt:n - 5*HORA, ultima:n - 5*HORA, historial:[ { at:n - 5*HORA, etapa:0, texto:'Obra registrada', por:'u_diego' } ] },
+        detalle:'Quincho de 25 m² en el fondo.', estado:'pendiente', maq:['obreros'], createdAt:n - 5*HORA, ultima:n - 5*HORA, historial:[ { at:n - 5*HORA, etapa:0, texto:'Obra registrada', por:'u_diego' } ] },
     ],
     dms: [
       { id:uid(), a:'u_diego', b:'u_lucia', msgs:[

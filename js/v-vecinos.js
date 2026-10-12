@@ -330,30 +330,76 @@ function marcarVistoLink(link){
 /* ---------- OBRAS EN EL BARRIO ---------- */
 const ETAPAS = ['Planos aprobados','Movimiento de suelo','Fundaciones','Estructura','Techo y cerramientos','Instalaciones','Terminaciones','Final de obra'];
 const TIPOS_OBRA = ['Casa nueva','Ampliación','Reforma','Quincho / pileta','Paisajismo','Cerco / deck','Otra'];
+/* CON QUÉ SE TRABAJA (pedido de Claudio, 12-10-2026: "que se pueda elegir si
+   la obra es con maquinaria pesada o solo obreros"). Se marca lo que va a
+   haber (puede ser más de una cosa) y la obra toma el nivel de lo más
+   pesado: así los vecinos saben de un vistazo cuánto ruido y movimiento
+   esperar, y la garita, si van a entrar camiones o máquinas. */
+const SVG_MAQ = {
+  obreros: `<svg viewBox="0 0 24 24" class="i"><path d="M4 15a8 8 0 0 1 16 0"/><path d="M2.5 15h19v2.5h-19z"/><path d="M12 7V4.5M9 8l-.6-2.4M15 8l.6-2.4"/></svg>`,
+  herramientas: `<svg viewBox="0 0 24 24" class="i"><path d="M3 9h10v5H3z"/><path d="M13 10.5h4l2 1-2 1h-4"/><path d="M6 14l-1 6h4l1-6"/></svg>`,
+  camiones: `<svg viewBox="0 0 24 24" class="i"><path d="M2 6h11v10H2zM13 10h4l4 3v3h-8"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>`,
+  pesada: `<svg viewBox="0 0 24 24" class="i"><path d="M3 17h11v-4H7l-2 2H3z"/><path d="M9 13V9h4l2 4"/><path d="M15 10l4-5 2 3-2 2"/><path d="M19 10v3h-3"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="11.5" cy="18.5" r="1.5"/></svg>`,
+};
+const MAQ_OBRA = {
+  obreros:      { n:'Solo obreros', d:'Trabajo a mano, poco ruido', nivel:1, c:'ok' },
+  herramientas: { n:'Herramientas eléctricas', d:'Amoladora, sierra, taladro: ruido por momentos', nivel:2, c:'sky' },
+  camiones:     { n:'Camiones o mixer', d:'Entregas de materiales y hormigón', nivel:3, c:'warn' },
+  pesada:       { n:'Maquinaria pesada', d:'Retroexcavadora, grúa, minicargadora', nivel:4, c:'danger' },
+};
+const NIVEL_OBRA = ['', 'Bajo', 'Medio', 'Alto', 'Muy alto'];
+const maqDe = o => aLista(o && o.maq).filter(k => MAQ_OBRA[k]);
+const nivelObra = o => Math.max(0, ...maqDe(o).map(k => MAQ_OBRA[k].nivel), ...(o && o.avisoHoy && o.avisoHoy.fecha === hoyISO() ? aLista(o.avisoHoy.maq).filter(k => MAQ_OBRA[k]).map(k => MAQ_OBRA[k].nivel) : []));
+const chipsMaq = (ls, cls = '') => ls.map(k => `<span class="ob-maq c-${MAQ_OBRA[k].c} ${cls}">${SVG_MAQ[k]}${esc(MAQ_OBRA[k].n)}</span>`).join('');
+/* La escena de arriba: la grúa que gira, el gancho que sube y baja y el
+   edificio que crece. Ideas de animate.css (82k★) y lax.js (10k★): solo
+   la idea, el dibujo y las animaciones son propios (CSS, sin librerías).
+   Con "reducir movimiento" del teléfono, queda quieta. */
+const ESCENA_OBRA = `<svg class="ob-escena" viewBox="0 0 320 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs><linearGradient id="obCielo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb46b"/><stop offset="1" stop-color="#ffe1b8"/></linearGradient></defs>
+  <rect width="320" height="150" fill="url(#obCielo)"/>
+  <circle class="ob-sol" cx="270" cy="34" r="16" fill="#fff4c7"/>
+  <g class="ob-nube"><ellipse cx="60" cy="30" rx="22" ry="8" fill="#fff" opacity=".8"/><ellipse cx="78" cy="26" rx="14" ry="7" fill="#fff" opacity=".8"/></g>
+  <path d="M0 130 C60 112 120 140 200 122 S300 118 320 126 V150 H0Z" fill="#7a4a24"/>
+  <g class="ob-edificio"><rect x="150" y="70" width="60" height="62" fill="#c9733a"/><rect x="150" y="70" width="60" height="6" fill="#8a4a1d"/>
+    <g fill="#ffe1b8"><rect x="158" y="84" width="10" height="10"/><rect x="175" y="84" width="10" height="10"/><rect x="192" y="84" width="10" height="10"/><rect x="158" y="104" width="10" height="10"/><rect x="192" y="104" width="10" height="10"/></g></g>
+  <rect class="ob-piso" x="150" y="58" width="60" height="12" fill="#e08a4a"/>
+  <g stroke="#3b2a1c" stroke-width="2.4" fill="none"><path d="M88 132V30M96 132V30"/><path d="M88 40l8 8M96 40l-8 8M88 56l8 8M96 56l-8 8M88 72l8 8M96 72l-8 8M88 88l8 8M96 88l-8 8M88 104l8 8M96 104l-8 8"/></g>
+  <g class="ob-brazo"><path d="M60 30H230" stroke="#f2b632" stroke-width="7" stroke-linecap="round"/><rect x="56" y="24" width="18" height="14" rx="2" fill="#3b2a1c"/>
+    <g class="ob-gancho"><path d="M200 33V52" stroke="#3b2a1c" stroke-width="1.6"/><rect x="190" y="52" width="20" height="10" rx="2" fill="#7445c0"/></g></g>
+  <g class="ob-camion"><rect x="230" y="114" width="30" height="14" rx="2" fill="#2b6fb3"/><path d="M260 118h10l6 6v4h-16z" fill="#1e5285"/><circle cx="238" cy="130" r="4" fill="#1d2430"/><circle cx="266" cy="130" r="4" fill="#1d2430"/></g>
+</svg>`;
 R.obras = {
   titulo: 'Obras en el barrio', icon: 'wrench', color: 'wood', sub: () => `Horario de obra: ${Store.s.config.obraHorario}`,
   render(f){
     const u = yo(), s = Store.s;
     const filtro = f || 'activas';
     let ls = s.obras.slice();
-    if (filtro === 'activas') ls = ls.filter(o => o.estado === 'activa' || o.estado === 'pausada');
+    const activas = s.obras.filter(o => o.estado === 'activa' || o.estado === 'pausada'), pesadas = s.obras.filter(o => (o.estado === 'activa' || o.estado === 'pausada') && nivelObra(o) >= 4);
+    if (filtro === 'activas') ls = activas.slice();
+    else if (filtro === 'pesada') ls = pesadas.slice();
     else if (filtro === 'finalizadas') ls = ls.filter(o => o.estado === 'finalizada');
     else if (filtro === 'pendientes') ls = ls.filter(o => o.estado === 'pendiente');
     const hoyObra = s.obras.filter(o => o.avisoHoy && o.avisoHoy.fecha === hoyISO());
     ls.sort((a, b) => (b.ultima || b.createdAt) - (a.ultima || a.createdAt));
     const puede = o => !esGuardia() && !esSupervisor() && (o.userId === u.id || esAdmin());
-    return `${!esGuardia() && !esSupervisor() ? superficie({ a:'nueva-obra', icon:'plus', t: esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', s: esAdmin() ? 'De un lote o del barrio (espacios comunes). La ven al instante todos: vecinos y garita.' : 'La ven al instante la Administración, la garita y todo el barrio', cls:'acento' }) : ''}
-      <p class="muted tiny" style="margin:0 0 10px">${I('info')} Cada obra en curso aparece todos los días en la Pizarra del día, desde que empieza hasta que termina. Los días con movimiento (mixer, camión, grúa) su dueño manda el "Aviso del día" y sale en amarillo. ${esGuardia() ? 'La garita las ve pero no las edita.' : 'La garita las ve pero no las puede editar; la Administración sí.'}</p>
-      ${hoyObra.map(o => aviso('warn', 'truck', `Hoy en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h` : '')).join('')}
-      <div class="chips">${[['activas','En curso'], ...(s.obras.some(o => o.estado === 'pendiente') ? [['pendientes','Por aprobar']] : []),['finalizadas','Terminadas'],['todas','Todas']].map(([k, t]) => `<button class="chip ${k === filtro ? 'on' : ''}" data-a="abrir" data-v="obras" data-p="${k}">${t}</button>`).join('')}</div>
-      ${ls.length ? ls.map(o => { const pct = Math.round((o.etapa + 1) / ETAPAS.length * 100), ult = o.historial?.at(-1);
-        return `<div class="card"><div class="row" style="align-items:flex-start"><span class="ic ic-wood" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('wrench')}</span>
-          <div class="grow"><b style="font-size:15px">${esc(o.casa)} · ${esc(o.tipo)}</b><div class="muted small">${esc(o.empresa || 'Sin empresa cargada')}${o.inicio ? ' · desde ' + fechaCorta(o.inicio) : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</div>
-            <div class="muted tiny">Cargada por ${o.porAdmin ? 'la Administración' : esc(autorVisible(o.userId).nombre)}${o.detalle ? ' · ' + esc(o.detalle) : ''}</div></div>
-          <span class="pill ${o.estado === 'activa' ? 'p-ok' : o.estado === 'pendiente' ? 'p-warn' : o.estado === 'pausada' ? 'p-danger' : ''}">${{ activa:'En curso', pendiente:'Por aprobar', pausada:'Pausada', finalizada:'Terminada' }[o.estado]}</span></div>
-          <div class="etapas">${ETAPAS.map((e, i) => `<i class="${i < o.etapa ? 'hecha' : i === o.etapa ? 'actual' : ''}" title="${e}"></i>`).join('')}</div>
-          <div class="row small" style="justify-content:space-between"><b>${esc(ETAPAS[o.etapa])}</b><span class="muted">${pct}%</span></div>
-          ${ult ? `<div class="small" style="margin-top:8px;color:var(--ink-2)">${esc(ult.texto)} <span class="muted">· ${hace(ult.at)}</span></div>${fotoHTML(ult.foto, 'post-foto')}` : ''}
+    const kpi = (n, t, c, p) => `<button type="button" class="ob-kpi c-${c}" data-a="abrir" data-v="obras" data-p="${p}"><b>${n}</b><span>${t}</span></button>`;
+    return `<section class="ob-hero">${ESCENA_OBRA}
+        <div class="ob-hero-txt"><small>${I('clock')} Horario de obra · ${esc(Store.s.config.obraHorario)}</small><h3>${activas.length ? plural(activas.length, 'obra en curso', 'obras en curso') : 'Sin obras en curso'}</h3>
+          <div class="ob-kpis">${kpi(activas.length, 'en curso', 'wood', 'activas')}${kpi(pesadas.length, 'con máquinas pesadas', 'danger', 'pesada')}${kpi(hoyObra.length, 'avisos de hoy', 'warn', 'activas')}</div></div></section>
+      ${!esGuardia() && !esSupervisor() ? superficie({ a:'nueva-obra', icon:'plus', t: esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', s: esAdmin() ? 'De un lote o del barrio (espacios comunes). La ven al instante todos: vecinos y garita.' : 'La ven al instante la Administración, la garita y todo el barrio', cls:'acento' }) : ''}
+      ${hoyObra.map(o => `<div class="ob-hoy">${SVG_MAQ[aLista(o.avisoHoy.maq).find(k => MAQ_OBRA[k]) || 'camiones']}<div class="grow"><b>Hoy en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}</b><small>${o.avisoHoy.hora ? `Desde las ${esc(o.avisoHoy.hora)} h` : 'Hoy'}${aLista(o.avisoHoy.maq).length ? ' · ' + aLista(o.avisoHoy.maq).filter(k => MAQ_OBRA[k]).map(k => MAQ_OBRA[k].n.toLowerCase()).join(', ') : ''}</small></div></div>`).join('')}
+      <div class="chips">${[['activas','En curso'], ['pesada','Con máquinas pesadas'], ...(s.obras.some(o => o.estado === 'pendiente') ? [['pendientes','Por aprobar']] : []),['finalizadas','Terminadas'],['todas','Todas']].map(([k, t]) => `<button class="chip ${k === filtro ? 'on' : ''}" data-a="abrir" data-v="obras" data-p="${k}">${t}</button>`).join('')}</div>
+      ${ls.length ? `<div class="ob-lista">${ls.map((o, idx) => { const pct = Math.round((o.etapa + 1) / ETAPAS.length * 100), ult = o.historial?.at(-1), nv = nivelObra(o), mq = maqDe(o);
+        return `<article class="ob-card nv-${nv}" style="--d:${Math.min(idx, 8) * 60}ms">
+          <div class="ob-cab"><span class="ob-ic">${SVG_MAQ[mq.slice().sort((a, b) => MAQ_OBRA[b].nivel - MAQ_OBRA[a].nivel)[0]] || I('wrench')}</span>
+            <div class="grow"><b>${esc(o.casa)} · ${esc(o.tipo)}</b><small>${esc(o.empresa || 'Sin empresa cargada')}${o.inicio ? ' · desde ' + fechaCorta(o.inicio) : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</small></div>
+            <span class="pill ${o.estado === 'activa' ? 'p-ok' : o.estado === 'pendiente' ? 'p-warn' : o.estado === 'pausada' ? 'p-danger' : ''}">${{ activa:'En curso', pendiente:'Por aprobar', pausada:'Pausada', finalizada:'Terminada' }[o.estado]}</span></div>
+          ${mq.length ? `<div class="ob-maqs">${chipsMaq(mq)}<span class="ob-nivel">Movimiento: <b>${NIVEL_OBRA[nv]}</b></span></div>` : `<div class="ob-maqs"><span class="ob-maq sin">Sin dato de maquinaria${puede(o) ? ' · cargalo en Editar' : ''}</span></div>`}
+          <div class="ob-avance"><div class="ob-pisos" role="img" aria-label="Etapa ${o.etapa + 1} de ${ETAPAS.length}: ${esc(ETAPAS[o.etapa])}">${ETAPAS.map((e, i) => `<i class="${i < o.etapa ? 'hecha' : i === o.etapa ? 'actual' : ''}" title="${e}"></i>`).join('')}</div>
+            <div class="ob-etapa"><b>${esc(ETAPAS[o.etapa])}</b><span>${pct}%</span></div></div>
+          <div class="muted tiny">Cargada por ${o.porAdmin ? 'la Administración' : esc(autorVisible(o.userId).nombre)}${o.detalle ? ' · ' + esc(o.detalle) : ''}</div>
+          ${ult ? `<div class="ob-ult">${I('clock')}<span>${esc(ult.texto)} <span class="muted">· ${hace(ult.at)}</span></span></div>${fotoHTML(ult.foto, 'post-foto')}` : ''}
           ${puede(o) ? `<div class="btns" style="margin-top:12px">
             ${o.estado === 'pendiente' && esAdmin() ? `<button class="btn btn-sm btn-ok" data-a="obra-aprobar" data-id="${o.id}">${I('check')}Aprobar</button>` : ''}
             ${o.estado !== 'finalizada' && o.estado !== 'pendiente' ? `<button class="btn btn-sm btn-pri" data-a="obra-avance" data-id="${o.id}">${I('edit')}Actualizar etapa</button><button class="btn btn-sm btn-sec" data-a="obra-hoy" data-id="${o.id}">${I('truck')}Aviso del día</button>` : ''}
@@ -361,15 +407,18 @@ R.obras = {
             ${o.userId === u.id && !o.porAdmin ? `<button class="btn btn-sm btn-sec" data-a="nuevo-pase" data-v="proveedor">${I('qr')}Pase para el personal</button>` : ''}
             ${esAdmin() ? `<button class="btn btn-sm btn-danger-soft" data-a="obra-borrar" data-id="${o.id}" title="Borrar la obra">${I('trash')}</button>` : ''}
             ${esAdmin() && o.estado === 'activa' ? `<button class="btn btn-sm btn-danger-soft" data-a="obra-pausa" data-id="${o.id}">Pausar</button>` : ''}
-            ${esAdmin() && o.estado === 'pausada' ? `<button class="btn btn-sm btn-ok" data-a="obra-reanudar" data-id="${o.id}">Reanudar</button>` : ''}</div>` : ''}</div>`; }).join('') : vacio('wrench', 'No hay obras en esta lista.')}
-      <p class="muted tiny">El personal de obra ingresa con ART vigente (Ley 24.557). La guardia lo verifica en Proveedores.</p>`;
+            ${esAdmin() && o.estado === 'pausada' ? `<button class="btn btn-sm btn-ok" data-a="obra-reanudar" data-id="${o.id}">Reanudar</button>` : ''}</div>` : ''}</article>`; }).join('')}</div>` : vacio('wrench', filtro === 'pesada' ? 'Ninguna obra en curso con maquinaria pesada.' : 'No hay obras en esta lista.')}
+      <p class="muted tiny" style="margin-top:12px">${I('info')} Cada obra en curso aparece todos los días en la Pizarra del día, desde que empieza hasta que termina. Los días con movimiento (mixer, camión, grúa) su dueño manda el "Aviso del día" y sale en amarillo. ${esGuardia() ? 'La garita las ve pero no las edita.' : 'La garita las ve pero no las puede editar; la Administración sí.'} El personal de obra ingresa con ART vigente (Ley 24.557). La guardia lo verifica en Proveedores.</p>`;
   },
 };
+const elegirMaq = (sel = [], nombre = 'maq') => `<div class="ob-elegir">${Object.entries(MAQ_OBRA).map(([k, m]) =>
+  `<label class="ob-op c-${m.c}"><input type="checkbox" name="${nombre}" value="${k}" ${sel.includes(k) ? 'checked' : ''}><i class="ob-op-borde"></i><span class="ob-op-ic">${SVG_MAQ[k]}</span><span><b>${m.n}</b><small>${m.d}</small></span></label>`).join('')}</div>`;
 const formObra = (o = {}) => `
   ${esAdmin() && !o.id ? `<div class="field"><label>¿De quién es la obra?</label><select name="casa"><option value="Barrio">Del barrio (espacios comunes, calles, portón…)</option>${opcionesLotes('')}</select>
     <div class="ayuda">Cada obra es un registro aparte: una del barrio y la de un vecino conviven sin pisarse.</div></div>` : ''}
   <div class="grid2"><div class="field"><label>Tipo</label><select name="tipo">${[...TIPOS_OBRA, 'Obra del barrio'].map(t => `<option ${t === o.tipo ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
     <div class="field"><label>Etapa actual</label><select name="etapa">${ETAPAS.map((e, i) => `<option value="${i}" ${i === (o.etapa || 0) ? 'selected' : ''}>${e}</option>`).join('')}</select></div></div>
+  <div class="field"><label>¿Con qué se trabaja? <small class="muted">(marcá todo lo que va a haber)</small></label>${elegirMaq(maqDe(o))}</div>
   <div class="grid2"><div class="field"><label>Empresa / constructor</label><input name="empresa" maxlength="60" value="${esc(o.empresa || '')}"></div><div class="field"><label>Teléfono del responsable</label><input name="tel" inputmode="tel" maxlength="20" value="${esc(o.tel || '')}"></div></div>
   <div class="grid2"><div class="field"><label>Inicio</label><input type="date" name="inicio" value="${o.inicio || hoyISO()}" required></div><div class="field"><label>Fin estimado</label><input type="date" name="finEstimado" value="${o.finEstimado || ''}"></div></div>
   <div class="field"><label>Detalle</label><textarea name="detalle" maxlength="400" placeholder="Qué se hace, si va a haber camiones, mixer, grúa…">${esc(o.detalle || '')}</textarea></div>`;
@@ -378,7 +427,7 @@ A['obra-editar'] = el => { const o = Store.s.obras.find(x => x.id === el.dataset
 F['obra-editar'] = (d, form) => {
   if (esGuardia()) return;
   Store.cambiar(s => { const o = s.obras.find(x => x.id === form.dataset.id); if (!o || !(o.userId === yo().id || esAdmin())) return;
-    Object.assign(o, { tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(), ultima:Date.now() });
+    Object.assign(o, { tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(), maq:[].concat(d.maq || []).filter(k => MAQ_OBRA[k]), ultima:Date.now() });
     if (o.etapa === ETAPAS.length - 1 && o.estado !== 'finalizada'){ o.estado = 'finalizada'; }
     listaDe(o, 'historial').push({ at:Date.now(), etapa:o.etapa, texto:'Datos de la obra editados', por:yo().id });
     auditar(s, 'Editó una obra', `${o.casa} · ${o.tipo}`, o.id); });
@@ -401,9 +450,10 @@ F['nueva-obra'] = d => {
      instante y la ven la Administración, la garita y todo el barrio. La
      Administración igual puede pausarla, editarla o borrarla. */
   const casa = esAdmin() && d.casa ? d.casa : u.casa, porAdmin = esAdmin() && d.casa && d.casa !== u.casa;
-  Store.cambiar(s => { s.obras.unshift({ id:uid(), userId:u.id, casa, porAdmin: !!porAdmin, tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(),
+  const maq = [].concat(d.maq || []).filter(k => MAQ_OBRA[k]);
+  Store.cambiar(s => { s.obras.unshift({ id:uid(), userId:u.id, casa, porAdmin: !!porAdmin, tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(), maq,
       estado:'activa', createdAt:Date.now(), ultima:Date.now(), historial:[{ at:Date.now(), etapa:+d.etapa, texto:d.detalle.trim() || 'Obra registrada', por:u.id }] });
-    notificar(s, { para:'todos', titulo:`Nueva obra en ${casa === 'Barrio' ? 'el barrio' : casa}`, texto:`${d.tipo}${d.empresa.trim() ? ' · ' + d.empresa.trim() : ''}${d.inicio ? ' · desde ' + fechaCorta(d.inicio) : ''}${d.finEstimado ? ' hasta ' + fechaCorta(d.finEstimado) : ''}`, icon:'wrench', color:'wood', link:'obras' });
+    notificar(s, { para:'todos', titulo:`Nueva obra en ${casa === 'Barrio' ? 'el barrio' : casa}`, texto:`${d.tipo}${maq.includes('pesada') ? ' · con maquinaria pesada' : maq.length === 1 && maq[0] === 'obreros' ? ' · solo obreros' : ''}${d.empresa.trim() ? ' · ' + d.empresa.trim() : ''}${d.inicio ? ' · desde ' + fechaCorta(d.inicio) : ''}${d.finEstimado ? ' hasta ' + fechaCorta(d.finEstimado) : ''}`, icon:'wrench', color:'wood', link:'obras' });
     auditar(s, 'Registró una obra', `${casa} · ${d.tipo}`); });
   cerrarHoja(); abrir('obras', 'activas'); toast('Obra publicada: ya la ve todo el barrio', 'wrench');
 };
@@ -424,10 +474,12 @@ F['obra-avance'] = (d, form) => {
   cerrarHoja(); toast('Obra actualizada', 'wrench');
 };
 A['obra-hoy'] = el => hoja('Aviso de obra para hoy', `<form data-f="obra-hoy" data-id="${el.dataset.id}"><div class="field"><label>¿Qué va a pasar hoy?</label><input name="texto" required maxlength="100" placeholder="Entra un mixer, corte de calle 20 min…"></div>
+  <div class="field"><label>¿Qué entra hoy?</label>${elegirMaq([], 'maq')}</div>
   <div class="field"><label>Hora</label><input type="time" name="hora"></div><button class="btn btn-pri btn-block">${I('send')}Avisar a los vecinos</button></form>`);
 F['obra-hoy'] = (d, form) => {
-  Store.cambiar(s => { const o = s.obras.find(x => x.id === form.dataset.id); if (!o) return; o.avisoHoy = { fecha:hoyISO(), texto:d.texto.trim(), hora:d.hora };
-    notificar(s, { para:'todos', titulo:`Obra en ${o.casa}: ${d.texto.trim()}`, texto:d.hora ? `Desde las ${d.hora} h` : 'Hoy', icon:'truck', color:'warn', link:'obras' }); });
+  const maq = [].concat(d.maq || []).filter(k => MAQ_OBRA[k]);
+  Store.cambiar(s => { const o = s.obras.find(x => x.id === form.dataset.id); if (!o) return; o.avisoHoy = { fecha:hoyISO(), texto:d.texto.trim(), hora:d.hora, maq };
+    notificar(s, { para:'todos', titulo:`Obra en ${o.casa}: ${d.texto.trim()}`, texto:`${d.hora ? `Desde las ${d.hora} h` : 'Hoy'}${maq.includes('pesada') ? ' · entra maquinaria pesada' : maq.includes('camiones') ? ' · entran camiones' : ''}`, icon:'truck', color:'warn', link:'obras' }); });
   cerrarHoja(); toast('Aviso enviado', 'truck');
 };
 A['obra-pausa'] = el => Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; o.estado = 'pausada'; o.historial.push({ at:Date.now(), etapa:o.etapa, texto:'Pausada por la Administración', por:yo().id }); notificar(s, { para:o.userId, titulo:'Tu obra fue pausada', texto:'Consultá con la Administración', icon:'wrench', color:'danger', link:'obras' }); auditar(s, 'Pausó una obra', o.casa, o.id); });
@@ -478,9 +530,12 @@ R.infracciones = {
         <div class="grow"><b>${esc(TIPOS_INF[i.tipo] || i.tipo)}</b><div class="muted small">${esc(i.casa)} · ${new Date(i.at).toLocaleDateString('es-AR')} · ${esc(NIVELES.find(n => n[0] === i.nivel)?.[1] || '')}${i.monto ? ' · ' + esc(i.monto) : ''}</div></div>
         <span class="pill ${i.estado === 'firme' ? 'p-danger' : i.estado === 'anulada' ? '' : 'p-warn'}">${{ notificada:'Notificada', descargo:'Con descargo', firme:'Firme', anulada:'Anulada' }[i.estado]}</span></div>
         <p class="small" style="margin:8px 0 0;color:var(--ink-2)">${esc(i.detalle)}</p>${fotoHTML(i.foto, 'post-foto')}
+        ${pruebasHTML(i)}
         ${i.descargo ? `<div class="card plana small" style="margin:10px 0 0"><b>Descargo:</b> ${esc(i.descargo)}</div>` : ''}
         <div class="btns" style="margin-top:10px">${!esAdmin() && i.estado === 'notificada' ? `<button class="btn btn-sm btn-pri" data-a="descargo" data-id="${i.id}">${I('edit')}Presentar descargo</button>` : ''}
-          ${esAdmin() && i.estado !== 'firme' && i.estado !== 'anulada' ? `<button class="btn btn-sm btn-danger" data-a="inf-estado" data-v="firme" data-id="${i.id}">Dejar firme</button><button class="btn btn-sm btn-sec" data-a="inf-estado" data-v="anulada" data-id="${i.id}">Anular</button>` : ''}</div></div>`).join('') : vacio('check', 'Sin infracciones.')}`;
+          ${esAdmin() && i.estado !== 'anulada' ? `<button class="btn btn-sm btn-sec" data-a="inf-pruebas" data-id="${i.id}">${I('clip')}Sumar pruebas</button>` : ''}
+          ${esAdmin() && i.estado !== 'firme' && i.estado !== 'anulada' ? `<button class="btn btn-sm btn-danger" data-a="inf-estado" data-v="firme" data-id="${i.id}">Dejar firme</button><button class="btn btn-sm btn-sec" data-a="inf-estado" data-v="anulada" data-id="${i.id}">Anular</button>` : ''}</div>
+        ${historialInf(i)}</div>`).join('') : vacio('check', 'Sin infracciones.')}`;
   },
 };
 A['nueva-infraccion'] = () => hoja('Registrar infracción', `<form data-f="infraccion">
@@ -489,14 +544,16 @@ A['nueva-infraccion'] = () => hoja('Registrar infracción', `<form data-f="infra
   <div class="field"><label>Qué pasó</label><textarea name="detalle" required maxlength="500"></textarea></div>
   <div class="grid2"><div class="field"><label>Nivel</label><select name="nivel" id="infNivel">${NIVELES.map(n => `<option value="${n[0]}">${n[1]}</option>`).join('')}</select><div class="ayuda" id="infSug"></div></div>
     <div class="field"><label>Monto (si es multa)</label><input name="monto" maxlength="30"></div></div>
-  ${campoFoto('fotoInf', 'Prueba (opcional)')}
+  ${campoPruebas('infPrb')}
   <button class="btn btn-danger btn-block">${I('send')}Notificar a la casa</button></form>`);
 document.addEventListener('change', e => { if (e.target.id === 'infCasa') sugerirNivel(); });
 function sugerirNivel(){ const c = $('#infCasa'), n = $('#infNivel'), s = $('#infSug'); if (!c || !n) return; n.value = nivelSugerido(c.value);
   const k = Store.s.infracciones.filter(i => i.casa === c.value && i.estado !== 'anulada' && Date.now() - i.at < 365 * DIA).length; s.textContent = `Sugerido por ${plural(k, 'antecedente')} en 12 meses`; }
 const _nuevaInf = A['nueva-infraccion']; A['nueva-infraccion'] = () => { _nuevaInf(); sugerirNivel(); };
 F['infraccion'] = d => {
-  Store.cambiar(s => { const i = { id:uid(), casa:d.casa, tipo:d.tipo, detalle:d.detalle.trim(), nivel:d.nivel, monto:d.monto.trim(), foto:fotoParaOtros(d.foto, 45), at:Date.now(), estado:'notificada', por:yo().id };
+  const pruebas = Pruebas.subirTodas(d.pruebas);
+  Store.cambiar(s => { const i = { id:uid(), casa:d.casa, tipo:d.tipo, detalle:d.detalle.trim(), nivel:d.nivel, monto:d.monto.trim(), at:Date.now(), estado:'notificada', por:yo().id,
+      pruebas, historial: pruebas.map(x => ({ at:x.at, por:yo().id, t:`La Administración subió ${quePrueba(x)} a la infracción de ${d.casa}` })) };
     s.infracciones.unshift(i);
     notificar(s, { para:s.users.filter(x => x.casa === d.casa && x.estado === 'aprobado').map(x => x.id), titulo:'Notificación de la Administración', texto:`${TIPOS_INF[d.tipo]} · podés presentar tu descargo`, icon:'alert', color:'danger', link:'infracciones' });
     auditar(s, 'Registró una infracción', `${d.casa} · ${TIPOS_INF[d.tipo]} · ${d.nivel}`, i.id); });
@@ -508,6 +565,138 @@ F['descargo'] = (d, form) => { Store.cambiar(s => { const i = s.infracciones.fin
 A['inf-estado'] = el => Store.cambiar(s => { const i = s.infracciones.find(x => x.id === el.dataset.id); if (!i) return; i.estado = el.dataset.v;
   notificar(s, { para:s.users.filter(x => x.casa === i.casa).map(x => x.id), titulo: el.dataset.v === 'firme' ? 'La sanción quedó firme' : 'La infracción fue anulada', texto:TIPOS_INF[i.tipo], icon:'alert', color: el.dataset.v === 'firme' ? 'danger' : 'ok', link:'infracciones' });
   auditar(s, el.dataset.v === 'firme' ? 'Dejó firme una infracción' : 'Anuló una infracción', i.casa, i.id); });
+
+/* =========================================================
+   LAS PRUEBAS DE UNA INFRACCIÓN (pedido de Claudio, 12-10-2026)
+   Antes había un dibujito y dos botones que hacían casi lo mismo. Ahora
+   son dos: "Sacar foto" (la cámara) y "Subir archivo" (fotos, PDF, Word,
+   Excel, audio o video corto, hasta 5 MB cada uno; se pueden elegir
+   varios). Cómo se guardan, para que la base no se llene:
+     · en la infracción va solo una vista previa liviana (la foto a 220 px,
+       unos 8 KB) o el nombre y el peso del archivo: eso es lo que baja a
+       cada equipo con la infracción;
+     · la foto buena (1600 px) o el archivo van aparte, en
+       barrio/adjuntos/<id>, que no baja con nada: se trae solo cuando
+       alguien toca la vista previa, y queda en SU equipo;
+     · a los 90 días se borra de la base (el reloj del Apps Script y la app
+       de la Administración borran lo vencido) y la infracción conserva la
+       constancia: quién la subió, quién la bajó y cuándo se borró.
+   Nada sube hasta tocar "Notificar a la casa": si se cancela, no queda nada.
+   ========================================================= */
+const PRUEBA_DIAS = 90;
+const ACEPTA_PRUEBA = 'image/*,.heic,.heif,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.txt,.csv,audio/*,video/*';
+const quePrueba = x => /^image\//.test(x.tipo || '') ? `la foto "${x.nombre}"` : `el archivo "${x.nombre}"`;
+const Pruebas = {
+  pend: new Map(),
+  /* Del archivo elegido a la ficha de la prueba (sin subirla todavía). */
+  async preparar(file){
+    const id = 'a' + uid(), foto = Adjuntos.esFoto(file);
+    let d = null, mini = '', tipo = file.type || 'application/octet-stream', nombre = String(file.name || (foto ? 'foto.jpg' : 'archivo')).slice(0, 80);
+    if (foto){ try { d = await comprimir(file, ADJ.foto, .8); } catch(e){ d = null; }
+      if (d){ mini = await achicarDato(d, ADJ.mini, .5); tipo = tipoDeDato(d); nombre = nombre.replace(/\.[a-z0-9]+$/i, '') + '.' + extDeTipo(tipo); } }
+    if (!d){
+      if (file.size > ADJ.maxArchivo) throw new Error(`"${nombre}" pesa ${pesoTexto(file.size)}. El máximo es 5 MB por archivo.`);
+      d = await leerComoDato(file);
+    }
+    this.pend.set(id, d);
+    return { id, nombre, tipo, peso:Math.round(d.length * .75), ...(mini ? { mini } : {}) };
+  },
+  /* Al guardar: cada prueba pendiente sube a la base con 90 días de vida
+     y queda también en este equipo. */
+  subirTodas(json){
+    let ls = []; try { ls = JSON.parse(json || '[]') || []; } catch(e){}
+    const at = Date.now(), vence = at + PRUEBA_DIAS * DIA;
+    return ls.filter(x => x && x.id && this.pend.has(x.id)).map(x => {
+      const d = this.pend.get(x.id); this.pend.delete(x.id);
+      Fotos.poner(x.id, d);
+      if (Adjuntos.nube()) Adjuntos.subir(x.id, d, { nombre:x.nombre, tipo:x.tipo, at, vence });
+      return { ...x, at, vence, por:yo().id };
+    });
+  },
+};
+const campoPruebas = id => `<div class="field"><label>Pruebas (opcional)</label>
+  <div class="prb-botones">
+    <label class="prb-b c-sky"><span class="prb-i">${I('camera')}</span><span><b>Sacar foto</b><small>Con la cámara</small></span><input type="file" accept="image/*" capture="environment" data-prueba-in="${id}" hidden></label>
+    <label class="prb-b c-accent"><span class="prb-i">${I('upload')}</span><span><b>Subir archivo</b><small>Fotos, PDF, Word, Excel, audio o video · hasta 5 MB</small></span><input type="file" multiple accept="${ACEPTA_PRUEBA}" data-prueba-in="${id}" hidden></label>
+  </div>
+  <div class="prb-lista" id="${id}Lista"></div>
+  <input type="hidden" name="pruebas" id="${id}" value="[]">
+  <div class="ayuda">Se guardan ${PRUEBA_DIAS} días en la base del barrio. Cada equipo ve una vista previa liviana; el archivo completo se baja solo si alguien lo toca. A los ${PRUEBA_DIAS} días se borra y queda la constancia en el historial de la infracción.</div></div>`;
+const filaPruebaNueva = (x, campo) => `<span class="prb-item" data-id="${esc(x.id)}">${x.mini ? `<i style="background-image:url('${x.mini}')"></i>` : `<i class="arch">${I('file')}</i>`}
+  <span><b>${esc(x.nombre)}</b><small>${pesoTexto(x.peso)}</small></span><button type="button" class="icon-btn" data-a="prueba-quitar" data-id="${esc(x.id)}" data-v="${esc(campo)}" aria-label="Quitar ${esc(x.nombre)}">${I('x')}</button></span>`;
+document.addEventListener('change', async e => {
+  const inp = e.target.closest && e.target.closest('input[type=file][data-prueba-in]'); if (!inp || !inp.files || !inp.files.length) return;
+  const campo = document.getElementById(inp.dataset.pruebaIn), lista = document.getElementById(inp.dataset.pruebaIn + 'Lista'); if (!campo) return;
+  const files = [...inp.files].slice(0, 6); inp.value = '';
+  toast(files.length > 1 ? `Preparando ${files.length} archivos…` : 'Preparando…', 'upload');
+  for (const f of files){
+    try { const x = await Pruebas.preparar(f); const ls = JSON.parse(campo.value || '[]'); ls.push(x); campo.value = JSON.stringify(ls);
+      if (lista) lista.insertAdjacentHTML('beforeend', filaPruebaNueva(x, campo.id)); }
+    catch(err){ toast(err.message || 'No se pudo leer ese archivo', 'alert'); }
+  }
+});
+A['prueba-quitar'] = el => {
+  const campo = document.getElementById(el.dataset.v); if (!campo) return;
+  campo.value = JSON.stringify(JSON.parse(campo.value || '[]').filter(x => x.id !== el.dataset.id));
+  Pruebas.pend.delete(el.dataset.id); el.closest('.prb-item')?.remove();
+};
+/* Las pruebas de una infracción ya notificada: vista previa y, al tocar, se baja. */
+function pruebasHTML(i){
+  const ls = aLista(i.pruebas); if (!ls.length) return '';
+  return `<div class="prb-ver">${ls.map(x => { const viva = !x.borrado && (x.vence || 0) > Date.now(), dias = Math.max(0, Math.ceil(((x.vence || 0) - Date.now()) / DIA));
+    return `<button type="button" class="prb-v ${viva ? '' : 'borrada'}" data-a="prueba-abrir" data-id="${esc(i.id)}" data-v="${esc(x.id)}" ${viva ? '' : 'disabled'} aria-label="${viva ? 'Bajar' : 'Ya borrada:'} ${esc(x.nombre)}">
+      ${x.mini ? `<i style="background-image:url('${x.mini}')">${viva ? I('download') : ''}</i>` : `<i class="arch">${I('file')}</i>`}
+      <span><b>${esc(x.nombre)}</b><small>${viva ? `${pesoTexto(x.peso)} · se borra en ${plural(dias, 'día')}` : 'Se borró de la base a los 90 días'}</small></span></button>`; }).join('')}</div>`;
+}
+function historialInf(i){
+  const h = aLista(i.historial).filter(Boolean).sort((a, b) => b.at - a.at); if (!h.length) return '';
+  return `<details class="inf-hist"><summary>${I('clock')} Historial (${h.length})</summary><ol>${h.map(x => `<li><time>${fechaCorta(isoDe(new Date(x.at)))} ${hora(x.at)}</time><span>${esc(x.t)}</span></li>`).join('')}</ol></details>`;
+}
+A['prueba-abrir'] = async el => {
+  const i = aLista(Store.s.infracciones).find(x => x && x.id === el.dataset.id), x = i && aLista(i.pruebas).find(p => p && p.id === el.dataset.v), u = yo();
+  if (!x || !u || el.dataset.bajando) return;
+  el.dataset.bajando = '1'; el.classList.add('bajando');
+  let v = null; try { v = await Adjuntos.bajar(x.id, { conservar:true }); } catch(e){}
+  delete el.dataset.bajando; el.classList.remove('bajando');
+  if (!v){ toast('Ya no está para bajar: se borra de la base a los 90 días de subida.', 'clock'); return; }
+  /* Constancia en la infracción: quién la bajó (una vez por persona y por día). */
+  const quien = esAdmin() ? 'La Administración' : u.casa || 'El vecino', hoy = hoyISO();
+  if (!aLista(x.bajadas).some(b => b && b.por === u.id && isoDe(new Date(b.at)) === hoy))
+    Store.cambiar(s => { const ii = aLista(s.infracciones).find(z => z.id === i.id), xx = ii && aLista(ii.pruebas).find(p => p.id === x.id); if (!xx) return;
+      listaDe(xx, 'bajadas').push({ at:Date.now(), por:u.id });
+      listaDe(ii, 'historial').push({ at:Date.now(), por:u.id, t:`${quien} bajó ${quePrueba(xx)}` }); });
+  adjAbierto = { v, nombre:x.nombre, tipo:x.tipo };
+  if (/^image\//.test(x.tipo || '')) return hoja('Prueba', `<img class="foto-full" src="${v}" alt="">
+    <div class="btns" style="margin-top:12px"><button class="btn btn-pri grow" data-a="adj-guardar">${I('download')}Guardar en este equipo</button></div>
+    <p class="muted small" style="margin:8px 2px 0">Ya quedó en esta app, en este equipo. Para tenerla en la galería o en las descargas, tocá "Guardar".</p>`, { ancho:'760px' });
+  if (await guardarArchivoEnEquipo(v, x.nombre, x.tipo)) toast('Archivo guardado en este equipo', 'download');
+};
+/* A los 90 días: el archivo sale de la base y la infracción guarda la
+   constancia (corre en la app de la Administración, una vez por prueba). */
+REGLAS.push({ id:'infraccion-pruebas-90d', n:`Pruebas de las infracciones → se borran de la base a los ${PRUEBA_DIAS} días`, d:'La foto o el archivo sale de la base del barrio; en la infracción queda la constancia de quién la subió, quién la bajó y cuándo se borró.',
+  run(s){ if (!esAdmin()) return 0; let n = 0; const ahora = Date.now();
+    aLista(s.infracciones).forEach(i => aLista(i && i.pruebas).forEach(x => { if (!x || x.borrado || !x.vence || x.vence > ahora) return;
+      n += marca(s, `prb90-${x.id}`, () => {
+        const ii = aLista(Store.s.infracciones).find(z => z && z.id === i.id), xx = ii && aLista(ii.pruebas).find(p => p && p.id === x.id); if (!xx || xx.borrado) return;
+        const nb = aLista(xx.bajadas).length; xx.borrado = Date.now();
+        listaDe(ii, 'historial').push({ at:Date.now(), por:'sistema', t:`Se borró ${quePrueba(xx)} de la base: pasaron ${PRUEBA_DIAS} días desde que se subió${nb ? ` (la bajaron ${plural(nb, 'vez', 'veces')})` : ' y nadie la bajó'}. Queda esta constancia.` });
+        if (Adjuntos.nube()) Nube.db.ref().update({ ['barrio/adjuntos/' + xx.id]:null, ['barrio/adjuntosIdx/' + xx.id]:null }).catch(() => {});
+        Fotos.borrar(xx.id);
+      }); })); return n; } });
+/* La Administración suma pruebas a una infracción ya notificada. */
+A['inf-pruebas'] = el => { if (!esAdmin()) return; const i = aLista(Store.s.infracciones).find(x => x && x.id === el.dataset.id); if (!i) return;
+  hoja(`Sumar pruebas · ${esc(i.casa)}`, `<form data-f="inf-pruebas" data-id="${esc(i.id)}">${campoPruebas('infPrbMas')}<button class="btn btn-pri btn-block">${I('upload')}Guardar y avisar a la casa</button></form>`); };
+F['inf-pruebas'] = (d, form) => {
+  if (!esAdmin()) return;
+  let n0 = []; try { n0 = JSON.parse(d.pruebas || '[]'); } catch(e){}
+  if (!n0.length){ toast('Sacá una foto o elegí un archivo', 'camera'); return; }
+  const nuevas = Pruebas.subirTodas(d.pruebas);
+  Store.cambiar(s => { const i = aLista(s.infracciones).find(x => x.id === form.dataset.id); if (!i) return;
+    nuevas.forEach(x => { listaDe(i, 'pruebas').push(x); listaDe(i, 'historial').push({ at:x.at, por:yo().id, t:`La Administración subió ${quePrueba(x)} a la infracción de ${i.casa}` }); });
+    notificar(s, { para:s.users.filter(u => u.casa === i.casa && u.estado === 'aprobado').map(u => u.id), titulo:'Nuevas pruebas en una infracción', texto:`${TIPOS_INF[i.tipo]} · ${plural(nuevas.length, 'archivo')}`, icon:'clip', color:'warn', link:'infracciones' });
+    auditar(s, 'Sumó pruebas a una infracción', `${i.casa} · ${plural(nuevas.length, 'archivo')}`, i.id); });
+  cerrarHoja(); toast(nuevas.length === 1 ? 'Prueba guardada' : `${nuevas.length} pruebas guardadas`, 'check');
+};
 
 /* ---------- PROVEEDORES HABILITADOS ---------- */
 const artEstado = p => { if (!p.artVence) return ['Sin ART cargada','warn']; const d = Math.round((fechaDe(p.artVence) - fechaDe(hoyISO())) / DIA); return d < 0 ? ['ART vencida','danger'] : d <= 7 ? [`ART vence en ${plural(d, 'día')}`,'warn'] : ['ART vigente','ok']; };

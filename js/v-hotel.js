@@ -39,16 +39,64 @@
    cuenta y el convenio.
    ========================================================= */
 
+/* =========================================================
+   EL HOTEL DE EJEMPLO EN LA APP DE VERDAD (pedido de Claudio, 12-10-2026:
+   "dejá los datos de demo en el hotel para que se vean hasta que el hotel
+   cargue los propios y así se vea su funcionalidad en tiempo real").
+   Mientras el hotel no cargó NADA propio (ni vans, ni traslados, ni
+   huéspedes, ni eventos, ni proveedores), la cuenta del hotel y la
+   Administración ven un hotel de ejemplo (el de la demo: dos vans, sus
+   traslados de hoy y los automatizados, huéspedes inventados, un evento,
+   dos proveedores), con un cartel que lo dice. Reglas:
+     · NO se guarda en la base: se arma en cada equipo, en memoria. Nadie
+       más lo recibe y no ocupa lugar.
+     · NO lo ven la garita ni la supervisión: que la guardia no espere vans
+       ni huéspedes que no existen.
+     · No se puede tocar: editar, borrar o registrar algo del ejemplo dice
+       "es un ejemplo". Lo nuevo que cargue el hotel es de verdad.
+     · Se va solo, para todos, apenas el hotel carga lo primero propio. Cada
+       uno lo puede ocultar en su equipo ("Ocultar el ejemplo").
+     · El motor del hotel no avisa nada del ejemplo.
+   ========================================================= */
+const HOTEL_OPERA = ['hotelVans', 'hotelViajes', 'hotelHuespedes', 'hotelEventos', 'hotelProv'];
+const HotelEjemplo = {
+  KEY:'bhc.hotel.ejemplo', cache:null, dia:'',
+  oculto(){ try { return localStorage.getItem(this.KEY) === 'no'; } catch(e){ return false; } },
+  hayReal(){ return HOTEL_OPERA.some(c => aLista(Store.s && Store.s[c]).some(Boolean)); },
+  puedeVerlo(){ return !!(yo() && (esHotel() || esAdmin())); },
+  activo(){ return this.puedeVerlo() && !this.oculto() && !this.hayReal(); },
+  datos(){
+    const hoy = hoyISO(); if (this.cache && this.dia === hoy) return this.cache;
+    const d = { users:[] }; hotelDemo(d);
+    /* Ids propios ("ej-…"): así ninguna acción los confunde con uno de verdad. */
+    const ids = new Set(); HOTEL_OPERA.concat('hotelMovs').forEach(c => aLista(d[c]).forEach(x => x && x.id && ids.add(x.id)));
+    const ej = v => ids.has(v) ? 'ej-' + v : v;
+    d.hotelViajes = aLista(d.hotelViajes).filter(x => !x.deRutina);
+    HOTEL_OPERA.concat('hotelMovs').forEach(c => { d[c] = aLista(d[c]).map(x => ({ ...x, id:ej(x.id), ...(x.vanId ? { vanId:ej(x.vanId) } : {}), ...(x.huespedes ? { huespedes:aLista(x.huespedes).map(ej) } : {}), ...(/^H-/.test(x.codigo || '') ? { codigo:'EJEMPLO' } : {}) })); });
+    generarRutinas(d);
+    this.dia = hoy; return this.cache = d;
+  },
+};
+const esEjemplo = id => /^(ej-|hr-ej-)/.test(String(id || ''));
+const avisoEjemplo = () => toast('Es un ejemplo: no se puede cambiar. Cargá lo tuyo y el ejemplo desaparece solo.', 'info');
+const hotelCol = col => HotelEjemplo.activo() ? aLista(HotelEjemplo.datos()[col]) : aLista(Store.s[col]);
 /* ---------- datos ---------- */
 const hotelInfo = () => Object.assign({ id:'info', trayAero:20, checkin:90, esperaArribo:15, trayPuerto:15, embarque:120, desembarque:45,
   avisoAntes:30, autoTraslados:true, dea:false, deaLugar:'', auxilios:'', telRecepcion:'', responsable:'', puntoEncuentro:'' },
-  aLista(Store.s.hotelInfo).find(x => x && x.id === 'info') || {});
-const hotelVans = () => aLista(Store.s.hotelVans).filter(v => v && !v.baja);
-const hotelProvs = () => aLista(Store.s.hotelProv).filter(Boolean);
-const hotelEventos = () => aLista(Store.s.hotelEventos).filter(e => e && !e.cancelado);
-const hotelHuespedes = () => aLista(Store.s.hotelHuespedes).filter(Boolean);
-const hotelViajes = () => aLista(Store.s.hotelViajes).filter(Boolean);
-const hotelMovs = () => aLista(Store.s.hotelMovs).filter(Boolean).sort((a, b) => b.at - a.at);
+  ...(HotelEjemplo.activo() ? [aLista(HotelEjemplo.datos().hotelInfo)[0] || {}] : []),
+  aLista(Store.s.hotelInfo).find(x => x && x.id === 'info') || {},
+  HotelEjemplo.activo() ? { huespedesHoy:(aLista(HotelEjemplo.datos().hotelInfo)[0] || {}).huespedesHoy || 0, huespedesDia:hoyISO() } : {});
+const hotelVans = () => hotelCol('hotelVans').filter(v => v && !v.baja);
+const hotelProvs = () => hotelCol('hotelProv').filter(Boolean);
+const hotelEventos = () => hotelCol('hotelEventos').filter(e => e && !e.cancelado);
+const hotelHuespedes = () => hotelCol('hotelHuespedes').filter(Boolean);
+const hotelViajes = () => hotelCol('hotelViajes').filter(x => x && !x.rutina);
+/* Los traslados automatizados (12-10-2026) viven en la misma colección,
+   marcados con rutina:true: son el molde, no un viaje (no tienen fecha). */
+const hotelRutinas = () => hotelCol('hotelViajes').filter(x => x && x.rutina);
+const hotelMovs = () => hotelCol('hotelMovs').filter(Boolean).sort((a, b) => b.at - a.at);
+/* Las vans de verdad (para elegir en un formulario: nunca una del ejemplo). */
+const vansReales = () => aLista(Store.s.hotelVans).filter(v => v && !v.baja);
 /* ¿Quién puede tocar qué? */
 const soloHotel = () => { if (esHotel()) return true; toast('Eso lo carga el hotel desde su cuenta.', 'lock'); return false; };
 const hotelId = () => (esHotel() ? yo() : cuentaHotel())?.id || '';
@@ -91,7 +139,7 @@ function ajusteViaje(x){
   return Math.abs(minutosDe(sug) - minutosDe(x.sale)) >= 10 ? { sale:sug, v } : null;
 }
 const textoViaje = x => { const d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro;
-  return `${x.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${d[0].toLowerCase()}${x.ref && x.ref.tipo === 'vuelo' ? ' · vuelo ' + x.ref.nro + (x.ref.hora ? ' ' + x.ref.hora : '') : x.ref && x.ref.tipo === 'crucero' ? ' · ' + conMayusculasBarco(x.ref.barco) : x.ref && x.ref.desc ? ' · ' + x.ref.desc : ''}`; };
+  return `${x.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${d[0].toLowerCase()}${x.ref && x.ref.tipo === 'vuelo' ? ' · vuelo ' + x.ref.nro + (x.ref.hora ? ' ' + x.ref.hora : '') : x.ref && x.ref.tipo === 'crucero' ? ' · ' + conMayusculasBarco(x.ref.barco) : x.ref && x.ref.desc && x.ref.tipo !== 'rutina' ? ' · ' + x.ref.desc : ''}`; };
 const viajesDelDia = (f = hoyISO()) => hotelViajes().filter(x => x.fecha === f && x.estado !== 'cancelado').sort((a, b) => (a.sale || '99').localeCompare(b.sale || '99'));
 
 /* =========================================================
@@ -105,7 +153,7 @@ const viajesDelDia = (f = hoyISO()) => hotelViajes().filter(x => x.fecha === f &
 function trasladosDeHuespedes(s){
   const info = hotelInfo(); if (!info.autoTraslados) return 0;
   const grupos = {};
-  hotelHuespedes().forEach(h => {
+  aLista(s.hotelHuespedes).filter(Boolean).forEach(h => {
     if (h.llegaVuelo && h.desde >= hoyISO()) (grupos[`${h.desde}|A|${normVuelo(h.llegaVuelo)}`] = grupos[`${h.desde}|A|${normVuelo(h.llegaVuelo)}`] || { fecha:h.desde, sentido:'A', nro:h.llegaVuelo, hora:h.llegaHora || '', hs:[] }).hs.push(h);
     if (h.saleVuelo && h.hasta >= hoyISO()) (grupos[`${h.hasta}|D|${normVuelo(h.saleVuelo)}`] = grupos[`${h.hasta}|D|${normVuelo(h.saleVuelo)}`] || { fecha:h.hasta, sentido:'D', nro:h.saleVuelo, hora:h.saleHora || '', hs:[] }).hs.push(h);
   });
@@ -143,7 +191,7 @@ const HotelMotor = {
   correr(){
     const u = yo(); if (!u) return;
     if (esGuardia()) return this.garita();
-    if (u.rol !== 'hotel') return;
+    if (u.rol !== 'hotel' || HotelEjemplo.activo()) return;
     const hoy = hoyISO(), ahora = ahoraMin(), info = hotelInfo(), avisos = [];
     viajesDelDia(hoy).filter(x => x.estado === 'programado').forEach(x => {
       const aj = ajusteViaje(x);
@@ -161,13 +209,17 @@ const HotelMotor = {
     Store.cambiar(s => {
       if (viejos.length){ const fuera = new Set(viejos.map(h => h.id)); s.hotelHuespedes = aLista(s.hotelHuespedes).filter(h => !fuera.has(h.id)); }
       trasladosDeHuespedes(s);
+      generarRutinas(s);
       if (info.huespedesHoy !== hoyN || info.huespedesDia !== hoy) guardarInfo(s, { huespedesHoy:hoyN, huespedesDia:hoy });
       avisos.forEach(a => notificar(s, { para:[u.id], titulo:a.titulo, texto:a.texto, icon:'car', color: a.urgente ? 'danger' : 'wood', link:'hotel-traslados', sonido:true, urgente:a.urgente }));
     });
     if (hayCambios) refrescarPronto();
   },
-  /* En la garita: los pasos de las vans de más de 30 días se van. */
+  /* En la garita: los traslados automatizados de hoy y mañana (por si el
+     equipo del hotel está apagado) y los pasos de las vans de más de 30
+     días se van. */
   garita(){
+    if (rutinasQueFaltan(2).length) Store.cambiar(s => { generarRutinas(s, 2); });
     if (!this.marcar('limpieza-movs-' + hoyISO())) return;
     const lim = Date.now() - 30 * DIA;
     if (hotelMovs().some(m => m.at < lim)) Store.cambiar(s => { s.hotelMovs = aLista(s.hotelMovs).filter(m => m && m.at >= lim); });
@@ -183,7 +235,6 @@ function guardarInfo(s, cambios){
 /* =========================================================
    LA PORTADA DEL HOTEL
    ========================================================= */
-const tejaHotel = (v, icon, color, t, s, extra = {}) => teja({ v, icon, color, t, s, ...extra });
 
 /* COMUNICACIÓN INTERNA (pedido de Claudio, 27-09): antes eran dos tejas,
    "Administración" y "Garita"; ahora es una sola y adentro se elige con
@@ -207,22 +258,6 @@ function comunicacionHotel(){
 /* Arriba de la conversación, para pasar de una a la otra sin volver. */
 const chipsHotel = con => `<div class="chips">${CANALES_HOTEL.map(c => { const nl = c.con !== con ? sinLeerHotel(c.con) : 0;
   return `<button class="chip ${con === c.con ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="${c.con}">${I(c.icon)}${c.t}${nl ? `<span class="n">${nl}</span>` : ''}</button>`; }).join('')}</div>`;
-function tarjetaVan(v, { garita = false } = {}){
-  const e = estadoVan(v), prox = viajesDelDia().find(x => x.vanId === v.id && x.estado === 'programado');
-  return `<div class="hv-van ${e.adentro ? 'adentro' : 'afuera'}"><span class="hv-van-ic">${I('car')}</span>
-    <div class="grow"><b>${esc(v.nombre)}</b><span class="mono">${esc(v.patente || '')}</span>
-      <small>${e.sin ? 'Sin pasos registrados' : e.adentro ? `En el barrio desde las ${hora(e.desde)} h` : `Afuera desde las ${hora(e.desde)} h`}${prox ? ` · próximo: ${prox.sale || '—'} h` : ''}</small></div>
-    ${garita && esGuardia() ? `<button class="btn btn-xs ${e.adentro ? 'btn-sec' : 'btn-ok'}" data-a="hvan-mov" data-id="${esc(v.id)}" data-v="${e.adentro ? 'out' : 'in'}">${I(e.adentro ? 'logout' : 'login')}${e.adentro ? 'Salió' : 'Entró'}</button>` : `<span class="pill ${e.adentro ? 'p-ok' : 'p-warn'}">${e.adentro ? 'Adentro' : 'Afuera'}</span>`}</div>`;
-}
-function filaViaje(x, { acciones = false } = {}){
-  const d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro, e = ESTADO_VIAJE[x.estado] || ESTADO_VIAJE.programado, van = hotelVans().find(v => v.id === x.vanId), aj = ajusteViaje(x);
-  return `<div class="hv-viaje"><div class="hv-hora"><b>${esc(x.sale || '—')}</b><small>${x.fecha === hoyISO() ? 'hoy' : fechaCorta(x.fecha)}</small></div>
-    <div class="grow"><b>${I(d[1])} ${esc(textoViaje(x))}</b>
-      <small>${plural(+x.pax || 0, 'pasajero')}${van ? ' · ' + esc(van.nombre) : ' · sin van asignada'}${x.auto ? ' · armado con los huéspedes' : ''}${x.nota ? ' · ' + esc(x.nota) : ''}</small>
-      ${aj && aj.cancelado ? `<span class="hv-alerta">${I('alert')} El vuelo figura CANCELADO en el aeropuerto</span>` : aj ? `<span class="hv-alerta">${I('clock')} ${esc(aj.v.estado || 'Nuevo horario')} ${esc(aj.v.real || aj.v.hora)} h: conviene salir ${esc(aj.sale)}${acciones && esHotel() ? ` <button class="link" data-a="hviaje-ajustar" data-id="${esc(x.id)}" data-v="${esc(aj.sale)}">Ajustar</button>` : ''}</span>` : ''}</div>
-    <span class="pill ${e[1] ? 'p-' + e[1] : ''}">${e[0]}</span>
-    ${acciones && esHotel() ? `<button class="icon-btn" data-a="hviaje-editar" data-id="${esc(x.id)}" aria-label="Editar el traslado">${I('edit')}</button>` : ''}</div>`;
-}
 /* =========================================================
    LA PORTADA DEL HOTEL, REDISEÑADA (pedido de Claudio, 11-10-2026: "más
    innovador, agradable a la vista y de fácil interpretación"; las ideas,
@@ -303,18 +338,19 @@ function lineaTraslados(vs, { dia = hoyISO(), acciones = false, max = 99 } = {})
       <span class="hl-hora"><b>${esc(x.sale || '—')}</b><small>${esHoy && x.estado === 'programado' ? esc(faltaTexto(x.sale)) : e[0]}</small></span>
       <span class="hl-nodo">${I(d[1])}</span>
       <div class="hl-card"><button type="button" class="hl-cab" data-a="hviaje-ver" data-id="${esc(x.id)}" aria-expanded="${abierto}">
-          <span class="grow"><b>${esc(textoViaje(x))}</b><small>${plural(+x.pax || 0, 'pasajero')} · ${van ? esc(van.nombre) : '<em>sin van</em>'}</small></span>
+          <span class="grow"><b>${x.deRutina ? `<i class="hl-auto" title="Traslado automatizado">${I('refresh')}</i>` : ''}${esc(textoViaje(x))}</b><small>${x.deRutina && x.ref && x.ref.desc ? esc(x.ref.desc) + ' · ' : ''}${plural(+x.pax || 0, 'pasajero')} · ${van ? esc(van.nombre) : '<em>sin van</em>'}${choferDe(x) ? ' · ' + esc(choferDe(x)) : ''}</small></span>
           <span class="pill ${e[1] ? 'p-' + e[1] : ''}">${e[0]}</span></button>
         ${aj ? `<span class="hv-alerta">${I(aj.cancelado ? 'alert' : 'clock')} ${aj.cancelado ? 'El vuelo figura CANCELADO' : `${esc(aj.v.estado || 'Nuevo horario')} ${esc(aj.v.real || aj.v.hora)} h: conviene salir ${esc(aj.sale)}`}${!aj.cancelado && esHotel() ? ` <button class="link" data-a="hviaje-ajustar" data-id="${esc(x.id)}" data-v="${esc(aj.sale)}">Ajustar</button>` : ''}</span>` : ''}
         ${abierto ? `<div class="hl-det">
-          <span>${I('car')} ${van ? `${esc(van.nombre)} · <span class="hp-chapa chica">${esc(chapaTexto(van.patente || ''))}</span>${van.chofer ? ' · ' + esc(van.chofer) : ''}` : 'Todavía sin van: asignala al editar'}</span>
+          <span>${I('car')} ${van ? `${esc(van.nombre)} · <span class="hp-chapa chica">${esc(chapaTexto(van.patente || ''))}</span>` : 'Todavía sin van: asignala al editar'}${choferDe(x) ? ' · ' + esc(choferDe(x)) : ''}</span>
           ${x.auto ? `<span>${I('users')} Armado solo con los huéspedes del vuelo</span>` : ''}
+          ${x.deRutina ? (r => r ? `<span>${I('refresh')} Traslado automatizado · ${esc(textoDias(r.dias))}${esHotel() ? ` · <button class="link" data-a="hrutina-editar" data-id="${esc(r.id)}">cambiarlo todos los días</button>` : ''}</span>` : '')(hotelRutinas().find(z => z.id === x.deRutina)) : ''}
           ${x.nota ? `<span>${I('edit')} ${esc(x.nota)}</span>` : ''}
           <span>${I('calendar')} ${x.fecha === hoyISO() ? 'Hoy' : fechaCorta(x.fecha)} · sale ${esc(x.sale || '—')} h</span>
           ${esHotel() ? `<div class="btns"><button class="btn btn-xs btn-pri" data-a="hviaje-editar" data-id="${esc(x.id)}">${I('edit')}Editar</button>${van ? `<button class="btn btn-xs btn-sec" data-a="hvan-qr" data-id="${esc(van.id)}">${I('qr')}QR de la van</button>` : ''}</div>` : ''}</div>` : ''}</div></li>`;
   }).join('');
   const fin = !marcoAhora && lista.length ? `<li class="hl-ahora"><span>${I('clock')} Ahora · ${hhmmDe(ahora)}</span></li>` : '';
-  return `${chips}${lista.length ? `<ol class="hl-linea">${filas}${fin}</ol>` : `<div class="hl-vacio">${I('check')} ${vs.length ? 'Nada con ese filtro.' : 'No hay traslados ese día.'}${esHotel() ? ` <button class="link" data-a="hviaje-nuevo">Programar uno</button>` : ''}</div>`}`;
+  return `${chips}${lista.length ? `<ol class="hl-linea">${filas}${fin}</ol>` : `<div class="hl-vacio">${I('check')} ${vs.length ? 'Nada con ese filtro.' : `No hay traslados ese día.${esHotel() ? ' Se agregan con "+ Traslado", arriba.' : ''}`}</div>`}`;
 }
 /* PASOS POR LA GARITA (pedido de Claudio, 11-10-2026: "hacele un diseño
    más innovador"). Un PORTÓN: arriba, cuántas salidas y entradas hubo y
@@ -345,24 +381,79 @@ A['hviaje-ver'] = el => {
   refrescar();
   setTimeout(() => { const li = document.getElementById('tras-' + id); if (li) li.scrollIntoView({ block:'nearest', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' }); }, 60);
 };
+/* =========================================================
+   LOS VUELOS PARA LAS VANS, COMO EL TABLERO DEL AEROPUERTO (pedido de
+   Claudio, 12-10-2026: "un diseño más innovador de los vuelos de llegada y
+   salida, con colores más vivos y animaciones"). Ideas de flipoff (3k★,
+   tablero de paletas que giran) y scottbez1/splitflap (4.2k★); el código es
+   propio y liviano: solo CSS, sin librerías.
+     · Arriba, Salidas / Llegadas con un avión que despega o aterriza.
+     · "La próxima van": el vuelo que pide la van más pronto, con su cuenta
+       regresiva y el botón para programarla.
+     · Cada vuelo en paletas amarillas sobre negro que giran al aparecer, el
+       estado en color (demorado, cancelado, embarcando, aterrizó) y la van
+       ya calculada con la ficha del hotel ("Van 14:10 · en 35 min"); si ya
+       está programada, una tilde verde.
+   ========================================================= */
+const HotelVuelos = { tab:'D' };
+A['hvue-tab'] = el => { HotelVuelos.tab = el.dataset.v === 'A' ? 'A' : 'D'; refrescar(); };
+const paletas = (txt, cls = '') => `<span class="sf ${cls}" aria-label="${esc(txt)}">${[...String(txt || '—')].map((ch, i) => `<i style="--i:${i}">${ch === ' ' ? '&nbsp;' : esc(ch)}</i>`).join('')}</span>`;
+const claseEstadoVuelo = e => /cancel/i.test(e) ? 'cancel' : /demor|delay|retras/i.test(e) ? 'demora' : /embar|board/i.test(e) ? 'embarca' : /aterr|arrib|landed/i.test(e) ? 'llego' : /despeg|depart|sali/i.test(e) ? 'salio' : 'prog';
+function vuelosParaVan(sentido, { todos = false } = {}){
+  const d = Vuelos.d, ahora = ahoraMin(); if (!d) return [];
+  return aLista(sentido === 'A' ? d.arr : d.dep).map(v => ({ ...v, tipo:sentido }))
+    .filter(v => todos || (!/cancel/i.test(v.estado) && (Vuelos.minutos(v.real || v.hora) ?? 0) >= ahora - 20));
+}
+const vanYaProgramada = v => viajesDelDia().some(x => x.ref && x.ref.tipo === 'vuelo' && normVuelo(x.ref.nro) === normVuelo(v.nro));
+function filaTablero(v, i){
+  const sale = salidaVuelo(v), ya = vanYaProgramada(v), est = v.estado || (v.real && v.real !== v.hora ? 'Est. ' + v.real : 'Programado'), ce = claseEstadoVuelo(est);
+  const pasada = sale && minDe(sale) < ahoraMin() - 5;
+  return `<div class="tv-fila tv-e-${ce}" style="--f:${i}">
+    <span class="tv-hora">${paletas(v.real || v.hora, 'sf-hora')}${v.real && v.real !== v.hora ? `<s>${esc(v.hora)}</s>` : ''}</span>
+    <span class="tv-vuelo">${paletas(v.nro)}<small>${esc(v.aerolinea || '')}</small></span>
+    <span class="tv-lugar"><b data-vuelo="${esc(v.nro)}">${esc(v.lugar)}</b><em class="tv-est">${esc(est)}</em></span>
+    ${esHotel() ? (ya ? `<span class="tv-van ok">${I('check')}<b>Van</b><small>programada</small></span>`
+      : `<button class="tv-van ${pasada ? 'tarde' : ''}" data-a="hviaje-nuevo" data-v="vuelo|${esc(v.nro)}|${v.tipo}|${esc(v.real || v.hora)}|${esc(sale)}" title="La van tendría que salir a las ${esc(sale)}">${I('car')}<b>Van ${esc(sale || '—')}</b><small>${sale ? esc(faltaTexto(sale)) : 'programar'}</small></button>`)
+      : `<span class="tv-van info"><b>${esc(sale || '—')}</b><small>van</small></span>`}</div>`;
+}
+function tableroVuelos({ max = 99, todos = false } = {}){
+  const d = Vuelos.d, tab = HotelVuelos.tab, ls = vuelosParaVan(tab, { todos }), info = hotelInfo();
+  const n = k => vuelosParaVan(k, { todos }).length;
+  /* La próxima van: el vuelo (de ida o de vuelta) que pide la van más pronto y todavía no la tiene. */
+  const prox = esHotel() ? [...vuelosParaVan('D'), ...vuelosParaVan('A')].filter(v => !vanYaProgramada(v) && !/cancel/i.test(v.estado || '')).map(v => ({ v, t:minDe(salidaVuelo(v)) })).filter(x => x.t != null && x.t >= ahoraMin() - 5).sort((a, b) => a.t - b.t)[0] : null;
+  return `<div class="tv-caja ${tab === 'A' ? 'llegadas' : 'salidas'}">
+    <div class="tv-cielo" aria-hidden="true"><span class="tv-avion">${I('send')}</span><i></i><i></i><i></i></div>
+    <div class="tv-tabs" role="tablist"><span class="tv-ind"></span>
+      <button type="button" role="tab" aria-selected="${tab === 'D'}" class="${tab === 'D' ? 'on' : ''}" data-a="hvue-tab" data-v="D">${I('logout')}Salidas<span>${n('D')}</span></button>
+      <button type="button" role="tab" aria-selected="${tab === 'A'}" class="${tab === 'A' ? 'on' : ''}" data-a="hvue-tab" data-v="A">${I('login')}Llegadas<span>${n('A')}</span></button></div>
+    ${prox ? `<button type="button" class="tv-prox" data-a="hviaje-nuevo" data-v="vuelo|${esc(prox.v.nro)}|${prox.v.tipo}|${esc(prox.v.real || prox.v.hora)}|${esc(salidaVuelo(prox.v))}">
+        <span class="tv-prox-ic">${I('car')}</span><span class="grow"><small>La próxima van</small><b>${prox.v.tipo === 'A' ? 'Buscar' : 'Llevar'} · vuelo ${esc(prox.v.nro)} ${prox.v.tipo === 'A' ? 'de' : 'a'} ${esc(prox.v.lugar)}</b><span>${prox.v.tipo === 'A' ? 'Aterriza' : 'Despega'} ${esc(prox.v.real || prox.v.hora)} h · tocá para programarla</span></span>
+        <span class="tv-prox-h"><b>${esc(salidaVuelo(prox.v))}</b><small>${esc(faltaTexto(salidaVuelo(prox.v)))}</small></span></button>` : ''}
+    <div class="tv-tablero">
+      <div class="tv-tit"><span>Hora</span><span>Vuelo</span><span>${tab === 'A' ? 'Desde' : 'Destino'}</span><span>${esHotel() ? 'Van' : 'Sale la van'}</span></div>
+      ${!d ? `<p class="tv-nada">${I('refresh')} Leyendo el tablero del aeropuerto…</p>` : ls.length ? ls.slice(0, max).map(filaTablero).join('') : `<p class="tv-nada">${I('check')} No quedan ${tab === 'A' ? 'llegadas' : 'salidas'} hoy.</p>`}
+    </div>
+    <p class="tv-pie">${I('info')} "Van 14:10" = cuándo tendría que salir la van: ${tab === 'A' ? `${info.esperaArribo} min después de que aterriza, menos ${info.trayAero} min de viaje al aeropuerto` : `${info.checkin} min de check-in más ${info.trayAero} min de viaje al aeropuerto`}. Se cambia en la Ficha del hotel.</p>
+  </div>`;
+}
+R['hotel-vuelos'] = {
+  titulo:'Vuelos para las vans', icon:'send', color:'sky', ancha:true, sub:'Aeropuerto de Ushuaia · con la hora de la van ya calculada',
+  render(){
+    const d = Vuelos.d;
+    return `${tableroVuelos({ todos:true })}
+      <div class="btns" style="margin-top:12px"><button class="btn btn-sec grow" data-a="vuelos-actualizar">${I('refresh')}Actualizar</button><button class="btn btn-sec grow" data-a="abrir" data-v="vuelos">${I('send')}El tablero completo</button></div>
+      ${d ? `<p class="muted tiny center">Última lectura: ${hora(d.t)}${d.act ? ` · el aeropuerto actualizó ${d.act}` : ''}</p>` : ''}`;
+  },
+  alPintar(){ if (!Vuelos.d || Date.now() - Vuelos.d.t > 5 * MIN) Vuelos.pedir().then(() => { if (PILA.at(-1)?.id === 'hotel-vuelos') refrescar(); }).catch(() => {}); },
+};
 /* Hoy en Ushuaia, en pestañas. */
 function hoyEnUshuaiaHotel(){
-  const d = Vuelos.d, ahora = ahoraMin(), hoy = hoyISO();
-  const prox = (lista, tipo) => aLista(lista).map(v => ({ ...v, tipo })).filter(v => !/cancel/i.test(v.estado) && (Vuelos.minutos(v.real || v.hora) ?? 0) >= ahora - 20).slice(0, 4);
-  const filaVuelo = v => { const sale = salidaVuelo(v), ya = viajesDelDia().some(x => x.ref && x.ref.tipo === 'vuelo' && normVuelo(x.ref.nro) === normVuelo(v.nro));
-    return `<div class="hb-fila"><span class="hb-hora">${esc(v.real || v.hora)}</span><span class="hb-vuelo">${esc(v.nro)}</span><span class="hb-lugar">${esc(v.lugar)}${v.estado ? `<small>${esc(v.estado)}</small>` : ''}</span>
-      ${esHotel() ? (ya ? `<span class="hb-ok">${I('check')}Van</span>` : `<button class="hb-van" data-a="hviaje-nuevo" data-v="vuelo|${esc(v.nro)}|${v.tipo}|${esc(v.real || v.hora)}|${esc(sale)}" title="La van tendría que salir a las ${esc(sale)}">${I('plus')}Van ${esc(sale)}</button>`) : ''}</div>`; };
+  const hoy = hoyISO();
   const cr = Cruceros.lista().filter(c => c.fecha >= hoy && c.fecha <= sumarDias(hoy, 2)).slice(0, 6);
   const ev = aLista(Store.s.eventosCiudad).filter(e => e && e.fecha >= hoy && e.fecha <= sumarDias(hoy, 7)).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 5);
-  const dep = d ? prox(d.dep, 'D') : [], arr = d ? prox(d.arr, 'A') : [];
-  const tabs = [['vuelos', 'send', 'Vuelos', dep.length + arr.length], ['cruceros', 'drop', 'Cruceros', cr.length], ['eventos', 'calendar', 'Eventos', ev.length]];
+  const tabs = [['vuelos', 'send', 'Vuelos', vuelosParaVan('D').length + vuelosParaVan('A').length], ['cruceros', 'drop', 'Cruceros', cr.length], ['eventos', 'calendar', 'Eventos', ev.length]];
   const tab = tabs.some(t => t[0] === HotelVista.hoyTab) ? HotelVista.hoyTab : 'vuelos';
-  const cuerpo = tab === 'vuelos' ? `<div class="hb-tablero">
-      <div class="hb-titulo">${I('send')}Salen del aeropuerto<button class="hb-todos" data-a="abrir" data-v="vuelos">Ver todos${I('right')}</button></div>
-      ${d ? dep.map(filaVuelo).join('') || '<p class="hb-nada">No quedan partidas hoy.</p>' : '<p class="hb-nada">Leyendo el tablero del aeropuerto…</p>'}
-      <div class="hb-titulo">${I('login')}Llegan al aeropuerto</div>
-      ${d ? arr.map(filaVuelo).join('') || '<p class="hb-nada">No quedan arribos hoy.</p>' : ''}
-      <p class="hb-pie">"Van 14:10" = cuándo tendría que salir la van (${hotelInfo().checkin} min de check-in, ${hotelInfo().trayAero} min al aeropuerto).</p></div>`
+  const cuerpo = tab === 'vuelos' ? `${tableroVuelos({ max:5 })}<button class="hu-todos" data-a="abrir" data-v="hotel-vuelos">${I('send')}Todos los vuelos de hoy${I('right')}</button>`
     : tab === 'cruceros' ? `<div class="hc-lista">${cr.length ? cr.map(tarjetaCrucero).join('')
         : `<p class="hu-nada">${I('drop')} ${Cruceros.url() ? 'No hay recaladas en los próximos tres días.' : 'El cronograma de cruceros todavía no está conectado.'}</p>`}
         <button class="hu-todos" data-a="abrir" data-v="cruceros">${I('drop')}Ver todos los cruceros${I('right')}</button></div>`
@@ -395,6 +486,51 @@ function tarjetaEventoCiudad(e){
     ${esHotel() ? `<button class="he-van" data-a="hviaje-nuevo" data-v="evento|${esc(e.titulo)}|llevar|${esc(e.fecha)}|${esc(e.hora || '')}" aria-label="Programar una van para ${esc(e.titulo)}">${I('car')}<span>Van</span></button>` : ''}</div>`;
 }
 A['hhoy-tab'] = el => { HotelVista.hoyTab = el.dataset.v || 'vuelos'; refrescar(); };
+/* =========================================================
+   EL HOTEL EN LA APP, REDISEÑADO (pedido de Claudio, 12-10-2026: "un
+   diseño innovador y más atractivo, con alguna animación que llame a su
+   uso"). Un mosaico de colores vivos (grilla "bento", idea de magicui,
+   22.5k★, y animate.css, 82k★; el código es propio):
+     · la teja grande de Vans y traslados, con la van que anda por la ruta;
+     · cada teja con su color y su ícono que se mueve al pasar o tocar;
+     · un brillo que recorre las tejas de a una, cada tanto, como una
+       invitación a tocarlas; las que tienen algo pendiente laten;
+     · al abrir la portada, las tejas entran de a una (solo la primera vez).
+   Con "reducir movimiento" del teléfono queda todo quieto.
+   ========================================================= */
+function hotelEnLaApp({ prox = 0, promosPend = 0, sinLeer = 0 } = {}){
+  const lotes = typeof lotesDelHotel === 'function' ? lotesDelHotel() : [];
+  let exp = null;
+  if (lotes.length){ const d = deudaGrupo(lotes), tot = totalDeuda(d), l = liquidacionesEmitidas().slice(-1)[0];
+    exp = { t:'Expensas del hotel', s: tot > .5 ? `${plata(tot)} entre las ${lotes.length} UF${l ? ' · vence el ' + fechaCorta(vtoDe(l.periodo, 1)) : ''}` : `Las ${lotes.length} UF al día · cupones y recibos`, badge: tot > .5 ? '!' : '' }; }
+  const rs = hotelRutinas().filter(r => r.activa !== false).length;
+  const T = [
+    { v:'hotel-traslados', ic:'car', c:'wood', t:'Vans y traslados', s:'Aeropuerto, puerto, excursiones · con el QR de cada van', n:prox, grande:true },
+    { v:'hotel-vuelos', ic:'send', c:'sky', t:'Vuelos para las vans', s:'La hora de la van, ya calculada' },
+    { v:'hotel-rutinas', ic:'refresh', c:'ok', t:'Traslados automatizados', s: rs ? `${plural(rs, 'activo', 'activos')} · se arman solos` : 'Las salidas de siempre, una vez' },
+    { v:'hotel-huespedes', ic:'users', c:'accent', t:'Huéspedes', s:'Lista del día para la garita · se borran solos' },
+    { v:'privado', p:'hotel', ic:'chat', c:'brand', t:'Comunicación interna', s:'Con la garita o la Administración', badge:sinLeer },
+    { v:'hotel-promos', ic:'sparkle', c:'cobre', t:'Promociones', s:'Salen en la tira de todas las apps', badge:promosPend },
+    { v:'hotel-eventos', ic:'star', c:'accent', t:'Eventos del hotel', s:'La garita se entera; los vecinos, si hace falta' },
+    { v:'hotel-proveedores', ic:'box', c:'brand', t:'Proveedores', s:'ART, seguro y su QR de ingreso' },
+    { v:'hotel-emergencias', ic:'siren', c:'danger', t:'Emergencias', s:'Llamar, avisar a la garita, DEA', alerta:true },
+    ...(exp ? [{ v:'expensas', ic:'wallet', c:'wood', t:exp.t, s:exp.s, badge:exp.badge }] : []),
+    { a:'hotel-hoja-dia', ic:'download', c:'ok', t:'Hoja del día', s:'Vuelos, cruceros y traslados para el mostrador' },
+    { v:'vecinos', ic:'pin', c:'sky', t:'Direcciones del barrio', s:'Para guiar a un huésped' },
+    { v:'hotel-ficha', ic:'sliders', c:'sky', t:'Ficha del hotel', s:'Responsable, tiempos de traslado, DEA' },
+    { v:'agenda', ic:'book', c:'cobre', t:'Agenda de Ushuaia', s:'Taxis, comidas, farmacias' },
+    { v:'documentos', ic:'file', c:'brand', t:'Normas', s:'Reglamento y convivencia' },
+    { v:'hotel-convenio', ic:'clipboard', c:'wood', t:'Convenio con el barrio', s:'Modelo de convivencia y servicios' },
+    { v:'manual', ic:'book', c:'accent', t:'Manual de uso', s:'El capítulo del hotel' },
+  ];
+  const primera = !HotelVista.hapVista; HotelVista.hapVista = true;
+  return `<div class="hap ${primera ? 'entra' : ''}">${T.map((x, i) => { const b = +x.badge || (x.badge === '!' ? '!' : 0);
+    return `<button type="button" class="hap-t c-${x.c} ${x.grande ? 'grande' : ''} ${b ? 'pide' : ''} ${x.alerta ? 'alerta' : ''}" data-a="${x.a || 'abrir'}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}" style="--i:${i}">
+      ${x.grande ? `<span class="hap-ruta" aria-hidden="true">${VAN_SVG}<i></i></span>` : ''}
+      <span class="hap-ic">${I(x.ic)}</span><span class="hap-txt"><b>${esc(x.t)}</b><small>${esc(x.s)}</small></span>
+      ${b ? `<span class="hap-badge">${b === '!' ? '!' : b > 99 ? '99+' : b}</span>` : x.n ? `<span class="hap-n">${x.n}</span>` : ''}
+      <span class="hap-brillo" aria-hidden="true"></span></button>`; }).join('')}</div>`;
+}
 R.hotel = {
   titulo: HOTEL_NOMBRE, icon:'star', color:'wood', ancha:true,
   render(){
@@ -421,25 +557,7 @@ R.hotel = {
             <div class="card hl-caja">${rielDia(vs, hoy)}${lineaTraslados(vs, { dia:hoy, max:8 })}</div></div>
         </section>
         <section class="bloque">${sec('Hoy en Ushuaia, para el hotel')}${hoyEnUshuaiaHotel()}</section>
-        <section class="bloque">${sec('El hotel en la app')}<div class="mosaico">
-          ${tejaHotel('hotel-traslados', 'car', 'wood', 'Vans y traslados', 'Aeropuerto, puerto, excursiones · con el QR de cada van', { destaca:true, n: prox.length || '' })}
-          ${tejaHotel('hotel-huespedes', 'users', 'sky', 'Huéspedes', 'Lista del día para la garita · se borran solos')}
-          ${tejaHotel('hotel-eventos', 'star', 'accent', 'Eventos del hotel', 'La garita se entera; a los vecinos, si hace falta')}
-          ${tejaHotel('hotel-proveedores', 'box', 'brand', 'Proveedores', 'ART, seguro y su QR de ingreso')}
-          ${tejaHotel('hotel-promos', 'sparkle', 'wood', 'Promociones', 'Agregar, editar o borrar · salen en la tira de todas las apps', { n: promosPend || '' })}
-          ${tejaHotel('hotel-emergencias', 'siren', 'danger', 'Emergencias', 'Llamar, avisar a la garita, DEA y primeros auxilios')}
-          ${tejaHotel('vecinos', 'pin', 'sky', 'Direcciones del barrio', 'Calle y altura de cada lote, para guiar a un huésped')}
-          ${(() => { const lotes = typeof lotesDelHotel === 'function' ? lotesDelHotel() : []; if (!lotes.length) return '';
-            const d = deudaGrupo(lotes), tot = totalDeuda(d), l = liquidacionesEmitidas().slice(-1)[0];
-            return tejaHotel('expensas', 'wallet', 'wood', 'Expensas del hotel', tot > .5 ? `${plata(tot)} entre las ${lotes.length} UF${l ? ' · vence el ' + fechaCorta(vtoDe(l.periodo, 1)) : ''}` : `Las ${lotes.length} UF al día · cupones y recibos`, { n: tot > .5 ? '!' : '' }); })()}
-          ${teja({ v:'privado', p:'hotel', icon:'chat', color:'accent', t:'Comunicación interna', s:'Mensajes privados con la garita o la Administración', badge: sinLeer })}
-          ${tejaHotel('hotel-ficha', 'sliders', 'sky', 'Ficha del hotel', 'Responsable, tiempos de traslado, DEA')}
-          ${tejaHotel('documentos', 'file', 'brand', 'Normas y reglamentos', 'Reglamento del barrio y convivencia')}
-          ${tejaHotel('hotel-convenio', 'clipboard', 'wood', 'Convenio con el barrio', 'Modelo de convivencia y servicios')}
-          ${teja({ a:'hotel-hoja-dia', icon:'download', color:'ok', t:'Hoja del día', s:'Vuelos, cruceros, eventos y traslados para el mostrador' })}
-          ${tejaHotel('agenda', 'book', 'sky', 'Agenda de Ushuaia', 'Taxis, comidas, farmacias')}
-          ${tejaHotel('manual', 'book', 'accent', 'Manual de uso', 'El capítulo del hotel, paso a paso')}
-        </div></section>
+        <section class="bloque">${sec('El hotel en la app', '<span class="muted small">tocá y entrá</span>')}${hotelEnLaApp({ prox:prox.length, promosPend, sinLeer })}</section>
         ${pieApp()}
       </div>`;
   },
@@ -461,6 +579,8 @@ R['hotel-traslados'] = {
     return `<div class="ht-cab"><div class="grow"><small>${vans.length ? `${plural(vans.length, 'van')} · ${vans.filter(v => estadoVan(v).adentro).length} adentro` : 'Sin vans cargadas'}</small>
         <b>${dia === hoy ? 'Traslados de hoy' : 'Traslados del ' + fechaCorta(dia)}</b></div>
         ${esHotel() ? `<button class="btn btn-sm btn-pri" data-a="hviaje-nuevo">${I('plus')}Traslado</button>` : ''}</div>
+      ${(() => { const rs = hotelRutinas(), act = rs.filter(r => r.activa !== false).length; if (!rs.length && !esHotel()) return '';
+        return `<button type="button" class="ht-auto" data-a="abrir" data-v="hotel-rutinas"><span class="ht-auto-ic">${I('refresh')}</span><span class="grow"><b>${rs.length ? plural(act, 'traslado automatizado', 'traslados automatizados') : 'Traslados automatizados'}</b><small>${rs.length ? `Se arman solos cada día${rs.length > act ? ` · ${rs.length - act} en pausa` : ''}` : 'Las salidas de siempre, cargadas una vez'}</small></span>${I('right')}</button>`; })()}
       <div class="ht-dias" role="tablist">${[0, 1, 2, 3, 4, 5, 6].map(i => sumarDias(hoy, i)).map(d => { const t = diaTxt(d), n = cuantos(d);
         return `<button type="button" role="tab" aria-selected="${d === dia}" class="ht-dia ${d === dia ? 'on' : ''}" data-a="abrir" data-v="hotel-traslados" data-p="${d}"><small>${esc(t.sem)}</small><b>${t.n}</b>${n ? `<span>${n}</span>` : '<i></i>'}</button>`; }).join('')}</div>
       <div class="card hl-caja">${rielDia(vs.filter(x => x.estado !== 'cancelado'), dia)}${lineaTraslados(vs.filter(x => x.estado !== 'cancelado'), { dia, acciones:true })}</div>
@@ -618,7 +738,7 @@ function bandaVansGarita(opera){
     const tarde = x.estado === 'programado' && x.sale && ahoraMin() > minutosDe(x.sale) + 15;
     return `<div class="vg-fila ${curso ? 'curso' : ''} ${tarde ? 'tarde' : ''}"><div class="vg-hora"><b>${esc(x.sale || '—')}</b><small>${curso ? 'en viaje' : 'sale'}</small></div>
       <div class="grow"><b>${I(d[1])} ${esc(textoViaje(x))}</b>
-        <small>${v ? `${esc(v.nombre)} · <span class="mono">${esc(v.patente || '')}</span>` : 'van sin asignar'} · ${plural(+x.pax || 0, 'pasajero')}${curso && x.salioAt ? ` · salió ${hora(x.salioAt)} h` : ''}${tarde ? ' · <b>se atrasó</b>' : ''}</small>
+        <small>${v ? `${esc(v.nombre)} · <span class="mono">${esc(v.patente || '')}</span>` : 'van sin asignar'}${choferDe(x) ? ' · ' + esc(choferDe(x)) : ''} · ${plural(+x.pax || 0, 'pasajero')}${curso && x.salioAt ? ` · salió ${hora(x.salioAt)} h` : ''}${tarde ? ' · <b>se atrasó</b>' : ''}</small>
         ${aj ? `<small class="hv-alerta">${I(aj.cancelado ? 'alert' : 'clock')} ${aj.cancelado ? 'El vuelo figura CANCELADO' : `El vuelo cambió: conviene salir ${esc(aj.sale)}`}</small>` : ''}</div>
       ${opera ? `<button class="btn btn-sm ${curso ? 'btn-ok' : 'btn-pri'}" data-a="hviaje-mov" data-id="${esc(x.id)}" data-v="${curso ? 'in' : 'out'}">${I(curso ? 'login' : 'logout')}${curso ? 'Volvió' : 'Salió'}</button>`
         : `<span class="pill ${curso ? 'p-warn' : 'p-sky'}">${curso ? 'En viaje' : 'Programado'}</span>`}</div>`; };
@@ -632,42 +752,70 @@ function bandaVansGarita(opera){
   </div>`;
 }
 
-/* Programar un traslado. `data-v` trae lo que ya se sabe:
-   "vuelo|AR1881|D|15:40|13:30", "crucero|<barco>|buscar|<fecha>|<sale>",
-   "evento|<título>|llevar|<fecha>|<hora>". */
+/* =========================================================
+   + TRASLADO: UN SOLO BOTÓN, DOS CAMINOS (pedido de Claudio, 12-10-2026:
+   "tiene un botón +Traslado arriba y otro abajo; que adentro empiece con
+   NUEVO TRASLADO o TRASLADOS AUTOMATIZADOS").
+     · Nuevo traslado: uno solo, un día y una hora (como siempre).
+     · Traslados automatizados: las salidas y entradas que el hotel hace
+       siempre (todos los días, o los días que elija, a la misma hora). Se
+       cargan una vez y la app arma sola el traslado de cada día, con su
+       van y su chofer, una semana para adelante. Se editan, se pausan y se
+       borran; un día suelto se cancela o se cambia sin tocar los demás.
+   Si viene de un vuelo, un crucero o un evento (`data-v` con lo que ya se
+   sabe: "vuelo|AR1881|D|15:40|13:30", "crucero|<barco>|buscar|<fecha>|<sale>",
+   "evento|<título>|llevar|<fecha>|<hora>"), va directo al traslado suelto.
+   ========================================================= */
 A['hviaje-nuevo'] = el => {
   if (!soloHotel()) return;
   const [t, a, b, c, dd] = String(el?.dataset?.v || '').split('|');
+  if (!t){
+    const rs = hotelRutinas(), act = rs.filter(r => r.activa !== false).length;
+    return hoja('Agregar un traslado', `<div class="tr-elige">
+      <button class="tr-op uno" data-a="hviaje-uno"><span class="tr-op-arte" aria-hidden="true"><i class="tr-pin"></i>${I('car')}</span>
+        <span class="tr-op-txt"><small>Una sola vez</small><b>Nuevo traslado</b><span>Un día y una hora: un vuelo, un crucero, una excursión.</span></span>${I('right')}</button>
+      <button class="tr-op auto" data-a="abrir" data-v="hotel-rutinas"><span class="tr-op-arte" aria-hidden="true"><i class="tr-giro"></i>${I('refresh')}</span>
+        <span class="tr-op-txt"><small>Se repiten solos</small><b>Traslados automatizados</b><span>${rs.length ? `${plural(act, 'activo', 'activos')}${rs.length > act ? ` · ${rs.length - act} en pausa` : ''} · ` : ''}Todos los días o los que elijas, a la misma hora, con su van y su chofer.</span></span>${I('right')}</button>
+    </div>`);
+  }
   const x = { fecha:hoyISO(), sale:'', destino:'aeropuerto', sentido:'llevar', ref:{ tipo:'' }, pax:1, vanId:'' };
   if (t === 'vuelo'){ Object.assign(x, { sentido: b === 'A' ? 'buscar' : 'llevar', sale:dd || '', ref:{ tipo:'vuelo', nro:a, sentido:b, hora:c } }); }
   if (t === 'crucero'){ Object.assign(x, { destino:'puerto', sentido:b, fecha:c || hoyISO(), sale:dd || '', ref:{ tipo:'crucero', barco:a } }); }
   if (t === 'evento'){ Object.assign(x, { destino:'centro', fecha:c || hoyISO(), sale:dd || '', ref:{ tipo:'evento', desc:a } }); }
   formViaje(x);
 };
+A['hviaje-uno'] = () => { if (soloHotel()) formViaje({ fecha:hoyISO(), sale:'', destino:'aeropuerto', sentido:'llevar', ref:{ tipo:'' }, pax:1, vanId:'' }); };
 A['hviaje-editar'] = el => { if (!soloHotel()) return; const x = hotelViajes().find(v => v.id === el.dataset.id); if (x) formViaje(x); };
+/* Los choferes que el hotel ya usó (de las vans y de los traslados), para elegir sin escribir. */
+const choferesHotel = () => [...new Set([...vansReales().map(v => v.chofer), ...aLista(Store.s.hotelViajes).map(x => x && x.chofer)].map(x => String(x || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+const choferDe = x => (x && x.chofer) || hotelVans().find(v => v.id === x?.vanId)?.chofer || '';
+const campoChofer = (v = '') => `<div class="field"><label>Chofer</label><input name="chofer" maxlength="40" list="hChoferes" value="${esc(v)}" placeholder="El habitual de la van" autocomplete="off"><datalist id="hChoferes">${choferesHotel().map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>`;
 function formViaje(x){
-  const vans = hotelVans();
+  const vans = vansReales(), r = x.deRutina ? hotelRutinas().find(z => z.id === x.deRutina) : null;
   hoja(x.id ? 'Editar traslado' : 'Nuevo traslado', `<form data-f="hviaje" data-id="${esc(x.id || '')}">
-    ${x.ref && x.ref.tipo ? `<div class="card plana small">${I(x.ref.tipo === 'vuelo' ? 'send' : x.ref.tipo === 'crucero' ? 'drop' : 'star')} ${esc(x.ref.tipo === 'vuelo' ? `Vuelo ${x.ref.nro}${x.ref.hora ? ' · ' + x.ref.hora + ' h' : ''} (${x.ref.sentido === 'A' ? 'llega' : 'sale'})` : x.ref.tipo === 'crucero' ? conMayusculasBarco(x.ref.barco) : x.ref.desc)}${x.sale ? ` · la hora de salida ya está calculada con la ficha del hotel` : ''}</div>` : ''}
+    ${r ? `<div class="tr-de-rutina">${I('refresh')}<span>Es de un traslado automatizado (<b>${esc(nombreRutina(r))}</b>). Lo que cambies acá vale solo para el ${fechaCorta(x.fecha)}. <button type="button" class="link" data-a="hrutina-editar" data-id="${esc(r.id)}">Cambiarlo todos los días</button></span></div>` : ''}
+    ${x.ref && x.ref.tipo && x.ref.tipo !== 'rutina' ? `<div class="card plana small">${I(x.ref.tipo === 'vuelo' ? 'send' : x.ref.tipo === 'crucero' ? 'drop' : 'star')} ${esc(x.ref.tipo === 'vuelo' ? `Vuelo ${x.ref.nro}${x.ref.hora ? ' · ' + x.ref.hora + ' h' : ''} (${x.ref.sentido === 'A' ? 'llega' : 'sale'})` : x.ref.tipo === 'crucero' ? conMayusculasBarco(x.ref.barco) : x.ref.desc)}${x.sale ? ` · la hora de salida ya está calculada con la ficha del hotel` : ''}</div>` : ''}
     <input type="hidden" name="ref" value="${esc(JSON.stringify(x.ref || {}))}">
     <div class="grid2"><div class="field"><label>Qué</label><select name="sentido"><option value="llevar" ${x.sentido === 'llevar' ? 'selected' : ''}>Llevar</option><option value="buscar" ${x.sentido === 'buscar' ? 'selected' : ''}>Buscar</option></select></div>
       <div class="field"><label>A dónde</label><select name="destino">${Object.entries(DESTINOS_HOTEL).map(([k, d]) => `<option value="${k}" ${x.destino === k ? 'selected' : ''}>${d[0]}</option>`).join('')}</select></div></div>
     <div class="grid3"><div class="field"><label>Día</label><input type="date" name="fecha" required value="${esc(x.fecha)}"></div>
       <div class="field"><label>Sale la van</label><input type="time" name="sale" value="${esc(x.sale || '')}"></div>
       <div class="field"><label>Pasajeros</label><input type="number" name="pax" min="0" max="60" value="${esc(x.pax || 1)}"></div></div>
-    <div class="field"><label>Van</label><select name="vanId"><option value="">Sin asignar todavía</option>${vans.map(v => `<option value="${esc(v.id)}" ${x.vanId === v.id ? 'selected' : ''}>${esc(v.nombre)} · ${esc(v.patente)}</option>`).join('')}</select></div>
+    <div class="grid2"><div class="field"><label>Van</label><select name="vanId"><option value="">Sin asignar todavía</option>${vans.map(v => `<option value="${esc(v.id)}" ${x.vanId === v.id ? 'selected' : ''}>${esc(v.nombre)} · ${esc(v.patente)}</option>`).join('')}</select></div>
+      ${campoChofer(x.chofer || '')}</div>
     <div class="field"><label>Nota (opcional)</label><input name="nota" maxlength="120" value="${esc(x.nota || '')}" placeholder="Ej: grupo de 4, con equipaje de esquí"></div>
     <button class="btn btn-pri btn-block">${I('check')}Guardar el traslado</button>
-    ${x.id ? `<button type="button" class="btn btn-danger-soft btn-block" style="margin-top:8px" data-a="hviaje-cancelar" data-id="${esc(x.id)}">${I('x')}Cancelar el traslado</button>` : ''}</form>`);
+    ${x.id ? `<div class="btns" style="margin-top:8px"><button type="button" class="btn btn-sec grow" data-a="hviaje-cancelar" data-id="${esc(x.id)}">${I('x')}${r ? 'Cancelar solo este día' : 'Cancelar el traslado'}</button>
+      <button type="button" class="btn btn-danger-soft grow" data-a="hviaje-borrar" data-id="${esc(x.id)}">${I('trash')}Borrar</button></div>` : ''}</form>`);
 }
 F['hviaje'] = (d, form) => {
   if (!soloHotel()) return;
   let ref = {}; try { ref = JSON.parse(d.ref || '{}') || {}; } catch(e){}
   const id = form.dataset.id;
   Store.cambiar(s => { s.hotelViajes = aLista(s.hotelViajes);
-    const datos = { fecha:d.fecha, sale:d.sale || '', destino:d.destino, sentido:d.sentido, pax:+d.pax || 0, vanId:d.vanId || '', nota:(d.nota || '').trim() };
+    const datos = { fecha:d.fecha, sale:d.sale || '', destino:d.destino, sentido:d.sentido, pax:+d.pax || 0, vanId:d.vanId || '', chofer:(d.chofer || '').trim(), nota:(d.nota || '').trim() };
     const x = id && s.hotelViajes.find(v => v.id === id);
-    if (x){ if (x.sale !== datos.sale) datos.saleAMano = true; Object.assign(x, datos); }
+    if (x){ if (x.sale !== datos.sale) datos.saleAMano = true; if (x.deRutina) datos.aMano = true; Object.assign(x, datos); }
     else s.hotelViajes.push({ id:'ht' + uid(), ref, estado:'programado', at:Date.now(), ...datos });
     /* Si es de hoy, la garita lo tiene que saber. */
     if (datos.fecha === hoyISO()) notificar(s, { para:'rol:guardia', titulo:'Traslado del hotel', texto:`${datos.sale || 'Sin hora'} · ${textoViaje({ ...datos, ref })}`, icon:'car', color:'wood', link:'hotel-vivo', push:false });
@@ -676,6 +824,129 @@ F['hviaje'] = (d, form) => {
 };
 A['hviaje-ajustar'] = el => { if (!soloHotel()) return; Store.cambiar(s => { const x = aLista(s.hotelViajes).find(v => v.id === el.dataset.id); if (x){ x.sale = el.dataset.v; x.saleAMano = false; } }); toast(`La van sale a las ${el.dataset.v}`, 'clock'); };
 A['hviaje-cancelar'] = el => { if (!soloHotel()) return; Store.cambiar(s => { const x = aLista(s.hotelViajes).find(v => v.id === el.dataset.id); if (x) x.estado = 'cancelado'; }); cerrarHoja(); toast('Traslado cancelado', 'check'); };
+/* Borrar del todo: sale de la lista. Si era de un traslado automatizado,
+   queda una marca de "borrado" para que la app no lo vuelva a armar ese día. */
+A['hviaje-borrar'] = async el => {
+  if (!soloHotel()) return; const x = hotelViajes().find(v => v.id === el.dataset.id); if (!x) return;
+  if (x.estado === 'en_curso') return toast('La van está en viaje: esperá a que vuelva o cancelalo después', 'car');
+  if (!await confirmar('Borrar el traslado', `${esc(x.sale || '')} h · ${esc(textoViaje(x))}. ${x.deRutina ? 'Es de un traslado automatizado: se borra solo este día.' : 'Sale de la lista.'}`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { s.hotelViajes = aLista(s.hotelViajes);
+    if (x.deRutina){ const y = s.hotelViajes.find(v => v.id === x.id); if (y){ y.estado = 'cancelado'; y.borrado = Date.now(); } }
+    else s.hotelViajes = s.hotelViajes.filter(v => v && v.id !== x.id); });
+  cerrarHoja(); toast('Traslado borrado', 'trash');
+};
+
+/* ---------- TRASLADOS AUTOMATIZADOS ---------- */
+const DIAS_SEM = [1, 2, 3, 4, 5, 6, 0], INI_DIA = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+const textoDias = ds => { const d = aLista(ds).map(Number); if (d.length === 7) return 'Todos los días'; const lv = [1, 2, 3, 4, 5];
+  if (d.length === 5 && lv.every(x => d.includes(x))) return 'De lunes a viernes'; if (d.length === 2 && d.includes(6) && d.includes(0)) return 'Sábados y domingos';
+  return DIAS_SEM.filter(x => d.includes(x)).map(x => DIAS[x]).join(', '); };
+const nombreRutina = r => r.nombre || `${r.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${((DESTINOS_HOTEL[r.destino] || DESTINOS_HOTEL.otro)[0]).toLowerCase()} · ${r.sale || ''}`;
+const rutinaVale = (r, f) => r && r.activa !== false && aLista(r.dias).map(Number).includes(fechaDe(f).getDay()) && (!r.desde || f >= r.desde) && (!r.hasta || f <= r.hasta);
+/* Qué días de la semana que viene le falta su traslado a cada rutina. */
+function rutinasQueFaltan(dias = 7){
+  const hoy = hoyISO(), hay = new Set(aLista(Store.s.hotelViajes).map(x => x && x.id)), out = [];
+  hotelRutinas().forEach(r => { for (let k = 0; k < dias; k++){ const f = sumarDias(hoy, k); if (rutinaVale(r, f) && !hay.has(`hr-${r.id}-${f}`)) out.push([r, f]); } });
+  return out;
+}
+/* Arma (o pone al día) el traslado de cada día de cada rutina. Id fijo
+   (hr-<rutina>-<fecha>): si dos equipos lo arman a la vez, queda uno. Los
+   que el hotel cambió a mano, canceló o ya salieron no se tocan. */
+function generarRutinas(s, dias = 7){
+  const hoy = hoyISO(); let n = 0;
+  s.hotelViajes = aLista(s.hotelViajes);
+  const rs = s.hotelViajes.filter(x => x && x.rutina);
+  rs.forEach(r => {
+    const datos = { sale:r.sale || '', destino:r.destino, sentido:r.sentido, pax:+r.pax || 0, vanId:r.vanId || '', chofer:r.chofer || '', nota:r.nota || '' };
+    for (let k = 0; k < dias; k++){
+      const f = sumarDias(hoy, k), id = `hr-${r.id}-${f}`, x = s.hotelViajes.find(v => v && v.id === id);
+      if (!rutinaVale(r, f)){
+        /* Pausada, sin ese día o fuera de fechas: se saca lo que estaba armado y no empezó. */
+        if (x && x.estado === 'programado' && !x.aMano){ s.hotelViajes = s.hotelViajes.filter(v => v !== x); n++; }
+        continue;
+      }
+      if (!x){ s.hotelViajes.push({ id, deRutina:r.id, fecha:f, ref:{ tipo:'rutina', desc:r.nombre || '' }, estado:'programado', at:Date.now(), ...datos }); n++; continue; }
+      if (x.estado !== 'programado' || x.aMano) continue;
+      const cambia = Object.keys(datos).filter(k2 => String(x[k2] ?? '') !== String(datos[k2] ?? ''));
+      if (cambia.length){ Object.assign(x, datos); n++; }
+      if ((x.ref && x.ref.desc) !== (r.nombre || '')){ x.ref = { tipo:'rutina', desc:r.nombre || '' }; n++; }
+    }
+  });
+  return n;
+}
+const proximaDeRutina = r => { const hoy = hoyISO(); for (let k = 0; k < 14; k++){ const f = sumarDias(hoy, k); if (rutinaVale(r, f) && !(k === 0 && minDe(r.sale) != null && minDe(r.sale) < ahoraMin())) return f; } return ''; };
+R['hotel-rutinas'] = {
+  titulo:'Traslados automatizados', icon:'refresh', color:'wood', ancha:true, sub:'Las salidas de siempre: se cargan una vez y se arman solas cada día',
+  render(){
+    const rs = hotelRutinas().sort((a, b) => (a.activa === false) - (b.activa === false) || String(a.sale).localeCompare(String(b.sale))), vans = hotelVans();
+    const tarjeta = r => { const d = DESTINOS_HOTEL[r.destino] || DESTINOS_HOTEL.otro, van = vans.find(v => v.id === r.vanId), prox = proximaDeRutina(r), pausa = r.activa === false, ds = aLista(r.dias).map(Number);
+      return `<article class="ru-card ${pausa ? 'pausa' : ''}">
+        <div class="ru-cab"><span class="ru-hora"><b>${esc(r.sale || '—')}</b><small>sale</small></span>
+          <span class="ru-ic">${I(d[1])}</span>
+          <div class="grow"><b>${esc(nombreRutina(r))}</b><small>${r.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${esc(d[0].toLowerCase())} · ${plural(+r.pax || 0, 'pasajero')}${r.nota ? ' · ' + esc(r.nota) : ''}</small></div>
+          <span class="pill ${pausa ? 'p-warn' : 'p-ok'}">${pausa ? 'En pausa' : 'Activo'}</span></div>
+        <div class="ru-dias" aria-label="${esc(textoDias(ds))}">${DIAS_SEM.map(x => `<i class="${ds.includes(x) ? 'on' : ''}">${INI_DIA[x]}</i>`).join('')}<span>${esc(textoDias(ds))}</span></div>
+        <div class="ru-datos"><span>${I('car')} ${van ? `${esc(van.nombre)} <span class="hp-chapa chica">${esc(chapaTexto(van.patente || ''))}</span>` : '<em>Van sin asignar</em>'}</span>
+          <span>${I('user')} ${esc(r.chofer || van?.chofer || 'Chofer sin asignar')}</span>
+          <span>${I('calendar')} ${r.desde && r.desde > hoyISO() ? 'Desde el ' + fechaCorta(r.desde) : 'Vigente'}${r.hasta ? ' hasta el ' + fechaCorta(r.hasta) : ', sin fecha de fin'}</span>
+          ${!pausa && prox ? `<span class="ru-prox">${I('clock')} Próximo: ${prox === hoyISO() ? 'hoy' : esc(relDia(prox).toLowerCase())} a las ${esc(r.sale)} h</span>` : ''}</div>
+        <div class="btns"><button class="btn btn-sm btn-pri" data-a="hrutina-editar" data-id="${esc(r.id)}">${I('edit')}Editar</button>
+          <button class="btn btn-sm btn-sec" data-a="hrutina-pausa" data-id="${esc(r.id)}">${I(pausa ? 'refresh' : 'clock')}${pausa ? 'Reanudar' : 'Pausar'}</button>
+          <button class="btn btn-sm btn-danger-soft" data-a="hrutina-borrar" data-id="${esc(r.id)}">${I('trash')}Borrar</button></div></article>`; };
+    return `<div class="ru-hero"><div class="ru-hero-arte" aria-hidden="true"><span class="ru-orbita"><i>${I('car')}</i></span><b>${I('refresh')}</b></div>
+        <div><b>Cargalos una vez y se arman solos</b><small>Cada traslado automatizado arma el de cada día, una semana para adelante, con su van y su chofer. La garita los ve en su lista de vans. Un día suelto lo cancelás o lo cambiás desde la lista de traslados, sin tocar los demás.</small></div></div>
+      ${esHotel() ? superficie({ a:'hrutina-editar', icon:'plus', color:'wood', t:'Nuevo traslado automatizado', s:'Días, hora, destino, van y chofer', cls:'acento' }) : ''}
+      ${rs.length ? `<div class="ru-lista">${rs.map(tarjeta).join('')}</div>` : vacio('refresh', 'Todavía no hay traslados automatizados. Ejemplo: "Aeropuerto de la mañana", de lunes a viernes a las 07:30.')}`;
+  },
+};
+A['hrutina-editar'] = el => {
+  if (!soloHotel()) return;
+  const r = hotelRutinas().find(x => x.id === el?.dataset?.id) || { dias:[1, 2, 3, 4, 5], sale:'', destino:'aeropuerto', sentido:'llevar', pax:1, vanId:'', desde:hoyISO() }, vans = vansReales(), ds = aLista(r.dias).map(Number);
+  hoja(r.id ? 'Editar el traslado automatizado' : 'Nuevo traslado automatizado', `<form data-f="hrutina" data-id="${esc(r.id || '')}">
+    <div class="field"><label>Nombre (opcional)</label><input name="nombre" maxlength="40" value="${esc(r.nombre || '')}" placeholder="Ej: Aeropuerto de la mañana"></div>
+    <div class="grid2"><div class="field"><label>Qué</label><select name="sentido"><option value="llevar" ${r.sentido === 'llevar' ? 'selected' : ''}>Llevar</option><option value="buscar" ${r.sentido === 'buscar' ? 'selected' : ''}>Buscar</option></select></div>
+      <div class="field"><label>A dónde</label><select name="destino">${Object.entries(DESTINOS_HOTEL).map(([k, d]) => `<option value="${k}" ${r.destino === k ? 'selected' : ''}>${d[0]}</option>`).join('')}</select></div></div>
+    <div class="field"><label>Qué días</label><div class="ru-rapidos"><button type="button" class="chip" data-a="hrutina-dias" data-v="1,2,3,4,5,6,0">Todos los días</button><button type="button" class="chip" data-a="hrutina-dias" data-v="1,2,3,4,5">Lunes a viernes</button><button type="button" class="chip" data-a="hrutina-dias" data-v="6,0">Fines de semana</button></div>
+      <div class="seg dias-sel">${DIAS_SEM.map(d => `<label><input type="checkbox" name="dias" value="${d}" ${ds.includes(d) ? 'checked' : ''}><span>${DIAS[d]}</span></label>`).join('')}</div></div>
+    <div class="grid2"><div class="field"><label>Sale la van</label><input type="time" name="sale" required value="${esc(r.sale || '')}"></div>
+      <div class="field"><label>Pasajeros (aprox.)</label><input type="number" name="pax" min="0" max="60" value="${esc(r.pax || 1)}"></div></div>
+    <div class="grid2"><div class="field"><label>Van</label><select name="vanId"><option value="">Sin asignar</option>${vans.map(v => `<option value="${esc(v.id)}" ${r.vanId === v.id ? 'selected' : ''}>${esc(v.nombre)} · ${esc(v.patente)}</option>`).join('')}</select></div>
+      ${campoChofer(r.chofer || '')}</div>
+    <div class="grid2"><div class="field"><label>Desde</label><input type="date" name="desde" value="${esc(r.desde || hoyISO())}" required></div>
+      <div class="field"><label>Hasta (opcional)</label><input type="date" name="hasta" value="${esc(r.hasta || '')}"></div></div>
+    <div class="field"><label>Nota (opcional)</label><input name="nota" maxlength="120" value="${esc(r.nota || '')}" placeholder="Ej: pasa también por el centro"></div>
+    <p class="muted tiny" style="margin:0 0 12px">${I('refresh')} Al guardar se arman los traslados de los próximos 7 días. ${r.id ? 'Los días que ya cambiaste a mano, cancelaste o que ya salieron no se tocan.' : ''}</p>
+    <button class="btn btn-pri btn-block">${I('check')}${r.id ? 'Guardar los cambios' : 'Guardar y armar los traslados'}</button></form>`);
+};
+A['hrutina-dias'] = el => { const f = el.closest('form'); if (!f) return; const v = String(el.dataset.v).split(',');
+  f.querySelectorAll('input[name="dias"]').forEach(c => { c.checked = v.includes(c.value); }); };
+F['hrutina'] = (d, form) => {
+  if (!soloHotel()) return;
+  const dias = [].concat(d.dias || []).map(Number);
+  if (!dias.length) return toast('Elegí al menos un día', 'calendar');
+  if (!d.sale) return toast('Poné la hora en que sale la van', 'clock');
+  if (d.hasta && d.hasta < d.desde) return toast('La fecha "hasta" tiene que ser después de "desde"', 'calendar');
+  const id = form.dataset.id;
+  Store.cambiar(s => { s.hotelViajes = aLista(s.hotelViajes);
+    const datos = { nombre:(d.nombre || '').trim(), dias:DIAS_SEM.filter(x => dias.includes(x)), sale:d.sale, destino:d.destino, sentido:d.sentido, pax:+d.pax || 0, vanId:d.vanId || '', chofer:(d.chofer || '').trim(), desde:d.desde || hoyISO(), hasta:d.hasta || '', nota:(d.nota || '').trim() };
+    const r = id && s.hotelViajes.find(x => x && x.id === id && x.rutina);
+    if (r) Object.assign(r, datos, { editado:Date.now() }); else s.hotelViajes.push({ id:'hr' + uid(), rutina:true, activa:true, at:Date.now(), ...datos });
+    generarRutinas(s);
+    auditar(s, r ? 'El hotel editó un traslado automatizado' : 'El hotel cargó un traslado automatizado', `${datos.nombre || datos.destino} · ${datos.sale} · ${textoDias(datos.dias)}`);
+  });
+  cerrarHoja(); if (PILA.at(-1)?.id !== 'hotel-rutinas') abrir('hotel-rutinas');
+  toast(id ? 'Traslado automatizado actualizado' : 'Listo: se arma solo cada día', 'refresh');
+};
+A['hrutina-pausa'] = el => { if (!soloHotel()) return;
+  let pausa = false;
+  Store.cambiar(s => { const r = aLista(s.hotelViajes).find(x => x && x.id === el.dataset.id && x.rutina); if (!r) return; r.activa = r.activa === false; pausa = !r.activa; generarRutinas(s); });
+  toast(pausa ? 'En pausa: no se arman más traslados hasta que lo reanudes' : 'Reanudado: se arman los de la semana', pausa ? 'clock' : 'refresh'); };
+A['hrutina-borrar'] = async el => { if (!soloHotel()) return; const r = hotelRutinas().find(x => x.id === el.dataset.id); if (!r) return;
+  if (!await confirmar('Borrar el traslado automatizado', `${esc(nombreRutina(r))} · ${esc(textoDias(r.dias))}. Se dejan de armar y se sacan los que estaban programados y no salieron. Los que ya se hicieron quedan.`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { s.hotelViajes = aLista(s.hotelViajes).filter(x => x && x.id !== r.id && !(x.deRutina === r.id && x.estado === 'programado' && x.fecha >= hoyISO() && !x.aMano));
+    auditar(s, 'El hotel borró un traslado automatizado', `${nombreRutina(r)} · ${textoDias(r.dias)}`); });
+  toast('Traslado automatizado borrado', 'trash');
+};
 
 /* =========================================================
    HUÉSPEDES
@@ -1211,36 +1482,75 @@ A['hotel-quitar'] = async el => {
 
 /* =========================================================
    EL HOTEL VISTO DESDE LA GARITA Y LA ADMINISTRACIÓN
+   REDISEÑO "EN VIVO" (pedido de Claudio, 12-10-2026: "más innovador e
+   interactivo, con animaciones y colores vivos; al entrar se vuelven a
+   repetir todas las ventanas que ya están en la sala del hotel").
+   Ya no repite la sala: es un tablero de lo que pasa AHORA.
+     · Arriba, el hotel de noche con el punto "EN VIVO" que late y cuatro
+       anillos que se llenan (huéspedes, vans adentro, traslados hechos,
+       proveedores al día), con los números que suben contando.
+     · Lo próximo: la van que sale después, con su cuenta regresiva.
+     · La ruta del día: el riel de 6 a 24 h y cada traslado en una línea
+       de tiempo que se abre al tocarla.
+     · Las vans dibujadas (la que está afuera, andando), el portón con los
+       pasos por la garita y los eventos como entradas.
+     · "Para resolver" aparece solo si hay algo pendiente.
+   Ideas de tabler (41.8k★, tarjetas de estado) y animate.css (82k★); el
+   código es propio. La garita y la supervisión, que no tienen la sala,
+   conservan sus atajos al final.
    ========================================================= */
+const anilloVivo = (p, c) => `<svg class="hvv-anillo" viewBox="0 0 36 36" aria-hidden="true" style="--c:${c}"><circle class="f" cx="18" cy="18" r="15.5"/><circle class="v" cx="18" cy="18" r="15.5" pathLength="100" style="--p:${Math.max(0, Math.min(100, Math.round(p)))}"/></svg>`;
 R['hotel-vivo'] = {
   titulo:HOTEL_NOMBRE, icon:'star', color:'wood', ancha:true, sub:() => esGuardia() ? 'Vans, traslados, huéspedes y eventos de hoy' : 'En vivo · sin los nombres de los huéspedes',
   render(){
-    const hoy = hoyISO(), vans = hotelVans(), vs = viajesDelDia(hoy), ev = hotelEventos().filter(e => e.fecha === hoy), h = cuentaHotel(), info = hotelInfo();
+    const hoy = hoyISO(), vans = hotelVans(), vs = viajesDelDia(hoy), h = cuentaHotel(), info = hotelInfo(), c = Clima.d?.c;
+    const evs = hotelEventos().filter(e => e.fecha >= hoy && e.fecha <= sumarDias(hoy, 7)).sort((a, b) => (a.fecha + (a.desde || '')).localeCompare(b.fecha + (b.desde || '')));
     const hs = esGuardia() ? hotelHuespedes().filter(x => x.desde <= hoy && x.hasta >= hoy) : [];
-    const promosPend = promosViejasPend().length;
-    const evPend = hotelEventos().filter(e => e.avisarVecinos && !e.publicado && e.fecha >= hoy).length;
-    const provMal = hotelProvs().filter(p => estadoProv(p)[0] !== 'ok').length;
-    return `${!h ? aviso('info', 'star', 'El hotel todavía no tiene su cuenta', esAdmin() ? 'Se crea en "Cuenta del hotel".' : 'La crea la Administración.', esAdmin() ? `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="hotel-cuenta">Cuenta del hotel</button>` : '') : ''}
-      ${ev.map(e => aviso('info', 'star', `Hoy en el hotel: ${esc(e.titulo)}`, `${esc(e.desde || '')}${e.hasta ? '–' + esc(e.hasta) : ''} h · ${plural(+e.asistentes || 0, 'invitado')}${e.ingreso ? ' · ingreso: ' + esc(e.ingreso) : ''}`)).join('')}
-      <section class="hv-dos">
-        <div>${sec('Vans')}${vans.length ? `<div class="hv-vans">${vans.map(v => tarjetaVan(v, { garita:true })).join('')}</div>` : vacio('car', 'El hotel no cargó vans.')}</div>
-        <div>${sec(`Traslados de hoy (${vs.length})`, `<button class="link" data-a="abrir" data-v="hotel-traslados">Ver todos</button>`)}${vs.length ? `<div class="card lista">${vs.map(x => filaViaje(x)).join('')}</div>` : vacio('calendar', 'Sin traslados hoy.')}</div>
+    const adentro = vans.filter(v => estadoVan(v).adentro).length, hechos = vs.filter(x => x.estado === 'hecho').length;
+    const provs = hotelProvs(), provOk = provs.filter(p => estadoProv(p)[0] === 'ok').length;
+    const movs = hotelMovs().filter(m => m.vanId && Date.now() - m.at < DIA).slice(0, 10);
+    const promosPend = promosViejasPend().length, evPend = hotelEventos().filter(e => e.avisarVecinos && !e.publicado && e.fecha >= hoy).length;
+    const provRev = provs.filter(p => !p.revisado || estadoProv(p)[0] === 'danger').length;
+    const huesp = esGuardia() ? hs.reduce((a, x) => a + (+x.pax || 1), 0) : (info.huespedesHoy || 0);
+    const kpi = (k, n, de, t, p, c2, v) => `<button type="button" class="hvv-kpi" data-a="abrir" data-v="${v}" style="--c:${c2}">${anilloVivo(p, c2)}
+      <span class="hvv-kpi-n"><b class="dn-num" data-k="hvv-${k}" data-n="${n}">${n}</b>${de != null ? `<small>/${de}</small>` : ''}</span><span class="hvv-kpi-t">${t}</span></button>`;
+    const pend = esAdmin() ? [promosPend && { v:'hotel-promos', ic:'sparkle', t:plural(promosPend, 'promoción para revisar', 'promociones para revisar') },
+      evPend && { v:'hotel-eventos', ic:'star', t:plural(evPend, 'evento para avisar a los vecinos', 'eventos para avisar a los vecinos') },
+      provRev && { v:'hotel-proveedores', ic:'box', t:plural(provRev, 'proveedor para revisar', 'proveedores para revisar') }].filter(Boolean) : [];
+    const ticket = e => { const f = new Date(e.fecha + 'T12:00:00');
+      return `<div class="he-ticket"><span class="he-talon"><small>${e.fecha === hoy ? 'hoy' : esc(f.toLocaleDateString('es-AR', { weekday:'short' }).replace('.', ''))}</small><b>${f.getDate()}</b><small>${esc(f.toLocaleDateString('es-AR', { month:'short' }).replace('.', ''))}</small></span>
+        <span class="he-cuerpo"><b>${esc(e.titulo)}</b><small>${e.desde ? `${I('clock')} ${esc(e.desde)}${e.hasta ? '–' + esc(e.hasta) : ''} h` : ''} ${I('users')} ${plural(+e.asistentes || 0, 'invitado')}${e.publicado ? ' · avisado a los vecinos' : ''}</small></span></div>`; };
+    return `${!h ? aviso('info', 'star', 'El hotel todavía no tiene su cuenta', esAdmin() ? 'Se crea en "Cuenta del hotel", en la sala del hotel.' : 'La crea la Administración.') : ''}
+      <section class="hvv-hero">
+        <div class="hvv-cielo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="hvv-cab"><img src="img/logo-noche.png" alt="" width="46" height="46">
+          <div class="grow"><span class="hvv-vivo"><i></i>EN VIVO</span><b>${HOTEL_NOMBRE}</b><small>${fechaLarga(hoy)} · ${hhmmDe(ahoraMin())} h</small></div>
+          ${c ? `<span class="hvv-clima"><b>${Math.round(c.temperature_2m)}°</b><small>${Clima.cod(c.weather_code)[0]}</small></span>` : ''}</div>
+        <div class="hvv-kpis">
+          ${kpi('hues', huesp, null, esGuardia() ? 'huéspedes hoy' : 'huéspedes', huesp ? 100 : 0, '#ffb46b', 'hotel-huespedes')}
+          ${kpi('vans', adentro, vans.length, 'vans adentro', vans.length ? adentro / vans.length * 100 : 0, '#5ee0a0', 'hotel-traslados')}
+          ${kpi('tras', hechos, vs.length, 'traslados hechos', vs.length ? hechos / vs.length * 100 : 0, '#7fc8ff', 'hotel-traslados')}
+          ${kpi('prov', provOk, provs.length, 'proveedores al día', provs.length ? provOk / provs.length * 100 : 0, '#c9a7ff', 'hotel-proveedores')}</div>
       </section>
-      ${esGuardia() ? `${sec(`Huéspedes de hoy (${hs.length})`, `<button class="link" data-a="abrir" data-v="hotel-huespedes">Lista completa</button>`)}${hs.filter(x => x.desde === hoy && !x.ingreso).length ? `<div class="card lista">${hs.filter(x => x.desde === hoy && !x.ingreso).map(x => `<div class="it"><div class="txt"><b>${esc(x.nombre)}</b><span>${x.patente ? esc(x.patente) + ' · ' : ''}${plural(+x.pax || 1, 'persona')}</span></div><button class="btn btn-xs btn-ok" data-a="hhuesped-ingreso" data-id="${esc(x.id)}">${I('login')}Ingresó</button></div>`).join('')}</div>` : `<div class="card plana small">${I('check')} No quedan huéspedes por llegar hoy.</div>`}`
-        : `<div class="garita-kpis"><div class="kpi"><b>${info.huespedesHoy || 0}</b><span>Huéspedes hoy</span></div><div class="kpi"><b>${vans.length}</b><span>Vans</span></div><div class="kpi"><b>${hotelProvs().length}</b><span>Proveedores</span></div></div>`}
-      ${sec('Más')}<div class="mosaico">
-        ${teja({ v:'hotel-traslados', icon:'car', color:'wood', t:'Vans y traslados', s:'Pasos por la garita y viajes' })}
-        ${teja({ v:'hotel-proveedores', icon:'box', color:'brand', t:'Proveedores del hotel', s:'ART, seguro y QR', badge: esAdmin() ? provMal : 0 })}
-        ${teja({ v:'hotel-eventos', icon:'star', color:'accent', t:'Eventos del hotel', s: esAdmin() ? 'Publicar para los vecinos' : 'Lo que anunció el hotel', badge: esAdmin() ? evPend : 0 })}
-        ${esGuardia() ? teja({ v:'hotel-huespedes', icon:'users', color:'sky', t:'Huéspedes', s:'Los de hoy y los que están' }) : teja({ v:'hotel-huespedes', icon:'users', color:'sky', t:'Huéspedes', s:'Solo la cantidad (sin nombres)' })}
-        ${esAdmin() ? teja({ v:'hotel-promos', icon:'sparkle', color:'wood', t:'Promociones', s:'Agregar, editar o borrar', badge: promosPend }) : ''}
-        ${teja({ v:'hotel-emergencias', icon:'siren', color:'danger', t:'Emergencias del hotel', s:'DEA y primeros auxilios' })}
-        ${h ? teja({ v:'privado', p:(esGuardia() ? 'guardia' : 'admin') + '|' + h.id, icon:'chat', color:'accent', t:'Mensajes con el hotel', s:'Privado, con la recepción' }) : ''}
-        ${esAdmin() ? teja({ v:'hotel-cuenta', icon:'key', color:'accent', t:'Cuenta del hotel', s: h ? 'Activa' : 'Crearla' }) : ''}
-        ${teja({ v:'hotel-convenio', icon:'clipboard', color:'wood', t:'Convenio (modelo)', s:'Convivencia y servicios' })}
-        ${teja({ v:'hotel-ficha', icon:'sliders', color:'sky', t:'Ficha del hotel', s:'Responsable y tiempos' })}
-      </div>`;
+      ${pend.length ? `<section class="hvv-pend"><b>${I('alert')} Para resolver</b>${pend.map(x => `<button type="button" class="hvv-pend-b" data-a="abrir" data-v="${x.v}">${I(x.ic)}<span>${esc(x.t)}</span>${I('right')}</button>`).join('')}</section>` : ''}
+      <section class="bloque">${proximaVan(vs)}</section>
+      <section class="bloque">${sec('La ruta de hoy', `<button class="link" data-a="abrir" data-v="hotel-traslados">Todos los días</button>`)}
+        <div class="card hl-caja">${rielDia(vs, hoy)}${lineaTraslados(vs, { dia:hoy })}</div></section>
+      ${esGuardia() ? `<section class="bloque">${sec(`Huéspedes por llegar (${hs.filter(x => x.desde === hoy && !x.ingreso).length})`, `<button class="link" data-a="abrir" data-v="hotel-huespedes">Lista completa</button>`)}${hs.filter(x => x.desde === hoy && !x.ingreso).length ? `<div class="card lista">${hs.filter(x => x.desde === hoy && !x.ingreso).map(x => `<div class="it"><div class="txt"><b>${esc(x.nombre)}</b><span>${x.patente ? esc(x.patente) + ' · ' : ''}${plural(+x.pax || 1, 'persona')}</span></div><button class="btn btn-xs btn-ok" data-a="hhuesped-ingreso" data-id="${esc(x.id)}">${I('login')}Ingresó</button></div>`).join('')}</div>` : `<div class="card plana small">${I('check')} No quedan huéspedes por llegar hoy.</div>`}</section>` : ''}
+      <section class="bloque hv-dos">
+        <div>${sec('Las vans ahora')}${vans.length ? `<div class="hp-vans">${vans.map(v => vanViva(v)).join('')}</div>` : vacio('car', 'El hotel no cargó vans.')}</div>
+        <div>${sec('Pasos por la garita', '<span class="muted small">últimas 24 h</span>')}${portonHotel(movs)}</div>
+      </section>
+      ${evs.length ? `<section class="bloque">${sec('Eventos del hotel', '<span class="muted small">próximos 7 días</span>')}<div class="he-lista">${evs.map(ticket).join('')}</div></section>` : ''}
+      ${!esAdmin() ? `<section class="bloque">${sec('Atajos')}<div class="hvv-atajos">
+        ${esGuardia() ? `<button type="button" data-a="abrir" data-v="hotel-huespedes">${I('users')}Huéspedes</button>` : ''}
+        <button type="button" data-a="abrir" data-v="hotel-proveedores">${I('box')}Proveedores</button>
+        <button type="button" data-a="abrir" data-v="hotel-eventos">${I('star')}Eventos</button>
+        <button type="button" data-a="abrir" data-v="hotel-emergencias">${I('siren')}Emergencias</button>
+        ${h && esGuardia() ? `<button type="button" data-a="abrir" data-v="privado" data-p="guardia|${esc(h.id)}">${I('chat')}Mensajes</button>` : ''}</div></section>` : ''}
+      <p class="muted tiny" style="margin-top:12px">${I('lock')} ${esAdmin() ? 'La Administración ve cuántos huéspedes hay, nunca sus nombres (Ley 25.326). Lo demás del hotel está en su sala, en el Día a día.' : 'Los huéspedes los ven solo el hotel y la garita, y se borran solos al día siguiente del check-out.'}</p>`;
   },
+  alPintar(){ if (typeof animarNumeros === 'function') animarNumeros(); },
 };
 /* La banda del hotel en la portada de la garita: eventos y huéspedes que
    llegan hoy. Las vans y sus traslados tienen su propia solapa
@@ -1311,7 +1621,10 @@ function hotelDemo(s){
     { id:'hh2', nombre:'Martina Olsen', pax:2, desde:D(-1), hasta:D(1), patente:'AC987QP', llegaVuelo:'', saleVuelo:'', at:n - 3 * DIA },
     { id:'hh3', nombre:'Grupo congreso', pax:3, desde:D(1), hasta:D(4), patente:'', llegaVuelo:'FO5022', llegaHora:'11:30', saleVuelo:'', at:n - DIA },
   ];
-  s.hotelViajes = [{ id:'ht1', vanId:'hv1', fecha:h, sale:'17:30', destino:'puerto', sentido:'llevar', ref:{ tipo:'crucero', barco:'Ushuaia expedition' }, pax:6, huespedes:[], nota:'', estado:'programado', at:n - DIA }];
+  s.hotelViajes = [{ id:'ht1', vanId:'hv1', fecha:h, sale:'17:30', destino:'puerto', sentido:'llevar', ref:{ tipo:'crucero', barco:'Ushuaia expedition' }, pax:6, huespedes:[], nota:'', estado:'programado', at:n - DIA },
+    { id:'hr1', rutina:true, activa:true, nombre:'Aeropuerto de la mañana', dias:[1, 2, 3, 4, 5], sale:'07:30', destino:'aeropuerto', sentido:'llevar', pax:6, vanId:'hv1', chofer:'Ramón', desde:D(-10), hasta:'', nota:'', at:n - 10 * DIA },
+    { id:'hr2', rutina:true, activa:true, nombre:'Centro, ida y vuelta', dias:[1, 2, 3, 4, 5, 6, 0], sale:'19:00', destino:'centro', sentido:'llevar', pax:8, vanId:'hv2', chofer:'Julio', desde:D(-10), hasta:'', nota:'Vuelve a las 23 h', at:n - 10 * DIA }];
+  generarRutinas(s);
   s.hotelEventos = [{ id:'he1', titulo:'Cena de gala del congreso', tipo:'cena', asistentes:80, fecha:D(1), desde:'20:30', hasta:'01:00', ingreso:'Con la van del hotel desde el centro', estacionamiento:'Dentro del predio del hotel', musicaHasta:'00:30', nota:'', avisarVecinos:true, at:n - DIA }];
   s.hotelProv = [
     { id:'hp1', empresa:'Lavandería Austral', rubro:'Lavandería', personal:'Carlos Díaz', patentes:'AB111CD', tel:'', dias:[1, 3, 5], desde:'08:00', hasta:'12:00', artVence:D(120), seguroVence:D(200), codigo:'H-PRV1DEMO', estado:'activo', revisado:true, at:n - 20 * DIA },
@@ -1320,3 +1633,22 @@ function hotelDemo(s){
   s.hotelPromos = [{ id:'hpr1', titulo:'Almuerzo de domingo para vecinos', detalle:'Menú de pasos con cordero fueguino', descuento:'15 %', desde:h, hasta:D(30), url:'', estado:'propuesta', at:n - HORA }];
   s.hotelDemoV = 1;
 }
+/* El cartel del ejemplo, arriba de cada ventana del hotel; y, si se ocultó,
+   el enlace para volver a verlo (solo mientras no haya nada cargado). */
+function bannerEjemplo(){
+  if (!HotelEjemplo.puedeVerlo() || HotelEjemplo.hayReal()) return '';
+  if (HotelEjemplo.oculto()) return `<p class="hej-otra"><button type="button" class="link" data-a="hotel-ejemplo" data-v="si">${I('eye')}Ver cómo se ve el hotel con datos de ejemplo</button></p>`;
+  return `<div class="hej-banda"><span class="hej-sello">EJEMPLO</span><div class="grow"><b>Así se ve el hotel funcionando</b><small>${esHotel() ? 'Vans, traslados, huéspedes y eventos inventados para que veas cómo anda todo. Desaparecen solos apenas cargues tu primera van, traslado, huésped, evento o proveedor.' : 'El hotel todavía no cargó nada propio: esto es un ejemplo para ver cómo funciona. Desaparece solo cuando el hotel carga lo suyo. La garita no lo ve.'}</small></div>
+    <button type="button" class="hej-ocultar" data-a="hotel-ejemplo" data-v="no">Ocultar</button></div>`;
+}
+A['hotel-ejemplo'] = el => { try { if (el.dataset.v === 'no') localStorage.setItem(HotelEjemplo.KEY, 'no'); else localStorage.removeItem(HotelEjemplo.KEY); } catch(e){} refrescar(); };
+['hotel', 'hotel-vivo', 'hotel-traslados', 'hotel-rutinas', 'hotel-vuelos', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores'].forEach(k => {
+  const r0 = R[k] && R[k].render; if (!r0) return;
+  R[k].render = function(...a){ const h = r0.apply(this, a); return h.includes('hej-banda') || h.includes('hej-otra') ? h : bannerEjemplo() + h; };
+});
+/* Nada del ejemplo se edita, se borra ni se registra. */
+['hvan-editar', 'hvan-baja', 'hvan-qr', 'hvan-mov', 'hviaje-editar', 'hviaje-cancelar', 'hviaje-borrar', 'hviaje-ajustar', 'hviaje-mov', 'hhuesped-editar', 'hhuesped-borrar', 'hhuesped-ingreso', 'hhuesped-salida',
+  'hevento-editar', 'hevento-cancelar', 'hevento-publicar', 'hprov-editar', 'hprov-borrar', 'hprov-qr', 'hprov-revisar', 'hprov-suspender', 'hprov-mov', 'hrutina-editar', 'hrutina-pausa', 'hrutina-borrar'].forEach(k => {
+  const a0 = A[k]; if (!a0) return;
+  A[k] = function(el, ...r){ if (el && el.dataset && esEjemplo(el.dataset.id)) return avisoEjemplo(); return a0.call(this, el, ...r); };
+});

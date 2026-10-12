@@ -38,7 +38,7 @@ const Adjuntos = {
     let d = null, mini = '', tipo = file.type || 'application/octet-stream', nombre = String(file.name || 'archivo').slice(0, 80);
     if (this.esFoto(file)){
       try { d = await comprimir(file, ADJ.foto, .8); } catch(e){ d = null; }
-      if (d){ mini = await achicarDato(d, ADJ.mini, .5); tipo = 'image/jpeg'; nombre = nombre.replace(/\.[a-z0-9]+$/i, '') + '.jpg'; }
+      if (d){ mini = await achicarDato(d, ADJ.mini, .5); tipo = tipoDeDato(d); nombre = nombre.replace(/\.[a-z0-9]+$/i, '') + '.' + extDeTipo(tipo); }
     }
     if (!d){
       if (file.size > ADJ.maxArchivo) throw new Error(`Ese archivo pesa ${pesoTexto(file.size)}. El máximo es 5 MB.`);
@@ -60,15 +60,16 @@ const Adjuntos = {
     return this.subiendo[id] = p.then(() => ({ ok:true }), e => ({ ok:false, msg:e.message }));
   },
   /* Lo trae a este equipo. La primera vez que lo baja alguien que no lo
-     mandó, le queda una hora en la base. */
-  async bajar(id){
+     mandó, le queda una hora en la base. Las pruebas de una infracción
+     (`conservar`) se quedan sus 90 días: las pueden bajar varios. */
+  async bajar(id, { conservar = false } = {}){
     const local = await Fotos.sacar(id, false);
     if (local) return local;
     if (!this.nube()) return null;
     const v = (await Nube.db.ref('barrio/adjuntos/' + id).get()).val();
     if (!v || typeof v.d !== 'string') return null;
     await Fotos.poner(id, v.d);
-    if (v.de !== Nube.uid){
+    if (v.de !== Nube.uid && !conservar){
       const vence = Math.min(v.vence || Infinity, Date.now() + ADJ.horaTrasBajar);
       if (vence !== v.vence) await Nube.db.ref().update({ ['barrio/adjuntos/' + id + '/vence']:vence, ['barrio/adjuntosIdx/' + id + '/vence']:vence }).catch(() => {});
     }

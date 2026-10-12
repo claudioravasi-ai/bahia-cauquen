@@ -172,8 +172,9 @@ const Push = {
        la consulta. Si ya contestó otro del lote, lo dice. */
     const [id, p, q, r] = String(link).split(':');
     const conLlegada = (lid, hacer, n = 0) => { if (Store.s.llegadas.some(x => x.id === lid)) hacer(); else if (n < 40) setTimeout(() => conLlegada(lid, hacer, n + 1), 250); else toast('No encontré esa consulta de la garita: puede que ya se haya resuelto', 'gate'); };
-    if (id === 'responder' && p === 'llegada' && q){ conLlegada(q, () => responderLlegada(q, r === 'si' ? 'autorizado' : 'rechazado')); return; }
-    if (id === 'llegada' && p){ conLlegada(p, () => A['llegada-ver']({ dataset:{ id:p } })); return; }
+    if (id === 'responder' && p === 'llegada' && q){ conLlegada(q, () => responderLlegada(q, r === 'si' ? 'autorizado' : 'rechazado', r === 'noesta' ? 'noesta' : '')); return; }
+    /* Tocar el aviso abre la ventana grande de la llegada (12-10-2026). */
+    if (id === 'llegada' && p){ conLlegada(p, () => { const l = Store.s.llegadas.find(x => x.id === p); if (l && l.estado === 'consultando' && typeof VentanaLlegada !== 'undefined') VentanaLlegada.mostrar(p, true); else A['llegada-ver']({ dataset:{ id:p } }); }); return; }
     if (R[id]) abrir(id, p || '');
   },
   /* Saca de la bandeja del teléfono los avisos que ya se resolvieron
@@ -181,8 +182,15 @@ const Push = {
   cerrarResueltos(){
     if (!('serviceWorker' in navigator) || typeof Nube === 'undefined' || !Nube.arrancada) return;
     navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(x => { const tag = String(x.tag || '');
+      /* "En la garita: …" (llegada-<id>-…): se va apenas alguien del lote contesta. */
+      const ml = /^llegada-([^-]+)-\d+$/.exec(tag);
+      if (ml){ const l = aLista(Store.s.llegadas).find(z => z && z.id === ml[1]); if (l && l.estado !== 'consultando'){ x.close(); this.callarLlegada(l.id); } return; }
       if (!tag.startsWith('n-')) return; const n = aLista(Store.s.notifs).find(z => z && z.id === tag.slice(2));
       if (n && (n.ref || n.llegadaId) && avisoCaduco(n)) x.close(); })).catch(() => {});
+  },
+  /* Que el teléfono deje de insistir con una llegada (ver sw.js). */
+  callarLlegada(id){
+    try { if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then(reg => { if (reg.active) reg.active.postMessage({ callar:'llegada-' + id }); }).catch(() => {}); } catch(e){}
   },
   arrancar(){
     if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.abrir) this.abrirEnlace(e.data.abrir); });

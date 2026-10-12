@@ -1289,8 +1289,10 @@ R.comunicados = {
         : `<div class="muted small" style="margin-top:10px">${I('eye')} Lo acusaron ${vistos} de ${alcance} cuentas</div>`}
         <div class="btns" style="margin-top:10px">
           ${c.tipo === 'reunion' ? `<button class="btn btn-sm btn-sec" data-a="comunicado-lista" data-id="${c.id}">${I('users')}Ver lote por lote</button>` : ''}
+          <button class="btn btn-sm btn-pri" data-a="comunicado-editar" data-id="${c.id}">${I('edit')}Editar</button>
           <button class="btn btn-sm btn-sec" data-a="comunicado-repetir" data-id="${c.id}">${I('refresh')}Volver a mostrarlo</button>
-          <button class="btn btn-sm btn-danger-soft" data-a="comunicado-cerrar" data-id="${c.id}">${c.archivado ? 'Cerrado' : 'Cerrar'}</button></div></div>`;
+          <button class="btn btn-sm btn-danger-soft" data-a="comunicado-cerrar" data-id="${c.id}">${c.archivado ? 'Cerrado' : 'Cerrar'}</button></div>
+        ${c.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editado ${hace(c.editado.at)}</div>` : ''}</div>`;
     };
     return `${superficie({ a:'nuevo-comunicado', icon:'plus', color:'danger', t:'Nuevo comunicado importante', s:'Sale como ventana, suena y pide acuse', cls:'acento' })}
       ${aviso('info', 'info', 'Usalo poco', 'Un comunicado importante interrumpe lo que el vecino esté haciendo. Si se usa para todo, deja de significar algo. Lo común va al pizarrón.')}
@@ -1298,28 +1300,48 @@ R.comunicados = {
       ${viejos.length ? sec('Cerrados') + viejos.slice(0, 10).map(card).join('') : ''}`;
   },
 };
-A['nuevo-comunicado'] = () => {
-  const lotes = (typeof LOTES !== 'undefined' ? LOTES : []).map(l => 'Lote ' + l.lote);
-  hoja('Nuevo comunicado importante', `<form data-f="comunicado">
+/* EDITAR UN COMUNICADO (pedido de Claudio, 12-10-2026: "aparte de cerrarlo
+   o volver a mostrarlo, un tercer botón: editarlo"). Es el mismo formulario,
+   con lo que ya tenía. Las respuestas de "voy / no puedo" se conservan. Si
+   el cambio es importante, se tilda "Que les vuelva a aparecer a todos" y
+   sale otra vez como ventana (con el aviso "Corregido"); si es una coma, se
+   guarda sin molestar a nadie. Queda en la auditoría. */
+A['nuevo-comunicado'] = el => {
+  const c = el && el.dataset && el.dataset.id ? aLista(Store.s.comunicados).find(x => x && x.id === el.dataset.id) : null;
+  const lotes = (typeof LOTES !== 'undefined' ? LOTES : []).map(l => 'Lote ' + l.lote), v = c || {};
+  hoja(c ? 'Editar el comunicado' : 'Nuevo comunicado importante', `<form data-f="comunicado" data-id="${esc(v.id || '')}">
     <div class="field"><label>¿A quién?</label>
-      <select name="para" required><option value="todos">A todo el barrio</option>${lotes.map(l => `<option value="${esc(l)}">Solo a ${esc(l)}</option>`).join('')}</select>
+      <select name="para" required><option value="todos">A todo el barrio</option>${lotes.map(l => `<option value="${esc(l)}" ${v.para === l ? 'selected' : ''}>Solo a ${esc(l)}</option>`).join('')}</select>
       <div class="ayuda">Si elegís un lote, lo ven todas las cuentas de ese lote y nadie más.</div></div>
     <div class="field"><label>¿Qué tipo?</label>
-      <select name="tipo" required><option value="aviso">Aviso · solo acusar recibo</option><option value="reunion">Invitación · con "voy / no puedo"</option></select></div>
-    <div class="field"><label>Título</label><input name="titulo" required maxlength="110" placeholder="Ej: Reunión extraordinaria del barrio"></div>
-    <div class="field"><label>Mensaje</label><textarea name="texto" required maxlength="900" style="min-height:130px" placeholder="Ej: El lunes próximo hay reunión extraordinaria. Tema: pavimento y asfalto."></textarea></div>
+      <select name="tipo" required><option value="aviso">Aviso · solo acusar recibo</option><option value="reunion" ${v.tipo === 'reunion' ? 'selected' : ''}>Invitación · con "voy / no puedo"</option></select></div>
+    <div class="field"><label>Título</label><input name="titulo" required maxlength="110" value="${esc(v.titulo || '')}" placeholder="Ej: Reunión extraordinaria del barrio"></div>
+    <div class="field"><label>Mensaje</label><textarea name="texto" required maxlength="900" style="min-height:130px" placeholder="Ej: El lunes próximo hay reunión extraordinaria. Tema: pavimento y asfalto.">${esc(v.texto || '')}</textarea></div>
     <div class="grid3">
-      <div class="field"><label>Fecha (si es reunión)</label><input type="date" name="fecha" min="${hoyISO()}"></div>
-      <div class="field"><label>Hora</label><input type="time" name="hora"></div>
-      <div class="field"><label>Deja de mostrarse</label><input type="date" name="vence" min="${hoyISO()}" value="${sumarDias(hoyISO(), 30)}"></div></div>
-    <div class="field"><label>Lugar</label><input name="lugar" maxlength="80" placeholder="Ej: Garita del barrio"></div>
+      <div class="field"><label>Fecha (si es reunión)</label><input type="date" name="fecha" value="${esc(v.fecha || '')}"></div>
+      <div class="field"><label>Hora</label><input type="time" name="hora" value="${esc(v.hora || '')}"></div>
+      <div class="field"><label>Deja de mostrarse</label><input type="date" name="vence" min="${hoyISO()}" value="${esc(c ? v.vence || '' : sumarDias(hoyISO(), 30))}"></div></div>
+    <div class="field"><label>Lugar</label><input name="lugar" maxlength="80" value="${esc(v.lugar || '')}" placeholder="Ej: Garita del barrio"></div>
+    ${c ? `<label class="check"><input type="checkbox" name="repetir" checked><span><b>Que les vuelva a aparecer a todos</b>, con el aviso "Corregido" (destildalo si es un cambio chico)</span></label>` : ''}
     <label class="check"><input type="checkbox" name="mail"><span>Mandarlo también por correo</span></label>
-    <button class="btn btn-pri btn-block btn-grande" style="margin-top:14px">${I('send')}Publicar el comunicado</button>
-    <p class="muted tiny" style="margin:10px 0 0">Aparece como ventana en la app de cada vecino, suena una vez y no se va hasta que lo acusan. Queda asentado en la auditoría.</p></form>`, { ancho:'620px' });
+    <button class="btn btn-pri btn-block btn-grande" style="margin-top:14px">${I(c ? 'check' : 'send')}${c ? 'Guardar los cambios' : 'Publicar el comunicado'}</button>
+    <p class="muted tiny" style="margin:10px 0 0">${c ? 'Las respuestas de "voy / no puedo" que ya llegaron se conservan. El cambio queda asentado en la auditoría.' : 'Aparece como ventana en la app de cada vecino, suena una vez y no se va hasta que lo acusan. Queda asentado en la auditoría.'}</p></form>`, { ancho:'620px' });
 };
-F['comunicado'] = async d => {
-  const id = uid(), esReunion = d.tipo === 'reunion';
-  Store.cambiar(s => {
+A['comunicado-editar'] = el => A['nuevo-comunicado'](el);
+F['comunicado'] = async (d, form) => {
+  const editar = form && form.dataset && form.dataset.id ? aLista(Store.s.comunicados).find(x => x && x.id === form.dataset.id) : null;
+  const id = editar ? editar.id : uid(), esReunion = d.tipo === 'reunion';
+  if (editar){
+    Store.cambiar(s => {
+      const c = s.comunicados.find(x => x.id === id); if (!c) return;
+      Object.assign(c, { titulo:d.titulo.trim(), texto:d.texto.trim(), para:d.para, tipo:d.tipo, fecha:d.fecha || '', hora:d.hora || '', lugar:(d.lugar || '').trim(), vence:d.vence || '', editado:{ at:Date.now(), por:yo().id } });
+      if (d.repetir){ c.vistos = []; c.at = Date.now(); c.archivado = false;
+        notificar(s, { para: d.para === 'todos' ? 'todos' : s.users.filter(u => u.casa === d.para && u.estado === 'aprobado').map(u => u.id),
+          titulo:'Corregido: ' + d.titulo.trim(), texto:d.texto.trim().slice(0, 120), icon: esReunion ? 'calendar' : 'tack', color:'danger', link:'pizarron', urgente:true }); }
+      auditar(s, 'Editó un comunicado importante', `${d.para} · ${d.titulo.trim()}${d.repetir ? ' · volvió a aparecer' : ''}`);
+    });
+    cerrarHoja(); toast(d.repetir ? 'Comunicado corregido: vuelve a aparecer en todas las pantallas' : 'Comunicado guardado', 'check');
+  } else Store.cambiar(s => {
     s.comunicados.unshift({ id, titulo:d.titulo.trim(), texto:d.texto.trim(), para:d.para, tipo:d.tipo,
       fecha:d.fecha || '', hora:d.hora || '', lugar:(d.lugar || '').trim(), vence:d.vence || '',
       creadoPor:yo().id, at:Date.now(), respuestas:{}, vistos:[] });
@@ -1328,8 +1350,7 @@ F['comunicado'] = async d => {
       icon: esReunion ? 'calendar' : 'tack', color:'danger', link:'pizarron', urgente:true });
     auditar(s, 'Publicó un comunicado importante', `${d.para} · ${d.titulo.trim()}`);
   });
-  cerrarHoja();
-  toast('Comunicado publicado', 'tack');
+  if (!editar){ cerrarHoja(); toast('Comunicado publicado', 'tack'); }
   if (d.mail){
     const gente = d.para === 'todos'
       ? Store.s.users.filter(u => u.estado === 'aprobado' && u.email)

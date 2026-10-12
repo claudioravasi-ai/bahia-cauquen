@@ -49,6 +49,11 @@ function estadoPase(p, iso = hoyISO()){
     if (m > d + 120) return 'noingreso'; }
   return 'esperado';
 }
+/* LAS VISITAS DEL LOTE (pedido de Claudio, 12-10-2026): las que autoriza
+   cualquiera de los que viven en el lote las ven todos ("Estela, del 148,
+   les aparece a Claudio y a Mónica"), con quién la autorizó, cuándo, y
+   cuándo entró y salió. El propietario a distancia no (no vive ahí). */
+const paseDeMiLote = (p, u = yo()) => !!p && !!u && (p.hostId === u.id || (/^Lote\s/i.test(u.casa || '') && !esPropDistancia(u) && usuario(p.hostId)?.casa === u.casa));
 const pasesDelDia = (iso = hoyISO()) => Store.s.pases.filter(p => paseValidoEn(p, iso) || (p.log && p.log[iso]));
 /* Lo que se ve en la garita: sin las visitas que ya no van a venir. */
 const pasesEnPantalla = (iso = hoyISO()) => pasesDelDia(iso).filter(p => estadoPase(p, iso) !== 'nollego');
@@ -71,6 +76,147 @@ function textoPase(p){
     `En la garita mostrá el QR de la imagen o decí el código.\n\n` +
     `📍 *Cómo llegar:* ${mapaCorto(c.mapa)}`;
 }
+/* =========================================================
+   EL RECORDATORIO DE UNA HORA ANTES (pedido de Claudio, 12-10-2026: "que
+   una hora antes le llegue a la visita por WhatsApp: Hoy vas al barrio, a
+   lo de …, no olvides tener preparado el QR de ingreso").
+   Una app web no puede mandar un WhatsApp sola desde el número del barrio:
+   WhatsApp lo permite solo con su servicio para empresas (Meta), con el
+   número verificado, cada mensaje aprobado y un costo por mensaje. Lo que
+   sí hace la app, sin costo: una hora antes de la hora anunciada, al
+   vecino que la autorizó le llega el aviso (también con el celular
+   bloqueado) con el mensaje ya escrito, y con un toque se abre WhatsApp en
+   el chat de la visita (si cargó su celular) o para elegirla. Sirve para
+   cada día del personal fijo, sin volver a cargar nada. Se apaga por visita
+   ("Una hora antes, avisame") o para todo el barrio en Automatizaciones.
+   El celular de la visita es opcional y lo ven solo el vecino, la garita
+   y la Administración, como el que deja la visita en el enlace.
+   ========================================================= */
+const telVisita = t => { const x = String(t || '').trim(); return soloDigitos(x).length >= 8 ? x.slice(0, 20) : ''; };
+const camposRecordatorio = (p = {}) => `<div class="rec-campos">
+    <div class="field"><label>Celular de la visita (opcional)</label><input name="tel" type="tel" inputmode="tel" maxlength="20" autocomplete="off" value="${esc(p.tel || '')}" placeholder="Ej: 2901 15 123456"><div class="ayuda">Para que el pase y el recordatorio se abran directo en su WhatsApp.</div></div>
+    <label class="check"><input type="checkbox" name="recordar" ${p.recordar !== false ? 'checked' : ''}><span><b>Una hora antes, avisame</b> para mandarle por WhatsApp que tenga el QR a mano (cada día que viene)</span></label></div>`;
+function textoRecordatorio(p){
+  const u = usuario(p.hostId) || {}, c = Store.s.config;
+  return `🚗 *Hoy vas al Barrio ${c.nombre}*, a lo de *${p.autoriza || u.nombre || 'tu vecino'}*${u.casa ? ` (${u.casa})` : ''}, a las *${p.desde} h*.\n\n` +
+    `📲 No olvides tener preparado el *QR de ingreso*: evitá demoras en la barrera de ingreso.${p.codigo ? `\nSi no lo encontrás, decí el código *${codigoEspaciado(p.codigo)}*.` : ''}\n\n¡Te esperamos!`;
+}
+const waRecordatorio = p => p.tel ? waLink(p.tel, textoRecordatorio(p)) : 'https://wa.me/?text=' + encodeURIComponent(textoRecordatorio(p));
+A['visita-recordar'] = el => {
+  const p = aLista(Store.s.pases).find(x => x && x.id === el.dataset.id), u = yo();
+  if (!p || !u || p.hostId !== u.id) return;
+  const est = estadoPase(p);
+  if (est === 'adentro' || est === 'salio'){ toast(`${p.nombre} ya entró`, 'check'); return; }
+  if (est === 'cancelado'){ toast('Esa visita está cancelada', 'x'); return; }
+  hoja(`Recordale a ${esc(p.nombre.split(' ')[0])}`, `<div class="rcd-cab"><span class="rec-reloj">${I('clock')}</span><div><b>${esc(p.nombre)} viene ${p.dias?.length || p.fecha === hoyISO() ? 'hoy' : relDia(p.fecha).toLowerCase()} a las ${esc(p.desde)} h</b><small>Mandale el recordatorio: así tiene el QR a mano y no se demora en la barrera.</small></div></div>
+    <div class="rec-burbuja">${esc(textoRecordatorio(p)).replace(/\*([^*]+)\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}<time>${hora(Date.now())}</time></div>
+    <a class="btn btn-wa btn-block btn-grande rec-wa" href="${esc(waRecordatorio(p))}" target="_blank" rel="noopener" data-a="visita-recordar-enviado" data-id="${esc(p.id)}">${I('chat')}${p.tel ? `Mandárselo a su WhatsApp` : 'Mandar por WhatsApp'}</a>
+    <div class="btns" style="margin-top:8px"><button class="btn btn-sec grow" data-a="copiar" data-v="${esc(textoRecordatorio(p))}">${I('copy')}Copiar el mensaje</button>
+      <button class="btn btn-sec grow" data-a="editar-pase" data-id="${esc(p.id)}">${I('edit')}${p.tel ? 'Cambiar su celular' : 'Cargar su celular'}</button></div>
+    <button class="cal-boton" data-a="visita-calendario" data-id="${esc(p.id)}"><span class="cal-hoja" aria-hidden="true"><b>${fechaDe(primerDiaCal(datosCalendario(p))).getDate()}</b><small>${esc(MESES[fechaDe(primerDiaCal(datosCalendario(p))).getMonth()])}</small><i>${I('bell')}</i></span><span><b>Mejor: que su teléfono se lo recuerde solo</b><small>Mandale una vez el recordatorio para su calendario y no tenés que acordarte más.</small></span>${I('right')}</button>
+    <p class="muted tiny" style="margin:10px 2px 0">${p.tel ? 'Se abre el chat con su número.' : 'Se abre WhatsApp y elegís a quién mandarlo. Si cargás su celular, la próxima vez va directo a su chat.'} Para no recibir más este aviso con ${esc(p.nombre.split(' ')[0])}, destildá "Una hora antes, avisame" en Editar.</p>`);
+};
+/* Al tocar "Mandar", el enlace abre WhatsApp; acá solo se cierra la hoja. */
+A['visita-recordar-enviado'] = () => setTimeout(cerrarHoja, 400);
+
+/* =========================================================
+   EL RECORDATORIO EN EL CALENDARIO DE LA VISITA (pedido de Claudio,
+   12-10-2026; idea de rrule, 3.7k★: solo la idea, el código es propio).
+   El vecino le manda UNA vez un enlace; la visita lo abre y toca "Agregar a
+   mi calendario": su teléfono le avisa solo una hora antes, cada día que
+   viene, hasta la fecha final, sin la app y sin WhatsApp. Gratis.
+   El enlace lleva solo lo que la visita ya sabe (a lo de quién va, el lote,
+   los días y el horario), sin DNI, sin patente y sin el código del pase:
+   un calendario se copia a la nube del teléfono. No se guarda en la base.
+   ========================================================= */
+const DIA_ICS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+const b64url = { a: t => btoa(unescape(encodeURIComponent(t))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+  de: t => decodeURIComponent(escape(atob(String(t).replace(/-/g, '+').replace(/_/g, '/')))) };
+function datosCalendario(p){ const u = usuario(p.hostId) || {};
+  return { n:String(p.nombre || '').split(' ')[0], a:p.autoriza || u.nombre || '', c:u.casa || '', d:aLista(p.dias).join(''), f:p.fecha, u:aLista(p.dias).length ? p.fechaFin || p.fecha : p.fecha, h:p.desde, k:p.hasta }; }
+const enlaceCalendario = x => urlApp('cal/' + b64url.a(JSON.stringify(x)));
+function leerCalendario(arg){ try { const x = JSON.parse(b64url.de(decodeURIComponent(arg || ''))); return x && /^\d{4}-\d{2}-\d{2}$/.test(x.f) && /^\d{1,2}:\d{2}$/.test(x.h) ? x : null; } catch(e){ return null; } }
+const diasDe = x => String(x.d || '').split('').filter(c => /[0-6]/.test(c)).map(Number);
+function primerDiaCal(x){ const ds = diasDe(x); if (!ds.length) return x.f; let f = x.f; for (let i = 0; i < 7; i++){ if (ds.includes(fechaDe(f).getDay())) return f; f = sumarDias(f, 1); } return x.f; }
+function textosCal(x){ const c = Store.s.config;
+  return { titulo:`Barrio ${c.nombre} · a lo de ${x.a || 'tu vecino'}`,
+    det:`Hoy vas al Barrio ${c.nombre}, a lo de ${x.a || 'tu vecino'}${x.c ? ' (' + x.c + ')' : ''}, de ${x.h} a ${x.k} h. No olvides tener preparado el QR de ingreso: evitá demoras en la barrera de ingreso.`,
+    lugar:`Barrio ${c.nombre}, ${c.domicilio || c.ciudad || 'Ushuaia'}` }; }
+/* Los días en palabras: seguidos, "de lunes a viernes"; sueltos, "lunes, miércoles y viernes". */
+const diasEnPalabras = ds => { const o = [1, 2, 3, 4, 5, 6, 0].filter(d => ds.includes(d)), n = o.map(d => DIAS_L[d].toLowerCase()), pos = o.map(d => (d + 6) % 7);
+  if (o.length === 7) return 'todos los días';
+  if (o.length >= 3 && pos.every((p, i) => !i || p === pos[i - 1] + 1)) return `de ${n[0]} a ${n.at(-1)}`;
+  return n.length > 1 ? `${n.slice(0, -1).join(', ')} y ${n.at(-1)}` : n[0]; };
+const cuandoCal = x => { const ds = diasDe(x); return ds.length ? `${diasEnPalabras(ds)}, de ${x.h} a ${x.k} h, hasta el ${fechaCorta(x.u)}` : `el ${fechaLarga(x.f).toLowerCase()}, de ${x.h} a ${x.k} h`; };
+/* El archivo de calendario (formato iCalendar, el que entienden iPhone, Android y Outlook). */
+function icsVisita(x){
+  const t = textosCal(x), f0 = primerDiaCal(x), ds = diasDe(x);
+  const fh = (f, h) => f.replace(/-/g, '') + 'T' + h.replace(':', '').padStart(4, '0') + '00';
+  const fin = minutosDe(x.k) > minutosDe(x.h) ? fh(f0, x.k) : f0.replace(/-/g, '') + 'T235900';
+  const txt = v => String(v).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  const enc = new TextEncoder();
+  const plegar = l => { let out = '', act = '', b = 0; for (const ch of l){ const n = enc.encode(ch).length; if (b + n > (out ? 74 : 75)){ out += act + '\r\n '; act = ''; b = 0; } act += ch; b += n; } return out + act; };
+  const ahora = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Barrio Bahia Cauquen//App del barrio//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT', `UID:${uid()}-${f0.replace(/-/g, '')}@bahiacauquen`, `DTSTAMP:${ahora}`, `DTSTART:${fh(f0, x.h)}`, `DTEND:${fin}`,
+    ...(ds.length ? [`RRULE:FREQ=WEEKLY;BYDAY=${ds.map(d => DIA_ICS[d]).join(',')};UNTIL=${String(x.u || x.f).replace(/-/g, '')}T235959`] : []),
+    `SUMMARY:${txt(t.titulo)}`, `DESCRIPTION:${txt(t.det)}`, `LOCATION:${txt(t.lugar)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${txt(t.det)}`, 'TRIGGER:-PT1H', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'].map(plegar).join('\r\n') + '\r\n';
+}
+/* Lo mismo para Google Calendar (abre la app de Google o la página). */
+function googleCalendar(x){
+  const t = textosCal(x), f0 = primerDiaCal(x).replace(/-/g, ''), ds = diasDe(x);
+  const hh = h => h.replace(':', '') + '00', fin = minutosDe(x.k) > minutosDe(x.h) ? hh(x.k) : '235900';
+  const q = new URLSearchParams({ action:'TEMPLATE', text:t.titulo, dates:`${f0}T${hh(x.h)}/${f0}T${fin}`, ctz:'America/Argentina/Ushuaia', details:t.det, location:t.lugar });
+  if (ds.length) q.set('recur', `RRULE:FREQ=WEEKLY;BYDAY=${ds.map(d => DIA_ICS[d]).join(',')};UNTIL=${String(x.u || x.f).replace(/-/g, '')}`);
+  return 'https://calendar.google.com/calendar/render?' + q.toString();
+}
+/* El vecino se lo manda una vez a su visita. */
+A['visita-calendario'] = el => {
+  const p = aLista(Store.s.pases).find(x => x && x.id === el.dataset.id); if (!p) return;
+  const x = datosCalendario(p), link = enlaceCalendario(x), c = Store.s.config;
+  const texto = `📅 *Para que tu teléfono te avise solo*, una hora antes cada vez que venís al Barrio ${c.nombre} (a lo de ${x.a}), abrí este enlace y tocá "Agregar a mi calendario":\n${link}`;
+  hoja('Recordatorio en su calendario', `<div class="cal-cab"><span class="cal-hoja" aria-hidden="true"><b>${fechaDe(primerDiaCal(x)).getDate()}</b><small>${esc(MESES[fechaDe(primerDiaCal(x)).getMonth()])}</small><i>${I('bell')}</i></span>
+      <div><b>Que su teléfono le avise solo</b><small>Se lo mandás una vez. ${esc(p.nombre.split(' ')[0])} toca "Agregar a mi calendario" y su teléfono le recuerda <b>una hora antes</b>, ${esc(cuandoCal(x))}. Gratis, sin la app y sin WhatsApp.</small></div></div>
+    <div class="rec-burbuja">${esc(texto).replace(/\*([^*]+)\*/g, '<b>$1</b>').replace(/\n/g, '<br>')}<time>${hora(Date.now())}</time></div>
+    <a class="btn btn-wa btn-block btn-grande rec-wa" href="${esc(p.tel ? waLink(p.tel, texto) : 'https://wa.me/?text=' + encodeURIComponent(texto))}" target="_blank" rel="noopener" data-a="visita-recordar-enviado">${I('chat')}${p.tel ? 'Mandárselo a su WhatsApp' : 'Mandar por WhatsApp'}</a>
+    <div class="btns" style="margin-top:8px"><button class="btn btn-sec grow" data-a="copiar" data-v="${esc(link)}">${I('copy')}Copiar el enlace</button><a class="btn btn-sec grow" href="${esc(link)}" target="_blank" rel="noopener">${I('eye')}Ver lo que le llega</a></div>
+    <p class="muted tiny" style="margin:10px 2px 0">${I('lock')} El enlace dice solo a lo de quién va, el lote, los días y el horario: sin DNI, sin patente y sin el código del pase. Si cambiás los días o el horario, mandáselo de nuevo.</p>`);
+};
+/* La página que abre la visita (#/cal/…): no necesita cuenta ni la app. */
+function pintarCalendarioPublico(arg){
+  const x = leerCalendario(arg), c = Store.s.config;
+  $('#app').innerHTML = `<section class="bienvenida" id="calPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+    <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(c.nombre)}</b><div class="tiny" style="opacity:.85">${esc(c.ciudad || '')}</div></div></div>
+    <h1 style="font-size:32px">Tu recordatorio</h1>
+    <div class="panel">${!x ? aviso('danger', 'alert', 'Enlace no válido', 'Pedile a quien te invitó que te lo mande de nuevo.') : `
+      <div class="cal-pub"><span class="cal-hoja grande" aria-hidden="true"><b>${fechaDe(primerDiaCal(x)).getDate()}</b><small>${esc(MESES[fechaDe(primerDiaCal(x)).getMonth()])}</small><i>${I('bell')}</i></span>
+        <p>${x.n ? `¡Hola ${esc(x.n)}! ` : ''}Vas a lo de <b>${esc(x.a || 'tu vecino')}</b>${x.c ? ` (${esc(x.c)})` : ''}, ${esc(cuandoCal(x))}.</p></div>
+      <p style="margin:12px 0 14px;opacity:.95">Agregalo a tu calendario y <b>tu teléfono te avisa solo una hora antes</b>${diasDe(x).length ? ', cada día que venís' : ''}: <i>"No olvides tener preparado el QR de ingreso"</i>.</p>
+      <button class="btn btn-pri btn-block btn-grande" data-a="cal-ics" data-v="${esc(arg)}">${I('calendar')}Agregar a mi calendario</button>
+      <a class="btn btn-sec btn-block" style="margin-top:8px" href="${esc(googleCalendar(x))}" target="_blank" rel="noopener">${I('calendar')}Usar Google Calendar</a>
+      <p class="tiny" style="margin:10px 2px 0;opacity:.9">En iPhone se abre "Agregar al calendario". En Android, si no se abre solo, tocá el archivo que se bajó o usá "Google Calendar". El QR de ingreso es el que te mandaron por WhatsApp.</p>
+      ${botonMapa()}`}</div></section>`;
+}
+A['cal-ics'] = el => {
+  const x = leerCalendario(el.dataset.v); if (!x) return toast('Enlace no válido', 'alert');
+  const blob = new Blob([icsVisita(x)], { type:'text/calendar;charset=utf-8' }), url = URL.createObjectURL(blob);
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios){ location.href = url; }
+  else { const a = document.createElement('a'); a.href = url; a.download = 'recordatorio-barrio.ics'; document.body.appendChild(a); a.click(); a.remove(); }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast('Abrilo con tu calendario y tocá "Agregar"', 'calendar');
+};
+
+/* La cronología de una visita, para los del lote: quién la autorizó y
+   cuándo, y cuándo entró y salió (hoy, o el último día que vino). */
+function cronoPase(p){
+  const u = yo(), host = usuario(p.hostId) || {}, quien = p.hostId === u?.id ? 'vos' : (p.autoriza || host.nombre || 'alguien del lote').split(' ')[0];
+  const dias = Object.keys(p.log || {}).filter(d => p.log[d] && (p.log[d].in || p.log[d].out)).sort(), d = dias.at(-1), l = d ? p.log[d] : null;
+  const cuando = x => `${isoDe(new Date(x)) === hoyISO() ? 'hoy' : fechaCorta(isoDe(new Date(x)))} ${hora(x)} h`;
+  return `<span class="crono-pase"><i class="${p.hostId === u?.id ? 'yo' : ''}">${I('check')}${quien === 'vos' ? 'Autorizaste vos' : 'Autorizó ' + esc(quien)}${p.createdAt ? ' · ' + cuando(p.createdAt) : ''}</i>${l && l.in ? `<i class="in">${I('login')}Entró ${cuando(l.in)}</i>` : ''}${l && l.out ? `<i class="out">${I('logout')}Salió ${cuando(l.out)}</i>` : ''}</span>`;
+}
 function tarjetaPase(p, { garita = false } = {}){
   const t = TIPOS_PASE[p.tipo] || TIPOS_PASE.visita, est = estadoPase(p), host = usuario(p.hostId) || {};
   const casaFoto = garita && host.fotoCasa ? fotoHTML(host.fotoCasa, 'casa-foto chica') : '';
@@ -79,7 +225,7 @@ function tarjetaPase(p, { garita = false } = {}){
     ${casaFoto || `<span class="ic ic-${t.c}">${I(t.icon)}</span>`}
     <div class="datos"><b>${esc(p.nombre)}</b>
       <span>${garita ? `<b style="display:inline;color:var(--ink)">${esc(host.casa || '')}</b> · ` : ''}${t.n} · ${franja}${p.patente ? ' · ' + esc(p.patente) : p.app ? ' · <b>patente a confirmar</b>' : ''}${p.app && p.nota ? ' · ' + esc(p.nota.toLowerCase()) : ''}</span>
-      ${garita ? `<span class="autoriza">${I('check')}Autorizó: <b>${esc(p.autoriza || host.nombre || 'vecino')}</b>${host.casa ? ' · ' + esc(host.casa) : ''}</span>` : ''}</div>
+      ${garita ? `<span class="autoriza">${I('check')}Autorizó: <b>${esc(p.autoriza || host.nombre || 'vecino')}</b>${host.casa ? ' · ' + esc(host.casa) : ''}</span>` : cronoPase(p)}</div>
     <span class="estado e-${est}">${ESTADO_TXT[est]}</span></div>
     ${!garita && est === 'noingreso' && p.hostId === yo()?.id ? `<div class="vnl-franja">${I('clock')}<span>Todavía no llegó.</span><button class="btn btn-xs btn-sec" data-a="editar-pase" data-id="${p.id}">Cambiar el horario</button><button class="btn btn-xs btn-danger-soft" data-a="visita-no-viene" data-id="${p.id}">Ya no viene</button></div>` : ''}
     <div class="btns" style="margin-top:10px">
@@ -122,7 +268,7 @@ function urgentesVecino(){
     `<button class="btn btn-xs btn-ok" data-a="sos-cancelar" data-id="${x.id}">${I('check')}Ya está solucionado</button>`)));
   s.llegadas.filter(l => llegadaDeMiLote(l, u) && l.estado === 'consultando').forEach(l => out.push(aviso('warn latido', 'gate',
     `En la garita: ${esc(l.nombre)} pregunta por ${l.hostId === u.id && !l.porLote ? 'vos' : 'tu casa'}`, `${esc(l.motivo || 'Sin aviso previo')}${l.patente ? ' · ' + esc(l.patente) : ''} · ${hace(l.at)}`,
-    `<button class="btn btn-xs btn-ok" data-a="llegada-si" data-id="${l.id}">${I('check')}Que pase</button><button class="btn btn-xs btn-danger-soft" data-a="llegada-no" data-id="${l.id}">No lo conozco</button>`)));
+    `<button class="btn btn-xs btn-ok" data-a="llegada-si" data-id="${l.id}">${I('check')}Que pase</button><button class="btn btn-xs btn-danger-soft" data-a="llegada-noesta" data-id="${l.id}">${I('home')}No estoy en casa</button><button class="btn btn-xs btn-sec" data-a="llegada-no" data-id="${l.id}">No lo conozco</button>`)));
   s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente').forEach(r => out.push(aviso('info', 'qr',
     `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}${r.patente ? ' · ' + esc(r.patente) : ''}`,
     `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">${I('check')}Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)));
@@ -213,14 +359,14 @@ const SECCIONES = {
        también acá, además de la portada y de la ventana de la salida. */
     arriba(u){ const x = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null; return x && x.salida && !x.salida.volvio && typeof tarjetaSalidaMia === 'function' ? tarjetaSalidaMia(x) : ''; },
     linea(u, s, hoy){
-      const v = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy)).length;
+      const v = s.pases.filter(p => paseDeMiLote(p, u) && paseValidoEn(p, hoy)).length;
       const m = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(x => x.from !== 'vecino' && !x.leido).length, 0) + dmNoLeidos();
       return [v && `${plural(v, 'visita esperada', 'visitas esperadas')} hoy`, m && `${plural(m, 'mensaje sin leer', 'mensajes sin leer')}`].filter(Boolean).join(' · ') || 'Todo en orden en tu lote';
     },
     /* Sin "Reservas" (29-09-2026, pedido de Claudio): el barrio todavía no
        tiene quincho, SUM, cancha ni pileta; no hay nada que reservar. */
     tejas(u, s, hoy){
-      const misHoy = s.pases.filter(p => p.hostId === u.id && paseValidoEn(p, hoy));
+      const misHoy = s.pases.filter(p => paseDeMiLote(p, u) && paseValidoEn(p, hoy));
       const privNoLeidos = s.privados.filter(h => h.userId === u.id).reduce((n, h) => n + h.msgs.filter(m => m.from !== 'vecino' && !m.leido).length, 0);
       return [
         teja({ a:'nuevo-pase', icon:'qr', t:'Autorizar una visita', s:'Visita, delivery, obra, personal o Uber/DiDi', destaca:true }),
@@ -352,7 +498,7 @@ function diaADia(u, s){
   const datosPend = typeof tareasDatosPendientes === 'function' ? tareasDatosPendientes() || 0 : 0;
   const votAbiertas = s.votaciones.filter(v => v.cierra > Date.now()).length;
   const obras = s.obras.filter(o => o.estado === 'activa').length;
-  const frec = aLista(s.frecuentes).filter(f => f && !f.baja).length;
+  const frec = aLista(s.frecuentes).filter(f => f && !f.baja).length + (typeof personalFijoVecinos === 'function' ? personalFijoVecinos().length : 0);
   const alertasAct = aLista(s.alertas).filter(alertaActiva).length;
   const comAct = (s.comunicados || []).filter(c => !c.archivado).length;
   const conCuenta = s.users.filter(x => x.estado === 'aprobado' && /^Lote\s/.test(x.casa || '')).length;
@@ -366,7 +512,7 @@ function diaADia(u, s){
         { v:'bitacora', icon:'book', t:'Bitácora', s:'Libro de guardia · lo escribe la garita, acá se lee' },
         { v:'turnos', icon:'clock', t:'Turnos de la garita', s: t ? 'Abierto ahora · horarios y policías' : 'Horarios, guardias y policías' },
         { v:'privado', p:'interno', icon:'shield', t:'Mensajes con la garita', s:'Chat con la garita y los pedidos firmados de los vecinos', badge: msgGarita + petPend },
-        { v:'frecuentes', icon:'qr', t:'Ingresos frecuentes', s:'QR fijo para proveedores y personal', n: frec || '' },
+        { v:'frecuentes', icon:'qr', t:'Ingresos frecuentes', s:'QR fijo de proveedores y el personal fijo de los vecinos', n: frec || '' },
         { v:'supervisores', icon:'eye', t:'Supervisión de la guardia', s: typeof haySupervision === 'function' && haySupervision() ? 'Quién mira la garita en vivo y sus mensajes' : 'Habilitar a quien controla el servicio (solo mira)', badge: typeof sinLeerDeSupervision === 'function' ? sinLeerDeSupervision('supAdmin') : 0 },
       ] },
     { k:'vecinos', t:'Vecinos', icon:'users', color:'accent',
@@ -629,7 +775,7 @@ function avisosGenerales(){
     const hoyHay = o.avisoHoy && o.avisoHoy.fecha === hoy;
     poner({ k:'obra-' + o.id + (hoyHay ? '-' + hoy : ''), nivel: hoyHay ? 'amarillo' : 'verde', icon: hoyHay ? 'truck' : 'wrench', tag: hoyHay ? 'Obra hoy' : 'Obra en curso',
       at: o.ultima || o.createdAt, titulo: hoyHay ? `${o.casa}: ${o.avisoHoy.texto}` : `${o.casa} · ${o.tipo}`,
-      texto: hoyHay ? (o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h` : 'Hoy') : `${ETAPAS[o.etapa] || ''}${o.empresa ? ' · ' + o.empresa : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}`,
+      texto: hoyHay ? (o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h` : 'Hoy') + (aLista(o.avisoHoy.maq).includes('pesada') ? ' · entra maquinaria pesada' : '') : `${ETAPAS[o.etapa] || ''}${aLista(o.maq).includes('pesada') ? ' · con maquinaria pesada' : ''}${o.empresa ? ' · ' + o.empresa : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}`,
       a:'abrir', v:'obras' });
   });
   aLista(s.viajes).filter(v => v && v.fecha >= hoy && v.userId !== u.id).forEach(v => {
@@ -1001,7 +1147,7 @@ A['visita-no-llego'] = el => {
     <button class="btn btn-sec btn-block" style="margin-top:10px" data-a="cerrar-hoja">Todavía viene: dejarlo así</button>`);
 };
 A['visita-no-viene'] = async el => {
-  const p0 = aLista(Store.s.pases).find(x => x && x.id === el.dataset.id), u = yo(); if (!p0 || !u || p0.hostId !== u.id) return;
+  const p0 = aLista(Store.s.pases).find(x => x && x.id === el.dataset.id), u = yo(); if (!p0 || !u || !paseDeMiLote(p0, u)) return;
   if (!await confirmar('Ya no viene', `Se cancela el pase de ${esc(p0.nombre)}: el código deja de servir en la garita.`, { si:'Cancelar el pase', peligro:true })) return;
   Store.cambiar(s => { const p = s.pases.find(x => x.id === p0.id); if (!p) return; p.cancelado = Date.now();
     s.bitacora.unshift({ id:uid(), autor:u.id, tipo:'novedad', texto:`Visita anunciada que ya no viene: ${p.nombre} → ${u.casa || ''} (lo avisó el vecino; era de ${p.desde} a ${p.hasta} h). Pase cancelado.`, at:Date.now() }); });
@@ -1009,16 +1155,18 @@ A['visita-no-viene'] = async el => {
 };
 R.visitas = {
   titulo: 'Mis visitas', icon: 'users', color: 'sky', sub: 'Pases con código y QR para la garita',
-  /* Desde el aviso "… todavía no llegó": visitas:no~<id>[~cambiar|~nollega]. */
+  /* Desde el aviso "… todavía no llegó": visitas:no~<id>[~cambiar|~nollega].
+     Desde el recordatorio de una hora antes: visitas:rec~<id>. */
   alPintar(param){
-    const m = /^no~([^~]+)(?:~(\w+))?$/.exec(param || ''); if (!m) return;
+    const m = /^(no|rec)~([^~]+)(?:~(\w+))?$/.exec(param || ''); if (!m) return;
     const top = PILA[PILA.length - 1]; if (top && top.id === 'visitas') top.param = '';
-    setTimeout(() => { const el = { dataset:{ id:m[1] } };
-      if (m[2] === 'cambiar') A['editar-pase'](el); else if (m[2] === 'nollega') A['visita-no-viene'](el); else A['visita-no-llego'](el); }, 120);
+    setTimeout(() => { const el = { dataset:{ id:m[2] } };
+      if (m[1] === 'rec') A['visita-recordar'](el);
+      else if (m[3] === 'cambiar') A['editar-pase'](el); else if (m[3] === 'nollega') A['visita-no-viene'](el); else A['visita-no-llego'](el); }, 120);
   },
   render(){
     const u = yo(), s = Store.s, hoy = hoyISO();
-    const mios = s.pases.filter(p => p.hostId === u.id && !p.cancelado && !p.borrado);
+    const mios = s.pases.filter(p => paseDeMiLote(p, u) && !p.cancelado && !p.borrado);
     const deHoy = mios.filter(p => paseValidoEn(p, hoy) || p.log?.[hoy]);
     const futuros = mios.filter(p => !p.dias?.length && p.fecha > hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
     const fijos = mios.filter(p => p.dias?.length && (p.fechaFin || '') >= hoy);
@@ -1030,7 +1178,7 @@ R.visitas = {
       ${pedidos.map(r => aviso('info', 'qr', `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}`, `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)).join('')}
       ${sec('Hoy')}${deHoy.length ? deHoy.map(p => tarjetaPase(p)).join('') : vacio('users', 'No anunciaste a nadie para hoy.')}
       ${futuros.length ? sec('Próximas') + futuros.map(p => tarjetaPase(p)).join('') : ''}
-      ${(() => { const idas = s.pases.filter(p => p.hostId === u.id && !p.borrado && !deHoy.includes(p) && !futuros.includes(p) && !fijos.includes(p)
+      ${(() => { const idas = s.pases.filter(p => paseDeMiLote(p, u) && !p.borrado && !deHoy.includes(p) && !futuros.includes(p) && !fijos.includes(p)
           && (p.fechaFin || p.fecha) < hoy && (p.fechaFin || p.fecha) >= sumarDias(hoy, -60)).sort((a, b) => (b.fechaFin || b.fecha).localeCompare(a.fechaFin || a.fecha));
         return idas.length ? sec('Visitas pasadas', `<span class="muted small">últimos 60 días</span>`) + idas.slice(0, 20).map(p => {
           const dias = Object.keys(p.log || {}).sort(), ult = dias.at(-1), l = ult ? p.log[ult] : null;
@@ -1041,7 +1189,7 @@ R.visitas = {
         return tarjetaPase(p) .replace('</div></div>', `</div><div class="muted small" style="margin-top:8px">${I('check')} Asistencia de este mes: ${plural(dias, 'día')}</div></div>`);
       }).join('') : ''}
       ${llegadas.length ? sec('Llegadas sin aviso') + llegadas.map(l => `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span>
-        <div class="datos"><b>${esc(l.nombre)}</b><span>${esc(l.motivo || '')} · ${hace(l.at)}</span></div><span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Autorizado', rechazado:'Rechazado' }[l.estado]}</span></div>${l.respondio && l.respondio !== u.id ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio).split(' ')[0])}</div>` : ''}</div>`).join('') : ''}
+        <div class="datos"><b>${esc(l.nombre)}</b><span>${esc(l.motivo || '')} · ${hace(l.at)}</span></div><span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Autorizado', rechazado: l.noEsta ? 'No estaba' : 'Rechazado' }[l.estado]}</span></div>${l.respondio && l.respondio !== u.id ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio).split(' ')[0])}</div>` : ''}</div>`).join('') : ''}
       ${sec('Avisos a la guardia')}
       ${(() => { const au = ausenciaDe(u); return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t: au ? `Casa sola hasta el ${fechaCorta(au.hasta)}` : 'Me voy de viaje', s: au ? 'La revisan una vez por día y te llega el aviso. Tocá para cambiar.' : 'La garita o el policía la revisa cada día y te avisa que está en orden' }); })()}
       ${superficie({ a:'aviso-guardia', icon:'shield', color:'brand', t:'Aviso rápido a la guardia', s:'Viene una visita sin aviso ni QR: que me avisen cuando llegue' })}
@@ -1097,6 +1245,7 @@ A['nuevo-pase'] = (el) => {
       `<label><input type="checkbox" name="dias" value="${d}" ${d >= 1 && d <= 5 ? 'checked' : ''}><span>${DIAS[d]}</span></label>`).join('')}</div></div>
       <div class="field"><label>Hasta la fecha</label><input type="date" name="fechaFin" value="${sumarDias(hoy, 90)}"></div></div>
     <div class="field" style="margin-top:8px"><label>Nota para la guardia (opcional)</label><input name="nota" maxlength="120" placeholder="Ej: deja la caja en la puerta"></div>
+    ${camposRecordatorio({ recordar:true })}
     <button class="btn btn-pri btn-block">${I('qr')}Crear el pase</button></form>`);
 };
 document.addEventListener('change', e => {
@@ -1115,7 +1264,8 @@ F['nuevo-pase'] = d => {
   const dias = d.fijo ? [].concat(d.dias || []).map(Number) : null;
   if (d.fijo && !dias.length){ toast('Elegí al menos un día', 'calendar'); return; }
   const p = { id:uid(), hostId:u.id, tipo:d.tipo, nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:(d.patente || '').toUpperCase().trim(),
-    fecha:d.fecha, desde:d.desde, hasta:d.hasta, nota:(d.nota || '').trim(), codigo:codigoPase(), log:{}, createdAt:Date.now(), autoriza:u.nombre };
+    fecha:d.fecha, desde:d.desde, hasta:d.hasta, nota:(d.nota || '').trim(), codigo:codigoPase(), log:{}, createdAt:Date.now(), autoriza:u.nombre,
+    recordar:!!d.recordar, ...(telVisita(d.tel) ? { tel:telVisita(d.tel) } : {}) };
   if (dias){ p.dias = dias; p.fechaFin = d.fechaFin || sumarDias(d.fecha, 90); }
   Store.cambiar(s => { s.pases.unshift(p); if (p.fecha === hoyISO()) notificar(s, { para:'rol:guardia', titulo:'Nueva visita anunciada', texto:`${u.nombre} (${u.casa}) autorizó a ${p.nombre} · ${p.desde}–${p.hasta}`, icon:'users', color:'sky', link:'garita' }); });
   verPase(p.id, true);
@@ -1131,7 +1281,8 @@ function verPase(id, recien = false){
       <div class="muted small">Mostralo en la garita. También sirve dictar el código.</div></div></div>
     <div class="btns" style="margin-top:14px">
       <button class="btn btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar por WhatsApp</button>
-      <button class="btn btn-sec" data-a="copiar" data-v="${esc(textoPase(p))}">${I('copy')}Copiar</button></div>`);
+      <button class="btn btn-sec" data-a="copiar" data-v="${esc(textoPase(p))}">${I('copy')}Copiar</button></div>
+    ${p.hostId === yo()?.id || paseDeMiLote(p) ? `<button class="cal-boton" data-a="visita-calendario" data-id="${p.id}"><span class="cal-hoja" aria-hidden="true"><b>${fechaDe(primerDiaCal(datosCalendario(p))).getDate()}</b><small>${esc(MESES[fechaDe(primerDiaCal(datosCalendario(p))).getMonth()])}</small><i>${I('bell')}</i></span><span><b>Recordatorio en su calendario</b><small>Su teléfono le avisa solo una hora antes${p.dias?.length ? ', cada día que viene' : ''}. Gratis.</small></span>${I('right')}</button>` : ''}`);
   $$('#hoja [data-qr]').forEach(el => pintarQR(el, el.dataset.qr));
 }
 A['ver-pase'] = el => verPase(el.dataset.id);
@@ -1184,7 +1335,7 @@ F['pase-app-patente'] = (d, form) => {
   cerrarHoja(); toast('Patente guardada. La garita ya la tiene.', 'car');
 };
 A['compartir-pase'] = el => { const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
-  compartirPase({ texto:textoPase(p), contenido:'BHC:' + p.codigo, codigo:p.codigo, sub:`Pase de ${p.nombre} · ${usuario(p.hostId)?.casa || ''}`, archivo:`pase-${p.codigo}.png`, datos:datosPase(p) }); };
+  compartirPase({ texto:textoPase(p), contenido:'BHC:' + p.codigo, codigo:p.codigo, sub:`Pase de ${p.nombre} · ${usuario(p.hostId)?.casa || ''}`, archivo:`pase-${p.codigo}.png`, datos:datosPase(p), tel:p.tel || '' }); };
 /* La página pública del QR (#/qr/…): la abre la visita desde el enlace del WhatsApp.
    No lee nada de la base: dibuja el QR con lo que trae el enlace. */
 function pintarQRPublico(contenido){
@@ -1216,41 +1367,60 @@ const resumenPase = p => {
 };
 A['editar-pase'] = el => {
   const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
-  const usado = p.log && Object.keys(p.log).length;
+  const usado = p.log && Object.keys(p.log).length, fijo = !!aLista(p.dias).length;
   hoja('Editar la visita', `<form data-f="editar-pase" data-id="${p.id}">
     <div class="field"><label>Nombre o empresa</label><input name="nombre" required maxlength="60" value="${esc(p.nombre)}"></div>
     <div class="grid2"><div class="field"><label>DNI</label><input name="dni" inputmode="numeric" maxlength="11" value="${esc(p.dni || '')}"></div>
       <div class="field"><label>Patente</label><input name="patente" maxlength="10" style="text-transform:uppercase" value="${esc(p.patente || '')}"></div></div>
-    ${usado || p.dias?.length ? '' : `<div class="grid3"><div class="field"><label>Día</label><input type="date" name="fecha" value="${p.fecha}" required></div>
+    ${fijo ? `<div class="field"><label>Días que viene</label><div class="seg dias-sel">${[1,2,3,4,5,6,0].map(d =>
+        `<label><input type="checkbox" name="dias" value="${d}" ${aLista(p.dias).map(Number).includes(d) ? 'checked' : ''}><span>${DIAS[d]}</span></label>`).join('')}</div></div>
+      <div class="grid3"><div class="field"><label>Desde</label><input type="time" name="desde" value="${esc(p.desde)}" required></div>
+        <div class="field"><label>Hasta</label><input type="time" name="hasta" value="${esc(p.hasta)}" required></div>
+        <div class="field"><label>Hasta la fecha</label><input type="date" name="fechaFin" value="${esc(p.fechaFin || '')}" min="${hoyISO()}" required></div></div>
+      <p class="muted tiny" style="margin:-2px 0 12px">Es el mismo QR: sirve los días y en el horario nuevos desde ahora. Lo que ya pasó por la garita no cambia.</p>`
+    : usado ? '' : `<div class="grid3"><div class="field"><label>Día</label><input type="date" name="fecha" value="${p.fecha}" required></div>
       <div class="field"><label>Desde</label><input type="time" name="desde" value="${p.desde}" required></div>
       <div class="field"><label>Hasta</label><input type="time" name="hasta" value="${p.hasta}" required></div></div>`}
     <div class="field"><label>Nota</label><input name="nota" maxlength="120" value="${esc(p.nota || '')}"></div>
-    ${usado ? `<p class="muted tiny" style="margin:-2px 0 12px">Esta visita ya pasó por la garita: el día y los horarios de entrada y salida no se cambian.</p>` : ''}
+    ${p.app ? '' : camposRecordatorio(p)}
+    ${usado && !fijo ? `<p class="muted tiny" style="margin:-2px 0 12px">Esta visita ya pasó por la garita: el día y los horarios de entrada y salida no se cambian.</p>` : ''}
     <p class="muted tiny" style="margin:0 0 12px">El cambio queda anotado en la auditoría del barrio.</p>
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`);
 };
 F['editar-pase'] = (d, form) => {
+  const p0 = Store.s.pases.find(x => x.id === form.dataset.id); if (!p0) return;
+  const diasNuevos = [].concat(d.dias || []).map(Number);
+  if (aLista(p0.dias).length && d.desde){
+    if (!diasNuevos.length){ toast('Elegí al menos un día', 'calendar'); return; }
+    if (minutosDe(d.hasta) <= minutosDe(d.desde)){ toast('La hora de salida tiene que ser después de la de entrada', 'clock'); return; }
+  }
   Store.cambiar(s => {
     const p = s.pases.find(x => x.id === form.dataset.id); if (!p) return;
     const nuevo = { nombre:d.nombre.trim(), dni:soloDigitos(d.dni), patente:normPatente(d.patente), nota:(d.nota || '').trim() };
     if (d.fecha){ nuevo.fecha = d.fecha; nuevo.desde = d.desde; nuevo.hasta = d.hasta; }
-    const nombres = { nombre:'nombre', dni:'DNI', patente:'patente', nota:'nota', fecha:'día', desde:'desde', hasta:'hasta' };
-    const cambios = Object.keys(nuevo).filter(k => String(p[k] || '') !== String(nuevo[k] || ''));
+    if (aLista(p.dias).length && d.desde)
+      Object.assign(nuevo, { dias:diasNuevos.sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)), desde:d.desde, hasta:d.hasta, fechaFin:d.fechaFin || p.fechaFin });
+    if ('tel' in d) nuevo.tel = telVisita(d.tel);
+    if (!p.app) nuevo.recordar = !!d.recordar;
+    const nombres = { nombre:'nombre', dni:'DNI', patente:'patente', nota:'nota', fecha:'día', desde:'desde', hasta:'hasta', dias:'días', fechaFin:'fecha final', tel:'celular', recordar:'recordatorio' };
+    const cambios = Object.keys(nuevo).filter(k => String(k === 'recordar' ? p[k] !== false : p[k] || '') !== String(k === 'recordar' ? nuevo[k] : nuevo[k] || ''));
     if (!cambios.length) return;
     const antes = resumenPase(p);
     Object.assign(p, nuevo);
     p.editado = { at:Date.now(), por:yo().id };
-    const ajena = p.hostId !== yo().id, casa = usuario(p.hostId)?.casa || '';
-    auditar(s, ajena ? 'La Administración editó una visita' : 'Editó una visita', `${ajena ? casa : yo().casa} · ${antes} · cambió: ${cambios.map(k => nombres[k]).join(', ')}`, p.id);
-    if (ajena) notificar(s, { para:p.hostId, titulo:`La Administración cambió la visita de ${p.nombre}`, texto:`Cambió: ${cambios.map(k => nombres[k]).join(', ')}`, icon:'edit', color:'sky', link:'visitas' });
+    const ajena = p.hostId !== yo().id, casa = usuario(p.hostId)?.casa || '', delLote = ajena && !esAdmin();
+    const quien = delLote ? yo().nombre.split(' ')[0] : 'La Administración';
+    auditar(s, ajena ? (delLote ? 'Editó una visita de su lote' : 'La Administración editó una visita') : 'Editó una visita', `${ajena ? casa : yo().casa} · ${antes} · cambió: ${cambios.map(k => nombres[k]).join(', ')}${delLote ? ' · la había autorizado ' + (p.autoriza || nombreDe(p.hostId)) : ''}`, p.id);
+    if (ajena) notificar(s, { para:p.hostId, titulo:`${quien} cambió la visita de ${p.nombre}`, texto:`Cambió: ${cambios.map(k => nombres[k]).join(', ')}`, icon:'edit', color:'sky', link:'visitas' });
   });
   cerrarHoja(); toast('Visita actualizada', 'check');
 };
 A['borrar-pase'] = async el => {
   const p = Store.s.pases.find(x => x.id === el.dataset.id); if (!p) return;
   const est = estadoPase(p), ajena = p.hostId !== yo().id && esAdmin(), vale = est === 'esperado' || est === 'noingreso' || est === 'futuro' || (p.dias?.length && !p.cancelado);
+  const deOtro = !ajena && p.hostId !== yo().id;
   const texto = ajena ? `${esc(p.nombre)} · ${esc(usuario(p.hostId)?.casa || '')}. Sale de la lista del vecino y de las visitas del barrio.${vale ? ' El código deja de servir en la garita.' : ''} Lo que ya pasó queda en el historial de la garita y en la auditoría. Al vecino le llega el aviso.`
-    : `Sale de tu lista.${est === 'esperado' || est === 'futuro' ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`;
+    : `Sale de la lista de ${deOtro ? 'todo el lote (la autorizó ' + esc((p.autoriza || nombreDe(p.hostId)).split(' ')[0]) + ', le llega el aviso)' : 'tu lote'}.${est === 'esperado' || est === 'futuro' ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`;
   if (!await confirmar('Borrar la visita', texto, { si:'Borrar', peligro:true })) return;
   Store.cambiar(s => {
     const x = s.pases.find(z => z.id === p.id); if (!x) return;
@@ -1259,7 +1429,8 @@ A['borrar-pase'] = async el => {
     if (ajena){
       auditar(s, 'La Administración borró una visita', `${usuario(x.hostId)?.casa || ''} · ${resumenPase(x)}`, x.id);
       notificar(s, { para:x.hostId, titulo:`La Administración borró la visita de ${x.nombre}`, texto: vale ? 'El código ya no sirve en la garita.' : 'Ya no está en tu lista.', icon:'trash', color:'warn', link:'visitas' });
-    } else auditar(s, 'Borró una visita de su lista', `${yo().casa} · ${resumenPase(x)}`, x.id);
+    } else { auditar(s, 'Borró una visita de su lista', `${yo().casa} · ${resumenPase(x)}`, x.id);
+      if (deOtro) notificar(s, { para:x.hostId, titulo:`${yo().nombre.split(' ')[0]} borró la visita de ${x.nombre}`, texto: est === 'esperado' || est === 'futuro' ? 'El código ya no sirve en la garita.' : 'Ya no está en la lista del lote.', icon:'trash', color:'warn', link:'visitas' }); }
   });
   toast(ajena ? 'Visita borrada' : 'Visita borrada de tu lista', 'trash');
 };
@@ -1333,29 +1504,124 @@ A['llegada-ver'] = el => {
   const casa = l.lote || usuario(l.hostId)?.casa || '';
   hoja('En la garita', `<div class="aviso-leido"><span class="ic ic-warn">${I('gate')}</span><div><b>${esc(l.nombre)}</b><time>${hace(l.at)}</time></div></div>
     <p class="aviso-leido-texto">${esc(l.motivo || 'Visita')}${l.patente ? ' · ' + esc(l.patente) : ''} · pregunta por ${esc(casa)}</p>
-    ${l.estado === 'consultando' ? `<div class="btns" style="margin-top:14px"><button class="btn btn-ok grow" data-a="llegada-si" data-id="${l.id}">${I('check')}Que pase</button><button class="btn btn-danger-soft grow" data-a="llegada-no" data-id="${l.id}">No lo conozco</button></div>`
-      : `<p class="muted small" style="margin:12px 0 0">${I('check')} Ya contestó ${l.respondio === yo().id ? 'vos' : esc(nombreDe(l.respondio).split(' ')[0] || 'alguien del lote')}: ${l.estado === 'autorizado' ? 'que pase' : 'no pasa'}.</p>`}`);
+    ${l.estado === 'consultando' ? `<div class="btns" style="margin-top:14px"><button class="btn btn-ok grow" data-a="llegada-si" data-id="${l.id}">${I('check')}Que pase</button><button class="btn btn-danger-soft grow" data-a="llegada-noesta" data-id="${l.id}">${I('home')}No estoy en casa</button></div>
+      <p class="small center" style="margin:8px 0 0"><button class="link" data-a="llegada-no" data-id="${l.id}">No lo conozco</button></p>`
+      : `<p class="muted small" style="margin:12px 0 0">${I('check')} Ya contestó ${l.respondio === yo().id ? 'vos' : esc(nombreDe(l.respondio).split(' ')[0] || 'alguien del lote')}: ${textoRespuesta(l)}.</p>`}`);
 };
 A['llegada-no'] = el => responderLlegada(el.dataset.id, 'rechazado');
+A['llegada-noesta'] = el => responderLlegada(el.dataset.id, 'rechazado', 'noesta');
+/* Lo que contestó el lote, en palabras (para la garita y los demás). */
+const textoRespuesta = l => l.estado === 'autorizado' ? 'que pase' : l.noEsta ? 'no está en casa' : l.estado === 'rechazado' ? 'no lo conoce' : 'sin responder';
 /* Contesta cualquiera del lote; el primero que contesta vale. Al contestar
    se cierra para todos: desaparecen los botones y el aviso de la
    campanita (ver avisoCaduco en js/core.js), y a los demás del lote les
    queda dicho quién contestó y qué. */
-function responderLlegada(id, estado){
+function responderLlegada(id, estado, motivo = ''){
   const u = yo(), l0 = Store.s.llegadas.find(x => x.id === id);
   if (!l0) return;
-  if (l0.estado !== 'consultando'){ toast(`Ya contestó ${l0.respondio === u.id ? 'vos' : nombreDe(l0.respondio).split(' ')[0] || 'alguien del lote'}: ${l0.estado === 'autorizado' ? 'que pase' : 'no pasa'}`, 'check'); cerrarHoja(); refrescar(); return; }
+  if (typeof VentanaLlegada !== 'undefined') VentanaLlegada.cerrar(id);
+  if (typeof Push !== 'undefined' && Push.callarLlegada) Push.callarLlegada(id);
+  if (l0.estado !== 'consultando'){ toast(`Ya contestó ${l0.respondio === u.id ? 'vos' : nombreDe(l0.respondio).split(' ')[0] || 'alguien del lote'}: ${textoRespuesta(l0)}`, 'check'); cerrarHoja(); refrescar(); return; }
+  let otros = [], titOtros = '';
   Store.cambiar(s => {
     const l = s.llegadas.find(x => x.id === id); if (!l) return;
     l.estado = estado; l.respondido = Date.now(); l.respondio = u.id;
+    if (motivo === 'noesta') l.noEsta = true;
     const casa = l.lote || usuario(l.hostId)?.casa || '', quien = u.nombre.split(' ')[0];
-    notificar(s, { para:'rol:guardia', titulo:`${casa}: ${estado === 'autorizado' ? 'que pase' : 'NO autoriza'}`, texto:`${l.nombre} · contestó ${quien}`, icon: estado === 'autorizado' ? 'check' : 'x', color: estado === 'autorizado' ? 'ok' : 'danger', urgente:true, link:'garita' });
-    const otros = residentesDelLote(casa).map(x => x.id).filter(x => x !== u.id);
-    if (otros.length) notificar(s, { para:otros, titulo:`${quien} ${estado === 'autorizado' ? 'dejó pasar' : 'no dejó pasar'} a ${l.nombre}`, texto:'Lo contestó a la garita: ya no hace falta que respondas.', icon: estado === 'autorizado' ? 'check' : 'x', color: estado === 'autorizado' ? 'ok' : 'danger', link:'visitas', push:false });
+    notificar(s, { para:'rol:guardia', titulo:`${casa}: ${estado === 'autorizado' ? 'que pase' : l.noEsta ? 'NO ESTÁ EN CASA' : 'NO autoriza'}`, texto:`${l.nombre} · contestó ${quien}${l.noEsta ? ' · no está en casa' : ''}`, icon: estado === 'autorizado' ? 'check' : l.noEsta ? 'home' : 'x', color: estado === 'autorizado' ? 'ok' : 'danger', urgente:true, link:'garita' });
+    otros = paraElLote(casa, l.hostId).filter(x => x !== u.id);
+    titOtros = `${quien} ${estado === 'autorizado' ? 'dejó pasar' : 'no dejó pasar'} a ${l.nombre}${l.noEsta ? ' (no está en casa)' : ''}`;
+    if (otros.length) notificar(s, { para:otros, titulo:titOtros, texto:'Lo contestó a la garita: ya no hace falta que respondas.', icon: estado === 'autorizado' ? 'check' : 'x', color: estado === 'autorizado' ? 'ok' : 'danger', link:'visitas', push:false });
   });
+  /* A los demás del lote se les calla el teléfono que estaba insistiendo (sw.js). */
+  if (otros.length && typeof Push !== 'undefined') Push.enviar({ para:otros, titulo:titOtros, texto:'Ya no hace falta que respondas.', link:'llegada-fin:' + id, tag:'llegada-' + id });
   cerrarHoja(); if (typeof Push !== 'undefined' && Push.cerrarResueltos) setTimeout(() => Push.cerrarResueltos(), 300);
-  toast(estado === 'autorizado' ? 'Avisamos a la guardia: puede pasar' : 'Avisamos a la guardia: no pasa', estado === 'autorizado' ? 'check' : 'x');
+  toast(estado === 'autorizado' ? 'Avisamos a la guardia: puede pasar' : motivo === 'noesta' ? 'Avisamos a la guardia: no estás en casa, no pasa' : 'Avisamos a la guardia: no pasa', estado === 'autorizado' ? 'check' : 'x');
 }
+/* =========================================================
+   LA VENTANA DE "LLEGÓ SIN AVISO" (pedido de Claudio, 12-10-2026: "que se
+   abra una ventana modal con diseño innovador e interactivo y dos botones:
+   QUE PASE y NO ESTOY EN CASA; al responder se cierra y la app vuelve a
+   stand-by"). Aparece sola, arriba de todo, en la app de cada uno de los
+   que viven en el lote, apenas la garita pregunta; suena cada 5 segundos
+   mientras está en pantalla y se va cuando alguien del lote contesta (si
+   fue otro, dice quién y qué). Con la app cerrada o el teléfono bloqueado,
+   insiste el aviso del celular (sw.js). "No lo conozco" queda como enlace
+   chico: para la garita no es lo mismo que "no está".
+   ========================================================= */
+const VentanaLlegada = {
+  abierta:'', timer:null, cerradas:new Set(),
+  pendiente(){ const u = yo(); if (!u || esStaff() || esHotel() || esSupervisor()) return null;
+    return aLista(Store.s.llegadas).filter(l => l && l.estado === 'consultando' && llegadaDeMiLote(l, u) && Date.now() - (l.at || 0) < 15 * MIN && !this.cerradas.has(l.id)).sort((a, b) => a.at - b.at)[0] || null; },
+  revisar(){
+    const l = this.pendiente();
+    if (!l){ if (this.abierta){ const vieja = aLista(Store.s.llegadas).find(x => x && x.id === this.abierta);
+        if (vieja && vieja.estado !== 'consultando' && vieja.respondio && vieja.respondio !== yo()?.id) toast(`${nombreDe(vieja.respondio).split(' ')[0] || 'Alguien del lote'} ya contestó: ${textoRespuesta(vieja)}`, vieja.estado === 'autorizado' ? 'check' : 'x');
+        this.quitar(); } return; }
+    if (this.abierta !== l.id) this.mostrar(l.id);
+    else this.reloj();
+  },
+  mostrar(id, desdeAviso = false){
+    const l = aLista(Store.s.llegadas).find(x => x && x.id === id), u = yo(); if (!l || !u || l.estado !== 'consultando') return;
+    this.cerradas.delete(id); this.abierta = id;
+    let caja = $('#llegadaVentana'); if (!caja){ caja = document.createElement('div'); caja.id = 'llegadaVentana'; caja.className = 'lv-fondo'; caja.setAttribute('role', 'alertdialog'); caja.setAttribute('aria-modal', 'true'); document.body.appendChild(caja); }
+    const casa = l.lote || usuario(l.hostId)?.casa || '', paraVos = l.hostId === u.id && !l.porLote;
+    caja.setAttribute('aria-label', `En la garita: ${l.nombre}`);
+    caja.innerHTML = `<div class="lv-caja">
+      <div class="lv-escena" aria-hidden="true"><span class="lv-ondas"><i></i><i></i><i></i></span>
+        <svg class="lv-garita" viewBox="0 0 160 90"><rect x="18" y="30" width="42" height="46" rx="4" fill="#f4efe6"/><path d="M12 32 39 12l27 20Z" fill="#b85f24"/><rect x="28" y="42" width="22" height="16" rx="2" fill="#9fd6ec"/><rect x="66" y="58" width="8" height="18" rx="2" fill="#3b2a1c"/>
+          <g class="lv-barrera"><rect x="70" y="56" width="84" height="7" rx="3.5" fill="#fff"/><rect x="84" y="56" width="12" height="7" fill="#d33a3a"/><rect x="108" y="56" width="12" height="7" fill="#d33a3a"/><rect x="132" y="56" width="12" height="7" fill="#d33a3a"/></g>
+          <path d="M0 80h160" stroke="rgba(255,255,255,.35)" stroke-width="3"/></svg>
+        <span class="lv-campana">${I('bell')}</span></div>
+      <small class="lv-sobre">En la garita · ${esc(casa)}</small>
+      <h2 class="lv-nombre">${esc(l.nombre)}</h2>
+      <p class="lv-detalle">${esc(l.motivo || 'Sin aviso previo')}${l.patente ? ` · <span class="hp-chapa chica">${esc(verPatente(l.patente))}</span>` : ''}<br>pregunta por ${paraVos ? 'vos' : 'tu casa'} · <b class="lv-reloj" data-desde="${l.at}">recién</b></p>
+      <div class="lv-botones">
+        <button class="lv-b si" data-a="llegada-si" data-id="${esc(l.id)}"><span class="lv-bi">${I('check')}</span><b>QUE PASE</b><small>La garita lo deja entrar</small></button>
+        <button class="lv-b no" data-a="llegada-noesta" data-id="${esc(l.id)}"><span class="lv-bi">${I('home')}</span><b>NO ESTOY EN CASA</b><small>No entra</small></button></div>
+      <button class="lv-desconozco" data-a="llegada-no" data-id="${esc(l.id)}">No lo conozco</button>
+      <p class="lv-pie">${I('users')} Le llega a todos los que viven en ${esc(casa || 'tu lote')}: vale la respuesta del primero. Suena cada 5 segundos hasta que alguien conteste.</p></div>`;
+    requestAnimationFrame(() => caja.classList.add('on'));
+    if (typeof Push !== 'undefined' && Push.callarLlegada) Push.callarLlegada(id);
+    this.reloj(); this.sonar(true);
+    clearInterval(this.timer); this.timer = setInterval(() => { this.reloj(); this.sonar(); }, 5000);
+    if (desdeAviso) cerrarHoja();
+  },
+  reloj(){ const r = $('#llegadaVentana .lv-reloj'); if (!r) return; const s = Math.max(0, Math.round((Date.now() - +r.dataset.desde) / 1000));
+    r.textContent = s < 10 ? 'recién' : `esperando hace ${s >= 60 ? Math.floor(s / 60) + ' min ' : ''}${s % 60} s`; },
+  sonar(){ if (document.visibilityState !== 'visible' || !this.abierta || typeof Sonido === 'undefined') return;
+    Sonido.tocar([[988, 0, .35], [784, .2, .35], [988, .45, .35], [784, .65, .5]], 'sine', .22); Sonido.vibrar([400, 150, 400]);
+    const c = $('#llegadaVentana .lv-campana'); if (c){ c.classList.remove('suena'); void c.offsetWidth; c.classList.add('suena'); } },
+  cerrar(id){ if (this.abierta === id) this.quitar(); },
+  quitar(){ clearInterval(this.timer); this.timer = null; const id = this.abierta; this.abierta = '';
+    const caja = $('#llegadaVentana'); if (!caja) return; caja.classList.remove('on'); caja.classList.add('chau'); setTimeout(() => caja.remove(), 380);
+    if (id) this.cerradas.add(id); },
+};
+Store.alCambiar(() => setTimeout(() => VentanaLlegada.revisar(), 0));
+setInterval(() => { try { VentanaLlegada.revisar(); } catch(e){} }, 3000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { try { VentanaLlegada.revisar(); VentanaLlegada.sonar(); } catch(e){} } });
+/* LA GARITA REENVÍA EL AVISO (12-10-2026): cada 45 segundos, durante 5
+   minutos, a los del lote, mientras nadie conteste. Solo el equipo de la
+   garita que hizo la consulta (así no se duplica) y solo el aviso del
+   celular, sin llenar la campanita (sw.js lo junta en uno solo). */
+const LlegadaInsiste = {
+  KEY:'bhc.llegadas.mias',
+  mias(){ try { return JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch(e){ return {}; } },
+  anotar(id){ const m = this.mias(), lim = Date.now() - HORA; Object.keys(m).forEach(k => { if (m[k].at < lim) delete m[k]; }); m[id] = { at:Date.now(), n:0 }; try { localStorage.setItem(this.KEY, JSON.stringify(m)); } catch(e){} },
+  correr(){
+    if (!esGuardia() || typeof Push === 'undefined') return;
+    const m = this.mias(), ahora = Date.now(); let cambio = false;
+    aLista(Store.s.llegadas).filter(l => l && m[l.id] && l.estado === 'consultando').forEach(l => {
+      const edad = ahora - (l.at || 0), x = m[l.id], toca = Math.floor(edad / 45000);
+      if (edad > 5 * MIN || toca < 1 || x.n >= toca) return;
+      x.n = toca; cambio = true;
+      const casa = l.lote || usuario(l.hostId)?.casa || '';
+      Push.enviar({ para:paraElLote(casa, l.hostId), titulo:`Sigue esperando en la garita: ${l.nombre}`, texto:`${l.motivo || 'Visita'}${casa ? ' · ' + casa : ''} · hace ${Math.max(1, Math.round(edad / MIN))} min · ¿Lo dejamos pasar?`, link:'llegada:' + l.id, tag:'llegada-' + l.id, urgente:true });
+    });
+    if (cambio) try { localStorage.setItem(this.KEY, JSON.stringify(m)); } catch(e){}
+  },
+};
+setInterval(() => { try { LlegadaInsiste.correr(); } catch(e){} }, 5000);
 A['modo-viaje'] = () => {
   const u = yo(), v = (typeof ausenciaDe === 'function' ? ausenciaDe(u) : u.viaje) || {}, hoy = hoyISO();
   hoja('Me voy de viaje', `<form data-f="modo-viaje">
@@ -2126,7 +2392,10 @@ function serviciosPolicia(registros = registrosTurno(), lineas = aLista(Store.s.
     /* Firebase no guarda las listas vacías: se rearman al leer. */
     if (sv.foto) return { ...sv, ...sv.foto, rondas: aLista(sv.foto.rondas).filter(Boolean).map(r => ({ ...r, qr:aLista(r.qr), faltan:aLista(r.faltan) })), guardias: aLista(sv.foto.guardias), acciones: aLista(sv.foto.acciones).filter(Boolean) };
     const fin = sv.sale || Date.now();
-    const guardias = [...new Set(regs.filter(r => r.at <= fin && (!r.cerradoAt || r.cerradoAt >= sv.entra)).flatMap(r => aLista(r.guardias)))];
+    /* La salida se anota al minuto (16:27) y el turno se abre con segundos
+       (16:27:50): el turno abierto en el mismo minuto de la salida también
+       cuenta (12-10-2026; si no, la constancia salía sin los guardias). */
+    const guardias = [...new Set(regs.filter(r => r.at < fin + MIN && (!r.cerradoAt || r.cerradoAt >= sv.entra)).flatMap(r => aLista(r.guardias)))];
     const rondas = sv.rondas.sort((a, b) => a.inicio - b.inicio).map(fotoRonda);
     const acciones = lineas.filter(b => b && b.at >= sv.entra - MIN && b.at <= fin + 5 * MIN && b.tipo !== 'turno' && (b.texto || '').includes(sv.nombre)).sort((a, b) => a.at - b.at).map(b => ({ at:b.at, texto:b.texto }));
     return { ...sv, guardias, rondas, acciones };
@@ -2508,7 +2777,7 @@ function movimientosDeHoy(){
   });
   aLista(s.llegadas).filter(l => l && (l.respondido || l.at) >= ini && l.estado !== 'consultando').forEach(l =>
     out.push({ id:l.id, at:l.respondido || l.at, sale:false, cat:'sinaviso', no: l.estado === 'rechazado',
-      texto:`${l.nombre} → ${usuario(l.hostId)?.casa || ''} · ${l.estado === 'autorizado' ? 'el vecino dijo "que pase"' : 'el vecino NO lo autorizó'}` }));
+      texto:`${l.nombre} → ${usuario(l.hostId)?.casa || ''} · ${l.estado === 'autorizado' ? 'el vecino dijo "que pase"' : l.noEsta ? 'el vecino no está en casa: no pasa' : 'el vecino NO lo autorizó'}` }));
   return out.sort((a, b) => b.at - a.at);
 }
 const filaMov = m => { const c = CAT_MOV[m.cat] || CAT_MOV.visita;
@@ -2660,7 +2929,7 @@ R.garita = {
       ${(() => { const rs = s.peticiones.filter(p => p.tipo === 'nopasar' && p.estado === 'en_funciones' && (!p.hasta || p.hasta >= hoy)); return rs.length ? sec('Restricciones de ingreso vigentes') + rs.map(p => `<button class="superficie peligro" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-danger">${I('x')}</span><span class="txt"><b>${esc(p.casa)}</b><small>${esc(p.texto.slice(0, 90))}</small></span>${I('right')}</button>`).join('') : ''; })()}
       ${llegadas.length ? '<span id="garLlegadas" class="ancla"></span>' + sec('Consultando al vecino') + llegadas.map(l => { const h = usuario(l.hostId) || {}; const min = Math.floor((Date.now() - l.at) / MIN);
         return `<div class="card" style="padding:13px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span><div class="datos"><b>${esc(l.nombre)} → ${esc(h.casa || '')}</b><span>${esc(l.motivo || '')}${l.patente ? ' · ' + esc(l.patente) : ''} · hace ${min} min</span></div>
-          <span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Puede pasar', rechazado:'No autorizado' }[l.estado]}</span></div>${l.respondio ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio))}</div>` : ''}
+          <span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Puede pasar', rechazado: l.noEsta ? 'No está en casa' : 'No autorizado' }[l.estado]}</span></div>${l.respondio ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio))}</div>` : ''}
           ${opera && l.estado === 'consultando' && min >= 2 ? (() => {
             /* A los 2 min, "Llamar" a cada uno de los que viven en el lote; a los 3, la app ya les insistió con sonido (regla llegada-3min). */
             const tels = paraElLote(l.lote || h.casa, l.hostId).map(usuario).filter(v => v && v.tel);
@@ -2818,7 +3087,7 @@ A['pase-vencido-avisar'] = el => {
     const casa = usuario(p.hostId)?.casa || '';
     if (enGarita){
       const lid = uid();
-      s.llegadas.unshift({ id:lid, hostId:p.hostId, lote:casa, nombre:p.nombre, patente:p.patente || '', motivo:`Pase vencido (era de ${p.desde} a ${p.hasta} h)`, at, estado:'consultando', paseId:p.id });
+      s.llegadas.unshift({ id:lid, hostId:p.hostId, lote:casa, nombre:p.nombre, patente:p.patente || '', motivo:`Pase vencido (era de ${p.desde} a ${p.hasta} h)`, at, estado:'consultando', paseId:p.id }); LlegadaInsiste.anotar(lid);
       notificar(s, { para:paraElLote(casa, p.hostId), titulo:`En la garita: ${p.nombre} (pase vencido)`, texto:`El pase era de ${p.desde} a ${p.hasta} h · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'llegada:' + lid, llegadaId:lid });
     } else notificar(s, { para:p.hostId, titulo:`Venció el pase de ${p.nombre}`, texto:`Era de ${p.desde} a ${p.hasta} h y no ingresó. Si todavía viene, cambiale el horario o hacé uno nuevo.`, icon:'clock', color:'warn', link:'visitas', sonido:true });
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Pase vencido: ${p.nombre} → ${casa} · ${enGarita ? 'se presentó; se consultó al vecino' : 'no ingresó; se avisó al vecino'}`, at });
@@ -2849,7 +3118,7 @@ A['llegada-nueva'] = el => hoja('Llegó alguien sin aviso', `<form data-f="llega
   <div class="grid2"><div class="field"><label>Patente</label><input name="patente" maxlength="10" style="text-transform:uppercase" value="${esc(el?.dataset?.pat ? verPatente(el.dataset.pat) : '')}"></div>
     <div class="field"><label>Motivo</label><select name="motivo"><option>Visita</option><option>Delivery</option><option>Uber / DiDi / taxi</option><option>Proveedor / obra</option><option>Correo / paquete</option><option>Otro</option></select></div></div>
   <button class="btn btn-pri btn-block">${I('send')}Consultar al vecino</button>
-  <p class="muted tiny" style="margin:10px 0 0">Les aparece a todos los que viven en ese lote, con dos botones: "Que pase" o "No lo conozco". Vale la respuesta del primero que conteste.</p></form>`);
+  <p class="muted tiny" style="margin:10px 0 0">A todos los que viven en ese lote se les abre una ventana con "Que pase" o "No estoy en casa" (y "No lo conozco"), y el celular les suena cada 5 segundos hasta que alguien conteste. Vale la respuesta del primero.</p></form>`);
 /* Las cuentas que viven en el lote (más el elegido, por si no figura con ese lote). */
 const paraElLote = (casa, hostId) => { const us = residentesDelLote(casa).map(u => u.id); if (hostId && !us.includes(hostId)) us.push(hostId); return us; };
 const llegadaDeMiLote = (l, u = yo()) => !!l && !!u && (l.hostId === u.id || (!!l.lote && l.lote === u.casa && !esPropDistancia(u)));
@@ -2864,7 +3133,7 @@ F['llegada'] = d => {
   Store.cambiar(s => {
     const l = { id, hostId:d.hostId, lote:casa, nombre:d.nombre.trim(), patente:(d.patente || '').toUpperCase(), motivo:d.motivo, at:Date.now(), estado:'consultando' };
     if (d.porLote) l.porLote = true;
-    s.llegadas.unshift(l);
+    s.llegadas.unshift(l); LlegadaInsiste.anotar(id);
     notificar(s, { para:paraElLote(casa, d.hostId), titulo:`En la garita: ${d.nombre.trim()}`, texto:`${d.motivo}${casa ? ' · ' + casa : ''} · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'llegada:' + id, llegadaId:id });
   });
   cerrarHoja(); toast('Consultando al vecino…', 'send');
@@ -3150,6 +3419,7 @@ function pintarPedirPase(arg){
       <div class="bottom"><div class="qr-box" data-qr="BHC:${esc(mio.codigo)}"></div><div class="codigo-grande">${codigoEspaciado(mio.codigo)}</div><div class="muted small">Mostrá el QR en la garita o decí el código</div></div></div>
     <button class="btn btn-wa btn-block" style="margin-top:12px" data-a="pedido-wa" data-v="${esc(hostId)}">${I('share')}Guardarlo en mi WhatsApp</button>
     <p class="tiny" style="margin:8px 2px 0;opacity:.9">Elegí tu propio chat ("Yo" o "Mensaje a mí mismo") y queda guardado. También queda en este teléfono: si volvés a abrir el enlace, lo ves acá.</p>
+    <button class="btn btn-sec btn-block" style="margin-top:10px" data-a="cal-ics" data-v="${esc(b64url.a(JSON.stringify({ n:String(mio.nombre || '').split(' ')[0], a:String(mio.espera || '').split(' · ')[0], c:String(mio.espera || '').split(' · ')[1] || '', d:'', f:mio.fecha, u:mio.fecha, h:mio.desde, k:mio.hasta })))}">${I('calendar')}Que mi teléfono me avise una hora antes</button>
     ${botonMapa()}
     <p class="small" style="margin:12px 0 0"><button type="button" class="link" style="color:#fff" data-a="pedido-otro" data-v="${esc(hostId)}">Pedir un pase para otra persona u otro día</button></p>`;
   else if (vencido) panel = aviso('warn', 'clock', 'Este enlace venció', `Pedile a ${esc(host.nombre || 'quien te invitó')} que te mande uno nuevo.`);

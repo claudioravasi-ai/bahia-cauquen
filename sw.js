@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261012-143758';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261012-143758',
-  './js/firebase-config.js?v=20261012-143758', './js/icons.js?v=20261012-143758', './js/agenda.js?v=20261012-143758', './js/padron.js?v=20261012-143758', './js/core.js?v=20261012-143758', './js/seed.js?v=20261012-143758', './js/clima.js?v=20261012-143758', './js/calendario.js?v=20261012-143758',
-  './js/v-inicio.js?v=20261012-143758', './js/v-comunidad.js?v=20261012-143758', './js/v-gestion.js?v=20261012-143758', './js/admin.js?v=20261012-143758', './js/v-vecinos.js?v=20261012-143758', './js/v-expensas.js?v=20261012-143758', './js/v-plan.js?v=20261012-143758', './js/v-contable.js?v=20261012-143758', './js/v-servicio.js?v=20261012-143758', './js/v-legal.js?v=20261012-143758', './js/v-hotel.js?v=20261012-143758', './js/v-cuidados.js?v=20261012-143758', './js/v-casa.js?v=20261012-143758', './js/mapa.js?v=20261012-143758', './js/recorrido.js?v=20261012-143758', './js/reglas.js?v=20261012-143758', './js/asistente.js?v=20261012-143758', './js/v-manual.js?v=20261012-143758', './js/push.js?v=20261012-143758', './js/sismos.js?v=20261012-143758', './js/nube.js?v=20261012-143758', './js/adjuntos.js?v=20261012-143758', './js/historial.js?v=20261012-143758', './js/v-supervisor.js?v=20261012-143758', './js/app.js?v=20261012-143758',
+const CACHE = 'bhc-20261012-202039';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261012-202039',
+  './js/firebase-config.js?v=20261012-202039', './js/icons.js?v=20261012-202039', './js/agenda.js?v=20261012-202039', './js/padron.js?v=20261012-202039', './js/core.js?v=20261012-202039', './js/seed.js?v=20261012-202039', './js/clima.js?v=20261012-202039', './js/calendario.js?v=20261012-202039',
+  './js/v-inicio.js?v=20261012-202039', './js/v-comunidad.js?v=20261012-202039', './js/v-gestion.js?v=20261012-202039', './js/admin.js?v=20261012-202039', './js/v-vecinos.js?v=20261012-202039', './js/v-expensas.js?v=20261012-202039', './js/v-plan.js?v=20261012-202039', './js/v-contable.js?v=20261012-202039', './js/v-servicio.js?v=20261012-202039', './js/v-legal.js?v=20261012-202039', './js/v-hotel.js?v=20261012-202039', './js/v-cuidados.js?v=20261012-202039', './js/v-casa.js?v=20261012-202039', './js/mapa.js?v=20261012-202039', './js/recorrido.js?v=20261012-202039', './js/reglas.js?v=20261012-202039', './js/asistente.js?v=20261012-202039', './js/v-manual.js?v=20261012-202039', './js/push.js?v=20261012-202039', './js/sismos.js?v=20261012-202039', './js/nube.js?v=20261012-202039', './js/adjuntos.js?v=20261012-202039', './js/historial.js?v=20261012-202039', './js/v-supervisor.js?v=20261012-202039', './js/app.js?v=20261012-202039',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
@@ -54,6 +54,40 @@ self.addEventListener('fetch', e => {
 /* 'correo': "Andreani va a tu casa" (07-10-2026). Llega como un WhatsApp: con el
    sonido de avisos del teléfono, aunque la app esté cerrada o la sesión cerrada. */
 const ICONO_TIPO = { camion:'🚛 ', correo:'📬 ', sos:'🆘 ', urgente:'⚠️ ', paquete:'📦 ', bien:'💚 ' };
+/* =========================================================
+   LLEGÓ SIN AVISO: EL TELÉFONO INSISTE SOLO (pedido de Claudio, 12-10-2026:
+   "que le suene al vecino, con la app apagada o en stand-by, cada 5
+   segundos hasta que responda"). Cuando llega el aviso "En la garita: …"
+   (link llegada:<id>), el propio teléfono lo vuelve a hacer sonar cada 5
+   segundos durante 3 minutos, hasta que se toca (o se desliza), hasta que
+   otro del lote contesta (llega "llegada-fin:<id>") o hasta que la app
+   abierta lo calla. Cada vez se cierra el anterior y se muestra uno nuevo,
+   así suena también donde un aviso repetido llegaría mudo. La garita además
+   lo reenvía cada 45 segundos (para el iPhone, que no deja insistir solo).
+   ========================================================= */
+const INSISTE = new Map();
+const baseLlegada = link => { const m = /^llegada(?:-fin)?:([^:]+)/.exec(link || ''); return m ? 'llegada-' + m[1] : ''; };
+const cerrarLlegada = base => self.registration.getNotifications().then(ns => ns.forEach(n => { if (String(n.tag || '').startsWith(base)) n.close(); }));
+async function mostrarLlegada(base, titulo, op){
+  await cerrarLlegada(base);
+  return self.registration.showNotification(titulo, { ...op, tag: base + '-' + Date.now(), renotify:true, requireInteraction:true });
+}
+async function insistirLlegada(base, titulo, op){
+  const fin = Date.now() + 3 * 60000, marca = {}; INSISTE.set(base, marca);
+  while (INSISTE.get(base) === marca && Date.now() < fin){
+    await new Promise(r => setTimeout(r, 5000));
+    if (INSISTE.get(base) !== marca) break;
+    const ns = await self.registration.getNotifications();
+    if (!ns.some(n => String(n.tag || '').startsWith(base))) break;      /* la tocó o la deslizó */
+    await mostrarLlegada(base, titulo, { ...op, timestamp: Date.now() });
+  }
+  if (INSISTE.get(base) === marca) INSISTE.delete(base);
+}
+self.addEventListener('message', e => {
+  /* La app contestó (o la vio en pantalla): se calla y se saca de la bandeja. */
+  const b = e.data && e.data.callar; if (b){ INSISTE.delete(b); e.waitUntil(cerrarLlegada(b)); }
+});
+self.addEventListener('notificationclose', e => { const b = baseLlegada(e.notification.data && e.notification.data.link); if (b) INSISTE.delete(b); });
 self.addEventListener('push', e => {
   let j = {};
   try { j = e.data ? e.data.json() : {}; } catch(err){ j = { data:{ texto: e.data ? e.data.text() : '' } }; }
@@ -69,24 +103,38 @@ self.addEventListener('push', e => {
     vibrate: d.sonido === 'camion' ? [120, 60, 120, 60, 120, 200, 300] : d.sonido === 'correo' ? [200, 100, 200, 100, 400] : (urgente || d.sonido === 'sos') ? [500, 150, 500, 150, 500, 150, 500] : [200, 100, 200],
     /* "Llegó sin aviso": se contesta desde la notificación (en Android;
        el iPhone no muestra botones en los avisos de una app web). */
-    actions: /^llegada:/.test(d.link || '') ? [{ action:'si', title:'✅ Que pase' }, { action:'no', title:'❌ No lo conozco' }]
+    actions: /^llegada:/.test(d.link || '') ? [{ action:'si', title:'✅ Que pase' }, { action:'noesta', title:'🏠 No estoy en casa' }]
       /* "Tu visita todavía no llegó" (12-10-2026) */
-      : /^visitas:no~/.test(d.link || '') ? [{ action:'cambiar', title:'🕑 Cambiar el horario' }, { action:'nollega', title:'❌ Ya no viene' }] : [{ action:'abrir', title:'Abrir' }],
+      : /^visitas:no~/.test(d.link || '') ? [{ action:'cambiar', title:'🕑 Cambiar el horario' }, { action:'nollega', title:'❌ Ya no viene' }]
+      /* "… viene hoy a las 9 h" (12-10-2026): abre el mensaje listo para WhatsApp */
+      : /^visitas:rec~/.test(d.link || '') ? [{ action:'abrir', title:'💬 Mandar el recordatorio' }] : [{ action:'abrir', title:'Abrir' }],
     data:{ link: d.link || '', sonido: d.sonido || '' },
   };
+  const base = baseLlegada(d.link);
   e.waitUntil(self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(cs => {
     /* Con la app a la vista ya sonó adentro (con su melodía): el aviso del
        sistema aparece igual, pero sin repetir el sonido. En iPhone no se
        toca nada, para que Safari no lo tome como un aviso "escondido". */
     const iOS = /iPhone|iPad|iPod/.test(self.navigator.userAgent || '');
-    if (!iOS && cs.some(c => c.visibilityState === 'visible' && c.focused)){ op.silent = true; delete op.vibrate; }
+    const aLaVista = cs.some(c => c.visibilityState === 'visible' && c.focused);
+    /* Ya contestó otro del lote: se calla y queda dicho quién y qué. */
+    if (/^llegada-fin:/.test(d.link || '')){ INSISTE.delete(base);
+      const callado = { ...op, actions:[], tag: base + '-fin', renotify:false, requireInteraction:false, silent:true }; delete callado.vibrate;
+      return cerrarLlegada(base).then(() => self.registration.showNotification(titulo, callado)); }
+    if (base){ op.vibrate = [600, 200, 600, 200, 600, 200, 900]; op.data.link = d.link;
+      /* Con la app a la vista, la ventana de adentro hace sonar y pide respuesta: el aviso no insiste. */
+      if (!iOS && aLaVista){ op.silent = true; delete op.vibrate; return mostrarLlegada(base, titulo, op); }
+      return mostrarLlegada(base, titulo, op).then(() => insistirLlegada(base, titulo, op)); }
+    if (!iOS && aLaVista){ op.silent = true; delete op.vibrate; }
     return self.registration.showNotification(titulo, op);
   }));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   let link = (e.notification.data && e.notification.data.link) || '';
-  if (/^llegada:/.test(link) && (e.action === 'si' || e.action === 'no')) link = 'responder:' + link + ':' + e.action;
+  const bl = baseLlegada(link); if (bl) INSISTE.delete(bl);
+  if (/^llegada-fin:/.test(link)) link = 'visitas';
+  if (/^llegada:/.test(link) && (e.action === 'si' || e.action === 'no' || e.action === 'noesta')) link = 'responder:' + link + ':' + e.action;
   if (/^visitas:no~/.test(link) && (e.action === 'cambiar' || e.action === 'nollega')) link = link + '~' + e.action;
   e.waitUntil(self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(cs => {
     const c = cs.find(x => x.url.startsWith(self.registration.scope));

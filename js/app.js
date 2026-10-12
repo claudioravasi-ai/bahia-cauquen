@@ -75,7 +75,12 @@ const VENTANAS_PROPIETARIO = new Set(['inicio', 'expensas', 'votaciones', 'table
 VENTANAS_HOTEL.add('aporte');
 /* 08-10-2026: el hotel ve las direcciones del barrio (lote y calle, sin nombres). */
 VENTANAS_HOTEL.add('vecinos');
-['hotel-vivo', 'hotel-traslados', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
+/* 12-10-2026: los traslados automatizados y el tablero de vuelos para las vans
+   (js/v-hotel.js). Los automatizados los miran también la garita y la
+   supervisión (solo los edita el hotel). */
+['hotel-rutinas', 'hotel-vuelos'].forEach(v => VENTANAS_HOTEL.add(v));
+VENTANAS_SUPERVISOR.add('hotel-rutinas');
+['hotel-vivo', 'hotel-traslados', 'hotel-rutinas', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
 const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : esSupervisor() ? VENTANAS_SUPERVISOR.has(id) : esPropDistancia() ? VENTANAS_PROPIETARIO.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
@@ -427,7 +432,7 @@ function pintar(){
   aplicarTema();
   /* El QR de un punto de ronda abre su pantallita aunque el teléfono tenga
      una sesión abierta: nada la tapa hasta que se cierra. */
-  if (/^#\/(punto|ronda|qr|pedir)\//.test(location.hash)){ rutaPublica(); return; }
+  if (/^#\/(punto|ronda|qr|pedir|cal)\//.test(location.hash)){ rutaPublica(); return; }
   const u = yo();
   if (!u){ PILA.length = 0; return pintarBienvenida(); }
   if (!$('#lienzo')){
@@ -1342,14 +1347,66 @@ document.addEventListener('pointermove', e => {
 window.addEventListener('blur', () => sosSoltar(false));
 /* Un clic suelto (sin mantener) no dispara nada, pero sí explica qué hacer. */
 document.addEventListener('click', e => { if (e.target.closest('#sosBtn')) e.preventDefault(); });
-function elegirSOS(){
-  hoja('¿Qué está pasando?', `
-    <p class="muted small" style="margin:0 0 12px">Elegí una y la alerta sale al instante a la guardia, a la Administración y a las terminales del barrio.</p>
-    ${Object.entries(TIPOS_SOS).map(([k, t]) => `<button class="superficie ${k === 'medica' || k === 'incendio' ? 'peligro' : ''}" data-a="sos-enviar" data-v="${k}">
-      <span class="ic ic-danger">${I(t.icon)}</span><span class="txt"><b>${t.nombre}</b>
-      <small>${k === 'medica' ? 'Guardia, Administración y vecinos (con aviso a quienes saben primeros auxilios)' : 'Guardia, Administración y todos los vecinos'}</small></span>${I('right')}</button>`).join('')}
-    <p class="muted tiny" style="margin:14px 0 0">La alerta les muestra a todos tu nombre, tu lote y, si el teléfono lo permite, tu ubicación en este momento, para que sepan dónde está pasando. Si te equivocaste, cerrá esta ventana: todavía no se mandó nada.</p>`);
-}
+/* LA VENTANA DEL SOS (rediseño, pedido de Claudio, 12-10-2026: "más
+   innovador e interactivo, con colores vívidos y animados"). Ideas de las
+   pantallas de emergencia de los teléfonos (el SOS del iPhone, Seguridad
+   Personal de Android), código propio: el fondo late como una sirena, un
+   radar arriba, cuatro fichas grandes, cada una con su color y su ícono en
+   movimiento (el corazón late, la llama tiembla, el escudo brilla). Al
+   tocar una, la alerta sale y la MISMA ventana se pinta del color elegido y
+   va mostrando, uno por uno, a quién le llegó, si salió la ubicación y los
+   botones para llamar. Cerrar sin elegir no manda nada. */
+const SOS_LOOK = { medica:['sv-medica', 'También a quienes saben primeros auxilios'], seguridad:['sv-seguridad', 'Alguien que entró, un robo, una amenaza'], incendio:['sv-incendio', 'Fuego, humo o un pastizal'], otra:['sv-otra', 'Un accidente, un escape de gas…'] };
+const SOSVentana = {
+  abrir(){
+    this.cerrar(true);
+    const caja = document.createElement('div'); caja.id = 'sosVentana'; caja.className = 'sv-fondo';
+    caja.setAttribute('role', 'alertdialog'); caja.setAttribute('aria-modal', 'true'); caja.setAttribute('aria-labelledby', 'svTit');
+    caja.innerHTML = `<div class="sv-caja">
+      <div class="sv-radar" aria-hidden="true"><i></i><i></i><i></i><span>${I('siren')}</span></div>
+      <h2 id="svTit">¿Qué está pasando?</h2>
+      <p class="sv-sub">Tocá una: la alerta sale al instante.</p>
+      <div class="sv-grid">${Object.entries(TIPOS_SOS).map(([k, t], i) => `<button type="button" class="sv-t ${(SOS_LOOK[k] || SOS_LOOK.otra)[0]}" style="--i:${i}" data-a="sos-enviar" data-v="${k}">
+        <span class="sv-ic">${I(t.icon)}</span><b>${t.nombre}</b><small>${(SOS_LOOK[k] || SOS_LOOK.otra)[1]}</small><em>${I('phone')}${t.llamar}</em></button>`).join('')}</div>
+      <div class="sv-llega"><span>Le llega a</span><i>${I('gate')}Guardia</i><i>${I('sliders')}Administración</i><i>${I('users')}Vecinos</i></div>
+      <p class="sv-nota">${I('pin')}Con tu nombre, tu lote y, si el teléfono lo permite, dónde estás ahora.</p>
+      <button type="button" class="sv-no" data-a="sos-no">${I('x')}Me equivoqué · cerrar</button>
+      <small class="sv-nada">Todavía no se mandó nada.</small></div>`;
+    document.body.appendChild(caja);
+    requestAnimationFrame(() => caja.classList.add('on'));
+    setTimeout(() => caja.querySelector('.sv-t')?.focus({ preventScroll:true }), 350);
+  },
+  /* La alerta ya salió: la misma ventana, del color de la emergencia. */
+  enviada(tipo, idSos){
+    const c = $('#sosVentana'); if (!c) return false;
+    const t = TIPOS_SOS[tipo] || TIPOS_SOS.otra, g = Store.s.config.garitaTel || contactoTel('Garita');
+    c.classList.add('enviada', (SOS_LOOK[tipo] || SOS_LOOK.otra)[0]);
+    c.querySelector('.sv-caja').innerHTML = `<div class="sv-onda" aria-hidden="true"></div>
+      <div class="sv-radar ok" aria-hidden="true"><i></i><i></i><i></i><span>${I(t.icon)}</span></div>
+      <h2 id="svTit">Alerta enviada</h2>
+      <p class="sv-sub">${esc(t.nombre)} · quedate en un lugar seguro.</p>
+      <ol class="sv-pasos">
+        <li style="--i:0">${I('gate')}<span>La guardia</span><b>${I('check')}</b></li>
+        <li style="--i:1">${I('sliders')}<span>La Administración</span><b>${I('check')}</b></li>
+        <li style="--i:2">${I('users')}<span>${tipo === 'medica' ? 'Los vecinos y quienes saben primeros auxilios' : 'Todos los vecinos'}</span><b>${I('check')}</b></li>
+        <li style="--i:3" class="sv-ubi" data-sos="${esc(idSos)}">${I('pin')}<span>Tu ubicación: buscando…</span><b class="sv-gira">${I('refresh')}</b></li>
+      </ol>
+      <div class="sv-llamar"><a class="sv-l1" href="tel:${t.llamar}">${I('phone')}Llamar al ${t.llamar}</a>${g ? `<a class="sv-l2" href="${telLink(g)}">${I('gate')}Llamar a la garita</a>` : ''}</div>
+      <p class="sv-nota">Tu alerta queda abierta en todas las apps del barrio hasta que marques que ya está solucionado.</p>
+      <button type="button" class="sv-listo" data-a="sos-no">Listo</button>`;
+    return true;
+  },
+  ubicacion(idSos, ok){
+    const li = document.querySelector(`#sosVentana .sv-ubi[data-sos="${idSos}"]`); if (!li) return;
+    li.classList.add(ok ? 'si' : 'no');
+    li.querySelector('span').textContent = ok ? 'Tu ubicación: enviada' : 'Sin ubicación: al llamar, decí dónde estás';
+    const b = li.querySelector('b'); b.classList.remove('sv-gira'); b.innerHTML = I(ok ? 'check' : 'alert');
+  },
+  cerrar(ya){ const c = $('#sosVentana'); if (!c) return; if (ya){ c.remove(); return; } c.classList.add('chau'); setTimeout(() => c.remove(), 280); },
+};
+function elegirSOS(){ SOSVentana.abrir(); }
+A['sos-no'] = () => SOSVentana.cerrar();
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#sosVentana')) SOSVentana.cerrar(); });
 A['sos-enviar'] = el => {
   if (esGuardia()) return;
   const u = yo(), tipo = el.dataset.v, t = TIPOS_SOS[tipo];
@@ -1358,12 +1415,14 @@ A['sos-enviar'] = el => {
      exactamente dónde está (puede no estar en su casa). */
   if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => {
     const coords = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
+    SOSVentana.ubicacion(idSos, true);
     /* La ubicación va dentro de la alerta y la ven TODOS los vecinos (pedido
        de Claudio, 25-09): así cualquiera sabe dónde está pasando y puede
        ayudar. No se guarda como "ubicación del lote" en la ficha: quien pide
        ayuda puede no estar en su casa. */
     Store.cambiar(s => { const x = s.sos.find(o => o.id === idSos); if (x) x.coords = coords; });
-  }, () => {}, { enableHighAccuracy:true, timeout:8000 });
+  }, () => SOSVentana.ubicacion(idSos, false), { enableHighAccuracy:true, timeout:8000 });
+  else setTimeout(() => SOSVentana.ubicacion(idSos, false), 1600);
   Store.cambiar(s => {
     const id = idSos;
     s.sos.unshift({ id, userId: u.id, tipo, at: Date.now(), estado:'activa' });
@@ -1374,6 +1433,8 @@ A['sos-enviar'] = el => {
   });
   /* A todos los equipos del barrio, aunque tengan la pantalla apagada. */
   if (typeof Push !== 'undefined') Push.enviar({ para:['todos', 'rol:supervisor'], titulo:`🚨 SOS · ${t.nombre}`, texto:`${u.casa} · ${u.nombre}`, tag:'sos-' + idSos, urgente:true, sonido:'sos', link:'emergencias' });
+  Sonido.vibrar([60, 40, 60]);
+  if (SOSVentana.enviada(tipo, idSos)) return;
   const g = Store.s.config.garitaTel || contactoTel('Garita');
   hoja('Ayuda en camino', `
     <div class="aviso a-danger latido">${I('siren')}<div class="txt"><b>La guardia ya recibió tu alerta</b>Quedate en un lugar seguro. Si podés, llamá también:</div></div>
@@ -1460,7 +1521,7 @@ A['mi-cuenta'] = () => { const u = yo(); Cuenta.enSub = false;
       ${pushCuenta()}
       <label class="cu-r cu-sw"><span class="cu-ri c-accent">${I('volume')}</span><span class="cu-rt"><b>Sonido</b><small>Cuando escribe la guardia o la Administración</small></span>
         <input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span class="cu-int" aria-hidden="true"></span></label></div>
-    ${otros.length ? `<div class="cu-lote">${I('users')}<span>En ${esc(u.casa)} también tienen cuenta: <b>${otros.map(x => esc(x.nombre.split(' ')[0])).join(', ')}</b>. Un solo lote: un voto y una expensa. <button class="link" data-a="abrir" data-v="perfil">Ver quiénes</button></span></div>` : ''}
+    ${otros.length && typeof tarjetaLote === 'function' ? tarjetaLote(u) : ''}
     <div class="cu-fichas">
       ${ficha({ a:'cambiar-clave', ic:'key', c:'brand', t: Nube.activa() ? 'Contraseña' : 'Mi clave', s:'Cambiarla' })}
       ${esGuardia() ? '' : ficha({ a:'cambiar-email', ic:'mail', c:'sky', t:'Mi correo', s:'Cambiarlo' })}
@@ -1991,13 +2052,15 @@ const fotoParaOtros = (v, dias = 7) => {
    foto" (la cámara) y "Elegir de la galería" (las fotos y archivos del
    teléfono, en cualquier formato de imagen: JPG, PNG, WEBP, HEIC del
    iPhone…). En la computadora, el segundo abre el explorador de archivos.
+   12-10-2026 (Claudio: "hay dos botones y un dibujito que hacen lo mismo"):
+   el cuadradito de la izquierda ya no abre nada, es solo la vista previa.
    ========================================================= */
 const ACEPTA_FOTO = 'image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.heic,.heif,.avif';
 const botonesFoto = (id, cls = 'btn btn-sm btn-sec') => `<label class="${cls}">${I('camera')}Sacar foto<input type="file" accept="image/*" capture="environment" data-foto-in="${id}" hidden></label>
   <label class="${cls}">${I('image')}Elegir de la galería<input type="file" accept="${ACEPTA_FOTO}" data-foto-in="${id}" hidden></label>`;
 const campoFoto = (id, etiqueta = 'Foto (opcional)') => `
   <div class="field"><label>${etiqueta}</label><div class="foto-in">
-    <label class="foto-prev" id="${id}Prev" style="cursor:pointer">${I('image')}<input type="file" accept="${ACEPTA_FOTO}" data-foto-in="${id}" hidden></label>
+    <span class="foto-prev" id="${id}Prev" aria-hidden="true">${I('image')}</span>
     <div class="grow"><div class="foto-botones">${botonesFoto(id)}</div>
     <div class="muted small">A los demás les llega una vista previa; la foto buena la bajan al tocarla (queda para bajar unos días).</div></div>
     <input type="hidden" name="foto" id="${id}"></div></div>`;
@@ -2020,6 +2083,8 @@ function rutaPublica(){
   const h = location.hash;
   if (h.startsWith('#/pedir/')){ if (!$('#pedidoPublico form')) pintarPedirPase(h.slice(8)); return true; }
   if (h.startsWith('#/qr/')){ if (!$('#qrPublico')) pintarQRPublico(h.slice(5)); return true; }
+  /* El recordatorio para el calendario de la visita (12-10-2026). */
+  if (h.startsWith('#/cal/')){ if (!$('#calPublico')) pintarCalendarioPublico(h.slice(6)); return true; }
   if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return true; }
   if (h.startsWith('#/punto/')){ if (!$('#puntoPublico')) pintarPunto(h.slice(8)); return true; }
   if (h.startsWith('#/ronda/')){ if (!$('#puntoPublico')) pintarRondaHabilitar(h.slice(8)); return true; }
@@ -2329,7 +2394,7 @@ function mostrarComunicado(){
     <div class="comunicado-cab">
       <span class="ic ic-${c.tipo === 'reunion' ? 'accent' : 'danger'}">${I(c.tipo === 'reunion' ? 'calendar' : 'tack')}</span>
       <div><b>${c.tipo === 'reunion' ? 'Invitación' : 'Comunicado de la Administración'}</b>
-        <span>${esMio ? 'Para ' + esc(c.para) : 'Para todo el barrio'} · ${hace(c.at)}</span></div></div>
+        <span>${esMio ? 'Para ' + esc(c.para) : 'Para todo el barrio'} · ${hace(c.at)}${c.editado ? ' · <b class="com-corregido">corregido</b>' : ''}</span></div></div>
     <h2>${esc(c.titulo)}</h2>
     <div class="comunicado-texto">${esc(c.texto).replace(/\n/g, '<br>')}</div>
     ${c.tipo === 'reunion' && c.fecha ? `<div class="comunicado-cuando">${I('calendar')}

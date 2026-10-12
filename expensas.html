@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Práctica de expensas</title>
+<meta name="description" content="Práctica guiada de las expensas del Barrio Bahía Cauquén: de cero a los cupones de cada propietario, con la app de verdad en modo prueba.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<!--
+  PRÁCTICA DE EXPENSAS (pedido de Claudio, 12-10-2026: "una sección
+  interactiva como probar.html, pero de expensas, que la app me vaya
+  diciendo qué hacer hasta finalizar la carga y el envío a cada
+  propietario, sin dejar nada al azar").
+  Adentro va la app DE VERDAD en modo prueba (index.html?local): datos de
+  ejemplo, guardados aparte en este navegador (llaves bhc.prueba.*), sin
+  tocar la base del barrio ni mandar correos reales (en la prueba los
+  correos quedan en la bandeja de salida). La guía lee el estado de la app
+  de adentro y marca sola cada paso cuando lo hiciste.
+-->
+<style>
+:root{
+  --bg:#edf2f1; --surf:#ffffff; --surf-2:#f5f8f7; --surf-3:#e6eeec;
+  --ink:#0f1f1e; --ink-2:#3d4f4d; --muted:#667775; --line:#dce5e3; --line-2:#c9d6d3;
+  --brand:#0d6b66; --brand-2:#14968c; --brand-soft:#d8eeea; --deep:#0b3c47;
+  --ok:#1b8f5a; --ok-soft:#dcf3e7; --danger:#d33a3a; --danger-soft:#fde5e5;
+  --warn:#b7790a; --warn-soft:#fcf0d2; --sky:#2b6fb3; --sky-soft:#e1edf9; --wood:#b85f24; --wood-soft:#fbe9dc;
+  --acc:#ff9f43;
+  --marco:#1b2629; --sombra:0 24px 60px rgba(11,60,71,.22);
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+    --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+    --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936;
+    --ok:#4fd08f; --ok-soft:#133526; --danger:#f07171; --danger-soft:#3d1c1d;
+    --warn:#f0b54a; --warn-soft:#3a2c10; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --wood-soft:#3a2415;
+    --marco:#000; --sombra:0 24px 60px rgba(0,0,0,.5); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+  --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+  --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936;
+  --ok:#4fd08f; --ok-soft:#133526; --danger:#f07171; --danger-soft:#3d1c1d;
+  --warn:#f0b54a; --warn-soft:#3a2c10; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --wood-soft:#3a2415;
+  --marco:#000; --sombra:0 24px 60px rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15.5px/1.5 var(--body);-webkit-font-smoothing:antialiased;padding:0 16px 48px}
+h1,h2,h3{margin:0;letter-spacing:-.02em;text-wrap:balance}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2.5px solid var(--brand-2);outline-offset:2px;border-radius:8px}
+.envol{max-width:1280px;margin:0 auto}
+
+/* ---------- portada ---------- */
+.cabeza{position:relative;margin:16px 0 18px;border-radius:26px;overflow:hidden;color:#fff;background:linear-gradient(120deg,#0b3c47 0%,#0d6b66 55%,#b85f24 130%)}
+.cabeza::before{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.08)}
+.cabeza-in{position:relative;padding:24px 24px 22px;display:grid;gap:12px;max-width:820px}
+.marca{display:flex;align-items:center;gap:12px}
+.marca img{width:48px;height:48px;border-radius:50%;background:#fff;object-fit:cover}
+.marca b{display:block;font-size:15px;font-weight:800} .marca small{display:block;font-size:12.5px;opacity:.85}
+.cabeza h1{font-size:clamp(28px,4.6vw,46px);font-weight:800;line-height:1.04}
+.cabeza p{font-size:16px;max-width:64ch;opacity:.94}
+.sellos{display:flex;flex-wrap:wrap;gap:8px}
+.sello{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22)}
+.sello.prueba{background:#ffd97a;color:#3a2a00;border:0}
+.sello.prueba::before{content:"";width:8px;height:8px;border-radius:50%;background:#d33a3a;animation:late 1.6s infinite}
+@keyframes late{50%{opacity:.25}}
+
+/* ---------- la práctica ---------- */
+.banco{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:22px;align-items:start}
+@media (max-width:980px){ .banco{grid-template-columns:minmax(0,1fr)} }
+.guia{display:flex;flex-direction:column;gap:14px;min-width:0}
+.prog{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:14px 16px}
+.prog-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.prog-cab b{font-size:15px} .prog-cab span{font-size:13px;color:var(--muted);font-weight:700}
+.barra{height:10px;border-radius:6px;background:var(--surf-3);overflow:hidden}
+.barra i{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,var(--brand),var(--brand-2),#ffd97a);transition:width .6s cubic-bezier(.2,.9,.3,1)}
+.fases{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.fase{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--surf-3);color:var(--muted)}
+.fase.on{background:var(--brand);color:#fff} .fase.ok{background:var(--ok-soft);color:var(--ok)}
+
+.paso-actual{position:relative;background:var(--surf);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 10px 30px rgba(11,60,71,.08);overflow:hidden}
+.paso-actual::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:linear-gradient(180deg,var(--acc),var(--brand))}
+.pa-fase{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--brand)}
+.pa-tit{display:flex;gap:12px;align-items:center;margin:4px 0 10px}
+.pa-num{flex:none;width:40px;height:40px;border-radius:13px;display:grid;place-items:center;font-weight:800;color:#fff;background:linear-gradient(140deg,var(--brand-2),var(--brand))}
+.pa-tit h2{font-size:21px;line-height:1.2}
+.donde{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:0 0 12px;font-size:13px;font-weight:700;color:var(--ink-2)}
+.donde span{padding:3px 9px;border-radius:8px;background:var(--surf-3)}
+.donde i{font-style:normal;color:var(--muted)}
+.bloque{margin-top:10px}
+.bloque h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.bloque ol,.bloque ul{margin:0;padding-left:20px} .bloque li{margin:3px 0}
+.sola{margin-top:12px;padding:11px 13px;border-radius:14px;background:var(--sky-soft);color:var(--ink);font-size:14px}
+.sola b{color:var(--sky)}
+.dato{margin-top:12px;padding:12px 13px;border-radius:14px;background:var(--surf-2);border:1px dashed var(--line-2);font-size:14px}
+.dato{overflow-x:auto}
+.dato table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.dato th,.dato td{padding:5px 5px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap} .dato th:first-child,.dato td:first-child{text-align:left}
+.dato th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.dato tr.tot td{font-weight:800;border-bottom:0}
+.acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 16px;border-radius:14px;font-weight:800;font-size:14.5px;transition:transform .15s,box-shadow .15s}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--brand);color:#fff;box-shadow:0 6px 16px rgba(13,107,102,.28)}
+.btn.acc{background:linear-gradient(135deg,#ffd36b,#ff9f43);color:#1b1206;box-shadow:0 6px 16px rgba(255,159,67,.3)}
+.btn.sec{background:var(--surf-3);color:var(--ink)}
+.btn[disabled]{opacity:.5;cursor:default}
+.hecho-ok{display:none;margin-top:12px;padding:11px 13px;border-radius:14px;background:var(--ok-soft);color:var(--ok);font-weight:800;align-items:center;gap:8px}
+.paso-actual.listo .hecho-ok{display:flex}
+.paso-actual.listo{animation:festeja .6s ease}
+@keyframes festeja{40%{transform:scale(1.015)}}
+
+.lista-pasos{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:10px}
+.lp{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:12px;font-size:14px;color:var(--ink-2)}
+.lp:hover{background:var(--surf-2)}
+.lp .e{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--surf-3);color:var(--muted)}
+.lp.ok .e{background:var(--ok);color:#fff}
+.lp.on{background:var(--brand-soft);color:var(--ink);font-weight:700}
+.lp.on .e{background:var(--brand);color:#fff}
+.lp-fase{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 10px 4px}
+
+/* ---------- el teléfono con la app ---------- */
+.telefono{position:sticky;top:12px}
+.marco{position:relative;border-radius:42px;padding:12px;background:var(--marco);box-shadow:var(--sombra)}
+.marco::before{content:"";position:absolute;top:14px;left:50%;width:90px;height:22px;margin-left:-45px;border-radius:12px;background:#000;z-index:2}
+.marco iframe{display:block;width:100%;height:min(820px,calc(100vh - 60px));min-height:560px;border:0;border-radius:32px;background:#fff}
+.tel-pie{display:flex;justify-content:space-between;gap:8px;margin-top:10px;font-size:12.5px;color:var(--muted)}
+.tel-pie button{font-weight:800;color:var(--danger)}
+@media (max-width:980px){ .telefono{position:static} .marco{border-radius:30px;padding:8px} .marco::before{display:none} .marco iframe{border-radius:24px;height:78vh} }
+
+/* ---------- las respuestas ---------- */
+.respuestas{margin-top:26px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:860px){ .respuestas{grid-template-columns:1fr} }
+.resp{background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:16px 18px}
+.resp h3{font-size:17px;margin-bottom:8px}
+.resp p,.resp li{font-size:14.5px;color:var(--ink-2)} .resp p+p{margin-top:8px}
+.resp ul,.resp ol{margin:6px 0 0;padding-left:20px}
+.resp b{color:var(--ink)}
+.resp.ancha{grid-column:1/-1}
+.formula{margin:10px 0;padding:12px 14px;border-radius:14px;background:var(--surf-2);font-family:var(--mono);font-size:13.5px;line-height:1.7;overflow-x:auto}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+@media (max-width:560px){ .dos{grid-template-columns:1fr} }
+.caja{border-radius:14px;padding:12px;background:var(--surf-2)}
+.caja b{display:block;margin-bottom:4px}
+.pie{margin-top:24px;font-size:13px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<div class="envol">
+  <header class="cabeza"><div class="cabeza-in">
+    <div class="marca"><img src="img/logo-noche.png" alt=""><div><b>Barrio Bahía Cauquén</b><small>Para la Administración</small></div></div>
+    <h1>Las expensas del mes, de cero a cada propietario</h1>
+    <p>Practicá con la app de verdad, en modo prueba: la guía te dice qué tocar, te lleva al botón y se da cuenta sola cuando lo hiciste. Primero un mes desde cero, después el mes siguiente con la deuda ajustada.</p>
+    <div class="sellos"><span class="sello prueba">Modo prueba: no toca la base del barrio</span><span class="sello">Sin correos reales</span><span class="sello">13 pasos · 15 minutos</span></div>
+  </div></header>
+
+  <div class="banco">
+    <section class="guia" aria-label="La guía">
+      <div class="prog"><div class="prog-cab"><b id="progTxt">Paso 1 de 13</b><span id="progPct">0 %</span></div><div class="barra"><i id="progBarra"></i></div><div class="fases" id="fases"></div></div>
+      <article class="paso-actual" id="pasoActual" aria-live="polite"></article>
+      <nav class="lista-pasos" id="listaPasos" aria-label="Todos los pasos"></nav>
+    </section>
+    <aside class="telefono" aria-label="La app, en modo prueba">
+      <div class="marco"><iframe id="app" title="La app del barrio en modo prueba" src="index.html?local&practica=expensas"></iframe></div>
+      <div class="tel-pie"><span>La app de verdad, con datos de ejemplo.</span><button type="button" id="reiniciar">Empezar de cero</button></div>
+    </aside>
+  </div>
+
+  <section class="respuestas" aria-label="Las respuestas">
+    <div class="resp ancha"><h3>El mes a mes, en una línea</h3>
+      <p><b>Egresos</b> (las facturas del mes) → <b>ingresos</b> (los pagos de los vecinos) → <b>cierre</b> (la app reparte por coeficiente, ajusta la deuda y la suma) → <b>emitir</b> (cupón a cada lote, aviso en la app y correo) → <b>seguimiento</b> (vencimientos, recordatorios, morosos) → <b>contador</b> (libro y carpeta del mes).</p></div>
+    <div class="resp"><h3>¿Desde Administración o desde Contabilidad?</h3>
+      <p>Las dos están adentro del <b>portal de Administración</b> (Día a día), con la misma cuenta. Son dos puertas:</p>
+      <ul><li><b>Contabilidad</b> = lo que se <b>gasta</b> y lo del contador: Gastos del mes, Libro contable, Carpeta del contador, <b>Cierre de mes</b> (donde se emiten los cupones), ARCA y Parámetros.</li>
+        <li><b>Expensas</b> = lo que se <b>cobra</b>: Automáticas (el año proyectado), Cupones, Pagos (los "por acreditar"), Morosos y Recibos.</li></ul>
+      <p>El contador no tiene cuenta: recibe la carpeta del mes (PDF y planillas) por correo.</p></div>
+    <div class="resp"><h3>¿Se arma sola para cada propietario?</h3>
+      <p>Sí. Al cerrar el mes, para cada uno de los 152 lotes:</p>
+      <div class="formula">cuota del mes = gastos comunes × coeficiente del lote<br>&nbsp;&nbsp;+ mejoras × coeficiente + gastos particulares del lote<br>&nbsp;&nbsp;+ multas firmes + Fondo de Infraestructura + redondeo</div>
+      <p>El redondeo hace que el total termine en el número del lote (Lote 148 → ,48): así el banco dice quién pagó.</p></div>
+    <div class="resp"><h3>¿Saca la deuda, la ajusta y la suma al mes?</h3>
+      <p>Sí, sola, al cerrar el mes:</p>
+      <div class="formula">ajuste = lo que quedó impago × tasa del mes<br>total a pagar = saldo anterior + ajuste + cuota del mes</div>
+      <p>La tasa se elige en <b>Contabilidad → Parámetros → Pago fuera de término</b>: <b>inflación</b> (el IPC del INDEC, que la app trae sola cada tres días), <b>inflación + interés</b>, o un <b>interés fijo</b>. Dentro del mes, el 2º vencimiento suma su recargo (hoy 1,5 %). Al día siguiente del 2º vencimiento, a quien no pagó ni avisó le llega un correo con el ajuste.</p></div>
+    <div class="resp"><h3>¿Pueden trabajar dos sin pisarse?</h3>
+      <div class="dos"><div class="caja"><b>No se pisan</b>Dos personas cargando facturas distintas, o una cargando gastos y otra confirmando pagos: cada cosa se guarda aparte. Los automáticos (estimados, cobros, recordatorios) llevan una marca única y no se duplican aunque haya varios equipos abiertos.</div>
+        <div class="caja"><b>Sí se pisan</b>Si dos editan <b>el mismo gasto</b> a la vez, queda lo último que se guardó. Si se emite y después se carga o cambia un gasto de ese mes, hay que <b>"Reabrir el período"</b> y volver a emitir. Corregir un asiento en el Libro no cambia la expensa.</div></div>
+      <p style="margin-top:10px"><b>Recomendación:</b> una persona carga gastos y confirma pagos durante el mes; <b>una sola</b> cierra y emite. El contador solo recibe la carpeta.</p></div>
+    <div class="resp"><h3>Lo que la app hace sola</h3>
+      <ul><li>Los gastos que se repiten aparecen solos el mes siguiente, ajustados (los revisás con lápiz, tilde o cruz).</li>
+        <li>El día 1 completa con estimados lo que falta del mes anterior y te avisa con "Ir al cierre" (emitir sola viene apagado mientras se lleve en paralelo con Octavo Piso).</li>
+        <li>Recordatorios de vencimiento a cada lote, el aviso de mora y los pagos de Mercado Pago que se acreditan solos.</li>
+        <li>Cada pago confirmado y cada gasto quedan como asiento en el Libro contable.</li></ul></div>
+    <div class="resp"><h3>Ojo mientras se lleve en paralelo</h3>
+      <p>La app cobra el ajuste a quien tenga saldo impago <b>en la app</b>. Si alguien pagó por fuera (a Octavo Piso) y no se registró acá, le saldría deuda. Antes de cerrar: registrá esos pagos (Expensas → Pagos → <b>Registrar un pago a mano</b>) o traé la liquidación real del mes (Expensas → Automáticas → <b>Traer la liquidación real de un mes</b>).</p></div>
+  </section>
+  <p class="pie">Práctica de la app del Barrio Bahía Cauquén · lo que hagas acá queda solo en este navegador · <a href="./">Abrir la app</a></p>
+</div>
+
+<script>
+/* =========================================================
+   LA GUÍA: cada paso sabe adónde llevar, qué botón resaltar y cómo darse
+   cuenta solo de que ya se hizo (mirando la app de adentro, que es del
+   mismo sitio). Lo que la app no puede notar sola tiene "Ya lo hice".
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const frame = $('#app');
+/* La app de adentro tiene piezas que no cuelgan de "window" (las const de
+   cada archivo): se leen con una función creada en su propio ámbito global.
+   Mismo sitio, así que se puede; si algún día no, la guía queda sin la app. */
+let cacheDoc = null, lectores = new Map();
+function W(){
+  try {
+    const win = frame.contentWindow; if (!win || !win.document) return null;
+    /* La ventana de adentro es la misma aunque la app se recargue: lo que
+       cambia es el documento. Lo leído antes de recargar ya no sirve. */
+    if (win.document !== cacheDoc){ cacheDoc = win.document; lectores = new Map(); }
+    const leer = n => { if (typeof n !== 'string') return undefined; if (n === 'document') return win.document; if (n in win) return win[n];
+      let f = lectores.get(n); if (!f){ try { f = win.Function(`return typeof ${n} === "undefined" ? undefined : ${n}`); } catch(e){ f = () => undefined; } lectores.set(n, f); }
+      try { return f(); } catch(e){ return undefined; } };
+    const w = new Proxy({}, { get:(_, n) => leer(n) });
+    return w.Store && w.Store.s && typeof w.abrir === 'function' ? w : null;
+  } catch(e){ return null; }
+}
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const KEY = 'bhc.practica.expensas.v1';
+const memo = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ return {}; } })();
+memo.vistos = memo.vistos || {}; memo.manual = memo.manual || {};
+const grabar = () => { try { localStorage.setItem(KEY, JSON.stringify(memo)); } catch(e){} };
+const visto = k => !!memo.vistos[k];
+
+/* Los meses de la práctica: el anterior (el primero que se liquida) y el actual. */
+const per = w => { const hoy = w.periodoHoy(); return { mes1: w.periodoAnterior(hoy), mes2: hoy, n1: w.nombrePeriodo(w.periodoAnterior(hoy)), n2: w.nombrePeriodo(hoy) }; };
+const plata = (w, n) => w.plata ? w.plata(n) : '$ ' + Math.round(n).toLocaleString('es-AR');
+
+/* Entrar como alguien en la app de adentro, sin el cartel del modo ni el recorrido. */
+function como(w, id, modo){
+  try { ['vecino','admin','garita','guardia','hotel','supervisor'].forEach(p => w.Recorrido && w.Recorrido.marcar(p)); } catch(e){}
+  if (!w.yo() || w.yo().id !== id) w.entrarComo(id);
+  w.Store.sesion.modo = modo; w.Store.guardarSesion();
+  setTimeout(() => { try { w.cerrarHoja(); w.pintarTop && w.pintarTop(); } catch(e){} }, 380);
+}
+function ir(w, id, p){ setTimeout(() => { try { w.cerrarHoja(); w.PILA.length = 0; w.pintar(); w.abrir(id, p || ''); } catch(e){} }, 450); }
+
+/* Datos de ejemplo para "Mostrame cómo". */
+const gastosEjemplo = (mes) => [
+  { proveedor:'Camuzzi Gas del Sur', cuit:'30-65786367-6', rubro:'3', tipoComp:'Factura B', nroComp:'0003-00045871', total:'1250000', detalle:'Gas de la garita y del SUM' },
+  { proveedor:'Vigilancia Fueguina SRL', cuit:'30-71234567-8', rubro:'4', tipoComp:'Factura A', nroComp:'0001-00002210', total:'8400000', detalle:'Servicio de seguridad del mes' },
+  { proveedor:'Seguros del Sur', cuit:'30-50001234-5', rubro:'10', tipoComp:'Factura B', nroComp:'0007-00110022', total:'620000', cuotaN:'1', cuotaDe:'6', detalle:'Póliza de responsabilidad civil' },
+  { proveedor:'Corralón Austral', cuit:'20-23456789-0', rubro:'12', tipoComp:'Factura C', nroComp:'0002-00000781', total:'85000', lote:'Lote 23', detalle:'Cordón dañado por la obra del Lote 23' },
+].map(g => ({ periodo:mes, fecha:mes + '-15', neto:'', iva:'', columna:'expensas', retGan:'', retSuss:'', cuotaN:'', cuotaDe:'', lote:'', ...g }));
+
+const PASOS = [
+  { fase:'Preparar (una sola vez)', t:'Revisá los parámetros',
+    donde:['Administración', 'Contabilidad', 'Parámetros'],
+    que:['Mirá los <b>vencimientos</b> (1º día 10 y 2º día 21) y el <b>recargo del 2º</b> (1,5 %).', 'En <b>Pago fuera de término</b> elegí cómo se ajusta la deuda: <b>inflación (IPC)</b>, <b>inflación + interés</b> o <b>interés fijo</b>.', 'Revisá el <b>Fondo de Infraestructura</b> por lote, el <b>alias y el CBU</b> y el correo del contador.', 'Tocá <b>"Guardar los parámetros"</b>.'],
+    sola:'Con esto arma cada cupón. Cambiarlo vale para lo que se emita de acá en adelante, no para lo ya emitido.',
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'parametros'); },
+    aca:'form[data-f="parametros-exp"] > button.btn-pri',
+    hecho: w => w.Store.s.auditoria.some(a => a && a.accion === 'Cambió los parámetros de expensas'),
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { w.F['parametros-exp']({ vto1:'10', vto2:'21', recargo2:'1.5', interesMensual:'3', fondoFijo:'5000', metodoDeuda:'interes', alias:w.Store.s.config.alias || 'bahia.cauquen', cbu:w.Store.s.config.cbu || '', cuenta:w.Store.s.config.cuenta || '', cuit:w.Store.s.config.cuit || '', mpLink:'', modoLink:'', condicion:'Exento', iibb:'', contador:'' }); ir(w, 'contabilidad', 'parametros'); }, 500); } },
+
+  { fase:'Primer mes', t: w => `Cargá los gastos (egresos) de ${per(w).n1}`,
+    donde:['Administración', 'Contabilidad', 'Gastos del mes'],
+    que: w => [`Arriba elegí <b>${per(w).n1}</b>.`, 'Tocá <b>"Cargar un gasto nuevo"</b> y completá: proveedor, CUIT, rubro, comprobante, <b>Total</b> y la <b>foto</b> de la factura. Si es en cuotas, "Cuota 1 de 6".', 'Cargá por lo menos <b>3 gastos</b>. Uno puede ser <b>de un lote en particular</b> (por ejemplo, un arreglo que pagó el barrio por la obra del Lote 23): ese no se reparte, va solo a ese lote.', 'Si todavía no llegó la factura, tildá <b>"Todavía es un estimado"</b>.'],
+    sola:'Cada gasto queda también como asiento en el Libro contable, para el contador.',
+    dato: w => { const p = per(w), gs = w.gastosDe(p.mes1); return `<b>${gs.length} de 3</b> gastos cargados en ${esc(p.n1)} · total ${plata(w, gs.reduce((a, g) => a + (+g.total || 0), 0))}`; },
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'gastos|' + per(w).mes1); },
+    aca:'#cuerpo [data-a="nuevo-gasto"]',
+    hecho: w => w.gastosDe(per(w).mes1).length >= 3,
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { const p = per(w); gastosEjemplo(p.mes1).slice(0, Math.max(0, 4 - w.gastosDe(p.mes1).length)).forEach(g => w.F['gasto'](g, { dataset:{} })); ir(w, 'contabilidad', 'gastos|' + p.mes1); }, 500); } },
+
+  { fase:'Primer mes', t: w => `Mirá cómo queda cada lote en ${per(w).n1}`,
+    donde:['Administración', 'Contabilidad', 'Cierre de mes'],
+    que:['Arriba ves el total de gastos por columna, el Fondo de Infraestructura (152 lotes × el fijo) y el <b>total a prorratear</b>.', 'Tocá <b>"Ver las 152 cuotas"</b>: cada lote con su coeficiente, sus expensas, el fondo y, si tiene, el gasto particular.'],
+    sola:'Todavía no se emitió nada: es una vista previa. Si algo no cierra, volvés a Gastos del mes y lo corregís.',
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'cierre|' + per(w).mes1); },
+    aca:'#cuerpo [data-a="previsualizar"]',
+    hecho: w => visto('hoja:Cuotas de ' + per(w).n1) || (w.liquidacionDe(per(w).mes1) || {}).estado === 'emitida',
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { w.cerrarHoja(); w.PILA.length = 0; w.pintar(); w.abrir('contabilidad', 'cierre|' + per(w).mes1); setTimeout(() => w.A['previsualizar']({ dataset:{ v:per(w).mes1 } }), 300); }, 500); } },
+
+  { fase:'Primer mes', t: w => `Emití la liquidación de ${per(w).n1}`,
+    donde:['Administración', 'Contabilidad', 'Cierre de mes'],
+    que:['Tocá <b>"Emitir la liquidación y los cupones"</b> y confirmá.', 'Si algún gasto es estimado, la app te lo recuerda antes de emitir.'],
+    sola:'Al emitir: arma un cupón por lote, le avisa a cada vecino en la app (con sonido), le manda el cupón por correo a cada propietario con correo cargado, y desde ahí corre el reloj de vencimientos de cada lote.',
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'cierre|' + per(w).mes1); },
+    aca:'#cuerpo [data-a="emitir-liquidacion"]',
+    hecho: w => (w.liquidacionDe(per(w).mes1) || {}).estado === 'emitida',
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { w.emitirLiquidacion(per(w).mes1); ir(w, 'contabilidad', 'cierre|' + per(w).mes1); }, 500); } },
+
+  { fase:'Primer mes', t:'Revisá el envío a cada propietario',
+    donde:['Administración', 'Administración', 'Correos'],
+    que:['Acá está cada correo con el cupón: a quién, el asunto y si salió.', 'En la app de verdad salen solos por Gmail. <b>En esta práctica quedan en la bandeja</b> (no se manda nada real).', 'Para reenviar: <b>Contabilidad → Cierre de mes → "Reenviar los cupones por correo"</b>: a todos, <b>solo a mí</b> para ver cómo llega, o <b>a un lote</b> (con otro correo o por <b>WhatsApp</b>, con el importe, los vencimientos, el alias y el CBU ya escritos).'],
+    sola:'Al lote que no tiene correo cargado no le llega nada por mail: cargalo en Vecinos → Padrón, o mandáselo por WhatsApp desde "A un lote".',
+    dato: w => { const n = w.Store.s.correos.filter(c => c && c.tipo === 'cupon').length; return `<b>${n}</b> ${n === 1 ? 'correo' : 'correos'} de cupones en la bandeja`; },
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'admin', 'correos'); },
+    aca:'#cuerpo .card',
+    hecho: w => visto('ventana:admin:correos') && w.Store.s.correos.some(c => c && c.tipo === 'cupon'),
+    porMi: w => { como(w, 'u_admin', 'admin'); ir(w, 'admin', 'correos'); } },
+
+  { fase:'Cobrar (ingresos)', t:'Una vecina paga: Lote 42',
+    donde:['Como Lucía (Lote 42)', 'Expensas'],
+    que:['La guía te pasa a la cuenta de <b>Lucía, del Lote 42</b>.', 'En su Expensas ve su cupón. Tocá <b>"Ya la pagué · marcarla como pagada"</b> y confirmá.', 'Con Mercado Pago activo, el vecino paga desde la app y se acredita solo, con recibo.'],
+    sola:'Queda "Pagada" para ella (no le llegan más recordatorios) y "por acreditar" para la Administración, que la confirma con el banco (los centavos dicen el lote).',
+    ir: w => { como(w, 'u_lucia', 'vecino'); ir(w, 'expensas'); },
+    aca:'#cuerpo [data-a="marcar-pagada"]',
+    hecho: w => w.Store.s.pagos.some(p => p && p.lote === 'Lote 42' && (w.porAcreditar(p) || w.pagoAcreditado(p))),
+    porMi: w => { como(w, 'u_lucia', 'vecino'); setTimeout(async () => { const c = w.cuentaLote('Lote 42'), debe = Math.max(0, c.saldo - (c.informado || 0)); if (debe > .5) await w.F['informar-pago']({ monto:debe.toFixed(2), fecha:w.hoyISO(), medio:'Transferencia bancaria', nota:'Práctica', comp:'' }); ir(w, 'expensas'); }, 500); } },
+
+  { fase:'Cobrar (ingresos)', t:'Confirmá el pago con el banco',
+    donde:['Administración', 'Expensas', 'Pagos'],
+    que:['Volvés a la Administración. En <b>Pagos</b>, arriba, están los <b>por acreditar</b>.', 'Comparalo con el resumen del banco (el importe termina en ,42: es el Lote 42) y tocá <b>"Confirmar"</b>.', 'Si alguien pagó en la oficina o por fuera y no avisó: <b>"Registrar un pago a mano"</b>.'],
+    sola:'Al confirmar sale el recibo numerado, se descuenta del saldo del lote y queda el asiento de ingreso en el Libro contable.',
+    dato: w => { const n = w.Store.s.pagos.filter(w.porAcreditar).length; return `<b>${n}</b> ${n === 1 ? 'pago' : 'pagos'} por acreditar`; },
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'cobranzas', 'cobranzas'); },
+    aca:'#cuerpo [data-a="confirmar-pago"]',
+    hecho: w => w.Store.s.pagos.some(p => p && p.lote === 'Lote 42' && w.pagoAcreditado(p)),
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { w.Store.s.pagos.filter(p => p && p.lote === 'Lote 42' && w.porAcreditar(p)).forEach(p => w.confirmarPago(p.id)); ir(w, 'cobranzas', 'cobranzas'); }, 500); } },
+
+  { fase:'Cobrar (ingresos)', t:'Otros ingresos (si los hay)',
+    donde:['Administración', 'Contabilidad', 'Libro contable'],
+    que:['Lo que entra y no es una expensa (calcomanías, alquiler del SUM, merchandising) va con <b>"Cargar otro ingreso"</b>.', 'Si este mes no hubo, tocá <b>"Ya lo hice"</b> abajo.'],
+    sola:'Queda como asiento de ingreso aparte (cuenta 4.4 / 4.6), para que el contador vea si tributa. No cambia ninguna expensa.',
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'libro'); },
+    aca:'#cuerpo [data-a="ingreso-nuevo"]',
+    manual:true, hecho: () => false },
+
+  { fase:'Segundo mes', t: w => `Los gastos de ${per(w).n2}: aparecen solos`,
+    donde:['Administración', 'Contabilidad', 'Gastos del mes'],
+    que: w => [`Elegí <b>${per(w).n2}</b>. Arriba aparecen <b>los gastos de ${per(w).n1} que se repiten</b>, con el importe ya actualizado.`, 'Cada uno: <b>lápiz</b> si cambió el importe (y "usar este importe en los meses siguientes"), <b>tilde</b> para confirmarlo tal cual, <b>cruz</b> si este mes no va. O <b>"Pasar todos … como estimados"</b>.', 'Si llegó una factura nueva, <b>"Cargar un gasto nuevo"</b>. Cuando llegue la real de un estimado, el estimado se borra solo.'],
+    sola:'Las cuotas siguen solas hasta la última ("2 de 6", "3 de 6"…) y lo que fue de una sola vez no se repite.',
+    dato: w => { const p = per(w), f = w.pendientesDelMes ? w.pendientesDelMes(p.mes2).length : 0; return `${f ? `<b>${f}</b> por revisar` : 'Nada por revisar'} · <b>${w.gastosDe(p.mes2).length}</b> cargados en ${esc(p.n2)}`; },
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'gastos|' + per(w).mes2); },
+    aca:'#cuerpo .gm-anterior, #cuerpo [data-a="nuevo-gasto"]',
+    hecho: w => { const p = per(w); return w.gastosDe(p.mes2).length > 0 && (!w.pendientesDelMes || w.pendientesDelMes(p.mes2).length === 0); },
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { const p = per(w); w.Store.cambiar(s => w.completarConEstimados(s, p.mes2)); ir(w, 'contabilidad', 'gastos|' + p.mes2); }, 500); } },
+
+  { fase:'Segundo mes', t:'La deuda, ajustada y sumada',
+    donde:['Administración', 'Contabilidad', 'Cierre de mes'],
+    que:['Tocá <b>"Ver las 152 cuotas"</b> y buscá el <b>Lote 42</b> (pagó) y el <b>Lote 148</b> (no pagó).', 'Al 148 la app le suma el <b>ajuste</b> sobre lo impago; al 42, no. La tabla de abajo lo muestra en vivo.'],
+    sola:'Total a pagar = saldo anterior + ajuste + cuota del mes. Todo termina en los centavos del lote.',
+    dato: w => { const p = per(w); try {
+      /* Antes de emitir, la cuenta en vivo; después, la del cupón emitido (lo que arrastraba al emitir). */
+      const emitida = (w.liquidacionDe(p.mes2) || {}).estado === 'emitida', calc = emitida ? null : w.calcularLiquidacion(p.mes2);
+      const fila = lote => { let ant, c;
+        if (emitida){ const m = w.montosCupon(p.mes2, lote) || {}; ant = Math.max(0, m.saldoAnt || 0); c = m.cu || {}; }
+        else { c = calc.cuotas.find(x => x.lote === lote) || {}; ant = Math.max(0, w.saldoLote(lote)); }
+        return `<tr><td>${lote.replace('Lote ', 'L. ')}</td><td>${plata(w, ant)}</td><td>${plata(w, c.interes || 0)}</td><td>${plata(w, c.total || 0)}</td><td><b>${plata(w, ant + (c.interes || 0) + (c.total || 0))}</b></td></tr>`; };
+      return `<table><tr><th>Lote</th><th>Debía</th><th>Ajuste</th><th>Mes</th><th>A pagar</th></tr>${fila('Lote 42')}${fila('Lote 148')}</table><div style="margin-top:6px;font-size:12.5px;color:var(--muted)">${emitida ? 'Así salió en el cupón emitido. ' : ''}Tasa de este cierre: ${esc(w.textoMora ? w.textoMora() : '')}</div>`; } catch(e){ return 'Cargá los gastos del mes para ver la cuenta.'; } },
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'cierre|' + per(w).mes2); },
+    aca:'#cuerpo [data-a="previsualizar"]',
+    hecho: w => visto('hoja:Cuotas de ' + per(w).n2) || (w.liquidacionDe(per(w).mes2) || {}).estado === 'emitida',
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { w.cerrarHoja(); w.PILA.length = 0; w.pintar(); w.abrir('contabilidad', 'cierre|' + per(w).mes2); setTimeout(() => w.A['previsualizar']({ dataset:{ v:per(w).mes2 } }), 300); }, 500); } },
+
+  { fase:'Segundo mes', t: w => `Emití ${per(w).n2}`,
+    donde:['Administración', 'Contabilidad', 'Cierre de mes'],
+    que:['<b>"Emitir la liquidación y los cupones"</b>, como el mes pasado.', 'En la vida real, el día 1 te llega el aviso con <b>"Ir al cierre"</b> del mes que terminó: completa con estimados lo que falta y te lleva directo.'],
+    sola:'Le llega a cada uno su cupón con lo que arrastra; a los que deben, con el ajuste explicado.',
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'cierre|' + per(w).mes2); },
+    aca:'#cuerpo [data-a="emitir-liquidacion"]',
+    hecho: w => (w.liquidacionDe(per(w).mes2) || {}).estado === 'emitida',
+    porMi: w => { como(w, 'u_admin', 'admin'); setTimeout(() => { w.emitirLiquidacion(per(w).mes2); ir(w, 'contabilidad', 'cierre|' + per(w).mes2); }, 500); } },
+
+  { fase:'Segundo mes', t:'Cómo lo ve el que debe: Lote 148',
+    donde:['Como Claudio (Lote 148)', 'Expensas'],
+    que:['La guía te pasa a la cuenta del <b>Lote 148</b>.', 'Mirá su cupón: <b>saldo anterior + ajuste + el mes</b>, los dos vencimientos, cómo pagar y su cuenta corriente.'],
+    sola:'Desde que se emite, en su Pizarra le corre el reloj: un renglón por día y, el día del 2º vencimiento, en rojo.',
+    ir: w => { como(w, 'u_claudio', 'vecino'); ir(w, 'expensas'); },
+    aca:'#cuerpo .btn-grande, #cuerpo [data-a="pago-transferencia"]',
+    hecho: w => visto('ventana:expensas@u_claudio') },
+
+  { fase:'El contador', t:'La carpeta del contador',
+    donde:['Administración', 'Contabilidad', 'Carpeta del contador'],
+    que:['Resumen del mes, libro diario, comprobantes, cobranzas por lote, retenciones y banco.', 'Bajala en PDF o en planillas, mandale el aviso al contador y, cuando lo revisó, <b>"Cerrar el mes para el contador"</b> (congela el libro de ese mes).'],
+    sola:'El libro se armó solo: un asiento por cada gasto y uno por cada pago confirmado. Corregir un asiento no toca la expensa.',
+    ir: w => { como(w, 'u_admin', 'admin'); ir(w, 'contabilidad', 'carpeta'); },
+    aca:'#cuerpo .btn-pri',
+    hecho: w => visto('ventana:contabilidad:carpeta') },
+];
+
+let actual = 0, ultimoListo = -1;
+const val = (x, w) => typeof x === 'function' ? x(w) : x;
+const hechoDe = (i, w) => { const p = PASOS[i]; if (memo.manual[i]) return true; try { return !!(w && p.hecho(w)); } catch(e){ return false; } };
+
+function pintarGuia(){
+  const w = W(), hechos = PASOS.map((_, i) => hechoDe(i, w)), n = hechos.filter(Boolean).length;
+  if (!memo.elegido) actual = Math.max(0, hechos.findIndex(x => !x)); if (actual < 0) actual = PASOS.length - 1;
+  const p = PASOS[actual], listo = hechos[actual];
+  $('#progTxt').textContent = n === PASOS.length ? '¡Terminaste la práctica!' : `Paso ${actual + 1} de ${PASOS.length}`;
+  $('#progPct').textContent = Math.round(n / PASOS.length * 100) + ' %';
+  $('#progBarra').style.width = (n / PASOS.length * 100) + '%';
+  const fases = [...new Set(PASOS.map(x => x.fase))];
+  $('#fases').innerHTML = fases.map(f => { const idx = PASOS.map((x, i) => x.fase === f ? i : -1).filter(i => i >= 0), ok = idx.every(i => hechos[i]);
+    return `<span class="fase ${ok ? 'ok' : idx.includes(actual) ? 'on' : ''}">${ok ? '✓ ' : ''}${esc(f)}</span>`; }).join('');
+  const que = w ? val(p.que, w) : p.que, tit = w ? val(p.t, w) : (typeof p.t === 'string' ? p.t : 'Cargando la app…');
+  $('#pasoActual').className = 'paso-actual' + (listo ? ' listo' : '');
+  $('#pasoActual').innerHTML = `<div class="pa-fase">${esc(p.fase)}</div>
+    <div class="pa-tit"><span class="pa-num">${actual + 1}</span><h2>${esc(tit)}</h2></div>
+    <div class="donde">${p.donde.map((d, i) => `${i ? '<i>›</i>' : ''}<span>${esc(d)}</span>`).join('')}</div>
+    <div class="bloque"><h3>Qué hacés</h3><ol>${(Array.isArray(que) ? que : []).map(x => `<li>${x}</li>`).join('')}</ol></div>
+    <div class="sola"><b>La app sola:</b> ${p.sola}</div>
+    ${p.dato && w ? `<div class="dato">${val(p.dato, w)}</div>` : ''}
+    <div class="acciones">
+      <button class="btn pri" data-g="ir">Llevame ahí</button>
+      ${p.porMi ? `<button class="btn acc" data-g="pormi">Mostrame cómo (lo hace la app)</button>` : ''}
+      ${p.manual ? `<button class="btn sec" data-g="manual">Ya lo hice</button>` : ''}
+      ${listo && actual < PASOS.length - 1 ? `<button class="btn sec" data-g="sig">Siguiente paso →</button>` : ''}</div>
+    <div class="hecho-ok">✓ ${n === PASOS.length ? '¡Listo! Ya sabés armar y mandar las expensas del mes.' : 'Hecho. Seguí con el próximo paso.'}</div>`;
+  let fase = '';
+  $('#listaPasos').innerHTML = PASOS.map((x, i) => { const cab = x.fase !== fase ? (fase = x.fase, `<div class="lp-fase">${esc(x.fase)}</div>`) : '';
+    return `${cab}<button class="lp ${hechos[i] ? 'ok' : ''} ${i === actual ? 'on' : ''}" data-paso="${i}"><span class="e">${hechos[i] ? '✓' : i + 1}</span><span>${esc(w ? val(x.t, w) : (typeof x.t === 'string' ? x.t : 'Paso ' + (i + 1)))}</span></button>`; }).join('');
+  if (listo && ultimoListo !== actual){ ultimoListo = actual; }
+}
+
+/* Resaltar el botón que hay que tocar, adentro de la app. */
+function resaltar(){
+  const w = W(); if (!w) return;
+  const d = w.document;
+  if (!d.getElementById('practicaCss')){ const st = d.createElement('style'); st.id = 'practicaCss';
+    st.textContent = `.practica-aca{outline:3px solid #ff9f43!important;outline-offset:3px;border-radius:14px;animation:practicaLate 1.3s ease-in-out infinite!important;position:relative;z-index:1}
+      @keyframes practicaLate{50%{outline-color:rgba(255,159,67,.2);box-shadow:0 0 0 8px rgba(255,159,67,.18)}}`; d.head.appendChild(st); }
+  d.querySelectorAll('.practica-aca').forEach(x => x.classList.remove('practica-aca'));
+  const p = PASOS[actual]; if (!p || !p.aca || hechoDe(actual, w)) return;
+  const el = [...d.querySelectorAll(p.aca)].find(x => x.offsetParent !== null); if (el) el.classList.add('practica-aca');
+}
+
+/* Lo que la app de adentro va mostrando (para los pasos de "mirar"). */
+function observar(){
+  const w = W(); if (!w) return;
+  try {
+    const h = w.document.getElementById('hoja'), t = w.document.getElementById('hojaTitulo');
+    if (h && h.open && t && t.textContent) memo.vistos['hoja:' + t.textContent.trim()] = 1;
+    const top = w.PILA && w.PILA[w.PILA.length - 1];
+    if (top){ memo.vistos['ventana:' + top.id + (top.param ? ':' + String(top.param).split('|')[0] : '')] = 1; if (w.yo()) memo.vistos['ventana:' + top.id + '@' + w.yo().id] = 1; }
+    grabar();
+  } catch(e){}
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-g],[data-paso]'); if (!b) return;
+  const w = W();
+  if (b.dataset.paso !== undefined){ actual = +b.dataset.paso; memo.elegido = true; pintarGuia(); if (w) { PASOS[actual].ir(w); setTimeout(resaltar, 900); } return; }
+  const p = PASOS[actual];
+  if (!w){ alert('La app todavía está cargando. Esperá un segundo.'); return; }
+  if (b.dataset.g === 'ir'){ p.ir(w); setTimeout(resaltar, 900); }
+  if (b.dataset.g === 'pormi' && p.porMi){ p.porMi(w); setTimeout(() => { memo.elegido = false; pintarGuia(); resaltar(); }, 1500); }
+  if (b.dataset.g === 'manual'){ memo.manual[actual] = true; memo.elegido = false; grabar(); pintarGuia(); }
+  if (b.dataset.g === 'sig'){ memo.elegido = false; pintarGuia(); const w2 = W(); if (w2) { PASOS[actual].ir(w2); setTimeout(resaltar, 900); } }
+});
+$('#reiniciar').addEventListener('click', () => {
+  if (!confirm('¿Empezar la práctica de cero? Se borran los datos de ejemplo de este navegador (la app real no se toca).')) return;
+  try { ['bhc.prueba.datos.v3', 'bhc.prueba.sesion.v3', KEY].forEach(k => localStorage.removeItem(k)); sessionStorage.removeItem('bhc.prueba.pestana'); sessionStorage.removeItem('bhc.prueba.modo'); } catch(e){}
+  location.reload();
+});
+
+/* Al cargar la app de adentro: entrar como Administración y llevar al primer paso que falta. */
+frame.addEventListener('load', () => {
+  let n = 0; const t = setInterval(() => { const w = W(); if (!w && ++n < 40) return; clearInterval(t); if (!w) return;
+    memo.elegido = false; pintarGuia(); PASOS[actual].ir(w); setTimeout(resaltar, 1200); }, 250);
+});
+setInterval(() => { observar(); const antes = $('#pasoActual').className; pintarGuia(); resaltar();
+  if (!antes.includes('listo') && $('#pasoActual').className.includes('listo') && actual < PASOS.length - 1) setTimeout(() => { memo.elegido = false; pintarGuia(); const w = W(); if (w && !hechoDe(actual, w)) { PASOS[actual].ir(w); setTimeout(resaltar, 900); } }, 2200);
+}, 1000);
+pintarGuia();
+</script>
+</body>
+</html>
