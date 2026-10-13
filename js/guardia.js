@@ -7,7 +7,8 @@
       policía provincial que hace horas adicionales. Antes se le pedía "el
       turno de la garita" al anotarla, como si fueran lo mismo. Ahora tiene
       su horario: de domingo a jueves desde las 21:59 y viernes y sábado
-      desde las 23:59, siempre hasta las 06:00 del día siguiente (la
+      desde las 23:59; de domingo a jueves hasta las 06:00 y viernes y
+      sábado hasta las 08:00 del día siguiente (14-10-2026) (la
       Administración lo cambia en Turnos → Policía nocturna). El turno de
       la garita en que entró o salió se sigue guardando solo, por la hora.
 
@@ -34,7 +35,7 @@
    ========================================================= */
 
 /* ---------- 1. el horario de la policía nocturna ---------- */
-const POLICIA_HORARIO_BASE = { semana:'21:59', finde:'23:59', hasta:'06:00' };
+const POLICIA_HORARIO_BASE = { semana:'21:59', finde:'23:59', hasta:'06:00', hastaFinde:'08:00' };
 const policiaHorario = () => ({ ...POLICIA_HORARIO_BASE, ...(Store.s.config.policiaHorario || {}) });
 const conHoraDe = (d, hhmm) => { const [h, m] = String(hhmm || '').split(':').map(Number); const x = new Date(d); x.setHours(h || 0, m || 0, 0, 0); return x.getTime(); };
 /* Viernes y sábado empieza más tarde. La noche "del viernes" termina el sábado a las 6. */
@@ -42,7 +43,7 @@ const nocheEsFinde = dia => dia === 5 || dia === 6;
 function nocheQueEmpieza(d){
   const h = policiaHorario(), dia = d.getDay(), desde = conHoraDe(d, nocheEsFinde(dia) ? h.finde : h.semana);
   const sig = new Date(d); sig.setDate(sig.getDate() + 1);
-  return { dia, desde, hasta: conHoraDe(sig, h.hasta) };
+  return { dia, desde, hasta: conHoraDe(sig, nocheEsFinde(dia) ? h.hastaFinde : h.hasta) };
 }
 /* La noche que corre ahora (o la próxima, si todavía no empezó). */
 function nochePolicia(at = Date.now()){
@@ -67,7 +68,7 @@ function cabNoche(n = nochePolicia()){
 /* La semana entera, para Turnos. */
 function semanaPolicia(){
   const h = policiaHorario(), hoy = new Date().getDay();
-  return `<div class="pn-semana">${[1, 2, 3, 4, 5, 6, 0].map(d => `<span class="${nocheEsFinde(d) ? 'finde' : ''}${d === hoy ? ' hoy' : ''}"><small>${DIAS[d]}</small><b>${nocheEsFinde(d) ? h.finde : h.semana}</b><i>a ${h.hasta}</i></span>`).join('')}</div>`;
+  return `<div class="pn-semana">${[1, 2, 3, 4, 5, 6, 0].map(d => `<span class="${nocheEsFinde(d) ? 'finde' : ''}${d === hoy ? ' hoy' : ''}"><small>${DIAS[d]}</small><b>${nocheEsFinde(d) ? h.finde : h.semana}</b><i>a ${nocheEsFinde(d) ? h.hastaFinde : h.hasta}</i></span>`).join('')}</div>`;
 }
 /* En Turnos: el horario y, para la Administración, cambiarlo. */
 function seccionPoliciaHorario(){
@@ -80,14 +81,15 @@ function seccionPoliciaHorario(){
         <form data-f="policia-horario" style="margin-top:10px"><div class="grid3">
           <div class="field"><label>Dom. a jue. desde</label><input type="time" name="semana" required value="${esc(h.semana)}"></div>
           <div class="field"><label>Vie. y sáb. desde</label><input type="time" name="finde" required value="${esc(h.finde)}"></div>
-          <div class="field"><label>Hasta (día siguiente)</label><input type="time" name="hasta" required value="${esc(h.hasta)}"></div></div>
+          <div class="field"><label>Dom. a jue. hasta</label><input type="time" name="hasta" required value="${esc(h.hasta)}"></div></div>
+          <div class="grid3"><div class="field"><label>Vie. y sáb. hasta</label><input type="time" name="hastaFinde" required value="${esc(h.hastaFinde)}"></div></div>
           <button class="btn btn-pri btn-block">${I('check')}Guardar el horario</button></form></details>` : ''}</div>`;
 }
 F['policia-horario'] = d => {
   if (!esAdmin()) return;
   const ok = x => /^\d{2}:\d{2}$/.test(x || '');
-  if (![d.semana, d.finde, d.hasta].every(ok)) return toast('Revisá las horas', 'clock');
-  Store.cambiar(s => { s.config.policiaHorario = { semana:d.semana, finde:d.finde, hasta:d.hasta }; auditar(s, 'Cambió el horario de la policía nocturna', `dom-jue ${d.semana} · vie-sáb ${d.finde} · hasta ${d.hasta}`); });
+  if (![d.semana, d.finde, d.hasta, d.hastaFinde].every(ok)) return toast('Revisá las horas', 'clock');
+  Store.cambiar(s => { s.config.policiaHorario = { semana:d.semana, finde:d.finde, hasta:d.hasta, hastaFinde:d.hastaFinde }; auditar(s, 'Cambió el horario de la policía nocturna', `dom-jue ${d.semana} a ${d.hasta} · vie-sáb ${d.finde} a ${d.hastaFinde}`); });
   toast('Horario de la policía guardado', 'check');
 };
 /* El turno de la garita que estaba abierto en un momento dado. */
@@ -282,7 +284,9 @@ let gaT = 0;
 function sincroGuardiaAhora(){
   if (!esGuardia() || !yo()) return;
   /* Hasta que la bitácora no bajó de la nube no se sabe si hay turno: no se publica nada. */
-  if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listos && Nube.listos.has('staff/bitacora'))) return;
+  /* Nube anota lo que ya bajó como base + colección, sin barra ("staffbitacora"):
+     antes se preguntaba por "staff/bitacora" y en la app real nunca publicaba (14-10-2026). */
+  if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listos && (Nube.listos.has('staffbitacora') || Nube.listos.has('staff/bitacora')))) return;
   const d = guardiaAhoraDeseada(), cur = aLista(Store.s.guardiaAhora).find(x => x && x.id === 'ahora');
   const igual = (a, b) => { if (!a || !b) return false; const k = x => JSON.stringify({ ...x, at:0, guardias: aLista(x.guardias) }); return k(a) === k(b); };
   if (igual(cur, d)) return;

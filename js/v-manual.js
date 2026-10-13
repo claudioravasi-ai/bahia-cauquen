@@ -693,9 +693,9 @@ const MANUAL_CAPS = [
     ['lista', ['<b>Camión de la basura</b>: registrá la entrada (patente) y la salida. A todo el barrio le llega el aviso.',
       '<b>Correos</b> (la tarjeta naranja de arriba): tocala, elegí la empresa (Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u <b>Otro</b>, que pide el nombre) y <b>"Registrar la entrada"</b>. Si el correo te dice a qué casas va, escribí los lotes (por ejemplo "12, 40, 133A"): a esas casas les llega <b>"va a tu casa"</b> al celular. Si después va a otra casa más, <b>"Avisar a otro lote"</b>. Cuando se va, <b>"Registrar la salida"</b>: su camión deja de verse en todas las pantallas. Los lotes y la patente los ve solo la garita (y la Administración y la supervisión).', '<b>Bitácora</b>: el libro de guardia. Lo que se anota no se borra; un incidente le suena siempre a la Administración.']],
     ['h', 'La policía nocturna'],
-    ['p', 'Es policía provincial que hace horas adicionales: tiene <b>su propio horario</b>, distinto del de los turnos de la garita. De <b>domingo a jueves desde las 21:59</b> y <b>viernes y sábado desde las 23:59</b>, siempre <b>hasta las 06:00</b>. La Administración lo cambia en Turnos → Policía nocturna.'],
+    ['p', 'Es policía provincial que hace horas adicionales: tiene <b>su propio horario</b>, distinto del de los turnos de la garita. De <b>domingo a jueves de 21:59 a 06:00</b> y <b>viernes y sábado de 23:59 a 08:00</b> del día siguiente. La Administración lo cambia en Turnos → Policía nocturna.'],
     ['pasos', [
-      'Cuando llega, tocá la tarjeta <b>Policía</b> de arriba (o "Ingreso" en su solapa). Arriba se ve su noche con el horario y una barra hasta las 6.',
+      'Cuando llega, tocá la tarjeta <b>Policía</b> de arriba (o "Ingreso" en su solapa). Arriba se ve su noche con el horario y una barra hasta la hora de salida (las 6, o las 8 los viernes y sábados).',
       'Si ya vino antes, <b>tocá su fichita</b> ("¿Quién llega?") y se completan solos el nombre, la matrícula, el celular y el correo. Si es nuevo, escribilos.',
       'La hora queda en <b>"Ahora"</b>; si lo anotás tarde, tocá "Otra hora" y poné el día y la hora. El turno de la garita se anota solo.',
       'Tocá <b>"Registrar el ingreso y armar su tarjeta"</b>: sale <b>su tarjeta</b> con su nombre, la matrícula, la noche de servicio, su <b>código de ronda</b> y un QR.',

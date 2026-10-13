@@ -911,6 +911,8 @@ const Nube = {
         /* Lo que es del personal (bitácora, auditoría) no es tarea del vecino:
            si no llega, no se lo asusta con un cartel. */
         /* Los correos (08-10-2026): si las reglas nuevas no están publicadas, se dice qué hacer. */
+        /* La guardia de ahora (14-10-2026): si las reglas nuevas no están publicadas, la garita se entera una vez. */
+        if (g === 'barrio/guardiaAhora'){ if (!this.avisoGuardia && typeof esGuardia === 'function' && esGuardia()){ this.avisoGuardia = true; toast('Los vecinos todavía no ven quién está de guardia: falta publicar las reglas nuevas de Firebase (reglas-firebase.txt).', 'alert'); } return; }
         if (g === 'barrio/mensajeria'){ (this.sinPermiso = this.sinPermiso || new Set()).add('mensajeria'); toast('El correo no se guardó en la base del barrio: falta publicar las reglas nuevas de Firebase (reglas-firebase.txt). Hasta entonces el camión no llega a los demás.', 'alert'); return; }
         /* La copia de una visita en la carpeta de OTRO del lote (12-10-2026): si
            las reglas nuevas todavía no se publicaron, la reparte la
