@@ -216,17 +216,58 @@ A['hist-visitas-todo'] = async () => {
     pintarHistVisitas('Historial de visitas', true);
   } catch(e){ Historial.fallo(e); }
 };
-function pintarHistVisitas(titulo, conCasa, q = ''){
-  const qq = normTxt(q);
-  const ls = qq ? histVisitas.filter(p => normTxt(`${p.nombre} ${(usuario(p.hostId) || {}).casa || ''} ${p.autoriza || ''} ${p.fecha}`).includes(qq)) : histVisitas;
-  hoja(titulo, `<form class="linea-form" data-f="hist-visitas-buscar" data-t="${esc(titulo)}" data-c="${conCasa ? 1 : ''}" style="margin-bottom:10px">
-      <input name="q" value="${esc(q)}" placeholder="${conCasa ? 'Nombre, lote o fecha (2026-09)…' : 'Nombre o fecha (2026-09)…'}"><button class="btn btn-pri">${I('search')}</button></form>
-    <p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'visita')}${qq ? ' encontradas' : ' en total'}. Las de más de ${Historial.diasVisitas()} días vienen del archivo histórico, sin DNI, celular ni patente.</p>
-    <div class="card lista">${ls.length ? ls.slice(0, 400).map(p => filaHistVisita(p, conCasa)).join('') : '<p class="muted small">No hay visitas.</p>'}</div>
-    ${ls.length > 400 ? `<p class="muted tiny">Se muestran las 400 más recientes. Buscá por nombre, lote o mes para ver otras, o bajá la planilla.</p>` : ''}
-    <button class="btn btn-sec btn-block" data-a="hist-visitas-csv">${I('download')}Descargar la planilla (CSV)</button>`);
+/* EL HISTORIAL DE VISITAS, REDISEÑADO (pedido de Claudio, 13-10-2026):
+   arriba los números (visitas, este mes, lotes o días, adentro ahora), los
+   tipos como fichas de color que filtran, y cada visita como una tarjeta
+   con su color, el lote, quién autorizó y una barrita de cuánto se quedó.
+   Agrupadas por mes. El buscador y la planilla siguen igual. */
+let histVisArgs = { titulo:'', conCasa:false, q:'', tipo:'' };
+const durTxt = ms => { const m = Math.max(1, Math.round(ms / MIN)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : ''); };
+function tarjetaHistVisita(p, conCasa, i){
+  const t = TIPOS_PASE[p.tipo] || TIPOS_PASE.visita, host = usuario(p.hostId) || {}, log = p.log || {}, dias = Object.keys(log).sort();
+  const ult = dias.length ? log[dias.at(-1)] : null, hoy = hoyISO();
+  const adentro = ult && ult.in && !ult.out && dias.at(-1) === hoy;
+  const porVenir = !dias.length && (p.fechaFin || p.fecha || '') >= hoy;
+  const estado = p.cancelado ? ['Cancelado', 'gris'] : adentro ? ['Adentro ahora', 'ok'] : porVenir ? [p.dias?.length ? 'Vigente' : 'Por venir', 'sky'] : !dias.length ? ['No vino', 'gris'] : ult.out ? ['Salió', 'sky'] : ['Entró', 'ok'];
+  const dur = ult && ult.in && ult.out ? ult.out - ult.in : adentro ? Date.now() - ult.in : 0, ancho = Math.min(100, Math.max(6, dur / (8 * HORA) * 100));
+  const cuando = p.dias?.length ? `fijo hasta ${fechaCorta(p.fechaFin)}` : fechaCorta(p.fecha || '');
+  return `<div class="hv-it c-${t.c}" style="--i:${Math.min(i, 14)}">
+    <span class="hv-av">${esc(inicial(p.nombre || '?'))}<i>${I(t.icon)}</i></span>
+    <div class="hv-txt"><div class="hv-l1"><b>${esc(p.nombre || '—')}</b>${conCasa && (host.casa || p.casa) ? `<span class="hv-lote">${I('home')}${esc(host.casa || p.casa)}</span>` : ''}</div>
+      <div class="hv-l2"><span class="hv-tipo">${esc(t.n)}</span><span>${I('calendar')}${esc(cuando)}</span>${p.autoriza || p.hostId ? `<span>${I('user')}autorizó ${esc(p.autoriza || primerNombre(nombreDe(p.hostId)))}</span>` : ''}${p.archivadoAt ? `<span>${I('lock')}archivo</span>` : ''}</div>
+      ${ult && ult.in ? `<div class="hv-estadia"><time>${hora(ult.in)}</time><span class="hv-barra ${adentro ? 'viva' : ''}"><i style="width:${ancho.toFixed(0)}%"></i></span><time>${ult.out ? hora(ult.out) : adentro ? 'ahora' : '—'}</time><small>${dur ? durTxt(dur) : ''}${dias.length > 1 ? ` · vino ${dias.length} días` : ''}</small></div>` : ''}</div>
+    <span class="hv-estado e-${estado[1]}">${estado[0]}</span></div>`;
 }
-F['hist-visitas-buscar'] = (d, form) => pintarHistVisitas(form.dataset.t, !!form.dataset.c, d.q || '');
+function pintarHistVisitas(titulo, conCasa, q = '', tipo = histVisArgs.titulo === titulo ? histVisArgs.tipo : ''){
+  histVisArgs = { titulo, conCasa, q, tipo };
+  const qq = normTxt(q), mes = hoyISO().slice(0, 7);
+  const porTexto = qq ? histVisitas.filter(p => normTxt(`${p.nombre} ${(usuario(p.hostId) || {}).casa || ''} ${p.autoriza || ''} ${p.fecha}`).includes(qq)) : histVisitas;
+  /* Se ordena y se agrupa por el último día que vino (o el día anunciado). */
+  const clave = p => Object.keys(p.log || {}).sort().at(-1) || p.fecha || '';
+  const ls = (tipo ? porTexto.filter(p => (p.tipo || 'visita') === tipo) : porTexto).slice().sort((a, b) => clave(b).localeCompare(clave(a)));
+  const tipos = [...new Set(porTexto.map(p => p.tipo || 'visita'))].filter(k => TIPOS_PASE[k]);
+  const delMes = porTexto.filter(p => String(p.fecha || '').startsWith(mes)).length;
+  const lotes = new Set(porTexto.map(p => (usuario(p.hostId) || {}).casa || p.casa).filter(Boolean)).size;
+  const adentro = porTexto.filter(p => { const l = p.log || {}, d = l[hoyISO()]; return d && d.in && !d.out; }).length;
+  const vinieron = porTexto.filter(p => Object.keys(p.log || {}).length).length;
+  let m0 = '';
+  const filas = ls.slice(0, 400).map((p, i) => { const m = clave(p).slice(0, 7), cab = m !== m0 ? (m0 = m, `<div class="hv-mes"><b>${esc(m && typeof nombrePeriodo === 'function' ? nombrePeriodo(m) : m || 'Sin fecha')}</b><span>${plural(ls.filter(x => clave(x).slice(0, 7) === m).length, 'visita')}</span></div>`) : '';
+    return cab + tarjetaHistVisita(p, conCasa, i); }).join('');
+  hoja(titulo, `<div class="hv-stats">
+      <span class="c-brand"><b>${porTexto.length}</b><small>${qq ? 'encontradas' : 'visitas'}</small></span>
+      <span class="c-accent"><b>${delMes}</b><small>este mes</small></span>
+      <span class="c-sky"><b>${conCasa ? lotes : vinieron}</b><small>${conCasa ? 'lotes' : 'vinieron'}</small></span>
+      <span class="c-ok ${adentro ? 'vivo' : ''}"><b>${adentro}</b><small>adentro ahora</small></span></div>
+    <form class="hv-buscar" data-f="hist-visitas-buscar" data-t="${esc(titulo)}" data-c="${conCasa ? 1 : ''}">${I('search')}
+      <input name="q" value="${esc(q)}" type="search" placeholder="${conCasa ? 'Nombre, lote o mes (2026-09)…' : 'Nombre o mes (2026-09)…'}" aria-label="Buscar visitas"><button class="btn btn-sm btn-pri">Buscar</button></form>
+    ${tipos.length > 1 ? `<div class="hv-tipos">${[['', 'Todas', 'list', 'brand'], ...tipos.map(k => [k, TIPOS_PASE[k].n, TIPOS_PASE[k].icon, TIPOS_PASE[k].c])].map(([k, n, ic, c]) => `<button type="button" class="hv-t c-${c} ${tipo === k ? 'on' : ''}" data-a="hv-tipo" data-v="${k}">${I(ic)}${esc(n)}<b>${k ? porTexto.filter(p => (p.tipo || 'visita') === k).length : porTexto.length}</b></button>`).join('')}</div>` : ''}
+    <div class="hv-lista">${filas || `<div class="bt-vacio">${I('users')}<b>No hay visitas${qq || tipo ? ' con ese filtro' : ''}</b><small>${qq || tipo ? 'Probá con otra palabra o tocá "Todas".' : 'Cuando vengan, aparecen acá.'}</small></div>`}</div>
+    ${ls.length > 400 ? `<p class="muted tiny">Se muestran las 400 más recientes. Buscá por nombre, lote o mes para ver otras, o bajá la planilla.</p>` : ''}
+    <p class="muted tiny" style="margin:10px 2px">${I('lock')} Las de más de ${Historial.diasVisitas()} días vienen del archivo histórico, sin DNI, celular ni patente.</p>
+    <button class="btn btn-sec btn-block" data-a="hist-visitas-csv">${I('download')}Descargar la planilla (CSV)</button>`, { ancho:'640px' });
+}
+A['hv-tipo'] = el => pintarHistVisitas(histVisArgs.titulo, histVisArgs.conCasa, histVisArgs.q, el.dataset.v || '');
+F['hist-visitas-buscar'] = (d, form) => pintarHistVisitas(form.dataset.t, !!form.dataset.c, d.q || '', histVisArgs.tipo);
 A['hist-visitas-csv'] = () => csvDe(filasCSVVisitas(histVisitas), `visitas-${hoyISO()}.csv`);
 
 /* ---------- El libro de guardia completo ---------- */

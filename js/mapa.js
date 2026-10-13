@@ -137,6 +137,31 @@ const mapaPrincipal = d => MAPA_ORDEN.find(k => mapaTiene(d, k)) || '';
    teléfono parado (el barrio es largo y angosto) arranca un poco acercado
    para llenar el alto, y se recorre con el dedo para los costados. */
 let mapaVista = { cx: MAPA_CAJA.x + MAPA_CAJA.w / 2, cy: MAPA_CAJA.y + MAPA_CAJA.h / 2, z:0 };
+/* EL PLANO DADO VUELTA (pedido de Claudio, 13-10-2026: "la garita abajo y
+   el Canal Beagle arriba; la garita está acostumbrada a verlo de esa
+   forma"). No se gira el dibujo (los números y los nombres quedarían de
+   cabeza): se dan vuelta las coordenadas de los lotes, las calles y la
+   garita, 180° alrededor del centro del plano. El mar y el espacio verde
+   se dibujan dentro de un grupo girado. Viene así de fábrica; el botón de
+   girar lo vuelve a poner como el plano original (lo recuerda cada equipo). */
+const MAPA_CENTRO = [MAPA_CAJA.x + MAPA_CAJA.w / 2, MAPA_CAJA.y + MAPA_CAJA.h / 2];
+const mapaGiro = ([x, y]) => [2 * MAPA_CENTRO[0] - x, 2 * MAPA_CENTRO[1] - y];
+let mapaGiradoYa = false;
+function mapaVoltear(){
+  Object.values(MAPA_LOTES).forEach(g => { [g.x, g.y] = mapaGiro([g.x, g.y]); });
+  [MAPA_GARITA[0], MAPA_GARITA[1]] = mapaGiro(MAPA_GARITA);
+  MAPA_CALLES.forEach(c => { c.pts = c.pts.map(mapaGiro); if (c.lbl) c.lbl = mapaGiro(c.lbl); });
+  const [cx, cy] = mapaGiro([mapaVista.cx, mapaVista.cy]); mapaVista = { ...mapaVista, cx, cy };
+  mapaGiradoYa = !mapaGiradoYa;
+}
+const mapaP = (x, y) => mapaGiradoYa ? mapaGiro([x, y]) : [x, y];
+try { if (localStorage.getItem('bhc.mapa.girado') !== '0') mapaVoltear(); } catch(e){ mapaVoltear(); }
+A['mapa-girar'] = () => {
+  mapaVoltear();
+  try { localStorage.setItem('bhc.mapa.girado', mapaGiradoYa ? '1' : '0'); } catch(e){}
+  toast(mapaGiradoYa ? 'La garita abajo y el canal arriba' : 'Como el plano original: el canal abajo', 'map');
+  refrescar();
+};
 const mapaZAuto = svg => { const cw = svg.clientWidth || 600, ch = svg.clientHeight || 300;
   return Math.max(1, Math.min(2, (ch / MAPA_CAJA.h) / (cw / MAPA_CAJA.w) * 0.92)); };
 const mapaZ = (svg, v = mapaVista) => v.z || mapaZAuto(svg);
@@ -236,11 +261,13 @@ function mapaSVG(est){
       <radialGradient id="mapaTierra" cx=".5" cy=".35" r=".8"><stop offset="0" stop-color="#16384a"/><stop offset="1" stop-color="#0b1f2e"/></radialGradient>
       <pattern id="mapaOlas" width="40" height="14" patternUnits="userSpaceOnUse"><path d="M0 7 Q10 2 20 7 T40 7" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.2"/></pattern>
     </defs>
-    <rect x="-200" y="-200" width="1600" height="1000" fill="url(#mapaTierra)"/>
+    <rect x="-400" y="-400" width="2000" height="1400" fill="url(#mapaTierra)"/>
+    <g${mapaGiradoYa ? ` transform="rotate(180 ${MAPA_CENTRO[0]} ${MAPA_CENTRO[1]})"` : ''}>
     <path class="mar" d="M-200,430 L30,420 L140,394 L250,364 L340,344 L470,353 L505,372 L530,396 L600,404 L700,438 L820,462 L940,484 L1000,506 L1300,520 L1300,800 L-200,800 Z"/>
     <path class="olas" d="M-200,430 L30,420 L140,394 L250,364 L340,344 L470,353 L505,372 L530,396 L600,404 L700,438 L820,462 L940,484 L1000,506 L1300,520 L1300,800 L-200,800 Z"/>
-    <text class="nombre-mar" x="250" y="430">Canal Beagle</text><text class="nombre-mar" x="780" y="500">Canal Beagle</text>
-    <path class="verde" d="M735,298 L915,298 L924,314 L908,346 Z"/><text class="nombre-verde" x="850" y="312">Espacio verde</text>
+    <path class="verde" d="M735,298 L915,298 L924,314 L908,346 Z"/></g>
+    ${[[250, 430], [780, 500]].map(([x, y]) => { const [a, b] = mapaP(x, y); return `<text class="nombre-mar" x="${a}" y="${b}">Canal Beagle</text>`; }).join('')}
+    ${(([a, b]) => `<text class="nombre-verde" x="${a}" y="${b}">Espacio verde</text>`)(mapaP(850, 312))}
     ${calles}${lineas}${nombres}
     <g class="radar"><path d="M${gx},${gy} L${(gx + 640 * Math.cos(-0.6)).toFixed(1)},${(gy + 640 * Math.sin(-0.6)).toFixed(1)} A640,640 0 0,1 ${gx + 640},${gy} Z"/><line x1="${gx}" y1="${gy}" x2="${gx + 640}" y2="${gy}"/>
       ${quieto ? '' : `<animateTransform attributeName="transform" type="rotate" from="0 ${gx} ${gy}" to="360 ${gx} ${gy}" dur="9s" repeatCount="indefinite"/>`}</g>
@@ -250,7 +277,7 @@ function mapaSVG(est){
       <circle class="g-halo" cx="${gx}" cy="${gy}" r="16"/><circle class="g-base" cx="${gx}" cy="${gy}" r="11"/>
       ${I('shield').replace('<svg class="i ', `<svg x="${gx - 7}" y="${gy - 7}" width="14" height="14" class="i g-ic `)}
       <text class="g-txt" x="${gx}" y="${gy - 18}">GARITA</text></g>
-    <text class="nombre-hotel" x="410" y="352">${esc(typeof HOTEL_NOMBRE !== 'undefined' ? HOTEL_NOMBRE : 'Hotel')}</text>
+    ${(([a, b]) => `<text class="nombre-hotel" x="${a}" y="${b}">`)(mapaP(410, 352))}${esc(typeof HOTEL_NOMBRE !== 'undefined' ? HOTEL_NOMBRE : 'Hotel')}</text>
   </svg>`;
 }
 
@@ -287,6 +314,7 @@ function mapaBarrio({ grande = false } = {}){
         <button data-a="mapa-zoom" data-v="+" aria-label="Acercar">${I('plus')}</button>
         <button data-a="mapa-zoom" data-v="-" aria-label="Alejar">${I('minus')}</button>
         <button data-a="mapa-zoom" data-v="todo" aria-label="Ver todo el barrio">${I('target')}</button>
+        <button data-a="mapa-girar" aria-label="Girar el plano 180 grados" title="${mapaGiradoYa ? 'Ver como el plano original' : 'Garita abajo, canal arriba'}">${I('refresh')}</button>
       </div>
       <div class="mapa-pista">${I('info')}<span>${MAPA_PISTA}</span></div>
       <div class="mapa-tip" hidden></div>
@@ -363,7 +391,7 @@ A['mapa-lote'] = el => {
   if (c && c.k * 22 < 18) return mapaIr({ cx:g.x, cy:g.y, z:mapaZoomLote() });
   mapaAbrirFicha(l);
 };
-A['mapa-garita'] = () => mapaIr({ cx:MAPA_GARITA[0], cy:MAPA_GARITA[1] + 40, z:Math.max(mapaVista.z || 1, 2.5) });
+A['mapa-garita'] = () => mapaIr({ cx:MAPA_GARITA[0], cy:MAPA_GARITA[1] + (mapaGiradoYa ? -40 : 40), z:Math.max(mapaVista.z || 1, 2.5) });
 A['mapa-zoom'] = el => {
   const v = el.dataset.v;
   if (v === 'todo') return mapaIr({ cx:MAPA_CAJA.x + MAPA_CAJA.w / 2, cy:MAPA_CAJA.y + MAPA_CAJA.h / 2, z:1 });

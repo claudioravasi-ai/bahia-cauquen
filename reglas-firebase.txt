@@ -107,6 +107,15 @@ QUÉ HACEN, EN CASTELLANO
    pueden llevar la marca "cerrada" (se cerró la sesión): el Apps Script les
    manda solo el aviso "un correo va a tu casa".
 
+8 ter. LA GUARDIA DE AHORA (13-10-2026). /barrio/guardiaAhora tiene un solo
+   registro: el turno abierto de la garita, su horario, los nombres de
+   quienes están de guardia (con su dibujo) y si hay policía de servicio
+   (sí o no, sin nombre). Lo escribe la garita y lo leen los vecinos, la
+   Administración y la supervisión; el hotel no. Los vecinos siguen sin leer
+   la bitácora. /staff/guardiaLooks guarda cómo eligió aparecer cada guardia:
+   lo escribe la garita y lo leen la garita, la Administración y la
+   supervisión.
+
 7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
    ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
    escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
@@ -188,6 +197,13 @@ PEGAR DESDE ACÁ
 
       /* El camión de la basura: lo registra la garita, lo ven todos. */
       "camion":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+
+      /* La guardia de ahora (13-10-2026): el turno abierto de la garita, su
+         horario y los nombres de quienes están de guardia (con el dibujo que
+         eligió cada uno), y si hay policía de servicio (sin su nombre). Lo
+         escribe la garita; lo leen los vecinos, la Administración y la
+         supervisión (el hotel no). */
+      "guardiaAhora":  { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
 
       /* Los correos que están en el barrio (07-10-2026): solo la empresa y las
          horas. Los anota la garita; los ven los vecinos, la Administración y la
@@ -454,6 +470,10 @@ PEGAR DESDE ACÁ
       "frecuentes": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'))", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* Los teléfonos de cada lote (08-10-2026): la garita, la Administración
          y la supervisión. Los vecinos no. Los carga la Administración. */
+      /* Cómo eligió aparecer cada guardia en el dibujo (13-10-2026): nombre y
+         rasgos (hombre o mujer, altura, contextura, pelo, piel). Lo escribe la
+         garita; lo leen la garita, la Administración y la supervisión. */
+      "guardiaLooks": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
       "telefonos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* El libro contable: solo la Administración. */
       "asientos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },

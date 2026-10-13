@@ -49,7 +49,9 @@ function sincronizarHistorial(){
 const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', 'privado', 'vecinos', 'pizarron',
   'obras', 'proveedores', 'agenda', 'emergencias', 'cruceros', 'vuelos', 'recoleccion', 'mensajeria', 'ushuaia', 'documentos', 'sismos', 'frecuentes', 'alertas', 'municipio', 'legal', 'ayuda', 'manual',
   /* "Estoy bien": la garita ve solo a los vecinos que la eligieron como contacto (27-09). */
-  'estoy-bien', 'salidas']);
+  'estoy-bien', 'salidas',
+  /* 13-10: el mapa del barrio en pantalla completa (el botón "Grande" no abría) */
+  'mapa']);
 /* El hotel ve solo lo suyo y lo público de la ciudad (ver js/v-hotel.js).
    Emergencias (la de los vecinos) no: tiene el pedido del DEA y los SOS del
    día; el hotel tiene la suya. */
@@ -66,7 +68,9 @@ const VENTANAS_SUPERVISOR = new Set(['supervisor', 'garita', 'bitacora', 'turnos
   /* 08-10: buscar un vecino (lote, dirección y teléfonos), igual que la garita */
   'vecinos',
   /* 12-10: los ingresos frecuentes, solo para mirar (sin el código ni el QR) */
-  'frecuentes']);
+  'frecuentes',
+  /* 13-10: el mapa del barrio en pantalla completa */
+  'mapa']);
 /* EL PROPIETARIO A DISTANCIA (07-10-2026): su lote está alquilado (o no vive
    en el barrio). Ve lo que le toca como dueño; el día a día es del inquilino
    (ver esPropDistancia en core.js). */
@@ -1522,6 +1526,7 @@ A['mi-cuenta'] = () => { const u = yo(); Cuenta.enSub = false;
       <label class="cu-r cu-sw"><span class="cu-ri c-accent">${I('volume')}</span><span class="cu-rt"><b>Sonido</b><small>Cuando escribe la guardia o la Administración</small></span>
         <input type="checkbox" data-a="sonido" ${Store.sesion.sinSonido ? '' : 'checked'}><span class="cu-int" aria-hidden="true"></span></label></div>
     ${otros.length && typeof tarjetaLote === 'function' ? tarjetaLote(u) : ''}
+    ${esGuardia() && typeof tarjetaGuardiasCuenta === 'function' ? tarjetaGuardiasCuenta() : ''}
     <div class="cu-fichas">
       ${ficha({ a:'cambiar-clave', ic:'key', c:'brand', t: Nube.activa() ? 'Contraseña' : 'Mi clave', s:'Cambiarla' })}
       ${esGuardia() ? '' : ficha({ a:'cambiar-email', ic:'mail', c:'sky', t:'Mi correo', s:'Cambiarlo' })}
@@ -2149,6 +2154,7 @@ const PIEZAS = [
   ['js/adjuntos.js',   () => typeof Adjuntos],
   ['js/historial.js',  () => typeof Historial],
   ['js/v-supervisor.js', () => typeof Supervisor],
+  ['js/guardia.js',    () => typeof svgGuardia],
 ];
 function piezasQueFaltan(){
   const falta = [];

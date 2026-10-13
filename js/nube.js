@@ -58,7 +58,9 @@ const Nube = {
              /* 08-10: el resumen de cada liquidación, sin las cuotas de los lotes (js/v-expensas.js, ExpLote) */
              'liqResumen',
              /* 10-10: los morosos por lote, sin nombres (js/v-expensas.js, Morosos): vecinos y Administración */
-             'morosos'],
+             'morosos',
+             /* 13-10: quiénes están de guardia ahora (turno, nombres y su dibujo; js/guardia.js) */
+             'guardiaAhora'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
@@ -70,7 +72,9 @@ const Nube = {
             /* 07-10: alertas a la supervisión y vistos de los partes (js/v-supervisor.js) */
             'alertasSup','vistos',
             /* 08-10: los teléfonos de cada lote (garita, Administración y supervisión) */
-            'telefonos'],
+            'telefonos',
+            /* 13-10: cómo eligió aparecer cada guardia en el dibujo (js/guardia.js) */
+            'guardiaLooks'],
     /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
        los huéspedes, solo el hotel y la garita; las promociones propuestas,
@@ -90,8 +94,8 @@ const Nube = {
        trabajar y nada más: sin votaciones, expensas, pizarrón, compras,
        comunicados ni lo del hotel que no es de la garita (los huéspedes). */
     supervisor: { barrio:['users','guia','agenda','temporadas','feriados','eventosCiudad','contactos','documentos','obras','proveedores',
-                          'avistamientos','cruceros','camion','mensajeria','alertas'],
-                  staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos','telefonos','frecuentes'],
+                          'avistamientos','cruceros','camion','mensajeria','alertas','guardiaAhora'],
+                  staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos','telefonos','frecuentes','guardiaLooks'],
                   hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv'] },
   },
 
@@ -142,6 +146,7 @@ const Nube = {
     hotelProv:       { listas:['dias'] },
     camion:          { listas:[] },
     mensajeria:      { listas:[] },
+    guardiaAhora:    { listas:['guardias'] },
     sos:             { objetos:['responden'] },
     ausencias:       { objetos:['revisiones'] },
     casaTareas:      { listas:['sugerencias','cambioQue'] },
@@ -502,7 +507,7 @@ const Nube = {
   tanda: null,
 
   /* Colecciones nuevas: si al abrir la app las reglas todavía no las permitían, se reintenta. */
-  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen', 'morosos'],
+  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen', 'morosos', 'guardiaAhora', 'guardiaLooks'],
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
       /* Bitácora y auditoría bajan solo lo reciente (ver js/historial.js). */
@@ -911,7 +916,7 @@ const Nube = {
            las reglas nuevas todavía no se publicaron, la reparte la
            Administración; la del propio vecino viaja aparte y llega igual. */
         if (g.startsWith('pv/pases/') && g !== 'pv/pases/' + this.uid) return;
-        if (!/^staff\/(bitacora|auditoria)$/.test(g)) toast('No se pudo guardar en la nube (' + g.split('/')[1] + '): ' + e.message, 'alert');
+        if (!/^(staff\/(bitacora|auditoria|guardiaLooks)|barrio\/guardiaAhora)$/.test(g)) toast('No se pudo guardar en la nube (' + g.split('/')[1] + '): ' + e.message, 'alert');
       });
     });
   },

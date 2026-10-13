@@ -87,6 +87,17 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .fases{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .fase{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;background:var(--surf-3);color:var(--muted)}
 .fase.on{background:var(--brand);color:#fff} .fase.ok{background:var(--ok-soft);color:var(--ok)}
+/* Volver un paso y volver a cero (13-10-2026) */
+.prog-acc{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.prog-acc button{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;border-radius:14px;font-weight:800;font-size:14px;border:1.5px solid var(--line-2);background:var(--surf-2);transition:transform .15s,background .15s}
+.prog-acc button:hover{background:var(--surf-3)} .prog-acc button:active{transform:scale(.97)}
+.prog-acc button[disabled]{opacity:.45;cursor:default}
+.prog-acc .cero{border-color:color-mix(in srgb,var(--danger) 40%,transparent);color:var(--danger);background:var(--danger-soft)}
+.prog-acc i{font-style:normal;font-size:17px;line-height:1}
+.fin-practica{margin-top:12px;padding:14px;border-radius:16px;background:linear-gradient(135deg,var(--ok-soft),var(--brand-soft));display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.fin-practica b{font-size:15px}
+.cargando{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(10,20,24,.45);color:#fff;font-weight:800;font-size:17px;backdrop-filter:blur(3px)}
+.cargando[hidden]{display:none}
 
 .paso-actual{position:relative;background:var(--surf);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 10px 30px rgba(11,60,71,.08);overflow:hidden}
 .paso-actual::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:linear-gradient(180deg,var(--acc),var(--brand))}
@@ -167,13 +178,14 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 
   <div class="banco">
     <section class="guia" aria-label="La guía">
-      <div class="prog"><div class="prog-cab"><b id="progTxt">Paso 1 de 13</b><span id="progPct">0 %</span></div><div class="barra"><i id="progBarra"></i></div><div class="fases" id="fases"></div></div>
+      <div class="prog"><div class="prog-cab"><b id="progTxt">Paso 1 de 13</b><span id="progPct">0 %</span></div><div class="barra"><i id="progBarra"></i></div><div class="fases" id="fases"></div>
+        <div class="prog-acc"><button type="button" id="atras" title="Deshace lo del paso anterior y lo volvés a practicar"><i>←</i>Volver un paso</button><button type="button" class="cero" id="cero" title="Borra la práctica y empieza de nuevo"><i>↺</i>Volver a cero</button></div></div>
       <article class="paso-actual" id="pasoActual" aria-live="polite"></article>
       <nav class="lista-pasos" id="listaPasos" aria-label="Todos los pasos"></nav>
     </section>
     <aside class="telefono" aria-label="La app, en modo prueba">
       <div class="marco"><iframe id="app" title="La app del barrio en modo prueba" src="index.html?local&practica=expensas"></iframe></div>
-      <div class="tel-pie"><span>La app de verdad, con datos de ejemplo.</span><button type="button" id="reiniciar">Empezar de cero</button></div>
+      <div class="tel-pie"><span>La app de verdad, con datos de ejemplo.</span><button type="button" id="reiniciar">Volver a cero</button></div>
     </aside>
   </div>
 
@@ -205,6 +217,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
     <div class="resp"><h3>Ojo mientras se lleve en paralelo</h3>
       <p>La app cobra el ajuste a quien tenga saldo impago <b>en la app</b>. Si alguien pagó por fuera (a Octavo Piso) y no se registró acá, le saldría deuda. Antes de cerrar: registrá esos pagos (Expensas → Pagos → <b>Registrar un pago a mano</b>) o traé la liquidación real del mes (Expensas → Automáticas → <b>Traer la liquidación real de un mes</b>).</p></div>
   </section>
+  <div class="cargando" id="cargando" hidden>Preparando la práctica…</div>
   <p class="pie">Práctica de la app del Barrio Bahía Cauquén · lo que hagas acá queda solo en este navegador · <a href="./">Abrir la app</a></p>
 </div>
 
@@ -237,7 +250,8 @@ const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&
 const KEY = 'bhc.practica.expensas.v1';
 const memo = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ return {}; } })();
 memo.vistos = memo.vistos || {}; memo.manual = memo.manual || {};
-const grabar = () => { try { localStorage.setItem(KEY, JSON.stringify(memo)); } catch(e){} };
+let tocando = false;   /* mientras se vuelve un paso o a cero, nada se guarda */
+const grabar = () => { if (tocando) return; try { localStorage.setItem(KEY, JSON.stringify(memo)); } catch(e){} };
 const visto = k => !!memo.vistos[k];
 
 /* Los meses de la práctica: el anterior (el primero que se liquida) y el actual. */
@@ -416,7 +430,9 @@ function pintarGuia(){
       ${p.porMi ? `<button class="btn acc" data-g="pormi">Mostrame cómo (lo hace la app)</button>` : ''}
       ${p.manual ? `<button class="btn sec" data-g="manual">Ya lo hice</button>` : ''}
       ${listo && actual < PASOS.length - 1 ? `<button class="btn sec" data-g="sig">Siguiente paso →</button>` : ''}</div>
-    <div class="hecho-ok">✓ ${n === PASOS.length ? '¡Listo! Ya sabés armar y mandar las expensas del mes.' : 'Hecho. Seguí con el próximo paso.'}</div>`;
+    <div class="hecho-ok">✓ ${n === PASOS.length ? '¡Listo! Ya sabés armar y mandar las expensas del mes.' : 'Hecho. Seguí con el próximo paso.'}</div>
+    ${n === PASOS.length ? `<div class="fin-practica"><b>¿Otra vuelta para que quede?</b><button class="btn acc" data-g="cero">↺ Practicar de nuevo desde cero</button></div>` : ''}`;
+  $('#atras').disabled = actual === 0;
   let fase = '';
   $('#listaPasos').innerHTML = PASOS.map((x, i) => { const cab = x.fase !== fase ? (fase = x.fase, `<div class="lp-fase">${esc(x.fase)}</div>`) : '';
     return `${cab}<button class="lp ${hechos[i] ? 'ok' : ''} ${i === actual ? 'on' : ''}" data-paso="${i}"><span class="e">${hechos[i] ? '✓' : i + 1}</span><span>${esc(w ? val(x.t, w) : (typeof x.t === 'string' ? x.t : 'Paso ' + (i + 1)))}</span></button>`; }).join('');
@@ -458,18 +474,67 @@ document.addEventListener('click', e => {
   if (b.dataset.g === 'manual'){ memo.manual[actual] = true; memo.elegido = false; grabar(); pintarGuia(); }
   if (b.dataset.g === 'sig'){ memo.elegido = false; pintarGuia(); const w2 = W(); if (w2) { PASOS[actual].ir(w2); setTimeout(resaltar, 900); } }
 });
-$('#reiniciar').addEventListener('click', () => {
-  if (!confirm('¿Empezar la práctica de cero? Se borran los datos de ejemplo de este navegador (la app real no se toca).')) return;
-  try { ['bhc.prueba.datos.v3', 'bhc.prueba.sesion.v3', KEY].forEach(k => localStorage.removeItem(k)); sessionStorage.removeItem('bhc.prueba.pestana'); sessionStorage.removeItem('bhc.prueba.modo'); } catch(e){}
-  location.reload();
-});
+/* =========================================================
+   VOLVER UN PASO Y VOLVER A CERO (pedido de Claudio, 13-10-2026: "una vez
+   corrida no deja empezar y probar de nuevo").
+   Antes "Empezar de cero" borraba los datos mientras la app de adentro
+   seguía abierta, y la app los volvía a guardar: quedaba todo hecho. Ahora
+   primero se cierra la app de adentro (página en blanco), recién ahí se
+   borra y después se vuelve a abrir.
+   Volver un paso: antes de cada paso la guía saca una FOTO de los datos de
+   la práctica; volver es reponer la foto del paso anterior, así ese paso
+   queda sin hacer y se practica de nuevo. Las fotos viven mientras esta
+   página está abierta (si se recarga, "Volver un paso" solo lleva al paso
+   anterior para mirarlo).
+   ========================================================= */
+const DATOS = 'bhc.prueba.datos.v3', SESION = 'bhc.prueba.sesion.v3', SRC = frame.getAttribute('src');
+const fotos = {};
+function sacarFoto(){
+  if (tocando) return; const w = W(); if (!w || hechoDe(actual, w) || fotos[actual]) return;
+  try { const d = localStorage.getItem(DATOS); if (d) fotos[actual] = d; } catch(e){}
+}
+/* Cierra la app de adentro, hace `fn` con todo quieto y la vuelve a abrir. */
+function conLaAppCerrada(fn, recargarTodo = false){
+  tocando = true; $('#cargando').hidden = false;
+  try { const w = frame.contentWindow; if (w && w.Store) { w.Store.guardar = () => {}; } } catch(e){}
+  frame.addEventListener('load', function una(){ frame.removeEventListener('load', una);
+    setTimeout(() => { try { fn(); } catch(e){}
+      if (recargarTodo) { location.reload(); return; }
+      tocando = false; frame.setAttribute('src', SRC); setTimeout(() => { $('#cargando').hidden = true; }, 1600); }, 150); });
+  frame.setAttribute('src', 'about:blank');
+}
+function volverACero(){
+  if (!confirm('¿Volver a cero? Se borra la práctica de este navegador (la app real no se toca) y empezás desde el paso 1.')) return;
+  conLaAppCerrada(() => { [DATOS, SESION, KEY].forEach(k => { try { localStorage.removeItem(k); } catch(e){} });
+    try { sessionStorage.removeItem('bhc.prueba.pestana'); sessionStorage.removeItem('bhc.prueba.modo'); } catch(e){}
+    memo.vistos = {}; memo.manual = {}; memo.elegido = false; }, true);
+}
+function volverUnPaso(){
+  const destino = Math.max(0, actual - 1);
+  /* Si el paso de ahora todavía no se hizo, se vuelve al anterior; si ya se hizo, se deshace este mismo. */
+  const w = W(), objetivo = w && hechoDe(actual, w) && fotos[actual] ? actual : destino;
+  const foto = fotos[objetivo];
+  if (!foto){ actual = objetivo; memo.elegido = true; pintarGuia(); const w2 = W(); if (w2) { PASOS[actual].ir(w2); setTimeout(resaltar, 900); }
+    return; }
+  if (!confirm(`¿Volver al paso ${objetivo + 1}? Se deshace lo que hiciste desde ahí y lo practicás de nuevo.`)) return;
+  conLaAppCerrada(() => {
+    try { localStorage.setItem(DATOS, foto); } catch(e){}
+    Object.keys(memo.manual).forEach(k => { if (+k >= objetivo) delete memo.manual[k]; });
+    Object.keys(fotos).forEach(k => { if (+k > objetivo) delete fotos[k]; });
+    memo.elegido = false; ultimoListo = -1; try { localStorage.setItem(KEY, JSON.stringify(memo)); } catch(e){}
+  });
+}
+$('#reiniciar').addEventListener('click', volverACero);
+$('#cero').addEventListener('click', volverACero);
+$('#atras').addEventListener('click', volverUnPaso);
+document.addEventListener('click', e => { if (e.target.closest('[data-g="cero"]')) volverACero(); });
 
 /* Al cargar la app de adentro: entrar como Administración y llevar al primer paso que falta. */
 frame.addEventListener('load', () => {
   let n = 0; const t = setInterval(() => { const w = W(); if (!w && ++n < 40) return; clearInterval(t); if (!w) return;
     memo.elegido = false; pintarGuia(); PASOS[actual].ir(w); setTimeout(resaltar, 1200); }, 250);
 });
-setInterval(() => { observar(); const antes = $('#pasoActual').className; pintarGuia(); resaltar();
+setInterval(() => { if (tocando) return; observar(); sacarFoto(); const antes = $('#pasoActual').className; pintarGuia(); resaltar();
   if (!antes.includes('listo') && $('#pasoActual').className.includes('listo') && actual < PASOS.length - 1) setTimeout(() => { memo.elegido = false; pintarGuia(); const w = W(); if (w && !hechoDe(actual, w)) { PASOS[actual].ir(w); setTimeout(resaltar, 900); } }, 2200);
 }, 1000);
 pintarGuia();

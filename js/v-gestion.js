@@ -1781,6 +1781,7 @@ function portadaPropietario(){
   const infr = aLista(s.infracciones).filter(i => i && i.casa === u.casa).length;
   const nombres = inq.map(x => esc(x.nombre)).join(' y ');
   const hero = `<div class="hero prop-hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+    ${typeof guardiaHero === 'function' ? guardiaHero() : ''}
     <div class="hero-centro">
       <div class="saludo">${saludo},</div>
       <h1>${esc(primerNombre(u.nombre))}</h1>

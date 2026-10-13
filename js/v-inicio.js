@@ -977,6 +977,7 @@ R.inicio = {
        llenar. El sismo va debajo, a lo ancho de esa misma grilla. */
     const hero = `<div class="hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
       ${deaHero()}
+      ${typeof guardiaHero === 'function' ? guardiaHero() : ''}
       <div class="hero-centro">
         <div class="saludo">${saludo},</div>
         <h1>${esc(u.rol === 'vecino' ? u.nombre.split(' ')[0] : u.nombre)}</h1>
@@ -1753,6 +1754,7 @@ function formularioTurno(){
       <span>${esc(aLista(abierto.guardias).join(', '))} · desde las ${hora(abierto.at)} h${isoDe(new Date(abierto.at)) !== hoyISO() ? ' del ' + fechaCorta(isoDe(new Date(abierto.at))) : ''}</span>
       <div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-sec" data-a="seguir-turno">Soy de ese turno: seguir</button></div>
       <p class="muted tiny" style="margin:8px 0 0">Pasa si la app se cerró en pleno turno o se entra desde otro equipo. Si sos de ese turno, seguí; si no, empezá el nuevo y ese se cierra solo (queda anotado en la bitácora).</p></div>` : ''}
+    ${notaDejadaHtml()}
     <form data-f="abrir-turno" class="card">
       <div class="field"><label>¿Qué turno es?</label><select name="turno">${turnosConfig().map(x => `<option value="${esc(x.nombre)}" ${x.nombre === t.nombre ? 'selected' : ''}>${esc(x.nombre)} · ${x.desde} a ${x.hasta} h</option>`).join('')}</select></div>
       <div class="field"><label>¿Quiénes trabajan hoy?</label>${[0, 1, 2].map(fila).join('')}<div id="turnoMas"></div>
@@ -1829,6 +1831,10 @@ F['cerrar-turno'] = d => {
     const x = t && aLista(s.bitacora).find(b => b.id === t.id);
     if (x){
       x.cerradoAt = ahora;
+      /* Las novedades para el turno que entra quedan también en el registro
+         del turno (13-10-2026): se fijan arriba en la bitácora y en la
+         pantalla de "Nuevo turno", para que el que entra las vea. */
+      if (nota) x.notaCierre = nota;
       x.policias = policiasDe(x).map(p => salen.has(p.id) && !p.sale ? { ...p, sale:ahora, turnoSale:t.turno } : p);
       /* La ronda que el que se va dejó abierta queda INCOMPLETA en la bitácora. */
       x.policias.filter(p => salen.has(p.id)).forEach(p => { const rc = rondaEnCurso(p); if (rc) cerrarRondaIncompleta(s, p, rc, ahora, 'el policía se retiró en plena ronda'); });
@@ -1956,24 +1962,28 @@ function bandaPolicia(){
   const guardia = esGuardia();
   const sueltos = pasosSueltos(t).filter(x => Date.now() - x.at > 30000);
   const avisoSueltos = sueltos.length ? `<div class="aviso a-warn" style="margin:10px 0 0">${I('qr')}<div class="txt"><b>${plural(sueltos.length, 'paso escaneado', 'pasos escaneados')} sin asignar</b>${sueltos.slice(0, 4).map(x => `${esc(nombrePunto(x.punto))} · ${esc(x.nombre)} · ${hora(x.at)} h`).join('<br>')}<br>Son de un código que ya no corresponde a ningún policía de este turno (por ejemplo, se registró la salida antes).</div></div>` : '';
-  const cab = `<div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="row" style="gap:8px">${I('shield')}Policía contratada${ps.length ? '' : `<span class="muted small" style="font-weight:600">· nadie de servicio ahora</span>`}</b>
-      ${guardia ? `<button class="btn btn-xs btn-sec" data-a="policia-nuevo">${I('plus')}Registrar ingreso</button>` : ''}</div>`;
+  /* (13-10-2026) Rediseño: la noche con su horario propio arriba, cada
+     policía como una credencial con su barra de servicio y botones grandes. */
+  const n = nochePolicia();
+  const cab = `<div class="pn-banda-cab"><span class="pn-luna">${I('moon')}<i></i><i></i><i></i></span>
+      <div class="grow"><b>Policía nocturna${ps.length ? '' : ' · nadie de servicio'}</b><small>${esc(n.etiqueta)} · ${horarioNocheTxt(n)}</small></div>
+      ${guardia ? `<button class="btn btn-xs btn-sec" data-a="policia-nuevo">${I('plus')}Ingreso</button>` : ''}</div>`;
   /* Sin nadie de servicio, el botón "Registrar ingreso" está en la tira de arriba (tiraGarita, 12-10-2026). */
   if (!ps.length) return avisoSueltos ? `<div class="card policia-card policia-solapa">${cab}${avisoSueltos}</div>` : '';
-  return `<div class="card policia-card">${cab}
-    ${ps.map(p => { const rc = rondaEnCurso(p), dur = rc ? minutos(rc.inicio, ahora) : 0;
-      return `<div class="policia">
-        <div class="policia-cab"><div class="grow"><b>${esc(p.nombre)}</b><span class="muted small">${p.matricula ? 'Mat. ' + esc(p.matricula) + ' · ' : ''}ingresó ${isoDe(new Date(p.entra)) !== hoyISO() ? fechaCorta(isoDe(new Date(p.entra))) + ' ' : ''}${hora(p.entra)} h${p.turnoEntra ? ' · turno ' + esc(p.turnoEntra) : ''}${codigoVigente(p.id) ? ` · código <span class="mono">${codigoVigente(p.id).id}</span>` : ''}${p.email ? '' : ' · <b>sin correo para la constancia</b>'}</span></div>
+  return `<div class="card policia-card pn-banda">${cab}${barraNoche(n)}
+    ${ps.map(p => { const rc = rondaEnCurso(p), dur = rc ? minutos(rc.inicio, ahora) : 0, hs = (ahora - p.entra) / HORA;
+      return `<div class="policia pn-agente ${rc ? 'en-ronda' : ''}">
+        <div class="policia-cab"><span class="pn-ini" style="--c:${colorDe(p.nombre)}">${esc(inicialesDe(p.nombre))}</span><div class="grow"><b>${esc(p.nombre)}</b><span class="muted small">${p.matricula ? 'Mat. ' + esc(p.matricula) + ' · ' : ''}ingresó ${isoDe(new Date(p.entra)) !== hoyISO() ? fechaCorta(isoDe(new Date(p.entra))) + ' ' : ''}${hora(p.entra)} h · ${hs >= 1 ? Math.floor(hs) + ' h ' : ''}${Math.round(hs % 1 * 60)} min${codigoVigente(p.id) ? ` · código <span class="mono">${codigoVigente(p.id).id}</span>` : ''}${p.email ? '' : ' · <b>sin correo para la constancia</b>'}</span></div>
           <span class="pill ${rc ? (dur > RONDA_LARGA ? 'p-danger' : 'p-accent') : ''}">${plural(p.rondas.length, 'ronda')}</span></div>
         ${rc ? `<div class="aviso a-${dur > RONDA_LARGA ? 'danger latido' : 'info'}" style="margin:8px 0 0">${I('clock')}<div class="txt"><b>En ronda desde las ${hora(rc.inicio)} h · ${dur} min</b>${dur > RONDA_LARGA ? `Una ronda lleva unos ${RONDA_MIN} minutos: conviene comunicarse con el policía.` : `Vuelve alrededor de las ${hora(rc.inicio + RONDA_MIN * MIN)} h.`}</div></div>` : ''}
         ${p.rondas.length ? `<div class="rondas">${p.rondas.map((r, i) => `<span class="ronda">${i + 1}. ${hora(r.inicio)}${r.fin ? '–' + hora(r.fin) + ' · ' + minutos(r.inicio, r.fin) + ' min' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}` : ''}${r.incompleta ? ' · <b>incompleta</b>' : ''}${guardia ? `<button class="x" data-a="policia-ronda-borrar" data-id="${p.id}" data-v="${r.id}" aria-label="Borrar la ronda">×</button>` : ''}</span>`).join('')}</div>` : ''}
         ${(() => { const r = rc || p.rondas.filter(x => x.pasos.length).slice(-1)[0]; return r && puntosActivos().length ? recorridoRonda(r) : ''; })()}
-        ${guardia ? `<div class="btns" style="margin-top:8px">
-          <button class="btn btn-sm ${rc ? 'btn-ok' : 'btn-pri'}" data-a="policia-ronda" data-id="${p.id}">${I(rc ? 'check' : 'pin')}${rc ? 'Terminó la ronda' : 'Sale a una ronda'}</button>
-          <button class="btn btn-sm btn-sec" data-a="policia-ronda-mano" data-id="${p.id}">${I('edit')}Anotar ronda a mano</button>
-          <button class="btn btn-sm btn-sec" data-a="policia-salida" data-id="${p.id}">${I('logout')}Salida</button>
-          ${codigoVigente(p.id) ? `<button class="btn btn-sm btn-sec" data-a="policia-codigo" data-id="${p.id}">${I('qr')}Código de ronda</button>` : ''}
-          <button class="btn btn-sm btn-sec" data-a="policia-codigo-nuevo" data-id="${p.id}">${I('refresh')}Código nuevo</button></div>` : ''}
+        ${guardia ? `<div class="pn-acc">
+          <button class="pn-b ${rc ? 'c-ok' : 'c-brand'}" data-a="policia-ronda" data-id="${p.id}">${I(rc ? 'check' : 'pin')}<span>${rc ? 'Terminó la ronda' : 'Sale a una ronda'}</span></button>
+          ${codigoVigente(p.id) ? `<button class="pn-b c-wa" data-a="policia-codigo" data-id="${p.id}">${I('qr')}<span>Su tarjeta</span></button>` : `<button class="pn-b c-wa" data-a="policia-codigo-nuevo" data-id="${p.id}">${I('qr')}<span>Armar su tarjeta</span></button>`}
+          <button class="pn-b c-wood" data-a="policia-salida" data-id="${p.id}">${I('logout')}<span>Se va</span></button></div>
+          <div class="btns" style="margin-top:6px"><button class="btn btn-xs btn-sec" data-a="policia-ronda-mano" data-id="${p.id}">${I('edit')}Anotar ronda a mano</button>
+          ${codigoVigente(p.id) ? `<button class="btn btn-xs btn-sec" data-a="policia-codigo-nuevo" data-id="${p.id}">${I('refresh')}Código nuevo</button>` : ''}</div>` : ''}
       </div>`; }).join('')}
     ${avisoSueltos}
   </div>`;
@@ -2228,37 +2238,42 @@ A['puntos-imprimir'] = async () => {
    orden (pedido de Claudio, 27-09). El turno es el de la garita en que
    entró o salió (puede no ser el que está abierto si se anota tarde). */
 const momentoDe = (dia, hhmm) => { const d = /^\d{4}-\d{2}-\d{2}$/.test(dia || '') ? fechaDe(dia) : new Date(); const [h, m] = String(hhmm || '').split(':').map(Number); if (isNaN(h)) return Date.now(); d.setHours(h, m || 0, 0, 0); return d.getTime(); };
-const camposDiaTurnoHora = (etqHora, nombreHora, turnoSel = '') => `<div class="grid3 dia-turno-hora">
-    <div class="field"><label>Día</label><input name="dia" type="date" required value="${hoyISO()}" max="${hoyISO()}"></div>
-    <div class="field"><label>Turno de la garita</label><select name="turno">${turnosConfig().map(x => `<option value="${esc(x.nombre)}" ${x.nombre === turnoSel ? 'selected' : ''}>${esc(x.nombre)} · ${x.desde}–${x.hasta}</option>`).join('')}</select></div>
-    <div class="field"><label>${etqHora}</label><input name="${nombreHora}" type="time" required value="${horaInput(Date.now())}"></div></div>`;
-const turnoElegido = n => (turnosConfig().find(x => x.nombre === n) || turnoAbierto() || turnoDeAhora() || {}).nombre || (turnoAbierto() || {}).turno || '';
+/* (13-10-2026) El turno de la garita ya no se elige: la policía nocturna
+   tiene su propio horario y el turno de la garita se anota solo por la hora
+   (turnoGaritaEn, js/guardia.js). */
 const correoValido = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+/* INGRESO DE LA POLICÍA NOCTURNA, RÁPIDO (rediseño, pedido de Claudio,
+   13-10-2026): arriba su horario (que no es el de la garita), los que ya
+   vinieron como fichitas que completan todo de un toque, y la hora en
+   "Ahora" (o "Otra hora" si se anota tarde). Al registrar, sale su tarjeta
+   para mandarle por WhatsApp (js/guardia.js). */
 A['policia-nuevo'] = () => {
   const t = turnoAbierto(); if (!t) return toast('Primero tiene que haber un turno abierto', 'clock');
-  const con = [...policiasConocidos().values()];
-  hoja('Ingreso del policía', `<form data-f="policia-nuevo">
-    ${camposDiaTurnoHora('Hora de ingreso', 'entra', t.turno)}
-    <div class="field"><label>Nombre y apellido</label><input name="nombre" list="policiasLista" required maxlength="60" autocomplete="off" placeholder="Nombre y apellido"></div>
-    <datalist id="policiasLista">${con.map(p => `<option value="${esc(p.nombre)}">${p.matricula ? 'Mat. ' + esc(p.matricula) : ''}</option>`).join('')}</datalist>
-    <div class="grid2"><div class="field"><label>Matrícula / legajo</label><input name="matricula" maxlength="20" autocomplete="off" placeholder="Si ya vino antes, se completa sola"></div>
-      <div class="field"><label>Celular del policía</label><input name="tel" type="tel" inputmode="tel" maxlength="20" autocomplete="off" placeholder="2901 15 123456"></div></div>
-    <div class="field"><label>Correo del policía</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off" placeholder="Si ya vino antes, se completa solo">
-      <div class="ayuda">Al registrar su salida, la app le manda por correo la <b>constancia de su servicio</b>: día, turno y hora de ingreso y de salida, con qué guardias estuvo y cada ronda con la hora de cada QR.</div></div>
-    <div class="ayuda" style="margin:-4px 0 12px">Con el celular se le manda por WhatsApp su <b>código de ronda</b> de esta noche. Sin ese código, los QR de los puntos no registran nada: así un vecino que escanee un punto no puede hacer pasar una ronda.</div>
-    <button class="btn btn-pri btn-block">${I('check')}Registrar el ingreso</button></form>`);
+  pnConocidos = [...policiasConocidos().values()].reverse().slice(0, 8);
+  hoja('Llegó la policía nocturna', `<form data-f="policia-nuevo" class="pn-form">
+    ${cabNoche()}
+    ${pnConocidos.length ? `<div class="pn-lbl">¿Quién llega? Si ya vino, tocalo y se completa todo</div>
+      <div class="pn-conocidos">${pnConocidos.map((p, i) => `<button type="button" class="pn-c" data-a="pn-elegir" data-i="${i}" style="--c:${colorDe(p.nombre)}"><span class="pn-ini">${esc(inicialesDe(p.nombre))}</span><b>${esc(p.nombre)}</b><small>${p.matricula ? 'Mat. ' + esc(p.matricula) : 'Sin matrícula'}</small></button>`).join('')}</div>` : ''}
+    <div class="pn-datos">
+      <div class="field"><label>Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="off" placeholder="Nombre y apellido"></div>
+      <div class="grid2"><div class="field"><label>Matrícula / legajo</label><input name="matricula" maxlength="20" autocomplete="off"></div>
+        <div class="field"><label>Celular (para su tarjeta)</label><input name="tel" type="tel" inputmode="tel" maxlength="20" autocomplete="off" placeholder="2901 15 123456"></div></div>
+      <div class="field"><label>Correo (para su constancia)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off"></div></div>
+    ${elegirCuando('Hora de ingreso', 'entra')}
+    <button class="btn btn-pri btn-block btn-grande">${I('shield')}Registrar el ingreso y armar su tarjeta</button>
+    <p class="muted tiny" style="margin:8px 0 0">Su tarjeta lleva el <b>código de ronda</b> de esta noche y un QR: sin eso, los QR de los puntos no registran nada (un vecino que escanee un punto no puede hacer pasar una ronda). Al irse, le llega por correo la constancia de su servicio.</p></form>`);
 };
 F['policia-nuevo'] = d => {
   const t = turnoAbierto(); if (!t) return;
   const k = claveNombre(d.nombre); if (!k) return toast('Falta el nombre', 'users');
-  const entra = momentoDe(d.dia, d.entra);
+  const entra = d.cuando === 'otra' ? momentoDe(d.dia, d.entra) : Date.now();
   if (entra > Date.now() + 10 * MIN) return toast('El ingreso no puede ser más tarde que ahora: revisá el día y la hora', 'clock');
   if (Date.now() - entra > DIA) return toast('Revisá el día: el ingreso da más de 24 horas atrás', 'clock');
   const email = String(d.email || '').trim().toLowerCase();
   if (email && !correoValido(email)) return toast('Revisá el correo del policía', 'mail');
   const ya = policiasConocidos().get(k) || {};
   const p = { id:uid(), nombre: ya.nombre || conMayusculas(d.nombre), matricula: String(d.matricula || '').trim() || ya.matricula || '', tel: String(d.tel || '').trim() || ya.tel || '',
-    email: email || ya.email || '', entra, turnoEntra: turnoElegido(d.turno), rondas:[] };
+    email: email || ya.email || '', entra, turnoEntra: turnoGaritaEn(entra), rondas:[] };
   if (policiasAdentro(t).some(q => claveNombre(q.nombre) === k)) return toast('Ese policía ya está anotado en este turno', 'users');
   p.codigo = codigoRondaNuevo();
   Store.cambiar(s => {
@@ -2294,20 +2309,23 @@ const enlaceRonda = (codigo, nombre) => location.origin + location.pathname.repl
 function textoCodigoRonda(p, c){
   return `${p.nombre}: tu código de ronda de hoy en el Barrio ${Store.s.config.nombre} es ${c.id}.\n\nTocá este enlace para dejar tu teléfono listo: ${enlaceRonda(c.id, p.nombre)}\n\nEn cada punto de control escaneá el QR con la cámara y tocá "Registrar paso". Si te pide el código, es ${c.id}. Vence mañana a las ${hora(c.vence)} h.`;
 }
+/* La tarjeta del policía (13-10-2026): sus datos, la noche de servicio, el
+   código y un QR que deja su teléfono listo. Se comparte como imagen por
+   WhatsApp, o se la muestra para que la escanee ahí mismo. */
 function mostrarCodigoRonda(pid){
   const t = turnoAbierto(), p = t && policiasDe(t).find(x => x.id === pid), c = codigoVigente(pid);
   if (!p || !c) return;
   const wa = p.tel && typeof waNumeroAR === 'function' ? waNumeroAR(p.tel) : '';
-  hoja('Código de ronda', `<p class="small" style="margin:0 0 10px">Es de <b>${esc(p.nombre)}</b>, solo por esta noche (vence a las ${hora(c.vence)} h). Sin este código, los QR de los puntos no registran nada.</p>
-    <div class="codigo-grande">${c.id.slice(0, 3)} ${c.id.slice(3)}</div>
-    ${wa ? `<a class="btn btn-ok btn-block" href="https://wa.me/${wa}?text=${encodeURIComponent(textoCodigoRonda(p, c))}" target="_blank" rel="noopener">${I('send')}Mandárselo por WhatsApp</a>`
-      : `<p class="muted small" style="margin:10px 0">No se anotó su celular: dictáselo o copiá el mensaje y mandáselo.</p>`}
-    <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="copiar" data-v="${esc(textoCodigoRonda(p, c))}">${I('copy')}Copiar el mensaje</button>
-    <p class="muted tiny" style="margin:10px 0 0">El código se borra cuando registrás la salida del policía. Si hace falta uno nuevo (por ejemplo, si se lo pasó a otra persona), tocá "Código nuevo" en su tarjeta.</p>`);
+  hoja('Tarjeta del policía', `${tarjetaPoliciaHtml(p, c)}
+    <button class="btn btn-wa btn-block btn-grande" style="margin-top:12px" data-a="pn-compartir" data-id="${esc(p.id)}">${I('share')}Mandarle la tarjeta por WhatsApp</button>
+    <div class="btns" style="margin-top:8px">${wa ? `<a class="btn btn-sec grow" href="https://wa.me/${wa}?text=${encodeURIComponent(textoCodigoRonda(p, c))}" target="_blank" rel="noopener">${I('send')}Solo el mensaje</a>` : ''}
+      <button class="btn btn-sec grow" data-a="copiar" data-v="${esc(textoCodigoRonda(p, c))}">${I('copy')}Copiar el mensaje</button></div>
+    <p class="muted tiny" style="margin:10px 0 0">${wa ? '' : 'No se anotó su celular: que escanee el QR de la tarjeta con su cámara, o mandale la imagen. '}Con la tarjeta, su teléfono queda listo para leer los QR de su recorrido: en cada punto escanea y toca "Registrar paso". El código vence solo y se borra con su salida; si hace falta otro, "Código nuevo".</p>`);
+  const q = document.querySelector('#hoja .pn-t-qr'); if (q) pintarQR(q, q.dataset.qrRonda);
 }
 A['policia-codigo'] = el => mostrarCodigoRonda(el.dataset.id);
 A['policia-codigo-nuevo'] = async el => {
-  if (!await confirmar('Código nuevo', 'El código anterior deja de valer al instante. Hay que mandarle el nuevo al policía.', { si:'Generar otro' })) return;
+  if (codigoVigente(el.dataset.id) && !await confirmar('Código nuevo', 'El código anterior deja de valer al instante. Hay que mandarle el nuevo al policía.', { si:'Generar otro' })) return;
   const t = turnoAbierto(), p = t && policiasDe(t).find(x => x.id === el.dataset.id); if (!p) return;
   const c = codigoRondaNuevo();
   Store.cambiar(s => { bajarCodigo(s, p.id); s.rondaCodigos.push({ id:c, pid:p.id, nombre:p.nombre, vence:Date.now() + CODIGO_VIGENCIA });
@@ -2344,23 +2362,29 @@ A['policia-ronda-borrar'] = async el => {
   if (!await confirmar('Borrar la ronda', 'Queda anotado en la bitácora que se borró.', { si:'Borrar' })) return;
   cambiarPolicia(el.dataset.id, p => { p.rondas = p.rondas.filter(r => r.id !== el.dataset.v); }, p => `Se borró una ronda del policía ${p.nombre}.`);
 };
+/* SALIDA EN UN TOQUE (13-10-2026): el resumen de su noche y "Ahora". */
 A['policia-salida'] = el => {
   const t = turnoAbierto(), p = t && policiasDe(t).find(x => x.id === el.dataset.id); if (!p) return;
-  hoja('Salida del policía', `<form data-f="policia-salida"><input type="hidden" name="pid" value="${esc(p.id)}">
-    <p class="small" style="margin:0 0 10px"><b>${esc(p.nombre)}</b> · ingresó ${fechaCorta(isoDe(new Date(p.entra)))} ${hora(p.entra)} h${p.turnoEntra ? ' · turno ' + esc(p.turnoEntra) : ''} · ${plural(p.rondas.length, 'ronda')}</p>
-    ${camposDiaTurnoHora('Hora de salida', 'sale', t.turno)}
+  const h = (Date.now() - p.entra) / HORA, inc = p.rondas.filter(r => r.incompleta).length, rc = rondaEnCurso(p);
+  hoja('Se va la policía nocturna', `<form data-f="policia-salida" class="pn-form"><input type="hidden" name="pid" value="${esc(p.id)}">
+    <div class="pn-resumen"><span class="pn-ini lg" style="--c:${colorDe(p.nombre)}">${esc(inicialesDe(p.nombre))}</span>
+      <div class="grow"><b>${esc(p.nombre)}</b><small>${p.matricula ? 'Mat. ' + esc(p.matricula) + ' · ' : ''}ingresó ${isoDe(new Date(p.entra)) !== hoyISO() ? fechaCorta(isoDe(new Date(p.entra))) + ' ' : ''}${hora(p.entra)} h</small></div>
+      <span class="pn-horas"><b>${h >= 1 ? Math.floor(h) + ' h ' : ''}${Math.round(h % 1 * 60)}</b><small>min de servicio</small></span></div>
+    <div class="pn-chips"><span class="c-ok">${I('pin')}${plural(p.rondas.length, 'ronda')}</span>${inc ? `<span class="c-danger">${I('alert')}${plural(inc, 'incompleta', 'incompletas')}</span>` : ''}${rc ? `<span class="c-warn">${I('clock')}una en curso: se cierra</span>` : ''}</div>
+    ${barraNoche(nochePolicia(p.entra))}
+    ${elegirCuando('Hora de salida', 'sale', p.entra)}
     ${p.email ? '' : `<div class="field"><label>Correo del policía (para mandarle la constancia)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off" placeholder="Opcional"></div>`}
-    <p class="muted tiny" style="margin:0 0 12px">Al registrar la salida se cierra su servicio: deja de verse en la portada y queda en <b>Turnos → Servicios del policía</b>, con todo su recorrido. ${p.email ? `La constancia sale por correo a <b>${esc(p.email)}</b>.` : 'Si dejás su correo, le sale la constancia.'}</p>
-    <button class="btn btn-pri btn-block">${I('logout')}Registrar la salida</button></form>`);
+    <button class="btn btn-pri btn-block btn-grande">${I('logout')}Registrar la salida</button>
+    <p class="muted tiny" style="margin:8px 0 0">Su servicio se cierra: deja de verse en la portada y queda en <b>Turnos → Servicios del policía</b>. ${p.email ? `La constancia sale por correo a <b>${esc(p.email)}</b>.` : 'Si dejás su correo, le sale la constancia.'}</p></form>`);
 };
 F['policia-salida'] = d => {
   const t = turnoAbierto(), p0 = t && policiasDe(t).find(x => x.id === d.pid); if (!p0) return;
-  const sale = momentoDe(d.dia, d.sale);
+  const sale = d.cuando === 'otra' ? momentoDe(d.dia, d.sale) : Date.now();
   if (sale > Date.now() + 10 * MIN) return toast('La salida no puede ser más tarde que ahora: revisá el día y la hora', 'clock');
   if (sale < p0.entra) return toast(`La salida no puede ser antes del ingreso (${fechaCorta(isoDe(new Date(p0.entra)))} ${hora(p0.entra)} h)`, 'clock');
   const email = String(d.email || '').trim().toLowerCase();
   if (email && !correoValido(email)) return toast('Revisá el correo del policía', 'mail');
-  const turnoSale = turnoElegido(d.turno);
+  const turnoSale = turnoGaritaEn(sale);
   Store.cambiar(s => bajarCodigo(s, d.pid));
   cambiarPolicia(d.pid, (p, x, s) => { const rc = rondaEnCurso(p); if (rc) cerrarRondaIncompleta(s, p, rc, Math.max(rc.inicio + MIN, sale), 'el policía se retiró en plena ronda');
       p.sale = Math.max(sale, p.entra + MIN); p.turnoSale = turnoSale; if (email && !p.email) p.email = email; cerrarServicio(s, p); },
@@ -2550,6 +2574,7 @@ R.turnos = {
         ${typeof vistoRenglon === 'function' ? vistoRenglon(r) : ''}
         ${policiasDe(r).map(p => `<span>${I('shield')} Policía ${esc(p.nombre)}${p.matricula ? ' · mat. ' + esc(p.matricula) : ''} · ${hora(p.entra)}${p.sale ? '–' + hora(p.sale) : p.paso ? ' · siguió en el turno siguiente' : ' · sigue'} · ${plural(p.rondas.length, 'ronda')}${p.rondas.length ? ': ' + p.rondas.map(x => hora(x.inicio) + (x.fin ? '–' + hora(x.fin) : '')).join(', ') : ''}</span>`).join('')}</div></div></div>`).join('')}</div>`
         : vacio('clock', 'Todavía no se abrió ningún turno.')}
+      ${seccionPoliciaHorario()}
       ${seccionServiciosPolicia()}
       ${seccionPuntos()}
       ${esAdmin() ? (() => { const ms = policiaDelMes(); return sec('Policía contratada · este mes') + (ms.length ? `<div class="card lista">${ms.map(p => `<div class="it"><div class="txt"><b>${esc(p.nombre)}${p.matricula ? ' · mat. ' + esc(p.matricula) : ''}</b>
@@ -2675,7 +2700,7 @@ function tareasGarita(){
   const pols = t ? policiasDe(t) : [], adentroP = t ? policiasAdentro(t) : [];
   if (adentroP.length){ const rondas = pols.reduce((n, p) => n + p.rondas.length, 0), enCurso = adentroP.map(rondaEnCurso).find(Boolean);
     add(1, 'shield', 'Policía contratado: rondas y, al irse, su salida', `${adentroP.map(p => esc(p.nombre)).join(', ')} de servicio · ${enCurso ? `ronda en curso desde las ${hora(enCurso.inicio)} h` : plural(rondas, 'ronda') + ' hechas'}`, { ir:'.policia-card' }); }
-  else if (t && turnoEsNoche(t.turno) && !pols.length) add(1, 'shield', 'Policía contratado: registrar su ingreso', 'Turno de noche: cuando llegue, anotalo y mandale su código de ronda', { a:'policia-nuevo' });
+  else if (t && !pols.length && (nochePolicia().ahora || nochePolicia().falta < 45 * MIN)) add(1, 'shield', 'Policía nocturna: registrar su ingreso', `${esc(nochePolicia().etiqueta)}, ${horarioNocheTxt(nochePolicia())}: cuando llegue, anotalo y mandale su tarjeta`, { a:'policia-nuevo' });
   else if (pols.length) hecho(`servicio del policía (${plural(pols.reduce((n, p) => n + p.rondas.length, 0), 'ronda')})`);
 
   /* De todo turno: la bitácora y el cierre. */
@@ -2842,7 +2867,7 @@ function tiraGarita(opera){
   /* policía */
   const ps = t ? policiasAdentro(t) : [], rondas = ps.reduce((k, p) => k + p.rondas.length, 0), enRonda = ps.map(rondaEnCurso).find(Boolean);
   const tPol = ps.length ? tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t: enRonda ? 'En ronda' : 'De servicio', x:`${esc(ps.map(p => p.nombre).join(', '))} · ${enRonda ? 'desde las ' + hora(enRonda.inicio) + ' h' : plural(rondas, 'ronda') + ' hoy'}`, a:'garita-ir', v:'.policia-card', on:true, n: rondas || '' })
-    : tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t:'Nadie de servicio', x: opera ? (t && turnoEsNoche(t.turno) ? 'Turno de noche: tocá cuando llegue' : 'Tocá para registrar el ingreso') : 'Si viene, lo registra la garita', a: opera && t ? 'policia-nuevo' : '' });
+    : tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t:'Nadie de servicio', x: (() => { const n = nochePolicia(); return opera ? (n.ahora ? `Horario de policía (${horarioNocheTxt(n)}): tocá cuando llegue` : `Viene a las ${hora(n.desde)} h · tocá para el ingreso`) : `${n.ahora ? 'En horario' : 'Desde las ' + hora(n.desde) + ' h'} · lo registra la garita`; })(), a: opera && t ? 'policia-nuevo' : '' });
   /* camión */
   const c = typeof Camion !== 'undefined' ? Camion.adentro() : null, dh = recoleccionDias()[new Date().getDay()];
   const paso = typeof camionPasoHoy === 'function' ? camionPasoHoy() : null;
@@ -3361,46 +3386,122 @@ A['patente-camara'] = async () => {
 F['patente-buscar'] = d => validar(d.q);
 
 /* ---------- BITÁCORA ---------- */
+/* =========================================================
+   LA BITÁCORA, UNIFICADA (rediseño, pedido de Claudio, 13-10-2026: "todas
+   estas opciones no se entienden bien, fijate qué función cumple cada una y
+   si se pisan, unificalas").
+   Antes, para escribir había cuatro tipos (Cambio de turno, Ronda, Novedad
+   e Incidente) y para mirar, seis filtros. "Cambio de turno" a mano se
+   pisaba con Empezar y Cerrar el turno, que ya lo anotan solos; "Acceso" lo
+   escribe sola la app con cada ingreso; y las rondas del policía quedaban
+   como "acceso". Ahora:
+     · se ESCRIBE una de tres cosas: Novedad, Incidente (que siempre le suena
+       a la Administración) o Ronda de la guardia;
+     · se MIRA por cinco colores, con lo que la app anota sola agrupado:
+       Novedades, Incidentes, Rondas y policía, Entradas y salidas, Turnos;
+     · lo que el turno que se fue dejó escrito al cerrar queda FIJADO arriba
+       (también en la pantalla de "Nuevo turno") hasta que cierra el turno
+       siguiente. Es lo mismo que va en el renglón "Termina el turno" y en
+       el parte por correo: no hay que escribirlo dos veces.
+   ========================================================= */
 const TIPOS_BIT = { turno:['Cambio de turno','clock','sky'], ronda:['Ronda','shield','brand'], novedad:['Novedad','info','accent'], incidente:['Incidente','alert','danger'], acceso:['Acceso','gate','ok'] };
+const CAT_BIT = {
+  novedad:    { n:'Novedades', ic:'info', c:'accent' },
+  incidente:  { n:'Incidentes', ic:'alert', c:'danger' },
+  ronda:      { n:'Rondas y policía', ic:'shield', c:'brand' },
+  movimiento: { n:'Entradas y salidas', ic:'gate', c:'ok' },
+  turno:      { n:'Turnos', ic:'clock', c:'sky' },
+};
+const catBit = b => b.tipo === 'turno' ? 'turno' : b.tipo === 'incidente' ? 'incidente' : b.tipo === 'novedad' ? 'novedad' : b.tipo === 'ronda' ? 'ronda' : /polic[ií]a|\bronda\b|casa sola/i.test(b.texto || '') ? 'ronda' : 'movimiento';
+const ESCRIBIR_BIT = {
+  novedad:   { n:'Novedad', ic:'info', c:'accent', ph:'¿Qué pasó? Ej: luz quemada en De la Plaza al 3300', frases:['Sin novedades', 'Portón revisado', 'Luz quemada en ', 'Perro suelto en ', 'Corte de luz', 'Llamó el lote '] },
+  incidente: { n:'Incidente', ic:'alert', c:'danger', ph:'¿Qué pasó y dónde? Le suena a la Administración', frases:['Intento de ingreso sin autorización', 'Auto sospechoso en ', 'Daño en ', 'Discusión en la entrada', 'Alarma sonando en el lote '] },
+  ronda:     { n:'Ronda de la guardia', ic:'shield', c:'brand', ph:'Cómo estuvo la ronda. Ej: perímetro norte en orden', frases:['Ronda completa, sin novedades', 'Perímetro en orden', 'Portón de servicio cerrado', 'Casa sola revisada: '] },
+};
+/* Lo que dejó escrito el último turno al cerrarse (16 horas como mucho). */
+function notaDejada(){
+  const r = registrosTurno().find(x => x.cerradoAt); if (!r || Date.now() - r.cerradoAt > 16 * HORA) return null;
+  let nota = r.notaCierre || '';
+  if (!nota){ const l = aLista(Store.s.bitacora).find(b => b && b.tipo === 'turno' && !b.abre && Math.abs(b.at - r.cerradoAt) < 2 * MIN && /Novedades: /.test(b.texto || ''));
+    if (l) nota = l.texto.split('Novedades: ').slice(1).join('Novedades: '); }
+  return nota ? { nota, turno:r.turno, guardias:aLista(r.guardias), at:r.cerradoAt } : null;
+}
+const notaDejadaHtml = () => { const n = notaDejada(); if (!n) return '';
+  return `<div class="bt-nota"><span class="bt-chinche">${I('tack')}</span><div class="grow"><small>Lo que dejó el turno ${esc(n.turno)} · ${esc(n.guardias.join(', '))} · ${hora(n.at)} h</small><p>${esc(n.nota)}</p></div></div>`; };
 R.bitacora = {
   titulo: 'Bitácora', icon: 'book', color: 'wood', sub: 'Libro de guardia',
   render(p){
     if (!veGarita()) return vacio('lock', 'El libro de guardia es solo para la guardia, la Administración y la supervisión.');
-    const filtro = p || 'todo';
+    const filtro = CAT_BIT[p] ? p : p === 'acceso' ? 'movimiento' : 'todo';
     /* SOLO EL DÍA, DE 00 A 24 H (pedido de Claudio, 10-10-2026). Lo de días
        anteriores se pide con "Ver otro día": se trae de la base en ese
        momento (js/historial.js), igual para la garita y la supervisión. */
     const ini = new Date(hoyISO() + 'T00:00').getTime(), fin = ini + DIA;
-    const lista = aLista(Store.s.bitacora).filter(b => b && b.at >= ini && b.at < fin && (filtro === 'todo' || b.tipo === filtro)).sort((a, b) => b.at - a.at);
-    let dia = '';
-    return `${!esGuardia() ? `<div class="garita-vivo">${I('eye')}<div class="grow"><b>El libro de guardia lo escribe la garita</b><span>${esSupervisor() ? 'Desde la supervisión' : 'La Administración'} lo lee en vivo pero no anota ni corrige: es el registro de la guardia. Para pedirle o avisarle algo a la garita, escribile: le llega al instante, con sonido.</span></div>
-        <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esSupervisor() ? 'supGarita' : 'interno'}">${I('chat')}Escribirle a la garita</button></div>` : `<form data-f="bitacora" class="card">
-        <div class="seg" style="margin-bottom:10px">${Object.entries(TIPOS_BIT).filter(([k]) => k !== 'acceso').map(([k, t], i) => `<label><input type="radio" name="tipo" value="${k}" ${i === 1 ? 'checked' : ''}><span>${I(t[1])}${t[0]}</span></label>`).join('')}</div>
-        <div class="linea-form"><input name="texto" id="bitTxt" required maxlength="300" placeholder="¿Qué pasó?"><button class="btn btn-pri">${I('send')}</button></div>
-        <label class="check" style="margin:10px 0 0"><input type="checkbox" name="avisar"><span>Además, que le suene a la Administración (le aparece en su campanita)</span></label>
-        <p class="muted tiny" style="margin:8px 0 0">${I('info')} Lo que se anota acá queda en el <b>libro de guardia</b>: lo leen solo la garita, la Administración y la supervisión de la guardia, con fecha, hora y quién lo escribió. No lo ven los vecinos y no se puede borrar.</p></form>`}
-      <div class="chips">${['todo', ...Object.keys(TIPOS_BIT)].map(k => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="bitacora" data-p="${k}">${k === 'todo' ? 'Todo' : TIPOS_BIT[k][0]}</button>`).join('')}</div>
-      <div class="bit-hoy"><span class="bit-hoy-dia"><small>${esc(MESES[new Date().getMonth()])}</small><b>${new Date().getDate()}</b></span><div class="grow"><b>Hoy, ${esc(fechaLarga(hoyISO()).toLowerCase())}</b><small>De 00 a 24 h · ${plural(lista.length, 'registro')}${filtro !== 'todo' ? ' de ' + esc(TIPOS_BIT[filtro]?.[0] || '') : ''}</small></div>
-        <button class="btn btn-sm btn-pri" data-a="bit-otro-dia">${I('calendar')}Ver otro día</button></div>
-      <div class="btns" style="margin:0 0 10px"><button class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('users')}Historial de visitas</button></div>
-      <p class="muted tiny" style="margin:-4px 0 10px">Acá está solo lo de hoy. Para ver otro día (o varios), tocá "Ver otro día": se trae de la base en ese momento, así la app no se hace pesada.</p>
-      <div class="card">${lista.length ? lista.map(b => {
-        const sep = '';
-        const t = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad;
-        return `${sep}<div class="lista"><div class="it"><span class="ic ic-${t[2]}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(t[1])}</span>
-          <div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(autorVisible(b.autor).nombre)}${usuario(b.autor)?.rol === 'guardia' && b.tipo !== 'turno' && guardiasEn(b.at).length ? ' (' + esc(guardiasEn(b.at).join(', ')) + ')' : ''}</span></div></div></div>`; }).join('') : vacio('book', 'Hoy todavía no hay registros.')}</div>`;
+    const delDia = aLista(Store.s.bitacora).filter(b => b && b.at >= ini && b.at < fin).sort((a, b) => b.at - a.at);
+    const lista = filtro === 'todo' ? delDia : delDia.filter(b => catBit(b) === filtro);
+    const cuenta = k => delDia.filter(b => catBit(b) === k).length;
+    const escribir = esGuardia() ? `<form data-f="bitacora" class="bt-escribe">
+        <div class="bt-tipos" role="radiogroup" aria-label="Qué querés anotar">${Object.entries(ESCRIBIR_BIT).map(([k, t], i) => `<label class="c-${t.c}"><input type="radio" name="tipo" value="${k}" ${i === 0 ? 'checked' : ''}><span>${I(t.ic)}<b>${t.n}</b></span></label>`).join('')}</div>
+        <div class="bt-frases" id="bitFrases">${ESCRIBIR_BIT.novedad.frases.map(f => `<button type="button" class="chip" data-a="bit-frase" data-v="${esc(f)}">${esc(f.trim())}${/ $/.test(f) ? '…' : ''}</button>`).join('')}</div>
+        <div class="bt-linea"><textarea name="texto" id="bitTxt" required maxlength="300" rows="2" placeholder="${esc(ESCRIBIR_BIT.novedad.ph)}"></textarea><button class="bt-mandar" aria-label="Anotar en el libro">${I('send')}</button></div>
+        <label class="check bt-avisar" style="margin:8px 0 0"><input type="checkbox" name="avisar"><span>Que le suene también a la Administración</span></label>
+        <p class="bt-siempre" hidden>${I('bell')} El incidente le suena siempre a la Administración, con el aviso en rojo.</p></form>`
+      : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>El libro de guardia lo escribe la garita</b><span>${esSupervisor() ? 'Desde la supervisión' : 'La Administración'} lo lee en vivo pero no anota ni corrige: es el registro de la guardia. Para pedirle o avisarle algo a la garita, escribile: le llega al instante, con sonido.</span></div>
+        <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esSupervisor() ? 'supGarita' : 'interno'}">${I('chat')}Escribirle a la garita</button></div>`;
+    let hHora = '';
+    const items = lista.map((b, i) => { const k = catBit(b), c = CAT_BIT[k];
+      const quien = `${esc(autorVisible(b.autor).nombre)}${usuario(b.autor)?.rol === 'guardia' && b.tipo !== 'turno' && guardiasEn(b.at).length ? ' · ' + esc(guardiasEn(b.at).join(', ')) : ''}`;
+      const hh = hora(b.at).slice(0, 2), cab = hh !== hHora ? (hHora = hh, `<div class="bt-hora"><span>${hh} h</span></div>`) : '';
+      if (k === 'turno') return `${cab}<div class="bt-it bt-turno" data-txt="${esc(normTxt(b.texto + ' ' + quien))}" style="--i:${Math.min(i, 12)}"><span class="bt-ic">${I(b.abre ? 'sunrise' : 'sunset')}</span><div class="grow"><b>${esc(b.texto)}</b><small>${hora(b.at)} h</small></div></div>`;
+      return `${cab}<div class="bt-it c-${c.c}" data-txt="${esc(normTxt(b.texto + ' ' + quien))}" style="--i:${Math.min(i, 12)}"><span class="bt-punto"><i>${I(c.ic)}</i></span>
+        <div class="bt-txt"><div class="bt-meta"><time>${hora(b.at)}</time><em>${{ novedad:'Novedad', incidente:'Incidente', movimiento:'Entrada o salida', ronda: b.tipo === 'ronda' && !/polic/i.test(b.texto || '') ? 'Ronda de la guardia' : 'Ronda y policía' }[k]}</em></div><p>${esc(b.texto)}</p><small>${quien}</small></div></div>`; }).join('');
+    return `${escribir}
+      ${notaDejadaHtml()}
+      <div class="bt-hero"><span class="bit-hoy-dia"><small>${esc(MESES[new Date().getMonth()])}</small><b>${new Date().getDate()}</b></span>
+        <div class="grow"><b>Hoy, ${esc(fechaLarga(hoyISO()).toLowerCase())}</b><small>De 00 a 24 h · ${plural(delDia.length, 'registro')}</small></div>
+        <button class="btn btn-sm btn-pri" data-a="bit-otro-dia">${I('calendar')}Otro día</button></div>
+      <div class="bt-cats" role="toolbar" aria-label="Filtrar el libro">
+        <button class="bt-cat c-brand2 ${filtro === 'todo' ? 'on' : ''}" data-a="abrir" data-v="bitacora" data-p="todo" aria-pressed="${filtro === 'todo'}"><span>${I('book')}</span><b>${delDia.length}</b><small>Todo</small></button>
+        ${Object.entries(CAT_BIT).map(([k, c]) => `<button class="bt-cat c-${c.c} ${filtro === k ? 'on' : ''} ${cuenta(k) ? '' : 'cero'}" data-a="abrir" data-v="bitacora" data-p="${k}" aria-pressed="${filtro === k}"><span>${I(c.ic)}</span><b>${cuenta(k)}</b><small>${c.n}</small></button>`).join('')}</div>
+      <div class="bt-herr"><div class="bt-buscar">${I('search')}<input id="bitBuscar" type="search" autocomplete="off" placeholder="Buscar en lo de hoy" aria-label="Buscar en el libro de hoy"></div>
+        <button class="btn btn-sm btn-sec" data-a="hist-visitas-todo">${I('users')}Historial de visitas</button></div>
+      <div class="bt-linea-tiempo">${items || `<div class="bt-vacio">${I('book')}<b>${filtro === 'todo' ? 'Hoy todavía no hay registros' : 'Hoy no hay ' + esc(CAT_BIT[filtro].n.toLowerCase())}</b><small>Lo que se anote aparece acá, en vivo.</small></div>`}</div>
+      <details class="plegable card bt-ayuda" data-k="bitAyuda"><summary><b>${I('info')} ¿Qué es cada cosa?</b><span class="muted small">ver</span></summary>
+        <ul class="bt-que">
+          <li class="c-accent"><b>Novedades</b>Lo de rutina que conviene que quede escrito (una luz quemada, un llamado). Las escribe la garita.</li>
+          <li class="c-danger"><b>Incidentes</b>Lo grave. Al anotarlo le suena a la Administración con el aviso en rojo.</li>
+          <li class="c-brand"><b>Rondas y policía</b>Las rondas que anota la guardia y, solas, todo lo de la policía nocturna (ingreso, rondas con sus QR, salida) y las casas solas revisadas.</li>
+          <li class="c-ok"><b>Entradas y salidas</b>Las anota la app sola con cada ingreso y cada salida: visitas, camión, correos, paquetes y proveedores.</li>
+          <li class="c-sky"><b>Turnos</b>Empezar y Cerrar el turno los anotan solos, con los guardias. Lo que se escribe al cerrar ("novedades para el turno que entra") queda fijado arriba para el que llega, va en el renglón del cierre y en el parte por correo: no hace falta escribirlo dos veces.</li></ul>
+        <p class="muted tiny" style="margin:8px 0 0">${I('lock')} El libro lo leen solo la garita, la Administración y la supervisión, con fecha, hora y quién lo escribió. No lo ven los vecinos y no se puede borrar. Acá está solo lo de hoy: "Otro día" lo trae de la base.</p></details>`;
   },
 };
+/* Elegir el tipo cambia las frases rápidas y el aviso. */
+document.addEventListener('change', e => {
+  const r = e.target; if (!r || r.name !== 'tipo' || !r.closest('.bt-escribe')) return;
+  const t = ESCRIBIR_BIT[r.value] || ESCRIBIR_BIT.novedad, f = r.closest('form');
+  const fr = f.querySelector('#bitFrases'); if (fr) fr.innerHTML = t.frases.map(x => `<button type="button" class="chip" data-a="bit-frase" data-v="${esc(x)}">${esc(x.trim())}${/ $/.test(x) ? '…' : ''}</button>`).join('');
+  const tx = f.querySelector('#bitTxt'); if (tx) tx.placeholder = t.ph;
+  f.querySelector('.bt-avisar').hidden = r.value === 'incidente'; f.querySelector('.bt-siempre').hidden = r.value !== 'incidente';
+});
+A['bit-frase'] = el => { const t = $('#bitTxt'); if (!t) return; const v = el.dataset.v; t.value = /\S$/.test(t.value) && !/ $/.test(v) ? t.value + '. ' + v : t.value + v; t.focus(); t.setSelectionRange(t.value.length, t.value.length); };
+document.addEventListener('input', e => {
+  if (!e.target || e.target.id !== 'bitBuscar') return;
+  const q = normTxt(e.target.value).trim();
+  document.querySelectorAll('.bt-linea-tiempo .bt-it').forEach(it => { it.hidden = !!q && !(it.dataset.txt || '').includes(q); });
+  document.querySelectorAll('.bt-linea-tiempo .bt-hora').forEach(h => { let n = h.nextElementSibling, ve = false; while (n && !n.classList.contains('bt-hora')){ if (!n.hidden) ve = true; n = n.nextElementSibling; } h.hidden = !ve; });
+});
 F['bitacora'] = (d, form) => {
   /* El libro lo escribe solo la garita (26-09-2026: la Administración lo
      lee y le escribe por "Mensajes con la garita"). Anota mucho de rutina:
-     a la Administración le suena solo si la garita lo pide. */
-  const texto = d.texto.trim(), para = 'rol:admin', avisar = !!d.avisar;
+     a la Administración le suena si es un incidente o si la garita lo pide. */
+  const tipo = ESCRIBIR_BIT[d.tipo] ? d.tipo : 'novedad', texto = String(d.texto || '').trim(), para = 'rol:admin', avisar = tipo === 'incidente' || !!d.avisar;
+  if (!texto) return toast('Escribí qué pasó', 'book');
   Store.cambiar(s => {
-    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:d.tipo, texto, at:Date.now() });
-    if (avisar) notificar(s, { para, titulo:`Libro de guardia · ${(TIPOS_BIT[d.tipo] || TIPOS_BIT.novedad)[0]}`, texto, icon:'book', color: d.tipo === 'incidente' ? 'danger' : 'wood', link:'bitacora', sonido:true, urgente: d.tipo === 'incidente' });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo, texto, at:Date.now() });
+    if (avisar) notificar(s, { para, titulo:`Libro de guardia · ${ESCRIBIR_BIT[tipo].n}`, texto, icon: tipo === 'incidente' ? 'alert' : 'book', color: tipo === 'incidente' ? 'danger' : 'wood', link:'bitacora', sonido:true, urgente: tipo === 'incidente' });
   });
-  form.reset(); const i = $('#bitTxt'); if (i) i.value = '';
+  const i = $('#bitTxt'); if (i) i.value = '';
   toast(avisar ? 'Anotado en el libro de guardia y avisado a la Administración' : 'Anotado en el libro de guardia', 'book');
 };
 
