@@ -271,22 +271,29 @@ function guardiaAhoraDeseada(){
   return { id:'ahora', abierto:true, turno:t.turno, desde:c.desde || '', hasta:c.hasta || '', inicio:t.at,
     guardias: aLista(t.guardias).map(n => { const l = lookDe(n); return l ? { n, look:l } : { n }; }), policia: policiasAdentro(t).length ? 1 : 0 };
 }
-/* La garita, la Administración y la supervisión lo arman de la bitácora; los vecinos leen el registro público. */
+/* ¿Este equipo tiene el libro de guardia? Lo bajan las cuentas de la garita,
+   la Administración (en cualquier modo, también "como vecino") y la supervisión.
+   Nube anota lo que ya bajó como base + colección, sin barra ("staffbitacora"). */
+const rolDeGuardia = () => ['guardia', 'admin', 'supervisor'].includes(yo()?.rol);
+const bitacoraBajada = () => typeof Nube === 'undefined' || !Nube.activa() || !!(Nube.listos && (Nube.listos.has('staffbitacora') || Nube.listos.has('staff/bitacora')));
+/* Quien tiene el libro lo arma de ahí; los vecinos leen el registro público. */
 function guardiaAhora(){
-  if (veGarita() && (typeof turnoAbierto === 'function') && aLista(Store.s.bitacora).length) return guardiaAhoraDeseada();
+  if (rolDeGuardia() && bitacoraBajada() && aLista(Store.s.bitacora).length) return guardiaAhoraDeseada();
   const g = aLista(Store.s.guardiaAhora).find(x => x && x.id === 'ahora');
   if (!g) return null;
   if (g.abierto && Date.now() - (g.inicio || 0) > 16 * HORA) return { id:'ahora', abierto:false, viejo:true };
   return { ...g, guardias: aLista(g.guardias).filter(x => x && x.n) };
 }
-/* La garita mantiene al día el registro público, solo cuando cambia algo. */
+/* El registro público se mantiene al día solo cuando cambia algo (14-10-2026):
+   lo escribe la garita y también cualquier equipo de la Administración (en
+   cualquier modo), así los vecinos ven a los guardias aunque el teléfono de
+   la garita todavía no tenga la versión nueva. Todos lo arman igual, del
+   mismo libro, y cada uno escribe solo si difiere de lo que hay en la base.
+   Hasta que la bitácora no bajó de la nube no se sabe si hay turno: nada. */
 let gaT = 0;
 function sincroGuardiaAhora(){
-  if (!esGuardia() || !yo()) return;
-  /* Hasta que la bitácora no bajó de la nube no se sabe si hay turno: no se publica nada. */
-  /* Nube anota lo que ya bajó como base + colección, sin barra ("staffbitacora"):
-     antes se preguntaba por "staff/bitacora" y en la app real nunca publicaba (14-10-2026). */
-  if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listos && (Nube.listos.has('staffbitacora') || Nube.listos.has('staff/bitacora')))) return;
+  if (!yo() || !['guardia', 'admin'].includes(yo().rol) || yo().estado !== 'aprobado') return;
+  if (!bitacoraBajada()) return;
   const d = guardiaAhoraDeseada(), cur = aLista(Store.s.guardiaAhora).find(x => x && x.id === 'ahora');
   const igual = (a, b) => { if (!a || !b) return false; const k = x => JSON.stringify({ ...x, at:0, guardias: aLista(x.guardias) }); return k(a) === k(b); };
   if (igual(cur, d)) return;
