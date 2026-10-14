@@ -379,7 +379,14 @@ function mapaAbrirFicha(l){
 /* Con la ficha abierta, si algo cambia (entró la visita, contestó el vecino), la ficha se pone al día sola. */
 Store.alCambiar(() => setTimeout(() => {
   const c = document.querySelector('#hojaCuerpo .mapa-ficha'), d = document.getElementById('hoja');
-  if (c && d && d.open){ const y = document.getElementById('hojaCuerpo').scrollTop; c.outerHTML = mapaFicha(c.dataset.lote); document.getElementById('hojaCuerpo').scrollTop = y; }
+  /* Retocada, no rehecha: con la ficha abierta llegaban datos del barrio cada
+     pocos segundos y la ficha entera parpadeaba (13-10-2026). */
+  if (c && d && d.open){
+    const molde = document.createElement('template'); molde.innerHTML = mapaFicha(c.dataset.lote);
+    const nuevo = molde.content.firstElementChild;
+    if (nuevo && typeof morfarNodo === 'function' && nuevo.nodeName === c.nodeName) morfarNodo(c, nuevo);
+    else if (nuevo) c.replaceWith(nuevo);
+  }
 }, 0));
 
 /* ---------- acciones ---------- */

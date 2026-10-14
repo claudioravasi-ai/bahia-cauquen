@@ -405,6 +405,105 @@ const Saludo = {
 try { if ('speechSynthesis' in window){ speechSynthesis.getVoices(); speechSynthesis.addEventListener?.('voiceschanged', () => speechSynthesis.getVoices()); } } catch(e){}
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.top .logo')) Saludo.decir(); });
 
+/* =========================================================
+   DIBUJAR SIN QUE LA PANTALLA TITILE  (13-10-2026)
+   -------------------------------------------------------
+   Por qué titilaba. La app es "en vivo": cada cosa que cambia en el barrio
+   (un vecino que escribe, una visita que entra, el camión, una expensa, la
+   presencia de quien abre la app) le llega a TODOS los equipos, y cada vez
+   la app volvía a escribir la pantalla entera de cero:
+
+       cuerpo.innerHTML = ...
+
+   El navegador, con eso, tira TODO lo que había y lo construye de nuevo:
+   vuelve a cargar las fotos, rearranca las animaciones, redibuja los dibujos.
+   Eso es el parpadeo. Y pasaba "de a ratos sí, de a ratos no" porque depende
+   de cuánta gente esté usando la app en ese momento: con el barrio tranquilo
+   no llega nada y no titila; con varios vecinos adentro, llega algo cada
+   pocos segundos y titila seguido.
+
+   Cómo se arregla. En vez de rehacer la pantalla, se COMPARA lo nuevo con lo
+   que ya está en pantalla y se retoca SOLO lo distinto: si una tarjeta no
+   cambió, no se toca (ni su foto, ni su animación, ni el texto que estabas
+   escribiendo adentro). Es la misma técnica que usan las apps grandes. La
+   pantalla queda quieta y, de paso, la app va más liviana: el navegador
+   trabaja mucho menos.
+
+   Qué se cuida especialmente:
+     · las fotos ya bajadas (data-foto + data-ok) no se vuelven a pedir;
+     · los QR ya dibujados se dejan como están;
+     · lo que la persona está escribiendo o eligiendo no se pisa;
+     · los desplegables quedan como los dejó;
+     · las marcas que pone la app al vuelo (la foto chica, una tira en pausa,
+       un lote elegido, un guardia saludando) no se borran.
+   Si algo saliera mal, se vuelve al modo viejo (rehacer todo) para que la
+   pantalla nunca quede a medias.
+   ========================================================= */
+/* Marcas que pone la app después de dibujar: no se borran al retocar. */
+const MORF_PROPIAS = new Set(['data-ok', 'data-enganchada', 'data-qr-pintado', 'open', 'style']);
+const MORF_CLASES = ['solo-mini', 'quieta', 'salta', 'elegido', 'on'];
+/* Dos nodos son "el mismo lugar" si son de la misma clase de cosa. */
+const morfarMismo = (a, b) => a.nodeType === b.nodeType && (a.nodeType !== 1 ||
+  (a.nodeName === b.nodeName && (a.id || '') === (b.id || '') &&
+   (a.dataset && a.dataset.k || '') === (b.dataset && b.dataset.k || '') &&
+   (a.dataset && a.dataset.id || '') === (b.dataset && b.dataset.id || '')));
+/* Lo que la app rellena DESPUÉS de dibujar y no hay que volver a tocar. */
+function morfarIntacto(a, b){
+  const d = a.dataset || {}, n = b.dataset || {};
+  if (a.tagName === 'CANVAS' || a.tagName === 'IFRAME' || a.tagName === 'VIDEO' || a.tagName === 'AUDIO') return true;
+  if (d.qr != null) return d.qr === n.qr;                 /* el QR ya dibujado adentro */
+  if (d.qrRonda != null) return d.qrRonda === n.qrRonda;
+  if (d.foto != null && d.ok) return d.foto === n.foto;   /* la foto ya bajada del equipo */
+  return false;
+}
+function morfarAtributos(a, b, marcas){
+  const escribiendo = document.activeElement === a;
+  const nb = b.attributes;
+  for (let i = nb.length - 1; i >= 0; i--){
+    const at = nb[i];
+    if (at.name === 'open') continue;                                  /* el desplegable queda como lo dejaron */
+    if (escribiendo && (at.name === 'value' || at.name === 'checked')) continue;
+    if (a.getAttribute(at.name) !== at.value) a.setAttribute(at.name, at.value);
+  }
+  const na = a.attributes;
+  for (let i = na.length - 1; i >= 0; i--){
+    const at = na[i];
+    if (!b.hasAttribute(at.name) && !MORF_PROPIAS.has(at.name)) a.removeAttribute(at.name);
+  }
+  /* Las marcas que puso la app al vuelo vuelven a su lugar. */
+  if (marcas && marcas.length) a.classList.add(...marcas);
+}
+function morfarNodo(a, b){
+  if (a.nodeType !== 1){ if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  if (a.isEqualNode(b)) return;          /* igualito: no se toca (acá es donde se deja de titilar) */
+  if (morfarIntacto(a, b)) return;
+  morfarAtributos(a, b, MORF_CLASES.filter(c => a.classList.contains(c)));
+  morfarHijos(a, b);
+}
+function morfarHijos(viejo, nuevo){
+  let a = viejo.firstChild, b = nuevo.firstChild;
+  while (b){
+    const sigB = b.nextSibling;
+    if (!a){ viejo.appendChild(document.importNode(b, true)); b = sigB; continue; }
+    if (morfarMismo(a, b)){ morfarNodo(a, b); a = a.nextSibling; b = sigB; continue; }
+    /* ¿Desapareció algo del medio? Se busca más adelante al compañero del nuevo. */
+    let c = a.nextSibling;
+    while (c && !morfarMismo(c, b)) c = c.nextSibling;
+    if (c){ while (a !== c){ const s = a.nextSibling; viejo.removeChild(a); a = s; } morfarNodo(a, b); a = a.nextSibling; b = sigB; continue; }
+    viejo.insertBefore(document.importNode(b, true), a);   /* esto es nuevo: entra acá */
+    b = sigB;
+  }
+  while (a){ const s = a.nextSibling; viejo.removeChild(a); a = s; }   /* lo que sobra se va */
+}
+/* Pone `html` adentro de `destino` tocando solo lo que cambió. */
+function morfar(destino, html){
+  if (!destino) return;
+  const molde = document.createElement('template');
+  molde.innerHTML = html == null ? '' : html;
+  try { morfarHijos(destino, molde.content); }
+  catch(err){ console.warn('No se pudo retocar la pantalla, se rehace', err); destino.innerHTML = html == null ? '' : html; }
+}
+
 /* ---------------- dibujo ---------------- */
 function pintarTop(){
   const u = yo(); if (!u) return;
@@ -412,7 +511,10 @@ function pintarTop(){
   const modo = modoActivo();
   const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia', hotel:'Hotel', supervisor:'Supervisión' }[modo] || '';
   $('#top').classList.toggle('con-modo', puedeAdministrar());
-  $('#top').innerHTML = `
+  /* Se retoca, no se rehace: si no, el logo, la foto de la cuenta y el
+     puntito de "quién está en la app" parpadean cada vez que un vecino abre
+     o cierra la app (que es todo el tiempo). */
+  morfar($('#top'), `
     <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
       <span class="logo">${LOGO}</span>
       <span class="marca-txt"><b><span class="marca-pre">Barrio </span>${esc(Store.s.config.nombre)}</b>
@@ -429,7 +531,7 @@ function pintarTop(){
          (le llega a todo el barrio) y llama al 911/101. */
       /* El supervisor tampoco: mira la garita, no es vecino del barrio. */
       /* El propietario a distancia tampoco: no está en el barrio. */
-      : esGuardia() || esSupervisor() || esPropDistancia() ? '' : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`;
+      : esGuardia() || esSupervisor() || esPropDistancia() ? '' : `<button class="sos-btn" id="sosBtn" aria-label="SOS: pedir ayuda">${I('siren')}<span>SOS</span></button>`}`);
 }
 
 function pintar(){
@@ -472,7 +574,7 @@ function pintar(){
   catch(err){ console.error(err); html = panelDeError(err); }
   lienzo.innerHTML = `<div class="lomos">${lomos}</div>` + `<section class="ventana ${PILA.length === 1 ? 'inicio' : ''} ${def.ancha ? 'ancha' : ''} ${ventanaNueva ? 'entra' : ''}" data-id="${activa.id}">${cab}<div class="cuerpo" id="cuerpo">${html}</div></section>`;
   lienzo.classList.toggle('apilado', PILA.length > 1);
-  { const ca = $('#cabAccion'); if (ca && typeof accionCabecera !== 'undefined') ca.innerHTML = accionCabecera; }
+  { const ca = $('#cabAccion'); if (ca && typeof accionCabecera !== 'undefined') ca.innerHTML = accionCabecera; }   /* ventana recién abierta: va entera */
   if (!ventanaNueva && activa.scroll != null && pintar.ultimaPila > PILA.length) scrollPendiente = activa.scroll;
   pintar.ultimaPila = PILA.length;
   ventanaNueva = false;
@@ -513,14 +615,22 @@ function refrescar(){
      antes, cada dato que llegaba los volvía a cerrar o a abrir. */
   const plegados = {}; $$('details[data-k]', cuerpo).forEach(d => { plegados[d.dataset.k] = d.open; });
   if (typeof accionCabecera !== 'undefined') accionCabecera = '';
-  try { cuerpo.innerHTML = def.render(activa.param); } catch(err){ console.error(err); cuerpo.innerHTML = panelDeError(err); }
-  { const ca = $('#cabAccion'); if (ca && typeof accionCabecera !== 'undefined') ca.innerHTML = accionCabecera; }
+  let nuevo; try { nuevo = def.render(activa.param); } catch(err){ console.error(err); nuevo = panelDeError(err); }
+  /* ACÁ ESTÁ LA CLAVE: se retoca solo lo que cambió (ver "DIBUJAR SIN QUE LA
+     PANTALLA TITILE"). Antes se rehacía todo el cuerpo y eso parpadeaba. */
+  morfar(cuerpo, nuevo);
+  { const ca = $('#cabAccion'); if (ca && typeof accionCabecera !== 'undefined') morfar(ca, accionCabecera); }
   $$('details[data-k]', cuerpo).forEach(d => { if (d.dataset.k in plegados) d.open = plegados[d.dataset.k]; });
   const fotoNueva = cuerpo.querySelector('.hero .foto');
-  if (fotoVieja && fotoNueva && fotoVieja.style.backgroundImage === fotoNueva.style.backgroundImage)
+  /* Al retocar, la foto grande suele ser el MISMO nodo de antes y no hace
+     falta hacer nada; solo se repone si de verdad se rehizo. */
+  if (fotoVieja && fotoNueva && fotoVieja !== fotoNueva && fotoVieja.style.backgroundImage === fotoNueva.style.backgroundImage)
     fotoNueva.replaceWith(fotoVieja);
-  for (const id in valores){ const el = document.getElementById(id); if (el){ if (el.type === 'checkbox') el.checked = valores[id]; else el.value = valores[id]; } }
-  if (foco){ const el = document.getElementById(foco); if (el){ el.focus({ preventScroll:true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch(e){} } }
+  /* Redes de seguridad: lo que se estaba escribiendo y dónde estaba el cursor.
+     Con el retoque casi nunca hace falta (los campos ni se tocan), pero si
+     una ventana se rehizo entera, esto lo deja como estaba. */
+  for (const id in valores){ const el = document.getElementById(id); if (el && el !== document.activeElement){ if (el.type === 'checkbox'){ if (el.checked !== valores[id]) el.checked = valores[id]; } else if (el.value !== valores[id]) el.value = valores[id]; } }
+  if (foco && document.activeElement !== document.getElementById(foco)){ const el = document.getElementById(foco); if (el){ el.focus({ preventScroll:true }); if (sel) try { el.setSelectionRange(sel[0], sel[1]); } catch(e){} } }
   cuerpo.scrollTop = y;
   conRed('encabezado', pintarTop);
   conRed('después de pintar', despuesDePintar);
@@ -829,9 +939,10 @@ function pintarAlarmas(){
   const act = sosQueVeo();
   if (!act.length){ box.innerHTML = ''; return; }
   const s0 = act[0], t = TIPOS_SOS[s0.tipo] || TIPOS_SOS.otra;
-  box.innerHTML = `<div class="sos-pantalla" role="alertdialog" aria-label="Alerta SOS"><div class="sos-caja">
+  /* Retocado: la alerta en pantalla no parpadea mientras llegan datos. */
+  morfar(box, `<div class="sos-pantalla" role="alertdialog" aria-label="Alerta SOS"><div class="sos-caja">
     ${s0.userId === u.id ? sosPanelMio(s0, t) : veGarita() ? sosPanelStaff(s0, t, act.length) : sosPanelVecino(s0, t)}
-  </div></div>`;
+  </div></div>`);
   Fotos.hidratar(box);
 }
 /* Si la app está abierta pero en segundo plano, el aviso del sistema. */

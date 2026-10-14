@@ -1018,11 +1018,15 @@ const botonMapa = () => `<a class="mapa-tile" href="${esc(mapaCorto())}" target=
   <span><b>Cómo llegar</b><small>Tocá el mapa: se abre Google Maps</small></span></a>`;
 const enlaceQR = contenido => urlApp('qr/' + encodeURIComponent(contenido));
 async function pintarQR(el, texto){
+  /* Si ese mismo QR ya está dibujado ahí, no se vuelve a dibujar: se repintaba
+     después de cada dato que llegaba del barrio y el código parpadeaba. */
+  if (el && el.dataset.qrPintado === texto && el.firstElementChild) return;
   const q = await cargarQR();
   if (!el) return;
   if (!q){ el.innerHTML = `<p class="muted small center" style="margin:30px 0">Sin conexión para dibujar el QR.<br>El código numérico alcanza.</p>`; return; }
   const qr = q(0, 'M'); qr.addData(texto); qr.make();
   el.innerHTML = qr.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+  el.dataset.qrPintado = texto;
 }
 
 /* =========================================================
