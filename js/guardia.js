@@ -290,14 +290,48 @@ function guardiaAhora(){
    la garita todavía no tenga la versión nueva. Todos lo arman igual, del
    mismo libro, y cada uno escribe solo si difiere de lo que hay en la base.
    Hasta que la bitácora no bajó de la nube no se sabe si hay turno: nada. */
-let gaT = 0;
+let gaT = 0, gaUlt = 0, gaVeces = 0, gaVentana = 0;
+/* COMPARAR BIEN, O LA PANTALLA TITILA (13-10-2026)
+   Lo que vuelve de la base del barrio trae las mismas cosas pero con las
+   claves en otro orden, sin los nulos y sin las listas vacías. Comparando el
+   texto tal cual, SIEMPRE daba "distinto": la garita y la Administración
+   volvían a publicar lo mismo cada 400 ms, cada publicación redibujaba la
+   ventana y además le llegaba a todos los demás, así que la pantalla
+   titilaba en la garita, la Administración, la supervisión y el hotel.
+   Ahora se compara el contenido, sin que importe el orden ni lo que la nube
+   no guarda. */
+const gaCanon = x => {
+  if (Array.isArray(x)) return x.map(gaCanon);
+  if (!x || typeof x !== 'object') return x;
+  const o = {};
+  Object.keys(x).sort().forEach(k => {
+    const v = x[k];
+    if (v == null || v === '') return;                 /* la nube no guarda nulos ni vacíos */
+    if (Array.isArray(v) && !v.length) return;         /* ni las listas vacías */
+    o[k] = gaCanon(v);
+  });
+  return o;
+};
+const gaHuella = x => { if (!x) return ''; const y = { ...x, guardias: aLista(x.guardias) }; delete y.at; return JSON.stringify(gaCanon(y)); };
 function sincroGuardiaAhora(){
-  if (!yo() || !['guardia', 'admin'].includes(yo().rol) || yo().estado !== 'aprobado') return;
+  const u = yo();
+  if (!u || !['guardia', 'admin'].includes(u.rol) || u.estado !== 'aprobado') return;
   if (!bitacoraBajada()) return;
   const d = guardiaAhoraDeseada(), cur = aLista(Store.s.guardiaAhora).find(x => x && x.id === 'ahora');
-  const igual = (a, b) => { if (!a || !b) return false; const k = x => JSON.stringify({ ...x, at:0, guardias: aLista(x.guardias) }); return k(a) === k(b); };
-  if (igual(cur, d)) return;
-  Store.cambiar(s => { s.guardiaAhora = [{ ...d, at:Date.now() }]; });
+  if (gaHuella(cur) === gaHuella(d)) return;
+  const ahora = Date.now();
+  /* La Administración es el respaldo de la garita: solo publica si en la base
+     no hay nada o lo que hay quedó viejo (más de un minuto). Así los dos
+     equipos no se pisan uno al otro escribiendo por turnos. */
+  if (u.rol === 'admin' && cur && ahora - (cur.at || 0) < 60000){ clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 60000); return; }
+  /* Freno de seguridad: nunca más de una publicación cada 10 segundos, ni más
+     de seis en cinco minutos. Si algo volviera a dar "distinto" para siempre,
+     la pantalla no titila: deja de publicar y queda anotado en la consola. */
+  if (ahora - gaUlt < 10000){ clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 10000 - (ahora - gaUlt)); return; }
+  if (ahora - gaVentana > 300000){ gaVentana = ahora; gaVeces = 0; }
+  if (++gaVeces > 6){ console.warn('Guardia en la portada: se publicó demasiadas veces seguidas, se frena un rato.'); return; }
+  gaUlt = ahora;
+  Store.cambiar(s => { s.guardiaAhora = [{ ...d, at:ahora }]; });
 }
 Store.alCambiar(() => { clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 400); });
 
