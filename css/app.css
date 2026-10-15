@@ -4912,11 +4912,6 @@ body.rk-arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .bt-mandar:active{transform:scale(.94)}
 .bt-siempre{margin:8px 0 0;font-size:12.5px;font-weight:700;color:var(--danger);display:flex;gap:6px;align-items:center}
 .bt-siempre svg.i{width:15px;height:15px}
-.bt-nota{display:flex;gap:12px;align-items:flex-start;margin:0 0 12px;padding:12px 14px;border-radius:6px 18px 18px 18px;background:linear-gradient(180deg,#fff6c9,#ffeaa0);color:#3a2d00;box-shadow:0 8px 18px rgba(183,121,10,.18);transform:rotate(-.4deg);animation:btNota .5s cubic-bezier(.2,1.3,.4,1)}
-.bt-nota small{display:block;font-size:11.5px;font-weight:800;letter-spacing:.03em;opacity:.75}
-.bt-nota p{margin:2px 0 0;font-size:14.5px;font-weight:600;white-space:pre-wrap}
-.bt-chinche{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#e53935;color:#fff;box-shadow:0 3px 8px rgba(229,57,53,.35)}
-.bt-chinche svg.i{width:16px;height:16px}
 @keyframes btNota{from{opacity:0;transform:translateY(-8px) rotate(-3deg)}}
 .bt-hero{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1)}
 .bt-hero .grow{min-width:0} .bt-hero b{display:block;font-size:15px} .bt-hero small{display:block;color:var(--muted);font-size:12px}
@@ -4961,7 +4956,7 @@ body.rk-arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .bt-que{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
 .bt-que li{padding:8px 12px;border-radius:12px;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 6%,var(--surface));font-size:13px;color:var(--ink-2)}
 .bt-que b{display:block;color:var(--c);font-size:13.5px}
-@media (prefers-reduced-motion:reduce){ .bt-it,.bt-nota,.bt-it.c-danger .bt-punto i,.bt-tipos input:checked+span svg.i{animation:none!important} }
+@media (prefers-reduced-motion:reduce){ .bt-it,.rl-nota,.bt-it.c-danger .bt-punto i,.bt-tipos input:checked+span svg.i{animation:none!important} }
 
 /* ---------- el historial de visitas ---------- */
 .hv-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
@@ -5250,3 +5245,35 @@ button.turno-banda>svg.i:last-child{width:18px;height:18px;color:var(--muted)}
 .gh-entra-f{display:flex;gap:8px} .gh-entra-f input{flex:1;min-width:0}
 .gh-entra-f .btn{flex:none}
 @media (prefers-reduced-motion:reduce){ .lg-real.on::after,.gh-p,.gh-entra.falta{animation:none!important} }
+
+/* LAS NOVEDADES DEL RELEVO (15-10-2026, rediseño del cartel amarillo):
+   un mensaje del que se fue al que entra, con su carita y su color de horario. */
+.rl-nota{position:relative;margin:0 0 14px;border-radius:22px;background:linear-gradient(135deg,color-mix(in srgb,var(--c) 14%,var(--surface)),var(--surface) 60%);border:1px solid color-mix(in srgb,var(--c) 35%,var(--line));box-shadow:0 10px 28px color-mix(in srgb,var(--c) 18%,transparent);overflow:hidden;animation:rlEntra .55s cubic-bezier(.2,1.2,.4,1) both}
+.rl-nota::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--c),color-mix(in srgb,var(--c) 40%,#fff))}
+@keyframes rlEntra{from{opacity:0;transform:translateY(-8px) scale(.98)}}
+.turno-portada ~ .rl-nota{max-width:560px;margin-left:auto;margin-right:auto}
+.rl-nota summary{list-style:none;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px 14px 10px 16px;cursor:pointer}
+.rl-nota summary::-webkit-details-marker{display:none}
+.rl-cara{position:relative;width:46px;height:46px;border-radius:50%;background:var(--cc);border:2.5px solid var(--c);display:grid;place-items:center;overflow:visible;color:#fff;font-weight:800}
+.rl-cara .ga-cara{width:100%;height:100%;border-radius:50%;transform:translateY(3px) scale(1.12);clip-path:circle(50% at 50% 46%)}
+.rl-nuevo{position:absolute;right:-2px;top:-2px;width:13px;height:13px;border-radius:50%;background:#ef4444;border:2px solid var(--surface);animation:latido 1.6s infinite}
+.rl-quien{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.rl-quien small{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--c)}
+.rl-quien small svg.i{width:13px;height:13px}
+.rl-quien b{font-size:16px;margin:2px 0 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rl-quien em{font-style:normal;font-size:12px;color:var(--muted)}
+.rl-h{font-style:normal;font-weight:800;color:var(--c);margin-right:5px}
+.rl-hace{align-self:start;padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--c) 14%,var(--surface-2));color:var(--ink-2);font-size:11.5px;font-weight:700;white-space:nowrap}
+.rl-globo{position:relative;margin:2px 16px 0 74px;padding:12px 14px;border-radius:4px 16px 16px 16px;background:var(--surface);border:1px solid color-mix(in srgb,var(--c) 30%,var(--line));box-shadow:var(--sh-1)}
+.rl-globo::before{content:"";position:absolute;left:-7px;top:-1px;width:12px;height:12px;background:var(--surface);border-left:1px solid color-mix(in srgb,var(--c) 30%,var(--line));border-top:1px solid color-mix(in srgb,var(--c) 30%,var(--line));transform:skewX(35deg)}
+.rl-globo p{margin:0;font-size:15.5px;font-weight:600;line-height:1.45;white-space:pre-wrap;color:var(--ink)}
+.rl-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 16px 12px 74px}
+.rl-pie span{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted)}
+.rl-pie span svg.i{width:13px;height:13px}
+.rl-ok{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:0;border-radius:999px;background:var(--c);color:#fff;font-weight:800;font-size:13px;box-shadow:0 4px 12px color-mix(in srgb,var(--c) 40%,transparent)}
+.rl-ok svg.i{width:15px;height:15px}
+.rl-ok:active{transform:scale(.95)}
+.rl-nota:not([open]){box-shadow:none;animation:none}
+.rl-nota:not([open]) summary{padding-bottom:12px}
+.rl-nota:not([open]) .rl-cara{width:36px;height:36px}
+@media (max-width:480px){ .rl-globo{margin-left:16px} .rl-pie{padding-left:16px} .rl-quien b{font-size:15px} }

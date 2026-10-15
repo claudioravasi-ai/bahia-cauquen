@@ -1704,9 +1704,13 @@ A['aviso-llego'] = el => { const a = Store.s.avisos.find(x => x.id === el.datase
    Si el barrio tenía guardados los tres turnos viejos de fábrica (6-14,
    14-22, 22-6), se toman los nuevos solos. */
 const TURNOS_BASE = [{ nombre:'Mañana', desde:'07:00', hasta:'15:00' }, { nombre:'Día', desde:'08:00', hasta:'20:00' }, { nombre:'Tarde', desde:'15:00', hasta:'23:00' }, { nombre:'Noche', desde:'23:00', hasta:'07:00' }];
-const TURNOS_VIEJOS = 'Mañana 06:00-14:00|Tarde 14:00-22:00|Noche 22:00-06:00';
+/* 15-10: en la garita de verdad estaban guardados tres horarios (7-15, 15-23
+   y 23-7) y faltaba el de 8 a 20 ("le falta la línea del turno de 8 a 20").
+   Esos tres también se toman como viejos: va la grilla de cuatro. */
+const TURNOS_VIEJOS = ['Mañana 06:00-14:00|Tarde 14:00-22:00|Noche 22:00-06:00', '07:00-15:00|15:00-23:00|23:00-07:00'];
 const turnosConfig = () => { const t = aLista(Store.s.config.turnosGarita).filter(x => x && x.nombre && x.desde && x.hasta);
-  return t.length && t.map(x => `${x.nombre} ${x.desde}-${x.hasta}`).join('|') !== TURNOS_VIEJOS ? t : TURNOS_BASE; };
+  const firma = t.map(x => `${x.nombre} ${x.desde}-${x.hasta}`).join('|'), horas = t.map(x => `${x.desde}-${x.hasta}`).join('|');
+  return t.length && !TURNOS_VIEJOS.includes(firma) && !TURNOS_VIEJOS.includes(horas) ? t : TURNOS_BASE; };
 const enFranja = (t, min) => { const d = minutosDe(t.desde), h = minutosDe(t.hasta); return d < h ? min >= d && min < h : (min >= d || min < h); };
 const turnoDeAhora = () => turnosConfig().find(t => enFranja(t, ahoraMin())) || turnosConfig()[0];
 const registrosTurno = () => aLista(Store.s.bitacora).filter(b => b && b.tipo === 'turno' && b.abre).sort((a, b) => b.at - a.at);
@@ -3475,15 +3479,33 @@ function notaDejada(){
   /* 14-10: con el relevo de a uno, la última nota puede ser de un guardia que
      salió antes que el último: se busca la más nueva de las últimas 16 h. */
   const conNota = registrosTurno().find(x => x.cerradoAt && x.notaCierre && Date.now() - x.cerradoAt < 16 * HORA);
-  if (conNota) return { nota:conNota.notaCierre, turno:conNota.turno, guardias: conNota.notaPor ? [conNota.notaPor] : aLista(conNota.guardias), at:conNota.cerradoAt, por:conNota.notaPor || '' };
+  if (conNota) return { id:conNota.id, nota:conNota.notaCierre, turno:conNota.turno, guardias: conNota.notaPor ? [conNota.notaPor] : aLista(conNota.guardias), at:conNota.cerradoAt, por:conNota.notaPor || '' };
   const r = registrosTurno().find(x => x.cerradoAt); if (!r || Date.now() - r.cerradoAt > 16 * HORA) return null;
   let nota = r.notaCierre || '';
   if (!nota){ const l = aLista(Store.s.bitacora).find(b => b && b.tipo === 'turno' && !b.abre && Math.abs(b.at - r.cerradoAt) < 2 * MIN && /Novedades: /.test(b.texto || ''));
     if (l) nota = l.texto.split('Novedades: ').slice(1).join('Novedades: '); }
-  return nota ? { nota, turno:r.turno, guardias:aLista(r.guardias), at:r.cerradoAt } : null;
+  return nota ? { id:r.id, nota, turno:r.turno, guardias:aLista(r.guardias), at:r.cerradoAt } : null;
 }
+/* LAS NOVEDADES DEL RELEVO (rediseño, pedido de Claudio, 15-10-2026: "el
+   cartel amarillo del cierre del turno de noche tiene un diseño muy feo").
+   Ahora es un mensaje del que se fue al que entra: su carita y su color de
+   horario, quién es, a qué hora lo dejó y hace cuánto, y lo que escribió en
+   un globo de diálogo. "Leído" lo pliega en este equipo (queda a mano con
+   un toque); una nota nueva aparece abierta otra vez. */
+const notaLeidaKey = 'bhc.notaRelevoLeida';
+const notaYaLeida = id => { try { return localStorage.getItem(notaLeidaKey) === id; } catch(e){ return false; } };
 const notaDejadaHtml = () => { const n = notaDejada(); if (!n) return '';
-  return `<div class="bt-nota"><span class="bt-chinche">${I('tack')}</span><div class="grow"><small>${n.por ? `Lo que dejó ${esc(n.por)}` : `Lo que dejó el turno ${esc(n.turno)} · ${esc(n.guardias.join(', '))}`} · ${hora(n.at)} h</small><p>${esc(n.nota)}</p></div></div>`; };
+  const m = /^(.*) \(([^()]+)\)$/.exec(n.por || ''), quien = m ? m[1] : n.guardias.join(', '), hor = m ? m[2] : n.turno;
+  const h = typeof horarioDe === 'function' ? horarioDe(hor) : null, color = typeof colorHorario === 'function' && h ? colorHorario(hor) : '#f59e0b';
+  const uno = quien.split(',')[0].trim(), leida = notaYaLeida(n.id), txt = String(n.nota).trim(), texto = txt.charAt(0).toUpperCase() + txt.slice(1);
+  const hace = Math.max(1, Math.round((Date.now() - n.at) / MIN)), haceTxt = hace < 60 ? `hace ${hace} min` : `hace ${Math.floor(hace / 60)} h${hace % 60 >= 10 ? ' ' + hace % 60 + ' min' : ''}`;
+  return `<details class="rl-nota" style="--c:${color}" data-id="${esc(n.id || '')}"${leida ? '' : ' open'}>
+    <summary><span class="rl-cara" style="--cc:${colorDe(uno)}">${typeof caraGuardia === 'function' ? caraGuardia(uno, typeof lookDe === 'function' ? lookDe(uno) : null) : esc(inicialesDe(uno))}${leida ? '' : '<i class="rl-nuevo"></i>'}</span>
+      <span class="rl-quien"><small>${I('chat')}Novedades del relevo${leida ? ' · leídas' : ''}</small><b>${esc(quien)}</b><em><i class="rl-h">${esc(hor)}</i>${h ? `${hhCorto(h.desde)} a ${hhCorto(h.hasta)} h · ` : ''}se fue a las ${hora(n.at)} h</em></span>
+      <span class="rl-hace">${haceTxt}</span></summary>
+    <div class="rl-globo"><p>${esc(texto)}</p></div>
+    <div class="rl-pie"><span>${I('book')}También quedó en la bitácora y en el parte.</span>${leida ? '' : `<button type="button" class="rl-ok" data-a="nota-leida" data-id="${esc(n.id || '')}">${I('check')}Leído</button>`}</div></details>`; };
+A['nota-leida'] = el => { try { localStorage.setItem(notaLeidaKey, el.dataset.id || ''); } catch(e){} const d = el.closest('details'); if (d) d.open = false; toast('Novedades leídas', 'check'); pintar(); };
 R.bitacora = {
   titulo: 'Bitácora', icon: 'book', color: 'wood', sub: 'Libro de guardia',
   render(p){
