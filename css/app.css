@@ -5277,3 +5277,240 @@ button.turno-banda>svg.i:last-child{width:18px;height:18px;color:var(--muted)}
 .rl-nota:not([open]) summary{padding-bottom:12px}
 .rl-nota:not([open]) .rl-cara{width:36px;height:36px}
 @media (max-width:480px){ .rl-globo{margin-left:16px} .rl-pie{padding-left:16px} .rl-quien b{font-size:15px} }
+
+/* =========================================================
+   MANTENIMIENTO EN VIVO (15-10-2026, js/mant-vivo.js)
+   El mapa con las gotas de trabajo, la hoja "Mantenimiento en vivo", los
+   mensajes, el brazo del teléfono de mantenimiento y la bitácora.
+   ========================================================= */
+.mv-svg .mar{fill:url(#mvMar)}
+.mv-svg .olas{fill:url(#mvOlas);opacity:.9}
+.mv-svg .mv-lote rect{fill:#1c4058;stroke:#4f88a6;stroke-width:.9}
+.mv-svg .mv-lote text{fill:#cfe9f5;font-size:8px;font-weight:800;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.mv-svg .mv-lote.b rect{fill:rgba(255,255,255,.03);stroke:#3c6378;stroke-dasharray:2.5 2}
+.mv-svg .mv-lote.b text{fill:#7fa3b6}
+.mv-svg .mv-lote.h rect{fill:#6b4d12;stroke:#ffcf6b}
+.mv-svg.lejos .mv-lote text{display:none}
+.mv-svg .garita-pin{cursor:default}
+.mv-pin{cursor:pointer;outline:none}
+.mv-pin .mv-gota{stroke:#fff;stroke-width:1.6;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+.mv-pin .mv-cara{fill:#fff}
+.mv-pin .mv-emo{font-size:8.6px;text-anchor:middle;pointer-events:none}
+.mv-pin .mv-onda{fill:none;stroke-width:2.4;transform-box:fill-box;transform-origin:center;animation:mvOnda 1.8s ease-out infinite}
+@keyframes mvOnda{0%{transform:scale(.8);opacity:.9}100%{transform:scale(2.3);opacity:0}}
+.mv-pin.curso{animation:mvSalta 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes mvSalta{0%,80%,100%{transform:translateY(0)}88%{transform:translateY(-3px)}}
+.mv-pin.hecho .mv-gota{opacity:.92}
+.mv-pin .mv-tilde circle{fill:#fff;stroke:#16a34a;stroke-width:1.2}
+.mv-pin .mv-tilde path{fill:none;stroke:#16a34a;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.mv-pin .mv-pl{fill:#fff;font-size:5.4px;font-weight:800;text-anchor:middle;paint-order:stroke;stroke:#071624;stroke-width:2.2px;display:none;pointer-events:none}
+.mapa-svg.cerca .mv-pin .mv-pl,.mv-pin.sel .mv-pl{display:block}
+.mv-pin.mio .mv-gota{stroke:#ffe066;stroke-width:2.2}
+.mv-pin.sel .mv-gota{stroke:#ffe066;stroke-width:3}
+.mv-pin:focus-visible .mv-gota{stroke:#ffe066;stroke-width:3}
+.mv-borrador circle{fill:rgba(255,224,102,.25);stroke:#ffe066;stroke-width:2;stroke-dasharray:4 3;animation:mvGira 6s linear infinite;transform-box:fill-box;transform-origin:center}
+.mv-borrador .c{fill:#ffe066;stroke:none;animation:none}
+@keyframes mvGira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.mv-pin.curso,.mv-pin .mv-onda,.mv-borrador circle{animation:none}}
+
+/* La hoja "Mantenimiento en vivo" */
+.mv-en-vivo .mapa-lienzo{height:clamp(240px,42vh,420px);margin-top:12px}
+.mv-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mv-kpis span{display:flex;flex-direction:column;align-items:flex-start;padding:10px 12px;border-radius:16px;color:#fff;background:linear-gradient(135deg,#ff8a00,#ff3d77)}
+.mv-kpis span.c{background:linear-gradient(135deg,#7c3aed,#3b82f6)}
+.mv-kpis span.h{background:linear-gradient(135deg,#16a34a,#0d9488)}
+.mv-kpis b{font-size:24px;line-height:1.05;font-weight:800}
+.mv-kpis small{font-size:11.5px;opacity:.92;font-weight:600}
+.mv-pista{display:flex;align-items:center;gap:6px;margin:8px 2px 0;font-size:12px;color:var(--muted)}
+.mv-pista .i{width:14px;height:14px;flex:none}
+.mv-persona{margin-top:12px;padding:12px;border-radius:18px;background:var(--surface-2);border:1px solid var(--line);border-left:5px solid hsl(var(--h) 80% 50%)}
+.mv-per-cab{display:flex;align-items:center;gap:10px}
+.mv-per-cab b{display:block;font-size:15px}
+.mv-per-cab small{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.mv-av{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;background:linear-gradient(135deg,hsl(var(--h,200) 80% 52%),hsl(calc(var(--h,200) + 50) 80% 45%))}
+.mv-av .i{width:18px;height:18px}
+.mv-vivo-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:mvPunto 1.6s infinite}
+@keyframes mvPunto{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}100%{box-shadow:0 0 0 8px rgba(34,197,94,0)}}
+.mv-msj{position:relative;display:inline-flex;align-items:center;gap:6px}
+.mv-msj em,.mv-hilo em,.mv-tc em,.mv-tabs em{font-style:normal;min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;font-size:11px;font-weight:800;color:#fff;background:#ef4444}
+.mv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mv-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12.5px;font-weight:700;color:var(--ink);background:var(--surface);border:1.5px solid var(--c)}
+.mv-chip small{font-weight:500;color:var(--muted)}
+.mv-chip.hecho{background:color-mix(in srgb,#16a34a 12%,var(--surface));border-color:#16a34a}
+.mv-chip .i{width:14px;height:14px;color:#16a34a}
+.mv-ficha{display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;background:color-mix(in srgb,var(--c) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+.mv-ficha-emo{font-size:30px;line-height:1}
+.mv-ficha b{display:block;font-size:16px}.mv-ficha small{color:var(--muted)}
+.mv-estado{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
+.mv-estado.curso{color:#c2410c;background:#ffedd5}
+.mv-estado.curso i{width:8px;height:8px;border-radius:50%;background:#f97316;animation:mvPunto 1.6s infinite}
+.mv-estado.hecho{color:#15803d;background:#dcfce7}
+.mv-estado .i{width:14px;height:14px}
+.mv-nota{margin:10px 2px 0;padding:10px 12px;border-radius:12px;background:var(--surface-2);font-size:14px}
+
+/* La conversación */
+.mv-chat{display:flex;flex-direction:column;min-height:52vh}
+.mv-burbujas{flex:1;display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow:auto;padding:4px 2px 10px}
+.mv-b{max-width:82%;display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:16px;font-size:14.5px;line-height:1.35;word-break:break-word}
+.mv-b small{font-size:10.5px;opacity:.75;font-weight:700}
+.mv-b.yo{align-self:flex-end;color:#fff;background:linear-gradient(135deg,var(--brand),#0b3c47);border-bottom-right-radius:5px}
+.mv-b.el{align-self:flex-start;background:var(--surface-3);border-bottom-left-radius:5px}
+.mv-vacio{display:flex;flex-direction:column;align-items:center;gap:8px;margin:auto;padding:26px 10px;color:var(--muted);text-align:center;font-size:13.5px}
+.mv-vacio .i{width:30px;height:30px;opacity:.5}
+.mv-escribir{display:flex;gap:8px;align-items:flex-end;margin-top:6px}
+.mv-escribir textarea{flex:1;min-height:44px;max-height:140px;resize:none;border-radius:22px;padding:11px 16px}
+.mv-escribir .btn{width:46px;height:46px;padding:0;border-radius:50%;flex:none}
+.mv-rapidos{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.mv-rapidos button{padding:6px 11px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--brand);background:var(--brand-soft)}
+.mv-hilos{display:flex;flex-direction:column;gap:8px}
+.mv-hilo{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;text-align:left;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink)}
+.mv-hilo b{display:block;font-size:14.5px}
+.mv-hilo small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56vw}
+.mv-hilo>.i{width:16px;height:16px;color:var(--muted)}
+
+/* En la tarjeta de la garita */
+.mv-tchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.mv-tc{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:700;color:#0b3c47;background:#e0f7f3;border:1px solid #9be3d6}
+.mv-tc .i{width:14px;height:14px}
+.mv-tc.nuevo{color:#fff;background:#ef4444;border-color:#ef4444;animation:mvLate 1.2s ease-in-out infinite}
+@keyframes mvLate{50%{transform:scale(1.06)}}
+
+/* La tarjeta del enlace (con el QR) */
+.mv-tarjeta{border-radius:22px;overflow:hidden;color:#fff;background:linear-gradient(150deg,hsl(var(--h) 70% 30%),#0b3c47 60%,#06222a);box-shadow:var(--sh-2)}
+.mv-t-cab{display:flex;align-items:center;gap:12px;padding:16px}
+.mv-t-cab small{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.8}
+.mv-t-cab b{font-size:19px}
+.mv-t-av{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:17px;color:#0b3c47;background:#ffe066}
+.mv-t-qr{width:min(230px,70%);aspect-ratio:1;margin:2px auto 0;padding:12px;border-radius:18px;background:#fff}
+.mv-t-qr svg{width:100%;height:100%;display:block}
+.mv-t-pie{margin:0;padding:12px 16px 16px;font-size:12.5px;text-align:center;opacity:.85}
+
+/* La bitácora de mantenimiento */
+.mv-jornadas{display:flex;flex-direction:column;gap:10px;margin-bottom:6px}
+.mv-jor{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1,0 1px 2px rgba(0,0,0,.05));flex-wrap:wrap}
+.mv-jor .grow{min-width:180px;flex:1}
+.mv-jor b{display:block;font-size:15px}.mv-jor small{color:var(--muted);font-size:12.5px}
+.mv-jor-tareas{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.mv-jor-tareas span{padding:3px 8px;border-radius:999px;font-size:11.5px;font-weight:700;background:color-mix(in srgb,var(--c) 15%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.mv-jor-acc{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
+.mv-parte-frame{width:100%;height:min(70vh,900px);border:1px solid var(--line);border-radius:14px;background:#fff}
+
+/* =========================================================
+   EL BRAZO: la app del teléfono de mantenimiento
+   ========================================================= */
+body.mv-modo{background:#06161c}
+.mv-brazo{--h:28;min-height:var(--alto,100dvh);display:flex;flex-direction:column;color:#eaf6f4;
+  background:radial-gradient(120% 60% at 100% 0%,hsl(var(--h) 85% 45% / .35),transparent 60%),radial-gradient(90% 50% at 0% 100%,rgba(20,150,140,.28),transparent 60%),#06161c}
+.mv-brazo .mv-b-cab{display:flex;align-items:center;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 16px 10px}
+.mv-logo{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,#ff8a00,#ff3d77);box-shadow:0 6px 16px rgba(255,61,119,.35)}
+.mv-logo .mt-gear{position:static;width:26px;height:26px;color:#fff;--mt-hueco:#ff5e62}
+.mv-b-cab small{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7}
+.mv-b-cab b{font-size:18px;font-weight:800}
+.mv-vivo{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:800;color:#bbf7d0;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.4)}
+.mv-vivo i{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:mvPunto 1.6s infinite}
+.mv-hola{display:flex;align-items:flex-end;gap:12px;padding:4px 16px 0}
+.mv-hola small{display:block;font-size:13px;opacity:.7}
+.mv-hola b{font-size:30px;font-weight:800;line-height:1.05;letter-spacing:-.01em}
+.mv-reloj{text-align:right}
+.mv-reloj small{display:block;font-size:11.5px;opacity:.7}
+.mv-reloj b{font-size:20px;font-weight:800;color:#ffe066;font-variant-numeric:tabular-nums}
+.mv-b-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 16px 0}
+.mv-b-stats span{display:flex;flex-direction:column;padding:9px 11px;border-radius:15px;font-size:11.5px;font-weight:600;color:#cde7e3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
+.mv-b-stats span b{font-size:21px;color:#fff;line-height:1.1}
+.mv-b-stats span.h b{color:#4ade80}
+.mv-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 16px 0;padding:5px;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1)}
+.mv-tabs button{background:transparent;border:0;display:flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:6px;border-radius:13px;font-size:13px;font-weight:700;color:#cde7e3}
+.mv-tabs button .i{width:17px;height:17px}
+.mv-tabs button.on{color:#06161c;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.mv-b-cuerpo{flex:1;position:relative;padding:12px 16px calc(96px + env(safe-area-inset-bottom))}
+.mv-b-mapa .mapa-lienzo{height:calc(var(--alto,100dvh) - 330px);min-height:320px;margin:0;border-radius:22px;border:1px solid rgba(255,255,255,.14)}
+.mv-b-mapa.marcando .mapa-lienzo{outline:3px solid #ffe066;outline-offset:2px;cursor:crosshair}
+.mv-b-mapa.marcando .mapa-svg{cursor:crosshair}
+.mv-marcando{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;border-radius:16px;color:#06161c;background:#ffe066;animation:mvLate 1.6s ease-in-out infinite}
+.mv-marcando b{flex:1;font-size:14px}
+.mv-marcando button{padding:7px 12px;border-radius:11px;font-weight:800;font-size:13px;background:rgba(6,22,28,.12)}
+.mv-fab{white-space:nowrap;position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:8px;padding:15px 24px;border-radius:999px;font-size:16px;font-weight:800;color:#fff;
+  background:linear-gradient(135deg,#ff8a00,#ff3d77 60%,#a743ff);box-shadow:0 10px 28px rgba(255,61,119,.45),inset 0 1px 0 rgba(255,255,255,.35)}
+.mv-fab .i{width:22px;height:22px}
+.mv-fab:active{transform:translateX(-50%) scale(.96)}
+.mv-brazo .mv-pista{color:#9fc2bd}
+.mv-lista{display:flex;flex-direction:column;gap:10px}
+.mv-item{display:flex;gap:12px;align-items:flex-start;padding:13px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-left:5px solid var(--c)}
+.mv-item.hecho{border-left-color:#22c55e;background:rgba(34,197,94,.08)}
+.mv-i-emo{font-size:28px;line-height:1}
+.mv-item b{display:block;font-size:16px}
+.mv-item small{display:flex;align-items:center;gap:4px;font-size:12.5px;opacity:.75}
+.mv-item small .i{width:13px;height:13px}
+.mv-item p{margin:6px 0 0;font-size:13.5px;opacity:.9}
+.mv-i-acc{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mv-i-acc button{display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:11px;font-size:12.5px;font-weight:700;color:#eaf6f4;background:rgba(255,255,255,.1)}
+.mv-i-acc button .i{width:14px;height:14px}
+.mv-i-acc button.ok{color:#06161c;background:#4ade80}
+.mv-brazo .mv-estado.curso{color:#fed7aa;background:rgba(249,115,22,.18)}
+.mv-brazo .mv-estado.hecho{color:#bbf7d0;background:rgba(34,197,94,.2)}
+.mv-brazo .mv-hilo{color:#eaf6f4;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1)}
+.mv-brazo .mv-hilo small{color:#9fc2bd}
+.mv-vacio-g{display:flex;flex-direction:column;align-items:center;gap:8px;padding:40px 16px;text-align:center}
+.mv-vacio-g>.i{width:40px;height:40px;opacity:.5}
+.mv-vacio-g b{font-size:17px}.mv-vacio-g small{opacity:.75;max-width:280px}
+.mv-solo{justify-content:flex-start}
+.mv-mensaje{margin:auto 16px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;border-radius:24px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12)}
+.mv-mensaje b{font-size:19px}.mv-mensaje small{opacity:.8;max-width:320px}
+.mv-m-ic{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:rgba(255,224,102,.15);color:#ffe066}
+.mv-m-ic .i{width:28px;height:28px}
+/* El formulario de un trabajo */
+.mv-form .mv-donde{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 12px;margin-bottom:12px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line)}
+.mv-form .mv-donde .i{width:18px;height:18px;color:var(--brand)}
+.mv-form .mv-donde input{flex:1;border:0;background:transparent;font-weight:700}
+.mv-tareas{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.mv-tareas label{position:relative;cursor:pointer}
+.mv-tareas input{position:absolute;opacity:0;pointer-events:none}
+.mv-tareas span{display:flex;align-items:center;gap:8px;min-height:48px;padding:8px 10px;border-radius:14px;font-size:13.5px;font-weight:700;background:var(--surface-2);border:2px solid var(--line);transition:.15s}
+.mv-tareas span i{font-style:normal;font-size:20px}
+.mv-tareas input:checked+span{border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,var(--surface));box-shadow:0 4px 12px color-mix(in srgb,var(--c) 30%,transparent)}
+.mv-tareas input:focus-visible+span{outline:2px solid var(--brand);outline-offset:2px}
+.mv-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 14px}
+.mv-seg label{position:relative;cursor:pointer}
+.mv-seg input{position:absolute;opacity:0}
+.mv-seg span{display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px;border-radius:14px;font-weight:800;background:var(--surface-2);border:2px solid var(--line)}
+.mv-seg span .i{width:16px;height:16px}
+.mv-seg .mv-dot{width:9px;height:9px;border-radius:50%;background:#f97316}
+.mv-seg input:checked+span{color:#c2410c;border-color:#f97316;background:#fff7ed}
+.mv-seg label.h input:checked+span{color:#15803d;border-color:#22c55e;background:#f0fdf4}
+@media (min-width:760px){.mv-tareas{grid-template-columns:repeat(3,1fr)}.mv-brazo{max-width:760px;margin:0 auto}}
+
+/* En la garita: tocar a alguien de mantenimiento despliega su mapa en vivo (15-10-2026) */
+.mt-nom{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:0;margin:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.mt-nom b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mt-nom .i{width:15px;height:15px;flex:none;opacity:.6;transition:transform .2s}
+.mt-nom.abierto .i{transform:rotate(90deg);opacity:1;color:var(--brand)}
+.mt-av[data-a]{cursor:pointer}
+.mv-desp{grid-column:1/-1;padding:12px;border-radius:18px;background:#0b1f2e;color:#eaf6f4;border:2px solid hsl(var(--h) 80% 52%);box-shadow:0 10px 28px rgba(0,0,0,.18);animation:mvAbre .28s ease-out}
+@keyframes mvAbre{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.mv-desp-cab{display:flex;align-items:center;gap:10px}
+.mv-desp-cab b{display:flex;align-items:center;gap:6px;font-size:15px}
+.mv-desp-cab b .i{width:17px;height:17px;color:hsl(var(--h) 85% 62%)}
+.mv-desp-cab small{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:3px;font-size:12px;color:#9fc2bd}
+.mv-desp-cab .mv-vivo{padding:2px 8px;font-size:11px}
+.mv-desp-x{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;color:#fff;background:rgba(255,255,255,.1);border:0}
+.mv-desp .mapa-lienzo{height:clamp(240px,38vh,380px);margin-top:10px}
+.mv-desp .mv-chip{color:#eaf6f4;background:rgba(255,255,255,.06)}
+.mv-desp .mv-chip small{color:#9fc2bd}
+.mv-desp .muted{color:#9fc2bd}
+.mv-pin.tenue{opacity:.35;animation:none}
+.mv-pin.recien .mv-gota{stroke:#ffe066;stroke-width:2.6}
+.mv-pin.recien .mv-onda{stroke:#ffe066 !important;stroke-width:3}
+
+/* ---------- Empleados del hotel con credencial permanente (15-10-2026) ---------- */
+.hemp-intro{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;margin-bottom:12px;border-radius:18px;background:linear-gradient(135deg,var(--wood-soft),var(--surface));border:1px solid var(--line)}
+.hemp-intro b{display:block;font-size:15px}
+.hemp-intro small{display:block;color:var(--ink-2);line-height:1.45;margin-top:2px}
+.hemp-intro-ic{flex:none;width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:var(--wood);color:#fff}
+.hemp-intro-ic svg{width:22px;height:22px}
+.hemp-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.hemp-card{border-left:4px solid var(--line)}
+.hemp-card.adentro{border-left-color:var(--ok)}
+.hemp-card b{overflow-wrap:anywhere}
+.hemp-av{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff;background:hsl(var(--h,25) 55% 45%)}
+.hemp-av.grande{width:56px;height:56px;font-size:20px}
+.hemp-cod{letter-spacing:.18em;font-family:ui-monospace,"SF Mono",Menlo,monospace}

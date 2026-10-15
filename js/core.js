@@ -194,14 +194,16 @@ function migrar(s){
   const def = { users:[], posts:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[],
     avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], mensajeria:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
-    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[],
+    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[], hotelEmpleados:[],
     /* 08-10: el resumen de cada liquidación y las cuotas de cada lote (ExpLote, js/v-expensas.js) */
     liqResumen:[], cuotasLote:[], morosos:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[],
     /* 07-10: supervisión de la guardia (js/v-supervisor.js) */
     alertasSup:[], vistos:[],
     /* 13-10: la guardia de ahora (pública) y cómo aparece cada guardia (js/guardia.js) */
-    guardiaAhora:[], guardiaLooks:[], mantenimiento:[] };
+    guardiaAhora:[], guardiaLooks:[], mantenimiento:[],
+    /* 15-10: mantenimiento en vivo (js/mant-vivo.js): puntos, enlaces, jornadas y, sin la base, los mensajes */
+    mantVivo:[], mantCodigos:[], mantJornadas:[], mantChat:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* El chat vecinal y las reservas de espacios comunes se sacaron el 29-09-2026:
      lo que haya quedado guardado en este equipo se borra al abrir la app. */
@@ -1218,7 +1220,9 @@ const Correo = {
   /* `privado`: no queda en la bandeja de salida de la Administración (el
      aviso de "Estoy bien" a un familiar: que alguien vive solo no tiene
      por qué verlo nadie más). */
-  async enviarDetalle({ para, asunto, html, tipo, privado = false }){
+  /* `pdf` ({ html, nombre }): el Apps Script (versión 14) lo convierte a PDF
+     y lo adjunta; uno más viejo lo ignora y el correo sale igual. */
+  async enviarDetalle({ para, asunto, html, tipo, privado = false, pdf = null }){
     if (!para) return { ok:false, error:'Sin dirección de correo' };
     const anota = !privado && this.anota();
     const reg = { id:uid(), para, asunto, html, tipo, at:Date.now(), estado:'pendiente', intentos:0 };
@@ -1227,7 +1231,7 @@ const Correo = {
     const d = this.datos();
     if (!d){ const error = 'El envío automático no está configurado (Ajustes → Correo): quedó en la bandeja de salida.'; if (anota) Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x) x.error = error; }); return { ok:false, error }; }
     const marcar = (estado, error = '') => { if (anota) Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x){ x.estado = estado; x.intentos = (x.intentos || 0) + 1; x.error = error; } }); };
-    try { await this.pedir(d, { para, asunto, html, tipo }); marcar('enviado'); return { ok:true }; }
+    try { await this.pedir(d, { para, asunto, html, tipo, ...(pdf ? { pdf } : {}) }); marcar('enviado'); return { ok:true }; }
     catch(e){ console.warn('No salió el correo', tipo, e); const error = this.motivo(e); marcar('error', error); return { ok:false, error }; }
   },
   /* Lo que quedó sin salir (el Apps Script no estaba configurado, se cayó

@@ -60,7 +60,9 @@ const Nube = {
              /* 10-10: los morosos por lote, sin nombres (js/v-expensas.js, Morosos): vecinos y Administración */
              'morosos',
              /* 13-10: quiénes están de guardia ahora (turno, nombres y su dibujo; js/guardia.js) */
-             'guardiaAhora'],
+             'guardiaAhora',
+             /* 15-10: mantenimiento en vivo: quién trabaja y sus puntos en el mapa (js/mant-vivo.js) */
+             'mantVivo'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
@@ -76,27 +78,31 @@ const Nube = {
             /* 13-10: cómo eligió aparecer cada guardia en el dibujo (js/guardia.js) */
             'guardiaLooks',
             /* 14-10: el personal de mantenimiento del barrio, con su DNI (js/mantenimiento.js): garita y Administración */
-            'mantenimiento'],
+            'mantenimiento',
+            /* 15-10: los enlaces del brazo de mantenimiento y su bitácora (js/mant-vivo.js) */
+            'mantCodigos','mantJornadas'],
     /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
        los huéspedes, solo el hotel y la garita; las promociones propuestas,
        el hotel y la Administración; el resto, los tres. */
     hotel: ['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos',
             /* 28-09: la copia privada de las cuotas de las 6 UF del hotel (js/v-expensas.js, HotelExp) */
-            'hotelLiqs'],
+            'hotelLiqs',
+            /* 15-10: los empleados del hotel con su credencial y su DNI (js/v-hotel.js): solo el hotel y la garita */
+            'hotelEmpleados'],
   },
   /* Qué baja cada rol. El hotel NO baja nada de los vecinos: solo lo
      público de la ciudad y lo suyo. */
   HOTEL_LEE: {
-    hotel:   { barrio:['agenda','temporadas','feriados','contactos','documentos','cruceros','eventosCiudad','promos','camion'],
-               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs'] },
+    hotel:   { barrio:['agenda','temporadas','feriados','contactos','documentos','cruceros','eventosCiudad','promos','camion','mantVivo'],
+               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs','hotelEmpleados'] },
     admin:   { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv','hotelPromos','hotelLiqs'] },
-    guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv'] },
+    guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelEmpleados'] },
     /* El supervisor de la guardia (07-10-2026) baja lo que la garita usa para
        trabajar y nada más: sin votaciones, expensas, pizarrón, compras,
        comunicados ni lo del hotel que no es de la garita (los huéspedes). */
     supervisor: { barrio:['users','guia','agenda','temporadas','feriados','eventosCiudad','contactos','documentos','obras','proveedores',
-                          'avistamientos','cruceros','camion','mensajeria','alertas','guardiaAhora'],
+                          'avistamientos','cruceros','camion','mensajeria','alertas','guardiaAhora','mantVivo'],
                   staff:['bitacora','avisos','sos','puntos','pasos','alertasSup','vistos','telefonos','frecuentes','guardiaLooks'],
                   hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv'] },
   },
@@ -146,9 +152,11 @@ const Nube = {
     frecuentes:      { listas:['dias'] },
     hotelViajes:     { listas:['huespedes','dias'] },
     hotelProv:       { listas:['dias'] },
+    hotelEmpleados:  { listas:['dias'] },
     camion:          { listas:[] },
     mensajeria:      { listas:[] },
     guardiaAhora:    { listas:['guardias'] },
+    mantJornadas:    { listas:['puntos','charlas','companeros'] },
     sos:             { objetos:['responden'] },
     ausencias:       { objetos:['revisiones'] },
     casaTareas:      { listas:['sugerencias','cambioQue'] },
@@ -245,6 +253,9 @@ const Nube = {
     await this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
     return new Promise(ok => {
       this.auth.onAuthStateChanged(async user => {
+        /* El teléfono de mantenimiento entra como "anónimo" (js/mant-vivo.js):
+           para la app es alguien sin cuenta. */
+        if (user && user.isAnonymous){ this.anonUid = user.uid; user = null; }
         this.uid = user ? user.uid : null;
         if (!user){ Store.sesion.userId = null; Store.guardarSesion(); this.arrancada = false; if (!(typeof rutaPublica === 'function' && location.hash.startsWith('#/') && rutaPublica())) pintar(); return ok(true); }
         await this.cargar();

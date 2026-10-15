@@ -147,6 +147,8 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .ap-it b{display:block;font-size:12.5px}
 .ap-it span{display:block;font-size:11.5px;color:var(--muted)}
 .ap-pill{flex:none;font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--surf-3);color:var(--ink-2)}
+.ap-top.hotel{background:#6e3a17;color:#fff;border-bottom:0}
+.ap-top.hotel small{color:rgba(255,255,255,.78)}
 .ap-pill.ok{background:var(--ok-soft);color:var(--ok)} .ap-pill.warn{background:var(--warn-soft);color:var(--warn)} .ap-pill.mal{background:var(--danger-soft);color:var(--danger)}
 .ap-campo{display:grid;gap:3px}
 .ap-campo label{font-size:11px;font-weight:800;color:var(--ink-2)}
@@ -303,7 +305,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
       <div class="marca"><img src="icons/logo.png" alt="Escudo del barrio"><div><b>Barrio Bahía Cauquén</b><small>Ushuaia · Tierra del Fuego</small></div></div>
       <span class="pronto">Muy pronto en tu teléfono</span>
       <h1>Pronto estaremos ahí para hacerte la vida más fácil</h1>
-      <p>La app del Barrio Bahía Cauquén conecta a los vecinos, la garita y la Administración en un solo lugar. Probala acá, en vivo: veintiuna situaciones de todos los días con vecinos inventados. Tocá los botones de los dos teléfonos y mirá cómo le llega a cada uno.</p>
+      <p>La app del Barrio Bahía Cauquén conecta a los vecinos, la garita y la Administración en un solo lugar. Probala acá, en vivo: veintidós situaciones de todos los días con vecinos inventados. Tocá los botones de los dos teléfonos y mirá cómo le llega a cada uno.</p>
       <div class="sellos"><span class="sello">📱 Dos teléfonos a la vez</span><span class="sello">🔒 No se guarda ni se envía nada</span><span class="sello">⏱ Un par de minutos cada una</span></div>
       <div class="sellos"><button class="sonido" id="sonido" aria-pressed="false">🔇 Activar el sonido de los avisos</button><a class="sonido" href="en-vivo.html" style="text-decoration:none">📱 Verlo en vivo, con 4 teléfonos</a></div>
     </div>
@@ -353,7 +355,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
         <li><b>Tu casa en invierno</b>Gas, monóxido, chimenea y caños, a tiempo.</li>
         <li><b>Asistente por voz</b>Pedile cosas a la app con la voz.</li>
         <li><b>La garita al día</b>Su lista de tareas se tilda sola, turno por turno.</li>
-        <li><b>Hotel Los Cauquenes</b>Vans, huéspedes y eventos, sin ver datos de vecinos.</li>
+        <li><b>Hotel Los Cauquenes</b>Vans, huéspedes, eventos y sus empleados con credencial, sin ver datos de vecinos.</li>
         <li><b>Modo noche automático</b>Sigue la salida y la puesta del sol en Ushuaia.</li>
         <li><b>Tus datos, protegidos</b>Cada uno ve solo lo suyo (Ley 25.326).</li>
       </ul>
@@ -445,7 +447,7 @@ const CAMION = `<svg viewBox="0 0 150 80"><rect x="4" y="16" width="86" height="
   <g class="rueda"><circle cx="26" cy="63" r="10" fill="#23272b"/><circle cx="26" cy="63" r="4" fill="#bfc5ca"/></g><g class="rueda"><circle cx="110" cy="63" r="10" fill="#23272b"/><circle cx="110" cy="63" r="4" fill="#bfc5ca"/></g>
   <text x="47" y="46" text-anchor="middle" font-family="Manrope,system-ui,sans-serif" font-size="10" font-weight="800" fill="#fff">RESIDUOS</text></svg>`;
 
-/* ---------- las veintiuna simulaciones ---------- */
+/* ---------- las veintidós simulaciones ---------- */
 const ESC = [
 { id:'visita', grupo:'Tu casa', e:'🔳', t:'Autorizar una visita', s:'Creás el pase y la garita lo valida',
   a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno tarde'], hora:'16:05',
@@ -785,6 +787,31 @@ const ESC = [
     a:() => casaSimple(aviso('ok', '🍕', 'Juan · Pizzería del Canal entró', '21:07 · va para tu casa'), 1),
     b:() => garitaInicio('', [it('🍕', 'Juan · Pizzería del Canal', 'Delivery · Lote 42', 'Adentro', 'ok')]) },
   ], fin:'Nadie entra sin que vos lo sepas, y no tenés que atender el portero.' },
+
+{ id:'empleados', grupo:'Garita y seguridad', e:'🏨', t:'Los empleados del hotel', s:'Se cargan una vez y entran solo los días que trabajan',
+  a:['Hotel', 'Recepción'], b:['Garita', 'Turno mañana'], hora:'07:50',
+  pasos:[
+  { lado:'a', txt:'En el hotel entra una empleada nueva. La recepción toca <b>Empleados del hotel → Cargar un empleado</b> y la carga <b>una sola vez</b>: nombre, DNI, puesto, la patente de su auto y los días que trabaja. Tocá <b>Guardar y ver su credencial</b>.', a:() => barra('Hotel Los Cauquenes', 'Recepción', { clase:'hotel', sos:false }) + ap(
+      `<div class="ap-card" style="display:grid;gap:8px"><h4>Nuevo empleado</h4><div class="ap-dos">${campo('Nombre', 'Rosa')}${campo('Apellido', 'Quiroga')}</div><div class="ap-dos">${campo('DNI', '30.123.456')}${campo('Puesto', 'Mucama')}</div>${campo('Patente del auto', 'AB 123 CD')}${campo('Días', 'Lun · Mar · Mié · Jue · Vie')}<div class="ap-dos">${campo('Entra', '08:00')}${campo('Sale', '16:00')}</div></div>`,
+      btn('Guardar y ver su credencial')),
+    b:() => garitaInicio() },
+  { lado:'a', txt:'Sale su <b>credencial</b>: un QR para pegar en el parabrisas y un <b>código de 5 signos</b> para decir en la garita (sin letras ni números que se confundan). Se la imprimís o se la mandás por WhatsApp. <b>Vale para siempre</b>; si la pierde, le hacés una nueva y la vieja deja de valer.', a:() => barra('Credencial', 'Rosa Quiroga · Mucama', { clase:'hotel', sos:false }) + ap(
+      `<div class="ap-card ap-centro"><span class="ap-muted">Hotel Los Cauquenes · empleada</span><h4 style="margin:4px 0 0">Rosa Quiroga</h4><div class="ap-muted">Mucama · Lun a Vie · 08:00 a 16:00</div></div>`,
+      qr('BHC:E-K7M3P'), `<div class="ap-codigo">K7M 3P</div>`, `<div class="nota-sim">Simulación</div>`, btn('Mandársela por WhatsApp', { cl:'ok' })),
+    b:() => garitaInicio() },
+  { lado:'b', txt:'Es jueves. En la garita, Rosa aparece en <b>Lo programado para hoy</b> y en <b>Ingresos frecuentes</b> con <b>"Hoy le toca"</b>. Llega con su auto: el lector de patentes la reconoce (o lee el QR, o ella dice su código). Tocá <b>Entró</b>.', hora:'07:56',
+    al(){ push('b', '🏨', 'Empleados del hotel de hoy', '08:00 Rosa Quiroga (Mucama) · falta llegar'); },
+    a:() => barra('Empleados del hotel', 'Recepción', { clase:'hotel', sos:false }) + ap(`<div class="ap-card">${it('👩', 'Rosa Quiroga', 'Mucama · AB 123 CD', 'Afuera')}${it('👨‍🍳', 'Julián Paz', 'Cocina · solo sábados', 'Afuera')}</div>`),
+    b:() => garita('Turno mañana · Guardia Pereyra') + ap(`<div class="ap-lbl">Empleados del Hotel Los Cauquenes</div><div class="ap-card">${it('👩', 'Rosa Quiroga', 'Mucama · AB 123 CD · Lun a Vie · 08:00 a 16:00', 'Hoy le toca', 'ok')}${it('👨‍🍳', 'Julián Paz', 'Cocina · Sáb · 10:00 a 18:00', 'Hoy no es su día', 'mal')}</div>`,
+      aviso('ok', '✅', 'Rosa Quiroga · autorizada', 'Hotel Los Cauquenes · por su patente'), btn('Entró', { cl:'ok' })) },
+  { lado:'b', txt:'Un rato después llega <b>Julián</b>, que trabaja solo los sábados, y dice su código. La app avisa en rojo <b>"Hoy no está autorizado"</b> y <b>no aparece el botón de entrada</b>: el guardia llama a la recepción del hotel. Si hoy le toca de verdad, el hotel le agrega el día y listo. Tocá <b>Llamar a la recepción</b>.', hora:'09:40',
+    a:() => barra('Empleados del hotel', 'Recepción', { clase:'hotel', sos:false }) + ap(aviso('ok', '🟢', '1 adentro ahora', 'Rosa Quiroga · entró 07:56'), `<div class="ap-card">${it('👩', 'Rosa Quiroga', 'Mucama · AB 123 CD', 'Adentro', 'ok')}${it('👨‍🍳', 'Julián Paz', 'Cocina · solo sábados', 'Afuera')}</div>`),
+    b:() => garita('Turno mañana · Guardia Pereyra') + ap(aviso('mal', '⛔', 'HOY NO ESTÁ AUTORIZADO', 'Julián Paz · Cocina · trabaja los sábados'), `<div class="ap-card">${it('👨‍🍳', 'Julián Paz', 'DNI ••• 654 · Sáb · 10:00 a 18:00', 'Afuera')}</div>`, btn('Llamar a la recepción del hotel'), `<span class="ap-btn sec">Está saliendo: registrar la salida</span>`) },
+  { lado:'a', txt:'La recepción ve en vivo quién de los suyos está adentro. A las 16 Rosa se va: la garita marca la salida, que <b>se puede marcar siempre</b>, para que nadie quede "adentro" por error. En la bitácora del barrio queda el nombre, el puesto y la hora, <b>nunca el DNI</b>.', hora:'16:05',
+    al(){ push('a', '🏨', 'Rosa Quiroga salió del barrio', '16:05 · entró 07:56'); },
+    a:() => barra('Empleados del hotel', 'Recepción', { clase:'hotel', sos:false }) + ap(aviso('info', '🏨', '0 adentro ahora', '2 empleados'), `<div class="ap-card">${it('👩', 'Rosa Quiroga', 'Hoy: entró 07:56 · salió 16:05', 'Afuera')}${it('👨‍🍳', 'Julián Paz', 'Cocina · solo sábados', 'Afuera')}</div>`),
+    b:() => garitaInicio('', [it('👩', 'Rosa Quiroga · Hotel', 'Mucama · 07:56 a 16:05', 'Salió')]) },
+  ], fin:'El hotel los carga una vez, y la garita los deja pasar solo los días que trabajan.' },
 
 { id:'camion', grupo:'Temporada', e:'🚛', t:'El camión de la basura', s:'Sabés cuándo entra y cuándo sale',
   a:['Tu teléfono', 'Lucía · Lote 42'], b:['Garita', 'Turno mañana'], hora:'08:40',

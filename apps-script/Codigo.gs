@@ -93,7 +93,8 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 13;  /* 13 (12-10-2026): más avisos por día (1500) y los urgentes (SOS, "llegó sin aviso") no se frenan hasta 4000; 12: cortes de luz, agua y gas a las 6 y a las 23; se borran las fotos y archivos de los mensajes vencidos */
+var VERSION_SCRIPT = 14;  /* 14 (15-10-2026): el parte del día de mantenimiento sale con un PDF adjunto (campo "pdf": {html, nombre}) */
+/* 13 (12-10-2026): más avisos por día (1500) y los urgentes (SOS, "llegó sin aviso") no se frenan hasta 4000; 12: cortes de luz, agua y gas a las 6 y a las 23; se borran las fotos y archivos de los mensajes vencidos */
 /* 11 (07-10-2026): equipos con la sesión cerrada reciben solo "un correo va a tu casa"; un equipo vale para la cuenta más nueva */
 
 function doPost(e) {
@@ -149,6 +150,15 @@ function mandarCorreo(datos) {
     name: NOMBRE_REMITENTE
   };
   if (RESPONDER_A) envio.replyTo = RESPONDER_A;
+  /* Un PDF adjunto armado de una página web (el parte del día de
+     mantenimiento): Google lo convierte acá mismo. Si la conversión falla,
+     el correo sale igual, sin el adjunto. */
+  if (datos.pdf && datos.pdf.html) {
+    try {
+      var nombrePdf = String(datos.pdf.nombre || 'parte.pdf').replace(/[^\w .\-áéíóúñÁÉÍÓÚÑ]/g, '').slice(0, 80) || 'parte.pdf';
+      envio.attachments = [Utilities.newBlob(String(datos.pdf.html), 'text/html', 'parte.html').getAs('application/pdf').setName(nombrePdf)];
+    } catch (err) { registrar('PDF-ERROR', datos.para, String(err).slice(0, 200)); }
+  }
   MailApp.sendEmail(envio);
   /* El aviso de "Estoy bien" a un familiar no deja la dirección completa en
      el registro: que alguien vive solo no tiene por qué quedar anotado. */

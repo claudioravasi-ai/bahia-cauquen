@@ -495,6 +495,7 @@ R.frecuentes = {
   titulo:'Ingresos frecuentes', icon:'qr', color:'brand', ancha:true, sub:'Proveedores y personal que entran siempre, con QR fijo',
   render(q){
     if (!esStaff() && !esSupervisor()) return vacio('lock', 'Solo para la garita, la Administración y la supervisión.');
+    /* 15-10-2026: también los empleados del hotel (solo la garita los ve; ver v-hotel.js). */
     const qq = normTxt(q || '');
     const ls = frecuentes().filter(f => !qq || normTxt([f.nombre, f.empresa, f.destino, f.patente, TIPOS_FREC[f.tipo]?.n].join(' ')).includes(qq))
       .sort((a, b) => (!!a.baja - !!b.baja) || a.nombre.localeCompare(b.nombre));
@@ -507,7 +508,8 @@ R.frecuentes = {
       ${sec('Personal fijo de los vecinos', `<span class="muted small">${fijos.length}${tocaHoy ? ` · ${plural(tocaHoy, 'viene hoy', 'vienen hoy')}` : ''}</span>`)}
       ${fijos.length ? fijos.map(p => `<div class="frec-fijo ${hoyLeToca(p) ? 'frec-toca' : ''}"><span class="frec-hoy">${cartelFijo(p)}</span>${tarjetaPase(p, { garita:true })}</div>`).join('')
         : vacio('user', qq ? 'Nadie del personal fijo coincide con la búsqueda.' : 'Ningún vecino cargó personal fijo todavía.')}
-      ${sec('Cargados por la Administración', `<span class="muted small">${ls.length}</span>`)}
+        ${typeof seccionEmpleadosHotel === 'function' ? seccionEmpleadosHotel(qq) : ''}
+    ${sec('Cargados por la Administración', `<span class="muted small">${ls.length}</span>`)}
       ${ls.length ? ls.map(f => { const t = TIPOS_FREC[f.tipo] || TIPOS_FREC.otro, v = frecuenteVigente(f), ult = ultimoMovFrec(f);
         return `<div class="card" style="padding:13px 14px${f.baja ? ';opacity:.55' : ''}"><div class="pase"><span class="ic ic-${v.ok && !v.aviso ? 'ok' : v.ok ? 'warn' : 'danger'}">${I(t.icon)}</span>
           <div class="datos"><b>${esc(f.nombre)}${f.empresa ? ' · ' + esc(f.empresa) : ''}</b>
@@ -642,6 +644,8 @@ function validarCodigoEspecial(txt){
   /* El QR de retiro de paquetes (firmado, cambia cada 30 s). */
   if (/^BHR1\./.test(String(txt || '').trim()) && !hayPaquetes()){ paqueteEnPausa(); return true; }
   if (/^BHR1\./.test(String(txt || '').trim())){ const pid = Retiro.paqueteId || ''; Retiro.paqueteId = ''; Retiro.alLeer(String(txt).trim(), pid); return true; }
+  /* La credencial de un empleado del hotel (15-10-2026): su QR (E-…) o los 5 signos que dice. */
+  if (typeof hotelEmpCodigo === 'function' && hotelEmpCodigo(txt)) return true;
   const t = String(txt || '').trim().toUpperCase().replace(/^BHC:/, '').replace(/\s/g, '');
   const m = t.match(/^([FVH])-?([A-Z0-9]{6,})$/); if (!m) return false;
   const codigo = m[1] + '-' + m[2];

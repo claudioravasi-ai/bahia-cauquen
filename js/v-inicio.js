@@ -2720,6 +2720,10 @@ function tareasGarita(){
   const frecFalta = frecHoy.filter(f => !frecEntro(f));
   if (frecFalta.length) add(1, 'user', `Ingresos frecuentes de hoy: ${plural(frecFalta.length, 'falta llegar', 'faltan llegar')}`, lista3(frecFalta.sort((a, b) => String(a.desde).localeCompare(String(b.desde))), f => `${f.desde ? esc(f.desde) + ' ' : ''}${esc(f.nombre)}${f.empresa ? ' (' + esc(f.empresa) + ')' : ''} → ${esc(f.destino || 'Barrio')}`), { v:'frecuentes' }, { hora:frecFalta[0].desde || '' });
 
+  /* Los empleados del hotel con día autorizado hoy que todavía no entraron (15-10-2026). */
+  const empHoy = typeof hotelEmpleados === 'function' ? hotelEmpleados().filter(e => aLista(e.dias).length && hEmpHoyLeToca(e) && !hEmpHoy(e).length) : [];
+  if (empHoy.length) add(1, 'users', `Empleados del hotel de hoy: ${plural(empHoy.length, 'falta llegar', 'faltan llegar')}`, lista3(empHoy.sort((a, b) => String(a.desde).localeCompare(String(b.desde))), e => `${e.desde ? esc(e.desde) + ' ' : ''}${esc(hEmpNombre(e))}${e.puesto ? ' (' + esc(e.puesto) + ')' : ''}`), { v:'frecuentes' }, { hora:empHoy[0].desde || '' });
+
   /* ART: solo si hoy viene alguien de una obra o un proveedor. */
   const deObra = [...esp.filter(p => p.tipo === 'proveedor').map(p => esc(p.nombre)),
     ...frecFalta.filter(f => ['obra', 'proveedor'].includes(f.tipo)).map(f => esc(f.empresa || f.nombre)),
@@ -3342,6 +3346,7 @@ function patentesConocidas(){
   aLista(s.users).forEach(u => aLista(u && u.vehiculos).forEach(v => add(v && v.patente)));
   if (typeof frecuentes === 'function') frecuentes().forEach(f => add(f.patente));
   if (typeof hotelVans === 'function'){ hotelVans().forEach(v => add(v.patente)); hotelHuespedes().forEach(h => add(h.patente)); }
+  if (typeof hotelEmpleados === 'function') hotelEmpleados().forEach(e => add(e.patente));
   return set;
 }
 /* La conocida que está a UNA letra de lo leído (y una sola, para no confundir). */

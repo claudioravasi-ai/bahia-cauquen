@@ -63,9 +63,9 @@ function tarjetaMant(m, opera, i = 0){
   const estado = on ? `<em class="mt-vivo" data-mt-desde="${m.adentro}">Adentro hace ${mantDur(Date.now() - m.adentro)}</em><small class="mt-desde">entró ${hora(m.adentro)} h</small>`
     : `<em class="mt-fuera">${hoy ? `Afuera · hoy trabajó ${mantDur(hoy)}` : 'Afuera'}</em>`;
   return `<div class="mt-p${on ? ' on' : ''}${olvido ? ' olvido' : ''}" style="--h:${h};--i:${i}">
-    <span class="mt-av"><b>${esc(mantIniciales(m))}</b></span>
-    <span class="mt-d"><b>${esc(mantNombre(m))}</b><small>${esc(m.tarea || 'Mantenimiento')} · DNI ${esc(mantDniTapado(m.dni))}</small>${estado}${mantChipLugar(m, on)}
-      ${olvido ? `<small class="mt-ojo">${I('alert')}¿Se olvidaron de marcar la salida?</small>` : ''}${mantBarra(m)}</span>
+    <span class="mt-av" data-a="mv-desplegar" data-id="${esc(m.id)}" role="button" aria-label="Ver dónde está ${esc(mantNombre(m))}"><b>${esc(mantIniciales(m))}</b></span>
+    <span class="mt-d"><button type="button" class="mt-nom${typeof MVDesp !== 'undefined' && MVDesp.mid === m.id ? ' abierto' : ''}" data-a="mv-desplegar" data-id="${esc(m.id)}" aria-expanded="${typeof MVDesp !== 'undefined' && MVDesp.mid === m.id}"><b>${esc(mantNombre(m))}</b>${I('right')}</button><small>${esc(m.tarea || 'Mantenimiento')} · DNI ${esc(mantDniTapado(m.dni))}</small>${estado}${mantChipLugar(m, on)}
+      ${olvido ? `<small class="mt-ojo">${I('alert')}¿Se olvidaron de marcar la salida?</small>` : ''}${on && typeof mvChipsTarjeta === 'function' ? mvChipsTarjeta(m) : ''}${mantBarra(m)}</span>
     <span class="mt-acc">
       ${opera ? `<button type="button" class="mt-btn ${on ? 'sale' : 'entra'}" data-a="mt-mov" data-id="${esc(m.id)}" aria-label="${on ? 'Marcar la salida' : 'Marcar la entrada'} de ${esc(mantNombre(m))}">${I(on ? 'logout' : 'login')}<span>${on ? 'Salida' : 'Entrada'}</span></button>` : ''}
       <button type="button" class="mt-ed" data-a="mt-editar" data-id="${esc(m.id)}" aria-label="Editar a ${esc(mantNombre(m))}">${I('edit')}</button></span></div>`;
@@ -85,10 +85,12 @@ function bandaMantenimiento(opera){
         <span>${ls.length ? `${plural(ls.length, 'persona')} en la lista · ${opera ? 'un toque para la entrada, otro para la salida' : 'lo marca la garita'}` : 'Nombre, apellido y DNI: quedan grabados y después se editan cuando quieras.'}</span></span>
       ${n ? `<span class="mt-n" aria-label="${n} adentro">${n}</span>` : ''}
     </div>
-    ${ls.length ? `<div class="mt-lista">${ls.map((m, i) => tarjetaMant(m, opera, i)).join('')}</div>` : ''}
+    ${ls.length ? `<div class="mt-lista">${ls.map((m, i) => tarjetaMant(m, opera, i) + (typeof mvDespliegue === 'function' ? mvDespliegue(m) : '')).join('')}</div>` : ''}
     <div class="mt-pie">
       <button type="button" class="mt-mas" data-a="mt-editar">${I('plus')}Agregar a alguien</button>
-      ${ls.length ? `<button type="button" class="mt-hist" data-a="abrir" data-v="mantenimiento">${I('clock')}Movimientos de hoy</button>` : ''}</div>
+      ${ls.length ? `<button type="button" class="mt-hist" data-a="abrir" data-v="mantenimiento">${I('clock')}Movimientos de hoy</button>` : ''}
+      ${typeof R !== 'undefined' && R['mant-bitacora'] ? `<button type="button" class="mt-hist" data-a="abrir" data-v="mant-bitacora">${I('book')}Bitácora</button>` : ''}
+      ${n && typeof mvPersonas === 'function' ? `<button type="button" class="mt-hist" data-a="mant-ver">${I('map')}En vivo</button>` : ''}</div>
   </section>`;
 }
 
@@ -104,8 +106,9 @@ R.mantenimiento = {
     const movs = aLista(Store.s.bitacora).filter(b => b && b.mantId && b.at >= +ini).sort((a, b) => b.at - a.at);
     return `<form data-f="buscar-mant" class="linea-form" style="margin:0 0 12px"><input name="q" value="${esc(q || '')}" placeholder="Nombre, apellido, DNI o tarea"><button class="btn btn-pri">${I('search')}</button></form>
       <button type="button" class="mt-mas solo" data-a="mt-editar">${I('plus')}Agregar a alguien</button>
+      ${R['mant-bitacora'] ? `<div class="btns" style="margin:10px 0 0"><button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="mant-bitacora">${I('book')}Bitácora de mantenimiento</button><button type="button" class="btn btn-sm btn-sec" data-a="mant-ver">${I('map')}En vivo</button></div>` : ''}
       ${sec('En la lista', `<span class="muted small">${ls.length} · ${mantAdentro().length} adentro</span>`)}
-      ${ls.length ? `<div class="mt-lista sueltas">${ls.map(m => tarjetaMant(m, opera)).join('')}</div>` : vacio('wrench', qq ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay nadie cargado.')}
+      ${ls.length ? `<div class="mt-lista sueltas">${ls.map(m => tarjetaMant(m, opera) + (typeof mvDespliegue === 'function' ? mvDespliegue(m) : '')).join('')}</div>` : vacio('wrench', qq ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay nadie cargado.')}
       ${sec('Movimientos de hoy', `<span class="muted small">${movs.length}</span>`)}
       ${movs.length ? `<div class="mt-movs">${movs.map(b => `<div class="mt-mv ${b.mov === 'in' ? 'in' : b.mov === 'tarea' ? 'tarea' : 'out'}"><span>${I(b.mov === 'in' ? 'login' : b.mov === 'tarea' ? 'pin' : 'logout')}</span><b>${hora(b.at)} h</b><em>${esc(b.texto)}</em></div>`).join('')}</div>`
         : vacio('clock', 'Hoy todavía no entró nadie de mantenimiento.')}
@@ -124,22 +127,27 @@ A['mt-editar'] = el => {
     <div class="grid2"><div class="field"><label>DNI (solo números)</label><input name="dni" required inputmode="numeric" pattern="[0-9.]{7,10}" maxlength="10" autocomplete="off" value="${esc(mantDniLindo(m.dni || ''))}"></div>
       <div class="field"><label>Tarea (opcional)</label><input name="tarea" maxlength="40" list="mtTareas" value="${esc(m.tarea || '')}" placeholder="Jardinería, electricidad…"></div></div>
     <datalist id="mtTareas">${MANT_TAREAS.map(t => `<option>${esc(t)}</option>`).join('')}</datalist>
+    <div class="grid2"><div class="field"><label>Celular (le llega el enlace por WhatsApp)</label><input name="tel" type="tel" inputmode="tel" maxlength="20" autocomplete="off" value="${esc(m.tel || '')}" placeholder="2901 15 123456"></div>
+      <div class="field"><label>Correo (le llega el parte del día)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off" value="${esc(m.email || '')}" placeholder="nombre@gmail.com"></div></div>
     <button class="btn btn-pri btn-block" style="margin-top:8px">${I('check')}${m.id ? 'Guardar los cambios' : 'Guardar'}</button>
     ${m.id ? `<button type="button" class="btn btn-danger-soft btn-block" style="margin-top:8px" data-a="mt-borrar" data-id="${esc(m.id)}">${I('trash')}Sacarlo de la lista</button>` : ''}
-    <p class="muted tiny" style="margin:10px 2px 0">El DNI lo ven solo la garita y la Administración, para controlar en la entrada. No va a la bitácora ni a los vecinos.</p></form>`);
+    <p class="muted tiny" style="margin:10px 2px 0">El DNI, el celular y el correo los ven solo la garita y la Administración. No van a la bitácora ni a los vecinos: los vecinos ven solo el nombre con la inicial del apellido y lo que está haciendo.</p></form>`);
 };
 F['mant'] = (d, form) => {
   if (!esStaff()) return;
   const id = form.dataset.id, dni = soloDigitos(d.dni), nombre = (d.nombre || '').trim(), apellido = (d.apellido || '').trim();
   if (!nombre || !apellido){ toast('Faltan el nombre o el apellido', 'alert'); return; }
   if (dni.length < 7 || dni.length > 8){ toast('El DNI tiene que tener 7 u 8 números', 'alert'); return; }
+  const tel = String(d.tel || '').trim(), email = String(d.email || '').trim().toLowerCase();
+  if (tel && typeof waNumeroAR === 'function' && !waNumeroAR(tel)){ toast('Revisá el celular: con la característica, por ejemplo 2901 15 123456', 'phone'); return; }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast('Revisá el correo', 'mail'); return; }
   const otro = mantLista().find(x => x.dni === dni && x.id !== id);
   if (otro){ toast(`Ese DNI ya está cargado: ${mantNombre(otro)}`, 'alert'); return; }
   Store.cambiar(s => {
     s.mantenimiento = aLista(s.mantenimiento);
     let m = s.mantenimiento.find(x => x && x.id === id);
     if (!m){ m = { id:'mt' + uid(), adentro:0, createdAt:Date.now(), por:yo().id }; s.mantenimiento.push(m); }
-    Object.assign(m, { nombre, apellido, dni, tarea:(d.tarea || '').trim(), updatedAt:Date.now() });
+    Object.assign(m, { nombre, apellido, dni, tarea:(d.tarea || '').trim(), tel, email, updatedAt:Date.now() });
     /* La auditoría lleva el nombre, no el DNI. */
     auditar(s, id ? 'Editó personal de mantenimiento' : 'Agregó personal de mantenimiento', `${nombre} ${apellido}`, m.id);
   });
@@ -157,7 +165,7 @@ A['mt-borrar'] = async el => {
 A['mt-mov'] = el => {
   if (!esGuardia()) return;
   const m = mantLista().find(x => x.id === el.dataset.id); if (!m) return;
-  const entra = !m.adentro, ahora = Date.now();
+  const entra = !m.adentro, ahora = Date.now(), desde = m.adentro;
   mantFiesta(el, entra);
   Store.cambiar(s => {
     const x = aLista(s.mantenimiento).find(z => z && z.id === m.id); if (!x) return;
@@ -165,8 +173,14 @@ A['mt-mov'] = el => {
     x.adentro = entra ? ahora : 0; x.ultMov = ahora;
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', mantId:m.id, mov: entra ? 'in' : 'out', at:ahora,
       texto:`${entra ? 'Entrada' : 'Salida'} de mantenimiento: ${mantNombre(m)}${m.tarea ? ' (' + m.tarea + ')' : ''}${!entra && estuvo ? ' · estuvo ' + mantDur(estuvo) : ''}` });
+    /* El brazo de mantenimiento en vivo (js/mant-vivo.js): la entrada crea
+       su enlace; la salida lo apaga y guarda la jornada. */
+    if (entra && typeof mvEntrada === 'function') mvEntrada(s, x, ahora);
   });
   toast(entra ? `${m.nombre} entró · ${hora(ahora)} h` : `${m.nombre} salió · ${hora(ahora)} h`, entra ? 'login' : 'logout');
+  if (typeof mvMandarEnlace !== 'function') return;
+  if (entra) mvMandarEnlace(m, { auto:true });
+  else mvSalida(m, desde, ahora);
 };
 /* La chispa al tocar: anillo y papelitos que saltan desde el botón. Va en
    una capa aparte, así sigue aunque la tarjeta se redibuje. */
@@ -195,6 +209,10 @@ setInterval(() => {
    registro público de la guardia de ahora (js/guardia.js, campo "mant"). */
 const mantBajada = () => typeof Nube === 'undefined' || !Nube.activa() || !!(Nube.listos && (Nube.listos.has('staffmantenimiento') || Nube.listos.has('staff/mantenimiento')));
 function mantPublico(){
+  /* Desde el 15-10-2026 también se publica quién está trabajando en
+     barrio/mantVivo (js/mant-vivo.js), que lo leen también el hotel. */
+  const pv = typeof mvPersonas === 'function' ? mvPersonas() : [];
+  if (pv.length) return { n:pv.length, desde:Math.min(...pv.map(p => p.entra || Date.now())) };
   if (['guardia', 'admin'].includes(yo()?.rol) && mantBajada()){
     const ad = mantAdentro();
     return { n:ad.length, desde: ad.length ? Math.min(...ad.map(m => m.adentro)) : 0 };
@@ -257,21 +275,8 @@ function mantHero(){
       <span>${p.desde ? `desde ${hora(p.desde)} · <em data-mh-desde="${p.desde}">hace ${mantDur(Date.now() - p.desde)}</em>` : 'en el barrio'}</span></span>
     <span class="mi-cascos" aria-hidden="true">${cascos}${p.n > 4 ? `<b>+${p.n - 4}</b>` : ''}</span></button>`;
 }
-A['mant-ver'] = () => {
-  if (esStaff()){ abrir('mantenimiento'); return; }
-  const p = mantPublico();
-  hoja('Mantenimiento en el barrio', p.n ? `<div class="mant-isla abierta">
-      <span class="mi-escena">${mantEscena(p.n, { grande:true })}</span>
-      <span class="mi-txt"><small><i class="mi-punto"></i>En vivo · Mantenimiento</small>
-        <b>${p.n === 1 ? 'Una persona trabajando' : `${p.n} personas trabajando`}</b>
-        <span>${p.desde ? `Desde las ${hora(p.desde)} h · <em data-mh-desde="${p.desde}">hace ${mantDur(Date.now() - p.desde)}</em>` : 'Ahora en el barrio'}</span></span></div>
-      <div class="mi-pasos">
-        <span>${I('gate')}<b>Entraron</b><small>La garita registró la entrada</small></span>
-        <span class="on">${I('wrench')}<b>Trabajando</b><small>En calles, parque y espacios comunes</small></span>
-        <span>${I('logout')}<b>Salen</b><small>El aviso se va solo</small></span></div>
-      <p class="muted small" style="margin:12px 2px 0">Es el personal del barrio. Si necesitás algo puntual, hacé un reclamo o escribile a la Administración.</p>`
-    : aviso('info', 'check', 'Nadie de mantenimiento en el barrio ahora', 'Cuando la garita registre una entrada, aparece en la portada.'));
-};
+/* Tocar la isla abre "Mantenimiento en vivo" (el mapa con los trabajos y
+   los mensajes): A['mant-ver'] está en js/mant-vivo.js. */
 
 /* ---------- TAREA DEL DÍA Y LUGAR EN EL MAPA (pedido de Claudio, 14-10-2026) ----------
    "La garita ve dónde trabaja cada uno (plaza, portón, calle 3)". Idea de
@@ -361,5 +366,6 @@ function mantCapaMapa(){
       <text class="mp-ini" x="${x}" y="${y + 2.6}">${esc(mantIniciales(m))}</text>
       <path class="mp-casco" d="M${x - 6} ${y - 7.6}a6 6 0 0 1 12 0z"/><rect class="mp-ala" x="${x - 7.4}" y="${y - 8.2}" width="14.8" height="2" rx="1"/>
       ${h.tarea ? `<text class="mp-tarea" x="${x}" y="${y + 24}">${esc(h.tarea.length > 16 ? h.tarea.slice(0, 15) + '…' : h.tarea)}</text>` : ''}</g>`; }));
-  return pins.length ? `<g class="mt-pines">${pins.join('')}</g>` : '';
+  const vivos = typeof mvCapaGarita === 'function' ? mvCapaGarita() : '';
+  return (pins.length ? `<g class="mt-pines">${pins.join('')}</g>` : '') + vivos;
 }

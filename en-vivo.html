@@ -415,7 +415,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
       <span class="pronto">En vivo · cuatro teléfonos a la vez</span>
       <h1>Mirá cómo se conecta todo el barrio</h1>
       <p>Una vecina, la garita, la Administración y un cuarto teléfono que cambia en cada situación: la médica del barrio, el electricista, el hotel, el policía de la ronda o una visita. Lo que toca uno le llega a los otros al instante. Tocá los botones que laten, o apretá <b>Reproducir solo</b> y mirá.</p>
-      <div class="sellos"><span class="sello">📱 4 teléfonos sincronizados</span><span class="sello">🎬 <span id="nEsc">23</span> situaciones, más de 80 toques</span><span class="sello">🔒 Vecinos inventados: no se guarda ni se envía nada</span></div>
+      <div class="sellos"><span class="sello">📱 4 teléfonos sincronizados</span><span class="sello">🎬 <span id="nEsc">24</span> situaciones, más de 80 toques</span><span class="sello">🔒 Vecinos inventados: no se guarda ni se envía nada</span></div>
       <div class="sellos"><button class="sonido" id="sonido" aria-pressed="false">🔇 Activar el sonido de los avisos</button><a class="sonido" href="probar.html" style="text-decoration:none">📱 Versión de dos teléfonos</a></div>
     </div>
   </header>
@@ -448,7 +448,7 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
         <li><b>La garita</b>Los ingresos, los correos, los SOS y los teléfonos de cada lote. No ve expensas ni mensajes entre vecinos.</li>
         <li><b>La Administración</b>Padrón, expensas, reclamos y el libro de guardia, para administrar.</li>
         <li><b>Equipo de salud</b>Solo el aviso de la emergencia médica cuando la garita sale con el DEA.</li>
-        <li><b>El hotel</b>Sus huéspedes, sus vans y sus 6 unidades. Ningún dato de vecinos.</li>
+        <li><b>El hotel</b>Sus huéspedes, sus vans, sus empleados con credencial y sus 6 unidades. Ningún dato de vecinos.</li>
         <li><b>La ronda</b>El policía ve sus puntos de control; la garita lo sigue en vivo.</li>
       </ul>
     </div>
@@ -882,6 +882,28 @@ const ESC = [
   { lado:'b', hora:'21:12', txt:'El sábado, cada auto entra <b>por patente</b>: la garita la escribe y la app la reconoce.',
     b:() => garita() + ap(aviso('ok', '✅', 'AF 220 KL · invitado del hotel', 'Cena de gala · 21:12'), card('Llegaron', `<div class="ap-barra"><i style="width:59%"></i><span><span>Autos</span><span>13 de 22</span></span></div>`)) },
   ], fin:'El hotel trabaja, los vecinos saben qué esperar y la garita no improvisa.' },
+
+{ id:'empleados', grupo:'Hotel y aeropuerto', e:'🏨', t:'Los empleados del hotel entran solo los días que trabajan', s:'El hotel los carga una vez; la garita los reconoce por QR, patente o código',
+  roles:{ a:LU, b:GA, c:AD, d:['Hotel Los Cauquenes', 'Recepción'] }, hora:'07:50',
+  pasos:[
+  { lado:'d', txt:'El hotel carga a su empleada nueva <b>una sola vez</b>: nombre, DNI, puesto, la patente de su auto y los días que trabaja (lunes a viernes). Toca <b>Guardar y ver su credencial</b>.',
+    a:() => inicioV('lucia'), b:() => garitaInicio(), c:() => adminInicio(),
+    d:() => hotel('Empleados del hotel') + ap(card('Nuevo empleado', `<div class="ap-dos">${campo('Nombre', 'Rosa Quiroga')}${campo('Puesto', 'Mucama')}</div>`, `<div class="ap-dos">${campo('DNI', '30.123.456')}${campo('Patente', 'AB 123 CD')}</div>`, campo('Días y horario', 'Lun a Vie · 08:00 a 16:00')), btn('Guardar y ver su credencial')) },
+  { lado:'d', txt:'Sale su <b>credencial</b>: el QR para el parabrisas y un <b>código de 5 signos</b> para decir en la garita. Vale para siempre; si la pierde, el hotel hace una nueva y la vieja deja de valer. Toca <b>Mandársela por WhatsApp</b>.',
+    d:() => hotel('Credencial') + ap(card('', `<div class="ap-centro"><span class="ap-muted">Hotel Los Cauquenes · empleada</span><h4 style="margin:4px 0 0">Rosa Quiroga</h4><div class="ap-muted">Mucama · Lun a Vie · 08:00 a 16:00</div></div>`), qr('BHC:E-K7M3P'), `<div class="ap-codigo">K7M 3P</div>`, btn('Mandársela por WhatsApp', { cl:'ok' })) },
+  { lado:'b', hora:'07:56', txt:'Es jueves: Rosa sale en <b>Lo programado para hoy</b> de la garita con "Hoy le toca". Llega en su auto y el <b>lector de patentes</b> la reconoce. El guardia toca <b>Entró</b>.',
+    al(){ push('b', '🏨', 'Empleados del hotel de hoy', '08:00 Rosa Quiroga · falta llegar'); },
+    b:() => garita() + ap(card('Empleados del Hotel Los Cauquenes', it('👩', 'Rosa Quiroga', 'Mucama · AB 123 CD · 08:00 a 16:00', 'Hoy le toca', 'ok'), it('👨‍🍳', 'Julián Paz', 'Cocina · solo sábados', 'Hoy no', 'mal')), aviso('ok', '✅', 'Rosa Quiroga · autorizada', 'Por su patente · AB 123 CD'), btn('Entró', { cl:'ok' })),
+    d:() => hotel('Empleados del hotel') + ap(card('', it('👩', 'Rosa Quiroga', 'Mucama · AB 123 CD', 'Afuera'), it('👨‍🍳', 'Julián Paz', 'Cocina · solo sábados', 'Afuera'))) },
+  { lado:'b', hora:'09:40', txt:'Llega <b>Julián</b>, que trabaja solo los sábados, y dice su código. La garita lo ve en rojo y <b>no tiene botón de entrada</b>: llama a la recepción. La Administración no ve a los empleados del hotel (tienen el DNI).',
+    b:() => garita() + ap(aviso('mal', '⛔', 'HOY NO ESTÁ AUTORIZADO', 'Julián Paz · Cocina · trabaja los sábados'), card('', it('👨‍🍳', 'Julián Paz', 'DNI ••• 654 · Sáb · 10:00 a 18:00', 'Afuera')), btn('Llamar a la recepción del hotel')),
+    c:() => adminInicio(card('Hotel en vivo', it('🚐', 'Vans', '2 en el hotel'), it('🔒', 'Empleados del hotel', 'Los ven solo el hotel y la garita'))),
+    d:() => hotel('Empleados del hotel') + ap(aviso('ok', '🟢', '1 adentro ahora', 'Rosa Quiroga · entró 07:56'), card('', it('👩', 'Rosa Quiroga', 'Mucama', 'Adentro', 'ok'), it('👨‍🍳', 'Julián Paz', 'Cocina · solo sábados', 'Afuera'))) },
+  { lado:'d', hora:'16:05', txt:'A las 16 Rosa se va. La salida <b>se marca siempre</b> y al hotel le queda el registro del día. En la bitácora del barrio va el nombre, el puesto y la hora, <b>nunca el DNI</b>.',
+    al(){ push('d', '🏨', 'Rosa Quiroga salió del barrio', '16:05 · entró 07:56'); },
+    b:() => garitaInicio('', [it('👩', 'Rosa Quiroga · Hotel', 'Mucama · 07:56 a 16:05', 'Salió')]),
+    d:() => hotel('Empleados del hotel') + ap(aviso('info', '🏨', '0 adentro ahora', '2 empleados'), card('', it('👩', 'Rosa Quiroga', 'Hoy: entró 07:56 · salió 16:05', 'Afuera'))) },
+  ], fin:'El hotel los carga una vez y la garita los deja pasar solo los días que trabajan.' },
 
 /* ======================= TU CASA ======================= */
 { id:'expensas', grupo:'Tu casa', e:'💳', t:'Expensas: cupón, "Ya la pagué" y recibo', s:'La Administración trae el mes, la vecina paga y recibe el recibo',

@@ -53,7 +53,9 @@ const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', '
   /* 13-10: el mapa del barrio en pantalla completa (el botón "Grande" no abría) */
   'mapa',
   /* 14-10: el personal de mantenimiento del barrio (js/mantenimiento.js) */
-  'mantenimiento']);
+  'mantenimiento',
+  /* 15-10: la bitácora de mantenimiento, aparte de la de la garita (js/mant-vivo.js) */
+  'mant-bitacora']);
 /* El hotel ve solo lo suyo y lo público de la ciudad (ver js/v-hotel.js).
    Emergencias (la de los vecinos) no: tiene el pedido del DEA y los SOS del
    día; el hotel tiene la suya. */
@@ -87,6 +89,10 @@ VENTANAS_HOTEL.add('vecinos');
 ['hotel-rutinas', 'hotel-vuelos'].forEach(v => VENTANAS_HOTEL.add(v));
 VENTANAS_SUPERVISOR.add('hotel-rutinas');
 ['hotel-vivo', 'hotel-traslados', 'hotel-rutinas', 'hotel-huespedes', 'hotel-eventos', 'hotel-proveedores', 'hotel-emergencias', 'hotel-convenio', 'hotel-ficha'].forEach(v => VENTANAS_GARITA.add(v));
+/* 15-10-2026: los empleados del hotel con su credencial (js/v-hotel.js): los
+   carga el hotel; la garita marca sus entradas y salidas. La Administración
+   y la supervisión no los ven (tienen el DNI). */
+VENTANAS_HOTEL.add('hotel-empleados'); VENTANAS_GARITA.add('hotel-empleados');
 const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : esSupervisor() ? VENTANAS_SUPERVISOR.has(id) : esPropDistancia() ? VENTANAS_PROPIETARIO.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
@@ -540,7 +546,7 @@ function pintar(){
   aplicarTema();
   /* El QR de un punto de ronda abre su pantallita aunque el teléfono tenga
      una sesión abierta: nada la tapa hasta que se cierra. */
-  if (/^#\/(punto|ronda|qr|pedir|cal)\//.test(location.hash)){ rutaPublica(); return; }
+  if (/^#\/(punto|ronda|qr|pedir|cal|mant)\//.test(location.hash)){ rutaPublica(); return; }
   const u = yo();
   if (!u){ PILA.length = 0; return pintarBienvenida(); }
   if (!$('#lienzo')){
@@ -2018,7 +2024,7 @@ const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
     'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'correo-menu', 'correo-elegir', 'correo-sale', 'correo-lotes', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
     'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno', 'guardia-sale',
-    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer']),
+    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hemp-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer']),
   formularios: new Set(['validar', 'patente-buscar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
     'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada', 'guardia-entra', 'guardia-sale']),
 };
@@ -2206,6 +2212,8 @@ function rutaPublica(){
   if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return true; }
   if (h.startsWith('#/punto/')){ if (!$('#puntoPublico')) pintarPunto(h.slice(8)); return true; }
   if (h.startsWith('#/ronda/')){ if (!$('#puntoPublico')) pintarRondaHabilitar(h.slice(8)); return true; }
+  /* El brazo de los chicos de mantenimiento (15-10-2026, js/mant-vivo.js). */
+  if (h.startsWith('#/mant/')){ pintarMantBrazo(h.slice(7)); return true; }
   return false;
 }
 
@@ -2269,6 +2277,7 @@ const PIEZAS = [
   ['js/v-supervisor.js', () => typeof Supervisor],
   ['js/guardia.js',    () => typeof svgGuardia],
   ['js/mantenimiento.js', () => typeof bandaMantenimiento],
+  ['js/mant-vivo.js',  () => typeof MVBrazo],
   ['js/relevos.js',    () => typeof lineaGuardia],
 ];
 function piezasQueFaltan(){

@@ -512,6 +512,7 @@ function hotelEnLaApp({ prox = 0, promosPend = 0, sinLeer = 0 } = {}){
     { v:'privado', p:'hotel', ic:'chat', c:'brand', t:'Comunicación interna', s:'Con la garita o la Administración', badge:sinLeer },
     { v:'hotel-promos', ic:'sparkle', c:'cobre', t:'Promociones', s:'Salen en la tira de todas las apps', badge:promosPend },
     { v:'hotel-eventos', ic:'star', c:'accent', t:'Eventos del hotel', s:'La garita se entera; los vecinos, si hace falta' },
+    { v:'hotel-empleados', ic:'users', c:'wood', t:'Empleados del hotel', s: hotelEmpleados().length ? `${hEmpAdentro().length} adentro ahora · QR, patente o código` : 'Credencial permanente: QR, patente o código', n: hEmpAdentro().length || '' },
     { v:'hotel-proveedores', ic:'box', c:'brand', t:'Proveedores', s:'ART, seguro y su QR de ingreso' },
     { v:'hotel-emergencias', ic:'siren', c:'danger', t:'Emergencias', s:'Llamar, avisar a la garita, DEA', alerta:true },
     ...(exp ? [{ v:'expensas', ic:'wallet', c:'wood', t:exp.t, s:exp.s, badge:exp.badge }] : []),
@@ -547,6 +548,7 @@ R.hotel = {
         ${c ? `<div class="hotel-temp"><b>${Math.round(c.temperature_2m)}°</b><small>${Clima.cod(c.weather_code)[0]}</small></div>` : ''}</div>
       ${pulsoHotel(prox.length, hsHoy.length, hsSalen.length, info)}
       <div class="inicio-lienzo">
+        ${typeof mantHero === 'function' ? mantHero() : ''}
         ${ajustes.length || evHoy.length ? `<section class="bloque">${ajustes.map(x => { const aj = ajusteViaje(x); return aviso(aj.cancelado ? 'danger latido' : 'warn', 'clock', aj.cancelado ? `Vuelo ${esc(x.ref.nro)} cancelado` : `Cambió el ${esc(x.ref.nro)}: la van conviene que salga ${esc(aj.sale)}`, esc(textoViaje(x)), aj.cancelado ? '' : `<button class="btn btn-xs btn-pri" data-a="hviaje-ajustar" data-id="${esc(x.id)}" data-v="${esc(aj.sale)}">Ajustar a las ${esc(aj.sale)}</button>`); }).join('')}
           ${evHoy.map(e => aviso('info', 'star', `Hoy: ${esc(e.titulo)}`, `${esc(e.desde || '')}${e.hasta ? '–' + esc(e.hasta) : ''} h · ${plural(+e.asistentes || 0, 'invitado')}${e.publicado ? ' · avisado a los vecinos' : ''}`)).join('')}</section>` : ''}
         <section class="bloque">${proximaVan(vs)}</section>
@@ -1182,18 +1184,288 @@ function hotelCodigo(codigo){
   hoja('Código desconocido', aviso('danger', 'x', 'Ese QR del hotel no existe', 'Puede ser de una van o un proveedor dado de baja. Consultá con la recepción del hotel.'));
   return true;
 }
-/* Una patente escrita en la garita que es de una van, de un proveedor o de
-   un huésped del hotel. */
+/* Una patente escrita (o leída por la cámara) en la garita que es de una
+   van, de un proveedor, de un empleado o de un huésped del hotel. */
 function hotelValidar(pat){
   if (!pat || pat.length < 6 || !esGuardia()) return false;
   const v = hotelVans().find(x => normPatente(x.patente) === pat);
   if (v) return hotelCodigo(String(v.codigo).toUpperCase());
   const p = hotelProvs().find(x => normPatente(x.patentes).includes(pat));
   if (p) return hotelCodigo(String(p.codigo).toUpperCase());
+  /* 15-10-2026: el auto de un empleado del hotel (el lector de patentes lo reconoce). */
+  const em = typeof hotelEmpleados === 'function' ? hotelEmpleados().find(x => x.patente && normPatente(x.patente) === pat) : null;
+  if (em) return hojaEmpleadoGarita(em, 'por su patente');
   const h = hotelHuespedes().find(x => normPatente(x.patente) === pat && x.desde <= hoyISO() && x.hasta >= hoyISO());
   if (h){ hoja('Huésped del hotel', `${aviso('ok', 'users', 'Huésped del ' + HOTEL_NOMBRE, `${fechaCorta(h.desde)} → ${fechaCorta(h.hasta)}`)}<div class="card"><b style="font-size:17px">${esc(h.nombre)}</b><div class="muted small">${esc(h.patente)} · ${plural(+h.pax || 1, 'persona')}</div></div>
       ${!h.ingreso ? `<button class="btn btn-ok btn-block btn-grande" data-a="hhuesped-ingreso" data-id="${esc(h.id)}">${I('login')}Registrar el ingreso</button>` : `<div class="card plana small">${I('check')} Ingresó a las ${hora(h.ingreso)} h</div>`}`); return true; }
   return false;
+}
+
+/* =========================================================
+   LOS EMPLEADOS DEL HOTEL, CON CREDENCIAL PERMANENTE (pedido de Claudio,
+   15-10-2026: "que la gerencia pueda cargar como visitas frecuentes a sus
+   empleados una vez y sirva para siempre o se pueda editar si cambian o se
+   pierde la entrada: un QR pegado en el parabrisas, el lector de patentes
+   o un código alfanumérico que diga el empleado al entrar y salir").
+
+   CÓMO ANDA
+   · El hotel carga a cada empleado UNA vez (nombre, apellido, DNI, puesto,
+     y si quiere la patente, los días y el horario). Lo edita cuando cambia
+     y lo da de baja cuando se va.
+   · Cada uno tiene una credencial: un QR para imprimir y pegar en el
+     parabrisas y un CÓDIGO CORTO para decir en voz alta (5 signos, sin las
+     letras y números que se confunden al hablar o al leer: ni O/0, ni I/1,
+     ni B/V/8, ni S/5, ni N/M, ni Z/2). Si se pierde, "Credencial nueva": el
+     QR y el código viejos dejan de valer al instante.
+   · En la garita se lo reconoce de tres maneras: leyendo el QR, con el
+     lector de patentes (si cargó su auto) o escribiendo el código que dice.
+     La entrada y la salida se marcan con un toque.
+   · El hotel ve en vivo quién de los suyos está adentro.
+
+   Se reusa lo que ya había: el horario y los días se controlan con
+   frecuenteVigente (los ingresos frecuentes), los pasos van a hotelMovs
+   (como las vans y los proveedores del hotel), el DNI se muestra tapado
+   como en mantenimiento, el pedido firmado de "no dejar pasar" se cruza
+   igual que con cualquier visita, y la tarjeta para WhatsApp es la del
+   pase fijo.
+
+   PROTECCIÓN DE DATOS (Ley 25.326, mínimo acceso)
+   · hotel/hotelEmpleados: lo escribe solo el hotel; lo leen el hotel y la
+     garita. Ni la Administración, ni la supervisión, ni los vecinos.
+   · La garita ve el DNI tapado (los tres últimos números, para cotejar).
+   · Los pasos (hotel/hotelMovs) llevan solo el id del empleado y la hora;
+     la bitácora, el nombre y el puesto, nunca el DNI. Se borran solos a
+     los 30 días, como los de las vans.
+   · "Dar de baja" borra la ficha entera (con el DNI): la credencial deja
+     de valer y en la bitácora queda solo lo que ya pasó.
+
+   Ideas de apps con más de 1000 estrellas en GitHub (solo la idea, código
+   propio): el pase de empleado con QR fijo y el "quién está adentro" de
+   Snipe-IT (11k★) y de los sistemas de visitas tipo "Envoy" de código
+   abierto (Lobby Track); el código corto sin signos ambiguos, del
+   alfabeto "Crockford Base32" (sin I, L, O, U).
+   ========================================================= */
+const hotelEmpleados = () => aLista(Store.s.hotelEmpleados).filter(e => e && e.id);
+const hEmpNombre = e => `${e.nombre || ''} ${e.apellido || ''}`.trim();
+/* El código para decir: 5 signos con al menos una letra y un número. */
+const EMP_ABC = 'ACDEFGHJKPRTUXY', EMP_NUM = '34679';
+function codigoEmpleado(){
+  const todos = EMP_ABC + EMP_NUM, usados = new Set(hotelEmpleados().map(e => e.codigo));
+  for (let k = 0; k < 50; k++){
+    const r = new Uint32Array(5); (crypto || window.msCrypto).getRandomValues(r);
+    const c = [...r].map(x => todos[x % todos.length]).join('');
+    if (/[A-Z]/.test(c) && /\d/.test(c) && !usados.has(c)) return c;
+  }
+  return 'E' + Date.now().toString(36).toUpperCase().slice(-4);
+}
+/* Lo que escribe la garita o lee el QR ("BHC:E-K7M3P", "e k7m-3p", "K7M3P"). */
+/* El QR trae "E-" adelante; el que dice el empleado, solo los 5 signos.
+   Sin el guion no se saca la E: una patente vieja como "EKA347" no es un código. */
+const codigoEmpDe = txt => String(txt || '').toUpperCase().replace(/^BHC:/, '').replace(/[\s.]/g, '').replace(/^E-(?=[A-Z0-9]{5}$)/, '').replace(/-/g, '');
+const codigoEmpLindo = c => String(c || '').replace(/^(.{3})(.{2})$/, '$1 $2');
+/* Adentro o afuera: por su último paso por la garita. */
+const hEmpMovs = e => aLista(Store.s.hotelMovs).filter(m => m && m.empId === e.id).sort((a, b) => b.at - a.at);
+function estadoEmp(e){
+  const m = hEmpMovs(e)[0];
+  return m ? { adentro:m.tipo === 'in', desde:m.at } : { adentro:false, desde:0 };
+}
+const hEmpAdentro = () => hotelEmpleados().filter(e => estadoEmp(e).adentro);
+const hEmpHoy = e => { const ini = new Date(); ini.setHours(0, 0, 0, 0); return hEmpMovs(e).filter(m => m.at >= +ini).reverse(); };
+const hEmpHoyTxt = e => { const ms = hEmpHoy(e); return ms.length ? 'Hoy: ' + ms.map(m => `${m.tipo === 'in' ? 'entró' : 'salió'} ${hora(m.at)}`).join(' · ') : ''; };
+const hEmpHorario = e => `${aLista(e.dias).length ? textoDias(e.dias) : 'Cualquier día'}${e.desde && e.hasta ? ` · ${e.desde} a ${e.hasta} h` : ''}`;
+const hEmpIniciales = e => ((e.nombre || '?')[0] + ((e.apellido || '')[0] || '')).toUpperCase();
+/* LOS DÍAS AUTORIZADOS (Claudio, 15-10-2026: "los empleados del hotel le
+   deben llegar a la garita como visitas frecuentes para permitir el ingreso
+   y egreso los días autorizados"). Igual que un ingreso frecuente: un día
+   que no es suyo, la garita NO le marca la entrada (lo ve en rojo y llama a
+   la recepción del hotel); fuera del horario, entra con una observación.
+   La salida se marca siempre: nadie queda "adentro" por error. */
+const hEmpHoyLeToca = e => !aLista(e.dias).length || aLista(e.dias).map(Number).includes(new Date().getDay());
+const hEmpPuedeEntrar = e => hEmpHoyLeToca(e);
+/* Más de 14 h adentro: ¿se olvidaron de marcar la salida? */
+const hEmpOlvido = e => { const s = estadoEmp(e); return s.adentro && Date.now() - s.desde > 14 * HORA; };
+
+R['hotel-empleados'] = {
+  titulo:'Empleados del hotel', icon:'users', color:'wood', ancha:true,
+  sub:() => esGuardia() ? 'Entran con su QR, su patente o su código' : 'Credencial permanente: QR, patente o código',
+  render(q){
+    if (!esHotel() && !esGuardia()) return vacio('lock', 'Los empleados del hotel los ven solo el hotel y la garita.');
+    const qq = normTxt(q || ''), todos = hotelEmpleados();
+    const ls = todos.filter(e => !qq || normTxt([hEmpNombre(e), e.puesto, e.patente, e.codigo, esHotel() ? e.dni : ''].join(' ')).includes(qq))
+      .sort((a, b) => (estadoEmp(b).adentro - estadoEmp(a).adentro) || hEmpNombre(a).localeCompare(hEmpNombre(b), 'es'));
+    const adentro = hEmpAdentro();
+    const tarjeta = e => { const st = estadoEmp(e), hoy = hEmpHoyTxt(e);
+      return `<div class="card hemp-card ${st.adentro ? 'adentro' : ''}"><div class="row" style="align-items:flex-start;gap:12px">
+          <span class="hemp-av" style="--h:${mantTono(e)}">${esc(hEmpIniciales(e))}</span>
+          <div class="grow"><b>${esc(hEmpNombre(e))}</b><div class="muted small">${esc(e.puesto || 'Empleado/a')}${e.patente ? ` · <span class="hp-chapa chica">${esc(chapaTexto(e.patente))}</span>` : ''}</div>
+            <div class="muted tiny">${esc(hEmpHorario(e))}${esGuardia() && e.dni ? ' · DNI ' + esc(mantDniTapado(e.dni)) : ''}</div>
+            <div class="hv-pills"><span class="pill ${st.adentro ? 'p-ok' : ''}">${st.adentro ? `${I('login')}Adentro desde las ${hora(st.desde)}` : 'Afuera'}</span>
+              ${hEmpOlvido(e) ? `<span class="pill p-warn">${I('alert')}¿Falta marcar la salida?</span>` : ''}
+              ${aLista(e.dias).length && !st.adentro ? (hEmpHoyLeToca(e) ? `<span class="pill p-sky">${I('clock')}Hoy le toca</span>` : `<span class="pill">Hoy no le toca</span>`) : ''}
+              ${esHotel() ? `<span class="pill mono">${esc(codigoEmpLindo(e.codigo))}</span>` : ''}</div>
+            ${hoy ? `<div class="muted tiny" style="margin-top:4px">${esc(hoy)}</div>` : ''}</div></div>
+        <div class="btns" style="margin-top:10px">
+          ${esGuardia() ? (st.adentro || hEmpPuedeEntrar(e) ? `<button class="btn btn-sm ${st.adentro ? 'btn-sec' : 'btn-ok'}" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="${st.adentro ? 'out' : 'in'}">${I(st.adentro ? 'logout' : 'login')}${st.adentro ? 'Salió' : 'Entró'}</button>` : `<span class="pill p-danger">${I('calendar')}Hoy no es su día</span>`) : ''}
+          ${esHotel() ? `<button class="btn btn-xs btn-pri" data-a="hemp-cred" data-id="${esc(e.id)}">${I('qr')}Credencial</button>
+            <button class="btn btn-xs btn-sec" data-a="hemp-editar" data-id="${esc(e.id)}">${I('edit')}Editar</button>` : ''}</div></div>`; };
+    return `${esHotel() ? `<div class="hemp-intro"><span class="hemp-intro-ic">${I('qr')}</span><div class="grow"><b>Cargalos una vez y sirve para siempre</b>
+          <small>Cada empleado entra al barrio con su QR en el parabrisas, con la patente de su auto o diciendo su código en la garita. Si pierde la credencial, generás una nueva y la vieja deja de valer.</small></div></div>
+        ${superficie({ a:'hemp-editar', icon:'plus', color:'wood', t:'Cargar un empleado', s:'Nombre, apellido, DNI y, si tiene, la patente', cls:'acento' })}` : ''}
+      <div class="hemp-kpis"><div class="kpi"><b>${adentro.length}</b><span>adentro ahora</span></div><div class="kpi"><b>${todos.length}</b><span>${todos.length === 1 ? 'empleado' : 'empleados'}</span></div></div>
+      ${todos.length > 4 ? `<form data-f="buscar-hemp" class="linea-form" style="margin:12px 0"><input name="q" value="${esc(q || '')}" placeholder="Nombre, puesto, patente o código"><button class="btn btn-pri">${I('search')}</button></form>` : ''}
+      ${ls.length ? ls.map(tarjeta).join('') : vacio('users', qq ? 'Nadie coincide con la búsqueda.' : esHotel() ? 'Todavía no cargaste empleados.' : 'El hotel todavía no cargó a sus empleados.')}
+      <p class="muted tiny" style="margin-top:12px">${I('lock')} ${esHotel() ? 'Los datos de tus empleados los ven solo el hotel y la garita (la garita, el DNI tapado). En la bitácora del barrio quedan el nombre, el puesto y la hora, nunca el DNI. Al dar de baja a alguien se borra su ficha.' : 'El DNI va tapado: los tres últimos números alcanzan para cotejar con el documento. En la bitácora queda el nombre y el puesto, nunca el DNI.'}</p>`;
+  },
+};
+F['buscar-hemp'] = d => abrir('hotel-empleados', d.q || '');
+
+/* ---------- el hotel: cargar, editar, credencial nueva y baja ---------- */
+A['hemp-editar'] = el => {
+  if (!soloHotel()) return;
+  const e = hotelEmpleados().find(x => x.id === el?.dataset?.id) || { dias:[] };
+  const dias = aLista(e.dias).map(Number);
+  hoja(e.id ? 'Editar empleado' : 'Nuevo empleado', `<form data-f="hemp" data-id="${esc(e.id || '')}">
+    <div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="40" value="${esc(e.nombre || '')}" autocomplete="off"></div>
+      <div class="field"><label>Apellido</label><input name="apellido" required maxlength="40" value="${esc(e.apellido || '')}" autocomplete="off"></div></div>
+    <div class="grid2"><div class="field"><label>DNI (solo números)</label><input name="dni" required inputmode="numeric" maxlength="10" autocomplete="off" value="${esc(mantDniLindo(e.dni || ''))}"></div>
+      <div class="field"><label>Puesto (opcional)</label><input name="puesto" maxlength="40" list="hEmpPuestos" value="${esc(e.puesto || '')}" placeholder="Recepción, cocina, mucama…"><datalist id="hEmpPuestos">${['Recepción', 'Cocina', 'Mucama', 'Mantenimiento', 'Mozo/a', 'Chofer', 'Gerencia', 'Seguridad'].map(p => `<option value="${p}">`).join('')}</datalist></div></div>
+    <div class="field"><label>Patente del auto (opcional: así lo reconoce el lector de patentes)</label><input name="patente" maxlength="10" class="cv-pat-in" autocapitalize="characters" value="${esc(e.patente || '')}" placeholder="AB 123 CD"></div>
+    <div class="field"><label>Días que trabaja (opcional; ninguno = cualquier día)</label><div class="seg dias-sel">${[1,2,3,4,5,6,0].map(d => `<label><input type="checkbox" name="dia${d}" ${dias.includes(d) ? 'checked' : ''}><span>${DIAS[d]}</span></label>`).join('')}</div></div>
+    <div class="grid2"><div class="field"><label>Entra (opcional)</label><input name="desde" type="time" value="${esc(e.desde || '')}"></div>
+      <div class="field"><label>Sale (opcional)</label><input name="hasta" type="time" value="${esc(e.hasta || '')}"></div></div>
+    <p class="muted tiny" style="margin:0 2px 12px">${I('info')} La garita lo ve en <b>Ingresos frecuentes</b> y le marca la entrada <b>solo los días autorizados</b> (sin días marcados, cualquier día). Fuera del horario entra igual, con una observación. Si cambia de turno, editalo acá.</p>
+    <button class="btn btn-pri btn-block">${I('check')}${e.id ? 'Guardar los cambios' : 'Guardar y ver su credencial'}</button>
+    ${e.id ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="hemp-nueva" data-id="${esc(e.id)}">${I('refresh')}Perdió la credencial: hacerle una nueva</button>
+      <button type="button" class="btn btn-danger-soft btn-block" style="margin-top:8px" data-a="hemp-baja" data-id="${esc(e.id)}">${I('trash')}Dar de baja (ya no trabaja en el hotel)</button>` : ''}</form>`);
+};
+F['hemp'] = (d, form) => {
+  if (!soloHotel()) return;
+  const id = form.dataset.id, dni = soloDigitos(d.dni), nombre = (d.nombre || '').trim(), apellido = (d.apellido || '').trim();
+  if (!nombre || !apellido){ toast('Faltan el nombre y el apellido', 'alert'); return; }
+  if (dni.length < 7 || dni.length > 8){ toast('El DNI tiene que tener 7 u 8 números', 'alert'); return; }
+  const otro = hotelEmpleados().find(x => x.dni === dni && x.id !== id);
+  if (otro){ toast(`Ese DNI ya está cargado: ${hEmpNombre(otro)}`, 'alert'); return; }
+  const desde = d.desde || '', hasta = d.hasta || '';
+  if (!!desde !== !!hasta){ toast('Poné la hora de entrada y la de salida, o ninguna', 'alert'); return; }
+  let guardado = '';
+  Store.cambiar(s => { s.hotelEmpleados = aLista(s.hotelEmpleados);
+    let e = id && s.hotelEmpleados.find(x => x && x.id === id);
+    if (!e){ e = { id:'he' + uid(), codigo:codigoEmpleado(), at:Date.now() }; s.hotelEmpleados.push(e); }
+    Object.assign(e, { nombre, apellido, dni, puesto:(d.puesto || '').trim(), patente:normPatente(d.patente || ''),
+      dias:[0, 1, 2, 3, 4, 5, 6].filter(x => d['dia' + x]), desde, hasta, updatedAt:Date.now() });
+    auditar(s, id ? 'El hotel editó un empleado' : 'El hotel cargó un empleado', hEmpNombre(e), e.id);
+    guardado = e.id; });
+  cerrarHoja();
+  if (id) toast('Cambios guardados', 'check');
+  else { toast('Empleado cargado', 'check'); setTimeout(() => A['hemp-cred']({ dataset:{ id:guardado } }), 60); }
+};
+A['hemp-nueva'] = async el => {
+  if (!soloHotel()) return;
+  const e = hotelEmpleados().find(x => x.id === el.dataset.id); if (!e) return;
+  if (!await confirmar('Credencial nueva', `${esc(hEmpNombre(e))}: el QR y el código que tiene ahora (${esc(codigoEmpLindo(e.codigo))}) dejan de valer en la garita en este mismo momento. Después imprimí el QR nuevo y avisale el código nuevo.`, { si:'Hacer una nueva' })) return;
+  Store.cambiar(s => { const x = aLista(s.hotelEmpleados).find(z => z && z.id === e.id); if (!x) return;
+    x.codigo = codigoEmpleado(); x.updatedAt = Date.now(); auditar(s, 'El hotel le hizo una credencial nueva a un empleado', hEmpNombre(x), x.id); });
+  cerrarHoja(); toast('Credencial nueva: la anterior ya no vale', 'refresh');
+  setTimeout(() => A['hemp-cred']({ dataset:{ id:e.id } }), 60);
+};
+A['hemp-baja'] = async el => {
+  if (!soloHotel()) return;
+  const e = hotelEmpleados().find(x => x.id === el.dataset.id); if (!e) return;
+  if (!await confirmar('Dar de baja al empleado', `${esc(hEmpNombre(e))}. Se borra su ficha con el DNI y su credencial deja de valer en la garita. Lo que ya entró y salió queda en la bitácora del barrio, sin el DNI.${estadoEmp(e).adentro ? '<br><b>Figura adentro del barrio:</b> avisale a la garita.' : ''}`, { si:'Dar de baja', peligro:true })) return;
+  Store.cambiar(s => { s.hotelEmpleados = aLista(s.hotelEmpleados).filter(x => x && x.id !== e.id); auditar(s, 'El hotel dio de baja a un empleado', hEmpNombre(e), e.id); });
+  cerrarHoja(); toast('Empleado dado de baja', 'trash');
+};
+/* La credencial: QR, código para decir, patente. Se imprime para el
+   parabrisas o se le manda por WhatsApp. */
+A['hemp-cred'] = el => {
+  const e = hotelEmpleados().find(x => x.id === el.dataset.id); if (!e || !esHotel()) return;
+  hoja('Credencial del empleado', `<div class="ticket hemp-cred"><div class="tk-top"><small>${HOTEL_NOMBRE} · empleado/a</small><h3>${esc(hEmpNombre(e))}</h3><div style="opacity:.85;font-size:13px">${esc(e.puesto || 'Personal del hotel')}</div></div>
+    <div class="bottom"><div class="qr-box" data-qr="BHC:E-${esc(e.codigo)}"></div>
+      <div class="muted tiny" style="margin-top:8px">Código para decir en la garita</div><div class="codigo-grande hemp-cod">${esc(codigoEmpLindo(e.codigo))}</div>
+      ${e.patente ? `<div class="cv-chapa lista" style="margin:10px auto 0;max-width:220px"><small>REPÚBLICA ARGENTINA</small><b>${esc(chapaTexto(e.patente))}</b></div>` : ''}
+      <div class="muted small" style="margin-top:8px">${esc(hEmpHorario(e))}</div></div></div>
+    <div class="btns" style="margin-top:12px"><button class="btn btn-pri grow" data-a="hemp-imprimir" data-id="${esc(e.id)}">${I('download')}Imprimir para el parabrisas</button>
+      <button class="btn btn-wa grow" data-a="hemp-wa" data-id="${esc(e.id)}">${I('share')}Mandársela por WhatsApp</button></div>
+    <div class="card plana small" style="margin-top:12px;line-height:1.5"><b>Tres maneras de entrar, la que le quede más cómoda:</b>
+      <ul style="margin:4px 0 0;padding-left:18px"><li><b>El QR pegado en el parabrisas</b> (del lado del acompañante): la garita lo lee con el celular.</li>
+        <li><b>La patente</b>${e.patente ? '' : ' (si cargás la de su auto)'}: el lector de patentes de la garita lo reconoce.</li>
+        <li><b>El código ${esc(codigoEmpLindo(e.codigo))}</b>: lo dice en la garita, a pie, en bici o en otro auto.</li></ul>
+      <p style="margin:6px 0 0">Vale para siempre, al entrar y al salir. Si la pierde o alguien la copió: Editar → "Perdió la credencial".</p></div>`);
+  setTimeout(() => $$('#hoja [data-qr]').forEach(x => pintarQR(x, x.dataset.qr)), 60);
+};
+A['hemp-imprimir'] = async el => {
+  const e = hotelEmpleados().find(x => x.id === el.dataset.id); if (!e) return;
+  const q = await cargarQR(); if (!q) return toast('Sin conexión para dibujar el QR', 'alert');
+  const qr = q(0, 'M'); qr.addData('BHC:E-' + e.codigo); qr.make();
+  imprimir('Credencial · ' + hEmpNombre(e), `<div style="max-width:360px;margin:0 auto;border:3px solid #0d6b66;border-radius:18px;padding:18px 20px;text-align:center">
+    <p style="margin:0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#0d6b66"><b>Barrio ${esc(Store.s.config.nombre)}</b> · ingreso</p>
+    <h2 style="border:0;margin:6px 0 0;color:#111;font-size:20px">${esc(HOTEL_NOMBRE)}</h2>
+    <p style="margin:2px 0 0;font-size:17px"><b>${esc(hEmpNombre(e))}</b></p><p style="margin:0;color:#555">${esc(e.puesto || 'Personal del hotel')}</p>
+    <div style="width:230px;margin:14px auto">${qr.createSvgTag({ cellSize:8, margin:2, scalable:true })}</div>
+    <p style="margin:0;font-size:11px;color:#555">Código</p><p style="margin:0;font-size:30px;letter-spacing:4px;font-family:monospace"><b>${esc(codigoEmpLindo(e.codigo))}</b></p>
+    ${e.patente ? `<p style="margin:8px 0 0;font-size:16px;letter-spacing:2px;font-family:monospace">${esc(chapaTexto(e.patente))}</p>` : ''}
+    <p style="margin:10px 0 0;color:#555;font-size:12px">Mostrar en la garita al entrar y al salir.</p></div>`, { pie:'Credencial permanente del hotel. Si se pierde, el hotel hace una nueva y esta deja de valer. No lleva el DNI.' });
+};
+A['hemp-wa'] = el => {
+  const e = hotelEmpleados().find(x => x.id === el.dataset.id); if (!e) return;
+  const texto = `🎟️ *Tu credencial para entrar al Barrio ${Store.s.config.nombre}*\n\nHola ${e.nombre}: sos personal del ${HOTEL_NOMBRE}.\n\n🔑 Código: *${codigoEmpLindo(e.codigo)}*\n\nEn la garita mostrá el QR de la imagen o decí el código, al entrar y al salir. Vale para siempre.\n\n📍 *Cómo llegar:* ${mapaCorto()}`;
+  compartirPase({ texto, contenido:'BHC:E-' + e.codigo, codigo:codigoEmpLindo(e.codigo), sub:`${HOTEL_NOMBRE} · ${hEmpNombre(e)}`, archivo:`credencial-${e.codigo}.png`,
+    datos:{ nombre:hEmpNombre(e), espera:HOTEL_NOMBRE, cuando: aLista(e.dias).length ? textoDias(e.dias) : 'Todos los días', horario: e.desde ? `${e.desde} a ${e.hasta} h` : 'Todo el día' } });
+};
+
+/* ---------- la garita: lo reconoce y marca la entrada o la salida ---------- */
+function hojaEmpleadoGarita(e, por = ''){
+  const st = estadoEmp(e), v = frecuenteVigente(e);
+  const r = typeof restriccionPara === 'function' ? restriccionPara(hEmpNombre(e), e.dni, e.patente) : null;
+  hoja('Empleado del hotel', `${r ? avisoRestriccion(r) : ''}
+    ${!v.ok && !st.adentro ? aviso('danger', 'x', 'HOY NO ESTÁ AUTORIZADO', `${esc(v.motivo)}. Consultá con la recepción del hotel: si hoy trabaja, que le agreguen el día.`) : v.aviso ? aviso('warn', 'clock', 'Empleado del hotel, con una observación', esc(v.motivo)) : aviso('ok', 'check', 'Empleado del hotel · autorizado', `${HOTEL_NOMBRE}${por ? ' · ' + esc(por) : ''}`)}
+    <div class="card" style="display:flex;gap:12px;align-items:center"><span class="hemp-av grande" style="--h:${mantTono(e)}">${esc(hEmpIniciales(e))}</span>
+      <div class="grow"><b style="font-size:18px">${esc(hEmpNombre(e))}</b><div class="muted small">${esc(e.puesto || 'Personal del hotel')}${e.dni ? ' · DNI ' + esc(mantDniTapado(e.dni)) : ''}</div>
+        <div class="muted small">${e.patente ? `<span class="hp-chapa chica">${esc(chapaTexto(e.patente))}</span> · ` : ''}${esc(hEmpHorario(e))}</div>
+        <div class="small" style="margin-top:4px">${st.adentro ? `${I('login')} <b>Adentro</b> desde las ${hora(st.desde)} h` : `${I('logout')} Afuera`}</div></div></div>
+    ${st.adentro ? `<button class="btn btn-block btn-grande btn-sec" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="out">${I('logout')}Registrar la salida</button>
+      ${hEmpPuedeEntrar(e) ? `<button class="btn btn-block btn-sec" style="margin-top:8px" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="in">No: está entrando</button>` : ''}`
+    : hEmpPuedeEntrar(e) ? `<button class="btn btn-block btn-grande btn-ok" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="in">${I('login')}Registrar la entrada</button>
+      <button class="btn btn-block btn-sec" style="margin-top:8px" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="out">No: está saliendo</button>`
+    : `<button class="btn btn-block btn-sec" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="out">${I('logout')}Está saliendo: registrar la salida</button>`}`);
+  return true;
+}
+/* Un código que llega a la garita: el QR (E-XXXXX) o los 5 signos que
+   dice el empleado. Devuelve true si lo resolvió. */
+function hotelEmpCodigo(txt){
+  if (!esGuardia() && !esHotel()) return false;
+  const crudo = String(txt || '').toUpperCase().replace(/^BHC:/, '').trim(), conPref = /^E-[A-Z0-9]{5}$/.test(crudo.replace(/\s/g, ''));
+  const c = codigoEmpDe(crudo); if (!/^[A-Z0-9]{5}$/.test(c)) return false;
+  const e = hotelEmpleados().find(x => x.codigo === c);
+  if (e) return hojaEmpleadoGarita(e, conPref ? 'leído del QR' : 'por su código');
+  if (conPref){ hoja('Credencial desconocida', aviso('danger', 'x', 'Esa credencial del hotel no vale', 'Puede ser una vieja que el hotel reemplazó, o de alguien que ya no trabaja ahí. Consultá con la recepción del hotel.')); return true; }
+  return false;
+}
+A['hemp-mov'] = el => {
+  if (!soloGarita()) return;
+  const e = hotelEmpleados().find(x => x.id === el.dataset.id); if (!e) return;
+  const tipo = el.dataset.v === 'in' ? 'in' : 'out', at = Date.now();
+  if (tipo === 'in' && !hEmpPuedeEntrar(e)){ toast('Hoy no es un día autorizado: consultá con la recepción del hotel', 'calendar'); return; }
+  Store.cambiar(s => { s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:'hm' + uid(), empId:e.id, tipo, at, por:yo().id });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', hotelEmpId:e.id, texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: empleado del hotel ${hEmpNombre(e)}${e.puesto ? ' (' + e.puesto + ')' : ''}${e.patente ? ' · ' + e.patente : ''}`, at }); });
+  cerrarHoja(); toast(`${hEmpNombre(e)}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada`, tipo === 'in' ? 'login' : 'logout');
+};
+/* LOS EMPLEADOS DEL HOTEL EN "INGRESOS FRECUENTES" DE LA GARITA, al lado
+   del personal fijo de los vecinos: los que hoy tienen día autorizado
+   primero, con su horario y "Entró" / "Salió" a un toque. */
+function seccionEmpleadosHotel(qq = ''){
+  const ts = hotelEmpleados(); if (!ts.length || !esGuardia()) return '';
+  const ls = ts.filter(e => !qq || normTxt([hEmpNombre(e), e.puesto, e.patente, e.codigo, 'hotel'].join(' ')).includes(qq))
+    .sort((a, b) => (estadoEmp(b).adentro - estadoEmp(a).adentro) || (hEmpHoyLeToca(b) - hEmpHoyLeToca(a)) || String(a.desde).localeCompare(String(b.desde)) || hEmpNombre(a).localeCompare(hEmpNombre(b), 'es'));
+  const hoy = ts.filter(e => aLista(e.dias).length && hEmpHoyLeToca(e)).length, ad = hEmpAdentro().length;
+  return `${sec(`Empleados del ${HOTEL_NOMBRE}`, `<span class="muted small">${ts.length}${hoy ? ` · ${plural(hoy, 'trabaja hoy', 'trabajan hoy')}` : ''}${ad ? ` · ${ad} adentro` : ''}</span>`)}
+    ${ls.length ? `<div class="card lista">${ls.map(e => { const st = estadoEmp(e), toca = hEmpHoyLeToca(e), hoyTxt = hEmpHoyTxt(e);
+      return `<div class="it"><span class="hemp-av" style="--h:${mantTono(e)}">${esc(hEmpIniciales(e))}</span><div class="txt"><b>${esc(hEmpNombre(e))}</b>
+        <span>${esc(e.puesto || 'Personal del hotel')}${e.patente ? ' · ' + esc(e.patente) : ''} · ${esc(hEmpHorario(e))}</span>
+        <span class="tiny" style="color:${st.adentro ? 'var(--ok)' : toca ? 'var(--ink-2)' : 'var(--danger)'}">${st.adentro ? `Adentro desde las ${hora(st.desde)} h` : toca ? (aLista(e.dias).length ? 'Hoy le toca' : 'Cualquier día') : 'Hoy no es su día: no entra'}${hoyTxt && !st.adentro ? ' · ' + esc(hoyTxt) : ''}</span></div>
+        ${st.adentro || toca ? `<button class="btn btn-xs ${st.adentro ? 'btn-sec' : 'btn-ok'}" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="${st.adentro ? 'out' : 'in'}">${I(st.adentro ? 'logout' : 'login')}${st.adentro ? 'Salió' : 'Entró'}</button>` : ''}</div>`; }).join('')}</div>`
+      : vacio('users', 'Ningún empleado del hotel coincide con la búsqueda.')}
+    <p class="muted tiny" style="margin:6px 2px 14px">${I('qr')} Los carga el hotel. Entran con el QR del parabrisas, su patente o el código que dicen (escribilo en "Código, patente o DNI").</p>`;
 }
 
 /* =========================================================
@@ -1544,6 +1816,7 @@ R['hotel-vivo'] = {
       ${evs.length ? `<section class="bloque">${sec('Eventos del hotel', '<span class="muted small">próximos 7 días</span>')}<div class="he-lista">${evs.map(ticket).join('')}</div></section>` : ''}
       ${!esAdmin() ? `<section class="bloque">${sec('Atajos')}<div class="hvv-atajos">
         ${esGuardia() ? `<button type="button" data-a="abrir" data-v="hotel-huespedes">${I('users')}Huéspedes</button>` : ''}
+        ${esGuardia() ? `<button type="button" data-a="abrir" data-v="hotel-empleados">${I('user')}Empleados</button>` : ''}
         <button type="button" data-a="abrir" data-v="hotel-proveedores">${I('box')}Proveedores</button>
         <button type="button" data-a="abrir" data-v="hotel-eventos">${I('star')}Eventos</button>
         <button type="button" data-a="abrir" data-v="hotel-emergencias">${I('siren')}Emergencias</button>

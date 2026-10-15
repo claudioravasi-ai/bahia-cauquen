@@ -45,6 +45,7 @@ const RECORRIDOS = {
   hotel: [
     { sel:'#cuerpo [data-a="abrir"][data-v="hotel-traslados"]', t:'Vans y traslados', x:'Cargás cada traslado y la garita lo ve para dejar pasar la van.' },
     { sel:'#cuerpo [data-a="abrir"][data-v="hotel-huespedes"]', t:'Huéspedes', x:'Quién llega y quién se va: la garita los deja pasar sin llamar.' },
+    { sel:'#cuerpo [data-a="abrir"][data-v="hotel-empleados"]', t:'Empleados del hotel', x:'Cargás a cada empleado <b>una sola vez</b> con sus días de trabajo: entra con el QR del parabrisas, su patente o un código de 5 signos. La garita le marca la entrada solo los días autorizados.' },
     { sel:'header.top [data-a="hotel-urgente"]', t:'Urgencia', x:'Para avisarle a la garita algo urgente del hotel.' },
     { sel:'#cuerpo [data-a="abrir"][data-v="privado"]', t:'Mensajes', x:'Con la garita y con la Administración.' },
   ],
