@@ -273,6 +273,7 @@ function mapaSVG(est){
       ${quieto ? '' : `<animateTransform attributeName="transform" type="rotate" from="0 ${gx} ${gy}" to="360 ${gx} ${gy}" dur="9s" repeatCount="indefinite"/>`}</g>
     <g class="rutas">${rutas}</g>
     <g class="lotes">${tiles}</g>
+    ${typeof mantCapaMapa === 'function' ? mantCapaMapa() : ''}
     <g class="garita-pin" data-a="mapa-garita" role="button" aria-label="La garita">
       <circle class="g-halo" cx="${gx}" cy="${gy}" r="16"/><circle class="g-base" cx="${gx}" cy="${gy}" r="11"/>
       ${I('shield').replace('<svg class="i ', `<svg x="${gx - 7}" y="${gy - 7}" width="14" height="14" class="i g-ic `)}

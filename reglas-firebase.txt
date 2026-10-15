@@ -116,6 +116,14 @@ QUÉ HACEN, EN CASTELLANO
    lo escribe la garita y lo leen la garita, la Administración y la
    supervisión.
 
+8 quater. EL PERSONAL DE MANTENIMIENTO (14-10-2026). /staff/mantenimiento
+   tiene a cada persona de mantenimiento del barrio: nombre, apellido, DNI,
+   la tarea, si está adentro y la tarea y el lugar del día (para el mapa
+   de la garita). Lo leen y lo escriben solo la garita y la
+   Administración. Sus entradas y salidas van a la bitácora sin el DNI. Los
+   vecinos ven solo cuántos están trabajando y desde qué hora, en
+   /barrio/guardiaAhora (campos "mant" y "mantDesde"), sin nombres ni DNI.
+
 7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
    ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
    escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
@@ -474,6 +482,12 @@ PEGAR DESDE ACÁ
          rasgos (hombre o mujer, altura, contextura, pelo, piel). Lo escribe la
          garita; lo leen la garita, la Administración y la supervisión. */
       "guardiaLooks": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      /* El personal de mantenimiento del barrio (14-10-2026): nombre, apellido,
+         DNI, la tarea, si está adentro y la tarea y el lugar del día. Lo leen y lo escriben SOLO la garita
+         y la Administración (la supervisión no; los vecinos ven solo cuántos
+         están trabajando, en barrio/guardiaAhora, sin nombres ni DNI). */
+      "mantenimiento": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { ".validate": "newData.child('id').val() === $id && newData.child('nombre').isString() && newData.child('nombre').val().length >= 1 && newData.child('nombre').val().length <= 40 && newData.child('apellido').isString() && newData.child('apellido').val().length >= 1 && newData.child('apellido').val().length <= 40 && newData.child('dni').isString() && newData.child('dni').val().matches(/^[0-9]{7,8}$/)" } },
       "telefonos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* El libro contable: solo la Administración. */
       "asientos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },

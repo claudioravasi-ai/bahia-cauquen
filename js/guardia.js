@@ -266,10 +266,18 @@ const lookDe = n => { const x = aLista(Store.s.guardiaLooks).find(z => z && z.id
 /* Lo que la garita publica: el turno abierto y sus guardias, nada más. */
 function guardiaAhoraDeseada(){
   const t = turnoAbierto();
-  if (!t) return { id:'ahora', abierto:false };
+  /* 14-10: cuántos de mantenimiento están trabajando en el barrio y desde
+     qué hora (sin nombres ni DNI), para el loguito de la portada
+     (js/mantenimiento.js). Si este equipo todavía no bajó la lista, se deja
+     lo que ya había publicado, así no lo borra. */
+  const cur = aLista(Store.s.guardiaAhora).find(x => x && x.id === 'ahora') || {};
+  const mp = typeof mantPublico === 'function' && typeof mantBajada === 'function' && mantBajada() ? mantPublico() : { n:cur.mant || 0, desde:cur.mantDesde || 0 };
+  const mant = mp.n ? { mant:mp.n, mantDesde:mp.desde } : {};
+  if (!t) return { id:'ahora', abierto:false, ...mant };
   const c = turnosConfig().find(x => x.nombre === t.turno) || {};
+  /* 14-10: cada guardia con su horario (los horarios se superponen). */
   return { id:'ahora', abierto:true, turno:t.turno, desde:c.desde || '', hasta:c.hasta || '', inicio:t.at,
-    guardias: aLista(t.guardias).map(n => { const l = lookDe(n); return l ? { n, look:l } : { n }; }), policia: policiasAdentro(t).length ? 1 : 0 };
+    guardias: relevosDe(t).map(r => { const l = lookDe(r.n), h = horarioDe(r.h); return { n:r.n, ...(l ? { look:l } : {}), ...(h ? { h:r.h, desde:h.desde, hasta:h.hasta } : {}) }; }), policia: policiasAdentro(t).length ? 1 : 0, ...mant };
 }
 /* ¿Este equipo tiene el libro de guardia? Lo bajan las cuentas de la garita,
    la Administración (en cualquier modo, también "como vecino") y la supervisión.
@@ -358,12 +366,12 @@ A['guardia-ver'] = () => {
       <div class="ga-cielo"><i class="tl-astro"></i>${noche ? '<i class="tl-estrella s1"></i><i class="tl-estrella s2"></i><i class="tl-estrella s3"></i>' : '<i class="tl-nube n1"></i><i class="tl-nube n2"></i>'}</div>
       ${escenaGuardias(g.guardias, { noche })}</div>
     <div class="ga-turno"><span class="ga-tic ${turnoEsNoche(g.turno) ? 'ga-noche' : ''}">${I(turnoEsNoche(g.turno) ? 'moon' : 'sun')}</span>
-      <div class="grow"><b>Turno ${esc(g.turno)}</b><small>${g.desde && g.hasta ? `${esc(g.desde)} a ${esc(g.hasta)} h · ` : ''}desde las ${hora(g.inicio)} h</small></div><span class="pill p-ok">${I('check')}En la garita</span></div>
-    <div class="ga-nombres">${g.guardias.map((x, i) => `<button type="button" class="ga-n" data-a="guardia-saluda" data-i="${i}" style="--c:${colorDe(x.n)}">${caraGuardia(x.n, x.look)}<span>${esc(x.n)}</span></button>`).join('')}</div>
+      <div class="grow"><b>Guardia · ${esc(g.turno)}</b><small>${g.desde && g.hasta ? `${esc(g.desde)} a ${esc(g.hasta)} h · ` : ''}desde las ${hora(g.inicio)} h</small></div><span class="pill p-ok">${I('check')}En la garita</span></div>
+    <div class="ga-nombres">${g.guardias.map((x, i) => `<button type="button" class="ga-n" data-a="guardia-saluda" data-i="${i}" style="--c:${colorDe(x.n)}">${caraGuardia(x.n, x.look)}<span>${esc(x.n)}${x.desde ? `<small class="ga-h">${esc(x.h || '')} · ${esc(x.desde)} a ${esc(x.hasta)} h</small>` : ''}</span></button>`).join('')}</div>
     ${pol}
     <div class="btns" style="margin-top:12px">${c.garitaTel ? `<a class="btn btn-pri grow" href="${telLink(c.garitaTel)}">${I('phone')}Llamar a la garita</a>` : ''}
       ${!veGarita() && !esHotel() ? `<button class="btn btn-sec grow" data-a="abrir" data-v="privado" data-p="guardia">${I('chat')}Escribirle a la garita</button>` : ''}</div>
-    <p class="muted tiny" style="margin:10px 2px 0">${I('lock')} Se ve solo el nombre de quienes están de guardia en este turno, tal como lo anotó la garita, y cómo eligió aparecer cada uno. Al cerrarse el turno, cambia solo.</p>`);
+    <p class="muted tiny" style="margin:10px 2px 0">${I('lock')} Se ve solo el nombre de quienes están de guardia ahora, su horario, tal como lo anotó la garita, y cómo eligió aparecer cada uno. Cambia solo cuando entra o sale cada guardia.</p>`);
   setTimeout(() => { const hc = document.getElementById('hojaCuerpo'); if (hc) hc.scrollTop = 0;
     const b = document.querySelector('#hoja .ga-caja g[data-i="0"]'); if (b) A['guardia-saluda'](b); }, 350);
 };

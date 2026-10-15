@@ -596,7 +596,11 @@ function datosInforme(periodo){
   let cubierto = 0, hasta = ini; iv.forEach(([a, b]) => { const d = Math.max(a, hasta); if (b > d){ cubierto += b - d; hasta = b; } });
   const dias = Math.max(1, Math.round((fin - ini) / DIA)), esperados = dias * turnosConfig().length;
   const porGuardia = {};
-  turnos.forEach(t => aLista(t.guardias).forEach(g => { const k = normTxt(g); porGuardia[k] = porGuardia[k] || { nombre:g, turnos:0, horas:0 }; porGuardia[k].turnos++; porGuardia[k].horas += Math.max(0, (t.cerradoAt || fin) - t.at) / HORA; }));
+  /* 14-10: con el relevo de a uno, un mismo horario de un guardia ocupa varios
+     registros; se cuenta una vez por entrada (relevo), no por registro. */
+  const vistosRel = new Set();
+  turnos.forEach(t => relevosDe(t).forEach(r => { const g = r.n, k = normTxt(g); porGuardia[k] = porGuardia[k] || { nombre:g, turnos:0, horas:0 };
+    const kr = k + '|' + (r.entra || t.at); if (!vistosRel.has(kr)){ vistosRel.add(kr); porGuardia[k].turnos++; } porGuardia[k].horas += Math.max(0, (t.cerradoAt || fin) - t.at) / HORA; }));
   /* Policía: cada servicio (un ingreso), con sus rondas aunque haya pasado de un turno a otro. */
   const pol = {};
   todos.forEach(t => policiasDe(t).forEach(p => { if (!en(p.entra || 0)) return;

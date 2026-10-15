@@ -201,7 +201,7 @@ function migrar(s){
     /* 07-10: supervisión de la guardia (js/v-supervisor.js) */
     alertasSup:[], vistos:[],
     /* 13-10: la guardia de ahora (pública) y cómo aparece cada guardia (js/guardia.js) */
-    guardiaAhora:[], guardiaLooks:[] };
+    guardiaAhora:[], guardiaLooks:[], mantenimiento:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* El chat vecinal y las reservas de espacios comunes se sacaron el 29-09-2026:
      lo que haya quedado guardado en este equipo se borra al abrir la app. */

@@ -51,7 +51,9 @@ const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', '
   /* "Estoy bien": la garita ve solo a los vecinos que la eligieron como contacto (27-09). */
   'estoy-bien', 'salidas',
   /* 13-10: el mapa del barrio en pantalla completa (el botón "Grande" no abría) */
-  'mapa']);
+  'mapa',
+  /* 14-10: el personal de mantenimiento del barrio (js/mantenimiento.js) */
+  'mantenimiento']);
 /* El hotel ve solo lo suyo y lo público de la ciudad (ver js/v-hotel.js).
    Emergencias (la de los vecinos) no: tiene el pedido del DEA y los SOS del
    día; el hotel tiene la suya. */
@@ -2015,10 +2017,10 @@ window.addEventListener('unhandledrejection', e => {
 const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
     'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'correo-menu', 'correo-elegir', 'correo-sale', 'correo-lotes', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
-    'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno',
+    'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno', 'guardia-sale',
     'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer']),
   formularios: new Set(['validar', 'patente-buscar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
-    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada']),
+    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada', 'guardia-entra', 'guardia-sale']),
 };
 /* Paquetes en pausa (hayPaquetes, core.js): aunque quede un botón o un
    aviso viejo que lleve ahí, no hace nada. El código sigue guardado. */
@@ -2266,6 +2268,8 @@ const PIEZAS = [
   ['js/historial.js',  () => typeof Historial],
   ['js/v-supervisor.js', () => typeof Supervisor],
   ['js/guardia.js',    () => typeof svgGuardia],
+  ['js/mantenimiento.js', () => typeof bandaMantenimiento],
+  ['js/relevos.js',    () => typeof lineaGuardia],
 ];
 function piezasQueFaltan(){
   const falta = [];

@@ -1792,6 +1792,7 @@ function portadaPropietario(){
     ? aviso('info', 'key', `${esc(u.casa)} está alquilado`, `El día a día del lote (la garita, las visitas, los correos y el SOS) lo maneja ${nombres} (${inq.length > 1 ? 'inquilinos' : 'inquilino/a'}). Vos ves y hacés lo que te toca como dueño.`)
     : aviso('info', 'key', 'No vivís en el lote', `Marcaste que no vivís en ${esc(u.casa)}: acá tenés lo que te toca como dueño. Si volvés a vivir ahí, cambialo en <b>Mi lote</b>.`);
   return `${hero}<div class="inicio-lienzo">
+    ${typeof mantHero === 'function' ? mantHero() : ''}
     <section class="bloque">${quien}</section>
     ${coms.length ? `<section class="bloque">${sec('Comunicados de la Administración')}${coms.map(x => `<button class="superficie" data-a="ver-novedad" data-v="com" data-id="${esc(x.id)}"><span class="ic ic-danger">${I(x.tipo === 'reunion' ? 'calendar' : 'tack')}</span><span class="txt"><b>${esc(x.titulo)}</b><small>${x.fecha ? fechaLarga(x.fecha) + (x.hora ? ' · ' + esc(x.hora) + ' h' : '') + ' · ' : ''}${esc(String(x.texto || '').slice(0, 90))}</small></span>${I('right')}</button>`).join('')}</section>` : ''}
     <section class="bloque">${sec('Lo tuyo como propietario/a')}<div class="mosaico">

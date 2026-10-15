@@ -74,7 +74,9 @@ const Nube = {
             /* 08-10: los teléfonos de cada lote (garita, Administración y supervisión) */
             'telefonos',
             /* 13-10: cómo eligió aparecer cada guardia en el dibujo (js/guardia.js) */
-            'guardiaLooks'],
+            'guardiaLooks',
+            /* 14-10: el personal de mantenimiento del barrio, con su DNI (js/mantenimiento.js): garita y Administración */
+            'mantenimiento'],
     /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
        los huéspedes, solo el hotel y la garita; las promociones propuestas,
@@ -119,7 +121,7 @@ const Nube = {
     notifs:          { listas:['para','leidas'] },
     notifsTodos:     { listas:['para','leidas'] },
     privados:        { listas:['msgs'] },
-    bitacora:        { listas:['guardias','policias','lotes'] },
+    bitacora:        { listas:['guardias','policias','lotes','relevos'] },
     dms:             { listas:['msgs'] },
     pases:           { listas:['dias','listaInvitados'], objetos:['log'] },
     solicitudesPase: { listas:['dias'], objetos:['log'] },
@@ -507,7 +509,7 @@ const Nube = {
   tanda: null,
 
   /* Colecciones nuevas: si al abrir la app las reglas todavía no las permitían, se reintenta. */
-  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen', 'morosos', 'guardiaAhora', 'guardiaLooks'],
+  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen', 'morosos', 'guardiaAhora', 'guardiaLooks', 'mantenimiento'],
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
       /* Bitácora y auditoría bajan solo lo reciente (ver js/historial.js). */
