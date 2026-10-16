@@ -108,11 +108,41 @@ document.addEventListener('change', e => {
   const r = e.target; if (!r || r.name !== 'cuando') return;
   const f = r.closest('form'), o = f && f.querySelector('.pn-otra'); if (o) o.hidden = r.value !== 'otra';
 });
+/* EL CARGO DEL POLICÍA (pedido de Claudio, 15-10-2026: "en sus datos
+   personales falta el cargo que tiene en la policía"). Las jerarquías de la
+   Policía de Tierra del Fuego, y "Otro" para escribirlo (por ejemplo, si
+   viene de Gendarmería o Prefectura). Va en su tarjeta, en la portada de la
+   garita, en el libro de guardia y en la constancia. */
+const CARGOS_POLICIA = ['Agente', 'Cabo', 'Cabo primero', 'Sargento', 'Sargento primero', 'Suboficial principal', 'Suboficial mayor',
+  'Oficial ayudante', 'Oficial subinspector', 'Oficial inspector', 'Oficial principal', 'Subcomisario', 'Comisario', 'Comisario inspector', 'Comisario mayor', 'Comisario general', 'Comandante'];
+function campoCargoPolicia(v = ''){
+  const otro = v && !CARGOS_POLICIA.includes(v);
+  return `<div class="field pn-cargo"><label>Cargo en la policía</label><select name="cargo" required>
+      <option value="">Elegí el cargo</option>${CARGOS_POLICIA.map(c => `<option ${c === v ? 'selected' : ''}>${c}</option>`).join('')}<option value="otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option></select>
+    <input name="cargoOtro" maxlength="30" autocomplete="off" placeholder="Escribí el cargo" value="${otro ? esc(v) : ''}" ${otro ? '' : 'hidden'} style="margin-top:6px"></div>`;
+}
+const cargoDelForm = d => String(d.cargo === 'otro' ? d.cargoOtro || '' : d.cargo || '').trim().slice(0, 30);
+document.addEventListener('change', e => {
+  const sel = e.target; if (!sel || sel.name !== 'cargo' || !sel.closest('.pn-cargo')) return;
+  const o = sel.closest('.pn-cargo').querySelector('[name=cargoOtro]'); if (!o) return;
+  o.hidden = sel.value !== 'otro'; o.required = sel.value === 'otro'; if (!o.hidden) o.focus();
+});
+/* "Sargento · Mat. 1234" (texto, sin escapar), con lo que haya. */
+const pnCargoMat = (p, fin = '', ini = '') => { const t = [p && p.cargo, p && p.matricula ? 'Mat. ' + p.matricula : ''].filter(Boolean).join(' · '); return t ? ini + t + fin : ''; };
+/* " (sargento, mat. 1234)" para los renglones del libro de guardia. */
+const pnParen = p => { const t = [p && p.cargo ? String(p.cargo).toLowerCase() : '', p && p.matricula ? 'mat. ' + p.matricula : ''].filter(Boolean).join(', '); return t ? ` (${t})` : ''; };
+function pnPonerCargo(f, v){
+  if (!f || !f.cargo) return;
+  const otro = v && !CARGOS_POLICIA.includes(v);
+  f.cargo.value = !v ? '' : otro ? 'otro' : v;
+  if (f.cargoOtro){ f.cargoOtro.hidden = !otro; f.cargoOtro.required = !!otro; f.cargoOtro.value = otro ? v : ''; }
+}
 /* Los que ya vinieron, para tocar y completar todo de una. */
 let pnConocidos = [];
 A['pn-elegir'] = el => {
   const p = pnConocidos[+el.dataset.i], f = el.closest('form'); if (!p || !f) return;
   ['nombre', 'matricula', 'tel', 'email'].forEach(k => { if (f[k]) f[k].value = p[k] || ''; });
+  pnPonerCargo(f, p.cargo || '');
   f.querySelectorAll('.pn-c.on').forEach(b => b.classList.remove('on')); el.classList.add('on');
   f.querySelector('.pn-datos')?.classList.add('lleno');
 };
@@ -124,7 +154,7 @@ function tarjetaPoliciaHtml(p, c){
     <div class="pn-t-cab"><span class="pn-escudo">${I('shield')}</span><div class="grow"><small>Barrio ${esc(Store.s.config.nombre)}</small><b>Policía nocturna</b></div><span class="pn-t-luz" aria-hidden="true"><i></i><i></i></span></div>
     <div class="pn-t-cuerpo">
       <div class="pn-t-datos"><b class="pn-t-nom">${esc(p.nombre)}</b>
-        ${p.matricula ? `<span>${I('user')}Mat. ${esc(p.matricula)}</span>` : ''}
+        ${p.cargo ? `<span>${I('shield')}${esc(p.cargo)}</span>` : ''}${p.matricula ? `<span>${I('user')}Mat. ${esc(p.matricula)}</span>` : ''}
         <span>${I('moon')}${esc(n.etiqueta)} · ${horarioNocheTxt(n)}</span>
         <span>${I('clock')}Ingresó ${hora(p.entra)} h</span>
         <div class="pn-t-cod"><small>Código de ronda</small><b>${c.id.slice(0, 3)} ${c.id.slice(3)}</b></div></div>
@@ -147,7 +177,7 @@ async function imagenTarjetaPolicia(p, c){
   x.fillStyle = '#fff'; x.font = `800 50px ${F}`; x.fillText('Policía nocturna', 168, 140);
   x.font = `800 54px ${F}`; x.fillText(p.nombre.length > 24 ? p.nombre.slice(0, 23) + '…' : p.nombre, 60, 258);
   x.font = `600 28px ${F}`; x.fillStyle = 'rgba(255,255,255,.88)';
-  let y = 306; [p.matricula ? 'Mat. ' + p.matricula : '', `${n.etiqueta} · ${horarioNocheTxt(n)}`, `Ingresó ${hora(p.entra)} h`].filter(Boolean).forEach(t => { x.fillText(t, 60, y); y += 42; });
+  let y = 306; [pnCargoMat(p), `${n.etiqueta} · ${horarioNocheTxt(n)}`, `Ingresó ${hora(p.entra)} h`].filter(Boolean).forEach(t => { x.fillText(t, 60, y); y += 42; });
   redondo(56, 440, 520, 128, 24); x.fillStyle = 'rgba(255,255,255,.12)'; x.fill();
   x.fillStyle = 'rgba(255,255,255,.8)'; x.font = `700 22px ${F}`; x.fillText('CÓDIGO DE RONDA', 84, 478);
   x.fillStyle = '#ffd54a'; x.font = `800 64px ui-monospace, Menlo, Consolas, monospace`; x.fillText(`${c.id.slice(0, 3)} ${c.id.slice(3)}`, 84, 548);
@@ -277,7 +307,9 @@ function guardiaAhoraDeseada(){
   const c = turnosConfig().find(x => x.nombre === t.turno) || {};
   /* 14-10: cada guardia con su horario (los horarios se superponen). */
   return { id:'ahora', abierto:true, turno:t.turno, desde:c.desde || '', hasta:c.hasta || '', inicio:t.at,
-    guardias: relevosDe(t).map(r => { const l = lookDe(r.n), h = horarioDe(r.h); return { n:r.n, ...(l ? { look:l } : {}), ...(h ? { h:r.h, desde:h.desde, hasta:h.hasta } : {}) }; }), policia: policiasAdentro(t).length ? 1 : 0, ...mant };
+    guardias: relevosDe(t).map(r => { const l = lookDe(r.n), h = horarioDe(r.h); return { n:r.n, ...(l ? { look:l } : {}), ...(h ? { h:r.h, desde:h.desde, hasta:h.hasta } : {}) }; }), policia: policiasAdentro(t).length ? 1 : 0, ...mant,
+    /* 15-10: la ronda del policía para los vecinos (sin nombres, con 10 min de demora: js/ronda-mapa.js). */
+    ...(typeof rondaPublica === 'function' && rondaPublica(t) ? { ronda:rondaPublica(t) } : {}) };
 }
 /* ¿Este equipo tiene el libro de guardia? Lo bajan las cuentas de la garita,
    la Administración (en cualquier modo, también "como vecino") y la supervisión.
@@ -342,6 +374,9 @@ function sincroGuardiaAhora(){
   Store.cambiar(s => { s.guardiaAhora = [{ ...d, at:ahora }]; });
 }
 Store.alCambiar(() => { clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 400); });
+/* La ronda de los vecinos va con 10 minutos de demora: cada minuto se mira
+   si ya corresponde mostrar un punto más (solo escribe si cambió algo). */
+setInterval(() => { try { sincroGuardiaAhora(); } catch(e){} }, 60000);
 
 /* En la portada: debajo del DEA, las caritas de quienes están de guardia. */
 function guardiaHero(){
@@ -369,6 +404,7 @@ A['guardia-ver'] = () => {
       <div class="grow"><b>Guardia · ${esc(g.turno)}</b><small>${g.desde && g.hasta ? `${esc(g.desde)} a ${esc(g.hasta)} h · ` : ''}desde las ${hora(g.inicio)} h</small></div><span class="pill p-ok">${I('check')}En la garita</span></div>
     <div class="ga-nombres">${g.guardias.map((x, i) => `<button type="button" class="ga-n" data-a="guardia-saluda" data-i="${i}" style="--c:${colorDe(x.n)}">${caraGuardia(x.n, x.look)}<span>${esc(x.n)}${x.desde ? `<small class="ga-h">${esc(x.h || '')} · ${esc(x.desde)} a ${esc(x.hasta)} h</small>` : ''}</span></button>`).join('')}</div>
     ${pol}
+    ${typeof rondaSeccionGuardia === 'function' ? rondaSeccionGuardia(g) : ''}
     <div class="btns" style="margin-top:12px">${c.garitaTel ? `<a class="btn btn-pri grow" href="${telLink(c.garitaTel)}">${I('phone')}Llamar a la garita</a>` : ''}
       ${!veGarita() && !esHotel() ? `<button class="btn btn-sec grow" data-a="abrir" data-v="privado" data-p="guardia">${I('chat')}Escribirle a la garita</button>` : ''}</div>
     <p class="muted tiny" style="margin:10px 2px 0">${I('lock')} Se ve solo el nombre de quienes están de guardia ahora, su horario, tal como lo anotó la garita, y cómo eligió aparecer cada uno. Cambia solo cuando entra o sale cada guardia.</p>`);

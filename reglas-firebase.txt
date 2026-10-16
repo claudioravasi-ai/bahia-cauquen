@@ -142,6 +142,15 @@ QUÉ HACEN, EN CASTELLANO
      garita y Administración. Los DNI, celulares y correos siguen solo en
      /staff/mantenimiento.
 
+8 sexies. LA RONDA DEL POLICÍA EN EL PLANO (15-10-2026). Los puntos de
+   control (/staff/puntos) suman su lugar en el plano y una foto chica. El
+   teléfono del policía baja una vez su guía (puntos, lugar y fotos) de
+   /ronda/guia/<clave larga al azar>, que va solo en el enlace de su
+   tarjeta: no se puede listar, la escriben la garita y la Administración,
+   y se borra con su salida. Los vecinos ven el recorrido y las rondas de la
+   noche dentro de /barrio/guardiaAhora (campo "ronda"), sin el nombre del
+   policía y con la ronda en curso 10 minutos atrasada.
+
 7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
    ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
    escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
@@ -589,11 +598,32 @@ PEGAR DESDE ACÁ
       "hotelLiqs":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* 15-10: los empleados del hotel con su credencial y su DNI. Los escribe solo el hotel; los leen el hotel y la garita. */
       "hotelEmpleados": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" }
+    },
+
+    /* 15-10: LA GUÍA DE LA RONDA para el teléfono del policía (sin cuenta):
+       los puntos en orden, su lugar en el plano y una foto chica de cada uno.
+       Vive en ronda/guia/<clave de 20 letras al azar> que va solo en el
+       enlace de su tarjeta. Nadie puede listar las guías (la carpeta no se
+       lee entera); cada una la lee solo quien tiene el enlace. La escriben y
+       la borran la garita y la Administración (se borra con su salida). */
+    "ronda": {
+      "guia": {
+        "$t": {
+          ".read": "$t.length >= 16",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+          ".validate": "!newData.exists() || ($t.length >= 16 && newData.hasChildren(['vence', 'pts']) && newData.child('vence').isNumber())"
+        }
+      }
     }
   }
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 15-10-2026, más tarde (hay que volver a publicar): LA RONDA EN EL
+  PLANO. Bloque nuevo: ronda/guia (ver el punto 8 sexies). Sin publicarlo,
+  todo anda igual, pero el teléfono del policía no recibe las fotos ni el
+  recorrido.
 
 ✔ NUEVO 15-10-2026 (hay que volver a publicar Y habilitar el acceso anónimo):
   MANTENIMIENTO EN VIVO. Bloques nuevos: barrio/mantVivo, staff/mantCodigos,

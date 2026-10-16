@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bahía Cauquén en escena</title>
+<meta name="description" content="Presentación interactiva de la app del Barrio Bahía Cauquén: cinco teléfonos a la vez (dos vecinos, la Administración, la garita y el hotel) más el policía de la ronda nocturna y el personal de mantenimiento, en tiempo real simulado.">
+<link rel="icon" href="icons/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* =========================================================
+   BAHÍA CAUQUÉN EN ESCENA (pedido de Claudio, 15-10-2026)
+   Demo aparte, que NO toca la app ni la base del barrio: todo es
+   simulado en esta página. Cinco teléfonos (Lucía, Martín, la
+   Administración, la garita y el hotel) y un sexto "invitado" que entra
+   cuando hace falta (el policía de la ronda, mantenimiento, una visita o
+   un proveedor). Cada rol tiene su color y las señales viajan de un
+   teléfono a otro como una chispa del mismo color.
+   ========================================================= */
+:root{
+  --bg:#060d1a; --bg-2:#0b1630; --panel:#0f1c36; --panel-2:#132447; --line:rgba(140,175,255,.16); --line-2:rgba(140,175,255,.28);
+  --ink:#eef3ff; --ink-2:#c3cfea; --muted:#8d9cc0;
+  --a:#14b8a6; --b:#8b5cf6; --c:#f59e0b; --d:#3b82f6; --e:#f43f5e;
+  --poli:#6366f1; --mant:#f97316; --visita:#22c55e; --prov:#eab308;
+  --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444;
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2.5px solid #9cc0ff;outline-offset:2px;border-radius:8px}
+h1,h2,h3,p{margin:0}
+.envol{max-width:1500px;margin:0 auto;padding:0 16px}
+
+/* ---------- fondo animado ---------- */
+.aurora{position:fixed;inset:-20vmax;z-index:-1;pointer-events:none;filter:blur(60px);opacity:.55;
+  background:radial-gradient(30vmax 30vmax at 15% 20%,rgba(20,184,166,.35),transparent 60%),radial-gradient(28vmax 28vmax at 85% 15%,rgba(139,92,246,.32),transparent 60%),
+  radial-gradient(30vmax 30vmax at 70% 85%,rgba(244,63,94,.22),transparent 60%),radial-gradient(26vmax 26vmax at 25% 85%,rgba(59,130,246,.3),transparent 60%);
+  animation:aurora 26s ease-in-out infinite alternate}
+@keyframes aurora{to{transform:rotate(12deg) scale(1.08) translate(2vmax,-1vmax)}}
+
+/* ---------- portada ---------- */
+.cabeza{position:relative;margin:16px 0 18px;border-radius:28px;overflow:hidden;border:1px solid var(--line-2);background:#081226}
+.cabeza-foto{position:absolute;inset:0;background:url("img/portada-dia.jpg") center 60%/cover no-repeat;opacity:.45}
+.cabeza::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,rgba(6,13,26,.96) 0%,rgba(6,13,26,.82) 48%,rgba(6,13,26,.25) 100%)}
+.cabeza-in{position:relative;z-index:1;padding:28px 26px 24px;display:grid;gap:14px;max-width:820px}
+.marca{display:flex;align-items:center;gap:12px}
+.marca img{width:54px;height:54px;border-radius:50%;background:#fff;object-fit:cover;box-shadow:0 0 0 3px rgba(255,255,255,.2)}
+.marca b{display:block;font-size:15px;font-weight:800}
+.marca small{display:block;font-size:12.5px;color:var(--ink-2)}
+.vivo-pill{justify-self:start;display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:6px 12px;border-radius:999px;background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.45);color:#ffb4b4}
+.vivo-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:#ef4444;animation:latido 1.4s infinite}
+@keyframes latido{0%{box-shadow:0 0 0 0 rgba(239,68,68,.7)}70%{box-shadow:0 0 0 9px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+.cabeza h1{font-size:clamp(30px,5.2vw,56px);font-weight:800;line-height:1.02;letter-spacing:-.03em}
+.cabeza h1 span{background:linear-gradient(90deg,var(--a),var(--b) 30%,var(--c) 55%,var(--d) 75%,var(--e));-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% 100%;animation:brillo 8s linear infinite}
+@keyframes brillo{to{background-position:200% 0}}
+.cabeza p{font-size:16.5px;max-width:62ch;color:var(--ink-2)}
+.elenco{display:flex;flex-wrap:wrap;gap:8px}
+.elenco span{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;padding:6px 11px 6px 7px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.elenco i{width:18px;height:18px;border-radius:50%;background:var(--c);display:grid;place-items:center;font-style:normal;font-size:10px}
+
+/* ---------- público y escenas ---------- */
+.publico{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;align-items:center}
+.publico b{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.pub{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:14px;font-weight:800;font-size:14px;background:var(--panel);border:1px solid var(--line);transition:transform .15s,background .2s,border-color .2s}
+.pub:hover{transform:translateY(-1px)}
+.pub[aria-pressed="true"]{background:color-mix(in srgb,var(--c) 22%,var(--panel));border-color:var(--c);box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 18%,transparent)}
+.pub .n{font-size:11px;font-weight:800;padding:1px 7px;border-radius:99px;background:rgba(255,255,255,.1)}
+.carril{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.esc-btn{flex:none;scroll-snap-align:start;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 9px;align-items:center;text-align:left;width:236px;padding:10px 12px;border-radius:16px;background:var(--panel);border:1px solid var(--line);transition:border-color .2s,transform .15s}
+.esc-btn:hover{transform:translateY(-1px);border-color:var(--line-2)}
+.esc-btn .e{grid-row:1/3;font-size:22px;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.06)}
+.esc-btn b{font-size:13.5px;line-height:1.25}
+.esc-btn small{font-size:11.5px;color:var(--muted);line-height:1.25;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.esc-btn small i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.esc-btn.on{border-color:#9cc0ff;background:linear-gradient(135deg,rgba(59,130,246,.22),rgba(139,92,246,.18));box-shadow:0 8px 24px rgba(59,130,246,.18)}
+.esc-btn.hecha .e::after{content:"✓";position:absolute;transform:translate(15px,-14px);font-size:11px;background:var(--ok);color:#04130a;border-radius:50%;width:16px;height:16px;display:grid;place-items:center;font-weight:800}
+.esc-btn .e{position:relative}
+
+/* ---------- el escenario ---------- */
+.escenario{position:relative;border-radius:28px;padding:16px 14px 18px;background:linear-gradient(180deg,rgba(15,28,54,.85),rgba(8,16,34,.92));border:1px solid var(--line-2);box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.esc-cab{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;justify-content:space-between;margin:2px 4px 14px}
+.esc-cab h2{font-size:clamp(20px,2.6vw,30px);font-weight:800;letter-spacing:-.02em;display:flex;gap:10px;align-items:center}
+.esc-cab p{color:var(--ink-2);font-size:14.5px;max-width:70ch}
+.controles{display:flex;gap:8px;flex-wrap:wrap}
+.ctl{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border-radius:12px;font-weight:800;font-size:13.5px;background:var(--panel-2);border:1px solid var(--line-2)}
+.ctl:disabled{opacity:.35;cursor:default}
+.ctl.pri{background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-color:transparent;color:#fff}
+.ctl[aria-pressed="true"]{background:#ffd54a;color:#2a1d00;border-color:#ffd54a}
+.mesa{position:relative;display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:14px;align-items:start}
+.slot{display:grid;justify-items:center;gap:8px;min-width:0;transition:opacity .4s,filter .4s}
+.slot[hidden]{display:none}
+.rol{display:flex;align-items:center;gap:8px;max-width:100%;padding:5px 11px 5px 6px;border-radius:999px;font-size:12.5px;font-weight:800;background:rgba(255,255,255,.05);border:1px solid var(--line);transition:background .3s,border-color .3s}
+.rol i{flex:none;width:20px;height:20px;border-radius:50%;background:var(--k);display:grid;place-items:center;font-style:normal;font-size:11px}
+.rol span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rol{min-width:0}
+.slot.toca .rol{max-width:100%}
+.rol small{font-weight:600;color:var(--muted)}
+.slot.toca .rol{background:color-mix(in srgb,var(--k) 25%,transparent);border-color:var(--k);box-shadow:0 0 18px color-mix(in srgb,var(--k) 45%,transparent)}
+.slot.toca .rol::after{flex:none;content:"Le toca";font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;background:var(--k);color:#06101f}
+.slot.quieto{opacity:.78}
+.marco{position:relative;width:100%}
+.tel{position:absolute;top:0;left:0;width:240px;height:500px;transform-origin:0 0;border-radius:36px;background:#0a0f18;padding:8px;box-shadow:0 20px 50px rgba(0,0,0,.55),inset 0 0 0 2px #1f2a3d}
+.slot.toca .tel{box-shadow:0 0 0 2px var(--k),0 0 40px color-mix(in srgb,var(--k) 55%,transparent),0 20px 50px rgba(0,0,0,.55)}
+.slot.llega .tel{animation:sacude .5s}
+@keyframes sacude{25%{transform:scale(var(--s)) rotate(-1.4deg)}75%{transform:scale(var(--s)) rotate(1.4deg)}}
+.pant{position:relative;height:100%;border-radius:29px;overflow:hidden;background:#f3f6fb;color:#13203a;display:flex;flex-direction:column}
+.isla{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:72px;height:20px;border-radius:12px;background:#000;z-index:6}
+.estado{flex:none;display:flex;justify-content:space-between;padding:9px 20px 3px;font:700 10.5px var(--mono);color:#13203a}
+.app{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;position:relative}
+.app::-webkit-scrollbar{display:none}
+.pushes{position:absolute;top:30px;left:7px;right:7px;z-index:8;display:grid;gap:5px;pointer-events:none}
+.push{display:flex;gap:8px;align-items:flex-start;padding:8px 9px;border-radius:15px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 26px rgba(0,0,0,.22);border:1px solid rgba(0,0,0,.06);animation:baja .45s cubic-bezier(.2,.9,.3,1.2) both}
+.push.sale{animation:sube .35s ease-in both}
+.push .pi{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px;background:var(--k);color:#fff}
+.push b{display:block;font-size:11px;line-height:1.25}
+.push span{display:block;font-size:10px;color:#4b5a78;line-height:1.25}
+.push small{display:block;font-size:8.5px;color:#7a88a6;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+@keyframes baja{from{transform:translateY(-120%);opacity:0}}
+@keyframes sube{to{transform:translateY(-120%);opacity:0}}
+
+/* ---------- la app dentro del teléfono ---------- */
+.bar{display:flex;align-items:center;gap:7px;padding:6px 10px 8px;color:#fff;background:linear-gradient(135deg,var(--k),color-mix(in srgb,var(--k) 60%,#0b1630))}
+.bar .av{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:11px;background:rgba(255,255,255,.25)}
+.bar b{display:block;font-size:12px;line-height:1.2}
+.bar small{display:block;font-size:9.5px;opacity:.85;line-height:1.2}
+.bar .g{flex:1;min-width:0}
+.bar .sos{font-size:9px;font-weight:800;padding:3px 7px;border-radius:99px;background:#ef4444}
+.ap{padding:8px 9px 14px;display:grid;gap:7px;font-size:11px;line-height:1.35}
+.hola{padding:2px 2px 0}
+.hola small{display:block;font-size:9.5px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.hola b{display:block;font-size:15px;letter-spacing:-.02em}
+.card{background:#fff;border-radius:13px;padding:8px 9px;box-shadow:0 1px 2px rgba(15,30,60,.06),0 6px 16px rgba(15,30,60,.05);border:1px solid #e6ecf5}
+.card h4{margin:0 0 5px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#64748b}
+.it{display:flex;gap:7px;align-items:center;padding:4px 0}
+.it+.it{border-top:1px solid #eef2f8}
+.it .e{flex:none;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;background:#f1f5fb;font-size:12px}
+.it .x{flex:1;min-width:0}
+.it .x b{display:block;font-size:11px;line-height:1.25}
+.it .x span{display:block;font-size:9.5px;color:#64748b;line-height:1.25}
+.pill{flex:none;font-size:8.5px;font-weight:800;padding:2px 6px;border-radius:99px;background:#eef2f8;color:#334155}
+.pill.ok{background:#dcfce7;color:#166534}.pill.warn{background:#fef3c7;color:#92400e}.pill.mal{background:#fee2e2;color:#991b1b}.pill.info{background:#dbeafe;color:#1e40af}
+.aviso{display:flex;gap:7px;padding:8px 9px;border-radius:12px;font-size:10.5px;line-height:1.3}
+.aviso .e{flex:none;font-size:15px}
+.aviso b{display:block;font-size:11px}
+.aviso.ok{background:#dcfce7;color:#14532d}.aviso.warn{background:#fef3c7;color:#713f12}.aviso.mal{background:#fee2e2;color:#7f1d1d}.aviso.info{background:#e0ecff;color:#1e3a8a}
+.aviso.alarma{background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff;animation:alarma 1s infinite}
+@keyframes alarma{50%{box-shadow:0 0 0 4px rgba(239,68,68,.35)}}
+.campo{display:grid;gap:2px}
+.campo small{font-size:9px;color:#64748b;font-weight:700}
+.campo span{padding:6px 8px;border-radius:9px;background:#f4f7fc;border:1px solid #e2e8f2;font-size:11px;font-weight:600}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tres{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.teja{display:grid;justify-items:center;gap:3px;padding:8px 4px;border-radius:12px;background:#fff;border:1px solid #e6ecf5;font-size:9.5px;font-weight:700;text-align:center}
+.teja .e{font-size:16px}
+.btn-go{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px 10px;border-radius:13px;font-weight:800;font-size:12px;color:#fff;background:linear-gradient(135deg,var(--k),color-mix(in srgb,var(--k) 65%,#000));box-shadow:0 6px 16px color-mix(in srgb,var(--k) 40%,transparent)}
+.btn-go.sec{background:#fff;color:#13203a;border:1.5px solid #d6deea;box-shadow:none}
+.btn-go.rojo{background:linear-gradient(135deg,#ef4444,#991b1b)}
+.slot.toca .btn-go[data-go]{animation:pulso 1.6s infinite}
+.slot.toca .btn-go[data-go]::after{content:"👆";position:absolute;right:8px;bottom:-12px;font-size:20px;animation:dedo 1.6s infinite;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+@keyframes pulso{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--k) 70%,transparent)}70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes dedo{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.qr{width:96px;height:96px;margin:2px auto;padding:6px;background:#fff;border-radius:10px;border:1px solid #e2e8f2}
+.qr svg{width:100%;height:100%;display:block}
+.codigo{font:700 20px var(--mono);letter-spacing:.12em;text-align:center}
+.centro{text-align:center}
+.muted{color:#64748b}
+.grande{font-size:30px;text-align:center}
+.sosb{width:96px;height:96px;margin:6px auto;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:18px;color:#fff;background:radial-gradient(circle at 35% 30%,#ff7b7b,#dc2626 60%,#7f1d1d);box-shadow:0 0 0 8px rgba(239,68,68,.18),0 10px 26px rgba(220,38,38,.45)}
+.mapa{border-radius:12px;overflow:hidden;background:#0a2236}
+.mapa svg{display:block;width:100%;height:auto}
+.anillos{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.anillo{display:grid;justify-items:center;gap:1px;padding:6px 2px;border-radius:11px;background:#fff;border:1px solid #e6ecf5;font-size:9px;text-align:center}
+.anillo i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:10px;background:radial-gradient(closest-side,#fff 74%,transparent 76%),conic-gradient(#22c55e calc(var(--p)*360deg),#e2e8f0 0)}
+.anillo.ok i{background:linear-gradient(135deg,#22c55e,#15803d);color:#fff}
+.anillo b{font-size:9.5px}
+.caritas{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:rgba(255,255,255,.9);border:1px solid #e6ecf5}
+.caritas .c{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;margin-left:-8px;border:2px solid #fff;background:#dbeafe}
+.caritas .c:first-child{margin-left:0}
+.capsula{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:99px;background:#0b1630;color:#fff;font-size:10px;position:relative;overflow:hidden}
+.capsula::before{content:"";position:absolute;inset:0;border-radius:99px;padding:1.5px;background:conic-gradient(from var(--ang,0deg),#f97316,#22c55e,#3b82f6,#f97316);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:giro 3s linear infinite}
+@property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes giro{to{--ang:360deg}}
+.foto{height:64px;border-radius:10px;background:linear-gradient(135deg,#7c9a6d,#3d5a4a);position:relative;overflow:hidden}
+.foto::after{content:"";position:absolute;left:46%;top:8px;width:7px;height:52px;border-radius:3px;background:#cbd5e1;box-shadow:0 0 0 2px rgba(0,0,0,.08)}
+.foto::before{content:"QR";position:absolute;left:calc(46% - 9px);top:18px;width:25px;height:16px;background:#fff;color:#111;font:800 8px var(--mono);display:grid;place-items:center;z-index:1;border-radius:2px}
+.vuelo{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;font:700 12px var(--mono)}
+.vuelo span{background:#0b1630;color:#ffd54a;border-radius:3px;text-align:center;padding:3px 0;animation:paleta .6s both}
+@keyframes paleta{from{transform:rotateX(90deg)}}
+
+/* ---------- la chispa que viaja ---------- */
+.chispa{position:fixed;z-index:50;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;pointer-events:none;background:var(--k);box-shadow:0 0 0 4px color-mix(in srgb,var(--k) 30%,transparent),0 0 24px 6px var(--k)}
+.estela{position:fixed;z-index:49;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;pointer-events:none;background:var(--k);opacity:.6}
+
+/* ---------- narrador ---------- */
+.narra{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);gap:14px;margin-top:16px}
+.guion{padding:14px 16px;border-radius:20px;background:var(--panel);border:1px solid var(--line-2)}
+.guion .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;font-size:12px;font-weight:800;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.guion .quien{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border-radius:99px;background:color-mix(in srgb,var(--k) 22%,transparent);color:var(--ink);border:1px solid var(--k);text-transform:none;letter-spacing:0}
+.guion .quien i{width:18px;height:18px;border-radius:50%;background:var(--k);display:grid;place-items:center;font-style:normal;font-size:10px}
+.guion p{font-size:16.5px;line-height:1.5}
+.guion p b{color:#fff;background:linear-gradient(transparent 62%,color-mix(in srgb,var(--k) 45%,transparent) 0)}
+.puntos{display:flex;gap:6px;margin-top:12px}
+.puntos i{flex:1;height:5px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden;position:relative}
+.puntos i.ya{background:var(--k)}
+.puntos i.ahora::after{content:"";position:absolute;inset:0;background:var(--k);animation:carga 1.4s ease-in-out infinite alternate}
+@keyframes carga{from{transform:translateX(-100%)}}
+.fin{margin-top:12px;padding:12px 14px;border-radius:16px;background:linear-gradient(135deg,rgba(34,197,94,.18),rgba(59,130,246,.14));border:1px solid rgba(34,197,94,.45);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.fin p{flex:1;min-width:200px;font-size:14.5px}
+.feed{padding:12px 14px;border-radius:20px;background:var(--panel);border:1px solid var(--line-2);max-height:260px;overflow:auto}
+.feed h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.feed ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.feed li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--ink-2);animation:entra .4s both}
+.feed li i{flex:none;width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--k);box-shadow:0 0 8px var(--k)}
+.feed li b{color:var(--ink)}
+.feed .vacio{color:var(--muted);font-size:12.5px}
+@keyframes entra{from{opacity:0;transform:translateX(-6px)}}
+
+/* ---------- pestañas del celular ---------- */
+.pestanas{display:none;gap:6px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none}
+.pest{flex:none;display:inline-flex;align-items:center;gap:6px;padding:7px 11px 7px 7px;border-radius:99px;font-size:12.5px;font-weight:800;background:rgba(255,255,255,.05);border:1px solid var(--line);position:relative}
+.pest i{width:18px;height:18px;border-radius:50%;background:var(--k);display:grid;place-items:center;font-style:normal;font-size:10px}
+.pest[aria-selected="true"]{background:color-mix(in srgb,var(--k) 25%,transparent);border-color:var(--k)}
+.pest.toca::after{content:"";position:absolute;top:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:#ffd54a;box-shadow:0 0 0 0 #ffd54a;animation:latido 1.4s infinite}
+.pest.nuevo::before{content:"";position:absolute;top:-2px;left:-2px;width:9px;height:9px;border-radius:50%;background:#ef4444}
+
+/* ---------- quién ve qué ---------- */
+.quien-ve{margin:26px 0 10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.qv{padding:14px;border-radius:18px;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--k)}
+.qv b{display:flex;gap:8px;align-items:center;font-size:14.5px;margin-bottom:4px}
+.qv b i{width:22px;height:22px;border-radius:50%;background:var(--k);display:grid;place-items:center;font-style:normal;font-size:12px}
+.qv p{font-size:13px;color:var(--ink-2)}
+.tit-sec{font-size:clamp(20px,2.4vw,26px);font-weight:800;margin:28px 4px 4px}
+.pie{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;margin:20px 0 34px;padding:16px;border-radius:20px;background:var(--panel);border:1px solid var(--line)}
+.pie p{font-size:12.5px;color:var(--muted);max-width:80ch}
+.wa{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:#22c55e;color:#04130a;font-weight:800;text-decoration:none}
+
+/* ---------- tamaños ---------- */
+@media (max-width:1180px){ .mesa{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:900px){ .narra{grid-template-columns:1fr} }
+@media (max-width:760px){
+  .pestanas{display:flex}
+  .mesa{grid-template-columns:minmax(0,1fr)!important}
+  .slot{display:none}
+  .slot.visible{display:grid}
+  .slot.visible[hidden]{display:none}
+  .cabeza-in{padding:22px 18px}
+  .escenario{padding:12px 10px 14px;border-radius:22px}
+  .controles{width:100%}
+  .controles .ctl{flex:1 1 auto;justify-content:center}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
+  .chispa,.estela{display:none}
+}
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+<div class="envol">
+  <header class="cabeza">
+    <div class="cabeza-foto" aria-hidden="true"></div>
+    <div class="cabeza-in">
+      <div class="marca"><img src="icons/logo.png" alt=""><div><b>Barrio Bahía Cauquén</b><small>Ushuaia · Tierra del Fuego</small></div></div>
+      <span class="vivo-pill">En escena · simulación en tiempo real</span>
+      <h1>Una sola app, <span>cinco teléfonos a la vez</span></h1>
+      <p>Dos vecinos, la Administración, la garita y el hotel, más el policía de la ronda nocturna y el personal de mantenimiento. Elegí para quién es la presentación, tocá el botón que late en el teléfono al que le toca y mirá cómo viaja cada aviso de un teléfono a otro.</p>
+      <div class="elenco" id="elenco"></div>
+    </div>
+  </header>
+
+  <div class="publico" role="toolbar" aria-label="Para quién es la presentación"><b>Para</b><span id="publico"></span></div>
+  <div class="carril" id="carril" role="list" aria-label="Situaciones"></div>
+
+  <section class="escenario" aria-label="El escenario con los teléfonos">
+    <div class="esc-cab">
+      <div><h2 id="escTit"></h2><p id="escSub"></p></div>
+      <div class="controles">
+        <button class="ctl" id="atras" aria-label="Paso anterior">◀ Atrás</button>
+        <button class="ctl pri" id="adelante">Siguiente ▶</button>
+        <button class="ctl" id="auto" aria-pressed="false">▶ Automático</button>
+        <button class="ctl" id="reiniciar">⟲ De nuevo</button>
+      </div>
+    </div>
+    <div class="pestanas" id="pestanas" role="tablist" aria-label="Teléfonos"></div>
+    <div class="mesa" id="mesa"></div>
+    <div class="narra">
+      <div class="guion" id="guion" aria-live="polite"></div>
+      <div class="feed"><h3>Lo que viajó entre teléfonos</h3><ol id="feed"><li class="vacio">Acá aparece cada aviso que va de un teléfono a otro.</li></ol></div>
+    </div>
+  </section>
+
+  <h2 class="tit-sec">Quién ve qué</h2>
+  <div class="quien-ve" id="quienVe"></div>
+
+  <div class="pie">
+    <p>Es una simulación: los nombres, lotes, teléfonos, vuelos y montos son inventados y esta página no se conecta con la app ni con la base del barrio. En la app real cada persona ve solo lo que le corresponde (Ley 25.326). Atajos: ← y → para pasar de paso, A para el modo automático.</p>
+    <a class="wa" href="https://wa.me/5492901494953?text=Hola%20Claudio%2C%20vi%20la%20presentaci%C3%B3n%20de%20la%20app%20del%20barrio%20y%20te%20quer%C3%ADa%20comentar%3A%20" target="_blank" rel="noopener">💬 Escribirle a Claudio</a>
+  </div>
+</div>
+
+<script>
+(function(){
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const angosto = () => matchMedia('(max-width:760px)').matches;
+
+/* ---------- el elenco ---------- */
+const TEL = {
+  a:{ n:'Lucía', s:'Vecina · Lote 42', k:'var(--a)', ic:'🏡' },
+  b:{ n:'Martín', s:'Vecino · Lote 23 · médico', k:'var(--b)', ic:'🩺' },
+  c:{ n:'Administración', s:'Del barrio', k:'var(--c)', ic:'🗂️' },
+  d:{ n:'Garita', s:'Guardia', k:'var(--d)', ic:'🛡️' },
+  e:{ n:'Hotel', s:'Los Cauquenes', k:'var(--e)', ic:'🏨' },
+};
+const INV = {
+  poli:{ n:'Policía', s:'Sargento Gómez · ronda nocturna', k:'var(--poli)', ic:'👮' },
+  mant:{ n:'Mantenimiento', s:'Raúl · espacios comunes', k:'var(--mant)', ic:'🦺' },
+  visita:{ n:'Visita', s:'Marcos · sin la app', k:'var(--visita)', ic:'🙋' },
+  prov:{ n:'Proveedor', s:'Electricista', k:'var(--prov)', ic:'🔌' },
+};
+const PUBLICOS = [
+  ['todo', 'Todo', '✨'], ['vecinos', 'Vecinos', '🏡'], ['admin', 'Administración', '🗂️'], ['garita', 'Garita y ronda', '🛡️'], ['hotel', 'Hotel', '🏨'], ['mant', 'Mantenimiento', '🦺'],
+];
+
+/* ---------- piezas de pantalla ---------- */
+const bar = (l, sub = '', o = {}) => { const t = TEL[l] || INV[l] || {}; return `<div class="bar"><span class="av">${o.av || esc((t.n || '?')[0])}</span><div class="g"><b>${esc(o.t || (l === 'a' || l === 'b' ? 'Bahía Cauquén' : t.n))}</b><small>${esc(sub || t.s)}</small></div>${l === 'a' || l === 'b' ? '<span class="sos">SOS</span>' : ''}</div>`; };
+const ap = (...x) => `<div class="ap">${x.join('')}</div>`;
+const hola = (s, t) => `<div class="hola"><small>${esc(s)}</small><b>${t}</b></div>`;
+const card = (h, ...x) => `<div class="card">${h ? `<h4>${h}</h4>` : ''}${x.join('')}</div>`;
+const it = (e, b, s = '', pill = '', cl = '') => `<div class="it"><span class="e">${e}</span><div class="x"><b>${b}</b>${s ? `<span>${s}</span>` : ''}</div>${pill ? `<span class="pill ${cl}">${pill}</span>` : ''}</div>`;
+const av = (cl, e, b, s = '') => `<div class="aviso ${cl}"><span class="e">${e}</span><div><b>${b}</b>${s}</div></div>`;
+const campo = (l, v) => `<div class="campo"><small>${l}</small><span>${v}</span></div>`;
+const dos = (...x) => `<div class="dos">${x.join('')}</div>`;
+const tejas = (...x) => `<div class="tres">${x.map(([e, t]) => `<div class="teja"><span class="e">${e}</span>${t}</div>`).join('')}</div>`;
+const sec = t => `<button class="btn-go sec" tabindex="-1">${t}</button>`;
+function qr(seed = 'BHC'){
+  let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  let s = ''; for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++){ h = (h * 1103515245 + 12345) >>> 0;
+    const esq = (x < 7 && y < 7) || (x > 13 && y < 7) || (x < 7 && y > 13);
+    const on = esq ? (x % 6 === 0 || y % 6 === 0 || (x % 6 > 1 && x % 6 < 5 && y % 6 > 1 && y % 6 < 5) || x === 20 || y === 20 || x === 14 || y === 14) : (h >> 16) & 1;
+    if (on) s += `<rect x="${x}" y="${y}" width="1" height="1"/>`; }
+  return `<div class="qr"><svg viewBox="0 0 21 21" shape-rendering="crispEdges" fill="#0b1630">${s}</svg></div>`;
+}
+/* El plano chico del barrio: calles, lotes, la garita, el recorrido de la ronda y las gotas de mantenimiento. */
+const RUTA = [[124,22],[44,34],[20,70],[86,74],[160,112],[226,96]];
+const CAMINO = 'M124,22 L124,34 L44,34 L20,46 L20,70 L40,80 L86,74 L112,74 L112,100 L160,112 L226,112 L226,96';
+function mapa({ pasados = 0, ruta = true, sim = false, poli = false, gotas = [], lotes = [], editar = false, garita = true } = {}){
+  const calles = ['M10,34 L230,34', 'M20,34 L20,80 L112,74', 'M112,22 L112,112', 'M112,74 L226,74', 'M60,112 L230,112', 'M226,34 L226,112', 'M150,74 L190,92 L226,92'];
+  let lts = ''; [[14,40,26],[24,10,212],[118,10,100],[120,82,96],[66,118,154],[28,86,78]].forEach(([y, x0, w], i) => { for (let x = x0; x < x0 + w; x += 12) lts += `<rect x="${x}" y="${y}" width="9" height="7" rx="1.5" fill="${lotes.includes(i * 100 + x) ? '#22c55e' : '#1d4060'}"/>`; });
+  const tot = RUTA.length, hechos = Math.min(pasados, tot);
+  const pins = ruta ? RUTA.map(([x, y], i) => { const ok = i < hechos, prox = !editar && i === hechos && pasados > 0;
+    return `${prox ? `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="#7aa2ff" stroke-width="1.5"><animate attributeName="r" from="6" to="13" dur="1.4s" repeatCount="indefinite"/><animate attributeName="opacity" from="1" to="0" dur="1.4s" repeatCount="indefinite"/></circle>` : ''}
+      <circle cx="${x}" cy="${y}" r="6.5" fill="${ok ? '#16a34a' : editar ? '#f59e0b' : '#2348d8'}" stroke="#fff" stroke-width="1.6"/><text x="${x}" y="${y + 2.8}" font-size="7.5" font-weight="800" fill="#fff" text-anchor="middle" font-family="Manrope,sans-serif">${ok ? '✓' : i + 1}</text>`; }).join('') : '';
+  const frac = tot > 1 ? Math.max(0, hechos - 1) / (tot - 1) : 0;
+  const linea = ruta ? `<path d="${CAMINO}" fill="none" stroke="#5b8cff" stroke-width="2.6" stroke-dasharray="5 4" stroke-linecap="round" stroke-linejoin="round" opacity=".9">${quieto ? '' : '<animate attributeName="stroke-dashoffset" from="0" to="-18" dur="1.2s" repeatCount="indefinite"/>'}</path>
+    ${hechos > 1 ? `<path d="${CAMINO}" pathLength="1" fill="none" stroke="#22c55e" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${frac.toFixed(3)} 1"/>` : ''}
+    ${sim ? `<path d="${CAMINO}" pathLength="1" fill="none" stroke="#ffe066" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 1" stroke-dashoffset="1">${quieto ? '' : '<animate attributeName="stroke-dashoffset" from="1" to="0" dur="5s" repeatCount="indefinite"/>'}</path>
+      <circle r="4.5" fill="#0b1630" stroke="#ffe066" stroke-width="1.6">${quieto ? '' : `<animateMotion dur="5s" repeatCount="indefinite" path="${CAMINO}"/>`}</circle>` : ''}` : '';
+  const pol = poli && hechos ? (([x, y]) => `<g><circle cx="${x}" cy="${y}" r="10" fill="rgba(99,102,241,.25)" stroke="#6366f1"><animate attributeName="stroke" values="#3d7bff;#ff3b4e;#3d7bff" dur="1s" repeatCount="indefinite"/></circle><text x="${x}" y="${y - 12}" font-size="10" text-anchor="middle">🚓</text></g>`)(RUTA[hechos - 1]) : '';
+  const got = gotas.map(([x, y, e, ok]) => `<g><path d="M${x} ${y} C${x - 2} ${y - 3} ${x - 6} ${y - 5} ${x - 6} ${y - 9} a6 6 0 1 1 12 0 C${x + 6} ${y - 5} ${x + 2} ${y - 3} ${x} ${y}Z" fill="${ok ? '#16a34a' : '#f97316'}" stroke="#fff" stroke-width="1"/><text x="${x}" y="${y - 6.5}" font-size="6.5" text-anchor="middle">${e}</text></g>`).join('');
+  return `<div class="mapa"><svg viewBox="0 0 240 140" role="img" aria-label="Plano del barrio">
+    <rect width="240" height="140" fill="#0b1f2e"/><path d="M0,124 Q60,116 120,128 T240,122 L240,140 L0,140Z" fill="#0f5c8f"/>
+    ${calles.map(d => `<path d="${d}" fill="none" stroke="#2f5871" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`).join('')}${lts}
+    ${garita ? `<circle cx="124" cy="22" r="5" fill="#2fe08a" stroke="#fff" stroke-width="1.4"/><text x="132" y="15" font-size="7" font-weight="800" fill="#2fe08a" font-family="Manrope,sans-serif">GARITA</text>` : ''}
+    ${linea}${pins}${pol}${got}</svg></div>`;
+}
+const anillos = (ok, curso = -1, total = 6) => `<div class="anillos">${[0, 1, 2].map(i => i < ok ? `<div class="anillo ok"><i>✓</i><b>Ronda ${i + 1}</b>completa</div>` : i === ok && curso >= 0 ? `<div class="anillo" style="--p:${(curso / total).toFixed(2)}"><i>${curso}/${total}</i><b>Ronda ${i + 1}</b>en curso</div>` : `<div class="anillo" style="--p:0"><i>${i + 1}</i><b>Ronda ${i + 1}</b>pendiente</div>`).join('')}</div>`;
+const caritas = (pol = false) => `<div class="caritas"><span class="c">👨🏻</span><span class="c">👩🏽</span>${pol ? '<span class="c" style="background:#e0e7ff">👮</span>' : ''}<span style="font-size:10px"><b>De guardia${pol ? ' + policía' : ''}</b> · Juan y Ana</span></div>`;
+
+/* Pantallas de base de cada teléfono. */
+const BASE = {
+  a: () => bar('a', 'Lucía · Lote 42') + ap(hola('Buen día,', 'Lucía'), caritas(), tejas(['🔳', 'Autorizar visita'], ['🏠', 'Tu casa'], ['💳', 'Expensas']), card('La pizarra de hoy', it('🚛', 'Hoy pasa el camión', 'Residuos · 8 h'), it('☀️', 'Ushuaia', '6° · viento sur'))),
+  b: () => bar('b', 'Martín · Lote 23') + ap(hola('Buen día,', 'Martín'), caritas(), tejas(['🔳', 'Autorizar visita'], ['🗳️', 'Votaciones'], ['📌', 'Pizarrón']), card('Para vos', it('🩺', 'Equipo de salud', 'Te avisan si piden el DEA', 'Activo', 'ok'))),
+  c: () => bar('c', 'Día a día') + ap(hola('Administración', '152 lotes · 138 con la app'), tejas(['📥', 'Inscripciones'], ['💳', 'Expensas'], ['🛡️', 'Garita en vivo']), card('Para resolver', it('💡', '2 reclamos', 'Luminaria · cerco'), it('🧾', '3 comprobantes', 'Para confirmar'))),
+  d: () => bar('d', 'Turno mañana · Juan y Ana') + ap(card('Validar un ingreso', dos(campo('Código, patente o DNI', '______'), campo('', '📷 Escanear'))), card('Lo programado para hoy', it('🧹', 'Personal de Lote 42', '9 a 13 h', 'Hoy', 'info'), it('🚛', 'Camión de residuos', 'Martes y viernes'))),
+  e: () => bar('e', 'Hotel Los Cauquenes') + ap(hola('El hotel en vivo', '18 huéspedes · 2 vans'), tejas(['✈️', 'Vuelos'], ['🚐', 'Traslados'], ['🪪', 'Empleados']), card('Hoy', it('🚐', 'Van 1', 'Aeropuerto 19:10', 'Programada', 'info'))),
+  poli: () => bar('poli', 'Ronda nocturna', { av:'👮' }) + ap(av('info', '🔒', 'Esperando el enlace de la garita', 'Con su tarjeta el teléfono queda listo para la ronda.')),
+  mant: () => bar('mant', 'Brazo de mantenimiento', { av:'🦺' }) + ap(av('info', '🔒', 'Esperando el enlace de la garita', 'Al marcar su entrada le llega por WhatsApp.')),
+  visita: () => bar('visita', 'WhatsApp', { av:'💬' }) + ap(card('Chats', it('💬', 'Lucía', 'Te mando el pase'))),
+  prov: () => bar('prov', 'WhatsApp', { av:'💬' }) + ap(card('Chats', it('💬', 'Lucía', 'Te espero a las 9'))),
+};
+
+/* =========================================================
+   LAS SITUACIONES
+   Cada paso: l = teléfono al que le toca, txt = lo que se cuenta,
+   b = el botón que late, s = pantallas que cambian, al = avisos que
+   viajan [de, para, ícono, título, detalle], h = hora.
+   ========================================================= */
+const ESC = [
+/* ---------------- VECINOS ---------------- */
+{ id:'visita', p:['vecinos', 'garita'], e:'🔳', t:'Una visita con QR', s:'Lucía crea el pase, la visita lo recibe por WhatsApp y la garita lo valida', inv:'visita', h:'16:10', pasos:[
+  { l:'a', txt:'Lucía espera a Marcos. En la portada toca <b>Autorizar visita</b>, carga quién viene y para qué día.', b:'Crear el pase',
+    s:{ a:() => bar('a', 'Autorizar una visita') + ap(campo('Quién viene', 'Marcos Ruiz'), dos(campo('Día', 'Hoy'), campo('Horario', '16 a 20 h')), campo('Motivo', 'Visita'), campo('Patente (opcional)', 'AF 512 KD')) } },
+  { l:'a', txt:'Sale un <b>código y un QR</b> que valen solo hoy y en ese horario. Lucía toca <b>Compartir por WhatsApp</b>.', b:'Compartir por WhatsApp',
+    s:{ a:() => bar('a', 'Pase listo') + ap(av('ok', '✅', 'Pase para Marcos Ruiz', 'Hoy de 16 a 20 h'), qr('marcos'), `<div class="codigo">48 2915</div>`) } },
+  { l:'x', h:'16:42', txt:'A Marcos le llega el pase <b>sin instalar nada</b>. Al llegar al portón muestra el QR.', b:'Mostrar el QR en la garita',
+    al:[['a', 'x', '💬', 'Lucía te mandó un pase', 'Barrio Bahía Cauquén · hoy 16 a 20 h']],
+    s:{ x:() => bar('visita', 'Pase de ingreso', { av:'🔳' }) + ap(hola('Barrio Bahía Cauquén', 'Tu pase de hoy'), qr('marcos'), `<div class="codigo">48 2915</div>`, `<div class="centro muted">Lote 42 · Lucía</div>`) } },
+  { l:'d', txt:'El guardia <b>escanea el QR</b>: la app dice si vale ahora y quién lo autorizó. Toca <b>Ingresó</b>.', b:'Ingresó',
+    s:{ d:() => bar('d', 'Validar un ingreso') + ap(av('ok', '✅', 'Pase válido · Marcos Ruiz', 'Lo autorizó Lucía (Lote 42) · hoy 16 a 20 h'), campo('Patente', 'AF 512 KD'), it('🏡', 'Va al Lote 42', 'De la Plaza 3340')) } },
+  { l:'a', txt:'A Lucía le llega <b>"Marcos ingresó"</b> al instante. La Administración lo ve en Garita en vivo, sin tocar nada.',
+    al:[['d', 'a', '🚪', 'Marcos ingresó', '16:43 · por la garita'], ['d', 'c', '🛡️', 'Ingreso al Lote 42', 'Visita · 16:43']],
+    s:{ a:() => BASE.a().replace('<div class="card"><h4>La pizarra', av('ok', '🚪', 'Marcos ingresó', '16:43 · lo dejó pasar la garita') + '<div class="card"><h4>La pizarra'), c:() => bar('c', 'Garita en vivo') + ap(card('Ingresos de hoy', it('🚪', 'Visita → Lote 42', '16:43', 'Adentro', 'ok'), it('🚛', 'Camión de residuos', '08:02 a 08:31'))) } },
+], fin:'Sin llamados ni listas en papel: el pase vale solo cuando tiene que valer.' },
+
+{ id:'sinaviso', p:['vecinos', 'garita'], e:'🚪', t:'Llegó alguien sin avisar', s:'La garita le pregunta a Martín y él contesta con un toque', h:'11:20', pasos:[
+  { l:'d', txt:'Llega un repartidor que nadie anunció. El guardia toca <b>Llegó alguien</b>, elige el lote y escribe quién es.', b:'Preguntarle al vecino',
+    s:{ d:() => bar('d', 'Llegó alguien sin aviso') + ap(campo('Para el lote', '23 · Martín'), campo('Quién es', 'Repartidor de farmacia'), campo('Patente', 'AC 118 PL')) } },
+  { l:'b', txt:'Martín recibe la pregunta con sonido, aunque tenga la app cerrada. Toca <b>Dejalo pasar</b>.', b:'Dejalo pasar',
+    al:[['d', 'b', '🚪', '¿Dejamos pasar?', 'Repartidor de farmacia · en la entrada']],
+    s:{ b:() => bar('b', 'En la entrada') + ap(av('warn', '🚪', 'Alguien te busca en la garita', 'Repartidor de farmacia · AC 118 PL'), sec('No lo conozco')) } },
+  { l:'d', txt:'En la garita aparece la respuesta en verde: <b>"Martín dice que pase"</b>. Queda en el libro de guardia.',
+    al:[['b', 'd', '✅', 'Martín: que pase', '11:21']],
+    s:{ d:() => bar('d', 'Turno mañana · Juan y Ana') + ap(av('ok', '✅', 'Martín dice que pase', 'Repartidor de farmacia → Lote 23 · 11:21'), card('Bitácora', it('🚪', 'Ingreso sin aviso autorizado', 'Lote 23 · 11:21'))) } },
+], fin:'Nadie entra sin que el vecino lo sepa, y la garita no tiene que llamar a nadie.' },
+
+{ id:'uber', p:['vecinos', 'garita'], e:'🚕', t:'Viene un Uber o DiDi', s:'Lucía anota la patente y la garita la reconoce', h:'20:05', pasos:[
+  { l:'a', txt:'Lucía pidió un Uber. En <b>Tu casa → Viene un Uber</b> escribe la patente (o la pega del mensaje del viaje).', b:'Avisar a la garita',
+    s:{ a:() => bar('a', 'Viene un Uber o DiDi') + ap(campo('Patente', 'AE 904 TT'), campo('Viene a', 'Buscarme'), av('info', '⏱️', 'Vale por 2 horas', 'Después se borra sola.')) } },
+  { l:'d', txt:'Llega el auto: el guardia escribe la patente y la app lo reconoce: <b>"Uber para Lote 42"</b>. Toca <b>Entró</b>.', b:'Entró',
+    al:[['a', 'd', '🚕', 'Uber para Lote 42', 'AE 904 TT · las próximas 2 h']],
+    s:{ d:() => bar('d', 'Validar un ingreso') + ap(campo('Patente', 'AE 904 TT'), av('ok', '🚕', 'Uber para el Lote 42', 'Lo avisó Lucía · vale hasta las 22:05')) } },
+  { l:'a', txt:'Lucía ve que su Uber <b>ya entró</b> y sale a la puerta.',
+    al:[['d', 'a', '🚕', 'Tu Uber entró', '20:14']],
+    s:{ a:() => bar('a', 'Lucía · Lote 42') + ap(av('ok', '🚕', 'Tu Uber entró al barrio', '20:14 · AE 904 TT')) } },
+], fin:'Hasta el remís entra rápido, sin que el guardia tenga que llamar.' },
+
+{ id:'frecuente', p:['vecinos', 'garita'], e:'🧹', t:'El personal de la casa, los días que viene', s:'Ingreso frecuente con días y horario: entra solo cuando le toca', h:'08:55', pasos:[
+  { l:'a', txt:'Rosa limpia en lo de Lucía <b>martes y jueves de 9 a 13</b>. Lucía la carga una sola vez en <b>Ingresos frecuentes</b>.', b:'Guardar',
+    s:{ a:() => bar('a', 'Ingreso frecuente') + ap(campo('Nombre', 'Rosa Paredes'), campo('Tarea', 'Limpieza'), dos(campo('Días', 'Mar y jue'), campo('Horario', '9 a 13 h'))) } },
+  { l:'d', txt:'El martes Rosa aparece en <b>Lo programado para hoy</b> de la garita. Llega, dice su código y el guardia toca <b>Entró</b>.', b:'Entró',
+    s:{ d:() => bar('d', 'Lo programado para hoy') + ap(card('Hoy le toca', it('🧹', 'Rosa Paredes', 'Lote 42 · 9 a 13 h', 'Hoy', 'ok')), av('ok', '✅', 'Código válido', 'Martes, dentro de su horario')) } },
+  { l:'a', txt:'A Lucía le llega <b>"Rosa entró"</b>. Si viniera un sábado, la garita la vería en rojo y llamaría a Lucía.',
+    al:[['d', 'a', '🧹', 'Rosa entró', '08:56']], s:{ a:() => bar('a', 'Lucía · Lote 42') + ap(av('ok', '🧹', 'Rosa entró', '08:56 · martes')) } },
+], fin:'Lo de todas las semanas se carga una vez y queda.' },
+
+{ id:'sos', p:['vecinos', 'garita', 'admin'], e:'🆘', t:'El botón SOS: incendio', s:'3 segundos apretado y llega a la garita, la Administración y los vecinos', h:'15:48', pasos:[
+  { l:'a', txt:'Sale humo del quincho de Lucía. <b>Mantiene apretado el botón rojo SOS</b> (si suelta antes, no manda nada) y elige <b>Incendio</b>.', b:'Mandar SOS · Incendio',
+    s:{ a:() => bar('a', 'SOS') + ap(`<div class="sosb">SOS</div>`, `<div class="centro muted">Mantenelo apretado 3 segundos</div>`, tejas(['🔥', 'Incendio'], ['🚑', 'Salud'], ['🚨', 'Seguridad'])) } },
+  { l:'d', txt:'A la garita le salta una <b>alarma a pantalla completa</b> con el lote y la ubicación. El guardia toca <b>Voy</b> y llama al 100.', b:'Voy en camino',
+    al:[['a', 'd', '🔥', 'SOS INCENDIO · Lote 42', 'Lucía · De la Plaza 3340'], ['a', 'c', '🔥', 'SOS incendio · Lote 42', '15:48'], ['a', 'b', '🔥', 'Incendio en el Lote 42', 'Alejate y dejá la calle libre']],
+    s:{ d:() => bar('d', 'ALARMA') + ap(av('alarma', '🔥', 'SOS INCENDIO · LOTE 42', '<br>Lucía · De la Plaza 3340 · 15:48'), sec('📞 Llamar al 100')), b:() => bar('b', 'Martín · Lote 23') + ap(av('mal', '🔥', 'Incendio en el Lote 42', 'Dejá la calle libre para los bomberos.')), c:() => bar('c', 'Alerta') + ap(av('mal', '🔥', 'SOS incendio · Lote 42', '15:48 · la garita va en camino')) } },
+  { l:'a', h:'16:20', txt:'Lucía ve quién va: <b>la garita en camino</b> y los bomberos que entraron. Cuando pasó, toca <b>Ya está solucionado</b>.', b:'Ya está solucionado',
+    al:[['d', 'a', '🛡️', 'La garita va en camino', '15:49 · y entraron los bomberos']],
+    s:{ a:() => bar('a', 'Tu SOS') + ap(av('info', '🛡️', 'La garita va en camino', '15:49'), it('🚒', 'Ingresaron los bomberos', '15:56', 'Adentro', 'ok')) } },
+  { l:'c', txt:'Se cierra para todos y queda en el <b>libro de guardia</b> con el tiempo de respuesta, para el informe del mes.',
+    al:[['a', 'd', '✅', 'SOS resuelto', 'Lote 42 · 16:20'], ['a', 'b', '✅', 'Ya está solucionado', 'Lote 42']],
+    s:{ c:() => bar('c', 'Informe del mes') + ap(card('SOS de octubre', it('🔥', 'Incendio · Lote 42', 'Pidió 15:48 · salió 15:49 · resuelto 16:20', 'Resuelto', 'ok'))), d:() => BASE.d() } },
+], fin:'Un solo gesto y todos saben qué pasa y qué hacer.' },
+
+{ id:'dea', p:['vecinos', 'garita'], e:'❤️', t:'Pedir el DEA (desfibrilador)', s:'La garita sale con el DEA y avisa al equipo de salud del barrio', h:'20:14', pasos:[
+  { l:'a', txt:'El papá de Lucía se descompone. En la portada toca el <b>corazón que late</b> ("DEA en la garita") y <b>Solicitarlo</b>.', b:'Solicitar el DEA',
+    s:{ a:() => bar('a', 'DEA operativo') + ap(`<div class="grande">❤️</div>`, av('mal', '⚡', 'El desfibrilador está en la garita', 'Mantené apretado 2 segundos')) } },
+  { l:'d', txt:'Salta la alarma en la garita. El guardia toca <b>Voy con el DEA</b>: con ese mismo toque se avisa al <b>equipo de salud</b>.', b:'Voy con el DEA',
+    al:[['a', 'd', '❤️', 'PIDEN EL DEA · Lote 42', 'Lucía · De la Plaza 3340']],
+    s:{ d:() => bar('d', 'ALARMA') + ap(av('alarma', '❤️', 'PIDEN EL DEA · LOTE 42', '<br>20:14')) } },
+  { l:'b', txt:'Martín es médico y está en el equipo de salud: le llega una <b>pantalla roja</b> con el lote y "Cómo llegar". Toca <b>Voy</b>.', b:'Voy',
+    al:[['d', 'b', '🩺', 'Emergencia médica · Lote 42', 'La garita sale con el DEA']],
+    s:{ b:() => bar('b', 'Equipo de salud') + ap(av('alarma', '🩺', 'EMERGENCIA MÉDICA · LOTE 42', '<br>De la Plaza 3340 · a 300 m'), sec('🗺️ Cómo llegar')) } },
+  { l:'a', txt:'Lucía ve que van <b>la garita con el DEA y el médico</b>, con su teléfono. Respira.',
+    al:[['b', 'a', '🩺', 'Martín (médico) va para tu casa', 'Llega en 2 minutos'], ['d', 'a', '❤️', 'La garita sale con el DEA', '20:15']],
+    s:{ a:() => bar('a', 'Tu pedido') + ap(it('🛡️', 'Garita con el DEA', 'Salió 20:15', 'En camino', 'info'), it('🩺', 'Martín · médico', 'Llega 20:16', 'En camino', 'info')) } },
+], fin:'En los primeros minutos el DEA y un médico ya están yendo.' },
+
+{ id:'estoybien', p:['vecinos', 'garita'], e:'💚', t:'"Estoy bien" de quien vive solo', s:'Si Martín no toca su botón a la hora, avisa a la garita y a quien él eligió', h:'10:01', pasos:[
+  { l:'b', txt:'Martín vive solo y eligió tocar <b>Estoy bien</b> todas las mañanas antes de las 10, con Lucía como contacto. Hoy no lo tocó… Tocá <b>Pasa la hora</b>.', b:'Pasa la hora',
+    s:{ b:() => bar('b', 'Estoy bien') + ap(`<div class="grande">💚</div>`, av('warn', '⏰', 'Antes de las 10:00', 'Hoy todavía no lo tocaste')) } },
+  { l:'d', txt:'A las 10:01 salta <b>una sola alarma</b> a la garita, a la Administración y a Lucía. El guardia toca <b>Llamar a Martín</b>.', b:'Llamar a Martín',
+    al:[['b', 'd', '💚', 'Martín no tocó "Estoy bien"', 'Lote 23 · vive solo'], ['b', 'a', '💚', 'Martín no tocó "Estoy bien"', 'Sos su contacto']],
+    s:{ d:() => bar('d', 'Atención') + ap(av('warn', '💚', 'Martín no tocó "Estoy bien"', 'Lote 23 · tenía hasta las 10:00')), a:() => bar('a', 'Lucía') + ap(av('warn', '💚', 'Martín no tocó "Estoy bien"', 'La garita lo está llamando')) } },
+  { l:'b', h:'10:04', txt:'Martín estaba en la ducha. Atiende y toca <b>Estoy bien</b>.', b:'Estoy bien',
+    s:{ b:() => bar('b', 'Estoy bien') + ap(`<div class="grande">💚</div>`, `<div class="centro"><b>Tocá cuando estés bien</b></div>`) } },
+  { l:'a', txt:'A todos les llega <b>"Martín está bien"</b>. Nadie más ve nada: es privado.',
+    al:[['b', 'a', '💚', 'Martín está bien', '10:04'], ['b', 'd', '💚', 'Martín está bien', '10:04']],
+    s:{ a:() => bar('a', 'Lucía') + ap(av('ok', '💚', 'Martín está bien', '10:04')), d:() => BASE.d() } },
+], fin:'Quien vive solo tiene una red que lo cuida sin pedirle nada.' },
+
+{ id:'viaje', p:['vecinos', 'garita'], e:'🧳', t:'Me voy de viaje', s:'La casa entra en la lista de casas solas y la revisan cada día', inv:'poli', h:'18:00', pasos:[
+  { l:'a', txt:'Lucía se va 10 días. Toca <b>Me voy de viaje</b>, pone las fechas y quién tiene llave.', b:'Avisar a la garita',
+    s:{ a:() => bar('a', 'Me voy de viaje') + ap(dos(campo('Me voy', '10/10'), campo('Vuelvo', '20/10')), campo('Tiene llave', 'Diego · 2901 55-0042')) } },
+  { l:'x', h:'23:22', txt:'Esa noche el Lote 42 aparece en la lista del policía de la ronda. Pasa, mira y la garita anota <b>Todo en orden</b>.', b:'Todo en orden',
+    al:[['a', 'd', '🧳', 'Lote 42 se va de viaje', 'Del 10 al 20/10']],
+    s:{ x:() => bar('poli', 'Ronda nocturna', { av:'👮' }) + ap(card('Casas solas esta noche', it('🏠', 'Lote 42', 'Hasta el 20/10', 'Revisar', 'warn'))), d:() => bar('d', 'Casas solas') + ap(it('🏠', 'Lote 42', 'Hasta el 20/10', 'Hoy falta', 'warn')) } },
+  { l:'a', txt:'A Lucía, esté donde esté, le llega <b>"Tu casa está en orden"</b>.',
+    al:[['x', 'a', '🏠', 'Tu casa está en orden', 'Revisada 23:22 · policía de la ronda']],
+    s:{ a:() => bar('a', 'Lucía · de viaje') + ap(av('ok', '🏠', 'Tu casa está en orden', 'Revisada hoy 23:22 por el policía de la ronda')), d:() => bar('d', 'Casas solas') + ap(it('🏠', 'Lote 42', 'Revisada 23:22', 'En orden', 'ok')) } },
+], fin:'Viajar tranquilo: alguien mira tu casa cada día y te avisa.' },
+
+{ id:'expensas', p:['vecinos', 'admin'], e:'💳', t:'Expensas: pagar y recibo', s:'Cupón, pago en línea o "Ya la pagué" y el recibo al instante', h:'09:30', pasos:[
+  { l:'a', txt:'Le llega el aviso de la expensa de octubre con el detalle de gastos. Lucía toca <b>Pagar</b> (Mercado Pago) o sube la transferencia.', b:'Ya la pagué · subir comprobante',
+    al:[['c', 'a', '💳', 'Expensa de octubre', 'Vence el 10 · $ 185.400']],
+    s:{ a:() => bar('a', 'Expensas') + ap(card('Octubre', it('🧾', 'Expensa ordinaria', 'Vence el 10/10', '$ 185.400', 'info'), it('📊', 'En qué se gastó', 'Garita 52 % · mantenimiento 21 %')), sec('Pagar con Mercado Pago')) } },
+  { l:'c', txt:'La Administración ve el comprobante en <b>Pagos para confirmar</b> y toca <b>Confirmar</b>: se cruza solo con la contabilidad.', b:'Confirmar el pago',
+    al:[['a', 'c', '🧾', 'Comprobante del Lote 42', '$ 185.400 · transferencia']],
+    s:{ c:() => bar('c', 'Pagos para confirmar') + ap(it('🧾', 'Lote 42 · Lucía', 'Transferencia · $ 185.400', 'Nuevo', 'warn'), `<div class="foto" style="background:linear-gradient(135deg,#e2e8f0,#cbd5e1)"></div>`) } },
+  { l:'a', txt:'A Lucía le llega el <b>recibo</b> y su cuenta queda al día.',
+    al:[['c', 'a', '✅', 'Pago confirmado · recibo', 'Octubre · $ 185.400']],
+    s:{ a:() => bar('a', 'Expensas') + ap(av('ok', '✅', 'Estás al día', 'Recibo N° 0042-1015'), sec('⬇️ Bajar el recibo')), c:() => bar('c', 'Expensas') + ap(card('Cobranza de octubre', it('📈', '71 % cobrado', '108 de 152 lotes'))) } },
+], fin:'Pagar lleva un minuto y nadie tiene que perseguir comprobantes.' },
+
+{ id:'reclamo', p:['vecinos', 'admin', 'mant'], e:'💡', t:'Reclamo: luminaria apagada', s:'De la foto del vecino al arreglo de mantenimiento, con aviso en cada paso', inv:'mant', h:'09:10', pasos:[
+  { l:'b', txt:'La luminaria de la esquina de Martín está apagada. Toca <b>Reclamos</b>, saca una foto y marca dónde.', b:'Mandar el reclamo',
+    s:{ b:() => bar('b', 'Nuevo reclamo') + ap(campo('Qué pasa', 'Luminaria apagada'), campo('Dónde', 'Esquina De la Plaza y De las Mareas'), `<div class="foto" style="background:linear-gradient(135deg,#1e293b,#0f172a)"></div>`) } },
+  { l:'c', txt:'La Administración lo recibe y lo pasa a <b>mantenimiento</b> con un toque.', b:'Pasarlo a mantenimiento',
+    al:[['b', 'c', '💡', 'Reclamo nuevo', 'Luminaria · De la Plaza y De las Mareas']],
+    s:{ c:() => bar('c', 'Reclamos') + ap(it('💡', 'Luminaria apagada', 'Martín · Lote 23 · con foto', 'Nuevo', 'warn')) } },
+  { l:'x', h:'11:30', txt:'Raúl, de mantenimiento, lo ve en su brazo de mantenimiento, va, la arregla y toca <b>Terminado</b> con la foto del después.', b:'Terminado',
+    al:[['c', 'x', '🔧', 'Tarea nueva', 'Luminaria · De la Plaza y De las Mareas']],
+    s:{ x:() => bar('mant', 'Brazo de mantenimiento', { av:'🦺' }) + ap(mapa({ ruta:false, gotas:[[150,74,'💡',false]] }), it('💡', 'Luminaria', 'De la Plaza y De las Mareas', 'En curso', 'warn')) } },
+  { l:'b', txt:'Martín recibe <b>"Tu reclamo está resuelto"</b> y puede calificar el arreglo.',
+    al:[['x', 'b', '✅', 'Tu reclamo está resuelto', 'Luminaria · 11:42'], ['x', 'c', '✅', 'Luminaria arreglada', 'Raúl · 11:42']],
+    s:{ b:() => bar('b', 'Tus reclamos') + ap(av('ok', '✅', 'Resuelto', 'Luminaria · 11:42 · por mantenimiento'), sec('⭐ Calificar')), x:() => bar('mant', 'Brazo de mantenimiento', { av:'🦺' }) + ap(mapa({ ruta:false, gotas:[[150,74,'💡',true]] })) } },
+], fin:'Cada reclamo tiene dueño, fecha y respuesta.' },
+
+{ id:'votacion', p:['vecinos', 'admin'], e:'🗳️', t:'Votar desde casa', s:'La Administración abre la votación y cada lote vota una vez', h:'19:00', pasos:[
+  { l:'c', txt:'La Administración propone <b>"¿Cambiamos las luminarias por LED?"</b> con fecha de cierre y la abre.', b:'Abrir la votación',
+    s:{ c:() => bar('c', 'Nueva votación') + ap(campo('Pregunta', '¿Cambiamos las luminarias por LED?'), dos(campo('Opciones', 'Sí / No'), campo('Cierra', 'Domingo 20 h'))) } },
+  { l:'a', txt:'A cada casa le llega el aviso. Lucía lee el detalle y vota <b>Sí</b> (un voto por lote).', b:'Votar Sí',
+    al:[['c', 'a', '🗳️', 'Votación abierta', '¿Luminarias LED? · cierra el domingo'], ['c', 'b', '🗳️', 'Votación abierta', '¿Luminarias LED?']],
+    s:{ a:() => bar('a', 'Votaciones') + ap(card('¿Cambiamos las luminarias por LED?', it('💡', 'Ahorro estimado 38 %', 'Presupuesto adjunto')), sec('No')) } },
+  { l:'b', txt:'Martín también vota y ve el resultado parcial en vivo.', b:'Votar Sí',
+    s:{ b:() => bar('b', 'Votaciones') + ap(card('¿Luminarias LED?', it('📊', 'Sí 64 % · No 36 %', '87 de 152 lotes votaron'))) } },
+  { l:'c', txt:'Al cierre, la Administración tiene el <b>resultado con el padrón</b>, listo para el acta.',
+    s:{ c:() => bar('c', 'Resultado') + ap(av('ok', '🗳️', 'Aprobado: Sí 66 %', '112 de 152 lotes · cerró el domingo 20 h')) } },
+], fin:'Decidir en comunidad sin juntar firmas casa por casa.' },
+
+{ id:'comunidad', p:['vecinos'], e:'📌', t:'Pizarrón, perro perdido y algo prestado', s:'La vida del barrio entre vecinos', h:'17:40', pasos:[
+  { l:'a', txt:'El perro de Lucía se escapó. Publica en el <b>pizarrón</b> con foto.', b:'Publicar en el pizarrón',
+    s:{ a:() => bar('a', 'Pizarrón') + ap(campo('Aviso', 'Se perdió Lola, beagle marrón'), `<div class="foto" style="background:linear-gradient(135deg,#d6a46b,#8a5a2b)"></div>`) } },
+  { l:'b', txt:'Martín la ve pasar y comenta <b>"Está en la plaza"</b>.', b:'Comentar',
+    al:[['a', 'b', '🐕', 'Pizarrón: perro perdido', 'Lola, beagle marrón']],
+    s:{ b:() => bar('b', 'Pizarrón') + ap(card('Se perdió Lola', it('📍', 'Martín', 'Está en la plaza con unos chicos'))) } },
+  { l:'a', txt:'Lucía la encuentra. De paso, le pide a Martín <b>una escalera prestada</b> desde "Pedir algo prestado".',
+    al:[['b', 'a', '💬', 'Martín comentó', 'Está en la plaza']],
+    s:{ a:() => bar('a', 'Pedir algo prestado') + ap(av('ok', '🐕', 'Lola apareció', '¡Gracias, Martín!'), it('🪜', 'Escalera', 'Martín puede prestarla', 'Disponible', 'ok')) } },
+], fin:'Un barrio que se ayuda, en el mismo lugar donde se cuida.' },
+
+{ id:'urgente', p:['vecinos', 'admin'], e:'💧', t:'Aviso urgente: corte de agua', s:'La Administración avisa solo a la zona afectada', h:'07:40', pasos:[
+  { l:'c', txt:'Se rompe un caño. La Administración manda un <b>aviso urgente</b> solo a la zona Oeste, con sonido.', b:'Mandar el aviso urgente',
+    s:{ c:() => bar('c', 'Aviso urgente') + ap(campo('Zona', 'Oeste · lotes 13 a 33'), campo('Mensaje', 'Corte de agua hasta las 12 h')) } },
+  { l:'b', txt:'Martín vive en la zona Oeste: le suena aunque tenga el teléfono en silencio. Lucía (otra zona) no recibe nada.', b:'Entendido',
+    al:[['c', 'b', '💧', 'URGENTE: corte de agua', 'Zona Oeste · hasta las 12 h']],
+    s:{ b:() => bar('b', 'Aviso urgente') + ap(av('alarma', '💧', 'CORTE DE AGUA · ZONA OESTE', '<br>Hasta las 12 h · Administración')) } },
+  { l:'c', txt:'La Administración ve <b>quiénes lo leyeron</b> y a qué casas conviene llamar.',
+    s:{ c:() => bar('c', 'Aviso urgente') + ap(card('Lo leyeron', it('👁️', '19 de 21 casas', 'Faltan Lote 15 y Lote 29'))) } },
+], fin:'A cada uno le llega lo que le toca, nada más.' },
+
+{ id:'sismo', p:['vecinos', 'garita', 'admin'], e:'🌋', t:'Sismo: ¿están todos bien?', s:'La app lo detecta y cada casa responde con un toque', h:'09:12', pasos:[
+  { l:'c', txt:'Un <b>sismo de 5,4</b> a 60 km. La app lo toma del servicio sismológico y la Administración toca <b>Preguntar a todos</b>.', b:'Preguntar a todos si están bien',
+    s:{ c:() => bar('c', 'Sismo') + ap(av('warn', '🌋', 'Sismo 5,4 · a 60 km', '09:11 · INPRES')) } },
+  { l:'a', txt:'A cada casa le llega <b>"¿Están todos bien?"</b>. Lucía toca <b>Estamos bien</b>.', b:'Estamos bien',
+    al:[['c', 'a', '🌋', '¿Están todos bien?', 'Sismo 5,4'], ['c', 'b', '🌋', '¿Están todos bien?', 'Sismo 5,4']],
+    s:{ a:() => bar('a', 'Sismo') + ap(av('warn', '🌋', '¿Están todos bien?', 'Sismo 5,4 · 09:11'), sec('Necesito ayuda')) } },
+  { l:'b', txt:'A Martín se le cayó un mueble encima del pie: toca <b>Necesito ayuda</b>.', b:'Necesito ayuda', s:{ b:() => bar('b', 'Sismo') + ap(av('warn', '🌋', '¿Están todos bien?', 'Sismo 5,4'), sec('Estamos bien')) } },
+  { l:'d', txt:'A la garita y a la Administración les llega el pedido de Martín <b>primero en la lista</b>. El guardia toca <b>Voy</b>.', b:'Voy',
+    al:[['b', 'd', '🆘', 'Lote 23 necesita ayuda', 'Sismo · Martín'], ['b', 'c', '🆘', 'Lote 23 necesita ayuda', 'Sismo']],
+    s:{ d:() => bar('d', 'Sismo') + ap(it('🆘', 'Lote 23 · Martín', 'Necesita ayuda', 'Primero', 'mal'), it('✅', '98 casas bien', ''), it('❔', '7 sin responder', 'Pasar a ver')) } },
+], fin:'En minutos se sabe quién está bien y a quién ir a ver.' },
+
+{ id:'kayak', p:['vecinos', 'garita'], e:'🛶', t:'Salida en kayak que no vuelve', s:'Si pasa la hora de regreso, avisa con los datos para Prefectura', h:'17:30', pasos:[
+  { l:'b', txt:'Martín sale en kayak por el canal. En <b>Salidas seguras</b> carga adónde va, con quién y a qué hora vuelve.', b:'Salgo',
+    s:{ b:() => bar('b', 'Salida segura') + ap(campo('Adónde', 'Isla Bridges'), dos(campo('Vuelvo', '17:00'), campo('Chaleco', 'Sí, rojo'))) } },
+  { l:'d', txt:'Son las 17:30 y no tocó <b>Volví</b>: salta el aviso a la garita y a Lucía, con todo lo que pide Prefectura.', b:'Llamar a Martín',
+    al:[['b', 'd', '🛶', 'Martín no volvió del kayak', 'Isla Bridges · debía volver 17:00'], ['b', 'a', '🛶', 'Martín no volvió', 'Sos su contacto']],
+    s:{ d:() => bar('d', 'Salida sin regreso') + ap(av('warn', '🛶', 'Martín no volvió', 'Isla Bridges · kayak amarillo · chaleco rojo'), sec('📞 Prefectura 106')) } },
+  { l:'b', h:'17:41', txt:'Martín atiende: el viento lo demoró. Al llegar toca <b>Volví</b> y se cierra para todos.', b:'Volví',
+    s:{ b:() => bar('b', 'Salida segura') + ap(av('info', '🛶', 'En el agua', 'Debías volver 17:00')) } },
+], fin:'Salir al canal con una red que te espera en la orilla.' },
+
+{ id:'voz', p:['vecinos'], e:'🎙️', t:'Hablale a la app', s:'"Mañana viene el plomero a las 10": la app arma el pase sola', h:'21:00', pasos:[
+  { l:'a', txt:'Lucía toca el micrófono y dice <b>"Mañana viene el plomero a las 10"</b>.', b:'🎙️ Hablar',
+    s:{ a:() => bar('a', 'Asistente') + ap(`<div class="grande">🎙️</div>`, `<div class="centro muted">"Mañana viene el plomero a las 10"</div>`) } },
+  { l:'a', txt:'La app entiende y arma el <b>pase de proveedor</b> para mañana a las 10. Lucía solo confirma.', b:'Confirmar el pase',
+    s:{ a:() => bar('a', 'Asistente') + ap(card('Entendí esto', it('🔧', 'Plomero', 'Mañana · 10 h', 'Proveedor', 'info')), sec('Cambiar algo')) } },
+  { l:'d', txt:'Al día siguiente el plomero aparece en <b>Lo programado para hoy</b> de la garita.',
+    al:[['a', 'd', '🔧', 'Proveedor para Lote 42', 'Plomero · mañana 10 h']],
+    s:{ d:() => bar('d', 'Lo programado para hoy') + ap(it('🔧', 'Plomero → Lote 42', '10 h', 'Hoy', 'info')) } },
+], fin:'Para quien no quiere escribir: hablar alcanza.' },
+
+/* ---------------- GARITA ---------------- */
+{ id:'correos', p:['garita', 'vecinos'], e:'📮', t:'Correos en el barrio', s:'Entra Andreani y la casa a la que va lo sabe al instante', h:'11:20', pasos:[
+  { l:'d', txt:'Entra el camión de <b>Andreani</b>. El guardia toca Andreani, escribe el lote (42) y toca <b>Registrar la entrada</b>.', b:'Registrar la entrada',
+    s:{ d:() => bar('d', 'Correos') + ap(tejas(['📦', 'Correo Arg.'], ['🟥', 'Andreani'], ['🟦', 'OCA']), campo('Va a los lotes', '42')) } },
+  { l:'a', txt:'A Lucía le llega <b>"Andreani va a tu casa"</b>. Martín solo ve que hay un correo en el barrio, no a qué casa va.', b:'Ya lo recibí',
+    al:[['d', 'a', '📮', 'Andreani va a tu casa', 'Entró 11:20']],
+    s:{ a:() => bar('a', 'Lucía · Lote 42') + ap(av('info', '🚚', 'Andreani VA A TU CASA', 'Entró 11:20')), b:() => BASE.b().replace('<div class="card"><h4>Para vos', av('info', '🚚', 'Andreani está en el barrio', '') + '<div class="card"><h4>Para vos') } },
+  { l:'d', h:'11:34', txt:'Andreani sale del barrio: el guardia toca <b>Registrar la salida</b> y el aviso se va solo de todas las pantallas.', b:'Registrar la salida',
+    s:{ d:() => bar('d', 'Correos') + ap(it('🟥', 'Andreani', 'Entró 11:20 · Lote 42', 'Adentro', 'info')) } },
+], fin:'Cada casa sabe cuándo llega lo suyo, y nadie más.' },
+
+{ id:'camion', p:['garita', 'vecinos'], e:'🚛', t:'Pasa el camión de residuos', s:'La garita marca la entrada y a todos les llega el aviso', h:'07:52', pasos:[
+  { l:'d', txt:'Llega el camión de residuos. El guardia toca <b>Entró el camión</b>.', b:'Entró el camión', s:{ d:() => bar('d', 'Camión de residuos') + ap(campo('Patente', 'AD 330 RS')) } },
+  { l:'a', txt:'A <b>todos</b> les llega el aviso y el camión cruza la pantalla. Lucía toca <b>Saco la bolsa</b>.', b:'Saco la bolsa',
+    al:[['d', 'a', '🚛', 'Entró el camión', 'Sacá la bolsa'], ['d', 'b', '🚛', 'Entró el camión', 'Sacá la bolsa'], ['d', 'e', '🚛', 'Entró el camión', '']],
+    s:{ a:() => bar('a', 'Lucía') + ap(av('info', '🚛', 'El camión está en el barrio', 'Entró 07:52')), b:() => bar('b', 'Martín') + ap(av('info', '🚛', 'El camión está en el barrio', 'Entró 07:52')) } },
+  { l:'d', h:'08:31', txt:'Cuando termina, el guardia toca <b>Salió el camión</b>: el aviso desaparece solo y queda en la bitácora.', b:'Salió el camión',
+    s:{ d:() => bar('d', 'Camión de residuos') + ap(it('🚛', 'En el barrio', 'Desde 07:52', 'Adentro', 'info')) } },
+], fin:'Nadie se queda con la bolsa en la mano.' },
+
+{ id:'proveedor', p:['garita', 'admin', 'vecinos'], e:'🧰', t:'El electricista con la ART vencida', s:'La garita lo frena, él sube la nueva y entra', inv:'prov', h:'09:02', pasos:[
+  { l:'d', txt:'Llega el electricista de Lucía. La garita lee su pase y la app avisa: <b>ART vencida ayer</b>. No pasa.', b:'Pedirle la ART nueva',
+    s:{ d:() => bar('d', 'Validar un ingreso') + ap(av('mal', '⛔', 'ART vencida', 'Venció ayer · no puede ingresar'), it('🔌', 'Electricista → Lote 42', 'Proveedor')) } },
+  { l:'x', txt:'Al electricista le llega el pedido. Saca una foto del certificado nuevo y toca <b>Subir</b>.', b:'Subir el certificado',
+    al:[['d', 'x', '📄', 'Falta tu ART vigente', 'Subila desde acá']],
+    s:{ x:() => bar('prov', 'Subir documentación', { av:'📄' }) + ap(`<div class="foto" style="background:linear-gradient(135deg,#f1f5f9,#cbd5e1)"></div>`, campo('Vence', '15/11/2026')) } },
+  { l:'c', txt:'La Administración lo ve en <b>Proveedores y cumplimiento</b> y toca <b>Aprobar</b>.', b:'Aprobar',
+    al:[['x', 'c', '📄', 'ART nueva para revisar', 'Electricista · vence 15/11']], s:{ c:() => bar('c', 'Proveedores') + ap(it('📄', 'ART · Electricista', 'Vence 15/11/2026', 'Revisar', 'warn')) } },
+  { l:'d', h:'09:09', txt:'En la garita el pase cambia a <b>válido</b>. El guardia toca <b>Ingresó</b> y Lucía se entera.', b:'Ingresó',
+    al:[['c', 'd', '✅', 'ART aprobada', 'Electricista · ya puede entrar']], s:{ d:() => bar('d', 'Validar un ingreso') + ap(av('ok', '✅', 'Pase válido', 'ART al día hasta el 15/11')) } },
+], fin:'Nadie entra a trabajar sin seguro.' },
+
+{ id:'relevo', p:['garita', 'admin', 'vecinos'], e:'🔄', t:'El relevo de la guardia', s:'Cuatro horarios que se superponen y las caritas en la portada', h:'15:00', pasos:[
+  { l:'d', txt:'La guardia trabaja en horarios superpuestos: <b>7–15, 8–20, 15–23 y 23–7</b>. A las 15 entra Pedro: toca <b>Marco mi entrada</b>.', b:'Marco mi entrada',
+    s:{ d:() => bar('d', 'Relevo') + ap(card('La línea del día', it('🌅', 'Mañana 7–15 · Juan', 'Sale ahora'), it('☀️', 'Día 8–20 · Ana', 'Sigue'), it('🌆', 'Tarde 15–23 · Pedro', 'Entra', 'Ahora', 'info'))) } },
+  { l:'d', txt:'Juan se va: deja las <b>novedades</b> para el que entra y sale el parte de su tramo a la Administración.', b:'Me voy · mandar el parte',
+    s:{ d:() => bar('d', 'Salida de Juan') + ap(campo('Novedades', 'Portón de servicio trabado, avisado a mantenimiento')) } },
+  { l:'a', txt:'En la portada de los vecinos cambian solas <b>las caritas de quienes están de guardia</b> (cada guardia eligió su dibujo).',
+    al:[['d', 'c', '📄', 'Parte del tramo Mañana', 'Juan · 7 a 15 · 1 novedad'], ['d', 'a', '🛡️', 'Cambió la guardia', 'Ana y Pedro']],
+    s:{ a:() => BASE.a().replace('Juan y Ana', 'Ana y Pedro'), c:() => bar('c', 'Partes de turno') + ap(it('📄', 'Mañana 7–15 · Juan', '12 ingresos · 1 novedad', 'Nuevo', 'info')) } },
+], fin:'Siempre se sabe quién está en la garita, y nada se pierde en el relevo.' },
+
+{ id:'mapa', p:['garita', 'admin'], e:'🗺️', t:'El mapa del barrio en vivo', s:'La garita ve cada lote con su color: visitas, casas solas, obras, SOS', h:'18:20', pasos:[
+  { l:'d', txt:'En el <b>Mapa del barrio</b> cada lote se pinta según lo que pasa: verde visita adentro, celeste llegan hoy, amarillo casa sola, rosa obra.', b:'Buscar "De la Plaza 3340"',
+    s:{ d:() => bar('d', 'Mapa del barrio') + ap(tejas(['🟢', '3 adentro'], ['🔵', '5 llegan'], ['🟡', '4 casas solas']), mapa({ ruta:false, lotes:[1022, 1046, 9082] })) } },
+  { l:'d', txt:'Una visita dice "voy a De la Plaza 3340": el mapa <b>va derecho a la casa</b>, con quién vive y "Llegó alguien para este lote".',
+    s:{ d:() => bar('d', 'Lote 42') + ap(it('🏡', 'De la Plaza 3340', 'Lucía Fernández · Lote 42'), it('🟢', 'Marcos Ruiz', 'Visita adentro desde 16:43')) } },
+], fin:'La garita conoce el barrio entero de un vistazo.' },
+
+/* ---------------- RONDA DEL POLICÍA ---------------- */
+{ id:'recorrido', p:['garita', 'admin'], e:'📍', t:'La Administración marca el recorrido de la ronda', s:'Puntos numerados en el plano, foto liviana de cada uno y simulación por las calles', h:'17:30', pasos:[
+  { l:'c', txt:'En el mapa de la garita, la Administración toca <b>Editar recorrido</b> y marca los puntos <b>en orden</b>: 1, 2, 3… Cada número es la dirección del recorrido.', b:'Agregar foto a cada punto',
+    s:{ c:() => bar('c', 'Marcar el recorrido') + ap(mapa({ editar:true }), card('Puntos', it('1️⃣', 'Portón', 'Junto al poste de luz'), it('2️⃣', 'Perímetro norte', 'Cerco con el bosque'), it('3️⃣', 'Contenedores', 'De la Cuesta'))) } },
+  { l:'c', txt:'A cada punto le saca <b>una foto del poste</b>: la app la achica sola a unos 12 KB, así viaja liviana al teléfono del policía.', b:'Finalizar',
+    s:{ c:() => bar('c', 'Marcar el recorrido') + ap(`<div class="foto"></div>`, it('📷', 'Foto del punto 1', '162 KB → 12 KB', 'Lista', 'ok'), it('📷', '6 de 6 puntos con foto', 'Total 74 KB')) } },
+  { l:'c', txt:'Al tocar <b>Finalizar</b> ve la <b>simulación</b>: la línea amarilla une los puntos en orden por las calles y un patrullero la recorre. 1,8 km, unos 24 minutos.',
+    s:{ c:() => bar('c', 'Recorrido guardado') + ap(mapa({ sim:true }), it('🟡', '6 puntos del 1 al 6', '1,8 km · unos 24 min caminando'), sec('Compartir el plano')), d:() => bar('d', 'Mapa del barrio') + ap(av('info', '📍', 'Recorrido nuevo de la ronda', 'Lo marcó la Administración'), mapa({})) } },
+], fin:'El recorrido se cambia cuando haga falta y la garita lo ve al instante.' },
+
+{ id:'policia', p:['garita', 'admin'], e:'👮', t:'Llega el policía nocturno', s:'Ingreso con su cargo, su tarjeta por WhatsApp y su recorrido con fotos', inv:'poli', h:'21:59', pasos:[
+  { l:'d', txt:'Llega la policía nocturna. El guardia toca su fichita (ya vino antes) y se completa todo: nombre, <b>cargo</b>, matrícula, celular.', b:'Registrar el ingreso y armar su tarjeta',
+    s:{ d:() => bar('d', 'Llegó la policía nocturna') + ap(av('info', '🌙', 'Noche del jueves', '21:59 a 06:00 h'), campo('Nombre', 'Julio Gómez'), dos(campo('Cargo', 'Sargento'), campo('Matrícula', '4521'))) } },
+  { l:'d', txt:'Sale <b>su tarjeta</b>: sargento Julio Gómez, su código de ronda de esta noche y un QR. El guardia toca <b>Mandarle la tarjeta por WhatsApp</b>.', b:'Mandarle la tarjeta por WhatsApp',
+    s:{ d:() => bar('d', 'Tarjeta del policía') + ap(card('Policía nocturna', it('🛡️', 'Julio Gómez', 'Sargento · Mat. 4521'), it('🌙', 'Noche del jueves', '21:59 a 06:00')), `<div class="codigo">257 866</div>`, qr('gomez')) } },
+  { l:'x', txt:'El sargento toca el enlace: su teléfono <b>queda listo</b> y baja <b>una sola vez su recorrido con las fotos</b> (74 KB, queda guardado en su teléfono).', b:'Ver mi recorrido',
+    al:[['d', 'x', '💬', 'Garita Bahía Cauquén', 'Tu tarjeta y tu código de ronda']],
+    s:{ x:() => bar('poli', 'Ronda de esta noche', { av:'👮' }) + ap(av('ok', '✅', 'Listo, Julio: tu teléfono quedó habilitado', 'Guardado en tu teléfono · 74 KB'), mapa({}), it('📷', '6 puntos con su foto', 'En orden, del 1 al 6')) } },
+  { l:'a', txt:'En la portada, las caritas de la guardia suman <b>"+ policía"</b> (sin su nombre).',
+    al:[['d', 'a', '👮', 'Policía nocturna de servicio', 'Noche del jueves']],
+    s:{ a:() => BASE.a().replace(caritas(), caritas(true)), x:() => bar('poli', 'Tu recorrido', { av:'👮' }) + ap(card('Punto 1 · Portón', `<div class="foto"></div>`), it('2️⃣', 'Perímetro norte', 'Cerco con el bosque'), it('3️⃣', 'Contenedores', 'De la Cuesta')) } },
+], fin:'El policía sabe exactamente dónde está cada QR, aunque sea su primera noche.' },
+
+{ id:'rondavivo', p:['garita', 'vecinos', 'admin'], e:'🚓', t:'La ronda en vivo y la meta de 3 rondas', s:'Cada QR escaneado se ve en el mapa, la garita lo sigue y los vecinos lo ven con demora', inv:'poli', h:'23:10', pasos:[
+  { l:'x', txt:'El sargento llega al <b>punto 1</b>: ve la foto del lugar, escanea el QR y toca <b>Registrar paso</b>. La app le muestra la foto del próximo.', b:'Registrar paso · punto 1',
+    s:{ x:() => bar('poli', '1. Portón', { av:'👮' }) + ap(`<div class="foto"></div>`, av('info', '📍', 'Punto de control 1 de 6', 'Queda con la hora exacta en la garita')) } },
+  { l:'d', txt:'En el mapa de la garita el punto 1 se pone <b>verde con la hora</b>, el 2 late y la chapa azul y roja marca dónde está el policía.', b:'Seguirlo en el mapa',
+    al:[['x', 'd', '📍', 'Punto 1 escaneado', 'Portón · 23:10']],
+    s:{ d:() => bar('d', 'Ronda del policía') + ap(mapa({ pasados:1, poli:true }), anillos(0, 1)), x:() => bar('poli', 'Paso registrado', { av:'👮' }) + ap(av('ok', '✅', 'Paso registrado · 23:10', 'Seguí al próximo'), card('Próximo punto', it('2️⃣', 'Perímetro norte', 'Cerco con el bosque'), `<div class="foto"></div>`)) } },
+  { l:'x', h:'23:34', txt:'Sigue por las calles: punto 2, 3, 4, 5… Tocá para <b>escanear los que faltan</b>.', b:'Escanear los puntos 2 a 6',
+    s:{ x:() => bar('poli', 'Tu recorrido', { av:'👮' }) + ap(mapa({ pasados:1 }), it('2️⃣', 'Perímetro norte', 'Próximo', '', '')) } },
+  { l:'d', txt:'Los seis en verde: <b>Ronda 1 completa</b>, queda en la bitácora con la hora de cada QR. La meta de la noche son <b>3 rondas completas</b>.',
+    al:[['x', 'd', '✅', 'Ronda 1 completa', '6 de 6 puntos · 23:10 a 23:34'], ['d', 'c', '🚓', 'Ronda 1 completa', 'Sargento Gómez · 24 min']],
+    s:{ d:() => bar('d', 'Ronda del policía') + ap(mapa({ pasados:6, poli:true }), anillos(1)), x:() => bar('poli', 'Ronda completa', { av:'👮' }) + ap(av('ok', '✅', 'Ronda completa', '6 de 6 · 23:10 a 23:34')), c:() => bar('c', 'Rondas de hoy') + ap(anillos(1)) } },
+  { l:'a', txt:'Lucía toca las caritas de la guardia: ve el plano con el recorrido y <b>Ronda 1 ✓ de 3</b>. La ronda en curso se ve <b>con 10 minutos de demora y sin el nombre</b> del policía, por seguridad.',
+    s:{ a:() => bar('a', 'De guardia ahora') + ap(caritas(true), card('La ronda del policía', mapa({ pasados:6 }), anillos(1)), `<div class="muted" style="font-size:9.5px">🔒 Con 10 minutos de demora y sin el nombre del policía.</div>`) } },
+  { l:'c', h:'05:50', txt:'A la mañana, la Administración ve la noche completa: <b>3 de 3 rondas</b>. Al irse, al policía le llega por correo la constancia con la hora de cada QR.',
+    al:[['d', 'x', '✉️', 'Constancia de servicio', '3 rondas · 21:59 a 06:00']],
+    s:{ c:() => bar('c', 'Policía · este mes') + ap(anillos(3), it('👮', 'Sargento Julio Gómez', '8 h · 3 rondas completas', 'Meta cumplida', 'ok')), x:() => bar('poli', 'Correo', { av:'✉️' }) + ap(card('Constancia de servicio', it('🕙', 'Ingreso', '21:59'), it('🕕', 'Salida', '06:00'), it('🚓', '3 rondas', 'Con la hora de cada QR'))) } },
+], fin:'Ni planillas ni firmas: cada punto queda con su hora y todos saben que la ronda se hizo.' },
+
+/* ---------------- MANTENIMIENTO ---------------- */
+{ id:'mantentra', p:['mant', 'garita', 'vecinos'], e:'🦺', t:'Mantenimiento entra a trabajar', s:'Reloj de entrada en la garita y la cápsula animada en la portada', inv:'mant', h:'08:00', pasos:[
+  { l:'d', txt:'Llega Raúl, de mantenimiento. En la garita, un toque: <b>Entrada</b>. Empieza a correr su reloj ("Adentro hace…").', b:'Entrada · Raúl',
+    s:{ d:() => bar('d', 'Mantenimiento') + ap(it('🦺', 'Raúl', 'Espacios comunes', 'Afuera', ''), it('🦺', 'Diego', 'Jardinería', 'Afuera', '')) } },
+  { l:'x', txt:'A Raúl le llega por WhatsApp el enlace a su <b>brazo de mantenimiento</b>: el mapa del barrio, sus tareas y los mensajes.', b:'Abrir mi brazo',
+    al:[['d', 'x', '💬', 'Garita Bahía Cauquén', 'Tu enlace de hoy']],
+    s:{ d:() => bar('d', 'Mantenimiento') + ap(it('🦺', 'Raúl', 'Adentro hace 0:01', 'Trabajando', 'ok')), x:() => bar('mant', 'Brazo de mantenimiento', { av:'🦺' }) + ap(av('ok', '✅', 'Hola, Raúl', 'Hoy: plaza y portón de servicio'), mapa({ ruta:false })) } },
+  { l:'a', txt:'En la portada de los vecinos aparece la <b>cápsula con la luz que recorre el borde</b>: "Mantenimiento · 1 trabajando ahora" (sin nombres).',
+    al:[['d', 'a', '🦺', 'Mantenimiento trabajando', '1 persona desde las 8:00']],
+    s:{ a:() => BASE.a().replace(caritas(), caritas() + `<div class="capsula">🏔️👷 <b>Mantenimiento</b> · 1 trabajando ahora</div>`) } },
+], fin:'Los vecinos saben que se está trabajando, sin exponer a nadie.' },
+
+{ id:'mantvivo', p:['mant', 'vecinos', 'admin'], e:'🗺️', t:'El brazo de mantenimiento en vivo', s:'Marca cada trabajo en el mapa, los vecinos le escriben y sale el parte del día', inv:'mant', h:'10:30', pasos:[
+  { l:'x', txt:'Raúl marca en el mapa dónde trabaja: toca el lugar, elige <b>Corte de pasto · plaza</b>. Aparece una gota naranja que late.', b:'Empezar el trabajo',
+    s:{ x:() => bar('mant', 'Brazo de mantenimiento', { av:'🦺' }) + ap(mapa({ ruta:false, gotas:[[70,100,'🌿',false]] }), tejas(['🌿', 'Pasto'], ['🔧', 'Arreglo'], ['🧹', 'Limpieza'])) } },
+  { l:'b', txt:'Martín ve la gota en su mapa y le escribe: <b>"¿Podés pasar por la vereda del 23?"</b>.', b:'Mandar mensaje',
+    al:[['x', 'b', '🌿', 'Mantenimiento en la plaza', 'Corte de pasto · en curso']],
+    s:{ b:() => bar('b', 'Mantenimiento en vivo') + ap(mapa({ ruta:false, gotas:[[70,100,'🌿',false]] }), campo('Mensaje para Raúl', '¿Podés pasar por la vereda del 23?')) } },
+  { l:'x', txt:'Raúl contesta y suma la tarea. Al terminar toca <b>Terminado</b>: la gota se pone verde con el tilde.', b:'Terminado',
+    al:[['b', 'x', '💬', 'Martín · Lote 23', '¿Podés pasar por la vereda del 23?']],
+    s:{ x:() => bar('mant', 'Mensajes', { av:'🦺' }) + ap(it('💬', 'Martín · Lote 23', '¿Podés pasar por la vereda del 23?'), it('↩️', 'Vos', 'Sí, al terminar la plaza')) } },
+  { l:'c', h:'16:00', txt:'Al marcar la salida, la Administración recibe el <b>parte del día en PDF</b>: plano con cada trabajo, horas y mensajes.',
+    al:[['x', 'b', '✅', 'Raúl terminó tu pedido', 'Vereda del 23'], ['d', 'c', '📄', 'Parte de mantenimiento', 'Raúl · 8 h · 5 trabajos']],
+    s:{ c:() => bar('c', 'Parte del día') + ap(mapa({ ruta:false, gotas:[[70,100,'🌿',true],[150,112,'🧹',true],[40,80,'🔧',true]] }), it('📄', 'Raúl · 8:00 a 16:00', '5 trabajos terminados', 'PDF', 'info')), x:() => bar('mant', 'Brazo de mantenimiento', { av:'🦺' }) + ap(mapa({ ruta:false, gotas:[[70,100,'🌿',true]] })) } },
+], fin:'Lo que se hace en el barrio se ve, y queda registrado.' },
+
+/* ---------------- HOTEL ---------------- */
+{ id:'vuelo', p:['hotel', 'garita'], e:'✈️', t:'El vuelo se demora y el traslado se corre solo', s:'El hotel carga el vuelo del huésped y la app lo sigue', h:'18:15', pasos:[
+  { l:'e', txt:'El hotel carga a sus huéspedes con el <b>vuelo AR 1872</b> (llega 19:10). La app arma sola el traslado: la van sale 18:40.', b:'Guardar el traslado',
+    s:{ e:() => bar('e', 'Traslado al aeropuerto') + ap(`<div class="vuelo"><span>A</span><span>R</span><span>1</span><span>8</span><span>7</span><span>2</span></div>`, dos(campo('Llega', '19:10'), campo('Personas', '3')), it('🚐', 'Van 1', 'Sale 18:40', 'Automático', 'info')) } },
+  { l:'e', txt:'La app consulta el vuelo: <b>se demora 45 minutos</b>. El traslado se corre solo a las 19:25. El hotel toca <b>Aceptar el cambio</b>.', b:'Aceptar el cambio',
+    s:{ e:() => bar('e', 'Vuelos de hoy') + ap(av('warn', '⏱️', 'AR 1872 demorado 45 min', 'Llega 19:55 · la van sale 19:25')) } },
+  { l:'d', h:'19:25', txt:'La van sale y vuelve con 3 huéspedes: la garita los ve <b>como cantidad</b> (sin nombres) y toca <b>Volvió</b>.', b:'Volvió · 3 huéspedes',
+    al:[['e', 'd', '🚐', 'Traslado corrido', 'Van 1 sale 19:25']],
+    s:{ d:() => bar('d', 'Vans del hotel') + ap(it('🚐', 'Van 1', 'Salió 19:25 · aeropuerto', 'Afuera', 'info')) } },
+  { l:'e', txt:'El hotel ve a sus huéspedes en casa. La Administración ve el movimiento de vans <b>sin nombres de huéspedes</b>.',
+    al:[['d', 'e', '🏨', 'Llegaron 3 huéspedes', 'Van 1 · 20:31']],
+    s:{ e:() => bar('e', 'El hotel en vivo') + ap(av('ok', '🏨', 'Llegaron 3 huéspedes', '20:31 · Van 1')) } },
+], fin:'El huésped nunca espera en el aeropuerto.' },
+
+{ id:'empleados', p:['hotel', 'garita'], e:'🪪', t:'Los empleados del hotel', s:'Se cargan una vez y entran solo los días que trabajan', h:'07:56', pasos:[
+  { l:'e', txt:'El hotel carga a su empleada nueva <b>una sola vez</b>: nombre, puesto, patente y los días que trabaja (lunes a viernes).', b:'Guardar y ver su credencial',
+    s:{ e:() => bar('e', 'Empleados') + ap(campo('Nombre', 'Rosa Medina'), dos(campo('Puesto', 'Mucama'), campo('Días', 'Lun a vie'))) } },
+  { l:'e', txt:'Sale su <b>credencial</b>: el QR para el parabrisas y un código de 5 signos para decir en la garita.', b:'Mandársela por WhatsApp',
+    s:{ e:() => bar('e', 'Credencial') + ap(qr('rosa'), `<div class="codigo">K7Q2M</div>`) } },
+  { l:'d', txt:'Es jueves: Rosa aparece en <b>Lo programado para hoy</b> con "Hoy le toca". El lector de patentes la reconoce y el guardia toca <b>Entró</b>.', b:'Entró',
+    s:{ d:() => bar('d', 'Lo programado para hoy') + ap(it('🏨', 'Rosa Medina · hotel', 'Mucama · hoy le toca', 'Hoy', 'ok')) } },
+], fin:'La garita no tiene que llamar a la recepción cada mañana.' },
+
+{ id:'evento', p:['hotel', 'admin', 'vecinos', 'garita'], e:'🎉', t:'Evento en el hotel', s:'El hotel avisa, la Administración lo publica y la garita espera los autos', h:'12:00', pasos:[
+  { l:'e', txt:'El hotel carga una <b>cena del sábado</b> con 60 invitados y 22 autos, y pide avisar a los vecinos.', b:'Enviar',
+    s:{ e:() => bar('e', 'Nuevo evento') + ap(campo('Evento', 'Cena del sábado'), dos(campo('Invitados', '60'), campo('Autos', '22'))) } },
+  { l:'c', txt:'A la Administración le llega para revisar. Toca <b>Publicar en el pizarrón</b>.', b:'Publicar en el pizarrón',
+    al:[['e', 'c', '🎉', 'Evento del hotel para revisar', 'Cena del sábado · 22 autos']], s:{ c:() => bar('c', 'Eventos del hotel') + ap(it('🎉', 'Cena del sábado', '60 invitados · 22 autos', 'Revisar', 'warn')) } },
+  { l:'d', txt:'Los vecinos lo ven en el pizarrón y a la garita le queda la <b>lista de patentes</b> para el sábado.',
+    al:[['c', 'a', '📌', 'Pizarrón: evento en el hotel', 'Sábado 21 h · más autos de lo habitual'], ['c', 'b', '📌', 'Pizarrón: evento en el hotel', 'Sábado 21 h'], ['c', 'd', '🎉', 'Lista de autos del sábado', '22 patentes']],
+    s:{ d:() => bar('d', 'Evento del sábado') + ap(card('Patentes esperadas', it('🚗', 'AB 123 CD', 'Invitado'), it('🚗', 'AE 455 FG', 'Invitado'), it('…', '20 más', ''))) } },
+], fin:'Un evento grande sin sorpresas para nadie.' },
+
+{ id:'promos', p:['hotel', 'vecinos'], e:'🍷', t:'Promociones del hotel para los vecinos', s:'El hotel publica y Lucía reserva desde la app', h:'13:00', pasos:[
+  { l:'e', txt:'El hotel publica una promo para vecinos: <b>cena de cordero fueguino, 20 % de descuento</b> este viernes.', b:'Publicar la promoción',
+    s:{ e:() => bar('e', 'Promociones') + ap(campo('Promo', 'Cena de cordero fueguino'), dos(campo('Descuento', '20 %'), campo('Cuándo', 'Viernes'))) } },
+  { l:'a', txt:'La promo pasa por la tira del hotel en la portada de Lucía. Toca <b>Me interesa</b>.', b:'Me interesa',
+    al:[['e', 'a', '🍷', 'Promo del hotel', 'Cordero fueguino · 20 % para vecinos'], ['e', 'b', '🍷', 'Promo del hotel', 'Cordero fueguino']],
+    s:{ a:() => bar('a', 'El hotel') + ap(card('Para vecinos', it('🍷', 'Cordero fueguino', 'Viernes · 20 % off', 'Promo', 'info'))) } },
+  { l:'e', txt:'Al hotel le llega <b>quién se interesó</b> para reservarle la mesa.',
+    al:[['a', 'e', '🙋', 'Lucía se interesó', 'Cordero fueguino · viernes']], s:{ e:() => bar('e', 'Promociones') + ap(it('🙋', 'Lucía · Lote 42', 'Cordero del viernes', 'Reservar', 'ok')) } },
+], fin:'El hotel y el barrio, buenos vecinos.' },
+
+/* ---------------- ADMINISTRACIÓN ---------------- */
+{ id:'inscripcion', p:['admin', 'vecinos'], e:'📥', t:'Un vecino nuevo se inscribe', s:'La Administración aprueba con el padrón y le da acceso a su lote', h:'10:00', pasos:[
+  { l:'b', txt:'Martín acaba de alquilar el Lote 23. Se inscribe en la app con su lote y dice que es <b>inquilino</b>.', b:'Mandar la inscripción',
+    s:{ b:() => bar('b', 'Inscribirme', { t:'Bahía Cauquén' }) + ap(campo('Nombre', 'Martín Álvarez'), dos(campo('Lote', '23'), campo('Soy', 'Inquilino'))) } },
+  { l:'c', txt:'La Administración lo ve en <b>Inscripciones</b>, cruzado con el padrón, y toca <b>Aprobar</b>.', b:'Aprobar',
+    al:[['b', 'c', '📥', 'Inscripción nueva', 'Martín · Lote 23 · inquilino']], s:{ c:() => bar('c', 'Inscripciones') + ap(it('📥', 'Martín Álvarez', 'Lote 23 · inquilino', 'Padrón ✓', 'ok')) } },
+  { l:'b', txt:'Martín entra a la app con todo lo de su lote. El propietario pasa a "propietario a distancia" y recibe el aviso.',
+    al:[['c', 'b', '✅', 'Bienvenido al barrio', 'Tu cuenta está aprobada']], s:{ b:() => BASE.b() } },
+], fin:'Cada uno ve lo de su lote, y la Administración sabe quién es quién.' },
+
+{ id:'supervision', p:['admin', 'garita'], e:'📊', t:'La Administración controla el servicio', s:'Partes de turno, alertas y el informe del mes, sin operar la garita', h:'09:00', pasos:[
+  { l:'c', txt:'La Administración mira la garita <b>en vivo, sin tocar nada</b>: ingresos, correos, policía y SOS. Abre el semáforo del día.', b:'Ver el informe del mes',
+    s:{ c:() => bar('c', 'Garita en vivo') + ap(tejas(['🟢', 'Garita conectada'], ['🟢', 'Turno ok'], ['🟢', 'Ronda 3/3']), card('El día en números', it('🚪', '48 ingresos', '+12 % que el promedio'), it('📮', '6 correos', ''))) } },
+  { l:'c', txt:'El día 1 llega el <b>informe mensual</b> por correo: tiempos de respuesta, rondas, ingresos. Sin datos personales de los vecinos.',
+    al:[['d', 'c', '📄', 'Informe de octubre', 'Garita · rondas · SOS']],
+    s:{ c:() => bar('c', 'Informe de octubre') + ap(it('⏱️', 'SOS: salida promedio', '1 min 10 s'), it('🚓', 'Rondas', '89 de 93 noches con 3 completas'), it('🚪', 'Ingresos', '1.412 en el mes')) } },
+], fin:'Controlar el servicio con datos, no con sospechas.' },
+];
+
+/* ---------- estado ---------- */
+const S = { pub:'todo', esc:0, paso:0, auto:false, vis:'a', pant:{}, hechas:new Set(), t:[] };
+const lista = () => S.pub === 'todo' ? ESC : ESC.filter(e => e.p.includes(S.pub));
+const escena = () => ESC[S.esc];
+const LADOS = ['a', 'b', 'c', 'd', 'e', 'x'];
+const datosDe = l => l === 'x' ? INV[escena().inv] || {} : TEL[l];
+const limpiarT = () => { S.t.forEach(clearTimeout); S.t = []; };
+const luego = (f, ms) => S.t.push(setTimeout(f, ms));
+
+/* ---------- armar la página ---------- */
+$('#elenco').innerHTML = [...Object.values(TEL), INV.poli, INV.mant].map(t => `<span><i style="background:${t.k}">${t.ic}</i>${esc(t.n)}</span>`).join('');
+$('#quienVe').innerHTML = [
+  [TEL.a, 'Los vecinos', 'Su casa, sus visitas, sus reclamos, sus expensas y la ronda de la noche con 10 minutos de demora. Nunca los datos de otro lote.'],
+  [TEL.c, 'La Administración', 'Padrón, expensas, reclamos, el recorrido de la ronda y la garita en vivo, para administrar y controlar. No opera la garita.'],
+  [TEL.d, 'La garita', 'Los ingresos, los correos, los SOS, el mapa con cada lote y la ronda del policía en vivo. No ve expensas ni mensajes entre vecinos.'],
+  [TEL.e, 'El hotel', 'Sus huéspedes, sus vans, sus empleados y sus promociones. Ningún dato de los vecinos.'],
+  [INV.poli, 'El policía', 'Su tarjeta, su código de la noche y su recorrido con las fotos de cada punto. Se borra de la base cuando se va.'],
+  [INV.mant, 'Mantenimiento', 'Su mapa de trabajos y los mensajes del día. Los vecinos ven que hay alguien trabajando, sin nombres.'],
+].map(([t, n, x]) => `<div class="qv" style="--k:${t.k}"><b><i>${t.ic}</i>${n}</b><p>${x}</p></div>`).join('');
+function pintarPublico(){
+  $('#publico').innerHTML = PUBLICOS.map(([k, t, e]) => `<button class="pub" data-pub="${k}" aria-pressed="${S.pub === k}">${e} ${t} <span class="n">${k === 'todo' ? ESC.length : ESC.filter(x => x.p.includes(k)).length}</span></button>`).join(' ');
+}
+function pintarCarril(){
+  $('#carril').innerHTML = lista().map(e => { const i = ESC.indexOf(e);
+    const roles = [...new Set(e.pasos.map(p => p.l))].map(l => l === 'x' ? INV[e.inv]?.k : TEL[l].k);
+    return `<button class="esc-btn ${i === S.esc ? 'on' : ''} ${S.hechas.has(i) ? 'hecha' : ''}" data-esc="${i}" role="listitem"><span class="e">${e.e}</span><b>${esc(e.t)}</b><small>${roles.map(k => `<i style="background:${k}"></i>`).join('')} ${e.pasos.length} pasos</small></button>`; }).join('');
+  const on = $('#carril .on'); if (on) on.scrollIntoView({ block:'nearest', inline:'center', behavior: quieto ? 'auto' : 'smooth' });
+}
+function pintarMesa(){
+  const e = escena();
+  $('#mesa').innerHTML = LADOS.map(l => { const t = datosDe(l); const hay = l !== 'x' || e.inv;
+    return `<div class="slot" data-l="${l}" style="--k:${t.k || '#888'}" ${hay ? '' : 'hidden'}>
+      <div class="rol"><i>${t.ic || ''}</i><span>${esc(t.n || '')} <small>${esc(t.s || '')}</small></span></div>
+      <div class="marco"><div class="tel"><div class="pant"><div class="isla"></div><div class="estado"><span class="hora">${e.h}</span><span>●●● 5G</span></div><div class="app" id="app${l}"></div><div class="pushes" id="push${l}"></div></div></div></div></div>`; }).join('');
+  $('#mesa').style.setProperty('--n', e.inv ? 6 : 5);
+  $('#pestanas').innerHTML = LADOS.filter(l => l !== 'x' || e.inv).map(l => { const t = datosDe(l); return `<button class="pest" role="tab" data-ver="${l}" style="--k:${t.k}" aria-selected="false"><i>${t.ic}</i>${esc(t.n)}</button>`; }).join('');
+  escalar();
+}
+/* Los teléfonos se dibujan a 240×500 y se escalan al lugar que hay. */
+function escalar(){
+  $$('.slot').forEach(s => {
+    const m = s.querySelector('.marco'), t = s.querySelector('.tel'); if (!m || s.offsetParent === null) return;
+    const w = Math.min(s.clientWidth, angosto() ? 320 : 260), k = w / 240;
+    t.style.transform = `scale(${k})`; t.style.setProperty('--s', k); m.style.height = (500 * k) + 'px'; m.style.width = w + 'px';
+  });
+}
+new ResizeObserver(() => escalar()).observe($('#mesa'));
+addEventListener('resize', () => { escalar(); verLado(S.vis); });
+
+/* ---------- pintar un paso ---------- */
+function pantallaInicial(l){ const e = escena(); return l === 'x' ? (BASE[e.inv] ? BASE[e.inv]() : '') : BASE[l](); }
+function pintarPaso(conAvisos = true){
+  limpiarT();
+  const e = escena(), p = e.pasos[S.paso], ultimo = S.paso >= e.pasos.length - 1;
+  /* Las pantallas de este paso pisan las anteriores; las demás quedan. */
+  if (S.paso === 0) S.pant = {};
+  for (let i = 0; i <= S.paso; i++) Object.entries(e.pasos[i].s || {}).forEach(([l, f]) => { S.pant[l] = f; });
+  LADOS.forEach(l => { const box = $('#app' + l); if (!box) return; const f = S.pant[l]; box.innerHTML = f ? f() : pantallaInicial(l); });
+  if (p.b && !ultimo){ const box = $('#app' + p.l), apx = box && box.querySelector('.ap');
+    (apx || box).insertAdjacentHTML('beforeend', `<button class="btn-go${/SOS|Necesito ayuda|DEA/.test(p.b) ? ' rojo' : ''}" data-go>${esc(p.b)}</button>`); }
+  if (!p.b && !ultimo){ const box = $('#app' + p.l), apx = box && box.querySelector('.ap'); (apx || box).insertAdjacentHTML('beforeend', `<button class="btn-go" data-go>Seguir</button>`); }
+  const hora = p.h || e.pasos.slice(0, S.paso + 1).reverse().find(x => x.h)?.h || e.h;
+  $$('.hora').forEach(h => h.textContent = hora);
+  $$('.slot').forEach(s => { s.classList.toggle('toca', s.dataset.l === p.l); s.classList.toggle('quieto', s.dataset.l !== p.l); });
+  $$('.pest').forEach(b => b.classList.toggle('toca', b.dataset.ver === p.l));
+  const t = datosDe(p.l);
+  $('#guion').style.setProperty('--k', t.k);
+  $('#guion').innerHTML = `<div class="meta"><span>Paso ${S.paso + 1} de ${e.pasos.length}</span><span class="quien"><i>${t.ic}</i>Le toca a ${esc(t.n)}</span><span>${esc(hora)} h</span></div>
+    <p>${p.txt}</p><div class="puntos">${e.pasos.map((_, i) => `<i class="${i < S.paso ? 'ya' : i === S.paso ? 'ahora' : ''}"></i>`).join('')}</div>
+    ${ultimo ? `<div class="fin"><span style="font-size:22px">🎬</span><p><b>${esc(e.fin)}</b></p><button class="ctl pri" id="otra">Siguiente situación ▶</button></div>` : ''}`;
+  $('#escTit').innerHTML = `<span>${e.e}</span>${esc(e.t)}`; $('#escSub').textContent = e.s;
+  $('#atras').disabled = S.paso === 0 && S.esc === ESC.indexOf(lista()[0]);
+  $('#adelante').textContent = ultimo ? 'Otra situación ▶' : 'Siguiente ▶';
+  verLado(p.l);
+  if (conAvisos) (p.al || []).forEach(([de, para, ic, tt, sub], i) => luego(() => enviar(de, para, ic, tt, sub), 350 + i * 650));
+  if (ultimo) S.hechas.add(S.esc);
+  if (S.auto) programarAuto();
+}
+/* En el celular se ve un teléfono por vez: el que le toca. */
+function verLado(l){
+  S.vis = l;
+  $$('.slot').forEach(s => s.classList.toggle('visible', s.dataset.l === l));
+  $$('.pest').forEach(b => { const on = b.dataset.ver === l; b.setAttribute('aria-selected', on); if (on) b.classList.remove('nuevo'); });
+  escalar();
+}
+
+/* ---------- la chispa: un aviso que viaja de un teléfono a otro ---------- */
+function enviar(de, para, ic, tt, sub){
+  const td = datosDe(de) || {}, tp = datosDe(para) || {};
+  const caja = $('#push' + para); if (!caja) return;
+  const llegar = () => {
+    const div = document.createElement('div'); div.className = 'push'; div.style.setProperty('--k', td.k);
+    div.innerHTML = `<span class="pi">${ic}</span><div><small>${esc(td.n || '')} · ahora</small><b>${esc(tt)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+    caja.prepend(div); while (caja.children.length > 2) caja.lastChild.remove();
+    const slot = $(`.slot[data-l="${para}"]`); if (slot){ slot.classList.remove('llega'); void slot.offsetWidth; slot.classList.add('llega'); }
+    luego(() => { div.classList.add('sale'); luego(() => div.remove(), 400); }, 3800);
+    if (angosto() && para !== S.vis) $(`.pest[data-ver="${para}"]`)?.classList.add('nuevo');
+    anotar(td, tp, ic, tt);
+  };
+  const a = $(`.slot[data-l="${de}"] .tel`), b = $(`.slot[data-l="${para}"] .tel`);
+  if (quieto || angosto() || !a || !b || a.offsetParent === null || b.offsetParent === null) return llegar();
+  const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+  const x0 = ra.left + ra.width / 2, y0 = ra.top + ra.height * .3, x1 = rb.left + rb.width / 2, y1 = rb.top + rb.height * .12;
+  const cx = (x0 + x1) / 2, cy = Math.min(y0, y1) - 90, dur = 780;
+  const ch = document.createElement('div'); ch.className = 'chispa'; ch.style.setProperty('--k', td.k); document.body.appendChild(ch);
+  const t0 = performance.now(); let ult = 0;
+  const paso = t => { const u = Math.min(1, (t - t0) / dur), e = u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+    const x = (1 - e) * (1 - e) * x0 + 2 * (1 - e) * e * cx + e * e * x1, y = (1 - e) * (1 - e) * y0 + 2 * (1 - e) * e * cy + e * e * y1;
+    ch.style.left = x + 'px'; ch.style.top = y + 'px';
+    if (t - ult > 28){ ult = t; const es = document.createElement('div'); es.className = 'estela'; es.style.setProperty('--k', td.k); es.style.left = x + 'px'; es.style.top = y + 'px'; document.body.appendChild(es);
+      es.animate([{ opacity:.6, transform:'scale(1)' }, { opacity:0, transform:'scale(.2)' }], { duration:420 }).onfinish = () => es.remove(); }
+    if (u < 1) requestAnimationFrame(paso); else { ch.animate([{ transform:'scale(1)', opacity:1 }, { transform:'scale(2.6)', opacity:0 }], { duration:260 }).onfinish = () => ch.remove(); llegar(); } };
+  requestAnimationFrame(paso);
+}
+function anotar(td, tp, ic, tt){
+  const f = $('#feed'); f.querySelector('.vacio')?.remove();
+  const li = document.createElement('li'); li.style.setProperty('--k', td.k || '#888');
+  li.innerHTML = `<i></i><span><b>${esc(td.n || '')} → ${esc(tp.n || '')}</b> ${ic} ${esc(tt)}</span>`;
+  f.prepend(li); while (f.children.length > 14) f.lastChild.remove();
+}
+
+/* ---------- moverse ---------- */
+function irA(i, { reiniciarFeed = true } = {}){
+  S.esc = i; S.paso = 0; S.pant = {};
+  if (reiniciarFeed) $('#feed').innerHTML = '<li class="vacio">Acá aparece cada aviso que va de un teléfono a otro.</li>';
+  pintarMesa(); pintarCarril(); pintarPaso();
+  try { history.replaceState(null, '', '#' + ESC[i].id); } catch(e){}
+}
+function adelante(){
+  const e = escena();
+  if (S.paso < e.pasos.length - 1){ S.paso++; pintarPaso(); return; }
+  const l = lista(), j = l.indexOf(e); irA(ESC.indexOf(l[(j + 1) % l.length]));
+}
+function atras(){
+  if (S.paso > 0){ S.paso--; pintarPaso(false); return; }
+  const l = lista(), j = l.indexOf(escena()); if (j > 0){ irA(ESC.indexOf(l[j - 1])); S.paso = escena().pasos.length - 1; pintarPaso(false); }
+}
+/* Modo automático: lee, "toca" el botón y sigue (para presentar en una pantalla grande). */
+function programarAuto(){
+  const p = escena().pasos[S.paso], ultimo = S.paso >= escena().pasos.length - 1;
+  const leer = Math.min(7000, 2800 + p.txt.replace(/<[^>]+>/g, '').length * 24) + (p.al || []).length * 500;
+  luego(() => { if (!S.auto) return;
+    if (ultimo){ luego(() => S.auto && adelante(), 1500); return; }
+    const b = $(`#app${p.l} [data-go]`); if (b){ b.animate([{ transform:'scale(1)' }, { transform:'scale(.94)' }, { transform:'scale(1)' }], { duration:300 }); }
+    luego(() => S.auto && adelante(), 420);
+  }, leer);
+}
+function ponerAuto(v){ S.auto = v; $('#auto').setAttribute('aria-pressed', v); $('#auto').textContent = v ? '⏸ Pausar' : '▶ Automático'; limpiarT(); if (v) programarAuto(); }
+
+/* ---------- toques ---------- */
+document.addEventListener('click', ev => {
+  const pub = ev.target.closest('[data-pub]');
+  if (pub){ S.pub = pub.dataset.pub; pintarPublico(); const l = lista(); if (!l.includes(escena())) irA(ESC.indexOf(l[0])); else pintarCarril(); return; }
+  const eb = ev.target.closest('[data-esc]'); if (eb){ ponerAuto(false); irA(+eb.dataset.esc); $('.escenario').scrollIntoView({ behavior: quieto ? 'auto' : 'smooth', block:'start' }); return; }
+  const ver = ev.target.closest('[data-ver]'); if (ver){ verLado(ver.dataset.ver); return; }
+  if (ev.target.closest('#otra')){ adelante(); return; }
+  const go = ev.target.closest('[data-go]');
+  if (go){ const l = go.closest('.slot')?.dataset.l, p = escena().pasos[S.paso];
+    if (l !== p.l){ toastTel(l, `Ahora le toca a ${datosDe(p.l).n}`); return; }
+    ponerAuto(false); adelante(); return; }
+  const tel = ev.target.closest('.tel');
+  if (tel){ const l = tel.closest('.slot')?.dataset.l, p = escena().pasos[S.paso]; if (l && l !== p.l) toastTel(l, `Ahora le toca a ${datosDe(p.l).n}`); }
+});
+function toastTel(l, txt){
+  const caja = $('#push' + l); if (!caja) return;
+  const d = document.createElement('div'); d.className = 'push'; d.style.setProperty('--k', '#64748b');
+  d.innerHTML = `<span class="pi">👉</span><div><b>${esc(txt)}</b></div>`; caja.prepend(d);
+  setTimeout(() => { d.classList.add('sale'); setTimeout(() => d.remove(), 400); }, 1600);
+}
+$('#adelante').addEventListener('click', () => { ponerAuto(false); adelante(); });
+$('#atras').addEventListener('click', () => { ponerAuto(false); atras(); });
+$('#auto').addEventListener('click', () => ponerAuto(!S.auto));
+$('#reiniciar').addEventListener('click', () => { ponerAuto(false); irA(S.esc); });
+document.addEventListener('keydown', ev => {
+  if (ev.target.closest('input,textarea,select')) return;
+  if (ev.key === 'ArrowRight'){ ponerAuto(false); adelante(); }
+  else if (ev.key === 'ArrowLeft'){ ponerAuto(false); atras(); }
+  else if (ev.key === 'a' || ev.key === 'A'){ ponerAuto(!S.auto); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) ponerAuto(false); });
+
+/* ---------- arranque (un enlace directo: …#rondavivo, #vuelo, #sos…) ---------- */
+pintarPublico();
+const ancla = (location.hash || '').slice(1), j = ESC.findIndex(x => x.id === ancla);
+irA(j >= 0 ? j : 0);
+})();
+</script>
+</body>
+</html>

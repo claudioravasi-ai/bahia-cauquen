@@ -604,7 +604,7 @@ function datosInforme(periodo){
   /* Policía: cada servicio (un ingreso), con sus rondas aunque haya pasado de un turno a otro. */
   const pol = {};
   todos.forEach(t => policiasDe(t).forEach(p => { if (!en(p.entra || 0)) return;
-    const x = pol[p.id] = pol[p.id] || { id:p.id, nombre:p.nombre, matricula:p.matricula || '', entra:p.entra, sale:0, rondas:new Map() };
+    const x = pol[p.id] = pol[p.id] || { id:p.id, nombre:p.nombre, cargo:p.cargo || '', matricula:p.matricula || '', entra:p.entra, sale:0, rondas:new Map() };
     if (p.sale) x.sale = Math.max(x.sale, p.sale);
     p.rondas.forEach(r => { const v = x.rondas.get(r.inicio); if (!v || (r.fin && !v.fin)) x.rondas.set(r.inicio, r); }); }));
   const servicios = Object.values(pol).map(p => { const rs = [...p.rondas.values()].sort((a, b) => a.inicio - b.inicio);
@@ -677,7 +677,7 @@ function informeHTML(d, { correo = false } = {}){
           v ? (v.estado === 'obs' ? '<b style="color:#c47f00">Con observaciones</b>' : '<span style="color:#1f9d55">Sin observaciones</span>') : t.cerradoAt ? '<span style="color:#9aa8a5">Sin visto</span>' : '—']; }), 'No se abrieron turnos en el período.')}
 
       ${h2(2, 'Policía contratada y rondas')}
-      ${tabla(['Ingreso', 'Policía', 'Salida', 'Horas', 'Rondas'], d.servicios.map(p => [fh(p.entra), `${esc(p.nombre)}${p.matricula ? '<br><span style="color:' + GR + '">mat. ' + esc(p.matricula) + '</span>' : ''}`, p.sale ? fh(p.sale) : 'sin salida anotada',
+      ${tabla(['Ingreso', 'Policía', 'Salida', 'Horas', 'Rondas'], d.servicios.map(p => [fh(p.entra), `${esc(p.nombre)}${p.cargo || p.matricula ? '<br><span style="color:' + GR + '">' + esc(pnCargoMat(p)) + '</span>' : ''}`, p.sale ? fh(p.sale) : 'sin salida anotada',
         p.horas == null ? '—' : p.horas.toFixed(1).replace('.', ','), `${p.completas} completas${p.incompletas ? `, <b style="color:#d64545">${p.incompletas} incompletas</b>` : ''}${p.rondas.length ? '<br><span style="color:' + GR + ';font-size:11.5px">' + p.rondas.map(r => hora(r.inicio) + (r.fin ? '–' + hora(r.fin) : '') + (r.incompleta ? ' (inc.)' : '')).join(' · ') + '</span>' : ''}`]), 'No hubo servicios del policía en el período.')}
 
       ${h2(3, 'Emergencias: SOS y DEA')}

@@ -274,6 +274,7 @@ function mapaSVG(est){
     <g class="rutas">${rutas}</g>
     <g class="lotes">${tiles}</g>
     ${typeof mantCapaMapa === 'function' ? mantCapaMapa() : ''}
+    ${typeof rondaCapaMapa === 'function' ? rondaCapaMapa() : ''}
     <g class="garita-pin" data-a="mapa-garita" role="button" aria-label="La garita">
       <circle class="g-halo" cx="${gx}" cy="${gy}" r="16"/><circle class="g-base" cx="${gx}" cy="${gy}" r="11"/>
       ${I('shield').replace('<svg class="i ', `<svg x="${gx - 7}" y="${gy - 7}" width="14" height="14" class="i g-ic `)}
@@ -308,6 +309,7 @@ function mapaBarrio({ grande = false } = {}){
     </div>
     <div class="mapa-filtrado" ${mapaFiltro && MAPA_ESTADOS[mapaFiltro] ? '' : 'hidden'}><span>Mostrando solo: <b>${esc(MAPA_ESTADOS[mapaFiltro]?.n || '')}</b></span><button data-a="mapa-filtro" data-v="${esc(mapaFiltro)}">${I('x')}Ver todo</button></div>
     ${ult ? `<button class="mapa-ultimo" data-a="mapa-ir" data-v="${esc(ult.lote)}" style="--c:${ult.sale ? '#ffd23f' : '#2fe08a'}"><i></i><b>${esc(hace(ult.at))}</b><span>${ult.no ? 'No entró' : ult.sale ? 'Salió' : 'Entró'}: ${esc(ult.texto)}</span>${I('right')}</button>` : ''}
+    ${typeof rondaTiraMapa === 'function' ? rondaTiraMapa() : ''}
     <div class="mapa-buscar">${I('search')}<input id="mapaQ" type="search" autocomplete="off" enterkeyhint="search" placeholder="¿A qué dirección va? Ej: De la Plaza 3340" aria-label="Buscar un lote en el mapa"></div>
     <div class="mapa-res" id="mapaRes"></div>
     <div class="mapa-lienzo">${mapaSVG(est)}

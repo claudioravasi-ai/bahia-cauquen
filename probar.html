@@ -705,10 +705,10 @@ const ESC = [
 { id:'ronda', grupo:'Garita y seguridad', e:'🚓', t:'El policía de la ronda, con QR', s:'Ingreso, rondas que se anotan solas y su constancia',
   a:['Teléfono del policía', 'Cabo Ruiz · ronda nocturna'], b:['Garita', 'Turno noche'], hora:'22:00',
   pasos:[
-  { lado:'b', txt:'Llega el policía contratado. En la garita se anota, en este orden, el <b>día</b>, el <b>turno</b> y la <b>hora de ingreso</b>, y después su nombre, su celular y su <b>correo</b>. Tocá <b>Registrar el ingreso</b>.',
+  { lado:'b', txt:'Llega el policía contratado. En la garita se anota su nombre, su <b>cargo</b> (agente, cabo, sargento…), la matrícula, su celular y su <b>correo</b>; la hora queda en "Ahora". Tocá <b>Registrar el ingreso</b>.',
     a:() => `<div class="ap" style="padding-top:60px"><div class="ap-centro" style="font-size:44px">🔒</div><b class="ap-centro">Ronda nocturna</b><div class="ap-centro ap-muted">Esperando el enlace de la garita…</div></div>`,
-    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card" style="display:grid;gap:8px"><h4>Ingreso del policía</h4>${campo('Día', 'Hoy, domingo 27')}${campo('Turno de la garita', 'Noche · 22 a 6')}${campo('Hora de ingreso', '22:00')}
-      ${campo('Nombre y apellido', 'Cabo Ruiz')}<div class="ap-dos">${campo('Celular', '2901 15 000123')}${campo('Correo', 'cabo.ruiz@correo.demo')}</div></div>`, btn('Registrar el ingreso')) },
+    b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card" style="display:grid;gap:8px"><h4>Ingreso del policía</h4>${campo('Hora de ingreso', 'Ahora · 22:00')}
+      ${campo('Nombre y apellido', 'Ruiz, Martín')}<div class="ap-dos">${campo('Cargo en la policía', 'Cabo')}${campo('Matrícula', '4521')}</div><div class="ap-dos">${campo('Celular', '2901 15 000123')}${campo('Correo', 'cabo.ruiz@correo.demo')}</div></div>`, btn('Registrar el ingreso')) },
   { lado:'b', txt:'La app genera un <b>código de ronda</b> que se le manda por WhatsApp. Con ese enlace, su teléfono queda habilitado solo por esta noche. Tocá <b>Mandarle el código</b>.',
     b:() => garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-card"><h4>Policía contratada</h4>${it('👮', 'Cabo Ruiz', 'Ingresó domingo 27 · turno noche · 22:00', 'De servicio', 'ok')}
       <div class="ap-muted" style="margin:8px 0 4px">Código de ronda de esta noche</div><div class="ap-codigo">482 915</div></div>`, btn('Mandarle el código por WhatsApp')) },

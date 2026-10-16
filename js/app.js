@@ -2023,10 +2023,10 @@ window.addEventListener('unhandledrejection', e => {
 const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
     'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'correo-menu', 'correo-elegir', 'correo-sale', 'correo-lotes', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
-    'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno', 'guardia-sale',
+    'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'policia-cargo', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno', 'guardia-sale',
     'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hemp-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer']),
   formularios: new Set(['validar', 'patente-buscar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
-    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'abrir-turno', 'cerrar-turno', 'casa-revisada', 'guardia-entra', 'guardia-sale']),
+    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'policia-cargo', 'abrir-turno', 'cerrar-turno', 'casa-revisada', 'guardia-entra', 'guardia-sale']),
 };
 /* Paquetes en pausa (hayPaquetes, core.js): aunque quede un botón o un
    aviso viejo que lleve ahí, no hace nada. El código sigue guardado. */
@@ -2266,6 +2266,7 @@ const PIEZAS = [
   ['js/v-cuidados.js', () => typeof Cuidado],
   ['js/v-casa.js',     () => typeof TAREAS_INVIERNO],
   ['js/mapa.js',      () => typeof mapaBarrio],
+  ['js/ronda-mapa.js', () => typeof rondaCapaMapa],
   ['js/recorrido.js', () => typeof Recorrido],
   ['js/reglas.js',    () => typeof DISPAROS],
   ['js/asistente.js',  () => typeof Asistente],

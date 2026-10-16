@@ -827,16 +827,22 @@ const ESC = [
     b:() => garitaInicio('', [it('🧰', 'Martín Soria', 'Electricista · Lote 42', 'Adentro', 'ok')]), d:() => barra('Bahía Cauquén', 'Martín Soria · proveedor', { sos:false }) + ap(aviso('ok', '✅', 'Estás adentro', 'Lote 42 · Calle 3 N.º 42')) },
   ], fin:'Nadie entra a trabajar sin seguro, y el que lo tenía vencido lo arregla desde el portón.' },
 
-{ id:'ronda', grupo:'La garita', e:'👮', t:'La ronda del policía, en vivo', s:'Escanea los 6 puntos y la garita lo sigue en el plano',
+{ id:'ronda', grupo:'La garita', e:'👮', t:'La ronda del policía, en vivo', s:'La Administración marca el recorrido, el policía escanea y todos lo siguen en el plano',
   roles:{ a:LU, b:['Garita', 'Turno noche · Guardia Sosa'], c:AD, d:['Policía', 'Cabo Gómez'] }, hora:'23:10',
   pasos:[
+  { lado:'c', hora:'18:30', txt:'De día, la Administración abre el mapa del barrio y toca <b>Editar recorrido</b>: marca en el plano los 6 puntos en orden (1, 2, 3…) y le agrega a cada uno una <b>foto chica del poste</b>. Toca <b>Finalizar</b> y ve la simulación del recorrido por las calles.',
+    a:() => inicioV('lucia', '', { saludo:'Buenas tardes,' }), b:() => garitaInicio(),
+    c:() => adminInicio(card('Recorrido de la ronda', it('1️⃣', 'Portón', 'Foto · 12 KB'), it('2️⃣', 'Perímetro norte', 'Foto · 14 KB'), it('3️⃣', 'Contenedores', 'Foto · 11 KB'), it('🟡', 'Simulación', '1,8 km · unos 24 min caminando')) + btn('Finalizar'), { sinSalas:true }),
+    d:() => poli() + ap(card('Tu recorrido', it('📷', '6 puntos con su foto', 'Guardado en tu teléfono · 72 KB'))) },
   { lado:'d', txt:'El cabo Gómez arranca la ronda. En cada punto escanea el QR pegado en el poste. Tocá <b>Escanear el próximo punto</b> (seis veces).', ronda:true,
     a:() => inicioV('lucia', '', { saludo:'Buenas noches,' }), c:() => adminInicio('', { sinSalas:true }),
     b:() => garitaRonda(), d:() => poliRonda() },
   { lado:'c', txt:'Ronda completa: queda en la bitácora y la Administración la ve en el informe. Si a la hora no hay ronda, salta el aviso a la supervisión.',
     al(){ avisar('bc', '✅', 'Ronda completa', '6 de 6 puntos · 23:10 a 23:47'); },
     c:() => adminInicio(card('Rondas de hoy', it('👮', 'Cabo Gómez', '6 de 6 puntos · 23:10 a 23:47', 'Completa', 'ok')), { sinSalas:true }) },
-  ], fin:'Ni planillas ni firmas: cada punto queda con su hora y la garita lo ve en el momento.' },
+  { lado:'a', hora:'23:58', txt:'Lucía toca las caritas de <b>De guardia</b> en la portada: ve el plano con el recorrido y los anillos de la noche, <b>Ronda 1 ✓ de 3</b>. La que está en curso le llega con 10 minutos de demora y sin el nombre del policía, por seguridad.',
+    a:() => inicioV('lucia', card('La ronda del policía', it('✅', 'Ronda 1', '23:10 a 23:47', 'Completa', 'ok'), it('⭕', 'Ronda 2', 'Pendiente'), it('⭕', 'Ronda 3', 'Pendiente')), { saludo:'Buenas noches,' }) },
+  ], fin:'Ni planillas ni firmas: cada punto queda con su hora, la garita lo ve en el momento y los vecinos saben que la ronda se hizo.' },
 
 /* ======================= HOTEL Y AEROPUERTO ======================= */
 { id:'avion', grupo:'Hotel y aeropuerto', e:'✈️', t:'El vuelo se demora y el traslado se corre solo', s:'El hotel carga el vuelo del huésped; la app lo sigue',

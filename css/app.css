@@ -5514,3 +5514,182 @@ body.mv-modo{background:#06161c}
 .hemp-av{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;color:#fff;background:hsl(var(--h,25) 55% 45%)}
 .hemp-av.grande{width:56px;height:56px;font-size:20px}
 .hemp-cod{letter-spacing:.18em;font-family:ui-monospace,"SF Mono",Menlo,monospace}
+
+/* =========================================================
+   LA RONDA DEL POLICÍA EN EL PLANO (15-10-2026, js/ronda-mapa.js)
+   Azul eléctrico: el recorrido planeado · verde: lo que ya pasó ·
+   azul y rojo que titilan: el policía.
+   ========================================================= */
+.ronda-capa .rm-tramo{fill:none;stroke:#5b8cff;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:9 7;opacity:.95;
+  filter:drop-shadow(0 0 4px rgba(91,140,255,.65));animation:rmFluye 1.6s linear infinite}
+.ronda-capa .rm-tramo.hecho{stroke:#2fe08a;stroke-dasharray:none;stroke-width:5.2;filter:drop-shadow(0 0 5px rgba(47,224,138,.7));animation:none}
+@keyframes rmFluye{to{stroke-dashoffset:-32}}
+.ronda-capa .rm-pin{cursor:pointer}
+.ronda-capa .rm-base{fill:#2348d8;stroke:#fff;stroke-width:2.6;filter:drop-shadow(0 3px 5px rgba(0,0,0,.45))}
+.ronda-capa .rm-num{fill:#fff;font:800 11px var(--font);text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.ronda-capa .rm-pin.hecho .rm-base{fill:#15a862}
+.ronda-capa .rm-pin.sel .rm-base{fill:#ff9a3d;stroke-width:3.4}
+.ronda-capa .rm-cam{fill:#ffd23f;stroke:#0a2236;stroke-width:1.2}
+.ronda-capa .rm-hora{fill:#b9ffd9;font:800 8px var(--font);text-anchor:middle;paint-order:stroke;stroke:#06263a;stroke-width:3px}
+.ronda-capa .rm-onda{fill:none;stroke:#5b8cff;stroke-width:2.5;transform-box:fill-box;transform-origin:center;animation:rmOnda 1.6s ease-out infinite}
+@keyframes rmOnda{from{transform:scale(1);opacity:.9}to{transform:scale(2.4);opacity:0}}
+.ronda-capa .rm-poli-halo{fill:rgba(91,140,255,.22);stroke:#5b8cff;stroke-width:1.5;animation:rmSirena 1s steps(1) infinite}
+.ronda-capa .rm-poli-chapa{fill:#0b1f3a;stroke:#fff;stroke-width:1.6}
+.ronda-capa .rm-poli-ic{color:#ffd54a}
+@keyframes rmSirena{0%{stroke:#3d7bff;fill:rgba(61,123,255,.25)}50%{stroke:#ff3b4e;fill:rgba(255,59,78,.25)}}
+/* La simulación: la línea se dibuja del 1 al último y un patrullero la recorre. */
+.ronda-capa .rm-sim{fill:none;stroke:#ffe066;stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;opacity:.9;
+  filter:drop-shadow(0 0 6px rgba(255,224,102,.8));animation:rmDibuja calc(var(--n) * 1.6s) linear infinite}
+@keyframes rmDibuja{0%{stroke-dashoffset:1}85%{stroke-dashoffset:0;opacity:.9}100%{stroke-dashoffset:0;opacity:0}}
+.ronda-capa.sim .rm-pin{animation:rmAparece .5s both;animation-delay:var(--d)}
+@keyframes rmAparece{from{opacity:0;transform:translateY(-6px)}}
+.ronda-capa.sim .rm-pin{transform-box:fill-box}
+.rm-auto-c{fill:#0b1f3a;stroke:#ffe066;stroke-width:2.4}
+.rm-auto-l{fill:#ff3b4e;animation:rmLuz .5s steps(1) infinite}
+@keyframes rmLuz{50%{fill:#3d7bff}}
+.ronda-capa.editar .rm-tramo{animation:none;stroke-dasharray:6 6}
+.ronda-capa.editar .rm-pin .rm-base{stroke:#ffe066}
+.mapa-svg.lejos .ronda-capa .rm-hora{display:none}
+
+/* La tira de la ronda arriba del mapa */
+.rm-tira{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;margin:10px 0 0;padding:8px 8px 8px 10px;border-radius:16px;
+  background:linear-gradient(100deg,rgba(35,72,216,.32),rgba(11,31,58,.55));border:1px solid rgba(91,140,255,.4)}
+.rm-tira.vivo{border-color:rgba(47,224,138,.55);box-shadow:0 0 0 1px rgba(47,224,138,.2),0 0 22px rgba(47,224,138,.15)}
+.rm-tira.vacia{grid-template-columns:auto minmax(0,1fr) auto;color:#dbe8ff}
+.rm-tira.vacia>.i{color:#8fb0ff}
+.rm-tira span b{display:block;font-size:13.5px}
+.rm-tira span{font-size:12px;color:#b9cdf5;line-height:1.3;min-width:0}
+.rm-tira-on{display:flex;align-items:center;gap:9px;text-align:left;color:#eaf1ff;min-width:0}
+.rm-tira-on>.i{flex:none;width:30px;height:30px;padding:6px;border-radius:10px;background:#2348d8;color:#ffd54a}
+.rm-tira-on span{flex:1;min-width:0}
+.rm-sw{flex:none;width:34px;height:20px;border-radius:99px;background:rgba(255,255,255,.2);position:relative;transition:background .2s}
+.rm-sw::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s}
+.rm-tira-on.on .rm-sw{background:#2fe08a}
+.rm-tira-on.on .rm-sw::after{transform:translateX(14px)}
+.rm-tira-acc{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.rm-falta{grid-column:1/-1;margin:2px 0 0;font-size:12px;color:#ffd98a;display:flex;gap:6px;align-items:flex-start}
+.rm-falta .i{flex:none;width:15px;height:15px;margin-top:1px}
+@container (max-width:460px){ .rm-tira{grid-template-columns:1fr} .rm-tira-acc{justify-content:flex-start} .rm-tira.vacia{grid-template-columns:auto 1fr} .rm-tira.vacia .btn{grid-column:1/-1} }
+
+/* El editor de la Administración */
+.rm-editor{margin:10px 0 0;padding:12px;border-radius:18px;background:rgba(6,20,40,.7);border:1.5px solid #ffe066;box-shadow:0 0 0 4px rgba(255,224,102,.08)}
+.rm-ed-cab{display:flex;gap:10px;align-items:flex-start}
+.rm-ed-ic{flex:none;width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:#ffe066;color:#3a2a00}
+.rm-ed-cab b{display:block;font-size:14.5px}
+.rm-ed-cab small{display:block;font-size:12.5px;color:#cfe0ff;line-height:1.35}
+.rm-ed-cab small b{display:inline;color:#ffe066;font-size:inherit}
+.rm-ed-lista{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px;max-height:300px;overflow:auto}
+.rm-ed-lista li{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;gap:7px;align-items:center;padding:6px;border-radius:13px;background:rgba(255,255,255,.06);border:1px solid transparent}
+.rm-ed-lista li.sel{border-color:#ff9a3d;background:rgba(255,154,61,.14)}
+.rm-ed-lista li.falta .rm-ed-n{background:transparent;border:2px dashed #8fb0ff;color:#8fb0ff}
+.rm-ed-n{width:30px;height:30px;border-radius:50%;background:#2348d8;color:#fff;font-weight:800;font-size:13px;border:2px solid #fff}
+li.sel .rm-ed-n{background:#ff9a3d}
+.rm-ed-foto{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.1);color:#ffe066;cursor:pointer;overflow:hidden}
+.rm-ed-foto img{width:100%;height:100%;object-fit:cover}
+.rm-ed-foto .i{width:19px;height:19px}
+.rm-ed-txt{min-width:0}
+.rm-ed-nom{width:100%;min-width:0;background:transparent;border:0;border-bottom:1px dashed rgba(255,255,255,.3);color:#fff;font:700 13.5px var(--font);padding:2px 0}
+.rm-ed-nom:focus{outline:none;border-bottom-color:#ffe066}
+.rm-ed-txt small{display:block;font-size:11px;color:#a9c2e6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm-ed-mov{display:flex;flex-direction:column;gap:2px}
+.rm-ed-mov button{width:26px;height:17px;border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:9px;line-height:1}
+.rm-ed-mov button:disabled{opacity:.25}
+.rm-ed-x{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;color:#ffb3b9;background:rgba(255,77,94,.14)}
+.rm-ed-x .i{width:15px;height:15px}
+.rm-ed-largo{margin:8px 2px 0;font-size:12.5px;color:#ffe066;display:flex;gap:6px;align-items:center}
+.rm-ed-largo .i{width:15px;height:15px}
+.rm-ed-acc{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.rm-ed-acc .btn-pri{margin-left:auto}
+.rm-ed-nota{margin:6px 2px 0;font-size:11.5px;color:#a9c2e6}
+@container (max-width:420px){ .rm-ed-acc .btn{flex:1 1 30%;justify-content:center} .rm-ed-acc .btn-pri{margin-left:0;flex-basis:100%} }
+
+/* Los anillos de la noche (ronda 1, 2, 3) */
+.rm-anillos{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin:10px 0 0}
+.rm-anillo{display:grid;justify-items:center;gap:2px;padding:10px 6px 8px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);text-align:center;min-width:0}
+.rm-anillo i{--c:#5b8cff;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:13px;color:var(--ink);
+  background:radial-gradient(closest-side,var(--surface) 76%,transparent 78% 100%),conic-gradient(var(--c) calc(var(--p) * 360deg),var(--line-2) 0)}
+.rm-anillo i .i{width:20px;height:20px;color:#fff}
+.rm-anillo.ok i{background:linear-gradient(135deg,#1fbf75,#0e8f55);box-shadow:0 6px 16px rgba(27,143,90,.35)}
+.rm-anillo.curso i{--c:#2fe08a;animation:rmLate 1.8s ease-in-out infinite}
+@keyframes rmLate{50%{box-shadow:0 0 0 6px rgba(47,224,138,.18)}}
+.rm-anillo b{font-size:12.5px}
+.rm-anillo small{font-size:11px;color:var(--muted);line-height:1.25}
+.rm-nota-inc{display:flex;gap:6px;align-items:flex-start;margin:8px 2px 0;font-size:12px;color:var(--warn)}
+.rm-nota-inc .i{flex:none;width:15px;height:15px;margin-top:1px}
+.rm-banda{margin:8px 0 0}
+.rm-banda>.btn{margin-top:8px}
+
+/* El mapa chico (vecinos, garita y teléfono del policía) */
+.rm-vecinos{margin:12px 0 0;padding:12px;border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,#2348d8 9%,var(--surface)),var(--surface));border:1px solid color-mix(in srgb,#2348d8 25%,var(--line))}
+.rm-v-cab{display:flex;gap:10px;align-items:center}
+.rm-v-ic{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#2348d8,#0b1f3a);color:#ffd54a}
+.rm-v-cab b{display:block;font-size:14.5px}
+.rm-v-cab small{display:block;font-size:12px;color:var(--muted);line-height:1.3}
+.rm-mini-caja{margin:10px 0 0;border-radius:16px;overflow:hidden;background:#0a2236;aspect-ratio:1030/420;border:1px solid rgba(91,140,255,.35)}
+.rm-mini{display:block;width:100%;height:100%}
+.rm-mini .rm-tierra{fill:#0b1f2e}
+.rm-mini .rm-mar{fill:#0f5c8f}
+.rm-mini .rm-calles polyline{fill:none;stroke:#2f5871;stroke-width:12;stroke-linecap:round;stroke-linejoin:round}
+.rm-mini .rm-lotes rect{fill:#17384c;stroke:#21506a;stroke-width:1}
+.rm-mini .rm-garita circle{fill:#2fe08a;stroke:#fff;stroke-width:2.5}
+.rm-mini .rm-garita text{fill:#2fe08a;font:800 12px var(--font);text-anchor:middle}
+.rm-sim-hoja .rm-mini{border-radius:16px;overflow:hidden;background:#0a2236}
+.rm-foto-grande{display:block;width:100%;max-height:52vh;object-fit:cover;border-radius:16px;background:var(--surface-2)}
+.rm-th{width:34px;height:34px;border-radius:11px;object-fit:cover;flex:none}
+.rm-meta{margin:12px 0 0;display:grid;gap:4px}
+.rm-meta label{font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.rm-meta div{display:flex;gap:8px;align-items:center}
+.rm-meta input{width:84px}
+.rm-pf{display:flex;gap:10px;align-items:center}
+.rm-pf-prev{flex:none;width:64px;height:64px;border-radius:14px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;color:var(--muted)}
+.rm-pf-prev img{width:100%;height:100%;object-fit:cover}
+
+/* La guía en el teléfono del policía (pantalla pública, sobre la foto) */
+.rm-guia-caja{margin-top:10px}
+.rm-guia-tit{font-size:16px;margin:14px 0 4px;display:flex;gap:6px;align-items:center}
+.rm-guia-tit .i{width:18px;height:18px}
+.rm-guia .rm-mini-caja{margin:6px 0 10px}
+.rm-guia-lista{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.rm-guia-lista li{display:grid;grid-template-columns:auto 64px minmax(0,1fr);gap:10px;align-items:center;padding:6px;border-radius:14px;background:rgba(255,255,255,.12)}
+.rm-guia-lista li.hecho{background:rgba(47,224,138,.2)}
+.rm-gn{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#2348d8;color:#fff;font-weight:800;border:2px solid #fff}
+li.hecho .rm-gn{background:#15a862}
+.rm-guia-lista img,.rm-gsin{width:64px;height:48px;border-radius:10px;object-fit:cover;display:grid;place-items:center;background:rgba(255,255,255,.12)}
+.rm-gt b{display:block;font-size:14px}
+.rm-gt small{display:block;font-size:12px;opacity:.85}
+.rm-pp-foto{display:block;width:100%;max-height:40vh;object-fit:cover;border-radius:16px;margin:0 0 12px;border:2px solid rgba(255,255,255,.4)}
+.rm-pp{margin-top:10px}
+.rm-pp>small{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin:0 0 4px}
+.rm-pp-in{display:flex;gap:10px;align-items:center;padding:8px;border-radius:14px;background:rgba(255,255,255,.14)}
+.rm-pp-in img,.rm-pp-in .rm-gsin{width:84px;height:62px;border-radius:10px;object-fit:cover;flex:none}
+.rm-pp-in b{display:block}
+.rm-pp-in small{display:block;font-size:12px;opacity:.85}
+@media (prefers-reduced-motion:reduce){
+  .ronda-capa .rm-tramo,.ronda-capa .rm-onda,.ronda-capa .rm-poli-halo,.rm-auto-l,.rm-anillo.curso i,.ronda-capa.sim .rm-pin{animation:none}
+  .ronda-capa .rm-sim{animation:none;stroke-dashoffset:0}
+  .rm-auto{display:none}
+}
+.rm-tira-on,.rm-ed-n,.rm-ed-mov button,.rm-ed-x{font:inherit;border:0;padding:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rm-ed-n{background:#2348d8;border:2px solid #fff}
+.rm-ed-mov button{background:rgba(255,255,255,.12)}
+.rm-ed-x{background:rgba(255,77,94,.14)}
+.rm-editor .rm-ed-lista input.rm-ed-nom{height:auto;min-height:0;padding:3px 0;margin:0;border:0;border-bottom:1px dashed rgba(255,255,255,.35);border-radius:0;background:transparent;box-shadow:none;color:#fff;font:700 13.5px var(--font)}
+.rm-editor .rm-ed-lista input.rm-ed-nom:focus{border-bottom-color:#ffe066;box-shadow:none}
+.rm-editor .rm-ed-lista button.rm-ed-n{background:#2348d8;color:#fff;border:2px solid #fff}
+.rm-editor .rm-ed-lista li.sel button.rm-ed-n{background:#ff9a3d}
+.rm-editor .rm-ed-lista li.falta button.rm-ed-n{background:transparent;border:2px dashed #8fb0ff;color:#8fb0ff}
+.rm-editor .rm-ed-mov button{background:rgba(255,255,255,.14);color:#fff;border:0;padding:0}
+.rm-editor .rm-ed-x{border:0;padding:0}
+@container (max-width:440px){
+  .rm-ed-lista li{grid-template-columns:auto auto minmax(0,1fr) auto;row-gap:4px}
+  .rm-ed-lista .rm-ed-mov{grid-column:3;grid-row:2;flex-direction:row;gap:6px}
+  .rm-ed-lista .rm-ed-mov button{width:34px;height:22px;font-size:10px}
+  .rm-ed-lista .rm-ed-x{grid-column:4;grid-row:1}
+  .rm-ed-lista .rm-ed-n,.rm-ed-lista .rm-ed-foto{grid-row:1/3}
+}
+@container (max-width:440px){
+  .rm-editor{padding:10px}
+  .rm-ed-lista .rm-ed-txt{grid-column:3/5;grid-row:1}
+  .rm-ed-lista .rm-ed-x{grid-column:4;grid-row:2;width:30px;height:24px;justify-self:end}
+  .rm-ed-lista .rm-ed-foto{width:34px;height:34px}
+}
