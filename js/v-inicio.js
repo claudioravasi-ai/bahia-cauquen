@@ -248,6 +248,59 @@ function tarjetaPase(p, { garita = false } = {}){
     </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} ${p.borrado.admin ? 'La Administración la borró' : 'El vecino la sacó de su lista'} ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
 }
 
+/* PERSONAL FIJO EN UNA SOLA TARJETA (pedido de Claudio, 16-10-2026: "Estela
+   figura en Hoy y en Personal fijo con la misma entrada y salida: no quiero
+   contaminación visual"). El personal fijo ya no se repite en "Hoy": tiene
+   su propia tarjeta con un anillo de estado (verde latiendo si está adentro,
+   tilde si ya se fue), la barra del día (el horario autorizado de fondo y
+   encima el rato que estuvo, con la marca de "ahora") y la semana en
+   puntitos (los días que vino, los que viene y los que faltó). Las acciones
+   quedan en una fila de íconos. */
+function tarjetaFijo(p){
+  const hoy = hoyISO(), est = estadoPase(p), l = (p.log || {})[hoy] || {}, vieneHoy = paseValidoEn(p, hoy);
+  const ini = String(p.nombre || '?').trim().split(/\s+/).map(x => x[0] || '').join('').slice(0, 2).toUpperCase();
+  const mins = x => { const d = new Date(x); return d.getHours() * 60 + d.getMinutes(); };
+  const dur = ms => { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ' ' + String(m % 60).padStart(2, '0') + ' min' : ''}`; };
+  /* El estado en palabras, corto. */
+  const estado = l.out ? { k:'fuera', t:`Se fue ${hora(l.out)} h`, s:`estuvo ${dur(l.out - l.in)}` }
+    : l.in ? { k:'adentro', t:'Está adentro', s:`desde las ${hora(l.in)} h` }
+    : vieneHoy ? { k: est === 'noingreso' || est === 'nollego' ? 'tarde' : 'espera', t: est === 'nollego' ? 'Hoy no vino' : est === 'noingreso' ? 'Todavía no llegó' : 'La esperás hoy', s:`de ${p.desde} a ${p.hasta} h` }
+    : { k:'libre', t:'Hoy no viene', s:'' };
+  /* La barra del día: del horario autorizado (con media hora de margen) a lo que estuvo de verdad. */
+  let barra = '';
+  if (vieneHoy || l.in){
+    const d = minutosDe(p.desde), h = minutosDe(p.hasta), a = l.in ? mins(l.in) : null, b = l.out ? mins(l.out) : l.in ? ahoraMin() : null;
+    const ini0 = Math.min(d, a ?? d) - 30, fin0 = Math.max(h, b ?? h) + 30, pc = m => ((m - ini0) / (fin0 - ini0) * 100).toFixed(1) + '%';
+    const ya = ahoraMin();
+    barra = `<div class="pf-dia" aria-label="Horario ${p.desde} a ${p.hasta}${l.in ? `, entró ${hora(l.in)}` : ''}${l.out ? `, salió ${hora(l.out)}` : ''}">
+      <div class="pf-pista"><i class="pf-aut" style="left:${pc(d)};width:calc(${pc(h)} - ${pc(d)})"></i>
+        ${a != null ? `<i class="pf-real${l.out ? '' : ' vivo'}" style="left:${pc(a)};width:calc(${pc(b)} - ${pc(a)})"></i>` : ''}
+        ${ya > ini0 && ya < fin0 && !l.out ? `<i class="pf-ahora" style="left:${pc(ya)}"></i>` : ''}</div>
+      <div class="pf-horas"><span style="left:${pc(d)}">${p.desde}</span><span style="left:${pc(h)}">${p.hasta}</span>
+        ${a != null ? `<b class="in" style="left:${pc(a)}">${I('login')}${hora(l.in)}</b>` : ''}${l.out ? `<b class="out" style="left:${pc(b)}">${I('logout')}${hora(l.out)}</b>` : ''}</div></div>`;
+  }
+  /* La semana (de lunes a domingo). */
+  const f = fechaDe(hoy), lunes = sumarDias(hoy, -((f.getDay() + 6) % 7));
+  const semana = Array.from({ length:7 }, (_, i) => { const iso = sumarDias(lunes, i), dw = fechaDe(iso).getDay(), toca = paseValidoEn(p, iso), vino = !!(p.log && p.log[iso] && p.log[iso].in);
+    const k = vino ? 'vino' : !toca ? 'no' : iso > hoy || (iso === hoy && !l.in) ? 'toca' : 'falto';
+    return `<span class="pf-d ${k}${iso === hoy ? ' hoy' : ''}" title="${DIAS[dw]}: ${{ vino:'vino', no:'no viene', toca:'viene', falto:'no vino' }[k]}"><i></i>${DIAS[dw][0]}</span>`; }).join('');
+  const mes = hoy.slice(0, 7), enMes = Object.keys(p.log || {}).filter(d => d.startsWith(mes) && p.log[d].in).length;
+  const t = TIPOS_PASE[p.tipo] || TIPOS_PASE.personal || TIPOS_PASE.visita;
+  return `<div class="card pf ${estado.k}">
+    <div class="pf-cab"><span class="pf-av"><b>${esc(ini)}</b>${estado.k === 'fuera' ? `<em>${I('check')}</em>` : ''}</span>
+      <div class="pf-nom"><b>${esc(p.nombre)}</b><small>${p.tipo && p.tipo !== 'personal' ? esc(t.n) + ' · ' : ''}${p.dias.slice().sort((a, b) => (a + 6) % 7 - (b + 6) % 7).map(d => DIAS[d][0]).join(' ')} · ${p.desde}–${p.hasta}</small></div>
+      <div class="pf-est"><b>${estado.t}</b>${estado.s ? `<small>${estado.s}</small>` : ''}</div></div>
+    ${barra}
+    <div class="pf-pie"><div class="pf-sem" aria-label="Esta semana">${semana}</div><span class="pf-mes">${plural(enMes, 'día')} este mes</span></div>
+    <div class="pf-acc">
+      <button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}" title="Ver pase">${I('qr')}<span>Pase</span></button>
+      <button class="btn btn-sm btn-sec" data-a="compartir-pase" data-id="${p.id}" title="Enviar el pase">${I('share')}<span>Enviar</span></button>
+      ${p.tel ? `<a class="btn btn-sm btn-sec" href="${telLink(p.tel)}" title="Llamar">${I('phone')}<span>Llamar</span></a>` : ''}
+      <button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}<span>Editar</span></button>
+      <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button></div>
+  </div>`;
+}
+
 /* LA ADMINISTRACIÓN EDITA Y BORRA CUALQUIER VISITA (pedido de Claudio,
    11-10-2026). En "Visitas del barrio" y en la garita en vivo: ver el
    pase, editarlo y borrarlo. Lo que hace queda en la auditoría y al vecino
@@ -1172,13 +1225,16 @@ R.visitas = {
     const deHoy = mios.filter(p => paseValidoEn(p, hoy) || p.log?.[hoy]);
     const futuros = mios.filter(p => !p.dias?.length && p.fecha > hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
     const fijos = mios.filter(p => p.dias?.length && (p.fechaFin || '') >= hoy);
+    /* El personal fijo va solo en su sección (no se repite en "Hoy"); primero los que vienen hoy. */
+    const deHoyV = deHoy.filter(p => !fijos.includes(p));
+    fijos.sort((a, b) => paseValidoEn(b, hoy) - paseValidoEn(a, hoy) || String(a.desde).localeCompare(String(b.desde)));
     const llegadas = s.llegadas.filter(l => llegadaDeMiLote(l, u)).slice(0, 5);
     const pedidos = s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente');
-    const mes = hoy.slice(0, 7);
     return `
       ${superficie({ a:'link-pedir', icon:'share', color:'accent', t:'Pasale un enlace a tu visita', s:'Completa sus datos desde su celular y le sale su QR al instante' })}
       ${pedidos.map(r => aviso('info', 'qr', `${esc(r.nombre)} te pide un pase`, `${fechaCorta(r.fecha)} · ${r.desde}`, `<button class="btn btn-xs btn-ok" data-a="sol-pase-si" data-id="${r.id}">Aprobar</button><button class="btn btn-xs btn-sec" data-a="sol-pase-no" data-id="${r.id}">Rechazar</button>`)).join('')}
-      ${sec('Hoy')}${deHoy.length ? deHoy.map(p => tarjetaPase(p)).join('') : vacio('users', 'No anunciaste a nadie para hoy.')}
+      ${sec('Hoy')}${deHoyV.length ? deHoyV.map(p => tarjetaPase(p)).join('') : vacio('users', fijos.some(p => paseValidoEn(p, hoy)) ? 'No anunciaste visitas para hoy. Tu personal fijo está acá abajo.' : 'No anunciaste a nadie para hoy.')}
+      ${fijos.length ? sec('Personal fijo', `<span class="muted small">${fijos.filter(p => paseValidoEn(p, hoy)).length ? plural(fijos.filter(p => paseValidoEn(p, hoy)).length, 'viene', 'vienen') + ' hoy' : ''}</span>`) + fijos.map(tarjetaFijo).join('') : ''}
       ${futuros.length ? sec('Próximas') + futuros.map(p => tarjetaPase(p)).join('') : ''}
       ${(() => { const idas = s.pases.filter(p => paseDeMiLote(p, u) && !p.borrado && !deHoy.includes(p) && !futuros.includes(p) && !fijos.includes(p)
           && (p.fechaFin || p.fecha) < hoy && (p.fechaFin || p.fecha) >= sumarDias(hoy, -60)).sort((a, b) => (b.fechaFin || b.fecha).localeCompare(a.fechaFin || a.fecha));
@@ -1186,10 +1242,6 @@ R.visitas = {
           const dias = Object.keys(p.log || {}).sort(), ult = dias.at(-1), l = ult ? p.log[ult] : null;
           return tarjetaPase(p).replace(/<span class="estado [^"]*">[^<]*<\/span>/, `<span class="estado e-${p.cancelado ? 'cancelado' : l?.out ? 'salio' : l?.in ? 'adentro' : 'vencido'}">${p.cancelado ? 'Cancelado' : l?.out ? `Salió ${hora(l.out)}` : l?.in ? `Entró ${hora(l.in)}` : 'No vino'}</span>`);
         }).join('') : ''; })()}
-      ${fijos.length ? sec('Personal fijo') + fijos.map(p => {
-        const dias = Object.keys(p.log || {}).filter(d => d.startsWith(mes) && p.log[d].in).length;
-        return tarjetaPase(p) .replace('</div></div>', `</div><div class="muted small" style="margin-top:8px">${I('check')} Asistencia de este mes: ${plural(dias, 'día')}</div></div>`);
-      }).join('') : ''}
       ${llegadas.length ? sec('Llegadas sin aviso') + llegadas.map(l => `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span>
         <div class="datos"><b>${esc(l.nombre)}</b><span>${esc(l.motivo || '')} · ${hace(l.at)}</span></div><span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Autorizado', rechazado: l.noEsta ? 'No estaba' : 'Rechazado' }[l.estado]}</span></div>${l.respondio && l.respondio !== u.id ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio).split(' ')[0])}</div>` : ''}</div>`).join('') : ''}
       ${sec('Avisos a la guardia')}

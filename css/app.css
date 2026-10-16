@@ -5693,3 +5693,49 @@ li.hecho .rm-gn{background:#15a862}
   .rm-ed-lista .rm-ed-x{grid-column:4;grid-row:2;width:30px;height:24px;justify-self:end}
   .rm-ed-lista .rm-ed-foto{width:34px;height:34px}
 }
+
+/* ---------- Personal fijo: una sola tarjeta con anillo, barra del día y semana (16-10-2026) ---------- */
+.pf{padding:14px;--c:var(--muted)}
+.pf.adentro{--c:var(--ok)} .pf.fuera{--c:var(--sky)} .pf.espera{--c:var(--brand)} .pf.tarde{--c:var(--warn)}
+.pf-cab{display:flex;align-items:center;gap:12px}
+.pf-av{position:relative;flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);box-shadow:0 0 0 3px var(--surface),0 0 0 5.5px var(--c)}
+.pf.libre .pf-av{box-shadow:0 0 0 3px var(--surface),0 0 0 4px var(--line-2)}
+.pf.espera .pf-av{box-shadow:0 0 0 3px var(--surface);outline:2.5px dashed var(--c);outline-offset:3px}
+.pf-av b{font-size:15px;font-weight:800;color:var(--ink);letter-spacing:.3px}
+.pf.adentro .pf-av::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2.5px solid var(--ok);animation:pfLate 1.8s ease-out infinite}
+@keyframes pfLate{from{transform:scale(1);opacity:.7}to{transform:scale(1.3);opacity:0}}
+.pf-av em{position:absolute;right:-5px;bottom:-5px;width:20px;height:20px;border-radius:50%;background:var(--c);color:#fff;display:grid;place-items:center;border:2px solid var(--surface)}
+.pf-av em svg{width:12px;height:12px}
+.pf-nom{flex:1;min-width:0}
+.pf-nom b{display:block;font-size:15.5px;line-height:1.2}
+.pf-nom small{display:block;color:var(--muted);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-est{flex:none;text-align:right;max-width:44%}
+.pf-est b{display:block;font-size:13px;font-weight:800;color:var(--c)}
+.pf.libre .pf-est b{color:var(--muted)}
+.pf-est small{display:block;font-size:11.5px;color:var(--muted)}
+.pf-dia{margin:14px 2px 0}
+.pf-pista{position:relative;height:12px;border-radius:999px;background:var(--surface-3)}
+.pf-pista i{position:absolute;top:0;bottom:0;border-radius:999px}
+.pf-aut{background:repeating-linear-gradient(135deg,var(--brand-soft) 0 6px,transparent 6px 10px);box-shadow:inset 0 0 0 1.5px var(--brand-soft)}
+.pf-real{background:var(--c);top:2px!important;bottom:2px!important;min-width:6px}
+.pf-real.vivo{background:linear-gradient(90deg,var(--ok),color-mix(in srgb,var(--ok) 55%,#fff));background-size:200% 100%;animation:pfCorre 2.4s linear infinite}
+@keyframes pfCorre{from{background-position:100% 0}to{background-position:-100% 0}}
+.pf-ahora{width:2px;top:-4px!important;bottom:-4px!important;background:var(--danger);border-radius:2px}
+.pf-horas{position:relative;height:20px;margin-top:4px;font-size:10.5px;color:var(--muted)}
+.pf-horas>*{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.pf-horas b{display:inline-flex;align-items:center;gap:2px;font-weight:800;color:var(--ink);top:-30px;background:var(--surface);padding:0 4px;border-radius:6px;font-size:10.5px}
+.pf-horas b svg{width:10px;height:10px;color:var(--c)}
+.pf-dia:has(.pf-horas b){margin-top:30px}
+.pf-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.pf-sem{display:flex;gap:6px}
+.pf-d{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:700;color:var(--muted)}
+.pf-d i{width:10px;height:10px;border-radius:50%;background:transparent;border:1.5px solid var(--line-2)}
+.pf-d.no i{border-color:transparent;background:var(--surface-3);transform:scale(.6)}
+.pf-d.toca i{border-color:var(--brand)}
+.pf-d.vino i{background:var(--ok);border-color:var(--ok)}
+.pf-d.falto i{border-color:var(--danger);background:var(--danger-soft)}
+.pf-d.hoy{color:var(--ink)} .pf-d.hoy i{box-shadow:0 0 0 2.5px var(--surface),0 0 0 4px var(--ink-2)}
+.pf-mes{font-size:11.5px;font-weight:700;color:var(--ink-2);white-space:nowrap}
+.pf-acc{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+@media (max-width:380px){ .pf-acc .btn span{display:none} .pf-sem{gap:4px} }
+@media (prefers-reduced-motion:reduce){ .pf.adentro .pf-av::after,.pf-real.vivo{animation:none} }

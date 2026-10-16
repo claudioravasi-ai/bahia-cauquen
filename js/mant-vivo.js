@@ -94,6 +94,7 @@ function mvEntrada(s, m, ahora){
   s.mantCodigos.push(c);
   s.mantVivo = aLista(s.mantVivo).filter(x => x && !(x.tipo === 'p' && x.mid === m.id));
   s.mantVivo.push({ id:'p' + m.id, tipo:'p', mid:m.id, nombre:mvCorto(m), entra:ahora });
+  if (typeof mantHoyPublico === 'function') mantHoyPublico(s, m.id);
   return c;
 }
 /* Después de marcar la entrada (en el mismo toque, para que el teléfono
@@ -289,6 +290,7 @@ function mvMapaSVG({ puntos = mvPuntos(), mio = '', sel = '', borrador = null, f
     <g class="mv-lotes">${tiles}</g>
     <g class="garita-pin"><circle class="g-halo" cx="${gx}" cy="${gy}" r="16"/><circle class="g-base" cx="${gx}" cy="${gy}" r="11"/>
       ${I('shield').replace('<svg class="i ', `<svg x="${gx - 7}" y="${gy - 7}" width="14" height="14" class="i g-ic `)}<text class="g-txt" x="${gx}" y="${gy - 18}">GARITA</text></g>
+    ${typeof mantCapaPines === 'function' ? mantCapaPines() : ''}
     <g class="mv-pines${foco ? ' con-foco' : ''}">${ordenados.map(p => mvPinSVG(p, { mio: p.mid === mio, sel: p.id === sel, tenue: !!foco && p.mid !== foco })).join('')}</g>${bor}
   </svg>`;
 }
@@ -369,11 +371,11 @@ function mvLugarDe(x, y){
 /* El toque sobre el mapa: una gota abre el trabajo; en modo "marcar", el
    lugar vacío pone un trabajo nuevo. Si el dedo arrastró, no hace nada. */
 document.addEventListener('click', e => {
-  const svg = e.target.closest && e.target.closest('.mv-svg'); if (!svg) return;
+  const svg = e.target.closest && e.target.closest('.mv-svg, .mapa-svg'); if (!svg) return;
   if (Date.now() - mapaMovido < 350) return;
   const pin = e.target.closest('[data-mv-pt]');
   if (pin){ mvAbrirPunto(pin.dataset.mvPt); return; }
-  if (MVBrazo.activo && MVBrazo.marcando){
+  if (MVBrazo.activo && MVBrazo.marcando && svg.classList.contains('mv-svg')){
     const p = mapaPunto(svg, e.clientX, e.clientY), [x, y] = mapaP(p.x, p.y);
     /* Afuera del plano (el mar, más allá del borde) no se marca. */
     if (x < MAPA_CAJA.x || x > MAPA_CAJA.x + MAPA_CAJA.w || y < MAPA_CAJA.y || y > MAPA_CAJA.y + MAPA_CAJA.h) return toast('Tocá dentro del barrio', 'pin');
@@ -421,8 +423,9 @@ function mvEnVivoHtml(){
         <div class="mv-per-cab"><span class="mv-av">${esc(per.nombre.slice(0, 1))}</span>
           <div class="grow"><b>${esc(per.nombre)}</b><small><i class="mv-vivo-dot"></i>desde ${hora(per.entra)} h · ${plural(suyos.length, 'trabajo')}</small></div>
           ${mvPuedeEscribir() ? `<button class="btn btn-sm btn-pri mv-msj" data-a="mv-chat" data-mid="${esc(per.mid)}">${I('chat')}<span>Mensaje</span>${nl ? `<em>${nl}</em>` : ''}</button>` : ''}</div>
+        ${per.hoy && per.hoy.fecha === hoyISO() && typeof mantLugarDe === 'function' ? `<div class="mv-chips"><button class="mv-chip" data-a="mt-pin-ver" data-id="${esc(per.mid)}" style="--c:hsl(${mvTono(per.mid)} 85% 55%)"><span>⛑️</span>Hoy: ${esc([per.hoy.tarea, mantLugarDe(per.hoy.lugar)?.n].filter(Boolean).join(' · ') || 'Mantenimiento')}</button></div>` : ''}
         ${suyos.length ? `<div class="mv-chips">${suyos.map(p => `<button class="mv-chip ${p.estado === 'hecho' ? 'hecho' : ''}" data-a="mv-ver-punto" data-id="${esc(p.id)}" style="--c:${mvTarea(p.tarea).c}"><span>${mvTarea(p.tarea).e}</span>${esc(mvTareaTxt(p))}${p.lugar ? ` <small>${esc(p.lugar)}</small>` : ''}${p.estado === 'hecho' ? I('check') : ''}</button>`).join('')}</div>`
-          : '<p class="muted small" style="margin:6px 0 0">Todavía no marcó dónde está trabajando.</p>'}</div>`; }).join('')
+          : per.hoy && per.hoy.fecha === hoyISO() ? '' : '<p class="muted small" style="margin:6px 0 0">Todavía no marcó dónde está trabajando.</p>'}</div>`; }).join('')
       : aviso('info', 'check', 'Nadie de mantenimiento en el barrio ahora', 'Cuando la garita registre una entrada, aparece acá en vivo.')}
     ${esStaff() ? `<button class="btn btn-sec btn-block" style="margin-top:12px" data-a="mv-a-bitacora">${I('book')}Bitácora de mantenimiento</button>` : ''}
     <p class="muted tiny" style="margin:12px 2px 0">Es el personal del barrio. Los mensajes los ven la persona de mantenimiento, vos, la garita y la Administración, y se borran cuando sale.</p></div>`;

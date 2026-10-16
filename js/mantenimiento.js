@@ -313,7 +313,7 @@ A['mt-lugar'] = el => {
   const h = mantHoy(m) || {}, ls = mantLugares(), grupos = [...new Set(ls.map(x => x.g))];
   const fijos = ls.filter(x => x.g === 'Lugares comunes');
   hoja('Tarea de hoy', `<form data-f="mant-lugar" data-id="${esc(m.id)}" class="mt-form">
-    <div class="mt-form-cab" style="--h:${mantTono(m)}"><span class="mt-av"><b>${esc(mantIniciales(m))}</b></span><span><b>${esc(mantNombre(m))}</b><br>Qué hace hoy y dónde: se ve en el mapa de la garita. Vale solo por hoy.</span></div>
+    <div class="mt-form-cab" style="--h:${mantTono(m)}"><span class="mt-av"><b>${esc(mantIniciales(m))}</b></span><span><b>${esc(mantNombre(m))}</b><br>Qué hace hoy y dónde: se ve en el mapa de la garita y en Mantenimiento en vivo de los vecinos. Vale solo por hoy.</span></div>
     <div class="field"><label>Tarea de hoy</label><input name="tarea" maxlength="50" list="mtTareasHoy" value="${esc(h.tarea || '')}" placeholder="Corte de pasto, poda, luminarias…"></div>
     <datalist id="mtTareasHoy">${MANT_TAREAS_HOY.map(t => `<option>${esc(t)}</option>`).join('')}</datalist>
     <div class="field"><label>¿Dónde?</label>
@@ -334,13 +334,14 @@ F['mant-lugar'] = (d, form) => {
   Store.cambiar(s => {
     const x = aLista(s.mantenimiento).find(z => z && z.id === id); if (!x) return;
     x.hoy = { fecha:hoyISO(), tarea, lugar, at:Date.now() }; x.updatedAt = Date.now();
+    mantHoyPublico(s, id);
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', mantId:id, mov:'tarea', at:Date.now(), texto:`Tarea de hoy de mantenimiento: ${mantNombre(m)} → ${[L ? L.n : '', tarea].filter(Boolean).join(' · ')}` });
   });
   cerrarHoja(); toast(`${m.nombre}: ${L ? L.n : tarea}`, 'pin');
 };
 A['mt-lugar-quitar'] = el => {
   if (!esStaff()) return;
-  Store.cambiar(s => { const x = aLista(s.mantenimiento).find(z => z && z.id === el.dataset.id); if (x){ x.hoy = null; x.updatedAt = Date.now(); } });
+  Store.cambiar(s => { const x = aLista(s.mantenimiento).find(z => z && z.id === el.dataset.id); if (x){ x.hoy = null; x.updatedAt = Date.now(); mantHoyPublico(s, x.id); } });
   cerrarHoja(); toast('Tarea de hoy quitada', 'x');
 };
 A['mt-ver-mapa'] = el => {
@@ -349,23 +350,55 @@ A['mt-ver-mapa'] = el => {
   setTimeout(() => { if (typeof mapaIr === 'function') mapaIr({ cx:xy[0], cy:xy[1], z:3 }); }, 750);
 };
 /* Los pines en el mapa de la garita: quien está adentro y tiene lugar hoy.
-   Si varios trabajan en el mismo lugar, se ponen uno al lado del otro. */
-function mantCapaMapa(){
-  if (!esStaff()) return '';
+   Si varios trabajan en el mismo lugar, se ponen uno al lado del otro.
+   Los vecinos, el hotel y la supervisión ven los mismos pines (pedido de
+   Claudio, 16-10-2026: "lo tengo que ver igual que la garita"): la garita
+   publica en barrio/mantVivo solo el nombre corto, el lugar y la tarea de
+   hoy (sin DNI ni teléfono), y se borra con la salida. */
+function mantPinesHoy(){
+  if (esStaff()) return mantAdentro().map(m => ({ m, h:mantHoy(m), id:m.id, nombre:mantNombre(m), ini:mantIniciales(m), tono:mantTono(m), staff:true }));
+  return typeof mvPersonas === 'function' ? mvPersonas().filter(p => p.hoy && p.hoy.fecha === hoyISO()).map(p => ({ h:p.hoy, id:p.mid, nombre:p.nombre, ini:String(p.nombre || '?').split(/\s+/).map(x => x[0] || '').join('').slice(0, 2).toUpperCase(), tono:mvTono(p.mid) })) : [];
+}
+function mantCapaPines(){
   const porLugar = {};
-  mantAdentro().forEach(m => { const h = mantHoy(m), L = h && mantLugarDe(h.lugar), xy = L && L.xy(); if (!xy) return; (porLugar[h.lugar] = porLugar[h.lugar] || { xy, ms:[] }).ms.push(m); });
+  mantPinesHoy().forEach(e => { const L = e.h && mantLugarDe(e.h.lugar), xy = L && L.xy(); if (!xy) return; (porLugar[e.h.lugar] = porLugar[e.h.lugar] || { xy, es:[] }).es.push(e); });
   /* Si dos pines caen casi en el mismo punto (el espacio verde y la calle de
      al lado), el segundo se corre hasta que no se tapan. */
   const puestos = [];
   const lugar = (x, y) => { let k = 0; while (k < 12 && puestos.some(([a, b]) => Math.abs(a - x) < 48 && Math.abs(b - y) < 44)){ x += 48; k++; } puestos.push([x, y]); return x; };
-  const pins = Object.values(porLugar).flatMap(({ xy, ms }) => ms.map((m, i) => {
-    const y = xy[1] - 20, x = lugar(xy[0] + (i - (ms.length - 1) / 2) * 34, y), h = mantHoy(m);
-    return `<g class="mt-pin" data-a="mt-lugar" data-id="${esc(m.id)}" role="button" tabindex="0" style="--h:${mantTono(m)}" transform="translate(${x} ${y}) scale(1.5) translate(${-x} ${-y})" aria-label="${esc(mantNombre(m))}: ${esc([mantLugarDe(h.lugar)?.n, h.tarea].filter(Boolean).join(', '))}">
+  const pins = Object.values(porLugar).flatMap(({ xy, es }) => es.map((e, i) => {
+    const y = xy[1] - 20, x = lugar(xy[0] + (i - (es.length - 1) / 2) * 34, y), h = e.h, que = [mantLugarDe(h.lugar)?.n, h.tarea].filter(Boolean).join(', ');
+    return `<g class="mt-pin" data-a="${e.staff ? 'mt-lugar' : 'mt-pin-ver'}" data-id="${esc(e.id)}" role="button" tabindex="0" style="--h:${e.tono}" transform="translate(${x} ${y}) scale(1.5) translate(${-x} ${-y})" aria-label="${esc(e.nombre)}: ${esc(que)}">
       <circle class="mp-onda" cx="${x}" cy="${y}" r="10"/>
       <path class="mp-gota" d="M${x} ${y + 15} C${x - 4} ${y + 9} ${x - 10} ${y + 5} ${x - 10} ${y} a10 10 0 1 1 20 0 C${x + 10} ${y + 5} ${x + 4} ${y + 9} ${x} ${y + 15}Z"/>
-      <text class="mp-ini" x="${x}" y="${y + 2.6}">${esc(mantIniciales(m))}</text>
+      <text class="mp-ini" x="${x}" y="${y + 2.6}">${esc(e.ini)}</text>
       <path class="mp-casco" d="M${x - 6} ${y - 7.6}a6 6 0 0 1 12 0z"/><rect class="mp-ala" x="${x - 7.4}" y="${y - 8.2}" width="14.8" height="2" rx="1"/>
       ${h.tarea ? `<text class="mp-tarea" x="${x}" y="${y + 24}">${esc(h.tarea.length > 16 ? h.tarea.slice(0, 15) + '…' : h.tarea)}</text>` : ''}</g>`; }));
-  const vivos = typeof mvCapaGarita === 'function' ? mvCapaGarita() : '';
-  return (pins.length ? `<g class="mt-pines">${pins.join('')}</g>` : '') + vivos;
+  return pins.length ? `<g class="mt-pines">${pins.join('')}</g>` : '';
+}
+/* Quien ya tenía tarea de hoy antes de este cambio (o si algo quedó
+   desparejo): la garita lo pone al día al dibujar su mapa. */
+function mantHoyRevisar(){
+  const clave = h => h ? `${h.lugar || ''}|${h.tarea || ''}` : '';
+  const mal = mantAdentro().filter(m => { const p = typeof mvPersona === 'function' && mvPersona(m.id); if (!p) return false; const h = mantHoy(m); return clave(h) !== clave(p.hoy && p.hoy.fecha === hoyISO() ? p.hoy : null); });
+  if (mal.length) Store.cambiar(s => mal.forEach(m => mantHoyPublico(s, m.id)));
+}
+function mantCapaMapa(){
+  if (esStaff()) setTimeout(mantHoyRevisar, 0);
+  return mantCapaPines() + (typeof mvCapaGarita === 'function' ? mvCapaGarita() : '');
+}
+/* El vecino toca el casco: quién es, dónde y qué hace hoy, y el botón para escribirle. */
+A['mt-pin-ver'] = el => {
+  const p = typeof mvPersona === 'function' && mvPersona(el.dataset.id); if (!p || !p.hoy) return;
+  const L = mantLugarDe(p.hoy.lugar);
+  hoja(p.nombre, `<div class="mv-ficha" style="--c:hsl(${mvTono(p.mid)} 85% 55%)"><span class="mv-ficha-emo">⛑️</span>
+      <div class="grow"><b>${esc(p.hoy.tarea || 'Mantenimiento')}</b><small>${esc(L ? L.n : 'En el barrio')}</small></div>
+      <span class="mv-estado curso"><i></i>Hoy</span></div>
+    <p class="muted small" style="margin:10px 2px 0">Personal de mantenimiento del barrio · desde las ${hora(p.entra)} h</p>
+    ${typeof mvPuedeEscribir === 'function' && mvPuedeEscribir() ? `<button class="btn btn-pri btn-block" style="margin-top:12px" data-a="mv-chat" data-mid="${esc(p.mid)}">${I('chat')}Mandarle un mensaje a ${esc(p.nombre)}</button>` : ''}`);
+};
+/* Lo que la garita publica para todos: copia el lugar y la tarea de hoy en "quién está trabajando". */
+function mantHoyPublico(s, id){
+  const x = aLista(s.mantenimiento).find(z => z && z.id === id), h = x && x.hoy && x.hoy.fecha === hoyISO() ? x.hoy : null;
+  aLista(s.mantVivo).forEach(p => { if (p && p.tipo === 'p' && p.mid === id){ if (h) p.hoy = { fecha:h.fecha, lugar:h.lugar || '', tarea:h.tarea || '' }; else delete p.hoy; } });
 }
