@@ -279,6 +279,7 @@ function mapaSVG(est){
       <circle class="g-halo" cx="${gx}" cy="${gy}" r="16"/><circle class="g-base" cx="${gx}" cy="${gy}" r="11"/>
       ${I('shield').replace('<svg class="i ', `<svg x="${gx - 7}" y="${gy - 7}" width="14" height="14" class="i g-ic `)}
       <text class="g-txt" x="${gx}" y="${gy - 18}">GARITA</text></g>
+    ${typeof rondaPoliMapa === 'function' ? rondaPoliMapa() : ''}
     ${(([a, b]) => `<text class="nombre-hotel" x="${a}" y="${b}">`)(mapaP(410, 352))}${esc(typeof HOTEL_NOMBRE !== 'undefined' ? HOTEL_NOMBRE : 'Hotel')}</text>
   </svg>`;
 }

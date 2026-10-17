@@ -26,13 +26,17 @@
      el mapa del barrio: los puntos ya pasados en verde, el tramo hecho
      pintado y el policía en el último punto que escaneó.
    · LOS VECINOS (al tocar las caritas de la guardia) ven el recorrido y las
-     rondas de la noche: cuántas hizo de las 3, a qué hora. La ronda que está
-     en curso les llega CON 10 MINUTOS DE DEMORA y sin el nombre del policía:
-     así nadie puede usar la app para saber dónde está el policía en este
-     momento. Va en el registro público de la guardia (/barrio/guardiaAhora).
+     rondas de la noche: cuántas hizo de las 3, a qué hora. Desde el
+     17-10-2026 la ronda en curso les llega EN VIVO (pedido de Claudio), sin
+     el nombre del policía; la Administración puede ponerle 5, 10 o 15
+     minutos de demora. Va en el registro público de la guardia
+     (/barrio/guardiaAhora).
+   · En todos los mapas, el punto ya leído queda verde y fijo; los que faltan
+     titilan (17-10-2026).
    · EL TELÉFONO DEL POLICÍA (sin cuenta) baja una sola vez, con el enlace de
      su tarjeta, "la guía de la ronda": los puntos en orden, su lugar y su
-     foto chica. Queda guardada en SU teléfono (no vuelve a bajarla en cada
+     foto chica. Cada vez que lee un QR le muestra el próximo punto con su
+     foto (17-10-2026); la foto grande, solo si la pide. Queda guardada en SU teléfono (no vuelve a bajarla en cada
      punto) y se borra de la base cuando la garita registra su salida. La
      guía vive en /ronda/guia/<clave larga al azar>: solo la lee quien tiene
      el enlace (no se puede listar) y la escriben la garita y la
@@ -42,7 +46,6 @@
 /* ---------- la meta de la noche: 3 rondas completas ---------- */
 const RONDA_META_BASE = 3;
 const rondaMeta = () => Math.max(1, Math.min(8, Math.round(+(Store.s.config.rondasMeta || RONDA_META_BASE)) || RONDA_META_BASE));
-const RONDA_DEMORA_VECINOS = 10 * MIN;
 /* Metros aproximados por unidad del plano (un lote de frente mide unos 27
    unidades y unos 20 m) y paso caminando a 4,5 km/h. */
 const RONDA_M = 0.75, RONDA_PASO = 75;
@@ -123,33 +126,46 @@ const rondaLargoTxt = tramos => { const m = tramos.reduce((s, t) => s + rgLargo(
   return `${m >= 1000 ? (m / 1000).toLocaleString('es-AR', { maximumFractionDigits:1 }) + ' km' : Math.round(m / 10) * 10 + ' m'} · unos ${Math.max(1, Math.round(m / RONDA_PASO))} min caminando`; };
 
 /* ---------- cómo va la ronda de esta noche ---------- */
+/* La ronda que se dibuja en el mapa: la que está en curso o, si recién
+   terminó, esa misma (toda en verde) durante RONDA_FIJA: así el último
+   punto leído no "desaparece" en cuanto se completa la ronda. */
+const RONDA_FIJA = 15 * MIN;
 /* Para la garita, la Administración y la supervisión: en vivo. */
 function rondaEnVivo(){
   const t = typeof turnoAbierto === 'function' ? turnoAbierto() : null;
   const p = t ? policiasAdentro(t)[0] : null, pts = rondaPuntosMapa();
-  if (!p) return { p:null, pts, hechas:[], curso:null };
+  if (!p) return { p:null, pts, hechas:[], curso:null, mapa:null };
   const orden = pt => pts.findIndex(x => x.id === pt) + 1;
   const pasados = r => { const m = new Map(); pasosDeRonda(r).forEach(x => { const n = orden(x.punto); if (n && !m.has(n)) m.set(n, x.at); }); return m; };
   const rc = rondaEnCurso(p);
   const hechas = p.rondas.filter(r => r.fin).map(r => { const e = conQR(r) ? estadoRonda(r) : null; return { ini:r.inicio, fin:r.fin, n:e ? e.n : 0, total:e ? e.total : 0, ok: !!e && e.total > 0 && e.n >= e.total && !r.incompleta, inc: !!r.incompleta, qr:conQR(r) }; });
-  return { p, pts, hechas, curso: rc ? { ini:rc.inicio, pasados:pasados(rc) } : null };
+  const curso = rc ? { ini:rc.inicio, pasados:pasados(rc) } : null;
+  const ult = !rc ? p.rondas.filter(r => r.fin && conQR(r) && Date.now() - r.fin < RONDA_FIJA).slice(-1)[0] : null;
+  return { p, pts, hechas, curso, mapa: curso || (ult ? { ini:ult.inicio, fin:ult.fin, pasados:pasados(ult) } : null) };
 }
-/* Lo que se publica para los vecinos: sin nombres y con demora. */
+/* LOS VECINOS, EN VIVO (17-10-2026). Claudio: "que esto se vea en todos los
+   usuarios de la app en tiempo real (garita, vecinos, administración,
+   supervisión)". Hasta ahora a los vecinos les llegaba con 10 minutos de
+   demora; ahora les llega en vivo (sin el nombre del policía). La
+   Administración puede volver a ponerle una demora (Turnos → Puntos de
+   control → "Los vecinos ven la ronda"): 0, 5, 10 o 15 minutos. */
+const rondaDemora = () => { const m = Math.round(+Store.s.config.rondaDemoraVecinos); return isFinite(m) && m > 0 ? Math.min(30, m) * MIN : 0; };
+/* Lo que se publica para los vecinos: sin nombres, en vivo o con la demora elegida. */
 function rondaPublica(t){
   const pts = rondaPuntosMapa(); if (!pts.length) return null;
-  const p = t ? policiasAdentro(t)[0] : null, corte = Date.now() - RONDA_DEMORA_VECINOS, aMin = x => Math.floor(x / MIN) * MIN;
-  const o = { meta:rondaMeta(), pts: pts.map(pt => Math.round(pt.x) + ',' + Math.round(pt.y)).join(' ') };
+  const p = t ? policiasAdentro(t)[0] : null, dem = rondaDemora(), corte = Date.now() - dem, aMin = x => Math.floor(x / MIN) * MIN;
+  const o = { meta:rondaMeta(), pts: pts.map(pt => Math.round(pt.x) + ',' + Math.round(pt.y)).join(' '), ...(dem ? { d:Math.round(dem / MIN) } : {}) };
   if (!p) return o;
   const v = rondaEnVivo();
   const hechas = v.hechas.filter(h => h.fin <= corte);
   if (hechas.length) o.r = hechas.map(h => [aMin(h.ini), aMin(h.fin), h.n, h.total, h.ok ? 1 : 0].join(',')).join(';');
-  /* La ronda en curso (o la que terminó hace menos de 10 min): solo los puntos de hace más de 10 min. */
-  const cursoIni = v.curso ? v.curso.ini : (v.hechas.find(h => h.fin > corte) || {}).ini;
-  if (cursoIni && cursoIni <= corte){
-    const rc = v.curso ? v.curso.pasados : null;
-    o.c = aMin(cursoIni);
-    if (rc) o.cp = [...rc].filter(([, at]) => at <= corte).map(([n, at]) => n + '@' + aMin(at)).join(' ');
-    else { const r = rondaEnVivo().p.rondas.find(x => x.inicio === cursoIni); if (r){ const m = new Map(); pasosDeRonda(r).forEach(x => { const n = pts.findIndex(z => z.id === x.punto) + 1; if (n && !m.has(n) && x.at <= corte) m.set(n, x.at); }); o.cp = [...m].map(([n, at]) => n + '@' + aMin(at)).join(' '); } }
+  /* La ronda del mapa a la hora del corte: la que estaba en curso o la que
+     había terminado hacía menos de RONDA_FIJA, con sus puntos ya leídos. */
+  const r = p.rondas.filter(x => conQR(x) && x.inicio <= corte && (!x.fin || x.fin > corte - RONDA_FIJA)).slice(-1)[0];
+  if (r){
+    const m = new Map(); pasosDeRonda(r).forEach(x => { const n = pts.findIndex(z => z.id === x.punto) + 1; if (n && !m.has(n) && x.at <= corte) m.set(n, x.at); });
+    o.c = aMin(r.inicio); o.cp = [...m].map(([n, at]) => n + '@' + aMin(at)).join(' ');
+    if (r.fin && r.fin <= corte) o.cf = aMin(r.fin);
   }
   return o;
 }
@@ -159,33 +175,73 @@ function rondaDePublico(r){
   const pts = String(r.pts).split(' ').map((s, i) => { const [x, y] = s.split(',').map(Number); return { id:'p' + i, x, y, orden:i + 1, nombre:'Punto ' + (i + 1) }; }).filter(p => isFinite(p.x));
   const hechas = String(r.r || '').split(';').filter(Boolean).map(s => { const [ini, fin, n, total, ok] = s.split(',').map(Number); return { ini, fin, n, total, ok:!!ok, qr:true }; });
   const pasados = new Map(String(r.cp || '').split(' ').filter(Boolean).map(s => { const [n, at] = s.split('@').map(Number); return [n, at]; }));
-  return { pts, meta:+r.meta || RONDA_META_BASE, hechas, curso: r.c ? { ini:+r.c, pasados } : null, demora:true };
+  const mapa = r.c ? { ini:+r.c, pasados, ...(r.cf ? { fin:+r.cf } : {}) } : null;
+  return { pts, meta:+r.meta || RONDA_META_BASE, hechas, curso: mapa && !mapa.fin ? mapa : null, mapa, demora:+r.d || 0 };
 }
 
 /* ---------- el dibujo de la ronda (capa del mapa y mapa chico) ---------- */
-/* hechos: Map(número → hora) de la ronda en curso. sim: animación del recorrido. */
-function rondaCapaSVG({ pts, pasados = new Map(), sim = false, editar = false, sel = -1, vivo = false }){
+/* LA GORRA DEL POLICÍA (pedido de Claudio, 17-10-2026: "el punto, que sería
+   el policía, rediseñalo a una gorra de policía"). Dibujo propio: copa azul
+   marino, escudo dorado, cinta y visera negra. Centrada en (0,0). */
+const rondaGorra = (cls = '') => `<g class="rm-gorra ${cls}"><ellipse class="rm-g-sombra" cx="0" cy="9" rx="11" ry="2.6"/>
+  <path class="rm-g-copa" d="M-13,-1 C-15,-9 -8,-15 0,-15 C8,-15 15,-9 13,-1 Z"/>
+  <rect class="rm-g-cinta" x="-11.5" y="-3.2" width="23" height="4.6" rx="1.2"/>
+  <path class="rm-g-raya" d="M-11.5,-1 H11.5"/>
+  <path class="rm-g-visera" d="M-12.5,1.2 Q0,9.5 12.5,1.2 Q0,4.8 -12.5,1.2 Z"/>
+  <path class="rm-g-escudo" d="M0,-11.8 L3.6,-10.4 L3.2,-6.6 Q2.4,-4.6 0,-3.6 Q-2.4,-4.6 -3.2,-6.6 L-3.6,-10.4 Z"/>
+  <circle class="rm-g-estrella" cx="0" cy="-7.8" r="1.25"/></g>`;
+/* LA SIMULACIÓN, PAREJA Y MÁS DESPACIO (17-10-2026): "que la gorra y la
+   línea que une los puntos vayan a la misma velocidad y más despacio". Las
+   dos van con el MISMO reloj (las dos animaciones adentro del mismo dibujo,
+   con la misma duración y los mismos tiempos) y a velocidad pareja por
+   distancia: la línea se pinta justo hasta donde está la gorra. La velocidad
+   es fija por largo del recorrido (RONDA_SIM_VEL unidades del plano por
+   segundo, unas 3 veces más lenta que antes): un recorrido largo tarda más. */
+const RONDA_SIM_VEL = 65;
+const rondaSimDur = tramos => Math.max(18, Math.min(90, rgLargo(tramos.flat()) / RONDA_SIM_VEL));
+const rondaQuieto = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){ return false; } };
+/* pasados: Map(número → hora) de la ronda que se muestra. servicio: hay
+   policía de servicio (los puntos que faltan titilan). sim: la simulación.
+   LEÍDO FIJO, FALTANTE TITILA (17-10-2026): el punto que el policía ya leyó
+   queda verde y quieto, con su hora; los que faltan de esa ronda titilan, y
+   el próximo además late con una onda. Lo ven igual la garita, la
+   Administración, la supervisión y los vecinos. */
+function rondaPoliSVG(pts, pasados){
+  const nPas = [...pasados.keys()]; if (!nPas.length) return '';
+  const ultimo = nPas.reduce((a, b) => (pasados.get(b) > pasados.get(a) ? b : a)), pt = pts[ultimo - 1];
+  if (!pt || !isFinite(pt.x)) return '';
+  const [x, y] = mapaP(pt.x, pt.y);
+  return `<g class="ronda-capa rm-poli-capa"><g class="rm-poli" transform="translate(${x} ${y - 30})"><circle class="rm-poli-halo" cx="0" cy="-4" r="22"/><g transform="scale(1.5)">${rondaGorra()}</g></g></g>`;
+}
+function rondaCapaSVG({ pts, pasados = new Map(), sim = false, editar = false, sel = -1, vivo = false, servicio = vivo, sinPoli = false }){
   /* Los puntos sin lugar (en el editor) no se dibujan, pero conservan su número. */
   const idx = pts.map((p, i) => i).filter(i => isFinite(pts[i].x) && isFinite(pts[i].y));
   if (!idx.length) return editar ? '<g class="ronda-capa editar"></g>' : '';
   const ubic = idx.map(i => pts[i]), tramos = rondaTramos(ubic);
   const xy = pts.map(pt => isFinite(pt.x) ? mapaP(pt.x, pt.y) : null);
-  const nPas = [...pasados.keys()], ultimo = nPas.length ? Math.max(...nPas) : 0;
   const siguiente = pts.findIndex((pt, i) => !pasados.has(i + 1)) + 1;
+  const titila = !editar && !sim && (servicio || pasados.size > 0);
   const todo = rgD(tramos.flat());
   const lineas = tramos.map((t, k) => { const hecho = pasados.has(idx[k] + 1) && pasados.has(idx[k + 1] + 1);
     return `<path class="rm-tramo${hecho ? ' hecho' : ''}" d="${rgD(t)}"/>`; }).join('');
-  const pins = idx.map(i => { const [x, y] = xy[i], n = i + 1, ok = pasados.has(n), pt = pts[i], prox = !editar && !ok && n === siguiente && (vivo || pasados.size > 0);
-    return `<g class="rm-pin${ok ? ' hecho' : ''}${prox ? ' prox' : ''}${sel === i ? ' sel' : ''}${pt.foto ? ' con-foto' : ''}" data-rp="${i}" role="button" tabindex="0" aria-label="Punto ${n}: ${esc(pt.nombre || '')}${ok ? ' · pasó a las ' + hora(pasados.get(n)) + ' h' : ''}" style="--d:${(idx.indexOf(i) * 0.55).toFixed(2)}s">
+  const pins = idx.map(i => { const [x, y] = xy[i], n = i + 1, ok = pasados.has(n), pt = pts[i], prox = titila && !ok && n === siguiente;
+    return `<g class="rm-pin${ok ? ' hecho' : titila ? ' falta' : ''}${prox ? ' prox' : ''}${sel === i ? ' sel' : ''}${pt.foto ? ' con-foto' : ''}" data-rp="${i}" role="button" tabindex="0" aria-label="Punto ${n}: ${esc(pt.nombre || '')}${ok ? ' · leído a las ' + hora(pasados.get(n)) + ' h' : titila ? ' · falta' : ''}" style="--d:${(idx.indexOf(i) * 0.55).toFixed(2)}s">
       ${prox ? `<circle class="rm-onda" cx="${x}" cy="${y}" r="11"/>` : ''}
       <circle class="rm-base" cx="${x}" cy="${y}" r="10.5"/>
       <text class="rm-num" x="${x}" y="${y + 0.4}">${ok ? '✓' : n}</text>
       ${pt.foto ? `<circle class="rm-cam" cx="${x + 9}" cy="${y - 8}" r="3.6"/>` : ''}
       ${ok && !editar ? `<text class="rm-hora" x="${x}" y="${y + 19}">${hora(pasados.get(n))}</text>` : ''}</g>`; }).join('');
-  const poli = vivo && ultimo && xy[ultimo - 1] ? (([x, y]) => `<g class="rm-poli"><circle class="rm-poli-halo" cx="${x}" cy="${y}" r="17"/><rect class="rm-poli-chapa" x="${x - 11}" y="${y - 34}" width="22" height="22" rx="7"/>${I('shield').replace('<svg class="i ', `<svg x="${x - 7.5}" y="${y - 30.5}" width="15" height="15" class="i rm-poli-ic `)}</g>`)(xy[ultimo - 1]) : '';
-  const andar = sim && tramos.length ? `<path class="rm-sim" d="${todo}" pathLength="1"/>
-    <g class="rm-auto"><circle r="7.5" class="rm-auto-c"/><circle r="3" class="rm-auto-l"/><animateMotion dur="${Math.max(6, tramos.length * 1.6).toFixed(1)}s" repeatCount="indefinite" path="${todo}"/></g>` : '';
-  return `<g class="ronda-capa${sim ? ' sim' : ''}${editar ? ' editar' : ''}" style="--n:${tramos.length}">${lineas}${andar}${pins}${poli}</g>`;
+  /* El policía: la gorra en el último punto que leyó (en el mapa grande va
+     en su propia capa, encima de la garita: rondaPoliMapa). */
+  const poli = vivo && !sim && !sinPoli ? rondaPoliSVG(pts, pasados) : '';
+  let andar = '';
+  if (sim && tramos.length){
+    const dur = rondaSimDur(tramos).toFixed(1) + 's', kt = '0;0.92;1';
+    andar = rondaQuieto() ? `<path class="rm-sim quieta" d="${todo}"/>`
+      : `<path class="rm-sim" d="${todo}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"><animate attributeName="stroke-dashoffset" values="1;0;0" keyTimes="${kt}" dur="${dur}" repeatCount="indefinite"/></path>
+    <g class="rm-auto"><g transform="translate(0 -20) scale(1.6)">${rondaGorra('anda')}</g><animateMotion dur="${dur}" repeatCount="indefinite" path="${todo}" calcMode="linear" keyPoints="0;1;1" keyTimes="${kt}"/></g>`;
+  }
+  return `<g class="ronda-capa${sim ? ' sim' : ''}${editar ? ' editar' : ''}${titila ? ' en-curso' : ''}" style="--n:${tramos.length}">${lineas}${andar}${pins}${poli}</g>`;
 }
 /* El mapa chico (para los vecinos, la garita y el teléfono del policía). */
 function rondaMiniSVG(datos, { sim = false, vivo = false } = {}){
@@ -197,7 +253,7 @@ function rondaMiniSVG(datos, { sim = false, vivo = false } = {}){
     <g${giro}><path class="rm-mar" d="M-200,430 L30,420 L140,394 L250,364 L340,344 L470,353 L505,372 L530,396 L600,404 L700,438 L820,462 L940,484 L1000,506 L1300,520 L1300,800 L-200,800 Z"/></g>
     <g class="rm-calles">${calles}</g><g class="rm-lotes">${lotes}</g>
     <g class="rm-garita"><circle cx="${gx}" cy="${gy}" r="11"/><text x="${gx}" y="${gy - 17}">GARITA</text></g>
-    ${rondaCapaSVG({ pts:datos.pts, pasados:datos.curso ? datos.curso.pasados : new Map(), sim, vivo })}</svg>`;
+    ${rondaCapaSVG({ pts:datos.pts, pasados:(datos.mapa || datos.curso || {}).pasados || new Map(), sim, vivo, servicio:!!datos.p })}</svg>`;
 }
 /* Los anillos de la noche: ronda 1, 2 y 3 (la meta). */
 function rondaAnillos(d, meta = rondaMeta()){
@@ -208,7 +264,7 @@ function rondaAnillos(d, meta = rondaMeta()){
     const h = hechas[i];
     if (h) return `<span class="rm-anillo ok" style="--p:1"><i>${I('check')}</i><b>Ronda ${i + 1}</b><small>${hora(h.ini)}–${hora(h.fin)} h</small></span>`;
     if (i === hechas.length && d.curso){ const k = d.curso.pasados.size;
-      return `<span class="rm-anillo curso" style="--p:${total ? (k / total).toFixed(2) : 0}"><i>${k}/${total}</i><b>Ronda ${i + 1}</b><small>en curso${d.demora ? ' · con 10 min de demora' : ` desde ${hora(d.curso.ini)} h`}</small></span>`; }
+      return `<span class="rm-anillo curso" style="--p:${total ? (k / total).toFixed(2) : 0}"><i>${k}/${total}</i><b>Ronda ${i + 1}</b><small>en curso${d.demora ? ` · con ${d.demora} min de demora` : ` desde ${hora(d.curso.ini)} h`}</small></span>`; }
     return `<span class="rm-anillo" style="--p:0"><i>${i + 1}</i><b>Ronda ${i + 1}</b><small>${i < meta ? 'pendiente' : 'extra'}</small></span>`;
   }).join('');
   return `<div class="rm-anillos">${items}</div>${otras.length ? `<p class="rm-nota-inc">${I('alert')}${plural(otras.length, 'ronda incompleta', 'rondas incompletas')} (no pasó por todos los puntos): no cuentan para la meta.</p>` : ''}`;
@@ -221,7 +277,13 @@ function rondaCapaMapa(){
   if (RondaEd.activo) return rondaCapaSVG({ pts:RondaEd.pts, editar:true, sel:RondaEd.sel });
   if (!rondaCapaOn) return '';
   const v = rondaEnVivo(); if (!v.pts.length) return '';
-  return rondaCapaSVG({ pts:v.pts, pasados: v.curso ? v.curso.pasados : new Map(), vivo: !!v.curso, sim: Date.now() < rondaSimHasta });
+  const sim = Date.now() < rondaSimHasta;
+  return rondaCapaSVG({ pts:v.pts, pasados: !sim && v.mapa ? v.mapa.pasados : new Map(), vivo: !!v.mapa, servicio: !!v.p, sim, sinPoli:true });
+}
+/* La gorra del policía en el mapa grande: se dibuja después de la garita, así no queda tapada. */
+function rondaPoliMapa(){
+  if (RondaEd.activo || !rondaCapaOn || Date.now() < rondaSimHasta) return '';
+  const v = rondaEnVivo(); return v.mapa ? rondaPoliSVG(v.pts, v.mapa.pasados) : '';
 }
 /* La tira de arriba del mapa: cómo va la noche, o el editor de la Administración. */
 function rondaTiraMapa(){
@@ -237,7 +299,9 @@ function rondaTiraMapa(){
   </div>`;
 }
 A['ronda-capa'] = () => { rondaCapaOn = !rondaCapaOn; try { localStorage.setItem('bhc.mapa.ronda', rondaCapaOn ? '1' : '0'); } catch(e){} refrescar(); };
-A['ronda-sim'] = () => { rondaCapaOn = true; rondaSimHasta = Date.now() + 60000; refrescar(); setTimeout(() => { if (Date.now() >= rondaSimHasta) refrescar(); }, 60500);
+/* La simulación dura dos vueltas (mínimo un minuto) y después vuelve a la ronda en vivo. */
+const rondaSimMs = () => Math.max(60000, Math.round(rondaSimDur(rondaTramos(rondaPuntosMapa())) * 2000) + 1500);
+A['ronda-sim'] = () => { rondaCapaOn = true; const ms = rondaSimMs(); rondaSimHasta = Date.now() + ms; refrescar(); setTimeout(() => { if (Date.now() >= rondaSimHasta) refrescar(); }, ms + 500);
   toast(`Simulación: del 1 al ${rondaPuntosMapa().length} por las calles · ${rondaLargoTxt(rondaTramos(rondaPuntosMapa()))}`, 'shield'); };
 
 /* ---------- el editor de la Administración ----------
@@ -245,11 +309,11 @@ A['ronda-sim'] = () => { rondaCapaOn = true; rondaSimHasta = Date.now() + 60000;
    tocar "Finalizar". Cada toque en el plano pone el punto elegido; si no
    hay uno elegido, ubica el primero que falta o agrega uno nuevo al final. */
 const RondaEd = {
-  activo:false, pts:[], sel:-1, hist:[],
+  activo:false, pts:[], sel:-1, hist:[], grandes:new Map(),
   abrir(){
     this.pts = puntosActivos().map(pt => ({ ...pt }));
     this.sel = this.pts.findIndex(p => !isFinite(p.x));
-    this.hist = []; this.activo = true;
+    this.hist = []; this.grandes = new Map(); this.activo = true;
   },
   guardarHist(){ this.hist.push(JSON.stringify(this.pts)); if (this.hist.length > 40) this.hist.shift(); },
   tocar(x, y, lugar){
@@ -316,20 +380,25 @@ A['ronda-ed-fin'] = async () => {
   const quedan = new Set(ps.map(p => p.id).filter(Boolean));
   const fuera = [...antes.values()].filter(p => p.activo !== false && !quedan.has(p.id));
   if (fuera.length && !await confirmar('Puntos que salen del recorrido', `${fuera.map(p => p.nombre).join(', ')}: sus QR dejan de valer. Los pasos ya registrados quedan en la historia.`, { si:'Seguir' })) return;
-  let nuevos = 0;
+  let nuevos = 0; const sueltas = [];
   Store.cambiar(s => {
+    aLista(s.puntos).filter(p => !(quedan.has(p.id) || p.activo === false) && p.fg).forEach(p => sueltas.push(p.fg));
     s.puntos = aLista(s.puntos).filter(p => quedan.has(p.id) || p.activo === false);
     ps.forEach((p, i) => {
       let pt = s.puntos.find(x => x.id === p.id);
       if (!pt){ pt = { id:'pt' + claveAzar().slice(0, 6), k:claveAzar(), at:Date.now(), activo:true }; s.puntos.push(pt); nuevos++; }
       Object.assign(pt, { nombre:String(p.nombre || 'Punto ' + (i + 1)).trim().slice(0, 40), lugar:String(p.lugar || '').slice(0, 80), orden:i + 1, x:p.x, y:p.y, activo:true });
-      if (p.foto) pt.foto = p.foto; else delete pt.foto;
+      const fgViejo = pt.fg;
+      if (p.foto){ pt.foto = p.foto; if (p._g && RondaEd.grandes.has(p._g)) pt.fg = rondaGrandeGuardar(RondaEd.grandes.get(p._g)); else if (p.fg) pt.fg = p.fg; else delete pt.fg; }
+      else { delete pt.foto; delete pt.fg; }
+      if (fgViejo && fgViejo !== pt.fg) sueltas.push(fgViejo);
     });
     auditar(s, 'Marcó el recorrido de la ronda en el plano', `${ps.length} puntos${nuevos ? ` (${nuevos} nuevos)` : ''}${fuera.length ? `, salieron ${fuera.length}` : ''}`);
   });
+  sueltas.forEach(rondaGrandeBorrar);
   RondaEd.activo = false;
   rondaGuiasAlDia();
-  rondaSimHasta = Date.now() + 60000;
+  rondaSimHasta = Date.now() + rondaSimMs();
   refrescar();
   hoja('Recorrido guardado', `<div class="rm-sim-hoja">${rondaMiniSVG({ pts:rondaPuntosMapa(), hechas:[], curso:null }, { sim:true })}</div>
     <p style="margin:12px 2px 6px"><b>${plural(ps.length, 'punto', 'puntos')} en orden, del 1 al ${ps.length}</b> · ${esc(rondaLargoTxt(rondaTramos(rondaPuntosMapa())))}.</p>
@@ -355,10 +424,11 @@ document.addEventListener('click', e => {
   const pin = e.target.closest && e.target.closest('.mapa-card .ronda-capa [data-rp]'); if (!pin) return;
   e.stopPropagation(); if (Date.now() - mapaMovido < 350) return;
   const v = rondaEnVivo(), i = +pin.dataset.rp, pt = v.pts[i]; if (!pt) return;
-  const at = v.curso && v.curso.pasados.get(i + 1);
+  const at = v.mapa && v.mapa.pasados.get(i + 1);
   hoja(`Punto ${i + 1} · ${pt.nombre}`, `${pt.foto ? `<img class="rm-foto-grande" src="${pt.foto}" alt="Foto del lugar del punto ${i + 1}">` : `<p class="muted small">${I('camera')} Todavía no tiene foto${esAdmin() ? ': agregala en "Editar recorrido".' : '.'}</p>`}
+    ${rondaBotonGrande(pt.fg, i + 1, pt.nombre)}
     <p style="margin:10px 2px 4px"><b>${esc(pt.lugar || 'En el plano')}</b></p>
-    <p class="muted small" style="margin:0 2px">${at ? `${I('check')} En esta ronda pasó a las ${hora(at)} h.` : v.curso ? 'En esta ronda todavía no pasó.' : 'Sin ronda en curso.'}</p>`);
+    <p class="muted small" style="margin:0 2px">${at ? `${I('check')} En esta ronda lo leyó a las ${hora(at)} h.` : v.curso ? 'En esta ronda todavía falta leerlo.' : 'Sin ronda en curso.'}</p>`);
 }, true);
 document.addEventListener('input', e => {
   const i = e.target && e.target.dataset && e.target.dataset.rondaNom; if (i === undefined || !RondaEd.pts[+i]) return;
@@ -367,11 +437,64 @@ document.addEventListener('input', e => {
 document.addEventListener('change', async e => {
   const inp = e.target; if (!inp || inp.dataset.rondaFoto === undefined) return;
   const f = inp.files && inp.files[0], i = +inp.dataset.rondaFoto; if (!f) return;
-  try { const dato = await rondaFotoChica(f); RondaEd.guardarHist(); RondaEd.pts[i].foto = dato; RondaEd.pintar(); toast(`Foto lista (${pesoTexto(Math.round(dato.length * 0.75))})`, 'camera'); }
+  try { const { chica, grande } = await rondaFotoDoble(f); RondaEd.guardarHist(); const gid = 'g' + uid(); RondaEd.grandes.set(gid, grande); Object.assign(RondaEd.pts[i], { foto:chica, _g:gid }); RondaEd.pintar(); toast(`Foto lista: ${pesoTexto(Math.round(chica.length * 0.75))} en la app (la grande, solo a pedido)`, 'camera'); }
   catch(err){ toast('No se pudo usar esa foto', 'alert'); }
 });
-/* La foto del lugar, liviana: 420 px y calidad baja (unos 10 a 25 KB). */
-const rondaFotoChica = f => comprimir(f, 420, .5);
+/* ---------- LAS FOTOS: CHICAS EN LA APP, GRANDES SOLO A PEDIDO (17-10-2026) ----------
+   Claudio: "que las fotos viajen en la app con bajo uso de datos, pequeñas,
+   y solo en grande si alguien la quiere bajar a su dispositivo".
+   · La CHICA (420 px, calidad baja, unos 10 a 25 KB) es la que va con el
+     punto: la ven la garita, la Administración, la supervisión y la baja una
+     sola vez el teléfono del policía con su guía.
+   · La GRANDE (1280 px, unos 100 a 250 KB) se guarda aparte, en
+     /ronda/fotos/<clave larga al azar>, que NO baja con nada: solo la trae
+     quien toca "Bajar la foto en grande", y queda guardada en SU equipo.
+     Se borra de la base cuando la Administración cambia o quita la foto.
+   Idea de browser-image-compression (1.7k★, MIT) y de la carga progresiva
+   de BlurImageView (1.3k★): primero lo liviano, lo pesado a pedido. Código
+   propio (comprimir y achicarDato, js/core.js). */
+const RONDA_CHICA = 420, RONDA_GRANDE = 1280;
+const rondaFotoChica = f => comprimir(f, RONDA_CHICA, .5);
+async function rondaFotoDoble(f){
+  const grande = await comprimir(f, RONDA_GRANDE, .72);
+  const chica = await achicarDato(grande, RONDA_CHICA, .5);
+  return { chica: chica || await rondaFotoChica(f), grande };
+}
+const rondaNube = () => typeof Nube !== 'undefined' && Nube.activa() && !!Nube.db;
+/* Guarda la grande (en este equipo y en la base) y devuelve su clave. */
+function rondaGrandeGuardar(grande){
+  if (!grande) return '';
+  const k = rondaToken();
+  Fotos.poner('rg-' + k, grande);
+  if (rondaNube()) Nube.db.ref('ronda/fotos/' + k).set({ d:grande, at:firebase.database.ServerValue.TIMESTAMP }).catch(e => { console.warn('Foto grande del punto', e && e.message); toast('La foto grande no se pudo subir (falta publicar las reglas nuevas de Firebase): la chica sí quedó.', 'alert'); });
+  return k;
+}
+function rondaGrandeBorrar(k){
+  if (!k) return;
+  Fotos.borrar('rg-' + k);
+  if (rondaNube()) Nube.db.ref('ronda/fotos/' + k).remove().catch(() => {});
+}
+async function rondaGrandeBajar(k){
+  const local = await Fotos.sacar('rg-' + k, false); if (local) return local;
+  if (!rondaNube()) return null;
+  const v = (await Nube.db.ref('ronda/fotos/' + k).once('value')).val();
+  if (v && v.d){ Fotos.poner('rg-' + k, v.d); return v.d; }
+  return null;
+}
+const rondaBotonGrande = (k, n, nombre) => k ? `<button type="button" class="btn btn-sm btn-sec rm-bajar" data-a="ronda-foto-bajar" data-k="${esc(k)}" data-n="${n}" data-nom="${esc(nombre || '')}">${I('download')}Bajar la foto en grande</button>` : '';
+A['ronda-foto-bajar'] = async el => {
+  const k = el.dataset.k; if (!k) return;
+  el.disabled = true; const antes = el.innerHTML; el.innerHTML = `${I('download')}Bajando…`;
+  try {
+    const d = await rondaGrandeBajar(k);
+    if (!d) throw new Error('sin foto');
+    const b = await (await fetch(d)).blob();
+    const nom = `punto-${el.dataset.n || ''}-${String(el.dataset.nom || 'ronda').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.${(b.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')}`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = nom; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`Foto en grande guardada en este equipo (${pesoTexto(b.size)})`, 'download');
+  } catch(e){ toast('No se pudo bajar la foto en grande. Probá con internet.', 'alert'); }
+  el.disabled = false; el.innerHTML = antes;
+};
 
 /* ---------- compartir el plano del recorrido como imagen ---------- */
 function rondaPlanoPlano(pts){
@@ -410,19 +533,30 @@ function rondaParaVecinos(g){
 }
 function rondaSeccionGuardia(g){
   const d = rondaParaVecinos(g); if (!d) return '';
-  const meta = d.meta || rondaMeta();
-  return `<section class="rm-vecinos">
-    <div class="rm-v-cab"><span class="rm-v-ic">${I('shield')}</span><div class="grow"><b>La ronda del policía</b><small>${d.p ? `Meta de la noche: ${meta} rondas completas por los ${d.pts.length} puntos` : 'Ahora no hay policía de servicio · así es el recorrido'}</small></div></div>
-    <div class="rm-mini-caja">${rondaMiniSVG(d, { vivo:!!d.vivo, sim:!d.p })}</div>
-    ${d.p ? rondaAnillos(d, meta) : ''}
-    <p class="muted tiny" style="margin:8px 2px 0">${I('lock')} ${d.vivo ? 'Lo ves en vivo porque tenés el libro de guardia.' : 'Por seguridad, la ronda que está en curso se ve con 10 minutos de demora y sin el nombre del policía.'}</p>
-  </section>`;
+  rmUltimo = rondaSeccionInterior(d);
+  return `<section class="rm-vecinos" id="rmVecinos">${rmUltimo}</section>`;
 }
+function rondaSeccionInterior(d){
+  const meta = d.meta || rondaMeta();
+  return `<div class="rm-v-cab"><span class="rm-v-ic">${I('shield')}</span><div class="grow"><b>La ronda del policía</b><small>${d.p ? `Meta de la noche: ${meta} rondas completas por los ${d.pts.length} puntos` : 'Ahora no hay policía de servicio · así es el recorrido'}</small></div>${d.p && !d.demora ? `<span class="rm-envivo"><i></i>En vivo</span>` : ''}</div>
+    <div class="rm-mini-caja">${rondaMiniSVG(d, { vivo:!!d.vivo, sim:!d.p })}</div>
+    ${d.p ? `<p class="rm-ley"><span><i class="rm-l-ok"></i>Ya leído</span><span><i class="rm-l-falta"></i>Falta (titila)</span>${d.vivo ? `<span><i class="rm-l-gorra"></i>Último punto</span>` : ''}</p>${rondaAnillos(d, meta)}` : ''}
+    <p class="muted tiny" style="margin:8px 2px 0">${I('lock')} ${d.vivo ? 'Lo ves en vivo porque tenés el libro de guardia.' : d.demora ? `Por seguridad, la ronda que está en curso se ve con ${d.demora} minutos de demora y sin el nombre del policía.` : 'Se actualiza solo cada vez que el policía lee un QR. No se ve su nombre.'}</p>`;
+}
+/* Con la hoja de la guardia abierta, la ronda se redibuja sola cuando llega
+   un punto leído (solo si cambió algo, así la simulación no se reinicia). */
+let rmVT = 0, rmUltimo = '';
+Store.alCambiar(() => { clearTimeout(rmVT); rmVT = setTimeout(() => {
+  const el = document.getElementById('rmVecinos'); if (!el || typeof guardiaAhora !== 'function') return;
+  const d = rondaParaVecinos(guardiaAhora()); if (!d) return;
+  const html = rondaSeccionInterior(d); if (html === rmUltimo) return;
+  rmUltimo = html; el.innerHTML = html;
+}, 350); });
 
 /* ---------- la guía del teléfono del policía (con las fotos) ---------- */
 const rondaToken = () => { const a = new Uint8Array(20); crypto.getRandomValues(a); return [...a].map(b => "abcdefghijkmnpqrstuvwxyz23456789"[b % 32]).join(""); };
 function rondaGuiaArmar(vence){
-  return { vence, meta:rondaMeta(), pts: puntosActivos().map((pt, i) => ({ n:i + 1, id:pt.id, nombre:pt.nombre, lugar:pt.lugar || '', ...(isFinite(pt.x) ? { x:Math.round(pt.x), y:Math.round(pt.y) } : {}), ...(pt.foto ? { f:pt.foto } : {}) })) };
+  return { vence, meta:rondaMeta(), pts: puntosActivos().map((pt, i) => ({ n:i + 1, id:pt.id, nombre:pt.nombre, lugar:pt.lugar || '', ...(isFinite(pt.x) ? { x:Math.round(pt.x), y:Math.round(pt.y) } : {}), ...(pt.foto ? { f:pt.foto } : {}), ...(pt.foto && pt.fg ? { fg:pt.fg } : {}) })) };
 }
 function rondaGuiaPublicar(token, vence){
   if (!token || typeof Nube === 'undefined' || !Nube.activa() || !Nube.db) return;
@@ -452,25 +586,68 @@ const rondaGuiaPeso = g => pesoTexto(Math.round(JSON.stringify(g || {}).length))
 function rondaGuiaHTML(g, { hechos = [] } = {}){
   const pts = aLista(g && g.pts); if (!pts.length) return '';
   const conLugar = pts.filter(p => isFinite(p.x)).map(p => ({ ...p, id:'n' + p.n, nombre:p.nombre, foto:p.f }));
-  const pas = new Map(hechos.map(h => [h.n, h.at]));
+  const pas = new Map(hechos.map(h => [h.n, h.at])), prox = (rondaProximo(g, hechos).p || {}).n;
   return `<div class="rm-guia">
     ${conLugar.length > 1 ? `<div class="rm-mini-caja">${rondaMiniSVG({ pts:conLugar, curso: pas.size ? { pasados:pas } : null })}</div>` : ''}
-    <ol class="rm-guia-lista">${pts.map(p => `<li class="${pas.has(p.n) ? 'hecho' : ''}"><span class="rm-gn">${pas.has(p.n) ? '✓' : p.n}</span>
+    <ol class="rm-guia-lista">${pts.map(p => `<li class="${pas.has(p.n) ? 'hecho' : p.n === prox ? 'prox' : ''}"><span class="rm-gn">${pas.has(p.n) ? '✓' : p.n}</span>
       ${p.f ? `<img src="${p.f}" alt="Foto del lugar del punto ${p.n}" loading="lazy">` : `<span class="rm-gsin">${I('camera')}</span>`}
       <span class="rm-gt"><b>${esc(p.nombre)}</b><small>${esc(p.lugar || '')}${pas.has(p.n) ? ` · pasaste ${hora(pas.get(p.n))} h` : ''}</small></span></li>`).join('')}</ol>
   </div>`;
 }
 /* Los pasos que este teléfono registró en la ronda actual (para tildar la guía). */
+const RondaLocal = {
+  KEY:'bhc.ronda.pasos',
+  leer(){ try { return JSON.parse(localStorage.getItem(this.KEY) || '[]').filter(x => x && Date.now() - x.at < 90 * MIN); } catch(e){ return []; } },
+  /* Anota el punto leído. Si ese punto ya estaba en la ronda (o la ronda ya
+     estaba completa), empieza una ronda nueva en este teléfono. */
+  anotar(id, g){
+    let hoy = this.leer();
+    const ids = aLista(g && g.pts).map(p => p.id).filter(Boolean);
+    const completa = ids.length && ids.every(i => hoy.some(x => x.id === i));
+    if (completa || hoy.some(x => x.id === id)) hoy = [];
+    hoy.push({ id, at:Date.now() });
+    try { localStorage.setItem(this.KEY, JSON.stringify(hoy)); } catch(e){}
+    return hoy;
+  },
+};
 function rondaHechosLocales(g){
-  let hoy = []; try { hoy = JSON.parse(localStorage.getItem('bhc.ronda.pasos') || '[]').filter(x => Date.now() - x.at < 90 * MIN); } catch(e){}
-  return hoy.map(x => { const p = aLista(g && g.pts).find(z => z.id === x.id || z.n === x.n); return p ? { n:p.n, at:x.at } : null; }).filter(Boolean);
+  return RondaLocal.leer().map(x => { const p = aLista(g && g.pts).find(z => z.id === x.id || z.n === x.n); return p ? { n:p.n, at:x.at } : null; }).filter(Boolean);
 }
+/* EL PRÓXIMO PUNTO, CON SU FOTO (pedido de Claudio, 17-10-2026): "que el
+   enlace que le envía la garita al policía le avise cuál sigue y le muestre
+   automáticamente la foto de dónde está colocado el QR". El próximo es el
+   primero que falta DESPUÉS del último que leyó (si saltó uno, se le avisa);
+   si ya leyó todos, la ronda está completa y la próxima empieza por el 1.
+   La foto es la chica que ya está guardada en su teléfono: no gasta datos. */
+function rondaProximo(g, hechos){
+  const pts = aLista(g && g.pts).slice().sort((a, b) => a.n - b.n); if (!pts.length) return { p:null, completa:false, salteados:[] };
+  const ya = new Set(hechos.map(h => h.n));
+  if (pts.every(p => ya.has(p.n))) return { p:pts[0], completa:true, salteados:[] };
+  const ult = hechos.length ? hechos.reduce((a, b) => (b.at >= a.at ? b : a)).n : 0;
+  const p = pts.find(x => x.n > ult && !ya.has(x.n)) || pts.find(x => !ya.has(x.n));
+  return { p, completa:false, salteados: pts.filter(x => x.n < ult && !ya.has(x.n)) };
+}
+function rondaProximoHTML(g, hechos, { inicio = false } = {}){
+  const { p, completa, salteados } = rondaProximo(g, hechos); if (!p) return '';
+  const total = aLista(g.pts).length, k = new Set(hechos.map(h => h.n)).size;
+  const tit = completa ? `¡Ronda completa! (${total} de ${total})` : inicio || !hechos.length ? 'Empezá por el punto' : `Seguí al punto (llevás ${k} de ${total})`;
+  return `<div class="rm-prox${completa ? ' completa' : ''}" role="status">
+    <small>${completa ? I('check') : I('right')} ${tit}</small>
+    ${completa ? '<p class="rm-prox-sub">La próxima ronda empieza de nuevo por el punto 1:</p>' : ''}
+    ${p.f ? `<img class="rm-prox-foto" src="${p.f}" alt="Foto del lugar donde está el QR del punto ${p.n}">` : `<span class="rm-prox-sin">${I('camera')}<span>Este punto todavía no tiene foto</span></span>`}
+    <div class="rm-prox-pie"><span class="rm-prox-n">${p.n}</span><span class="grow"><b>${esc(p.nombre)}</b><small>${esc(p.lugar || '')}</small></span></div>
+    ${p.fg ? rondaBotonGrande(p.fg, p.n, p.nombre) : ''}
+    ${salteados.length ? `<p class="rm-prox-falta">${I('alert')} Te ${salteados.length > 1 ? 'faltaron los puntos' : 'faltó el punto'} ${salteados.map(x => x.n).join(', ')}: si podés, volvé a leer${salteados.length > 1 ? 'los' : 'lo'} para que la ronda quede completa.</p>` : ''}
+  </div>`;
+}
+const rondaVibrar = () => { try { navigator.vibrate && navigator.vibrate([120, 80, 120]); } catch(e){} };
 
 /* Desde Turnos: ver el recorrido y la meta de rondas por noche. */
-A['ronda-ver'] = () => { rondaCapaOn = true; rondaSimHasta = Date.now() + 60000; abrir('mapa'); };
+A['ronda-ver'] = () => { rondaCapaOn = true; rondaSimHasta = Date.now() + rondaSimMs(); abrir('mapa'); };
 F['rondas-meta'] = d => {
   if (!esAdmin()) return;
   const n = Math.max(1, Math.min(8, Math.round(+d.meta) || RONDA_META_BASE));
-  Store.cambiar(s => { s.config.rondasMeta = n; auditar(s, 'Cambió la meta de rondas del policía', `${n} rondas completas por noche`); });
-  toast(`Meta: ${plural(n, 'ronda completa', 'rondas completas')} por noche`, 'check'); refrescar();
+  const dem = [0, 5, 10, 15].includes(+d.demora) ? +d.demora : Math.round(rondaDemora() / MIN);
+  Store.cambiar(s => { s.config.rondasMeta = n; s.config.rondaDemoraVecinos = dem; auditar(s, 'Cambió la ronda del policía', `${n} rondas completas por noche · vecinos: ${dem ? `con ${dem} min de demora` : 'en vivo'}`); });
+  toast(`Meta: ${plural(n, 'ronda completa', 'rondas completas')} por noche · vecinos ${dem ? `con ${dem} min de demora` : 'en vivo'}`, 'check'); refrescar();
 };

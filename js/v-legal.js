@@ -5,7 +5,7 @@
    Preguntas frecuentes. El texto está acá, en un solo lugar: si cambia,
    se cambia la fecha de VERSION_LEGAL y listo.
    ========================================================= */
-const VERSION_LEGAL = '15 de octubre de 2026';
+const VERSION_LEGAL = '17 de octubre de 2026';
 
 const LEGAL = [
   ['1. Partes y objeto', [

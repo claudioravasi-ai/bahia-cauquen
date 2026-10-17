@@ -2239,7 +2239,8 @@ function pintarRondaHabilitar(ruta){
     const guardada = RondaGuia.guardar(g);
     caja.innerHTML = `<h2 class="rm-guia-tit">${I('pin')} Tu recorrido: ${plural(aLista(g.pts).length, 'punto', 'puntos')} en orden</h2>
       <p class="tiny" style="opacity:.85;margin:0 0 8px">${guardada ? `Quedó guardado en tu teléfono (${rondaGuiaPeso(g)}): no gasta datos en cada punto.` : 'Miralo ahora: este teléfono no tiene lugar para guardarlo.'} La meta son ${g.meta || 3} rondas completas.</p>
-      ${rondaGuiaHTML(g)}`;
+      ${rondaProximoHTML(g, rondaHechosLocales(g), { inicio:true })}
+      ${rondaGuiaHTML(g, { hechos:rondaHechosLocales(g) })}`;
   }).catch(() => { const caja = $('#rondaGuia'); if (caja) caja.innerHTML = `<p class="tiny" style="opacity:.8;margin:12px 0 0">No se pudo bajar el recorrido (sin señal). Volvé a tocar el enlace cuando tengas internet.</p>`; });
 }
 /* El recorrido guardado en el teléfono del policía, con lo que ya pasó. */
@@ -2247,7 +2248,7 @@ function pintarGuiaPolicia(g, r){
   $('#app').innerHTML = `<section class="bienvenida" id="puntoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
     <h1 style="font-size:28px">${I('pin')} Tu recorrido</h1>
-    <div class="panel">${g ? `<p class="tiny" style="opacity:.85;margin:0 0 8px">${r && r.nombre ? esc(r.nombre) + ' · ' : ''}guardado en este teléfono · meta: ${g.meta || 3} rondas completas</p>${rondaGuiaHTML(g, { hechos:rondaHechosLocales(g) })}`
+    <div class="panel">${g ? `<p class="tiny" style="opacity:.85;margin:0 0 8px">${r && r.nombre ? esc(r.nombre) + ' · ' : ''}guardado en este teléfono · meta: ${g.meta || 3} rondas completas</p>${rondaProximoHTML(g, rondaHechosLocales(g))}${rondaGuiaHTML(g, { hechos:rondaHechosLocales(g) })}`
       : `<p style="margin:0">Este teléfono no tiene guardado el recorrido. Tocá el enlace de tu tarjeta (el que te mandó la garita).</p>`}</div></section>`;
 }
 function pintarPunto(codigo){
@@ -2257,8 +2258,6 @@ function pintarPunto(codigo){
   const r = Ronda.leer();
   /* (15-10-2026) Con la guía guardada en el teléfono: la foto del lugar y el próximo punto. */
   const g = typeof RondaGuia !== 'undefined' ? RondaGuia.leer() : null, gps = aLista(g && g.pts), gp = gps.find(x => x.id === id);
-  const sig = gp ? (gps.find(x => x.n === gp.n + 1) || null) : null;
-  const fichaGuia = (x, tit) => x ? `<div class="rm-pp"><small>${tit}</small><div class="rm-pp-in">${x.f ? `<img src="${x.f}" alt="Foto del lugar">` : `<span class="rm-gsin">${I('camera')}</span>`}<span><b>${x.n}. ${esc(x.nombre)}</b><small>${esc(x.lugar || '')}</small></span></div></div>` : '';
   $('#app').innerHTML = `<section class="bienvenida" id="puntoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
     <h1 style="font-size:28px">${I('pin')} ${gp ? gp.n + '. ' : ''}${esc(nombre)}</h1>
@@ -2288,12 +2287,15 @@ function pintarPunto(codigo){
         Store.cambiar(s => { s.pasos.unshift({ id:uid(), punto:id, k, c, nombre:cod.nombre, at:Date.now() }); });
       }
       if (!r) Ronda.guardar(c, '');
-      let hoy = []; try { hoy = JSON.parse(localStorage.getItem('bhc.ronda.pasos') || '[]').filter(x => Date.now() - x.at < 90 * MIN); } catch(err){}
-      if (!hoy.some(x => x.id === id)) hoy.push({ id, at:Date.now() });
-      try { localStorage.setItem('bhc.ronda.pasos', JSON.stringify(hoy)); } catch(err){}
+      /* 17-10: el teléfono anota el punto y muestra solo el próximo, con su foto. */
+      const hoy = RondaLocal.anotar(id, g);
       f.hidden = true;
-      res.innerHTML = `${aviso('ok', 'check', `Paso registrado · ${hora(Date.now())} h`, `${esc(nombre)}. Llevás ${plural(hoy.length, 'punto', 'puntos')} en esta ronda.${gps.length ? (sig ? ' Seguí al próximo.' : ' Era el último: ronda terminada.') : ' Seguí al próximo.'}`)}
-        ${fichaGuia(sig, 'Próximo punto')}${g ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:10px" id="verMiRecorrido">${I('map')}Ver todo mi recorrido</button>` : ''}`;
+      const fotoAca = $('#puntoPublico .rm-pp-foto'); if (fotoAca) fotoAca.hidden = true;
+      const hechos = g ? rondaHechosLocales(g) : [], px = g ? rondaProximo(g, hechos) : null;
+      res.innerHTML = `${aviso('ok', 'check', `Leído · ${hora(Date.now())} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Llevás ${plural(hechos.length || hoy.length, 'punto', 'puntos')} en esta ronda.${gps.length ? '' : ' Seguí al próximo.'}`)}
+        ${g ? rondaProximoHTML(g, hechos) : ''}${g ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:10px" id="verMiRecorrido">${I('map')}Ver todo mi recorrido</button>` : ''}`;
+      rondaVibrar();
+      if (px && px.p) setTimeout(() => $('#puntoRes .rm-prox')?.scrollIntoView({ block:'start', behavior:'smooth' }), 120);
       $('#verMiRecorrido')?.addEventListener('click', () => { history.replaceState(null, '', '#/ronda/guia'); pintarGuiaPolicia(g, Ronda.leer()); });
     } catch(err){
       b.disabled = false;
@@ -2317,7 +2319,9 @@ function seccionPuntos(){
         ${esAdmin() ? `<button class="icon-btn" data-a="punto-editar" data-id="${pt.id}" aria-label="Editar">${I('edit')}</button>` : ''}</div>`).join('')}</div>
       <div class="btns" style="margin-top:10px">${esAdmin() ? `<button class="btn btn-sm btn-pri" data-a="ronda-editar">${I('map')}Marcar el recorrido en el plano</button><button class="btn btn-sm btn-sec" data-a="puntos-imprimir">${I('qr')}Imprimir los QR</button>` : ''}
         ${typeof rondaPuntosMapa === 'function' && rondaPuntosMapa().length > 1 ? `<button class="btn btn-sm btn-sec" data-a="ronda-ver">${I('target')}Ver el recorrido</button>` : ''}</div>
-      ${esAdmin() ? `<form data-f="rondas-meta" class="rm-meta"><label>Rondas completas por noche (meta)</label><div><input name="meta" type="number" min="1" max="8" value="${rondaMeta()}" inputmode="numeric"><button class="btn btn-sm btn-sec">${I('check')}Guardar</button></div></form>` : `<p class="muted small" style="margin:8px 0 0">Meta: ${rondaMeta()} rondas completas por noche.</p>`}
+      ${esAdmin() ? `<form data-f="rondas-meta" class="rm-meta"><label>Rondas completas por noche (meta)</label><div><input name="meta" type="number" min="1" max="8" value="${rondaMeta()}" inputmode="numeric"></div>
+        <label style="margin-top:6px">Los vecinos ven la ronda</label><div><select name="demora">${[[0, 'En vivo (sin el nombre del policía)'], [5, 'Con 5 minutos de demora'], [10, 'Con 10 minutos de demora'], [15, 'Con 15 minutos de demora']].map(([v, t]) => `<option value="${v}" ${Math.round(rondaDemora() / MIN) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div><button class="btn btn-sm btn-sec">${I('check')}Guardar</button></div></form>` : `<p class="muted small" style="margin:8px 0 0">Meta: ${rondaMeta()} rondas completas por noche.</p>`}
       <p class="muted tiny" style="margin:10px 0 0">Conviene ponerlos donde obliguen a recorrer lo importante (no solo las esquinas): el acceso de servicio, el punto más alejado de la garita, el perímetro que linda con bosque o costa, los espacios comunes y la calle más oscura. A 1,5 m de altura, en un poste (nunca frente a una casa), plastificados y con algo de luz.</p>`
       : `<p class="small" style="margin:0 0 10px">Con puntos de control, el policía escanea un QR en cada punto con su teléfono y la ronda queda anotada sola, con la hora exacta de cada punto.</p>
         ${esAdmin() ? `<button class="btn btn-sm btn-pri" data-a="puntos-crear">${I('plus')}Crear los ${PUNTOS_SUGERIDOS.length} puntos sugeridos</button>` : `<p class="muted small" style="margin:0">Los crea la Administración.</p>`}`}</div></details>`;
@@ -2333,7 +2337,8 @@ A['punto-editar'] = el => {
       <span class="rm-pf-prev">${pt.foto ? `<img src="${pt.foto}" alt="">` : I('camera')}</span>
       <div class="grow"><label class="btn btn-sm btn-sec">${I('camera')}${pt.foto ? 'Cambiar la foto' : 'Sacar o elegir foto'}<input type="file" accept="image/*" data-punto-foto hidden></label>
       ${pt.foto ? `<label class="check" style="margin-top:6px"><input type="checkbox" name="sinFoto"><span>Quitar la foto</span></label>` : ''}</div>
-      <input type="hidden" name="fotoDato" value=""></div></div>
+      <input type="hidden" name="fotoDato" value=""><input type="hidden" name="fotoGrande" value=""></div>
+      <small class="muted tiny" style="display:block;margin-top:4px">En la app viaja una versión chica (unos 15 KB); la grande se guarda aparte y solo la baja quien toca "Bajar la foto en grande".</small></div>
     <div class="grid2"><div class="field"><label>Orden en la ronda</label><input name="orden" type="number" min="1" max="12" value="${pt.orden || 1}"></div>
       <label class="check" style="align-self:end"><input type="checkbox" name="activo" ${pt.activo !== false ? 'checked' : ''}><span>Activo</span></label></div>
     ${pt.id ? `<label class="check"><input type="checkbox" name="nuevaClave"><span>Cambiar la clave (el QR impreso deja de valer: hay que imprimirlo de nuevo)</span></label>` : ''}
@@ -2348,7 +2353,11 @@ F['punto'] = (d, form) => {
     if (!pt){ pt = { id:'pt' + claveAzar().slice(0, 6), k:claveAzar(), at:Date.now() }; s.puntos.push(pt); }
     Object.assign(pt, { nombre:d.nombre.trim(), lugar:(d.lugar || '').trim(), orden:Math.min(12, Math.max(1, +d.orden || 1)), activo:!!d.activo });
     if (d.nuevaClave) pt.k = claveAzar();
-    if (d.fotoDato && /^data:image\//.test(d.fotoDato)) pt.foto = d.fotoDato; else if (d.sinFoto) delete pt.foto;
+    /* 17-10: la chica va con el punto; la grande, aparte y a pedido (js/ronda-mapa.js). */
+    const fgViejo = pt.fg;
+    if (d.fotoDato && /^data:image\//.test(d.fotoDato)){ pt.foto = d.fotoDato; if (/^data:image\//.test(d.fotoGrande || '')) pt.fg = rondaGrandeGuardar(d.fotoGrande); else delete pt.fg; }
+    else if (d.sinFoto){ delete pt.foto; delete pt.fg; }
+    if (fgViejo && fgViejo !== pt.fg) rondaGrandeBorrar(fgViejo);
     auditar(s, id ? 'Editó un punto de control' : 'Agregó un punto de control', pt.nombre + (d.nuevaClave ? ' (clave nueva)' : ''));
   });
   cerrarHoja(); toast(d.nuevaClave ? 'Guardado. Imprimí de nuevo el QR de ese punto.' : 'Guardado', 'check'); refrescar();
@@ -2358,13 +2367,15 @@ F['punto'] = (d, form) => {
 document.addEventListener('change', async e => {
   const inp = e.target; if (!inp || inp.dataset.puntoFoto === undefined) return;
   const f = inp.files && inp.files[0], form = inp.closest('form'); if (!f || !form) return;
-  try { const dato = await rondaFotoChica(f); form.fotoDato.value = dato; const pv = form.querySelector('.rm-pf-prev'); if (pv) pv.innerHTML = `<img src="${dato}" alt="">`; toast(`Foto lista (${pesoTexto(Math.round(dato.length * 0.75))})`, 'camera'); }
+  try { const { chica:dato, grande } = await rondaFotoDoble(f); form.fotoDato.value = dato; form.fotoGrande.value = grande; const pv = form.querySelector('.rm-pf-prev'); if (pv) pv.innerHTML = `<img src="${dato}" alt="">`; toast(`Foto lista (${pesoTexto(Math.round(dato.length * 0.75))})`, 'camera'); }
   catch(err){ toast('No se pudo usar esa foto', 'alert'); }
 });
 A['punto-borrar'] = async el => {
   if (aLista(Store.s.puntos).length <= 2) return toast('Tienen que quedar al menos dos puntos', 'qr');
   if (!await confirmar('Borrar el punto', 'Su QR deja de valer. Los pasos ya registrados quedan en la historia.', { si:'Borrar', peligro:true })) return;
-  Store.cambiar(s => { const pt = s.puntos.find(x => x.id === el.dataset.id); s.puntos = s.puntos.filter(x => x.id !== el.dataset.id); auditar(s, 'Borró un punto de control', pt?.nombre || ''); });
+  let fg = '';
+  Store.cambiar(s => { const pt = s.puntos.find(x => x.id === el.dataset.id); fg = pt?.fg || ''; s.puntos = s.puntos.filter(x => x.id !== el.dataset.id); auditar(s, 'Borró un punto de control', pt?.nombre || ''); });
+  if (fg && typeof rondaGrandeBorrar === 'function') rondaGrandeBorrar(fg);
   cerrarHoja(); refrescar();
 };
 const enlacePunto = pt => location.origin + location.pathname.replace(/[^/]*$/, '') + (typeof Nube !== 'undefined' && Nube.activa() ? '' : '?local') + `#/punto/${pt.id}.${pt.k}/${encodeURIComponent(pt.nombre)}`;

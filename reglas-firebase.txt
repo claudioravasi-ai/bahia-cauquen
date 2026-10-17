@@ -149,7 +149,11 @@ QUÉ HACEN, EN CASTELLANO
    tarjeta: no se puede listar, la escriben la garita y la Administración,
    y se borra con su salida. Los vecinos ven el recorrido y las rondas de la
    noche dentro de /barrio/guardiaAhora (campo "ronda"), sin el nombre del
-   policía y con la ronda en curso 10 minutos atrasada.
+   policía; desde el 17-10-2026 la ronda en curso va en vivo (la
+   Administración puede ponerle 5, 10 o 15 minutos de demora). La foto
+   GRANDE de cada punto (17-10-2026) vive aparte, en
+   /ronda/fotos/<clave larga al azar>: no se puede listar, la escribe y la
+   borra solo la Administración, y la baja solo quien la pide.
 
 7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
    ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
@@ -613,12 +617,30 @@ PEGAR DESDE ACÁ
           ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
           ".validate": "!newData.exists() || ($t.length >= 16 && newData.hasChildren(['vence', 'pts']) && newData.child('vence').isNumber())"
         }
+      },
+      /* 17-10: LA FOTO GRANDE de cada punto (la chica va con el punto y con
+         la guía). Vive en ronda/fotos/<clave de 20 letras al azar>, no baja
+         con nada: la trae solo quien toca "Bajar la foto en grande" (la
+         clave está en el punto y en la guía del policía). Nadie puede listar
+         la carpeta. La escribe y la borra solo la Administración; hasta
+         unos 600 KB por foto. */
+      "fotos": {
+        "$k": {
+          ".read": "$k.length >= 16",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+          ".validate": "!newData.exists() || ($k.length >= 16 && newData.hasChildren(['d', 'at']) && newData.child('d').isString() && newData.child('d').val().beginsWith('data:image/') && newData.child('d').val().length <= 800000 && newData.child('at').val() === now)"
+        }
       }
     }
   }
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 17-10-2026 (hay que volver a publicar): LAS FOTOS GRANDES DE LOS
+  PUNTOS DE LA RONDA. Bloque nuevo: ronda/fotos (dentro de "ronda", al
+  lado de "guia"). Sin publicarlo, la foto chica anda igual, pero "Bajar la
+  foto en grande" no funciona en los otros equipos.
 
 ✔ NUEVO 15-10-2026, más tarde (hay que volver a publicar): LA RONDA EN EL
   PLANO. Bloque nuevo: ronda/guia (ver el punto 8 sexies). Sin publicarlo,

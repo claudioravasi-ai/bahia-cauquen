@@ -308,7 +308,7 @@ function guardiaAhoraDeseada(){
   /* 14-10: cada guardia con su horario (los horarios se superponen). */
   return { id:'ahora', abierto:true, turno:t.turno, desde:c.desde || '', hasta:c.hasta || '', inicio:t.at,
     guardias: relevosDe(t).map(r => { const l = lookDe(r.n), h = horarioDe(r.h); return { n:r.n, ...(l ? { look:l } : {}), ...(h ? { h:r.h, desde:h.desde, hasta:h.hasta } : {}) }; }), policia: policiasAdentro(t).length ? 1 : 0, ...mant,
-    /* 15-10: la ronda del policía para los vecinos (sin nombres, con 10 min de demora: js/ronda-mapa.js). */
+    /* 15-10: la ronda del policía para los vecinos (sin nombres; 17-10: en vivo o con la demora que elija la Administración, js/ronda-mapa.js). */
     ...(typeof rondaPublica === 'function' && rondaPublica(t) ? { ronda:rondaPublica(t) } : {}) };
 }
 /* ¿Este equipo tiene el libro de guardia? Lo bajan las cuentas de la garita,
@@ -365,17 +365,18 @@ function sincroGuardiaAhora(){
      equipos no se pisan uno al otro escribiendo por turnos. */
   if (u.rol === 'admin' && cur && ahora - (cur.at || 0) < 60000){ clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 60000); return; }
   /* Freno de seguridad: nunca más de una publicación cada 10 segundos, ni más
-     de seis en cinco minutos. Si algo volviera a dar "distinto" para siempre,
+     de catorce en cinco minutos (17-10: eran seis, pero con la ronda en vivo
+     cada QR leído es una publicación y una ronda tiene hasta 12). Si algo volviera a dar "distinto" para siempre,
      la pantalla no titila: deja de publicar y queda anotado en la consola. */
   if (ahora - gaUlt < 10000){ clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 10000 - (ahora - gaUlt)); return; }
   if (ahora - gaVentana > 300000){ gaVentana = ahora; gaVeces = 0; }
-  if (++gaVeces > 6){ console.warn('Guardia en la portada: se publicó demasiadas veces seguidas, se frena un rato.'); return; }
+  if (++gaVeces > 14){ console.warn('Guardia en la portada: se publicó demasiadas veces seguidas, se frena un rato.'); return; }
   gaUlt = ahora;
   Store.cambiar(s => { s.guardiaAhora = [{ ...d, at:ahora }]; });
 }
 Store.alCambiar(() => { clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 400); });
-/* La ronda de los vecinos va con 10 minutos de demora: cada minuto se mira
-   si ya corresponde mostrar un punto más (solo escribe si cambió algo). */
+/* Si la Administración le puso demora a la ronda de los vecinos, cada minuto
+   se mira si ya corresponde mostrar un punto más (solo escribe si cambió algo). */
 setInterval(() => { try { sincroGuardiaAhora(); } catch(e){} }, 60000);
 
 /* En la portada: debajo del DEA, las caritas de quienes están de guardia. */

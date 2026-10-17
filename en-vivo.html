@@ -210,6 +210,14 @@ button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;paddin
 .plano .pt{cursor:pointer}
 .plano .pt circle.aro{fill:var(--danger);opacity:.18}
 .plano .pt.ok circle.aro{fill:var(--ok);opacity:.25}
+/* 17-10: leído fijo en verde, los que faltan titilan, el próximo late */
+.plano .pt.falta circle.nucleo{animation:ptTitila 1.15s ease-in-out infinite}
+.plano .pt.prox circle.aro{animation:ptLate 1s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes ptTitila{50%{fill:#ff9a3d;opacity:.5}}
+@keyframes ptLate{from{transform:scale(1);opacity:.35}to{transform:scale(1.7);opacity:0}}
+.prox-foto{height:90px;border-radius:12px;display:grid;place-items:center;font-size:30px;background:linear-gradient(160deg,#5c7d63,#2e4a3a 60%,#1f3328);position:relative;overflow:hidden}
+.prox-foto::after{content:"QR";position:absolute;left:58%;top:30%;font:800 10px var(--body);color:#111;background:#fff;padding:5px 4px;border-radius:3px;box-shadow:0 0 0 2px #ffd54a}
+@media (prefers-reduced-motion:reduce){.plano .pt.falta circle.nucleo,.plano .pt.prox circle.aro{animation:none}}
 .plano text{font-family:var(--body);font-size:9px;font-weight:800;fill:var(--ink-2)}
 .chk{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);width:100%;text-align:left;font-size:12.5px;font-weight:600}
 .chk .o{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--line-2);display:grid;place-items:center;font-size:12px;color:#fff}
@@ -830,17 +838,17 @@ const ESC = [
 { id:'ronda', grupo:'La garita', e:'👮', t:'La ronda del policía, en vivo', s:'La Administración marca el recorrido, el policía escanea y todos lo siguen en el plano',
   roles:{ a:LU, b:['Garita', 'Turno noche · Guardia Sosa'], c:AD, d:['Policía', 'Cabo Gómez'] }, hora:'23:10',
   pasos:[
-  { lado:'c', hora:'18:30', txt:'De día, la Administración abre el mapa del barrio y toca <b>Editar recorrido</b>: marca en el plano los 6 puntos en orden (1, 2, 3…) y le agrega a cada uno una <b>foto chica del poste</b>. Toca <b>Finalizar</b> y ve la simulación del recorrido por las calles.',
+  { lado:'c', hora:'18:30', txt:'De día, la Administración abre el mapa del barrio y toca <b>Editar recorrido</b>: marca en el plano los 6 puntos en orden (1, 2, 3…) y le agrega a cada uno una <b>foto del poste</b> (por la app viaja la chica; la grande, solo si alguien la baja). Toca <b>Finalizar</b> y ve la simulación del recorrido por las calles.',
     a:() => inicioV('lucia', '', { saludo:'Buenas tardes,' }), b:() => garitaInicio(),
     c:() => adminInicio(card('Recorrido de la ronda', it('1️⃣', 'Portón', 'Foto · 12 KB'), it('2️⃣', 'Perímetro norte', 'Foto · 14 KB'), it('3️⃣', 'Contenedores', 'Foto · 11 KB'), it('🟡', 'Simulación', '1,8 km · unos 24 min caminando')) + btn('Finalizar'), { sinSalas:true }),
     d:() => poli() + ap(card('Tu recorrido', it('📷', '6 puntos con su foto', 'Guardado en tu teléfono · 72 KB'))) },
-  { lado:'d', txt:'El cabo Gómez arranca la ronda. En cada punto escanea el QR pegado en el poste. Tocá <b>Escanear el próximo punto</b> (seis veces).', ronda:true,
-    a:() => inicioV('lucia', '', { saludo:'Buenas noches,' }), c:() => adminInicio('', { sinSalas:true }),
+  { lado:'d', txt:'El cabo Gómez arranca la ronda. Su teléfono le dice <b>cuál sigue y le muestra la foto</b> del lugar del QR. Tocá <b>Escanear el próximo punto</b> (seis veces): el leído queda verde y fijo y los que faltan titilan, en la garita y en el teléfono de Lucía, en vivo.', ronda:true,
+    a:() => vecinaRonda(), c:() => adminInicio('', { sinSalas:true }),
     b:() => garitaRonda(), d:() => poliRonda() },
   { lado:'c', txt:'Ronda completa: queda en la bitácora y la Administración la ve en el informe. Si a la hora no hay ronda, salta el aviso a la supervisión.',
     al(){ avisar('bc', '✅', 'Ronda completa', '6 de 6 puntos · 23:10 a 23:47'); },
     c:() => adminInicio(card('Rondas de hoy', it('👮', 'Cabo Gómez', '6 de 6 puntos · 23:10 a 23:47', 'Completa', 'ok')), { sinSalas:true }) },
-  { lado:'a', hora:'23:58', txt:'Lucía toca las caritas de <b>De guardia</b> en la portada: ve el plano con el recorrido y los anillos de la noche, <b>Ronda 1 ✓ de 3</b>. La que está en curso le llega con 10 minutos de demora y sin el nombre del policía, por seguridad.',
+  { lado:'a', hora:'23:58', txt:'Lucía toca las caritas de <b>De guardia</b> en la portada: ve el plano con el recorrido y los anillos de la noche, <b>Ronda 1 ✓ de 3</b>. La que está en curso la ve <b>en vivo</b>, sin el nombre del policía (la Administración puede ponerle una demora).',
     a:() => inicioV('lucia', card('La ronda del policía', it('✅', 'Ronda 1', '23:10 a 23:47', 'Completa', 'ok'), it('⭕', 'Ronda 2', 'Pendiente'), it('⭕', 'Ronda 3', 'Pendiente')), { saludo:'Buenas noches,' }) },
   ], fin:'Ni planillas ni firmas: cada punto queda con su hora, la garita lo ve en el momento y los vecinos saben que la ronda se hizo.' },
 
@@ -1132,12 +1140,17 @@ const PUNTOS = [['Portón', 52, 196], ['Plaza', 132, 150], ['Residuos', 212, 120
 const horaRonda = n => `23:${String(12 + n * 7).padStart(2, '0')}`;
 function plano(p, tocable){
   return `<div class="plano"><svg viewBox="0 0 300 250"><rect width="300" height="250" fill="var(--surf-2)"/><path d="M20 210 C 80 150, 160 160, 280 40" stroke="var(--line-2)" stroke-width="14" fill="none" stroke-linecap="round"/>
-    ${PUNTOS.map(([n, x, y], i) => { const ok = p.includes(i); return `<g class="pt ${ok ? 'ok' : ''}" ${tocable ? `data-act="punto" data-i="${i}" role="button" aria-label="Escanear ${n}"` : ''}><circle class="aro" cx="${x}" cy="${y}" r="17"/><circle cx="${x}" cy="${y}" r="9" fill="${ok ? 'var(--ok)' : 'var(--danger)'}"/><text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:#fff;font-size:9px">${ok ? '✓' : 'QR'}</text><text x="${x}" y="${y - 21}" text-anchor="middle">${n}</text></g>`; }).join('')}</svg></div>`;
+    ${PUNTOS.map(([n, x, y], i) => { const ok = p.includes(i), prox = i === p.length; return `<g class="pt ${ok ? 'ok' : 'falta'}${prox ? ' prox' : ''}" ${tocable ? `data-act="punto" data-i="${i}" role="button" aria-label="Escanear ${i + 1}. ${n}"` : `aria-label="${i + 1}. ${n}${ok ? ': leído' : ': falta'}"`}><circle class="aro" cx="${x}" cy="${y}" r="17"/><circle class="nucleo" cx="${x}" cy="${y}" r="9" fill="${ok ? 'var(--ok)' : '#2348d8'}"/><text x="${x}" y="${y + 3}" text-anchor="middle" style="fill:#fff;font-size:9px">${ok ? '✓' : i + 1}</text><text x="${x}" y="${y - 21}" text-anchor="middle">${n}</text></g>`; }).join('')}</svg></div>`;
 }
 function poliRonda(){ const p = S.d.puntos || [];
-  return poli() + ap(plano(p, true), p.length < 6 ? btn(`📷 Escanear el próximo punto (${p.length + 1} de 6)`) : aviso('ok', '✅', 'Ronda completa', '6 de 6 puntos')); }
+  /* 17-10: el teléfono del policía le dice cuál sigue y le muestra la foto del lugar del QR. */
+  const sig = p.length < 6 ? `<div class="ap-card" style="border:2px solid #ffd54a"><div class="ap-muted" style="font-weight:800;text-transform:uppercase;font-size:10.5px">${p.length ? `Seguí al punto (llevás ${p.length} de 6)` : 'Empezá por el punto'}</div><div class="prox-foto" style="margin-top:6px">📷</div><b style="display:block;margin-top:6px">${p.length + 1}. ${PUNTOS[p.length][0]}</b></div>` : '';
+  return poli() + ap(sig, plano(p, true), p.length < 6 ? btn(`📷 Escanear el próximo punto (${p.length + 1} de 6)`) : aviso('ok', '✅', '¡Ronda completa!', '6 de 6 puntos · la próxima empieza por el 1')); }
+/* 17-10: Lucía también lo ve en vivo, sin el nombre del policía. */
+function vecinaRonda(){ const p = S.d.puntos || [];
+  return inicioV('lucia', card('La ronda del policía · 🔴 En vivo', plano(p, false), it('🛡️', `Ronda 1 · ${p.length} de 6 puntos`, 'Verde: ya leído · titila: falta'))); }
 function garitaRonda(){ const p = S.d.puntos || [];
-  return garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-lbl">Ronda en vivo</div>`, plano(p, false), card('', ...PUNTOS.map(([n], i) => { const k = p.indexOf(i); return it(k >= 0 ? '✅' : '▫️', n, k >= 0 ? `Escaneado ${horaRonda(k)}` : 'Pendiente', k >= 0 ? 'Listo' : '', k >= 0 ? 'ok' : ''); }))); }
+  return garita('Turno noche · Guardia Sosa') + ap(`<div class="ap-lbl">Ronda en vivo</div>`, plano(p, false), card('', ...PUNTOS.map(([n], i) => { const k = p.indexOf(i); return it(k >= 0 ? '✅' : '▫️', `${i + 1}. ${n}`, k >= 0 ? `Leído ${horaRonda(k)}` : 'Falta', k >= 0 ? 'Listo' : '', k >= 0 ? 'ok' : ''); }))); }
 
 /* ---------- el motor ---------- */
 function pasoDe(e, i, l){ for (let k = i; k >= 0; k--) if (e.pasos[k][l]) return e.pasos[k][l]; return null; }
@@ -1244,7 +1257,7 @@ document.addEventListener('pointerdown', ev => {
 function marcarPunto(i){
   S.d.puntos = S.d.puntos || []; if (S.d.puntos.includes(i)) return;
   S.d.puntos.push(i); tono([[1320, 0, .12]]); $$('.hora').forEach(h => h.textContent = horaRonda(S.d.puntos.length - 1));
-  $('#appd').innerHTML = poliRonda(); $('#appb').innerHTML = garitaRonda();
+  $('#appd').innerHTML = poliRonda(); $('#appb').innerHTML = garitaRonda(); $('#appa').innerHTML = vecinaRonda();
   anotar(`<b>Garita</b> vio en vivo: punto ${esc(PUNTOS[i][0])} escaneado`);
   if (S.d.puntos.length === 6) tiempo(avanzar, 900);
 }
@@ -1256,7 +1269,8 @@ document.addEventListener('click', ev => {
   const act = ev.target.closest('[data-act="punto"]');
   if (act || (p.ronda && lado === 'd' && ev.target.closest('[data-go]'))){
     if (!p.ronda || lado !== 'd'){ return; }
-    const pts = S.d.puntos || []; const i = act ? +act.dataset.i : [0, 1, 2, 3, 4, 5].find(x => !pts.includes(x));
+    const pts = S.d.puntos || []; const i = [0, 1, 2, 3, 4, 5].find(x => !pts.includes(x));
+    if (act && +act.dataset.i !== i && i !== undefined){ toastTel('d', `El próximo es el ${i + 1}: ${PUNTOS[i][0]} (el que titila)`); return; }
     if (i !== undefined) marcarPunto(i); return;
   }
   const go = ev.target.closest('[data-go]'); if (!go || go.dataset.hold) return;

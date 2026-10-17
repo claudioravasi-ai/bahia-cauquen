@@ -5534,19 +5534,31 @@ body.mv-modo{background:#06161c}
 .ronda-capa .rm-onda{fill:none;stroke:#5b8cff;stroke-width:2.5;transform-box:fill-box;transform-origin:center;animation:rmOnda 1.6s ease-out infinite}
 @keyframes rmOnda{from{transform:scale(1);opacity:.9}to{transform:scale(2.4);opacity:0}}
 .ronda-capa .rm-poli-halo{fill:rgba(91,140,255,.22);stroke:#5b8cff;stroke-width:1.5;animation:rmSirena 1s steps(1) infinite}
-.ronda-capa .rm-poli-chapa{fill:#0b1f3a;stroke:#fff;stroke-width:1.6}
-.ronda-capa .rm-poli-ic{color:#ffd54a}
 @keyframes rmSirena{0%{stroke:#3d7bff;fill:rgba(61,123,255,.25)}50%{stroke:#ff3b4e;fill:rgba(255,59,78,.25)}}
 /* La simulación: la línea se dibuja del 1 al último y un patrullero la recorre. */
-.ronda-capa .rm-sim{fill:none;stroke:#ffe066;stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;opacity:.9;
-  filter:drop-shadow(0 0 6px rgba(255,224,102,.8));animation:rmDibuja calc(var(--n) * 1.6s) linear infinite}
-@keyframes rmDibuja{0%{stroke-dashoffset:1}85%{stroke-dashoffset:0;opacity:.9}100%{stroke-dashoffset:0;opacity:0}}
+/* 17-10: la línea la mueve el propio dibujo (SMIL), con el mismo reloj que la gorra. */
+.ronda-capa .rm-sim{fill:none;stroke:#ffe066;stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round;opacity:.9;
+  filter:drop-shadow(0 0 6px rgba(255,224,102,.8))}
 .ronda-capa.sim .rm-pin{animation:rmAparece .5s both;animation-delay:var(--d)}
 @keyframes rmAparece{from{opacity:0;transform:translateY(-6px)}}
 .ronda-capa.sim .rm-pin{transform-box:fill-box}
-.rm-auto-c{fill:#0b1f3a;stroke:#ffe066;stroke-width:2.4}
-.rm-auto-l{fill:#ff3b4e;animation:rmLuz .5s steps(1) infinite}
-@keyframes rmLuz{50%{fill:#3d7bff}}
+/* LEÍDO FIJO, FALTANTE TITILA (17-10-2026): verde quieto el que ya se leyó;
+   los que faltan titilan; el próximo, además, late con su onda. */
+.ronda-capa .rm-pin.falta .rm-base{animation:rmTitila 1.15s ease-in-out infinite}
+.ronda-capa .rm-pin.falta .rm-num{animation:rmTitilaN 1.15s ease-in-out infinite}
+.ronda-capa .rm-pin.falta.prox .rm-base{animation-duration:.8s}
+@keyframes rmTitila{50%{fill:#ff9a3d;stroke:#ffe066;opacity:.55}}
+@keyframes rmTitilaN{50%{opacity:.35}}
+.ronda-capa .rm-pin.hecho .rm-base{stroke:#d9ffe9;animation:none}
+/* LA GORRA DEL POLICÍA (17-10-2026) */
+.rm-gorra .rm-g-sombra{fill:rgba(0,0,0,.35)}
+.rm-gorra .rm-g-copa{fill:#16305e;stroke:#fff;stroke-width:1.5;stroke-linejoin:round}
+.rm-gorra .rm-g-cinta{fill:#0a1730;stroke:#fff;stroke-width:1}
+.rm-gorra .rm-g-raya{stroke:#ffd54a;stroke-width:1}
+.rm-gorra .rm-g-visera{fill:#05080f;stroke:#fff;stroke-width:1.1;stroke-linejoin:round}
+.rm-gorra .rm-g-escudo{fill:#ffd54a;stroke:#8a6400;stroke-width:.6}
+.rm-gorra .rm-g-estrella{fill:#16305e}
+.rm-gorra{filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
 .ronda-capa.editar .rm-tramo{animation:none;stroke-dasharray:6 6}
 .ronda-capa.editar .rm-pin .rm-base{stroke:#ffe066}
 .mapa-svg.lejos .ronda-capa .rm-hora{display:none}
@@ -5664,10 +5676,41 @@ li.hecho .rm-gn{background:#15a862}
 .rm-pp-in img,.rm-pp-in .rm-gsin{width:84px;height:62px;border-radius:10px;object-fit:cover;flex:none}
 .rm-pp-in b{display:block}
 .rm-pp-in small{display:block;font-size:12px;opacity:.85}
+/* El próximo punto en el teléfono del policía, con la foto grande (17-10-2026) */
+.rm-prox{margin:12px 0 0;padding:10px;border-radius:18px;background:rgba(255,255,255,.14);border:2px solid #ffd54a;box-shadow:0 0 0 4px rgba(255,213,74,.15)}
+.rm-prox.completa{border-color:#2fe08a;box-shadow:0 0 0 4px rgba(47,224,138,.18)}
+.rm-prox>small{display:flex;gap:6px;align-items:center;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px}
+.rm-prox>small .i{width:16px;height:16px}
+.rm-prox-sub{margin:0 0 8px;font-size:13px;opacity:.9}
+.rm-prox-foto{display:block;width:100%;max-height:46vh;object-fit:cover;border-radius:14px;border:2px solid rgba(255,255,255,.45);background:rgba(0,0,0,.2)}
+.rm-prox-sin{display:flex;gap:8px;align-items:center;justify-content:center;min-height:90px;border-radius:14px;background:rgba(255,255,255,.1);font-size:13px;opacity:.85}
+.rm-prox-sin .i{width:20px;height:20px}
+.rm-prox-pie{display:flex;gap:10px;align-items:center;margin-top:10px}
+.rm-prox-pie b{display:block;font-size:16px}
+.rm-prox-pie small{display:block;font-size:12.5px;opacity:.85}
+.rm-prox-n{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#ff9a3d;color:#fff;font-weight:800;font-size:17px;border:2.5px solid #fff;animation:rmLateN 1.2s ease-in-out infinite}
+.rm-prox.completa .rm-prox-n{background:#15a862;animation:none}
+@keyframes rmLateN{50%{box-shadow:0 0 0 7px rgba(255,154,61,.3)}}
+.rm-prox-falta{display:flex;gap:6px;align-items:flex-start;margin:8px 0 0;font-size:12.5px;color:#ffe08a}
+.rm-prox-falta .i{flex:none;width:15px;height:15px;margin-top:1px}
+.rm-prox .rm-bajar,.rm-bajar{margin-top:10px}
+.rm-guia-lista li.prox{background:rgba(255,154,61,.22);box-shadow:inset 0 0 0 2px #ff9a3d}
+li.prox .rm-gn{background:#ff9a3d}
+/* Para los vecinos: la leyenda y la marca "En vivo" */
+.rm-envivo{flex:none;display:inline-flex;gap:5px;align-items:center;padding:3px 9px;border-radius:99px;background:rgba(255,59,78,.14);color:#ff4d5e;font-size:11.5px;font-weight:800}
+.rm-envivo i{width:7px;height:7px;border-radius:50%;background:#ff3b4e;animation:rmLateV 1.2s ease-in-out infinite}
+@keyframes rmLateV{50%{opacity:.25}}
+.rm-ley{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 2px 0;font-size:11.5px;color:var(--muted)}
+.rm-ley span{display:inline-flex;gap:5px;align-items:center}
+.rm-ley i{width:11px;height:11px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.rm-l-ok{background:#15a862}
+.rm-l-falta{background:#2348d8;animation:rmTitilaL 1.15s ease-in-out infinite}
+@keyframes rmTitilaL{50%{background:#ff9a3d;opacity:.6}}
+.rm-l-gorra{background:#16305e;border-radius:4px 4px 2px 2px!important}
 @media (prefers-reduced-motion:reduce){
-  .ronda-capa .rm-tramo,.ronda-capa .rm-onda,.ronda-capa .rm-poli-halo,.rm-auto-l,.rm-anillo.curso i,.ronda-capa.sim .rm-pin{animation:none}
-  .ronda-capa .rm-sim{animation:none;stroke-dashoffset:0}
-  .rm-auto{display:none}
+  .ronda-capa .rm-tramo,.ronda-capa .rm-onda,.ronda-capa .rm-poli-halo,.rm-auto-l,.rm-anillo.curso i,.ronda-capa.sim .rm-pin,.rm-prox-n,.rm-envivo i{animation:none}
+  .ronda-capa .rm-pin.falta .rm-base{animation:none;fill:#ff9a3d}
+  .ronda-capa .rm-pin.falta .rm-num,.rm-l-falta{animation:none}
 }
 .rm-tira-on,.rm-ed-n,.rm-ed-mov button,.rm-ed-x{font:inherit;border:0;padding:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rm-ed-n{background:#2348d8;border:2px solid #fff}
