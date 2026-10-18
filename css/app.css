@@ -5677,6 +5677,10 @@ li.hecho .rm-gn{background:#15a862}
 .rm-pp-in b{display:block}
 .rm-pp-in small{display:block;font-size:12px;opacity:.85}
 /* El próximo punto en el teléfono del policía, con la foto grande (17-10-2026) */
+/* 18-10: los pasos guardados sin señal (pantalla del policía). */
+.rm-cola{display:flex;gap:10px;align-items:flex-start;margin:12px 0 0;padding:10px 12px;border-radius:14px;background:rgba(255,183,77,.18);border:1.5px dashed #ffb74d}
+.rm-cola svg{flex:none;width:20px;height:20px;margin-top:2px}
+.rm-cola span{display:block;font-size:13px;line-height:1.35}.rm-cola b{display:block;font-size:14px}
 .rm-prox{margin:12px 0 0;padding:10px;border-radius:18px;background:rgba(255,255,255,.14);border:2px solid #ffd54a;box-shadow:0 0 0 4px rgba(255,213,74,.15)}
 .rm-prox.completa{border-color:#2fe08a;box-shadow:0 0 0 4px rgba(47,224,138,.18)}
 .rm-prox>small{display:flex;gap:6px;align-items:center;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;margin:0 0 8px}

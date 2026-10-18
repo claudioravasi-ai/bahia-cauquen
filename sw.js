@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261017-154350';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261017-154350',
-  './js/firebase-config.js?v=20261017-154350', './js/icons.js?v=20261017-154350', './js/agenda.js?v=20261017-154350', './js/padron.js?v=20261017-154350', './js/core.js?v=20261017-154350', './js/seed.js?v=20261017-154350', './js/clima.js?v=20261017-154350', './js/calendario.js?v=20261017-154350',
-  './js/v-inicio.js?v=20261017-154350', './js/v-comunidad.js?v=20261017-154350', './js/v-gestion.js?v=20261017-154350', './js/admin.js?v=20261017-154350', './js/v-vecinos.js?v=20261017-154350', './js/v-expensas.js?v=20261017-154350', './js/v-plan.js?v=20261017-154350', './js/v-contable.js?v=20261017-154350', './js/v-servicio.js?v=20261017-154350', './js/v-legal.js?v=20261017-154350', './js/v-hotel.js?v=20261017-154350', './js/v-cuidados.js?v=20261017-154350', './js/v-casa.js?v=20261017-154350', './js/mapa.js?v=20261017-154350', './js/ronda-mapa.js?v=20261017-154350', './js/recorrido.js?v=20261017-154350', './js/reglas.js?v=20261017-154350', './js/asistente.js?v=20261017-154350', './js/v-manual.js?v=20261017-154350', './js/push.js?v=20261017-154350', './js/sismos.js?v=20261017-154350', './js/nube.js?v=20261017-154350', './js/adjuntos.js?v=20261017-154350', './js/historial.js?v=20261017-154350', './js/v-supervisor.js?v=20261017-154350', './js/guardia.js?v=20261017-154350', './js/mantenimiento.js?v=20261017-154350', './js/mant-vivo.js?v=20261017-154350', './js/relevos.js?v=20261017-154350', './js/app.js?v=20261017-154350',
+const CACHE = 'bhc-20261018-090911';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261018-090911',
+  './js/firebase-config.js?v=20261018-090911', './js/icons.js?v=20261018-090911', './js/agenda.js?v=20261018-090911', './js/padron.js?v=20261018-090911', './js/core.js?v=20261018-090911', './js/seed.js?v=20261018-090911', './js/clima.js?v=20261018-090911', './js/calendario.js?v=20261018-090911',
+  './js/v-inicio.js?v=20261018-090911', './js/v-comunidad.js?v=20261018-090911', './js/v-gestion.js?v=20261018-090911', './js/admin.js?v=20261018-090911', './js/v-vecinos.js?v=20261018-090911', './js/v-expensas.js?v=20261018-090911', './js/v-plan.js?v=20261018-090911', './js/v-contable.js?v=20261018-090911', './js/v-servicio.js?v=20261018-090911', './js/v-legal.js?v=20261018-090911', './js/v-hotel.js?v=20261018-090911', './js/v-cuidados.js?v=20261018-090911', './js/v-casa.js?v=20261018-090911', './js/mapa.js?v=20261018-090911', './js/ronda-mapa.js?v=20261018-090911', './js/recorrido.js?v=20261018-090911', './js/reglas.js?v=20261018-090911', './js/asistente.js?v=20261018-090911', './js/v-manual.js?v=20261018-090911', './js/push.js?v=20261018-090911', './js/sismos.js?v=20261018-090911', './js/nube.js?v=20261018-090911', './js/adjuntos.js?v=20261018-090911', './js/historial.js?v=20261018-090911', './js/v-supervisor.js?v=20261018-090911', './js/guardia.js?v=20261018-090911', './js/mantenimiento.js?v=20261018-090911', './js/mant-vivo.js?v=20261018-090911', './js/relevos.js?v=20261018-090911', './js/app.js?v=20261018-090911',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
@@ -25,6 +25,13 @@ const guardar = (req, r) => { if (r && r.ok){ const c = r.clone(); caches.open(C
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
+  /* 18-10-2026: el programa de la base (Firebase, con su versión en la
+     dirección: no cambia nunca) también queda guardado, así el policía que
+     abre un QR sin señal guarda el paso y lo manda apenas vuelve. */
+  if (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/')){
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => { if (x && (x.ok || x.type === 'opaque')){ const c = x.clone(); caches.open(CACHE).then(k => k.put(e.request, c)).catch(() => {}); } return x; })));
+    return;
+  }
   if (url.origin !== self.location.origin) return;   /* clima, vuelos, QR: siempre en vivo */
   if (url.searchParams.has('v') && /\.(js|css)$/.test(url.pathname)){
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => guardar(e.request, x))));

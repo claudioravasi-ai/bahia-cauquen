@@ -2117,11 +2117,16 @@ const claveAzar = () => { const a = new Uint8Array(9); crypto.getRandomValues(a)
 function puntosSugeridos(){ return PUNTOS_SUGERIDOS.map(([nombre, lugar, x, y], i) => ({ id:'pt' + (i + 1) + claveAzar().slice(0, 3), nombre, lugar, x, y, orden:i + 1, k:claveAzar(), activo:true, at:Date.now() })); }
 const puntosActivos = () => aLista(Store.s.puntos).filter(x => x && x.activo !== false).sort((a, b) => (a.orden || 0) - (b.orden || 0));
 const nombrePunto = id => (aLista(Store.s.puntos).find(x => x.id === id) || {}).nombre || 'Punto';
-const pasosDeRonda = r => { const ids = new Set(aLista(r.pasos)); return aLista(Store.s.pasos).filter(x => ids.has(x.id)).sort((a, b) => a.at - b.at); };
+/* La hora de un paso (18-10-2026): la del servidor ("at"); si el paso
+   quedó guardado en el teléfono por falta de señal y llegó tarde, la hora
+   en que el policía leyó el QR ("t"), si es razonable (entre 2 minutos y
+   6 horas antes de llegar). */
+const pasoAt = x => { const t = +(x && x.t), at = +(x && x.at) || 0; return t && at - t > 2 * MIN && at - t < 6 * HORA ? t : at; };
+const pasosDeRonda = r => { const ids = new Set(aLista(r.pasos)); return aLista(Store.s.pasos).filter(x => ids.has(x.id)).sort((a, b) => pasoAt(a) - pasoAt(b)); };
 /* El recorrido de una ronda, como lista de control: barra de avance arriba y
    un renglón por punto, en el orden de la ronda, con la hora a la derecha. */
 function recorridoRonda(r){
-  const hechos = new Map(); pasosDeRonda(r).forEach(x => { if (!hechos.has(x.punto)) hechos.set(x.punto, x.at); });
+  const hechos = new Map(); pasosDeRonda(r).forEach(x => { if (!hechos.has(x.punto)) hechos.set(x.punto, pasoAt(x)); });
   const pts = puntosActivos(), n = pts.filter(pt => hechos.has(pt.id)).length, total = pts.length;
   const fin = r.fin || Date.now();
   const completa = total && n >= total;
@@ -2137,7 +2142,7 @@ function recorridoRonda(r){
 /* Pasos del turno que no se pudieron asignar a ningún policía. */
 function pasosSueltos(t){
   const asignados = new Set(); registrosTurno().forEach(x => policiasDe(x).forEach(p => p.rondas.forEach(r => r.pasos.forEach(id => asignados.add(id)))));
-  return aLista(Store.s.pasos).filter(x => x && x.at >= t.at && !asignados.has(x.id)).sort((a, b) => a.at - b.at);
+  return aLista(Store.s.pasos).filter(x => x && x.at >= t.at && !asignados.has(x.id)).sort((a, b) => pasoAt(a) - pasoAt(b));
 }
 /* Cómo quedó una ronda con QR: cuántos puntos se pasaron y cuáles faltaron. */
 function estadoRonda(r){
@@ -2146,7 +2151,7 @@ function estadoRonda(r){
   return { n: pts.length - faltan.length, total: pts.length, faltan };
 }
 const conQR = r => !!(r && (r.qr || aLista(r.pasos).length));
-const ultimoPaso = r => Math.max(r.inicio + MIN, ...pasosDeRonda(r).map(z => z.at));
+const ultimoPaso = r => Math.max(r.inicio + MIN, ...pasosDeRonda(r).map(pasoAt));
 /* =========================================================
    LA RONDA QUE NO SE TERMINÓ TAMBIÉN VA A LA BITÁCORA
    La completa ya dejaba su renglón. La que quedaba a medias (faltó escanear
@@ -2191,13 +2196,13 @@ function procesarPasos(){
       let r = rondaEnCurso(p);
       /* Una ronda abierta hace más de una hora no se estira: se cierra
          (incompleta, a la bitácora) y empieza otra. */
-      if (r && ps.at - r.inicio > HORA){ r.fin = r.fin || ultimoPaso(r); cerrarRondaIncompleta(s, p, r, r.fin, 'pasó más de una hora sin completar los puntos'); r = null; }
-      if (!r){ r = { id:'q-' + ps.id, inicio:ps.at, qr:true, pasos:[] }; p.rondas.push(r); }
+      if (r && pasoAt(ps) - r.inicio > HORA){ r.fin = r.fin || ultimoPaso(r); cerrarRondaIncompleta(s, p, r, r.fin, 'pasó más de una hora sin completar los puntos'); r = null; }
+      if (!r){ r = { id:'q-' + ps.id, inicio:pasoAt(ps), qr:true, pasos:[] }; p.rondas.push(r); }
       if (!r.pasos.includes(ps.id)) r.pasos.push(ps.id);
       cambios = true;
       const pts = new Set(r.pasos.map(id => (aLista(s.pasos).find(z => z.id === id) || {}).punto));
       if (total && pts.size >= total){
-        r.fin = ps.at;
+        r.fin = pasoAt(ps);
         renglones.push({ id:'rc-' + r.id, texto:`Ronda ${p.rondas.indexOf(r) + 1} del policía ${p.nombre} completa por QR: ${total}/${total} puntos, ${hora(r.inicio)} a ${hora(r.fin)} h (${minutos(r.inicio, r.fin)} min).` });
       }
     });
@@ -2232,6 +2237,7 @@ function pintarRondaHabilitar(ruta){
       <div id="rondaGuia" class="rm-guia-caja"><p class="tiny" style="opacity:.8;margin:12px 0 0">${I('download')} Bajando tu recorrido con las fotos de cada punto…</p></div>`
       : `<p style="margin:0"><b>Este enlace no es válido.</b> Pedile a la garita que te lo mande de nuevo.</p>`}</div></section>`;
   if (!ok || typeof RondaGuia === 'undefined') return;
+  if (typeof rondaColaVaciar === 'function') setTimeout(rondaColaVaciar, 300);
   /* La guía se baja UNA vez y queda guardada en este teléfono (las fotos son chicas). */
   RondaGuia.bajar(token).then(g => {
     const caja = $('#rondaGuia'); if (!caja) return;
@@ -2251,13 +2257,21 @@ function pintarGuiaPolicia(g, r){
     <div class="panel">${g ? `<p class="tiny" style="opacity:.85;margin:0 0 8px">${r && r.nombre ? esc(r.nombre) + ' · ' : ''}guardado en este teléfono · meta: ${g.meta || 3} rondas completas</p>${rondaProximoHTML(g, rondaHechosLocales(g))}${rondaGuiaHTML(g, { hechos:rondaHechosLocales(g) })}`
       : `<p style="margin:0">Este teléfono no tiene guardado el recorrido. Tocá el enlace de tu tarjeta (el que te mandó la garita).</p>`}</div></section>`;
 }
-function pintarPunto(codigo){
+function pintarPunto(codigo, yaBusco){
   const [idk, nombreUrl] = String(codigo || '').split('/');
   const [id, k] = String(idk || '').split('.');
   const nombre = decodeURIComponent(nombreUrl || '') || 'Punto de control';
   const r = Ronda.leer();
   /* (15-10-2026) Con la guía guardada en el teléfono: la foto del lugar y el próximo punto. */
-  const g = typeof RondaGuia !== 'undefined' ? RondaGuia.leer() : null, gps = aLista(g && g.pts), gp = gps.find(x => x.id === id);
+  let g = typeof RondaGuia !== 'undefined' ? RondaGuia.leer() : null, gps = aLista(g && g.pts), gp = gps.find(x => x.id === id);
+  /* (18-10-2026) Sin la guía pero con el código (no abrió el enlace de su
+     tarjeta): la baja con el código y vuelve a dibujar con la foto. */
+  const bajarGuia = async c => {
+    if (g || typeof RondaGuia === 'undefined') return null;
+    try { const ng = await Promise.race([RondaGuia.bajar(null, c), new Promise(ok => setTimeout(() => ok(null), 6000))]); if (ng && aLista(ng.pts).length){ RondaGuia.guardar(ng); return ng; } } catch(e){}
+    return null;
+  };
+  if (!g && r && !yaBusco) bajarGuia(r.c).then(ng => { const f = $('#puntoForm'); if (ng && f && !f.hidden && !f.querySelector('button:disabled')) pintarPunto(codigo, true); });
   $('#app').innerHTML = `<section class="bienvenida" id="puntoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
     <h1 style="font-size:28px">${I('pin')} ${gp ? gp.n + '. ' : ''}${esc(nombre)}</h1>
@@ -2268,7 +2282,8 @@ function pintarPunto(codigo){
           : `<div class="field"><label>Código de ronda (6 números)</label><input name="c" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Te lo da la garita al empezar"></div>`}
         <button class="btn btn-pri btn-block btn-grande">${I('check')}Registrar paso</button>
         <p class="tiny" style="opacity:.75;margin:10px 0 0">Solo cuenta con el código que la garita le da al policía de turno. Tu nombre y la hora del paso los ven solo la garita y la Administración del barrio (Ley 25.326).</p></form>
-      <div id="puntoRes"></div>`}</div></section>`;
+      <div id="puntoRes"></div>${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}`}</div></section>`;
+  if (typeof rondaColaVaciar === 'function') setTimeout(rondaColaVaciar, 300);
   $('#puntoOtro')?.addEventListener('click', () => { Ronda.olvidar(); pintarPunto(codigo); });
   const f = $('#puntoForm'); if (!f) return;
   f.addEventListener('submit', async e => {
@@ -2278,21 +2293,22 @@ function pintarPunto(codigo){
     const b = f.querySelector('button:not([type="button"])'); b.disabled = true;
     const res = $('#puntoRes');
     try {
-      if (typeof Nube !== 'undefined' && Nube.activa() && Nube.db){
-        const ref = Nube.db.ref('staff/pasos').push();
-        await ref.set({ id:ref.key, punto:id, k, c, nombre:(r && r.nombre) || 'Policía de ronda', at:firebase.database.ServerValue.TIMESTAMP });
-      } else {
-        const pt = aLista(Store.s.puntos).find(x => x.id === id), cod = aLista(Store.s.rondaCodigos).find(x => x && x.id === c && x.vence > Date.now());
-        if (!pt || pt.k !== k || pt.activo === false || !cod) throw new Error('PERMISSION_DENIED');
-        Store.cambiar(s => { s.pasos.unshift({ id:uid(), punto:id, k, c, nombre:cod.nombre, at:Date.now() }); });
-      }
+      /* 18-10: sin señal, el paso queda guardado en el teléfono y sale solo después (js/ronda-mapa.js). */
+      const paso = { id:rondaIdPaso(), punto:id, k, c, nombre:(r && r.nombre) || 'Policía de ronda', t:Date.now() };
+      if (RondaCola.leer().length) await RondaCola.mandar();
+      let res0 = RondaCola.leer().length ? 'sin' : await rondaEscribirPaso(paso);
+      if (res0 === 'no') throw new Error('PERMISSION_DENIED');
+      const guardado = res0 === 'sin';
+      if (guardado && !RondaCola.sumar(paso)) throw new Error('SIN_LUGAR');
       if (!r) Ronda.guardar(c, '');
+      if (!g && !guardado){ g = await bajarGuia(c); gps = aLista(g && g.pts); gp = gps.find(x => x.id === id); }
       /* 17-10: el teléfono anota el punto y muestra solo el próximo, con su foto. */
       const hoy = RondaLocal.anotar(id, g);
       f.hidden = true;
       const fotoAca = $('#puntoPublico .rm-pp-foto'); if (fotoAca) fotoAca.hidden = true;
       const hechos = g ? rondaHechosLocales(g) : [], px = g ? rondaProximo(g, hechos) : null;
-      res.innerHTML = `${aviso('ok', 'check', `Leído · ${hora(Date.now())} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Llevás ${plural(hechos.length || hoy.length, 'punto', 'puntos')} en esta ronda.${gps.length ? '' : ' Seguí al próximo.'}`)}
+      res.innerHTML = `${guardado ? aviso('warn', 'clock', `Guardado en tu teléfono · ${hora(paso.t)} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Acá no hay señal: el paso queda con esta hora y se manda solo cuando vuelva. Seguí la ronda tranquilo.`)
+        : aviso('ok', 'check', `Leído · ${hora(Date.now())} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Llevás ${plural(hechos.length || hoy.length, 'punto', 'puntos')} en esta ronda.${gps.length ? '' : ' Seguí al próximo.'}`)}
         ${g ? rondaProximoHTML(g, hechos) : ''}${g ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:10px" id="verMiRecorrido">${I('map')}Ver todo mi recorrido</button>` : ''}`;
       rondaVibrar();
       if (px && px.p) setTimeout(() => $('#puntoRes .rm-prox')?.scrollIntoView({ block:'start', behavior:'smooth' }), 120);
@@ -2301,7 +2317,7 @@ function pintarPunto(codigo){
       b.disabled = false;
       const permiso = /permission|PERMISSION/i.test(String(err && err.message));
       if (permiso) Ronda.olvidar();
-      res.innerHTML = aviso('danger', 'alert', 'No se pudo registrar', permiso ? 'El código de ronda no es válido o venció, o este QR ya no vale. Pedile el código a la garita.' : 'Revisá la conexión a internet y probá de nuevo.');
+      res.innerHTML = aviso('danger', 'alert', 'No se pudo registrar', permiso ? 'El código de ronda no es válido o venció, o este QR ya no vale. Pedile el código a la garita.' : /SIN_LUGAR/.test(String(err && err.message)) ? 'Tu teléfono no tiene lugar para guardar el paso sin señal. Probá de nuevo donde haya señal.' : 'Revisá la conexión a internet y probá de nuevo.');
       if (permiso && r) setTimeout(() => pintarPunto(codigo), 2500);
     }
   });
@@ -2436,7 +2452,7 @@ F['policia-nuevo'] = d => {
   p.codigo = codigoRondaNuevo();
   /* La guía de la ronda (puntos, lugar y fotos chicas) para su teléfono: js/ronda-mapa.js. */
   const guiaNueva = typeof rondaToken === 'function' ? rondaToken() : '';
-  if (guiaNueva) rondaGuiaPublicar(guiaNueva, Date.now() + CODIGO_VIGENCIA);
+  if (guiaNueva) rondaGuiaPublicar(guiaNueva, Date.now() + CODIGO_VIGENCIA, p.codigo);
   Store.cambiar(s => {
     const x = aLista(s.bitacora).find(b => b.id === t.id); if (!x) return;
     x.policias = [...policiasDe(x), p];
@@ -2467,7 +2483,7 @@ function codigoRondaNuevo(){
 const codigoVigente = pid => aLista(Store.s.rondaCodigos).find(c => c && c.pid === pid && c.vence > Date.now()) || null;
 const bajarCodigo = (s, pid) => {
   /* Con el código se borra de la base la guía de su teléfono (la que ya bajó queda en su teléfono hasta que vence). */
-  aLista(s.rondaCodigos).filter(c => c && c.pid === pid && c.g).forEach(c => { if (typeof rondaGuiaBorrar === 'function') setTimeout(() => rondaGuiaBorrar(c.g), 0); });
+  aLista(s.rondaCodigos).filter(c => c && c.pid === pid).forEach(c => { if (typeof rondaGuiaBorrar === 'function') setTimeout(() => rondaGuiaBorrar(c.g, c.id), 0); });
   s.rondaCodigos = aLista(s.rondaCodigos).filter(c => c && c.pid !== pid);
 };
 const enlaceRonda = (codigo, nombre) => { const c = aLista(Store.s.rondaCodigos).find(x => x && x.id === codigo);
@@ -2505,7 +2521,7 @@ A['policia-codigo-nuevo'] = async el => {
   if (codigoVigente(el.dataset.id) && !await confirmar('Código nuevo', 'El código anterior deja de valer al instante. Hay que mandarle el nuevo al policía.', { si:'Generar otro' })) return;
   const t = turnoAbierto(), p = t && policiasDe(t).find(x => x.id === el.dataset.id); if (!p) return;
   const c = codigoRondaNuevo(), g = typeof rondaToken === 'function' ? rondaToken() : '';
-  if (g) rondaGuiaPublicar(g, Date.now() + CODIGO_VIGENCIA);
+  if (g) rondaGuiaPublicar(g, Date.now() + CODIGO_VIGENCIA, c);
   Store.cambiar(s => { bajarCodigo(s, p.id); s.rondaCodigos.push({ id:c, pid:p.id, nombre:p.nombre, vence:Date.now() + CODIGO_VIGENCIA, ...(g ? { g } : {}) });
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Se cambió el código de ronda del policía ${p.nombre}.`, at:Date.now() }); });
   mostrarCodigoRonda(p.id);
@@ -2607,7 +2623,7 @@ function serviciosPolicia(registros = registrosTurno(), lineas = aLista(Store.s.
 function fotoRonda(r){
   if (r.qrFoto) return r;
   const pasos = pasosDeRonda(r), vistos = new Set(), qr = [];
-  pasos.forEach(x => { if (!vistos.has(x.punto)){ vistos.add(x.punto); qr.push({ n:nombrePunto(x.punto), at:x.at }); } });
+  pasos.forEach(x => { if (!vistos.has(x.punto)){ vistos.add(x.punto); qr.push({ n:nombrePunto(x.punto), at:pasoAt(x) }); } });
   const e = conQR(r) ? estadoRonda(r) : null;
   return { id:r.id, inicio:r.inicio, fin:r.fin || 0, incompleta:!!r.incompleta, aMano:!!r.aMano, conQR:conQR(r), qr, total: e ? e.total : 0, faltan: e ? e.faltan : [], qrFoto:true };
 }
@@ -2619,30 +2635,167 @@ function cerrarServicio(s, p){
 }
 const estadoRondaTxt = r => r.incompleta ? `INCOMPLETA${r.conQR && r.total ? ` · ${r.qr.length}/${r.total} QR · faltó ${r.faltan.join(', ')}` : ''}`
   : r.conQR && r.total ? `completa · ${r.qr.length}/${r.total} QR` : r.aMano ? 'anotada a mano' : r.fin ? 'sin QR (la anotó la garita)' : 'en curso';
-function constanciaHtml(sv){
-  const c = Store.s.config, fila = (a, b) => `<tr><td style="padding:4px 10px 4px 0;color:#6c7d7a;white-space:nowrap;vertical-align:top">${a}</td><td style="padding:4px 0">${b}</td></tr>`;
-  const inc = sv.rondas.filter(r => r.incompleta).length, dur = sv.sale ? Math.round((sv.sale - sv.entra) / MIN) : 0;
-  return Correo.plantilla('Constancia de servicio', `
-    <p style="margin:0 0 12px">Hola, ${esc(sv.nombre)}: esta es la constancia de tu servicio en el Barrio ${esc(c.nombre)}, tal como la registró la garita.</p>
-    <table style="border-collapse:collapse;font-size:14px;margin:0 0 14px">
-      ${fila('Policía', `<b>${esc(sv.nombre)}</b>${esc(pnCargoMat(sv, '', ' · '))}`)}
-      ${fila('Ingreso', `${fechaLarga(isoDe(new Date(sv.entra)))} · turno ${esc(sv.turnoEntra || '')} · <b>${hora(sv.entra)} h</b>`)}
-      ${fila('Salida', sv.sale ? `${fechaLarga(isoDe(new Date(sv.sale)))} · turno ${esc(sv.turnoSale || '')} · <b>${hora(sv.sale)} h</b>` : 'sigue de servicio')}
-      ${dur ? fila('Duración', `${Math.floor(dur / 60)} h ${String(dur % 60).padStart(2, '0')} min`) : ''}
-      ${fila('Guardias de la garita', esc(sv.guardias.join(', ') || '—'))}
-      ${fila('Rondas', `${sv.rondas.length}${inc ? ` (${inc} incompleta${inc > 1 ? 's' : ''})` : sv.rondas.length && sv.rondas.every(r => r.conQR && r.total) ? ' · todas completas por QR' : ''}`)}
-    </table>
-    <h3 style="font-size:15px;margin:16px 0 6px">Rondas</h3>
-    ${sv.rondas.length ? sv.rondas.map((r, i) => `<p style="margin:0 0 10px"><b>Ronda ${i + 1}</b> · ${hora(r.inicio)}${r.fin ? ' a ' + hora(r.fin) + ' h (' + minutos(r.inicio, r.fin) + ' min)' : ' h · en curso'} · ${esc(estadoRondaTxt(r))}
-      ${r.qr.length ? `<br><span style="color:#35504c">${r.qr.map(q => `${esc(q.n)} ${hora(q.at)}`).join(' · ')}</span>` : ''}</p>`).join('') : '<p style="margin:0">No se anotaron rondas.</p>'}
-    ${sv.acciones.length ? `<h3 style="font-size:15px;margin:16px 0 6px">Todo lo anotado por la garita</h3>
-      <table style="border-collapse:collapse;font-size:13px">${sv.acciones.map(a => fila(hora(a.at), esc(a.texto))).join('')}</table>` : ''}
-    <p style="font-size:12px;color:#6c7d7a;margin-top:16px">Constancia emitida por la app del barrio al registrarse tu salida. Si algún dato no coincide, avisá a la garita o a la Administración. Tu nombre, matrícula, celular y correo los ven solo la garita y la Administración del barrio (Ley 25.326).</p>`);
+/* =========================================================
+   LA CONSTANCIA DEL POLICÍA EN PDF (pedido de Claudio, 18-10-2026)
+   "No me gusta como queda escrito en el mail, todo monótono y no se
+   entiende bien: que sea un archivo PDF con la portada del barrio, el
+   nombre del policía, cargo, matrícula, fecha y horarios, todo detallado y
+   encuadrado, con diseño innovador y atractivo, que cada ronda tenga un
+   encuadre diferente y de fácil atención a la vista, y al final un saludo
+   y agradecimiento por su labor."
+   · El correo es corto y amable; la constancia completa va ADJUNTA en PDF
+     (el Apps Script, versión 14, convierte la página a PDF: el mismo camino
+     que el parte de mantenimiento).
+   · Tablas y estilos escritos en cada elemento: así lo entiende el
+     conversor a PDF de Google. La portada y el logo van dentro del archivo
+     (como imagen achicada), no se piden a internet.
+   · La garita la ve igual que el policía en Turnos → "Ver la constancia".
+   ========================================================= */
+const CP_COLORES = [['#0d9488', '#e7f6f4', 'Verde agua'], ['#7c3aed', '#f2ecfe', 'Violeta'], ['#d97706', '#fdf3e2', 'Ámbar'], ['#2563eb', '#e9f0fd', 'Azul'], ['#e11d48', '#fdebef', 'Rosa'], ['#15803d', '#e8f6ec', 'Verde']];
+const CP_ORD = ['Primera', 'Segunda', 'Tercera', 'Cuarta', 'Quinta', 'Sexta', 'Séptima', 'Octava', 'Novena', 'Décima'];
+const CP_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const cpDur = ms => { const m = Math.max(0, Math.round(ms / MIN)); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; };
+const cpDia = ts => { const d = new Date(ts); return `${DIAS_L[d.getDay()]} ${d.getDate()}`; };
+/* "Noche del sábado 17 al domingo 18 de octubre de 2026" */
+function cpNoche(entra, sale){
+  const a = new Date(entra), b = new Date(sale || entra), mes = d => `${CP_MESES[d.getMonth()]} de ${d.getFullYear()}`;
+  if (isoDe(a) === isoDe(b)) return `${DIAS_L[a.getDay()].replace(/^./, c => c.toUpperCase())} ${a.getDate()} de ${mes(a)}`;
+  return `Noche del ${cpDia(entra)}${a.getMonth() !== b.getMonth() ? ' de ' + CP_MESES[a.getMonth()] : ''} al ${cpDia(sale)} de ${mes(b)}`;
+}
+/* Una imagen de la app achicada y dentro del archivo (para el PDF). */
+const cpCache = {};
+/* `alto` (proporción alto/ancho): recorta al medio, como un banner. */
+function cpImagen(src, ancho, tipo = 'image/jpeg', q = .8, alto = 0){
+  const k = src + '|' + ancho + '|' + alto;
+  if (cpCache[k]) return cpCache[k];
+  return (cpCache[k] = new Promise(ok => {
+    try {
+      const img = new Image();
+      img.onload = () => { try {
+        const W = img.naturalWidth, H = img.naturalHeight, sh = alto ? Math.min(H, Math.round(W * alto)) : H, sy = Math.round((H - sh) * .55);
+        const w = Math.min(ancho, W), h = Math.round(sh * w / W), c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, sy, W, sh, 0, 0, w, h); ok(c.toDataURL(tipo, q)); } catch(e){ ok(''); } };
+      img.onerror = () => ok('');
+      img.src = src;
+    } catch(e){ ok(''); }
+  }));
+}
+const constanciaImgs = async () => ({ portada: await cpImagen('img/portada-noche.jpg', 1100, 'image/jpeg', .8, .42), logo: await cpImagen('icons/logo.png', 140, 'image/png') });
+
+function constanciaPdfHtml(sv, im = {}){
+  const c = Store.s.config, barrio = esc(c.nombre), fin = sv.sale || Date.now(), total = Math.max(MIN, fin - sv.entra);
+  const meta = typeof rondaMeta === 'function' ? rondaMeta() : 3;
+  const completas = sv.rondas.filter(r => !r.incompleta && r.conQR && r.total && r.qr.length >= r.total).length;
+  const pila = esc(String(sv.nombre || '').trim().split(/\s+/)[0] || sv.nombre);
+  const nro = String(sv.id || '').replace(/[^\w]/g, '').slice(-6).toUpperCase();
+  const tit = t => `<div style="font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#0b1f3a;margin:18px 0 8px">${t}</div>`;
+  const kpi = (arriba, n, abajo, color) => `<td width="25%" style="padding:0 4px"><div style="border:1.5px solid ${color};border-radius:14px;padding:10px 12px;background:#fff">
+      <div style="font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${color}">${arriba}</div>
+      <div style="font-size:21px;font-weight:800;color:#0b1f3a;line-height:1.2;margin-top:2px">${n}</div><div style="font-size:10.5px;color:#5b6b80">${abajo}</div></div></td>`;
+
+  /* La noche de un vistazo: una barra del ingreso a la salida con cada ronda en su color. */
+  const tramos = []; let cursor = sv.entra;
+  sv.rondas.slice().sort((a, b) => a.inicio - b.inicio).forEach((r, i) => {
+    const ini = Math.max(sv.entra, r.inicio), f = Math.min(fin, r.fin || fin);
+    if (ini > cursor) tramos.push({ w:ini - cursor });
+    tramos.push({ w:Math.max(f - ini, total * .03), i }); cursor = Math.max(cursor, f);
+  });
+  if (fin > cursor) tramos.push({ w:fin - cursor });
+  const suma = tramos.reduce((k, t) => k + t.w, 0) || 1;
+  const barra = `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:fixed"><tr>${tramos.map(t => {
+    const pct = Math.max(1, Math.round(t.w / suma * 1000) / 10), col = t.i != null ? CP_COLORES[t.i % CP_COLORES.length][0] : '#dbe3ee';
+    return `<td width="${pct}%" style="height:26px;background:${col};color:#fff;font-size:11px;font-weight:800;text-align:center;border-right:2px solid #fff">${t.i != null ? t.i + 1 : ''}</td>`; }).join('')}</tr></table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;font-size:10px;color:#5b6b80"><tr><td>Ingreso ${hora(sv.entra)} h</td><td align="right">${sv.sale ? 'Salida ' + hora(sv.sale) + ' h' : 'sigue de servicio'}</td></tr></table>`;
+
+  /* Cada ronda en su recuadro, cada una de un color. */
+  const ronda = (r, i) => {
+    const [col, claro] = CP_COLORES[i % CP_COLORES.length], ok = !r.incompleta && r.conQR && r.total && r.qr.length >= r.total;
+    const estado = r.incompleta ? `INCOMPLETA${r.conQR && r.total ? ` · ${r.qr.length} de ${r.total} puntos` : ''}` : ok ? `COMPLETA · ${r.qr.length} de ${r.total} puntos` : r.aMano ? 'ANOTADA A MANO' : r.fin ? 'ANOTADA POR LA GARITA' : 'EN CURSO';
+    const filas = r.qr.map((q, j) => `<tr>
+        <td width="34" style="padding:3px 0 3px 12px"><div style="width:22px;height:22px;border-radius:11px;background:${col};color:#fff;font-size:10.5px;font-weight:800;text-align:center;line-height:22px">${j + 1}</div></td>
+        <td style="padding:3px 8px;font-size:12px;color:#0b1f3a"><b>${esc(q.n)}</b></td>
+        <td width="80" align="right" style="padding:3px 8px;font-size:12px;font-weight:700;color:#0b1f3a;white-space:nowrap">${hora(q.at)} h</td>
+        <td width="74" align="right" style="padding:3px 12px 3px 0;font-size:10.5px;color:#5b6b80;white-space:nowrap">${j ? '+' + minutos(r.qr[j - 1].at, q.at) + ' min' : 'inicio'}</td></tr>`).join('');
+    const faltan = aLista(r.faltan).map(n => `<tr><td width="34" style="padding:5px 0 5px 12px"><div style="width:24px;height:24px;border-radius:12px;border:2px solid #dc2626;color:#dc2626;font-size:12px;font-weight:800;text-align:center;line-height:20px">!</div></td>
+        <td colspan="3" style="padding:5px 12px 5px 8px;font-size:12px;color:#b91c1c"><b>${esc(n)}</b> · no se leyó su QR en esta ronda</td></tr>`).join('');
+    return `<div style="page-break-inside:avoid;margin:0 0 12px;border:2px solid ${col};border-radius:16px;overflow:hidden;background:${claro}">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${col}"><tr>
+        <td width="58" style="padding:8px 0 8px 14px"><div style="width:40px;height:40px;border-radius:20px;background:#fff;color:${col};font-size:20px;font-weight:800;text-align:center;line-height:40px">${i + 1}</div></td>
+        <td style="padding:8px 8px;color:#fff"><div style="font-size:16px;font-weight:800">${CP_ORD[i] || 'Ronda ' + (i + 1)} ronda</div>
+          <div style="font-size:12px;opacity:.95">${hora(r.inicio)}${r.fin ? ` a ${hora(r.fin)} h · ${minutos(r.inicio, r.fin)} minutos caminando el barrio` : ' h · en curso'}</div></td>
+        <td align="right" style="padding:10px 14px"><span style="display:inline-block;background:#fff;color:${r.incompleta ? '#b91c1c' : col};font-size:10px;font-weight:800;letter-spacing:.08em;padding:5px 10px;border-radius:20px;white-space:nowrap">${r.incompleta ? '! ' : ok ? '✓ ' : ''}${estado}</span></td></tr></table>
+      ${filas || faltan ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:4px 0">${filas}${faltan}</table>`
+        : `<div style="padding:12px 16px;font-size:12px;color:#334155">${r.aMano ? 'La garita anotó esta ronda a mano.' : 'Ronda registrada por la garita, sin lectura de QR.'}</div>`}</div>`;
+  };
+
+  const acciones = aLista(sv.acciones).slice(0, 14);
+  const n = sv.rondas.length;
+  const gracias = n
+    ? `Esta noche estuviste de guardia mientras el barrio descansaba. Recorriste ${n === 1 ? 'una vez' : n + ' veces'} sus calles, el perímetro y los rincones más oscuros, punto por punto, y gracias a tu presencia las familias de ${barrio} pudieron dormir tranquilas y seguras. Ese trabajo constante y silencioso es el que hace que nuestro barrio sea un lugar en paz.`
+    : `Esta noche estuviste de guardia mientras el barrio descansaba, y gracias a tu presencia las familias de ${barrio} pudieron dormir tranquilas y seguras. Ese trabajo constante y silencioso es el que hace que nuestro barrio sea un lugar en paz.`;
+
+  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#0b1f3a;max-width:720px;margin:0 auto;font-size:12px;line-height:1.45">
+  <div style="border-radius:18px;overflow:hidden;background:#0b1f3a">
+    ${im.portada ? `<img src="${im.portada}" width="720" style="display:block;width:100%;height:auto" alt="El barrio ${barrio} de noche">` : ''}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>
+      ${im.logo ? `<td width="76" style="padding:16px 0 18px 20px"><img src="${im.logo}" width="58" height="58" style="display:block;border-radius:29px;background:#fff" alt=""></td>` : ''}
+      <td style="padding:16px 20px 18px;color:#fff"><div style="font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#f5b70a">Barrio ${barrio} · Seguridad nocturna</div>
+        <div style="font-size:27px;font-weight:800;line-height:1.15;margin-top:3px">Constancia de servicio</div>
+        <div style="font-size:12.5px;color:#c7d3e6;margin-top:2px">Policía adicional · ${esc(cpNoche(sv.entra, sv.sale))}</div></td>
+      <td width="120" align="right" style="padding:16px 20px 18px 0;color:#c7d3e6;font-size:10px;line-height:1.5">N.º ${nro || '—'}<br>Emitida el<br><b style="color:#fff">${fechaCorta(isoDe(new Date()))} · ${hora(Date.now())} h</b></td></tr></table>
+  </div>
+  <div style="height:6px;background:#f5b70a;border-radius:0 0 6px 6px;margin:0 30px"></div>
+
+  ${tit('El policía')}
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border:1.5px solid #dbe3ee;border-radius:16px;background:#f7f9fc"><tr>
+    <td width="84" style="padding:14px 0 14px 16px"><div style="width:62px;height:62px;border-radius:31px;background:#0b1f3a;color:#f5b70a;font-size:24px;font-weight:800;text-align:center;line-height:62px">${esc(inicialesDe(sv.nombre))}</div></td>
+    <td style="padding:14px 10px"><div style="font-size:21px;font-weight:800;color:#0b1f3a">${esc(sv.nombre)}</div>
+      <div style="margin-top:6px">${sv.cargo ? `<span style="display:inline-block;background:#0b1f3a;color:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;margin-right:6px">${esc(sv.cargo)}</span>` : ''}${sv.matricula ? `<span style="display:inline-block;border:1.5px solid #0b1f3a;color:#0b1f3a;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">Matrícula ${esc(sv.matricula)}</span>` : ''}</div></td>
+    <td width="210" style="padding:14px 16px 14px 0;font-size:11px;color:#334155;line-height:1.6"><b style="color:#0b1f3a">Ingreso:</b> ${esc(cpDia(sv.entra))} · ${hora(sv.entra)} h<br>${sv.sale ? `<b style="color:#0b1f3a">Salida:</b> ${esc(cpDia(sv.sale))} · ${hora(sv.sale)} h` : 'Sigue de servicio'}<br><b style="color:#0b1f3a">Guardia:</b> ${esc(sv.guardias.join(', ') || '—')}</td></tr></table>
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:12px -4px 0"><tr>
+    ${kpi('Ingreso', hora(sv.entra) + ' h', esc(cpDia(sv.entra)), '#0d9488')}
+    ${kpi('Salida', sv.sale ? hora(sv.sale) + ' h' : '—', sv.sale ? esc(cpDia(sv.sale)) : 'sigue de servicio', '#2563eb')}
+    ${kpi('De servicio', cpDur(total).replace(' min', '′').replace(' h ', ' h '), 'en el barrio', '#7c3aed')}
+    ${kpi('Rondas', `${completas} de ${meta}`, completas >= meta ? '¡meta cumplida!' : plural(n, 'ronda hecha', 'rondas hechas'), '#d97706')}</tr></table>
+
+  ${tit('La noche de un vistazo')}${barra}
+
+  ${tit(n ? `Las rondas, punto por punto · ${n}` : 'Las rondas')}
+  ${n ? sv.rondas.map(ronda).join('') : '<div style="padding:14px 16px;border:1.5px dashed #cbd5e1;border-radius:14px;color:#5b6b80">No se anotaron rondas en este servicio.</div>'}
+
+  ${acciones.length ? `<div style="page-break-inside:avoid">${tit('Lo que anotó la garita')}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1.5px solid #dbe3ee;border-radius:14px">${acciones.map((a, j) => `<tr style="background:${j % 2 ? '#ffffff' : '#f7f9fc'}">
+      <td width="62" valign="top" style="padding:6px 0 6px 14px;font-weight:700;color:#0b1f3a;white-space:nowrap">${hora(a.at)} h</td><td style="padding:6px 14px 6px 6px;color:#334155;font-size:11.5px">${esc(a.texto)}</td></tr>`).join('')}</table></div>` : ''}
+
+  <div style="page-break-inside:avoid;margin-top:20px;border-radius:18px;background:#0b1f3a;color:#fff;padding:22px 24px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#f5b70a">De parte de todo el barrio</div>
+    <div style="font-size:24px;font-weight:800;margin:4px 0 10px">¡Gracias, ${pila}!</div>
+    <div style="font-size:13px;line-height:1.6;color:#e2e8f0">${gracias}</div>
+    <div style="font-size:13px;line-height:1.6;color:#e2e8f0;margin-top:8px">Queremos agradecerte de corazón el compromiso y la responsabilidad con que cumpliste tu servicio. Te esperamos en la próxima guardia.</div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #33496b;font-size:12px;color:#f5b70a;font-weight:700">La Administración y los vecinos del Barrio ${barrio}</div>
+  </div>
+
+  <div style="margin-top:12px;font-size:9.5px;color:#7a8799;line-height:1.5">Constancia emitida por la app del barrio al registrarse tu salida en la garita, con las horas exactas de cada QR leído. Si algún dato no coincide, avisá a la garita o a la Administración. Tu nombre, cargo, matrícula, celular y correo los ven solo la garita y la Administración del barrio (Ley 25.326).</div>
+</div>`;
+}
+const cpPdfDoc = cuerpo => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Constancia de servicio</title><style>@page{size:A4;margin:9mm}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${cuerpo}</body></html>`;
+/* El correo: corto y amable. La constancia completa va en el PDF adjunto. */
+function constanciaCorreoHtml(sv){
+  const c = Store.s.config, n = sv.rondas.length, pila = esc(String(sv.nombre || '').trim().split(/\s+/)[0] || sv.nombre);
+  const dato = (t, v) => `<td width="33%" style="padding:10px 12px;background:#f3f6fb;border-radius:12px;text-align:center"><div style="font-size:11px;color:#5b6b80;text-transform:uppercase;letter-spacing:.08em">${t}</div><div style="font-size:18px;font-weight:800;color:#0b1f3a">${v}</div></td>`;
+  return Correo.plantilla('Tu constancia de servicio', `
+    <p style="margin:0 0 12px">¡Hola, ${pila}! Gracias por cuidar el Barrio ${esc(c.nombre)}. Te adjuntamos en <b>PDF</b> la constancia de tu servicio de la ${esc(cpNoche(sv.entra, sv.sale).replace(/^Noche del /, 'noche del '))}, con cada ronda y la hora de cada punto.</p>
+    <table width="100%" cellpadding="0" cellspacing="6" style="border-collapse:separate;margin:0 0 12px"><tr>${dato('Ingreso', hora(sv.entra) + ' h')}${dato('Salida', sv.sale ? hora(sv.sale) + ' h' : '—')}${dato('Rondas', n)}</tr></table>
+    <p style="margin:0;color:#334155">Si no ves el archivo adjunto, pedile a la garita que te la muestre en la app.</p>`);
 }
 async function mandarConstanciaPolicia(pid, { avisar = true } = {}){
   const sv = serviciosPolicia().find(x => x.id === pid); if (!sv || !sv.sale) return;
   if (!sv.email){ if (avisar) toast('El policía no dejó correo: la constancia no salió (queda en Turnos)', 'mail'); return; }
-  const r = await Correo.enviarDetalle({ para:sv.email, asunto:`Constancia de servicio · Barrio ${Store.s.config.nombre} · ${fechaCorta(isoDe(new Date(sv.entra)))}`, html:constanciaHtml(sv), tipo:'policia-servicio' });
+  /* 18-10: el correo corto y la constancia completa en PDF adjunto. */
+  const im = await constanciaImgs();
+  const r = await Correo.enviarDetalle({ para:sv.email, asunto:`Constancia de servicio · Barrio ${Store.s.config.nombre} · ${fechaCorta(isoDe(new Date(sv.entra)))}`, html:constanciaCorreoHtml(sv), tipo:'policia-servicio',
+    pdf:{ html:cpPdfDoc(constanciaPdfHtml(sv, im)), nombre:`Constancia ${isoDe(new Date(sv.entra))} ${sv.nombre}.pdf`.replace(/\s+/g, ' ') } });
   /* Queda anotado en su registro si salió o no (se ve en Turnos). */
   Store.cambiar(s => { const x = aLista(s.bitacora).find(b => b.id === sv.registroSale); if (!x) return; x.policias = policiasDe(x);
     const p = x.policias.find(q => q.id === pid); if (p) p.constancia = { at:Date.now(), ok:r.ok, error:r.ok ? '' : String(r.error || '').slice(0, 120), para:sv.email }; });
@@ -2650,7 +2803,12 @@ async function mandarConstanciaPolicia(pid, { avisar = true } = {}){
 }
 A['policia-constancia'] = el => mandarConstanciaPolicia(el.dataset.id);
 A['policia-constancia-ver'] = el => { const sv = [...serviciosPolicia(), ...aLista(typeof Historial !== 'undefined' && Historial.servPolicia)].find(x => x.id === el.dataset.id); if (!sv) return;
-  hoja('Constancia de servicio', `<div class="card plana" style="padding:0;overflow:hidden">${constanciaHtml(sv)}</div>`, { ancho:'640px' }); };
+  /* 18-10: se ve tal cual el PDF que le llega al policía. */
+  constanciaImgs().then(im => {
+    hoja('Constancia de servicio', `<iframe class="mv-parte-frame" title="Constancia de servicio" sandbox="allow-same-origin allow-modals"></iframe>
+      <button class="btn btn-pri btn-block" style="margin-top:10px" data-a="mv-parte-imprimir">${I('download')}Imprimir o guardar en PDF</button>`, { ancho:'820px' });
+    const f = $('#hoja .mv-parte-frame'); if (f) f.srcdoc = cpPdfDoc(constanciaPdfHtml(sv, im));
+  }); };
 /* Un servicio en la ventana Turnos: se despliega con todo el recorrido. */
 function tarjetaServicio(sv, { conAcciones = true } = {}){
   const inc = sv.rondas.filter(r => r.incompleta).length, c = sv.constancia;

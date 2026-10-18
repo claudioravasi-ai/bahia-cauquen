@@ -672,9 +672,9 @@ const ESC = [
     s:{ d:() => bar('d', 'Ronda del policía') + ap(mapa({ pasados:6, poli:true }), anillos(1)), x:() => bar('poli', 'Ronda completa', { av:'👮' }) + ap(av('ok', '✅', 'Ronda completa', '6 de 6 · 23:10 a 23:34')), c:() => bar('c', 'Rondas de hoy') + ap(anillos(1)) } },
   { l:'a', txt:'Lucía toca las caritas de la guardia: ve el plano con el recorrido y <b>Ronda 1 ✓ de 3</b>. La ronda en curso la ve <b>en vivo y sin el nombre</b> del policía (la Administración puede ponerle una demora).',
     s:{ a:() => bar('a', 'De guardia ahora') + ap(caritas(true), card('La ronda del policía', mapa({ pasados:6 }), anillos(1)), `<div class="muted" style="font-size:9.5px">🔴 En vivo · 🔒 sin el nombre del policía.</div>`) } },
-  { l:'c', h:'05:50', txt:'A la mañana, la Administración ve la noche completa: <b>3 de 3 rondas</b>. Al irse, al policía le llega por correo la constancia con la hora de cada QR.',
+  { l:'c', h:'05:50', txt:'A la mañana, la Administración ve la noche completa: <b>3 de 3 rondas</b>. Al irse, al policía le llega por correo la constancia <b>en PDF</b>, con cada ronda en su color, la hora de cada QR y el agradecimiento del barrio.',
     al:[['d', 'x', '✉️', 'Constancia de servicio', '3 rondas · 21:59 a 06:00']],
-    s:{ c:() => bar('c', 'Policía · este mes') + ap(anillos(3), it('👮', 'Sargento Julio Gómez', '8 h · 3 rondas completas', 'Meta cumplida', 'ok')), x:() => bar('poli', 'Correo', { av:'✉️' }) + ap(card('Constancia de servicio', it('🕙', 'Ingreso', '21:59'), it('🕕', 'Salida', '06:00'), it('🚓', '3 rondas', 'Con la hora de cada QR'))) } },
+    s:{ c:() => bar('c', 'Policía · este mes') + ap(anillos(3), it('👮', 'Sargento Julio Gómez', '8 h · 3 rondas completas', 'Meta cumplida', 'ok')), x:() => bar('poli', 'Correo', { av:'✉️' }) + ap(card('Constancia de servicio', it('📄', 'Constancia en PDF', 'Adjunta · 2 hojas'), it('🕙', 'Ingreso', '21:59'), it('🕕', 'Salida', '06:00'), it('🚓', '3 rondas', 'Cada una en su color, con la hora de cada QR'))) } },
 ], fin:'Ni planillas ni firmas: cada punto queda con su hora y todos saben que la ronda se hizo.' },
 
 /* ---------------- MANTENIMIENTO ---------------- */

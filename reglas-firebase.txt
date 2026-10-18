@@ -637,6 +637,11 @@ PEGAR DESDE ACÁ
 -----------------------------------------------------------
 HASTA ACÁ
 
+✔ 18-10-2026 (NO hay que volver a publicar): la guía de la ronda se guarda
+  además en ronda/guia/<resumen del código de 6 números> (25 letras), para
+  el policía que puso el código a mano sin abrir el enlace. Entra en la
+  misma regla de ronda/guia que ya está publicada.
+
 ✔ NUEVO 17-10-2026 (hay que volver a publicar): LAS FOTOS GRANDES DE LOS
   PUNTOS DE LA RONDA. Bloque nuevo: ronda/fotos (dentro de "ronda", al
   lado de "guia"). Sin publicarlo, la foto chica anda igual, pero "Bajar la

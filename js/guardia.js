@@ -368,9 +368,15 @@ function sincroGuardiaAhora(){
      de catorce en cinco minutos (17-10: eran seis, pero con la ronda en vivo
      cada QR leído es una publicación y una ronda tiene hasta 12). Si algo volviera a dar "distinto" para siempre,
      la pantalla no titila: deja de publicar y queda anotado en la consola. */
-  if (ahora - gaUlt < 10000){ clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, 10000 - (ahora - gaUlt)); return; }
+  /* 18-10-2026: que entre o se vaya alguien (el policía, un guardia, el
+     turno) pasa siempre, aunque la ronda haya gastado el cupo: Claudio le
+     dio la salida al policía después de leer muchos QR y la portada seguía
+     diciendo "+ policía". El freno queda solo para los puntos de la ronda. */
+  const sinRonda = x => { if (!x) return ''; const y = { ...x }; delete y.ronda; return gaHuella(y); };
+  const importante = sinRonda(cur) !== sinRonda(d);
+  if (ahora - gaUlt < (importante ? 2000 : 10000)){ clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, (importante ? 2000 : 10000) - (ahora - gaUlt)); return; }
   if (ahora - gaVentana > 300000){ gaVentana = ahora; gaVeces = 0; }
-  if (++gaVeces > 14){ console.warn('Guardia en la portada: se publicó demasiadas veces seguidas, se frena un rato.'); return; }
+  if (++gaVeces > (importante ? 30 : 14)){ console.warn('Guardia en la portada: se publicó demasiadas veces seguidas, se frena un rato.'); clearTimeout(gaT); gaT = setTimeout(sincroGuardiaAhora, Math.max(10000, 300000 - (ahora - gaVentana))); return; }
   gaUlt = ahora;
   Store.cambiar(s => { s.guardiaAhora = [{ ...d, at:ahora }]; });
 }

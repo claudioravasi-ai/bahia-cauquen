@@ -136,7 +136,7 @@ function rondaEnVivo(){
   const p = t ? policiasAdentro(t)[0] : null, pts = rondaPuntosMapa();
   if (!p) return { p:null, pts, hechas:[], curso:null, mapa:null };
   const orden = pt => pts.findIndex(x => x.id === pt) + 1;
-  const pasados = r => { const m = new Map(); pasosDeRonda(r).forEach(x => { const n = orden(x.punto); if (n && !m.has(n)) m.set(n, x.at); }); return m; };
+  const pasados = r => { const m = new Map(); pasosDeRonda(r).forEach(x => { const n = orden(x.punto); if (n && !m.has(n)) m.set(n, pasoAt(x)); }); return m; };
   const rc = rondaEnCurso(p);
   const hechas = p.rondas.filter(r => r.fin).map(r => { const e = conQR(r) ? estadoRonda(r) : null; return { ini:r.inicio, fin:r.fin, n:e ? e.n : 0, total:e ? e.total : 0, ok: !!e && e.total > 0 && e.n >= e.total && !r.incompleta, inc: !!r.incompleta, qr:conQR(r) }; });
   const curso = rc ? { ini:rc.inicio, pasados:pasados(rc) } : null;
@@ -163,7 +163,7 @@ function rondaPublica(t){
      había terminado hacía menos de RONDA_FIJA, con sus puntos ya leídos. */
   const r = p.rondas.filter(x => conQR(x) && x.inicio <= corte && (!x.fin || x.fin > corte - RONDA_FIJA)).slice(-1)[0];
   if (r){
-    const m = new Map(); pasosDeRonda(r).forEach(x => { const n = pts.findIndex(z => z.id === x.punto) + 1; if (n && !m.has(n) && x.at <= corte) m.set(n, x.at); });
+    const m = new Map(); pasosDeRonda(r).forEach(x => { const n = pts.findIndex(z => z.id === x.punto) + 1; if (n && !m.has(n) && pasoAt(x) <= corte) m.set(n, pasoAt(x)); });
     o.c = aMin(r.inicio); o.cp = [...m].map(([n, at]) => n + '@' + aMin(at)).join(' ');
     if (r.fin && r.fin <= corte) o.cf = aMin(r.fin);
   }
@@ -558,22 +558,40 @@ const rondaToken = () => { const a = new Uint8Array(20); crypto.getRandomValues(
 function rondaGuiaArmar(vence){
   return { vence, meta:rondaMeta(), pts: puntosActivos().map((pt, i) => ({ n:i + 1, id:pt.id, nombre:pt.nombre, lugar:pt.lugar || '', ...(isFinite(pt.x) ? { x:Math.round(pt.x), y:Math.round(pt.y) } : {}), ...(pt.foto ? { f:pt.foto } : {}), ...(pt.foto && pt.fg ? { fg:pt.fg } : {}) })) };
 }
-function rondaGuiaPublicar(token, vence){
-  if (!token || typeof Nube === 'undefined' || !Nube.activa() || !Nube.db) return;
-  Nube.db.ref('ronda/guia/' + token).set(rondaGuiaArmar(vence)).catch(e => console.warn('Guía de la ronda', e && e.message));
+/* LA GUÍA TAMBIÉN POR EL CÓDIGO (18-10-2026). Claudio probó la ronda sin
+   abrir el enlace de la tarjeta (el WhatsApp no se abrió desde la PC): el
+   policía puso el código a mano en el primer QR y registraba bien, pero su
+   teléfono no tenía la guía, así que nunca le mostraba la foto del próximo
+   punto. Ahora la guía se guarda además con una clave que sale del código
+   de 6 números: con el enlace O con el código, el teléfono baja la guía. La
+   clave es un resumen (SHA-256) del código, no el código mismo, y se borra
+   con la salida igual que la otra. */
+async function rondaClaveCodigo(c){
+  if (!/^\d{6}$/.test(String(c || '')) || !(window.crypto && crypto.subtle)) return '';
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('bhc-ronda-guia:' + c));
+  return 'c' + [...new Uint8Array(b)].slice(0, 12).map(x => x.toString(16).padStart(2, '0')).join('');
 }
-function rondaGuiaBorrar(token){
-  if (!token || typeof Nube === 'undefined' || !Nube.activa() || !Nube.db) return;
-  Nube.db.ref('ronda/guia/' + token).remove().catch(() => {});
+function rondaGuiaPublicar(token, vence, codigo){
+  if (typeof Nube === 'undefined' || !Nube.activa() || !Nube.db) return;
+  const g = rondaGuiaArmar(vence), poner = t => t && Nube.db.ref('ronda/guia/' + t).set(g).catch(e => console.warn('Guía de la ronda', e && e.message));
+  poner(token);
+  if (codigo) rondaClaveCodigo(codigo).then(poner).catch(() => {});
+}
+function rondaGuiaBorrar(token, codigo){
+  if (typeof Nube === 'undefined' || !Nube.activa() || !Nube.db) return;
+  const sacar = t => t && Nube.db.ref('ronda/guia/' + t).remove().catch(() => {});
+  sacar(token);
+  if (codigo) rondaClaveCodigo(codigo).then(sacar).catch(() => {});
 }
 /* Cuando la Administración cambia el recorrido, se actualizan las guías de los policías de servicio. */
-function rondaGuiasAlDia(){ aLista(Store.s.rondaCodigos).filter(c => c && c.g && c.vence > Date.now()).forEach(c => rondaGuiaPublicar(c.g, c.vence)); }
+function rondaGuiasAlDia(){ aLista(Store.s.rondaCodigos).filter(c => c && c.vence > Date.now()).forEach(c => rondaGuiaPublicar(c.g, c.vence, c.id)); }
 const RondaGuia = {
   KEY:'bhc.ronda.guia',
   leer(){ try { const g = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return g && g.vence > Date.now() ? g : null; } catch(e){ return null; } },
   guardar(g){ try { localStorage.setItem(this.KEY, JSON.stringify(g)); return true; } catch(e){ return false; } },
-  async bajar(token){
+  async bajar(token, codigo){
     if (typeof Nube !== 'undefined' && Nube.activa() && Nube.db){
+      if (!token) token = await rondaClaveCodigo(codigo);
       if (!token) return null;
       const snap = await Nube.db.ref('ronda/guia/' + token).once('value'); const v = snap.val();
       return v ? { ...v, pts: aLista(v.pts).filter(Boolean) } : null;
@@ -610,6 +628,79 @@ const RondaLocal = {
     return hoy;
   },
 };
+/* LEER EL QR SIN SEÑAL (pedido de Claudio, 18-10-2026): "el paso queda
+   guardado en el teléfono y se manda solo cuando vuelve la señal; sirve
+   para el perímetro o la calle oscura". Idea de serviceworker-cookbook
+   (2.9k★, MIT): solo la idea, el código es propio.
+   · Sin señal (o si la base no contesta en 8 segundos), el paso se guarda
+     en ESTE teléfono con la hora exacta en que lo leyó (campo "t") y el
+     policía sigue al próximo punto igual.
+   · Se manda solo, en orden, apenas vuelve la señal: con la página abierta,
+     al abrir otro QR o al volver a tocar el enlace de su tarjeta.
+   · La base anota igual su propia hora ("at", la del servidor); la garita
+     usa "t" solo si el paso llegó tarde (más de 2 minutos y menos de 6
+     horas después): así ve la hora real de cada punto (pasoAt, js/v-inicio.js).
+   · Si la base lo rechaza al mandarlo (el código venció, o ya había
+     llegado), se descarta y se le avisa. Se guarda hasta 14 horas. */
+const RondaCola = {
+  KEY:'bhc.ronda.cola',
+  leer(){ try { return JSON.parse(localStorage.getItem(this.KEY) || '[]').filter(x => x && x.id && Date.now() - x.t < CODIGO_VIGENCIA); } catch(e){ return []; } },
+  escribir(l){ try { localStorage.setItem(this.KEY, JSON.stringify(l)); return true; } catch(e){ return false; } },
+  sumar(x){ const l = this.leer(); if (!l.some(y => y.id === x.id)) l.push(x); return this.escribir(l); },
+  sacar(id){ this.escribir(this.leer().filter(y => y.id !== id)); },
+  mandando:false,
+  /* Manda lo guardado, de a uno y en orden. Devuelve cuántos salieron y cuántos rechazó la base. */
+  async mandar(){
+    if (this.mandando) return { ok:0, no:0, quedan:this.leer().length };
+    this.mandando = true; let ok = 0, no = 0;
+    try {
+      for (const x of this.leer()){
+        if (navigator.onLine === false) break;
+        const r = await rondaEscribirPaso(x);
+        if (r === 'ok'){ ok++; this.sacar(x.id); }
+        else if (r === 'no'){ no++; this.sacar(x.id); }
+        else break;
+      }
+    } finally { this.mandando = false; }
+    return { ok, no, quedan:this.leer().length };
+  },
+};
+/* Escribe un paso en la base: 'ok', 'no' (la base no lo acepta) o 'sin' (sin señal). */
+async function rondaEscribirPaso(x){
+  if (navigator.onLine === false) return 'sin';
+  try {
+    if (typeof Nube !== 'undefined' && Nube.activa() && Nube.db){
+      const espera = new Promise((_, mal) => setTimeout(() => mal(new Error('SIN_SENAL')), 8000));
+      await Promise.race([Nube.db.ref('staff/pasos/' + x.id).set({ id:x.id, punto:x.punto, k:x.k, c:x.c, nombre:x.nombre, t:x.t, at:firebase.database.ServerValue.TIMESTAMP }), espera]);
+    } else if (!/[?&]local\b/.test(location.search)){
+      /* La app real abierta sin señal: el programa de la base no llegó a cargar. Queda guardado. */
+      return 'sin';
+    } else {
+      /* Sin la nube (prueba en esta computadora): se valida contra lo guardado acá. */
+      const pt = aLista(Store.s.puntos).find(z => z.id === x.punto), cod = aLista(Store.s.rondaCodigos).find(z => z && z.id === x.c && z.vence > Date.now());
+      if (!pt || pt.k !== x.k || pt.activo === false || !cod) throw new Error('PERMISSION_DENIED');
+      if (!aLista(Store.s.pasos).some(z => z.id === x.id)) Store.cambiar(s => { s.pasos.unshift({ id:x.id, punto:x.punto, k:x.k, c:x.c, nombre:cod.nombre, t:x.t, at:Date.now() }); });
+    }
+    return 'ok';
+  } catch(e){ return /permission/i.test(String(e && e.message)) ? 'no' : 'sin'; }
+}
+const rondaIdPaso = () => (typeof Nube !== 'undefined' && Nube.activa() && Nube.db) ? Nube.db.ref('staff/pasos').push().key : 'p' + uid();
+/* El cartelito de lo que está guardado sin mandar (en la pantalla del policía). */
+function rondaColaAviso(){
+  const n = RondaCola.leer().length; if (!n) return '';
+  return `<div class="rm-cola" role="status">${I('clock')}<span><b>${n === 1 ? 'Tenés 1 paso guardado en tu teléfono' : `Tenés ${n} pasos guardados en tu teléfono`}</b>Se ${n === 1 ? 'manda' : 'mandan'} solo${n === 1 ? '' : 's'} cuando vuelva la señal. No hace falta que hagas nada.</span></div>`;
+}
+/* Mandar lo guardado y avisar. Con la página del policía abierta, se reintenta solo. */
+async function rondaColaVaciar(){
+  if (!RondaCola.leer().length) return;
+  const r = await RondaCola.mandar();
+  document.querySelectorAll('#puntoPublico .rm-cola').forEach(el => { el.outerHTML = rondaColaAviso(); });
+  if (r.ok) toast(r.ok === 1 ? 'Volvió la señal: se mandó el paso que estaba guardado' : `Volvió la señal: se mandaron los ${r.ok} pasos guardados`, 'check');
+  if (r.no) toast(`${plural(r.no, 'paso guardado no se aceptó', 'pasos guardados no se aceptaron')} (el código venció). Avisá a la garita.`, 'alert');
+}
+window.addEventListener('online', () => setTimeout(rondaColaVaciar, 1500));
+setInterval(() => { if (document.getElementById('puntoPublico') && navigator.onLine !== false) rondaColaVaciar(); }, 20000);
+
 function rondaHechosLocales(g){
   return RondaLocal.leer().map(x => { const p = aLista(g && g.pts).find(z => z.id === x.id || z.n === x.n); return p ? { n:p.n, at:x.at } : null; }).filter(Boolean);
 }
