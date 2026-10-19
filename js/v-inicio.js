@@ -1243,7 +1243,7 @@ R.visitas = {
           return tarjetaPase(p).replace(/<span class="estado [^"]*">[^<]*<\/span>/, `<span class="estado e-${p.cancelado ? 'cancelado' : l?.out ? 'salio' : l?.in ? 'adentro' : 'vencido'}">${p.cancelado ? 'Cancelado' : l?.out ? `Salió ${hora(l.out)}` : l?.in ? `Entró ${hora(l.in)}` : 'No vino'}</span>`);
         }).join('') : ''; })()}
       ${llegadas.length ? sec('Llegadas sin aviso') + llegadas.map(l => `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span>
-        <div class="datos"><b>${esc(l.nombre)}</b><span>${esc(l.motivo || '')} · ${hace(l.at)}</span></div><span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Autorizado', rechazado: l.noEsta ? 'No estaba' : 'Rechazado' }[l.estado]}</span></div>${l.respondio && l.respondio !== u.id ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio).split(' ')[0])}</div>` : ''}</div>`).join('') : ''}
+        <div class="datos"><b>${esc(l.nombre)}</b><span>${esc(l.motivo || '')} · ${hace(l.at)}</span></div><span class="estado e-${l.sale ? 'salio' : l.estado}">${l.sale ? `Salió ${hora(l.sale)}` : { consultando:'Esperando', autorizado:'Autorizado', rechazado: l.noEsta ? 'No estaba' : 'Rechazado' }[l.estado]}</span></div>${l.respondio && l.respondio !== u.id ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio).split(' ')[0])}</div>` : ''}</div>`).join('') : ''}
       ${sec('Avisos a la guardia')}
       ${(() => { const au = ausenciaDe(u); return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t: au ? `Casa sola hasta el ${fechaCorta(au.hasta)}` : 'Me voy de viaje', s: au ? 'La revisan una vez por día y te llega el aviso. Tocá para cambiar.' : 'La garita o el policía la revisa cada día y te avisa que está en orden' }); })()}
       ${superficie({ a:'aviso-guardia', icon:'shield', color:'brand', t:'Aviso rápido a la guardia', s:'Viene una visita sin aviso ni QR: que me avisen cuando llegue' })}
@@ -1634,28 +1634,37 @@ const VentanaLlegada = {
         <button class="lv-b si" data-a="llegada-si" data-id="${esc(l.id)}"><span class="lv-bi">${I('check')}</span><b>QUE PASE</b><small>La garita lo deja entrar</small></button>
         <button class="lv-b no" data-a="llegada-noesta" data-id="${esc(l.id)}"><span class="lv-bi">${I('home')}</span><b>NO ESTOY EN CASA</b><small>No entra</small></button></div>
       <button class="lv-desconozco" data-a="llegada-no" data-id="${esc(l.id)}">No lo conozco</button>
-      <p class="lv-pie">${I('users')} Le llega a todos los que viven en ${esc(casa || 'tu lote')}: vale la respuesta del primero. Suena cada 5 segundos hasta que alguien conteste.</p></div>`;
+      <p class="lv-pie">${I('users')} Le llega a todos los que viven en ${esc(casa || 'tu lote')}: vale la respuesta del primero. Suena sin parar hasta que alguien conteste.</p></div>`;
     requestAnimationFrame(() => caja.classList.add('on'));
     if (typeof Push !== 'undefined' && Push.callarLlegada) Push.callarLlegada(id);
     this.reloj(); this.sonar(true);
-    clearInterval(this.timer); this.timer = setInterval(() => { this.reloj(); this.sonar(); }, 5000);
+    clearInterval(this.timer); this.timer = setInterval(() => { this.reloj(); this.sonar(); }, 2500);
+    this.despierta();
     if (desdeAviso) cerrarHoja();
   },
   reloj(){ const r = $('#llegadaVentana .lv-reloj'); if (!r) return; const s = Math.max(0, Math.round((Date.now() - +r.dataset.desde) / 1000));
     r.textContent = s < 10 ? 'recién' : `esperando hace ${s >= 60 ? Math.floor(s / 60) + ' min ' : ''}${s % 60} s`; },
+  /* 18-10-2026 (pedido de Claudio): "el sonido debe ser intenso y constante
+     hasta que se atienda". Suena como un teléfono que llama, cada 2,5
+     segundos, más fuerte, aunque se haya bajado el sonido de la app, y la
+     pantalla no se apaga mientras la ventana está abierta. */
   sonar(){ if (document.visibilityState !== 'visible' || !this.abierta || typeof Sonido === 'undefined') return;
-    Sonido.tocar([[988, 0, .35], [784, .2, .35], [988, .45, .35], [784, .65, .5]], 'sine', .22); Sonido.vibrar([400, 150, 400]);
+    Sonido.tocar([[1175, 0, .18], [988, .2, .18], [1175, .4, .18], [988, .6, .18], [1175, 1.0, .18], [988, 1.2, .18], [1175, 1.4, .18], [988, 1.6, .28]], 'square', .2, true);
+    Sonido.vibrar([700, 200, 700, 200, 700]);
     const c = $('#llegadaVentana .lv-campana'); if (c){ c.classList.remove('suena'); void c.offsetWidth; c.classList.add('suena'); } },
   cerrar(id){ if (this.abierta === id) this.quitar(); },
+  /* Que la pantalla no se apague mientras alguien espera en la garita. */
+  async despierta(){ try { if ('wakeLock' in navigator && !this.lock) { this.lock = await navigator.wakeLock.request('screen'); this.lock.addEventListener?.('release', () => { this.lock = null; }); } } catch(e){ this.lock = null; } },
   quitar(){ clearInterval(this.timer); this.timer = null; const id = this.abierta; this.abierta = '';
+    try { this.lock && this.lock.release(); } catch(e){} this.lock = null;
     const caja = $('#llegadaVentana'); if (!caja) return; caja.classList.remove('on'); caja.classList.add('chau'); setTimeout(() => caja.remove(), 380);
     if (id) this.cerradas.add(id); },
 };
 Store.alCambiar(() => setTimeout(() => VentanaLlegada.revisar(), 0));
 setInterval(() => { try { VentanaLlegada.revisar(); } catch(e){} }, 3000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { try { VentanaLlegada.revisar(); VentanaLlegada.sonar(); } catch(e){} } });
-/* LA GARITA REENVÍA EL AVISO (12-10-2026): cada 45 segundos, durante 5
-   minutos, a los del lote, mientras nadie conteste. Solo el equipo de la
+/* LA GARITA REENVÍA EL AVISO (12-10-2026; 18-10: cada 30 segundos, durante 15
+   minutos), a los del lote, mientras nadie conteste. Solo el equipo de la
    garita que hizo la consulta (así no se duplica) y solo el aviso del
    celular, sin llenar la campanita (sw.js lo junta en uno solo). */
 const LlegadaInsiste = {
@@ -1666,8 +1675,8 @@ const LlegadaInsiste = {
     if (!esGuardia() || typeof Push === 'undefined') return;
     const m = this.mias(), ahora = Date.now(); let cambio = false;
     aLista(Store.s.llegadas).filter(l => l && m[l.id] && l.estado === 'consultando').forEach(l => {
-      const edad = ahora - (l.at || 0), x = m[l.id], toca = Math.floor(edad / 45000);
-      if (edad > 5 * MIN || toca < 1 || x.n >= toca) return;
+      const edad = ahora - (l.at || 0), x = m[l.id], toca = Math.floor(edad / 30000);
+      if (edad > 15 * MIN || toca < 1 || x.n >= toca) return;
       x.n = toca; cambio = true;
       const casa = l.lote || usuario(l.hostId)?.casa || '';
       Push.enviar({ para:paraElLote(casa, l.hostId), titulo:`Sigue esperando en la garita: ${l.nombre}`, texto:`${l.motivo || 'Visita'}${casa ? ' · ' + casa : ''} · hace ${Math.max(1, Math.round(edad / MIN))} min · ¿Lo dejamos pasar?`, link:'llegada:' + l.id, tag:'llegada-' + l.id, urgente:true });
@@ -3050,7 +3059,7 @@ function tareasGarita(){
 
   /* De todo turno: la bitácora y el cierre. */
   const manual = t && aLista(s.bitacora).some(b => b && b.at >= t.at && b.autor && b.autor !== 'sistema' && ['novedad', 'incidente', 'ronda'].includes(b.tipo));
-  if (t && !manual) add(3, 'book', 'Bitácora: anotar las novedades del turno', 'Todavía no se anotó ninguna en este turno', { v:'bitacora' });
+  if (t && !manual) add(3, 'book', 'Bitácora: anotar las novedades del turno', 'Todavía no se anotó ninguna en este turno', { ir:'#garBitacora' });
   else if (manual) hecho('novedades en la bitácora');
   if (t){ const prox = relevosDe(t).map(r => ({ r, f:faltanDe(horarioDe(r.h)) })).sort((a, b) => a.f - b.f)[0];
     add(3, 'clock', 'Relevo: cada guardia marca su salida con las novedades', prox ? `${esc(prox.r.n)} (${esc(prox.r.h)}) ${prox.f < 0 ? 'terminó a las ' + esc(horarioDe(prox.r.h)?.hasta || '') + ' h' : 'termina a las ' + esc(horarioDe(prox.r.h)?.hasta || '') + ' h'}` : 'Deja todo anotado para el que entra', { a:'guardia-hoy' }); }
@@ -3139,7 +3148,7 @@ function movimientosDeHoy(){
   aLista(s.bitacora).filter(b => b && b.tipo === 'acceso' && b.at >= ini).forEach(b => {
     const t = String(b.texto || ''), m = /^(Ingreso|Egreso|Salida)\b/i.exec(t); if (!m) return;
     const sale = !/^ingreso/i.test(m[1]);
-    const cat = /cami[oó]n de residuos/i.test(t) ? 'servicio' : b.mensId ? 'correo' : /polic[ií]a/i.test(t) ? 'policia'
+    const cat = /cami[oó]n de residuos/i.test(t) ? 'servicio' : b.mensId ? 'correo' : /lleg[oó] sin aviso/i.test(t) ? 'sinaviso' : /polic[ií]a/i.test(t) ? 'policia'
       : /hotel|hu[eé]sped/i.test(t) ? 'hotel' : /frecuente|\((Proveedor|Personal|Delivery)/i.test(t) ? 'proveedor' : 'visita';
     let que = t.replace(/^(Ingreso|Egreso|Salida)\s*(frecuente)?\s*(:|del|de)?\s*/i, '').replace(/\s·\s\d{1,2}:\d{2} h\b.*$/, '').trim();
     que = que.charAt(0).toUpperCase() + que.slice(1);
@@ -3166,7 +3175,7 @@ function bloqueIngresosHoy(lista, opera){
      cierra cuando pasa el autito, y los totales del día (entraron,
      salieron, adentro); las cuentas por tipo en fichas de color, y la línea
      del día con una flecha verde para lo que entra y gris para lo que sale. */
-  const salidas = movs.filter(m => m.sale).length, adn = lista.filter(p => estadoPase(p) === 'adentro').length;
+  const salidas = movs.filter(m => m.sale).length, adn = lista.filter(p => estadoPase(p) === 'adentro').length + aLista(s.llegadas).filter(llegadaAdentro).length;
   return `<span id="garIngresos" class="ancla"></span><section class="ing2">
     <div class="ing2-cab">
       <div class="ing2-escena${movs.length ? ' anda' : ''}" aria-hidden="true"><span class="ing2-ruta"></span>${AUTO_SVG}<span class="ing2-poste"></span><span class="ing2-brazo"></span></div>
@@ -3244,6 +3253,7 @@ function validadorGarita(){
       ${botonVal({ a:'escanear', ic:'scan', c:'brand', t:'Escanear QR' })}
       ${botonVal({ a:'patente-camara', ic:'camera', c:'sky', t:'Leer patente' })}
       ${botonVal({ a:'llegada-nueva', ic:'gate', c:'warn', t:'Llegó sin aviso' })}
+      ${botonVal({ a:'hotel-cliente', ic:'star', c:'wood', t:'Va al hotel' })}
       ${hayPaquetes() ? botonVal({ a:'paquete-nuevo', ic:'box', c:'wood', t:'Llegó un paquete' }) : ''}
       ${botonVal({ a:'abrir', v:'frecuentes', ic:'qr', c:'accent', t:'Ingresos frecuentes' })}
       ${botonVal({ a:'hist-visitas-todo', ic:'clock', c:'ok', t:'Historial de visitas' })}
@@ -3263,7 +3273,8 @@ R.garita = {
     const adentro = lista.filter(p => estadoPase(p) === 'adentro').length;
     const esperados = lista.filter(p => estadoPase(p) === 'esperado').length;
     const paq = hayPaquetes() ? s.paquetes.filter(p => !p.retirado) : [];
-    const llegadas = s.llegadas.filter(l => l.estado === 'consultando' || Date.now() - l.at < 30 * MIN);
+    /* 18-10: la que pasó queda a la vista hasta que la garita marca que salió (ese mismo día). */
+    const llegadas = s.llegadas.filter(l => l.estado === 'consultando' || Date.now() - l.at < 30 * MIN || llegadaAdentro(l));
     const solas = typeof casasSolas === 'function' ? casasSolas(hoy) : [];
     /* El aviso de "viene una visita sin aviso" queda todo el día (la visita
        puede venir a la noche); los demás, 6 horas como siempre. */
@@ -3277,7 +3288,7 @@ R.garita = {
        la lista va debajo del título. */
     return `<div class="garita-grid ${PILA.length === 1 ? '' : 'sin-titulo'}">
       ${PILA.length === 1 ? `<div class="garita-titulo titulo-vista"><h1>Garita</h1><p>${fechaLarga(hoy)}</p></div>` : ''}
-      <aside class="garita-lado">${tareasGarita()}</aside>
+      <aside class="garita-lado">${tareasGarita()}${bitacoraGarita()}</aside>
       <div class="garita-main">
       ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos${hayPaquetes() ? ', paquetes' : ''}, el camión, los correos, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
         <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esSupervisor() ? 'supGarita' : 'interno'}">${I('chat')}Escribirle a la garita</button></div>`}
@@ -3303,11 +3314,13 @@ R.garita = {
       ${(() => { const rs = s.peticiones.filter(p => p.tipo === 'nopasar' && p.estado === 'en_funciones' && (!p.hasta || p.hasta >= hoy)); return rs.length ? sec('Restricciones de ingreso vigentes') + rs.map(p => `<button class="superficie peligro" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-danger">${I('x')}</span><span class="txt"><b>${esc(p.casa)}</b><small>${esc(p.texto.slice(0, 90))}</small></span>${I('right')}</button>`).join('') : ''; })()}
       ${llegadas.length ? '<span id="garLlegadas" class="ancla"></span>' + sec('Consultando al vecino') + llegadas.map(l => { const h = usuario(l.hostId) || {}; const min = Math.floor((Date.now() - l.at) / MIN);
         return `<div class="card" style="padding:13px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span><div class="datos"><b>${esc(l.nombre)} → ${esc(h.casa || '')}</b><span>${esc(l.motivo || '')}${l.patente ? ' · ' + esc(l.patente) : ''} · hace ${min} min</span></div>
-          <span class="estado e-${l.estado}">${{ consultando:'Esperando', autorizado:'Puede pasar', rechazado: l.noEsta ? 'No está en casa' : 'No autorizado' }[l.estado]}</span></div>${l.respondio ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio))}</div>` : ''}
+          <span class="estado e-${l.sale ? 'salio' : l.estado}">${l.sale ? `Salió ${hora(l.sale)}` : { consultando:'Esperando', autorizado:'Adentro', rechazado: l.noEsta ? 'No está en casa' : 'No autorizado' }[l.estado]}</span></div>${l.respondio ? `<div class="muted tiny" style="margin-top:6px">Contestó ${esc(nombreDe(l.respondio))}${l.sale ? ` · salió ${hora(l.sale)} h` : ''}</div>` : ''}
+          ${l.estado === 'autorizado' && !l.sale ? (opera ? `<div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-sec" data-a="llegada-salio" data-id="${esc(l.id)}">${I('logout')}Salió</button></div>` : `<div class="muted tiny" style="margin-top:6px">${I('users')} Está adentro</div>`) : ''}
           ${opera && l.estado === 'consultando' && min >= 2 ? (() => {
             /* A los 2 min, "Llamar" a cada uno de los que viven en el lote; a los 3, la app ya les insistió con sonido (regla llegada-3min). */
             const tels = paraElLote(l.lote || h.casa, l.hostId).map(usuario).filter(v => v && v.tel);
             return `<div class="btns" style="margin-top:10px">${tels.map(v => `<a class="btn btn-sm btn-sec" href="${telLink(v.tel)}">${I('phone')}Llamar a ${esc(v.nombre.split(' ')[0])}</a>`).join('')}${min >= 3 ? `<span class="pill p-warn">Se les insistió con sonido</span>` : ''}</div>`; })() : ''}</div>`; }).join('') : ''}
+      ${hcGaritaHtml(opera)}
       ${avisos.length ? '<span id="garAvisos" class="ancla"></span>' + sec('Avisos de vecinos') + avisos.map(a => { const v = usuario(a.userId) || {}, t = AVISOS_GUARDIA[a.tipo] || AVISOS_GUARDIA.otro;
         return `<div class="card" style="padding:12px 14px"><div class="pase"><span class="ic ic-warn">${I(t.icon)}</span><div class="datos"><b>${esc(v.casa || '')}: ${t.t}</b><span>${esc(a.texto || t.x)} · ${hace(a.at)}</span></div>
           ${a.visto ? `<span class="estado e-autorizado">Visto</span>` : opera ? `<button class="btn btn-xs btn-ok" data-a="aviso-visto" data-id="${a.id}">Visto</button>` : `<span class="estado e-consultando">Sin ver</span>`}</div>
@@ -3428,6 +3441,7 @@ function validar(q){
     const esPat = typeof patenteDeTexto === 'function' && patenteDeTexto(txt) === pat && pat.length >= 6;
     hoja('Sin coincidencias', `${esPat ? `<div class="pat-leida">${I('car')}<b>${esc(verPatente(pat))}</b></div>` : ''}${avisoRestriccion(restriccionPara('', dig, pat))}${aviso('danger', 'x', 'No hay ningún pase con ese dato', 'Si dice venir a una casa, registrá la llegada y consultamos al vecino.')}
       <button class="btn btn-pri btn-block" data-a="llegada-nueva" data-pat="${esPat ? esc(pat) : ''}">${I('gate')}Registrar llegada sin aviso</button>
+      <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="hotel-cliente" data-pat="${esPat ? esc(pat) : ''}">${I('star')}Va al hotel (restaurante o spa)</button>
       ${esPat ? `<button class="btn btn-sec btn-block" data-a="patente-camara" style="margin-top:8px">${I('camera')}No es esa: leer otra vez</button>` : ''}`); return;
   }
   const restr = pases.map(p => restriccionPara(p.nombre, p.dni, p.patente)).find(Boolean) || restriccionPara('', dig, pat);
@@ -3483,7 +3497,7 @@ function movimiento(id, tipo){
   toast(tipo === 'in' ? 'Ingreso registrado. El vecino ya fue avisado.' : 'Salida registrada', tipo === 'in' ? 'login' : 'logout');
 }
 /* Solo quienes viven en el lote: al propietario a distancia no se le consulta quién entra. */
-const opcionesCasas = (sel = '') => vecinosAprobados().filter(u => !esPropDistancia(u)).sort((a, b) => a.casa.localeCompare(b.casa, 'es', { numeric:true }))
+const opcionesCasas = (sel = '') => habitantesAprobados().filter(u => !esPropDistancia(u)).sort((a, b) => a.casa.localeCompare(b.casa, 'es', { numeric:true }))
   .map(u => `<option value="${u.id}" ${u.id === sel ? 'selected' : ''}>${esc(u.casa)} · ${esc(u.nombre)}</option>`).join('');
 /* Todos los lotes del padrón, estén o no registrados en la app. */
 const opcionesLotes = (sel = '') => LOTES.map(l => `<option value="Lote ${l.lote}" ${'Lote ' + l.lote === sel ? 'selected' : ''}>${esc(nombreLote(l))}${propietarioDe('Lote ' + l.lote) ? ' · ' + esc(propietarioDe('Lote ' + l.lote)) : ''}</option>`).join('');
@@ -3493,7 +3507,7 @@ A['llegada-nueva'] = el => hoja('Llegó alguien sin aviso', `<form data-f="llega
   <div class="grid2"><div class="field"><label>Patente</label><input name="patente" maxlength="10" style="text-transform:uppercase" value="${esc(el?.dataset?.pat ? verPatente(el.dataset.pat) : '')}"></div>
     <div class="field"><label>Motivo</label><select name="motivo"><option>Visita</option><option>Delivery</option><option>Uber / DiDi / taxi</option><option>Proveedor / obra</option><option>Correo / paquete</option><option>Otro</option></select></div></div>
   <button class="btn btn-pri btn-block">${I('send')}Consultar al vecino</button>
-  <p class="muted tiny" style="margin:10px 0 0">A todos los que viven en ese lote se les abre una ventana con "Que pase" o "No estoy en casa" (y "No lo conozco"), y el celular les suena cada 5 segundos hasta que alguien conteste. Vale la respuesta del primero.</p></form>`);
+  <p class="muted tiny" style="margin:10px 0 0">A todos los que viven en ese lote se les abre una ventana con "Que pase" o "No estoy en casa" (y "No lo conozco"), y el celular les suena sin parar hasta que alguien conteste. Vale la respuesta del primero.</p></form>`);
 /* Las cuentas que viven en el lote (más el elegido, por si no figura con ese lote). */
 const paraElLote = (casa, hostId) => { const us = residentesDelLote(casa).map(u => u.id); if (hostId && !us.includes(hostId)) us.push(hostId); return us; };
 const llegadaDeMiLote = (l, u = yo()) => !!l && !!u && (l.hostId === u.id || (!!l.lote && l.lote === u.casa && !esPropDistancia(u)));
@@ -3512,6 +3526,99 @@ F['llegada'] = d => {
     notificar(s, { para:paraElLote(casa, d.hostId), titulo:`En la garita: ${d.nombre.trim()}`, texto:`${d.motivo}${casa ? ' · ' + casa : ''} · ¿Lo dejamos pasar?`, icon:'gate', color:'warn', urgente:true, link:'llegada:' + id, llegadaId:id });
   });
   cerrarHoja(); toast('Consultando al vecino…', 'send');
+};
+/* =========================================================
+   "VA AL HOTEL" EN UN TOQUE (pedido de Claudio, 18-10-2026)
+   La gente que viene a desayunar, almorzar, merendar, cenar o al spa del
+   hotel no es visita de nadie y nadie sabe cuándo ni cuántos vienen. La
+   garita los anota en unos 10 segundos: patente (con la cámara o
+   escrita), para qué viene y cuántos son. Al hotel le llega en vivo
+   "Llegan 2 al restaurante · Fiat Cronos AB 123 CD", y queda en el libro
+   de guardia como "Cliente del hotel". Mientras están adentro se ven en la
+   garita con "Salió". El hotel no ve nada más que ese aviso.
+   ========================================================= */
+const HC_MOTIVOS = [['desayuno', 'Desayuno', '☕'], ['almuerzo', 'Almuerzo', '🍽️'], ['merienda', 'Merienda', '🧁'], ['cena', 'Cena', '🍷'], ['spa', 'Spa', '💆']];
+const hcMotivo = m => HC_MOTIVOS.find(x => x[0] === m) || HC_MOTIVOS[1];
+/* Lo que se sugiere según la hora (se cambia con un toque). */
+const hcSugerido = (h = new Date().getHours() + new Date().getMinutes() / 60) => h >= 5 && h < 11 ? 'desayuno' : h >= 11 && h < 15.5 ? 'almuerzo' : h >= 15.5 && h < 19.5 ? 'merienda' : 'cena';
+const hcLugar = m => m === 'spa' ? 'al spa' : 'al restaurante';
+const hcPat = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
+let hcBorrador = null, patenteDestino = null;
+/* Los clientes del hotel que entraron hoy y todavía no salieron (salen del libro de guardia). */
+function hcAdentro(){
+  const ini = new Date(hoyISO() + 'T00:00').getTime(), hoy = aLista(Store.s.bitacora).filter(b => b && b.at >= ini && b.tipo === 'acceso');
+  const salieron = new Set(hoy.filter(b => b.hcRef).map(b => b.hcRef));
+  return hoy.filter(b => b.hc && !salieron.has(b.id)).sort((a, b) => a.at - b.at);
+}
+A['hotel-cliente'] = el => {
+  if (!esGuardia()) return;
+  const b = hcBorrador || {}, pat = hcPat(b.patente || el?.dataset?.pat || ''), m = b.motivo || hcSugerido(), n = +b.personas || 2;
+  hoja('Va al hotel', `<form data-f="hotel-cliente" class="hc">
+    <div class="hc-pat"><input name="patente" class="hc-chapa" maxlength="10" autocomplete="off" placeholder="AB 123 CD" value="${esc(pat ? verPatente(pat) : '')}" aria-label="Patente">
+      <button type="button" class="btn btn-sec" data-a="hc-camara">${I('camera')}Leer</button></div>
+    <input name="auto" class="hc-auto" maxlength="40" autocomplete="off" placeholder="Auto (opcional): Fiat Cronos gris" value="${esc(b.auto || '')}">
+    <div class="hc-lbl">¿A qué viene?</div>
+    <div class="hc-motivos" role="radiogroup">${HC_MOTIVOS.map(([k, t, e], i) => `<label style="--i:${i}"><input type="radio" name="motivo" value="${k}" ${k === m ? 'checked' : ''}><span><em>${e}</em><b>${t}</b></span></label>`).join('')}</div>
+    <div class="hc-lbl">¿Cuántas personas?</div>
+    <div class="hc-pers" role="radiogroup">${[1, 2, 3, 4, 5, 6, 8, 10].map(k => `<label><input type="radio" name="personas" value="${k}" ${k === n ? 'checked' : ''}><span>${k}${k >= 6 ? '+' : ''}</span></label>`).join('')}</div>
+    <button class="btn btn-pri btn-block btn-grande">${I('check')}Pasa al hotel</button>
+    <p class="muted tiny" style="margin:10px 0 0">${I('star')} Al hotel le llega en vivo cuántos llegan y para qué, con la patente. Queda en el libro de guardia como "Cliente del hotel". No es visita de ningún vecino.</p></form>`);
+  hcBorrador = null;
+};
+/* Leer la patente con la cámara y volver al formulario con lo que ya estaba elegido. */
+A['hc-camara'] = el => {
+  const f = el.closest('form'); if (!f) return;
+  hcBorrador = { patente:f.patente.value, auto:f.auto.value, motivo:f.querySelector('[name=motivo]:checked')?.value, personas:f.querySelector('[name=personas]:checked')?.value };
+  patenteDestino = p => { hcBorrador = { ...(hcBorrador || {}), patente:p }; A['hotel-cliente'](); };
+  A['patente-camara']({ dataset:{ v:'hotel' } });
+};
+const patenteListo = p => { if (patenteDestino){ const f = patenteDestino; patenteDestino = null; setTimeout(() => f(hcPat(p)), 60); } else validar(p); };
+F['hotel-cliente'] = d => {
+  if (!esGuardia()) return;
+  const pat = hcPat(d.patente), [m, mt] = hcMotivo(d.motivo), n = Math.max(1, Math.min(30, Math.round(+d.personas) || 1)), auto = String(d.auto || '').trim().slice(0, 40);
+  const r = pat ? restriccionPara('', '', pat) : null;
+  if (r){ hoja('Atención', `${avisoRestriccion(r)}<p class="small">Hay un pedido firmado para no dejar pasar este vehículo.</p>`); return; }
+  const ahora = Date.now(), coche = [auto, pat ? verPatente(pat) : ''].filter(Boolean).join(' ');
+  Store.cambiar(s => {
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', hc:{ m, n, ...(pat ? { pat } : {}), ...(auto ? { auto } : {}) },
+      texto:`Ingreso: Cliente del hotel · ${mt} · ${plural(n, 'persona')}${coche ? ' · ' + coche : ''} · ${hora(ahora)} h.`, at:ahora });
+    /* A la cuenta del hotel, en su carpeta privada (no al pizarrón de todos: lleva la patente). */
+    const hoteles = aLista(s.users).filter(u => u && u.rol === 'hotel' && u.estado === 'aprobado').map(u => u.id);
+    if (hoteles.length) notificar(s, { para:hoteles, titulo:`Llega${n === 1 ? '' : 'n'} ${n} ${hcLugar(m)}`, texto:`${mt}${coche ? ' · ' + coche : ''} · entró ${hora(ahora)} h`, icon:'star', color:'wood', link:'hotel', sonido:true });
+  });
+  cerrarHoja(); toast(`Avisado al hotel: llega${n === 1 ? '' : 'n'} ${n} ${hcLugar(m)}`, 'star');
+};
+A['hc-salio'] = el => {
+  if (!esGuardia()) return;
+  const b0 = hcAdentro().find(b => b.id === el.dataset.id); if (!b0) return;
+  const ahora = Date.now(), x = b0.hc || {}, coche = [x.auto, x.pat ? verPatente(x.pat) : ''].filter(Boolean).join(' ');
+  Store.cambiar(s => { s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', hcRef:b0.id, texto:`Salida: Cliente del hotel · ${hcMotivo(x.m)[1]} · ${plural(x.n || 1, 'persona')}${coche ? ' · ' + coche : ''} · ${hora(ahora)} h.`, at:ahora }); });
+  toast('Salida anotada', 'logout');
+};
+/* En la garita: los que están en el hotel ahora, con "Salió". */
+function hcGaritaHtml(opera){
+  const ls = hcAdentro(); if (!ls.length) return '';
+  return `<span id="garHotelClientes" class="ancla"></span>${sec('En el hotel ahora (clientes)', `<span class="muted small">${plural(ls.reduce((k, b) => k + (b.hc.n || 1), 0), 'persona')}</span>`)}
+    <div class="hc-lista">${ls.map(b => { const x = b.hc, [, t, e] = hcMotivo(x.m); return `<div class="hc-it"><span class="hc-e">${e}</span>
+      <div class="grow"><b>${t} · ${plural(x.n || 1, 'persona')}</b><small>${x.pat ? `<span class="hp-chapa chica">${esc(verPatente(x.pat))}</span> ` : ''}${esc(x.auto || '')}${x.auto || x.pat ? ' · ' : ''}entró ${hora(b.at)} h · hace ${Math.max(1, Math.round((Date.now() - b.at) / MIN))} min</small></div>
+      ${opera ? `<button class="btn btn-xs btn-sec" data-a="hc-salio" data-id="${esc(b.id)}">${I('logout')}Salió</button>` : ''}</div>`; }).join('')}</div>`;
+}
+/* LA SALIDA DE LA QUE LLEGÓ SIN AVISO (18-10-2026). Claudio autorizó a
+   Olegario y, cuando se fue, la garita no tenía cómo marcarlo: la llegada
+   no tenía botón de salida. Ahora la que pasó queda "Adentro" en la garita
+   hasta que se toca "Salió": queda en el libro de guardia y en Ingresos de
+   hoy, y al lote le llega el aviso (sin sonar). */
+const llegadaAdentro = l => !!l && l.estado === 'autorizado' && !l.sale && isoDe(new Date(l.respondido || l.at)) === hoyISO();
+A['llegada-salio'] = el => {
+  if (!esGuardia()) return;
+  const l0 = aLista(Store.s.llegadas).find(x => x.id === el.dataset.id); if (!l0 || l0.sale) return;
+  const casa = l0.lote || usuario(l0.hostId)?.casa || '', ahora = Date.now();
+  Store.cambiar(s => {
+    const l = s.llegadas.find(x => x.id === l0.id); if (!l) return; l.sale = ahora;
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Salida: ${l.nombre}${l.patente ? ' (' + l.patente + ')' : ''} → ${casa} (llegó sin aviso) · ${hora(ahora)} h.`, at:ahora });
+    notificar(s, { para:paraElLote(casa, l.hostId), titulo:`${l.nombre} salió del barrio`, texto:`${hora(ahora)} h · había llegado sin aviso`, icon:'logout', color:'ok', link:'visitas', push:false });
+  });
+  toast(`Salida de ${l0.nombre} anotada`, 'logout');
 };
 /* Los paquetes (con foto y confirmación del vecino) están en v-servicio.js. */
 A['aviso-visto'] = el => Store.cambiar(s => { const a = s.avisos.find(x => x.id === el.dataset.id); if (a){ a.visto = Date.now();
@@ -3687,7 +3794,8 @@ function rectGuia(v){
 }
 /* Se baja apenas se abre la garita, para que la cámara lea al instante. */
 const precargarLectorPatente = () => { if (!ocrWorker && !ocrCargando && esGuardia()) setTimeout(() => lectorPatente(), 4000); };
-A['patente-camara'] = async () => {
+A['patente-camara'] = async el => {
+  if (!(el && el.dataset && el.dataset.v === 'hotel')) patenteDestino = null;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('Este equipo no puede usar la cámara. Escribí la patente.', 'camera'); return; }
   hoja('Leer la patente', `<div class="pat-cam"><video id="patVideo" playsinline muted></video><div class="pat-guia" id="patGuia" aria-hidden="true"></div><div class="pat-vivo" id="patVivo"></div></div>
     <p class="small center" id="patEstado" style="margin:10px 0">Apuntá a la patente: que entre justo en el recuadro amarillo. Se lee sola.</p>
@@ -3715,7 +3823,7 @@ A['patente-camara'] = async () => {
   const conocidas = patentesConocidas(), vistas = []; let cuadro = 0;
   const listo = p => { vivo = false; parar();
     if (typeof Sonido !== 'undefined'){ Sonido.tocar([[988, 0, .1], [1319, .1, .22]], 'sine', .18); Sonido.vibrar(90); }
-    cerrarHoja(); validar(p); };
+    cerrarHoja(); patenteListo(p); };
   while (vivo && $('#hoja')?.open){
     const r = v.videoWidth ? rectGuia(v) : null;
     if (r && r.w > 20){
@@ -3734,7 +3842,7 @@ A['patente-camara'] = async () => {
     await new Promise(ok => setTimeout(ok, 60));
   }
 };
-F['patente-buscar'] = d => validar(d.q);
+F['patente-buscar'] = d => patenteListo(d.q);
 
 /* ---------- BITÁCORA ---------- */
 /* =========================================================
@@ -3801,6 +3909,162 @@ const notaDejadaHtml = () => { const n = notaDejada(); if (!n) return '';
     <div class="rl-globo"><p>${esc(texto)}</p></div>
     <div class="rl-pie"><span>${I('book')}También quedó en la bitácora y en el parte.</span>${leida ? '' : `<button type="button" class="rl-ok" data-a="nota-leida" data-id="${esc(n.id || '')}">${I('check')}Leído</button>`}</div></details>`; };
 A['nota-leida'] = el => { try { localStorage.setItem(notaLeidaKey, el.dataset.id || ''); } catch(e){} const d = el.closest('details'); if (d) d.open = false; toast('Novedades leídas', 'check'); pintar(); };
+/* =========================================================
+   LA BITÁCORA EN LA PORTADA DE LA GARITA (pedido de Claudio, 18-10-2026)
+   "Que la Bitácora esté debajo de 'Hoy la garita no puede olvidar', con las
+   mismas funciones y un diseño de apertura e interactividad más innovador y
+   animado, que invite rápido al guardia a interactuar con cada sección."
+   · Un libro que se abre (la tapa gira) con el día, cuántos registros hay
+     y el último; "En vivo" late porque se actualiza solo.
+   · "¿Qué querés anotar?": tres botones grandes (Novedad, Incidente, Ronda);
+     al tocar uno se despliega con sus frases rápidas y el renglón para
+     escribir. Es el mismo formulario del libro (F['bitacora']).
+   · Las secciones del libro como fichas de colores con su número: tocar una
+     muestra ahí mismo lo último de esa sección, sin salir de la garita. La
+     que tuvo algo en los últimos 15 minutos tiene un punto que late.
+   · "Abrir el libro completo" lleva a la ventana de siempre (buscador,
+     Otro día, Historial de visitas), ya filtrada en la sección elegida.
+   ========================================================= */
+let bitPortalCat = 'todo', bitPortalTipo = '';
+const BIT_PORTAL_MAX = 6;
+function bitDelDia(){
+  const ini = new Date(hoyISO() + 'T00:00').getTime(), fin = ini + DIA;
+  return aLista(Store.s.bitacora).filter(b => b && b.at >= ini && b.at < fin).sort((a, b) => b.at - a.at);
+}
+function bitPortalLista(delDia){
+  const k = bitPortalCat, lista = k === 'todo' ? delDia : delDia.filter(b => catBit(b) === k), c = CAT_BIT[k];
+  if (!lista.length) return `<div class="bt-vacio bg2-vacio">${I(c ? c.ic : 'book')}<b>${k === 'todo' ? 'Hoy todavía no hay registros' : 'Hoy no hay ' + esc(c.n.toLowerCase())}</b><small>${esGuardia() && ['todo', 'novedad', 'incidente', 'ronda'].includes(k) ? 'Tocá arriba qué querés anotar y queda acá al instante.' : 'Lo que se anote aparece acá, en vivo.'}</small></div>`;
+  const resto = lista.length - BIT_PORTAL_MAX;
+  return bitItemsHtml(lista.slice(0, BIT_PORTAL_MAX)) + (resto > 0 ? `<button type="button" class="bg2-mas" data-a="abrir" data-v="bitacora" data-p="${k}">${I('book')}${resto === 1 ? 'Ver 1 registro más' : `Ver ${resto} registros más`} en el libro</button>` : '');
+}
+function bitacoraGarita(){
+  if (!veGarita()) return '';
+  const delDia = bitDelDia(), ult = delDia[0], ahora = Date.now();
+  const cuenta = k => k === 'todo' ? delDia.length : delDia.filter(b => catBit(b) === k).length;
+  const nuevo = k => delDia.some(b => (k === 'todo' || catBit(b) === k) && ahora - b.at < 15 * MIN);
+  const cats = [['todo', { n:'Todo', ic:'book', c:'brand2' }], ...Object.entries(CAT_BIT)];
+  const d = new Date();
+  return `<details class="card bg2" id="garBitacora" data-k="bit-portal" open>
+    <summary class="bg2-cab">
+      <span class="bg2-libro" aria-hidden="true"><i class="bg2-tapa">${I('book')}</i><span class="bg2-hoja"><b>${d.getDate()}</b><small>${esc(MESES[d.getMonth()])}</small></span></span>
+      <span class="bg2-tit"><b>Bitácora</b><small>Libro de guardia · ${plural(delDia.length, 'registro')} hoy${ult ? ` · último ${hora(ult.at)} h` : ''}</small></span>
+      <span class="bg2-vivo"><i></i>En vivo</span>${I('right')}</summary>
+    <div class="bg2-cuerpo">
+      ${esGuardia() ? bitEscribirHtml({ plegado:true }) : `<p class="muted small bg2-mira">${I('eye')} La escribe la garita; ${esSupervisor() ? 'la supervisión' : 'la Administración'} la lee en vivo.</p>`}
+      <div class="bg2-cats" role="toolbar" aria-label="Secciones del libro">${cats.map(([k, c], i) => `<button type="button" class="bg2-cat c-${c.c}${bitPortalCat === k ? ' on' : ''}${cuenta(k) ? '' : ' cero'}" data-a="bit-portal-cat" data-v="${k}" aria-pressed="${bitPortalCat === k}" style="--i:${i}">
+        <span class="bg2-ic">${I(c.ic)}${nuevo(k) ? '<i class="bg2-nuevo" title="Algo nuevo en los últimos 15 minutos"></i>' : ''}</span><b>${cuenta(k)}</b><small>${esc(c.n)}</small></button>`).join('')}</div>
+      <div class="lb-modo" role="tablist" aria-label="Cómo leer la bitácora">${[['lista', 'list', 'Lista'], ['libro', 'book', 'Hojear']].map(([v, ic, t]) => `<button type="button" role="tab" class="${bitPortalModo === v ? 'on' : ''}" data-a="bit-portal-modo" data-v="${v}" aria-selected="${bitPortalModo === v}">${I(ic)}${t}</button>`).join('')}</div>
+      <div class="bg2-lista bt-linea-tiempo${bitPortalModo === 'libro' ? ' es-libro' : ''}" aria-live="polite">${bitPortalContenido(delDia)}</div>
+      <div class="bg2-pie"><button type="button" class="btn btn-sm btn-pri" data-a="abrir" data-v="bitacora" data-p="${bitPortalCat}">${I('book')}Abrir el libro completo</button>
+        <button type="button" class="btn btn-sm btn-sec" data-a="bit-otro-dia">${I('calendar')}Otro día</button></div>
+    </div></details>`;
+}
+/* =========================================================
+   LA BITÁCORA COMO UN LIBRO QUE SE HOJEA (pedido de Claudio, 18-10-2026)
+   "Un libro que al tocarlo se abren sus páginas una por una por cada toque
+   y así se avanza hasta todo lo que se quiera leer." Es una forma MÁS de
+   leerla: la lista rápida queda igual ("Lista" / "Hojear").
+   · Una página por cada hora del día que tuvo algo (de la sección elegida).
+   · Tocar la mitad derecha de la hoja (o deslizar el dedo a la izquierda)
+     pasa a la página siguiente; la mitad izquierda (o deslizar a la
+     derecha), a la anterior. La hoja gira con efecto 3D.
+   · Abajo, una tira con las horas para saltar directo, y "Anterior" /
+     "Siguiente". Abre en la última hora, la más nueva.
+   Idea de turn.js (7.5k★, el efecto de pasar páginas): solo la idea, el
+   efecto es propio, con CSS.
+   ========================================================= */
+let bitPortalModo = (() => { try { return localStorage.getItem('bhc.bit.modo') === 'libro' ? 'libro' : 'lista'; } catch(e){ return 'lista'; } })();
+let bitLibroHora = '';
+const bitHoraDe = b => String(new Date(b.at).getHours()).padStart(2, '0');
+function bitLibroHtml(delDia){
+  const k = bitPortalCat, lista = (k === 'todo' ? delDia : delDia.filter(b => catBit(b) === k)).slice().sort((a, b) => a.at - b.at), c = CAT_BIT[k];
+  if (!lista.length) return `<div class="bt-vacio bg2-vacio">${I(c ? c.ic : 'book')}<b>${k === 'todo' ? 'Hoy todavía no hay registros' : 'Hoy no hay ' + esc(c.n.toLowerCase())}</b><small>Cuando se anote algo, aparece su página.</small></div>`;
+  const porHora = new Map(); lista.forEach(b => { const h = bitHoraDe(b); if (!porHora.has(h)) porHora.set(h, []); porHora.get(h).push(b); });
+  const horas = [...porHora.keys()], hh = porHora.has(bitLibroHora) ? bitLibroHora : horas[horas.length - 1], i = horas.indexOf(hh), regs = porHora.get(hh);
+  return `<div class="lb" data-hora="${hh}">
+    <div class="lb-libro" role="region" aria-label="Página de las ${hh} h. Tocá la derecha para la siguiente y la izquierda para la anterior.">
+      <div class="lb-pag">
+        <div class="lb-cab"><span class="lb-h">${hh}<small>h</small></span><div class="grow"><b>De ${hh}:00 a ${hh}:59</b><small>${plural(regs.length, 'registro')}${k === 'todo' ? '' : ' · ' + esc(c.n.toLowerCase())}</small></div><span class="lb-num">${i + 1}<i>/</i>${horas.length}</span></div>
+        <div class="lb-cont bt-linea-tiempo">${bitItemsHtml(regs)}</div>
+        <div class="lb-pie">${i > 0 ? `<span>${I('left')} ${horas[i - 1]} h</span>` : '<span></span>'}<em>Tocá o deslizá para pasar la hoja</em>${i < horas.length - 1 ? `<span>${horas[i + 1]} h ${I('right')}</span>` : '<span></span>'}</div>
+      </div>
+    </div>
+    <div class="lb-nav">
+      <button type="button" class="lb-flecha" data-a="bit-libro-paso" data-v="-1" ${i === 0 ? 'disabled' : ''} aria-label="Página anterior">${I('left')}</button>
+      <div class="lb-horas" role="tablist" aria-label="Ir a la hora">${horas.map(h => `<button type="button" role="tab" class="${h === hh ? 'on' : ''}" data-a="bit-libro-ir" data-v="${h}" aria-selected="${h === hh}"><b>${h}</b><i>${porHora.get(h).length}</i></button>`).join('')}</div>
+      <button type="button" class="lb-flecha" data-a="bit-libro-paso" data-v="1" ${i === horas.length - 1 ? 'disabled' : ''} aria-label="Página siguiente">${I('right')}</button>
+    </div></div>`;
+}
+const bitPortalContenido = delDia => bitPortalModo === 'libro' ? bitLibroHtml(delDia) : bitPortalLista(delDia);
+/* Pasar la hoja: la página de antes gira (hacia la izquierda si avanza, a la derecha si vuelve) y deja ver la nueva. */
+function bitLibroIr(caja, hora, dir){
+  const l = caja && caja.querySelector('.bg2-lista'); if (!l) return;
+  const vieja = l.querySelector('.lb-pag'), clon = vieja ? vieja.cloneNode(true) : null;
+  bitLibroHora = hora; l.innerHTML = bitLibroHtml(bitDelDia());
+  const libro = l.querySelector('.lb-libro');
+  if (clon && libro && dir && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+    clon.classList.add('lb-gira', dir > 0 ? 'adelante' : 'atras'); clon.setAttribute('aria-hidden', 'true'); libro.appendChild(clon);
+    libro.querySelector('.lb-pag:not(.lb-gira)')?.classList.add(dir > 0 ? 'lb-aparece' : 'lb-aparece-atras');
+    clon.addEventListener('animationend', () => clon.remove(), { once:true }); setTimeout(() => clon.remove(), 900);
+  }
+  if (typeof Sonido !== 'undefined') Sonido.tocar([[520, 0, .06], [380, .05, .08]], 'triangle', .05);
+  l.querySelector('.lb-horas .on')?.scrollIntoView({ block:'nearest', inline:'center', behavior:'smooth' });
+}
+const bitLibroPaso = (caja, dir) => {
+  const l = caja && caja.querySelector('.lb'); if (!l) return;
+  const hs = [...caja.querySelectorAll('.lb-horas [data-v]')].map(b => b.dataset.v), i = hs.indexOf(l.dataset.hora), j = i + dir;
+  if (j < 0 || j >= hs.length){ const p = caja.querySelector('.lb-pag'); if (p){ p.classList.remove('lb-tope'); void p.offsetWidth; p.classList.add('lb-tope'); } return; }
+  bitLibroIr(caja, hs[j], dir);
+};
+A['bit-libro-paso'] = el => bitLibroPaso(el.closest('#garBitacora'), +el.dataset.v || 1);
+A['bit-libro-ir'] = el => { const caja = el.closest('#garBitacora'), act = caja?.querySelector('.lb')?.dataset.hora || ''; if (el.dataset.v === act) return; bitLibroIr(caja, el.dataset.v, el.dataset.v > act ? 1 : -1); };
+A['bit-portal-modo'] = el => {
+  bitPortalModo = el.dataset.v === 'libro' ? 'libro' : 'lista'; try { localStorage.setItem('bhc.bit.modo', bitPortalModo); } catch(e){}
+  const caja = el.closest('#garBitacora'); if (!caja) return refrescar();
+  caja.querySelectorAll('.lb-modo button').forEach(b => { const on = b.dataset.v === bitPortalModo; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  const l = caja.querySelector('.bg2-lista'); if (l){ l.classList.toggle('es-libro', bitPortalModo === 'libro'); l.classList.remove('cambia'); void l.offsetWidth; l.classList.add('cambia'); l.innerHTML = bitPortalContenido(bitDelDia()); }
+};
+/* Tocar la hoja: la mitad derecha avanza, la izquierda vuelve. Deslizar el dedo, igual. */
+document.addEventListener('click', e => {
+  const lib = e.target.closest && e.target.closest('#garBitacora .lb-libro'); if (!lib || e.target.closest('a,button,input,textarea,label')) return;
+  const r = lib.getBoundingClientRect(); bitLibroPaso(lib.closest('#garBitacora'), e.clientX - r.left > r.width / 2 ? 1 : -1);
+});
+let lbToque = null;
+document.addEventListener('touchstart', e => { const lib = e.target.closest && e.target.closest('#garBitacora .lb-libro'); lbToque = lib && e.touches.length === 1 ? { x:e.touches[0].clientX, y:e.touches[0].clientY, lib } : null; }, { passive:true });
+document.addEventListener('touchend', e => {
+  if (!lbToque) return; const t = e.changedTouches[0], dx = t.clientX - lbToque.x, dy = t.clientY - lbToque.y, lib = lbToque.lib; lbToque = null;
+  if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4){ e.preventDefault(); bitLibroPaso(lib.closest('#garBitacora'), dx < 0 ? 1 : -1); }
+});
+/* Tocar una sección: se muestra ahí mismo, sin salir de la garita. */
+A['bit-portal-cat'] = el => {
+  bitPortalCat = el.dataset.v === 'todo' || CAT_BIT[el.dataset.v] ? el.dataset.v : 'todo';
+  const caja = el.closest('#garBitacora'); if (!caja) return refrescar();
+  caja.querySelectorAll('.bg2-cat').forEach(b => { const on = b.dataset.v === bitPortalCat; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  bitLibroHora = '';
+  const l = caja.querySelector('.bg2-lista'); if (l){ l.classList.remove('cambia'); void l.offsetWidth; l.classList.add('cambia'); l.innerHTML = bitPortalContenido(bitDelDia()); }
+  const ab = caja.querySelector('.bg2-pie [data-v="bitacora"]'); if (ab) ab.dataset.p = bitPortalCat;
+};
+/* Los renglones del libro (la ventana Bitácora y la Bitácora de la portada de la garita). */
+function bitItemsHtml(lista){
+  let hHora = '';
+  return lista.map((b, i) => { const k = catBit(b), c = CAT_BIT[k];
+    const quien = `${esc(autorVisible(b.autor).nombre)}${usuario(b.autor)?.rol === 'guardia' && b.tipo !== 'turno' && guardiasEn(b.at).length ? ' · ' + esc(guardiasEn(b.at).join(', ')) : ''}`;
+    const hh = hora(b.at).slice(0, 2), cab = hh !== hHora ? (hHora = hh, `<div class="bt-hora"><span>${hh} h</span></div>`) : '';
+    if (k === 'turno') return `${cab}<div class="bt-it bt-turno" data-txt="${esc(normTxt(b.texto + ' ' + quien))}" style="--i:${Math.min(i, 12)}"><span class="bt-ic">${I(b.abre ? 'sunrise' : 'sunset')}</span><div class="grow"><b>${esc(b.texto)}</b><small>${hora(b.at)} h</small></div></div>`;
+    return `${cab}<div class="bt-it c-${c.c}" data-txt="${esc(normTxt(b.texto + ' ' + quien))}" style="--i:${Math.min(i, 12)}"><span class="bt-punto"><i>${I(c.ic)}</i></span>
+      <div class="bt-txt"><div class="bt-meta"><time>${hora(b.at)}</time><em>${{ novedad:'Novedad', incidente:'Incidente', movimiento:'Entrada o salida', ronda: b.tipo === 'ronda' && !/polic/i.test(b.texto || '') ? 'Ronda de la guardia' : 'Ronda y policía' }[k]}</em></div><p>${esc(b.texto)}</p><small>${quien}</small></div></div>`; }).join('');
+}
+/* Lo que se anota en el libro. `plegado` (la portada de la garita): arranca
+   con solo "¿Qué querés anotar?" y los tres tipos; al elegir uno se abre. */
+function bitEscribirHtml({ plegado = false } = {}){
+  const tipo = plegado ? bitPortalTipo : 'novedad', abierto = !!tipo;
+  return `<form data-f="bitacora" class="bt-escribe${plegado ? ' bg2-escribe' + (abierto ? ' abierto' : '') : ''}">${plegado ? `<p class="bg2-pregunta">${I('edit')}¿Qué querés anotar?</p>` : ''}
+        <div class="bt-tipos" role="radiogroup" aria-label="Qué querés anotar">${Object.entries(ESCRIBIR_BIT).map(([k, t], i) => `<label class="c-${t.c}"><input type="radio" name="tipo" value="${k}" ${k === tipo ? 'checked' : ''}><span>${I(t.ic)}<b>${t.n}</b></span></label>`).join('')}</div>
+        <div class="bt-frases" id="bitFrases">${(ESCRIBIR_BIT[tipo] || ESCRIBIR_BIT.novedad).frases.map(f => `<button type="button" class="chip" data-a="bit-frase" data-v="${esc(f)}">${esc(f.trim())}${/ $/.test(f) ? '…' : ''}</button>`).join('')}</div>
+        <div class="bt-linea"><textarea name="texto" id="bitTxt" required maxlength="300" rows="2" placeholder="${esc((ESCRIBIR_BIT[tipo] || ESCRIBIR_BIT.novedad).ph)}"></textarea><button class="bt-mandar" aria-label="Anotar en el libro">${I('send')}</button></div>
+        <label class="check bt-avisar" style="margin:8px 0 0" ${tipo === 'incidente' ? 'hidden' : ''}><input type="checkbox" name="avisar"><span>Que le suene también a la Administración</span></label>
+        <p class="bt-siempre" ${tipo === 'incidente' ? '' : 'hidden'}>${I('bell')} El incidente le suena siempre a la Administración, con el aviso en rojo.</p></form>`;
+}
 R.bitacora = {
   titulo: 'Bitácora', icon: 'book', color: 'wood', sub: 'Libro de guardia',
   render(p){
@@ -3813,21 +4077,10 @@ R.bitacora = {
     const delDia = aLista(Store.s.bitacora).filter(b => b && b.at >= ini && b.at < fin).sort((a, b) => b.at - a.at);
     const lista = filtro === 'todo' ? delDia : delDia.filter(b => catBit(b) === filtro);
     const cuenta = k => delDia.filter(b => catBit(b) === k).length;
-    const escribir = esGuardia() ? `<form data-f="bitacora" class="bt-escribe">
-        <div class="bt-tipos" role="radiogroup" aria-label="Qué querés anotar">${Object.entries(ESCRIBIR_BIT).map(([k, t], i) => `<label class="c-${t.c}"><input type="radio" name="tipo" value="${k}" ${i === 0 ? 'checked' : ''}><span>${I(t.ic)}<b>${t.n}</b></span></label>`).join('')}</div>
-        <div class="bt-frases" id="bitFrases">${ESCRIBIR_BIT.novedad.frases.map(f => `<button type="button" class="chip" data-a="bit-frase" data-v="${esc(f)}">${esc(f.trim())}${/ $/.test(f) ? '…' : ''}</button>`).join('')}</div>
-        <div class="bt-linea"><textarea name="texto" id="bitTxt" required maxlength="300" rows="2" placeholder="${esc(ESCRIBIR_BIT.novedad.ph)}"></textarea><button class="bt-mandar" aria-label="Anotar en el libro">${I('send')}</button></div>
-        <label class="check bt-avisar" style="margin:8px 0 0"><input type="checkbox" name="avisar"><span>Que le suene también a la Administración</span></label>
-        <p class="bt-siempre" hidden>${I('bell')} El incidente le suena siempre a la Administración, con el aviso en rojo.</p></form>`
+    const escribir = esGuardia() ? bitEscribirHtml()
       : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>El libro de guardia lo escribe la garita</b><span>${esSupervisor() ? 'Desde la supervisión' : 'La Administración'} lo lee en vivo pero no anota ni corrige: es el registro de la guardia. Para pedirle o avisarle algo a la garita, escribile: le llega al instante, con sonido.</span></div>
         <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esSupervisor() ? 'supGarita' : 'interno'}">${I('chat')}Escribirle a la garita</button></div>`;
-    let hHora = '';
-    const items = lista.map((b, i) => { const k = catBit(b), c = CAT_BIT[k];
-      const quien = `${esc(autorVisible(b.autor).nombre)}${usuario(b.autor)?.rol === 'guardia' && b.tipo !== 'turno' && guardiasEn(b.at).length ? ' · ' + esc(guardiasEn(b.at).join(', ')) : ''}`;
-      const hh = hora(b.at).slice(0, 2), cab = hh !== hHora ? (hHora = hh, `<div class="bt-hora"><span>${hh} h</span></div>`) : '';
-      if (k === 'turno') return `${cab}<div class="bt-it bt-turno" data-txt="${esc(normTxt(b.texto + ' ' + quien))}" style="--i:${Math.min(i, 12)}"><span class="bt-ic">${I(b.abre ? 'sunrise' : 'sunset')}</span><div class="grow"><b>${esc(b.texto)}</b><small>${hora(b.at)} h</small></div></div>`;
-      return `${cab}<div class="bt-it c-${c.c}" data-txt="${esc(normTxt(b.texto + ' ' + quien))}" style="--i:${Math.min(i, 12)}"><span class="bt-punto"><i>${I(c.ic)}</i></span>
-        <div class="bt-txt"><div class="bt-meta"><time>${hora(b.at)}</time><em>${{ novedad:'Novedad', incidente:'Incidente', movimiento:'Entrada o salida', ronda: b.tipo === 'ronda' && !/polic/i.test(b.texto || '') ? 'Ronda de la guardia' : 'Ronda y policía' }[k]}</em></div><p>${esc(b.texto)}</p><small>${quien}</small></div></div>`; }).join('');
+    const items = bitItemsHtml(lista);
     return `${escribir}
       ${notaDejadaHtml()}
       <div class="bt-hero"><span class="bit-hoy-dia"><small>${esc(MESES[new Date().getMonth()])}</small><b>${new Date().getDate()}</b></span>
@@ -3853,6 +4106,8 @@ R.bitacora = {
 document.addEventListener('change', e => {
   const r = e.target; if (!r || r.name !== 'tipo' || !r.closest('.bt-escribe')) return;
   const t = ESCRIBIR_BIT[r.value] || ESCRIBIR_BIT.novedad, f = r.closest('form');
+  /* En la portada de la garita, elegir el tipo despliega el renglón (y se recuerda al redibujar). */
+  if (f.classList.contains('bg2-escribe')){ bitPortalTipo = r.value; f.classList.add('abierto'); setTimeout(() => f.querySelector('#bitTxt')?.focus({ preventScroll:true }), 260); }
   const fr = f.querySelector('#bitFrases'); if (fr) fr.innerHTML = t.frases.map(x => `<button type="button" class="chip" data-a="bit-frase" data-v="${esc(x)}">${esc(x.trim())}${/ $/.test(x) ? '…' : ''}</button>`).join('');
   const tx = f.querySelector('#bitTxt'); if (tx) tx.placeholder = t.ph;
   f.querySelector('.bt-avisar').hidden = r.value === 'incidente'; f.querySelector('.bt-siempre').hidden = r.value !== 'incidente';
@@ -3875,6 +4130,7 @@ F['bitacora'] = (d, form) => {
     if (avisar) notificar(s, { para, titulo:`Libro de guardia · ${ESCRIBIR_BIT[tipo].n}`, texto, icon: tipo === 'incidente' ? 'alert' : 'book', color: tipo === 'incidente' ? 'danger' : 'wood', link:'bitacora', sonido:true, urgente: tipo === 'incidente' });
   });
   const i = $('#bitTxt'); if (i) i.value = '';
+  if (form && form.classList.contains('bg2-escribe')){ bitPortalTipo = ''; bitPortalCat = 'todo'; refrescar(); }
   toast(avisar ? 'Anotado en el libro de guardia y avisado a la Administración' : 'Anotado en el libro de guardia', 'book');
 };
 

@@ -2293,7 +2293,7 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 @media (min-width:1000px){
   .garita-grid{grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto 1fr;grid-template-areas:"titulo lado" "main lado";column-gap:18px}
   .garita-grid.sin-titulo{grid-template-rows:1fr;grid-template-areas:"main lado"}
-  .garita-lado{align-self:start;position:sticky;top:8px;margin-bottom:0}
+  .garita-lado{align-self:start;position:sticky;top:8px;margin-bottom:0;max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:0 4px 8px 0}
 }
 .tareas-dia{padding:12px 14px}
 .tareas-dia summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
@@ -4727,14 +4727,14 @@ body.rk-arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
    BITÁCORA UNIFICADA E HISTORIAL DE VISITAS (js/guardia.js, v-inicio.js,
    historial.js)
    ========================================================= */
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-brand{--c:var(--brand)}
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-brand2{--c:var(--brand-2)}
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-accent{--c:var(--accent)}
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-danger{--c:var(--danger)}
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-ok{--c:var(--ok)}
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-sky{--c:var(--sky)}
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-wood{--c:var(--wood)}
-:is(.bt-tipos label,.bt-it,.bt-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-warn{--c:var(--warn)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-brand{--c:var(--brand)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-brand2{--c:var(--brand-2)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-accent{--c:var(--accent)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-danger{--c:var(--danger)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-ok{--c:var(--ok)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-sky{--c:var(--sky)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-wood{--c:var(--wood)}
+:is(.bt-tipos label,.bt-it,.bt-cat,.bg2-cat,.bt-que li,.hv-it,.hv-t,.hv-stats span,.pn-b,.pn-chips span).c-warn{--c:var(--warn)}
 .pn-b.c-wa{--c:#1fa855}
 
 /* ---------- policía nocturna ---------- */
@@ -5786,3 +5786,130 @@ li.prox .rm-gn{background:#ff9a3d}
 .pf-acc{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 @media (max-width:380px){ .pf-acc .btn span{display:none} .pf-sem{gap:4px} }
 @media (prefers-reduced-motion:reduce){ .pf.adentro .pf-av::after,.pf-real.vivo{animation:none} }
+
+/* ===== 18-10-2026: la Bitácora en la portada de la garita (debajo de "Hoy la garita no puede olvidar") ===== */
+.garita-lado .bg2{margin:12px 0 0}
+.bg2{padding:12px 14px;border:1.5px solid color-mix(in srgb,var(--wood) 30%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,var(--wood) 7%,var(--surface)),var(--surface) 120px);overflow:hidden}
+.bg2-cab{list-style:none;display:flex;align-items:center;gap:12px;cursor:pointer}
+.bg2-cab::-webkit-details-marker{display:none}
+.bg2-cab>svg.i{flex:none;width:18px;height:18px;color:var(--muted);transition:transform .35s ease}
+.bg2[open] .bg2-cab>svg.i{transform:rotate(90deg)}
+/* El libro: la tapa gira al abrir y deja ver la hoja del día. */
+.bg2-libro{position:relative;flex:none;width:50px;height:56px;perspective:260px}
+.bg2-hoja{position:absolute;inset:0;border-radius:6px 12px 12px 6px;background:var(--surface);border:1.5px solid color-mix(in srgb,var(--wood) 35%,var(--line));box-shadow:inset 6px 0 0 color-mix(in srgb,var(--wood) 18%,transparent),var(--sh-1);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.bg2-hoja b{font-size:21px;line-height:1;color:var(--wood)} .bg2-hoja small{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.bg2-tapa{position:absolute;inset:0;z-index:1;border-radius:6px 12px 12px 6px;display:grid;place-items:center;color:#fff;background:linear-gradient(140deg,color-mix(in srgb,var(--wood) 80%,#fff),var(--wood));box-shadow:0 6px 14px color-mix(in srgb,var(--wood) 35%,transparent);transform-origin:left center;transition:transform .8s cubic-bezier(.3,1.3,.5,1),opacity .8s;backface-visibility:hidden}
+.bg2-tapa svg.i{width:22px;height:22px}
+.bg2[open] .bg2-tapa{transform:rotateY(-155deg);opacity:.0}
+.bg2-tit{flex:1;min-width:0} .bg2-tit b{display:block;font-size:17px} .bg2-tit small{display:block;color:var(--muted);font-size:12px}
+.bg2-vivo{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--ok);padding:3px 9px;border-radius:999px;background:color-mix(in srgb,var(--ok) 12%,var(--surface))}
+.bg2-vivo i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:bg2Vivo 1.6s ease-in-out infinite}
+@keyframes bg2Vivo{50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--ok) 22%,transparent)}}
+.bg2[open] .bg2-cuerpo{animation:bg2Abre .5s cubic-bezier(.2,1,.4,1) both}
+@keyframes bg2Abre{from{opacity:0;transform:translateY(-10px)}}
+.bg2-cuerpo{padding-top:12px}
+.bg2-mira{display:flex;gap:6px;align-items:center;margin:0 0 10px}
+/* "¿Qué querés anotar?": tres botones que invitan; al elegir uno se despliega el renglón. */
+.bg2-pregunta{display:flex;align-items:center;gap:6px;margin:0 0 8px;font-weight:800;font-size:13.5px;color:var(--ink-2)}
+.bg2-pregunta svg.i{width:16px;height:16px;color:var(--wood)}
+.bg2-escribe:not(.abierto) .bt-frases,.bg2-escribe:not(.abierto) .bt-linea,.bg2-escribe:not(.abierto) .bt-avisar,.bg2-escribe:not(.abierto) .bt-siempre{display:none}
+.bg2-escribe .bt-tipos label{animation:bg2Pop .45s cubic-bezier(.3,1.5,.5,1) both}
+.bg2-escribe .bt-tipos label:nth-child(2){animation-delay:.07s} .bg2-escribe .bt-tipos label:nth-child(3){animation-delay:.14s}
+.bg2-escribe:not(.abierto) .bt-tipos span{position:relative;overflow:hidden}
+.bg2-escribe:not(.abierto) .bt-tipos span::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);transform:translateX(-120%);animation:bg2Brillo 4.5s ease-in-out infinite}
+.bg2-escribe:not(.abierto) .bt-tipos label:nth-child(2) span::after{animation-delay:.25s} .bg2-escribe:not(.abierto) .bt-tipos label:nth-child(3) span::after{animation-delay:.5s}
+@keyframes bg2Brillo{0%,62%{transform:translateX(-120%)}80%,100%{transform:translateX(120%)}}
+.bg2-escribe.abierto .bt-frases,.bg2-escribe.abierto .bt-linea{animation:bg2Abre .4s cubic-bezier(.2,1,.4,1) both}
+.bg2-escribe.abierto .bt-linea{animation-delay:.06s}
+@keyframes bg2Pop{from{opacity:0;transform:scale(.85) translateY(6px)}}
+/* Las secciones del libro: fichas con su número; la elegida se enciende. */
+.bg2-cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0 10px}
+.bg2-cat{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 4px 8px;border-radius:16px;border:1.5px solid color-mix(in srgb,var(--c) 28%,var(--line));background:color-mix(in srgb,var(--c) 8%,var(--surface));text-align:center;cursor:pointer;transition:transform .2s,box-shadow .2s,background .2s;animation:bg2Pop .4s cubic-bezier(.3,1.4,.5,1) both;animation-delay:calc(var(--i,0) * 45ms)}
+.bg2-cat:hover{transform:translateY(-2px)} .bg2-cat:active{transform:scale(.95)}
+.bg2-ic{position:relative;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;color:#fff;background:var(--c)}
+.bg2-ic svg.i{width:16px;height:16px}
+.bg2-cat b{font-size:18px;line-height:1.1;color:var(--c)}
+.bg2-cat small{font-size:10.5px;font-weight:700;line-height:1.15;color:var(--ink-2)}
+.bg2-cat.cero{opacity:.55}
+.bg2-cat.on{background:var(--c);border-color:var(--c);transform:translateY(-2px);box-shadow:0 8px 18px color-mix(in srgb,var(--c) 30%,transparent);opacity:1}
+.bg2-cat.on b,.bg2-cat.on small{color:#fff} .bg2-cat.on .bg2-ic{background:rgba(255,255,255,.24)}
+.bg2-nuevo{position:absolute;top:-4px;right:-4px;width:11px;height:11px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);animation:bg2Vivo 1.4s ease-in-out infinite}
+.bg2-lista{min-height:40px}
+.bg2-lista.cambia{animation:bg2Cambia .35s ease both}
+@keyframes bg2Cambia{from{opacity:0;transform:translateX(12px)}}
+.bg2-vacio{padding:18px 12px}
+.bg2-mas{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin:2px 0 4px;padding:9px;border-radius:14px;border:1.5px dashed var(--line-2);background:none;color:var(--ink-2);font-weight:700;font-size:13px;cursor:pointer}
+.bg2-mas svg.i{width:15px;height:15px}
+.bg2-pie{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.bg2-pie .btn{flex:1 1 140px}
+@media (min-width:560px) and (max-width:999px){ .bg2-cats{grid-template-columns:repeat(6,minmax(0,1fr))} }
+@media (prefers-reduced-motion:reduce){ .bg2 *,.bg2 *::after{animation:none!important;transition:none!important} .bg2[open] .bg2-tapa{opacity:0} }
+
+/* ===== 18-10-2026: "Va al hotel" (clientes del restaurante y del spa, js/v-inicio.js) ===== */
+.hc-pat{display:flex;gap:8px;align-items:stretch}
+.hc .hc-pat input.hc-chapa{background:#fff;color:#111;border-color:#1f2937;border-top-color:#1d4ed8}
+.hc-chapa{flex:1;min-width:0;font-size:22px;font-weight:800;letter-spacing:.12em;text-align:center;text-transform:uppercase;border:3px solid #1f2937;border-top-width:12px;border-top-color:#1d4ed8;border-radius:10px;background:#fff;color:#111;padding:6px 8px}
+.hc-auto{width:100%;margin-top:8px}
+.hc-lbl{margin:14px 0 6px;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hc-motivos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.hc-motivos label{cursor:pointer;animation:bg2Pop .4s cubic-bezier(.3,1.4,.5,1) both;animation-delay:calc(var(--i,0) * 50ms)}
+.hc-motivos input,.hc-pers input{position:absolute;opacity:0;pointer-events:none}
+.hc-motivos span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 2px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);transition:transform .15s,background .15s,box-shadow .15s}
+.hc-motivos em{font-style:normal;font-size:24px;line-height:1}
+.hc-motivos b{font-size:11.5px}
+.hc-motivos input:checked+span{background:var(--wood);border-color:var(--wood);color:#fff;transform:translateY(-2px);box-shadow:0 8px 18px color-mix(in srgb,var(--wood) 35%,transparent)}
+.hc-motivos input:focus-visible+span,.hc-pers input:focus-visible+span{outline:2.5px solid var(--brand-2);outline-offset:2px}
+.hc-pers{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin-bottom:14px}
+.hc-pers label{cursor:pointer}
+.hc-pers span{display:grid;place-items:center;height:44px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface);font-size:17px;font-weight:800}
+.hc-pers input:checked+span{background:var(--brand);border-color:var(--brand);color:#fff;transform:scale(1.06)}
+@media (max-width:420px){ .hc-motivos{grid-template-columns:repeat(3,minmax(0,1fr))} .hc-pers{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.hc-lista{display:grid;gap:8px;margin-bottom:12px}
+.hc-it{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:color-mix(in srgb,var(--wood) 7%,var(--surface));border:1px solid color-mix(in srgb,var(--wood) 25%,var(--line))}
+.hc-e{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:var(--surface)}
+.hc-it .grow{min-width:0} .hc-it b{display:block;font-size:14px} .hc-it small{display:block;font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){ .hc-motivos label{animation:none} }
+
+/* ===== 18-10-2026: la Bitácora como libro que se hojea (garita, js/v-inicio.js) ===== */
+.lb-modo{display:inline-flex;gap:4px;padding:4px;margin:0 0 10px;border-radius:14px;background:var(--surface-3);border:1px solid var(--line)}
+.lb-modo button{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:0;border-radius:10px;background:none;color:var(--ink-2);font-weight:800;font-size:13px;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s}
+.lb-modo button svg.i{width:15px;height:15px}
+.lb-modo button.on{background:var(--surface);color:var(--wood);box-shadow:var(--sh-1)}
+.bg2-lista.es-libro::before{display:none}
+.lb-libro{position:relative;perspective:1600px;cursor:pointer;-webkit-user-select:none;user-select:none;touch-action:pan-y}
+.lb-pag{position:relative;min-height:260px;display:flex;flex-direction:column;padding:12px 14px 10px 20px;border-radius:6px 16px 16px 6px;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--wood) 16%,var(--surface)) 0,var(--surface) 14px),repeating-linear-gradient(180deg,transparent 0 27px,color-mix(in srgb,var(--sky) 9%,transparent) 27px 28px),var(--surface);
+  border:1px solid color-mix(in srgb,var(--wood) 28%,var(--line));box-shadow:0 1px 0 var(--surface),0 3px 0 -1px color-mix(in srgb,var(--wood) 20%,var(--line)),0 6px 0 -2px color-mix(in srgb,var(--wood) 14%,var(--line)),0 10px 22px color-mix(in srgb,#000 12%,transparent);transform-origin:left center;backface-visibility:hidden}
+.lb-cab{display:flex;align-items:center;gap:10px;padding-bottom:8px;margin-bottom:8px;border-bottom:1.5px dashed color-mix(in srgb,var(--wood) 30%,var(--line))}
+.lb-h{flex:none;font-size:30px;font-weight:900;line-height:1;color:var(--wood);letter-spacing:-.02em}
+.lb-h small{font-size:13px;font-weight:800;margin-left:2px}
+.lb-cab .grow{min-width:0} .lb-cab b{display:block;font-size:14px} .lb-cab .grow small{display:block;font-size:12px;color:var(--muted)}
+.lb-num{flex:none;font-size:13px;font-weight:800;color:var(--muted)} .lb-num i{font-style:normal;opacity:.5;margin:0 1px}
+.lb-cont{flex:1}
+.lb-cont .bt-hora{display:none}
+.lb-cont::before{display:none}
+.lb-pie{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;font-size:11.5px;color:var(--muted)}
+.lb-pie span{display:inline-flex;align-items:center;gap:2px;font-weight:800;min-width:48px} .lb-pie span:last-child{justify-content:flex-end}
+.lb-pie svg.i{width:13px;height:13px} .lb-pie em{font-style:normal;text-align:center}
+/* La hoja que gira */
+.lb-gira{position:absolute;inset:0;z-index:3;pointer-events:none;will-change:transform}
+.lb-gira.adelante{animation:lbAdelante .62s cubic-bezier(.45,.05,.35,1) forwards}
+.lb-gira.atras{transform-origin:right center;animation:lbAtras .62s cubic-bezier(.45,.05,.35,1) forwards}
+@keyframes lbAdelante{0%{transform:rotateY(0)}60%{filter:brightness(.92)}100%{transform:rotateY(-118deg);opacity:0}}
+@keyframes lbAtras{0%{transform:rotateY(0)}60%{filter:brightness(.92)}100%{transform:rotateY(118deg);opacity:0}}
+.lb-aparece{animation:lbAparece .62s ease both}
+.lb-aparece-atras{animation:lbAparece .62s ease both}
+@keyframes lbAparece{0%{filter:brightness(.86)}100%{filter:none}}
+.lb-tope{animation:lbTope .35s ease}
+@keyframes lbTope{25%{transform:rotateY(-6deg)}60%{transform:rotateY(3deg)}}
+/* Abajo: anterior, la tira de horas y siguiente */
+.lb-nav{display:flex;align-items:center;gap:6px;margin-top:12px}
+.lb-flecha{flex:none;width:40px;height:40px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);display:grid;place-items:center;color:var(--wood);cursor:pointer}
+.lb-flecha svg.i{width:18px;height:18px} .lb-flecha:disabled{opacity:.35;cursor:default}
+.lb-horas{flex:1;min-width:0;display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.lb-horas::-webkit-scrollbar{display:none}
+.lb-horas button{flex:none;position:relative;min-width:40px;height:40px;border-radius:12px;border:1.5px solid color-mix(in srgb,var(--wood) 25%,var(--line));background:color-mix(in srgb,var(--wood) 6%,var(--surface));cursor:pointer;transition:transform .15s,background .15s}
+.lb-horas b{font-size:14px;color:var(--ink)}
+.lb-horas i{position:absolute;top:-5px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--wood);color:#fff;font-style:normal;font-size:10px;font-weight:800;line-height:16px}
+.lb-horas button.on{background:var(--wood);border-color:var(--wood);transform:translateY(-2px)} .lb-horas button.on b{color:#fff} .lb-horas button.on i{background:var(--surface);color:var(--wood)}
+@media (prefers-reduced-motion:reduce){ .lb-gira,.lb-aparece,.lb-aparece-atras,.lb-tope{animation:none!important} }

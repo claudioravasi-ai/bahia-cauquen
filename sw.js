@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261018-090911';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261018-090911',
-  './js/firebase-config.js?v=20261018-090911', './js/icons.js?v=20261018-090911', './js/agenda.js?v=20261018-090911', './js/padron.js?v=20261018-090911', './js/core.js?v=20261018-090911', './js/seed.js?v=20261018-090911', './js/clima.js?v=20261018-090911', './js/calendario.js?v=20261018-090911',
-  './js/v-inicio.js?v=20261018-090911', './js/v-comunidad.js?v=20261018-090911', './js/v-gestion.js?v=20261018-090911', './js/admin.js?v=20261018-090911', './js/v-vecinos.js?v=20261018-090911', './js/v-expensas.js?v=20261018-090911', './js/v-plan.js?v=20261018-090911', './js/v-contable.js?v=20261018-090911', './js/v-servicio.js?v=20261018-090911', './js/v-legal.js?v=20261018-090911', './js/v-hotel.js?v=20261018-090911', './js/v-cuidados.js?v=20261018-090911', './js/v-casa.js?v=20261018-090911', './js/mapa.js?v=20261018-090911', './js/ronda-mapa.js?v=20261018-090911', './js/recorrido.js?v=20261018-090911', './js/reglas.js?v=20261018-090911', './js/asistente.js?v=20261018-090911', './js/v-manual.js?v=20261018-090911', './js/push.js?v=20261018-090911', './js/sismos.js?v=20261018-090911', './js/nube.js?v=20261018-090911', './js/adjuntos.js?v=20261018-090911', './js/historial.js?v=20261018-090911', './js/v-supervisor.js?v=20261018-090911', './js/guardia.js?v=20261018-090911', './js/mantenimiento.js?v=20261018-090911', './js/mant-vivo.js?v=20261018-090911', './js/relevos.js?v=20261018-090911', './js/app.js?v=20261018-090911',
+const CACHE = 'bhc-20261018-224753';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261018-224753',
+  './js/firebase-config.js?v=20261018-224753', './js/icons.js?v=20261018-224753', './js/agenda.js?v=20261018-224753', './js/padron.js?v=20261018-224753', './js/core.js?v=20261018-224753', './js/seed.js?v=20261018-224753', './js/clima.js?v=20261018-224753', './js/calendario.js?v=20261018-224753',
+  './js/v-inicio.js?v=20261018-224753', './js/v-comunidad.js?v=20261018-224753', './js/v-gestion.js?v=20261018-224753', './js/admin.js?v=20261018-224753', './js/v-vecinos.js?v=20261018-224753', './js/v-expensas.js?v=20261018-224753', './js/v-plan.js?v=20261018-224753', './js/v-contable.js?v=20261018-224753', './js/v-servicio.js?v=20261018-224753', './js/v-legal.js?v=20261018-224753', './js/v-hotel.js?v=20261018-224753', './js/v-cuidados.js?v=20261018-224753', './js/v-casa.js?v=20261018-224753', './js/mapa.js?v=20261018-224753', './js/ronda-mapa.js?v=20261018-224753', './js/recorrido.js?v=20261018-224753', './js/reglas.js?v=20261018-224753', './js/asistente.js?v=20261018-224753', './js/v-manual.js?v=20261018-224753', './js/push.js?v=20261018-224753', './js/sismos.js?v=20261018-224753', './js/nube.js?v=20261018-224753', './js/adjuntos.js?v=20261018-224753', './js/historial.js?v=20261018-224753', './js/v-supervisor.js?v=20261018-224753', './js/guardia.js?v=20261018-224753', './js/mantenimiento.js?v=20261018-224753', './js/mant-vivo.js?v=20261018-224753', './js/relevos.js?v=20261018-224753', './js/app.js?v=20261018-224753',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
@@ -66,11 +66,11 @@ const ICONO_TIPO = { camion:'🚛 ', correo:'📬 ', sos:'🆘 ', urgente:'⚠�
    "que le suene al vecino, con la app apagada o en stand-by, cada 5
    segundos hasta que responda"). Cuando llega el aviso "En la garita: …"
    (link llegada:<id>), el propio teléfono lo vuelve a hacer sonar cada 5
-   segundos durante 3 minutos, hasta que se toca (o se desliza), hasta que
+   segundos (18-10-2026: cada 4, hasta 15 minutos, más largo), hasta que se toca (o se desliza), hasta que
    otro del lote contesta (llega "llegada-fin:<id>") o hasta que la app
    abierta lo calla. Cada vez se cierra el anterior y se muestra uno nuevo,
    así suena también donde un aviso repetido llegaría mudo. La garita además
-   lo reenvía cada 45 segundos (para el iPhone, que no deja insistir solo).
+   lo reenvía cada 30 segundos durante 15 minutos (para el iPhone, que no deja insistir solo).
    ========================================================= */
 const INSISTE = new Map();
 const baseLlegada = link => { const m = /^llegada(?:-fin)?:([^:]+)/.exec(link || ''); return m ? 'llegada-' + m[1] : ''; };
@@ -80,9 +80,9 @@ async function mostrarLlegada(base, titulo, op){
   return self.registration.showNotification(titulo, { ...op, tag: base + '-' + Date.now(), renotify:true, requireInteraction:true });
 }
 async function insistirLlegada(base, titulo, op){
-  const fin = Date.now() + 3 * 60000, marca = {}; INSISTE.set(base, marca);
+  const fin = Date.now() + 15 * 60000, marca = {}; INSISTE.set(base, marca);
   while (INSISTE.get(base) === marca && Date.now() < fin){
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(r => setTimeout(r, 4000));
     if (INSISTE.get(base) !== marca) break;
     const ns = await self.registration.getNotifications();
     if (!ns.some(n => String(n.tag || '').startsWith(base))) break;      /* la tocó o la deslizó */
@@ -128,7 +128,7 @@ self.addEventListener('push', e => {
     if (/^llegada-fin:/.test(d.link || '')){ INSISTE.delete(base);
       const callado = { ...op, actions:[], tag: base + '-fin', renotify:false, requireInteraction:false, silent:true }; delete callado.vibrate;
       return cerrarLlegada(base).then(() => self.registration.showNotification(titulo, callado)); }
-    if (base){ op.vibrate = [600, 200, 600, 200, 600, 200, 900]; op.data.link = d.link;
+    if (base){ op.vibrate = [900, 200, 900, 200, 900, 200, 900, 200, 1200]; op.data.link = d.link;
       /* Con la app a la vista, la ventana de adentro hace sonar y pide respuesta: el aviso no insiste. */
       if (!iOS && aLaVista){ op.silent = true; delete op.vibrate; return mostrarLlegada(base, titulo, op); }
       return mostrarLlegada(base, titulo, op).then(() => insistirLlegada(base, titulo, op)); }

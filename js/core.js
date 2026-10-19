@@ -621,6 +621,10 @@ const hayPaquetes = () => PAQUETES_ACTIVOS;
 const loteDelPaquete = p => (p && (p.lote || usuario(p.hostId)?.casa)) || '';
 const paquetesDelLote = (u = yo()) => !u ? [] : aLista(Store.s.paquetes).filter(p => p && (p.hostId === u.id || (u.casa && loteDelPaquete(p) === u.casa)));
 const vecinosAprobados = () => Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino');
+/* QUIENES VIVEN EN UNA CASA (18-10-2026): los vecinos y también la
+   Administración que tiene lote. Claudio (Administración, Lote 148) no
+   aparecía en "¿A qué casa va?" de la garita: solo figuraba Mónica. */
+const habitantesAprobados = () => Store.s.users.filter(u => u.estado === 'aprobado' && u.casa && (u.rol === 'vecino' || u.rol === 'admin'));
 const casasRegistradas = () => new Set(Store.s.users.filter(u => u.estado === 'aprobado' && u.casa && u.rol === 'vecino').map(u => u.casa)).size;
 const totalLotes = () => (typeof LOTES !== 'undefined' ? lotesVecinos().length : Store.s.config.casas);
 const loteDe = u => typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === u.casa) : null;

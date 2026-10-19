@@ -383,7 +383,7 @@ const GaritaVoz = {
      → { texto:'Lote 42, de Juan Pérez', rel:'Propietario/a' } */
   quienEs(lote){
     const casa = 'Lote ' + lote, f = (typeof fichasDeVecinos === 'function' ? fichasDeVecinos() : []).find(x => normTxt(x.lote) === normTxt(lote));
-    const cs = vecinosAprobados().filter(u => u.casa === casa);
+    const cs = habitantesAprobados().filter(u => u.casa === casa);
     const inq = f && f.inq.length ? f.inq : inquilinosDe(casa).map(u => u.nombre);
     /* Nombres primero, como lo diría la garita (11-10-2026): "Claudio Ravasi
        y Monica Ponzio, Lote 148", y el sector o para dónde queda, si se sabe. */
@@ -446,7 +446,7 @@ const GaritaVoz = {
     const alHotel = d.lote === 'hotel' || (L && L.grupo === 'hotel');
     const ho = alHotel ? this.hotel() : null;
     if (alHotel && !ho) return Asistente.responder('El hotel no tiene cuenta en la app. Llamalos por teléfono.');
-    const hosts = alHotel ? [] : vecinosAprobados().filter(u => u.casa === 'Lote ' + d.lote && !esPropDistancia(u));
+    const hosts = alHotel ? [] : habitantesAprobados().filter(u => u.casa === 'Lote ' + d.lote && !esPropDistancia(u));
     const q = alHotel ? null : this.quienEs(d.lote), rel = q && q.rel ? ` <span class="pill">${esc(q.rel)}</span>` : '';
     if (!alHotel && !hosts.length) return Asistente.responder(`${q.texto}. No tiene a nadie con la app. Te abro su ficha para que lo llames.`, () => abrir('vecinos', d.lote));
     if (!d.nombre){

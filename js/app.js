@@ -853,8 +853,9 @@ const Sonido = {
     return this.ctx;
   },
   /* notas: [frecuencia, cuándo empieza, cuánto dura] */
-  tocar(notas, tipo = 'sine', vol = .18){
-    if (Store.sesion?.sinSonido) return;
+  /* `forzar`: lo que no puede pasar desapercibido (alguien esperando en la garita) suena igual. */
+  tocar(notas, tipo = 'sine', vol = .18, forzar = false){
+    if (Store.sesion?.sinSonido && !forzar) return;
     const ctx = this.despertar(); if (!ctx || ctx.state !== 'running') return;
     notas.forEach(([f, t, d = .5]) => {
       const o = ctx.createOscillator(), g = ctx.createGain();
@@ -2024,9 +2025,9 @@ const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
     'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'correo-menu', 'correo-elegir', 'correo-sale', 'correo-lotes', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
     'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'policia-cargo', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno', 'guardia-sale',
-    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hemp-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer']),
+    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hemp-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer', 'llegada-salio', 'hotel-cliente', 'hc-camara', 'hc-salio']),
   formularios: new Set(['validar', 'patente-buscar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
-    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'policia-cargo', 'abrir-turno', 'cerrar-turno', 'casa-revisada', 'guardia-entra', 'guardia-sale']),
+    'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'policia-cargo', 'abrir-turno', 'cerrar-turno', 'casa-revisada', 'guardia-entra', 'guardia-sale', 'hotel-cliente']),
 };
 /* Paquetes en pausa (hayPaquetes, core.js): aunque quede un botón o un
    aviso viejo que lleve ahí, no hace nada. El código sigue guardado. */
