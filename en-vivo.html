@@ -1003,11 +1003,11 @@ const ESC = [
     d:() => v('fede', { tit:'Mi obra' }) + ap(aviso('ok', '✅', 'Avisado', 'La garita y los vecinos de la calle ya lo saben')) },
   { lado:'b', hora:'09:04', txt:'Al otro día llega el mixer: el guardia busca la patente en la lista y toca <b>Ingresó</b>.',
     b:() => garita('Turno mañana') + ap(aviso('ok', '✅', 'AC 771 RT · mixer', 'Obra del Lote 120 · esperado 9 a 11 h'), btn('Ingresó', { cl:'ok' })) },
-  { lado:'d', txt:'Federico se entera y, cuando termina la etapa, la marca. La obra avanza en la ficha que ve la Administración.',
+  { lado:'d', txt:'Federico se entera y, cuando termina la etapa, toca <b>Paso siguiente</b>: un solo toque, sin formulario. Al llegar al final toca <b>Terminar la obra</b> y sale sola de la lista; si la obra no se hace, la puede <b>Eliminar</b> antes. Y si se olvida, a los 30 días sin cambios (o pasada la fecha de fin) la app le pregunta <b>¿Terminaste la obra?</b> Las obras de afuera que afectan al barrio (la ruta, el agua, la luz) las carga la Administración y llegan igual.',
     al(){ push('d', '🚧', 'Entró el mixer', '09:04 · va al Lote 120'); },
     b:() => garitaInicio('', [it('🚧', 'Mixer AC 771 RT', 'Obra · Lote 120', 'Adentro', 'ok')]),
     c:() => adminInicio(card('Obras', it('🏗️', 'Lote 120 · casa', 'Etapa: estructura → cerramientos', 'Activa', 'ok'), etapas(3)), { sinSalas:true }),
-    d:() => v('fede', { tit:'Mi obra' }) + ap(etapas(3), aviso('ok', '🚧', 'El mixer está en tu obra', '09:04')) },
+    d:() => v('fede', { tit:'Mi obra' }) + ap(etapas(3), aviso('ok', '🚧', 'El mixer está en tu obra', '09:04'), btn('➜ Paso siguiente: Techo y cerramientos'), btn('🗑 Eliminar', { cl:'sec', go:false })) },
   ], fin:'Las obras conviven con el barrio: todos saben qué viene y cuándo.' },
 
 { id:'nieve', grupo:'Tu casa', e:'❄️', t:'Ángeles de la nieve', s:'Una vecina mayor pide ayuda para palear y un vecino la toma',

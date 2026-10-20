@@ -167,9 +167,22 @@ const REGLAS = [
   { id:'avisos-limpieza', n:'Avisos repetidos o vencidos → se juntan y se borran', d:'Una vez por día: los avisos iguales quedan en uno solo y se borran los vencidos (el tiempo de otro día, el camión que ya pasó) y los de más de 60 días.',
     run(s, hoy){ return marca(s, 'limpia-avisos-' + hoy, () => limpiarAvisos(s)); } },
   /* 10-10-2026 (pedido de Claudio): lo del pizarrón ya no queda para siempre (ver DURA_POST en js/v-comunidad.js). */
-  { id:'pizarron-vence', n:'Pizarrón → cada publicación se borra sola a su tiempo', d:'Alertas 2 días, guardia 3, avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, eventos al día siguiente; lo fijado queda. A quien la publicó le llega el aviso.',
+  { id:'pizarron-vence', n:'Pizarrón → cada publicación se borra sola a su tiempo', d:'Alertas 2 días, guardia al terminar el día (a las 0 h; la garita puede elegir hasta 3 días), avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, eventos al día siguiente; lo fijado queda. A quien la publicó le llega el aviso.',
     run(s){ let n = 0; if (typeof postVencido !== 'function') return 0;
       aLista(s.posts).filter(p => p && p.id && postVencido(p)).forEach(p => { n += marca(s, 'pzv-' + p.id, () => borrarPostVencido(s, p.id)); }); return n; } },
+  /* 20-10-2026 (pedido de Claudio): que no queden obras viejas "en curso".
+     Al dueño le llega un aviso si su obra no cambió en 30 días (otra vez a
+     los 30 días del último cambio) y otro, una sola vez, si pasó la fecha de
+     fin estimado. Los dos lo llevan a la obra, donde la tarjeta le pregunta
+     y la termina con un toque (ver OBRA_QUIETA en js/v-vecinos.js). */
+  { id:'obras-recordar', n:'Obra quieta o con el fin pasado → preguntarle al dueño', d:'Si una obra no cambió en 30 días, a su dueño le llega "¿Tu obra sigue en…?"; si pasó el fin estimado, "¿Terminaste la obra?". Desde ahí la avanza o la termina con un toque.',
+    run(s, hoy){ let n = 0; if (typeof obraQuieta !== 'function') return 0;
+      aLista(s.obras).filter(o => o && o.id && o.estado === 'activa' && o.userId).forEach(o => {
+        if (obraQuieta(o)) n += marca(s, `obq-${o.id}-${o.ultima || o.createdAt}`, () => notificar(s, { para:o.userId, titulo:`¿Tu obra sigue en ${ETAPAS[o.etapa] || 'la misma etapa'}?`,
+          texto:`${dondeObra(o)} · hace ${OBRA_QUIETA} días que no cambia. Si avanzó, tocá "Paso siguiente"; si ya terminó, "Terminar la obra".`, icon:'wrench', color:'wood', link:'obras' }));
+        if (obraFinPasado(o, hoy)) n += marca(s, `obf-${o.id}-${o.finEstimado}`, () => notificar(s, { para:o.userId, titulo:'¿Terminaste la obra?',
+          texto:`${dondeObra(o)} · el fin estimado era el ${fechaCorta(o.finEstimado)}. Si terminó, la cerrás con un toque; si sigue, cambiá la fecha en "Editar".`, icon:'wrench', color:'wood', link:'obras' })); });
+      return n; } },
   { id:'privacidad', n:`Datos de visitas → borrar a los N días`, d:'Borra DNI, celular y patente de pases y llegadas viejas (Ley 25.326, principio de finalidad).',
     run(s){ const lim = Date.now() - (s.config.datosDias || 90) * DIA; let n = 0;
       s.pases.forEach(p => { if (p.createdAt < lim && (p.dni || p.patente || p.tel) && !(p.dias && (p.fechaFin || '') >= hoyISO())){ p.dni = ''; p.patente = ''; p.tel = ''; n++; } });

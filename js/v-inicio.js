@@ -827,7 +827,7 @@ function avisosGenerales(){
   aLista(s.obras).filter(o => o && o.estado === 'activa' && (!o.inicio || o.inicio <= hoy)).forEach(o => {
     const hoyHay = o.avisoHoy && o.avisoHoy.fecha === hoy;
     poner({ k:'obra-' + o.id + (hoyHay ? '-' + hoy : ''), nivel: hoyHay ? 'amarillo' : 'verde', icon: hoyHay ? 'truck' : 'wrench', tag: hoyHay ? 'Obra hoy' : 'Obra en curso',
-      at: o.ultima || o.createdAt, titulo: hoyHay ? `${o.casa}: ${o.avisoHoy.texto}` : `${o.casa} · ${o.tipo}`,
+      at: o.ultima || o.createdAt, titulo: hoyHay ? `${enObra(o)}: ${o.avisoHoy.texto}` : `${dondeObra(o)} · ${o.tipo}`,
       texto: hoyHay ? (o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h` : 'Hoy') + (aLista(o.avisoHoy.maq).includes('pesada') ? ' · entra maquinaria pesada' : '') : `${ETAPAS[o.etapa] || ''}${aLista(o.maq).includes('pesada') ? ' · con maquinaria pesada' : ''}${o.empresa ? ' · ' + o.empresa : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}`,
       a:'abrir', v:'obras' });
   });
@@ -3026,7 +3026,7 @@ function tareasGarita(){
   /* ART: solo si hoy viene alguien de una obra o un proveedor. */
   const deObra = [...esp.filter(p => p.tipo === 'proveedor').map(p => esc(p.nombre)),
     ...frecFalta.filter(f => ['obra', 'proveedor'].includes(f.tipo)).map(f => esc(f.empresa || f.nombre)),
-    ...s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => `${esc(o.empresa || 'Obra')}${o.casa ? ' (' + esc(o.casa) + ')' : ''}`)];
+    ...s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => `${esc(o.empresa || 'Obra')}${o.casa ? ' (' + esc(dondeObra(o)) + ')' : ''}`)];
   const provVencida = aLista(s.proveedores).filter(p => p && p.empresa && (!p.artVence || p.artVence < hoy) && deObra.some(n => normTxt(n).includes(normTxt(p.empresa || '').slice(0, 12))));
   if (deObra.length) add(1, 'wrench', 'Obras y proveedores de hoy: controlar la ART al entrar', `${lista3([...new Set(deObra)], x => x)}${provVencida.length ? ` · <b style="color:var(--danger)">ART vencida: ${provVencida.map(p => esc(p.empresa)).join(', ')} (no entra)</b>` : ''}`, { v:'proveedores' });
 
@@ -3310,7 +3310,7 @@ R.garita = {
           ${botonVal({ a:'abrir', v:'frecuentes', ic:'qr', c:'accent', t:'Ingresos frecuentes' })}</div>`}
       ${typeof mapaBarrio === 'function' ? mapaBarrio() : ''}
       ${s.peticiones.filter(p => p.estado === 'pendiente').map(p => aviso('warn latido', 'edit', `Petición de ${esc(p.casa)} sin recibir`, esc(TIPOS_PET[p.tipo]?.n || '') + (opera ? '' : ' · la recibe y la firma la garita'), `<button class="btn btn-xs btn-sec" data-a="ver-peticion" data-id="${p.id}">${opera ? 'Leer y firmar' : 'Ver'}</button>`)).join('')}
-      ${s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => aviso('info', 'truck', `Obra en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h · ${esc(o.empresa || '')}` : esc(o.empresa || ''))).join('')}
+      ${s.obras.filter(o => o.avisoHoy?.fecha === hoy).map(o => aviso('info', 'truck', `Obra en ${esc(enObra(o))}: ${esc(o.avisoHoy.texto)}`, o.avisoHoy.hora ? `Desde las ${o.avisoHoy.hora} h · ${esc(o.empresa || '')}` : esc(o.empresa || ''))).join('')}
       ${(() => { const rs = s.peticiones.filter(p => p.tipo === 'nopasar' && p.estado === 'en_funciones' && (!p.hasta || p.hasta >= hoy)); return rs.length ? sec('Restricciones de ingreso vigentes') + rs.map(p => `<button class="superficie peligro" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-danger">${I('x')}</span><span class="txt"><b>${esc(p.casa)}</b><small>${esc(p.texto.slice(0, 90))}</small></span>${I('right')}</button>`).join('') : ''; })()}
       ${llegadas.length ? '<span id="garLlegadas" class="ancla"></span>' + sec('Consultando al vecino') + llegadas.map(l => { const h = usuario(l.hostId) || {}; const min = Math.floor((Date.now() - l.at) / MIN);
         return `<div class="card" style="padding:13px 14px"><div class="pase"><span class="ic ic-warn">${I('gate')}</span><div class="datos"><b>${esc(l.nombre)} → ${esc(h.casa || '')}</b><span>${esc(l.motivo || '')}${l.patente ? ' · ' + esc(l.patente) : ''} · hace ${min} min</span></div>

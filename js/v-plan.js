@@ -695,7 +695,7 @@ R.tablero = {
       <div class="card grafico-card">${graficoLineas(A2.meses, [{ k:'deuda', n:'Deuda total de vecinos (estimada)', c:CHART_COL.deuda }])}
         <p class="muted tiny" style="margin:6px 0 0">Suma de lo que deben todos los lotes, con intereses. No se muestra quién debe: eso lo ve solo la Administración.</p></div>
       ${sec('Obras')}
-      ${aLista(Store.s.obras).filter(o => o.estado === 'activa').length ? `<div class="card lista">${aLista(Store.s.obras).filter(o => o.estado === 'activa').map(o => `<div class="it"><div class="txt"><b>${esc(o.casa)} · ${esc(o.tipo)}</b><span>${esc(typeof ETAPAS !== 'undefined' ? ETAPAS[o.etapa] || '' : '')}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</span></div></div>`).join('')}</div>` : '<p class="muted small">No hay obras en curso.</p>'}
+      ${aLista(Store.s.obras).filter(o => o.estado === 'activa').length ? `<div class="card lista">${aLista(Store.s.obras).filter(o => o.estado === 'activa').map(o => `<div class="it"><div class="txt"><b>${esc(typeof dondeObra === 'function' ? dondeObra(o) : o.casa)} · ${esc(o.tipo)}</b><span>${esc(typeof ETAPAS !== 'undefined' ? ETAPAS[o.etapa] || '' : '')}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</span></div></div>`).join('')}</div>` : '<p class="muted small">No hay obras en curso.</p>'}
       ${superficie({ a:'abrir', v:'expensas', icon:'wallet', color:'wood', t:'Mi cuenta de expensas', s:'Cupones, pagos y recibos de tu lote' })}`;
   },
 };

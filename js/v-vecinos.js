@@ -330,6 +330,17 @@ function marcarVistoLink(link){
 /* ---------- OBRAS EN EL BARRIO ---------- */
 const ETAPAS = ['Planos aprobados','Movimiento de suelo','Fundaciones','Estructura','Techo y cerramientos','Instalaciones','Terminaciones','Final de obra'];
 const TIPOS_OBRA = ['Casa nueva','Ampliación','Reforma','Quincho / pileta','Paisajismo','Cerco / deck','Otra'];
+/* OBRAS FUERA DEL BARRIO QUE LO AFECTAN (pedido de Claudio, 20-10-2026):
+   el pavimento de una calle de acceso, un corte en la ruta, una obra de
+   agua, luz o gas. Las carga solo la Administración, con el lugar ("Ruta 3,
+   acceso al barrio"), y las ve todo el barrio como cualquier obra: en la
+   lista, la pizarra y el aviso del día. No van al mapa (no son de un lote).
+   Se guardan con casa 'Fuera del barrio', afuera:true y lugar. */
+const OBRA_AFUERA = 'Fuera del barrio';
+const TIPOS_OBRA_AFUERA = ['Calle o ruta de acceso', 'Agua o cloaca', 'Luz o gas', 'Otra obra de afuera'];
+/* Para frases con "en": "Obra en Ruta 3: corte…" (no "en Fuera del barrio"). */
+const enObra = o => o && o.afuera ? (o.lugar || 'las afueras del barrio') : (o && o.casa) || '';
+const dondeObra = o => o && o.afuera ? `${OBRA_AFUERA}${o.lugar ? ' · ' + o.lugar : ''}` : (o && o.casa) || '';
 /* CON QUÉ SE TRABAJA (pedido de Claudio, 12-10-2026: "que se pueda elegir si
    la obra es con maquinaria pesada o solo obreros"). Se marca lo que va a
    haber (puede ser más de una cosa) y la obra toma el nivel de lo más
@@ -348,6 +359,13 @@ const MAQ_OBRA = {
   pesada:       { n:'Maquinaria pesada', d:'Retroexcavadora, grúa, minicargadora', nivel:4, c:'danger' },
 };
 const NIVEL_OBRA = ['', 'Bajo', 'Medio', 'Alto', 'Muy alto'];
+/* OBRAS VIEJAS "EN CURSO" (pedido de Claudio, 20-10-2026). Una obra quieta
+   30 días o con el fin estimado vencido le pregunta a su dueño (aviso del
+   motor, regla "obras-recordar" en js/admin.js, y un cartel en su tarjeta)
+   si sigue o si terminó, y la termina con un toque. */
+const OBRA_QUIETA = 30;
+const obraQuieta = o => !!o && o.estado === 'activa' && Date.now() - (o.ultima || o.createdAt || Date.now()) >= OBRA_QUIETA * DIA;
+const obraFinPasado = (o, hoy = hoyISO()) => !!o && o.estado === 'activa' && !!o.finEstimado && o.finEstimado < hoy;
 const maqDe = o => aLista(o && o.maq).filter(k => MAQ_OBRA[k]);
 const nivelObra = o => Math.max(0, ...maqDe(o).map(k => MAQ_OBRA[k].nivel), ...(o && o.avisoHoy && o.avisoHoy.fecha === hoyISO() ? aLista(o.avisoHoy.maq).filter(k => MAQ_OBRA[k]).map(k => MAQ_OBRA[k].nivel) : []));
 const chipsMaq = (ls, cls = '') => ls.map(k => `<span class="ob-maq c-${MAQ_OBRA[k].c} ${cls}">${SVG_MAQ[k]}${esc(MAQ_OBRA[k].n)}</span>`).join('');
@@ -380,6 +398,7 @@ R.obras = {
     else if (filtro === 'pesada') ls = pesadas.slice();
     else if (filtro === 'finalizadas') ls = ls.filter(o => o.estado === 'finalizada');
     else if (filtro === 'pendientes') ls = ls.filter(o => o.estado === 'pendiente');
+    else if (filtro === 'afuera') ls = activas.filter(o => o.afuera);
     const hoyObra = s.obras.filter(o => o.avisoHoy && o.avisoHoy.fecha === hoyISO());
     ls.sort((a, b) => (b.ultima || b.createdAt) - (a.ultima || a.createdAt));
     const puede = o => !esGuardia() && !esSupervisor() && (o.userId === u.id || esAdmin());
@@ -388,24 +407,27 @@ R.obras = {
         <div class="ob-hero-txt"><small>${I('clock')} Horario de obra · ${esc(Store.s.config.obraHorario)}</small><h3>${activas.length ? plural(activas.length, 'obra en curso', 'obras en curso') : 'Sin obras en curso'}</h3>
           <div class="ob-kpis">${kpi(activas.length, 'en curso', 'wood', 'activas')}${kpi(pesadas.length, 'con máquinas pesadas', 'danger', 'pesada')}${kpi(hoyObra.length, 'avisos de hoy', 'warn', 'activas')}</div></div></section>
       ${!esGuardia() && !esSupervisor() ? superficie({ a:'nueva-obra', icon:'plus', t: esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', s: esAdmin() ? 'De un lote o del barrio (espacios comunes). La ven al instante todos: vecinos y garita.' : 'La ven al instante la Administración, la garita y todo el barrio', cls:'acento' }) : ''}
-      ${hoyObra.map(o => `<div class="ob-hoy">${SVG_MAQ[aLista(o.avisoHoy.maq).find(k => MAQ_OBRA[k]) || 'camiones']}<div class="grow"><b>Hoy en ${esc(o.casa)}: ${esc(o.avisoHoy.texto)}</b><small>${o.avisoHoy.hora ? `Desde las ${esc(o.avisoHoy.hora)} h` : 'Hoy'}${aLista(o.avisoHoy.maq).length ? ' · ' + aLista(o.avisoHoy.maq).filter(k => MAQ_OBRA[k]).map(k => MAQ_OBRA[k].n.toLowerCase()).join(', ') : ''}</small></div></div>`).join('')}
-      <div class="chips">${[['activas','En curso'], ['pesada','Con máquinas pesadas'], ...(s.obras.some(o => o.estado === 'pendiente') ? [['pendientes','Por aprobar']] : []),['finalizadas','Terminadas'],['todas','Todas']].map(([k, t]) => `<button class="chip ${k === filtro ? 'on' : ''}" data-a="abrir" data-v="obras" data-p="${k}">${t}</button>`).join('')}</div>
+      ${hoyObra.map(o => `<div class="ob-hoy">${SVG_MAQ[aLista(o.avisoHoy.maq).find(k => MAQ_OBRA[k]) || 'camiones']}<div class="grow"><b>Hoy en ${esc(enObra(o))}: ${esc(o.avisoHoy.texto)}</b><small>${o.avisoHoy.hora ? `Desde las ${esc(o.avisoHoy.hora)} h` : 'Hoy'}${aLista(o.avisoHoy.maq).length ? ' · ' + aLista(o.avisoHoy.maq).filter(k => MAQ_OBRA[k]).map(k => MAQ_OBRA[k].n.toLowerCase()).join(', ') : ''}</small></div></div>`).join('')}
+      <div class="chips">${[['activas','En curso'], ['pesada','Con máquinas pesadas'], ...(s.obras.some(o => o.estado === 'pendiente') ? [['pendientes','Por aprobar']] : []),...(activas.some(o => o.afuera) ? [['afuera','Fuera del barrio']] : []),['finalizadas','Terminadas'],['todas','Todas']].map(([k, t]) => `<button class="chip ${k === filtro ? 'on' : ''}" data-a="abrir" data-v="obras" data-p="${k}">${t}</button>`).join('')}</div>
       ${ls.length ? `<div class="ob-lista">${ls.map((o, idx) => { const pct = Math.round((o.etapa + 1) / ETAPAS.length * 100), ult = o.historial?.at(-1), nv = nivelObra(o), mq = maqDe(o);
         return `<article class="ob-card nv-${nv}" style="--d:${Math.min(idx, 8) * 60}ms">
           <div class="ob-cab"><span class="ob-ic">${SVG_MAQ[mq.slice().sort((a, b) => MAQ_OBRA[b].nivel - MAQ_OBRA[a].nivel)[0]] || I('wrench')}</span>
-            <div class="grow"><b>${esc(o.casa)} · ${esc(o.tipo)}</b><small>${esc(o.empresa || 'Sin empresa cargada')}${o.inicio ? ' · desde ' + fechaCorta(o.inicio) : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</small></div>
+            <div class="grow"><b>${esc(dondeObra(o))} · ${esc(o.tipo)}</b><small>${esc(o.empresa || 'Sin empresa cargada')}${o.inicio ? ' · desde ' + fechaCorta(o.inicio) : ''}${o.finEstimado ? ' · fin estimado ' + fechaCorta(o.finEstimado) : ''}</small></div>
             <span class="pill ${o.estado === 'activa' ? 'p-ok' : o.estado === 'pendiente' ? 'p-warn' : o.estado === 'pausada' ? 'p-danger' : ''}">${{ activa:'En curso', pendiente:'Por aprobar', pausada:'Pausada', finalizada:'Terminada' }[o.estado]}</span></div>
           ${mq.length ? `<div class="ob-maqs">${chipsMaq(mq)}<span class="ob-nivel">Movimiento: <b>${NIVEL_OBRA[nv]}</b></span></div>` : `<div class="ob-maqs"><span class="ob-maq sin">Sin dato de maquinaria${puede(o) ? ' · cargalo en Editar' : ''}</span></div>`}
           <div class="ob-avance"><div class="ob-pisos" role="img" aria-label="Etapa ${o.etapa + 1} de ${ETAPAS.length}: ${esc(ETAPAS[o.etapa])}">${ETAPAS.map((e, i) => `<i class="${i < o.etapa ? 'hecha' : i === o.etapa ? 'actual' : ''}" title="${e}"></i>`).join('')}</div>
             <div class="ob-etapa"><b>${esc(ETAPAS[o.etapa])}</b><span>${pct}%</span></div></div>
-          <div class="muted tiny">Cargada por ${o.porAdmin ? 'la Administración' : esc(autorVisible(o.userId).nombre)}${o.detalle ? ' · ' + esc(o.detalle) : ''}</div>
+          <div class="muted tiny">Cargada por ${o.porAdmin || o.afuera ? 'la Administración' : esc(autorVisible(o.userId).nombre)}${o.detalle ? ' · ' + esc(o.detalle) : ''}</div>
           ${ult ? `<div class="ob-ult">${I('clock')}<span>${esc(ult.texto)} <span class="muted">· ${hace(ult.at)}</span></span></div>${fotoHTML(ult.foto, 'post-foto')}` : ''}
+          ${puede(o) && (obraFinPasado(o) || obraQuieta(o)) ? `<div class="ob-pregunta">${I('alert')}<div class="grow"><b>${obraFinPasado(o) ? '¿Terminaste la obra?' : `¿Sigue en ${esc(ETAPAS[o.etapa])}?`}</b><small>${obraFinPasado(o) ? `El fin estimado era el ${fechaCorta(o.finEstimado)}. Si sigue, cambiá la fecha en "Editar".` : `Hace ${OBRA_QUIETA} días que no cambia. Si avanzó, tocá "Paso siguiente".`}</small>
+            <div class="btns"><button class="btn btn-sm btn-ok" data-a="obra-terminar" data-id="${o.id}">${I('check')}Sí, terminó</button>${obraFinPasado(o) ? `<button class="btn btn-sm btn-sec" data-a="obra-editar" data-id="${o.id}">${I('calendar')}Sigue: cambiar fecha</button>` : `<button class="btn btn-sm btn-sec" data-a="obra-sigue" data-id="${o.id}">Sigue igual</button>`}</div></div></div>` : ''}
           ${puede(o) ? `<div class="btns" style="margin-top:12px">
             ${o.estado === 'pendiente' && esAdmin() ? `<button class="btn btn-sm btn-ok" data-a="obra-aprobar" data-id="${o.id}">${I('check')}Aprobar</button>` : ''}
-            ${o.estado !== 'finalizada' && o.estado !== 'pendiente' ? `<button class="btn btn-sm btn-pri" data-a="obra-avance" data-id="${o.id}">${I('edit')}Actualizar etapa</button><button class="btn btn-sm btn-sec" data-a="obra-hoy" data-id="${o.id}">${I('truck')}Aviso del día</button>` : ''}
+            ${o.estado === 'activa' ? `<button class="btn btn-sm btn-pri" data-a="obra-siguiente" data-id="${o.id}">${o.etapa >= ETAPAS.length - 2 ? `${I('check')}Terminar la obra` : `${I('right')}Paso siguiente: ${esc(ETAPAS[o.etapa + 1])}`}</button>` : ''}
+            ${o.estado !== 'finalizada' && o.estado !== 'pendiente' ? `<button class="btn btn-sm btn-sec" data-a="obra-avance" data-id="${o.id}">${I('camera')}Novedad</button><button class="btn btn-sm btn-sec" data-a="obra-hoy" data-id="${o.id}">${I('truck')}Aviso del día</button>` : ''}
             <button class="btn btn-sm btn-sec" data-a="obra-editar" data-id="${o.id}">${I('edit')}Editar</button>
-            ${o.userId === u.id && !o.porAdmin ? `<button class="btn btn-sm btn-sec" data-a="nuevo-pase" data-v="proveedor">${I('qr')}Pase para el personal</button>` : ''}
-            ${esAdmin() ? `<button class="btn btn-sm btn-danger-soft" data-a="obra-borrar" data-id="${o.id}" title="Borrar la obra">${I('trash')}</button>` : ''}
+            ${o.userId === u.id && !o.porAdmin && o.estado !== 'finalizada' ? `<button class="btn btn-sm btn-sec" data-a="nuevo-pase" data-v="proveedor">${I('qr')}Pase para el personal</button>` : ''}
+            <button class="btn btn-sm btn-danger-soft" data-a="obra-borrar" data-id="${o.id}">${I('trash')}Eliminar</button>
             ${esAdmin() && o.estado === 'activa' ? `<button class="btn btn-sm btn-danger-soft" data-a="obra-pausa" data-id="${o.id}">Pausar</button>` : ''}
             ${esAdmin() && o.estado === 'pausada' ? `<button class="btn btn-sm btn-ok" data-a="obra-reanudar" data-id="${o.id}">Reanudar</button>` : ''}</div>` : ''}</article>`; }).join('')}</div>` : vacio('wrench', filtro === 'pesada' ? 'Ninguna obra en curso con maquinaria pesada.' : 'No hay obras en esta lista.')}
       <p class="muted tiny" style="margin-top:12px">${I('info')} Cada obra en curso aparece todos los días en la Pizarra del día, desde que empieza hasta que termina. Los días con movimiento (mixer, camión, grúa) su dueño manda el "Aviso del día" y sale en amarillo. ${esGuardia() ? 'La garita las ve pero no las edita.' : 'La garita las ve pero no las puede editar; la Administración sí.'} El personal de obra ingresa con ART vigente (Ley 24.557). La guardia lo verifica en Proveedores.</p>`;
@@ -414,30 +436,56 @@ R.obras = {
 const elegirMaq = (sel = [], nombre = 'maq') => `<div class="ob-elegir">${Object.entries(MAQ_OBRA).map(([k, m]) =>
   `<label class="ob-op c-${m.c}"><input type="checkbox" name="${nombre}" value="${k}" ${sel.includes(k) ? 'checked' : ''}><i class="ob-op-borde"></i><span class="ob-op-ic">${SVG_MAQ[k]}</span><span><b>${m.n}</b><small>${m.d}</small></span></label>`).join('')}</div>`;
 const formObra = (o = {}) => `
-  ${esAdmin() && !o.id ? `<div class="field"><label>¿De quién es la obra?</label><select name="casa"><option value="Barrio">Del barrio (espacios comunes, calles, portón…)</option>${opcionesLotes('')}</select>
+  ${esAdmin() && !o.id ? `<div class="field"><label>¿De quién es la obra?</label><select name="casa" id="obraCasa"><option value="Barrio">Del barrio (espacios comunes, calles, portón…)</option><option value="${OBRA_AFUERA}">Fuera del barrio, pero lo afecta (ruta, acceso, agua, luz, gas…)</option>${opcionesLotes('')}</select>
     <div class="ayuda">Cada obra es un registro aparte: una del barrio y la de un vecino conviven sin pisarse.</div></div>` : ''}
-  <div class="grid2"><div class="field"><label>Tipo</label><select name="tipo">${[...TIPOS_OBRA, 'Obra del barrio'].map(t => `<option ${t === o.tipo ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+  ${esAdmin() && (!o.id || o.afuera) ? `<div class="field" id="obraLugar" ${o.afuera ? '' : 'hidden'}><label>¿Dónde es?</label><input name="lugar" maxlength="60" value="${esc(o.lugar || '')}" placeholder="Ej: Ruta 3, en el acceso al barrio"><div class="ayuda">La ven todos los vecinos y la garita. No sale en el mapa del barrio.</div></div>` : ''}
+  <div class="grid2"><div class="field"><label>Tipo</label><select name="tipo">${[...TIPOS_OBRA, 'Obra del barrio', ...(esAdmin() ? TIPOS_OBRA_AFUERA : [])].map(t => `<option ${t === o.tipo ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
     <div class="field"><label>Etapa actual</label><select name="etapa">${ETAPAS.map((e, i) => `<option value="${i}" ${i === (o.etapa || 0) ? 'selected' : ''}>${e}</option>`).join('')}</select></div></div>
   <div class="field"><label>¿Con qué se trabaja? <small class="muted">(marcá todo lo que va a haber)</small></label>${elegirMaq(maqDe(o))}</div>
   <div class="grid2"><div class="field"><label>Empresa / constructor</label><input name="empresa" maxlength="60" value="${esc(o.empresa || '')}"></div><div class="field"><label>Teléfono del responsable</label><input name="tel" inputmode="tel" maxlength="20" value="${esc(o.tel || '')}"></div></div>
   <div class="grid2"><div class="field"><label>Inicio</label><input type="date" name="inicio" value="${o.inicio || hoyISO()}" required></div><div class="field"><label>Fin estimado</label><input type="date" name="finEstimado" value="${o.finEstimado || ''}"></div></div>
   <div class="field"><label>Detalle</label><textarea name="detalle" maxlength="400" placeholder="Qué se hace, si va a haber camiones, mixer, grúa…">${esc(o.detalle || '')}</textarea></div>`;
 A['obra-editar'] = el => { const o = Store.s.obras.find(x => x.id === el.dataset.id); if (!o || esGuardia()) return;
-  hoja(`Editar la obra · ${o.casa}`, `<form data-f="obra-editar" data-id="${o.id}">${formObra(o)}<button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`); };
+  hoja(`Editar la obra · ${dondeObra(o)}`, `<form data-f="obra-editar" data-id="${o.id}">${formObra(o)}<button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`); };
 F['obra-editar'] = (d, form) => {
   if (esGuardia()) return;
   Store.cambiar(s => { const o = s.obras.find(x => x.id === form.dataset.id); if (!o || !(o.userId === yo().id || esAdmin())) return;
+    if (o.afuera && esAdmin() && d.lugar != null) o.lugar = String(d.lugar).trim();
     Object.assign(o, { tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(), maq:[].concat(d.maq || []).filter(k => MAQ_OBRA[k]), ultima:Date.now() });
     if (o.etapa === ETAPAS.length - 1 && o.estado !== 'finalizada'){ o.estado = 'finalizada'; }
     listaDe(o, 'historial').push({ at:Date.now(), etapa:o.etapa, texto:'Datos de la obra editados', por:yo().id });
-    auditar(s, 'Editó una obra', `${o.casa} · ${o.tipo}`, o.id); });
+    auditar(s, 'Editó una obra', `${dondeObra(o)} · ${o.tipo}`, o.id); });
   cerrarHoja(); toast('Obra actualizada', 'wrench');
 };
+/* ELIMINAR (pedido de Claudio, 20-10-2026: "la opción de eliminar antes de
+   la finalización"). Antes solo podía la Administración; ahora también el
+   dueño de la obra (una cargada por error, una que no se hace). La garita y
+   la supervisión no. Queda en la auditoría. */
 A['obra-borrar'] = async el => {
-  if (!esAdmin()) return;
-  if (!await confirmar('Borrar la obra', 'Sale de la lista y de la pizarra. Queda anotado en la auditoría.', { si:'Borrar', peligro:true })) return;
-  Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; auditar(s, 'Borró una obra', `${o.casa} · ${o.tipo}`, o.id); s.obras = s.obras.filter(x => x.id !== o.id); });
-  toast('Obra borrada', 'trash');
+  const o0 = Store.s.obras.find(x => x.id === el.dataset.id);
+  if (!o0 || esGuardia() || esSupervisor() || !(o0.userId === yo().id || esAdmin())) return;
+  if (!await confirmar('Eliminar la obra', 'Sale de la lista, de la pizarra y del mapa, para todos. No se puede deshacer.', { si:'Eliminar', peligro:true })) return;
+  Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; auditar(s, 'Eliminó una obra', `${o.casa} · ${o.tipo}`, o.id); s.obras = s.obras.filter(x => x.id !== o.id); });
+  toast('Obra eliminada', 'trash');
+};
+/* PASO SIGUIENTE (pedido de Claudio, 20-10-2026: "un botón, paso siguiente
+   y así hasta completar el final y desaparecer sola"). Un toque avanza una
+   etapa, sin formulario. En la anteúltima el botón dice "Terminar la obra":
+   pide confirmación, la marca terminada y sale sola de "En curso", de la
+   Pizarra del día y del mapa (queda en "Terminadas"). La novedad con foto
+   sigue aparte, en "Novedad". */
+A['obra-siguiente'] = async el => {
+  const o0 = Store.s.obras.find(x => x.id === el.dataset.id);
+  if (!o0 || o0.estado !== 'activa' || esGuardia() || esSupervisor() || !(o0.userId === yo().id || esAdmin())) return;
+  const fin = o0.etapa >= ETAPAS.length - 2;
+  if (fin && !await confirmar('Terminar la obra', 'Sale de "En curso", de la pizarra y del mapa. Queda en "Terminadas".', { si:'Terminar' })) return;
+  let nueva = '';
+  Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o || o.estado !== 'activa') return;
+    o.etapa = Math.min(o.etapa + 1, ETAPAS.length - 1); o.ultima = Date.now(); nueva = ETAPAS[o.etapa];
+    if (o.etapa === ETAPAS.length - 1){ o.estado = 'finalizada'; o.avisoHoy = null; auditar(s, 'Obra finalizada', o.casa, o.id); }
+    listaDe(o, 'historial').push({ at:Date.now(), etapa:o.etapa, texto: o.estado === 'finalizada' ? 'Obra terminada' : 'Pasó a: ' + nueva, por:yo().id });
+    if (o.userId !== yo().id) notificar(s, { para:o.userId, titulo:'Novedad en tu obra', texto: o.estado === 'finalizada' ? 'Obra terminada' : 'Pasó a: ' + nueva, icon:'wrench', color:'wood', link:'obras' }); });
+  toast(fin ? 'Obra terminada: ya no figura en curso' : 'Ahora: ' + nueva, fin ? 'check' : 'wrench');
 };
 A['nueva-obra'] = () => hoja(esAdmin() ? 'Registrar una obra' : 'Registrar mi obra', `<form data-f="nueva-obra">
   ${formObra()}
@@ -450,11 +498,13 @@ F['nueva-obra'] = d => {
      instante y la ven la Administración, la garita y todo el barrio. La
      Administración igual puede pausarla, editarla o borrarla. */
   const casa = esAdmin() && d.casa ? d.casa : u.casa, porAdmin = esAdmin() && d.casa && d.casa !== u.casa;
+  const afuera = esAdmin() && casa === OBRA_AFUERA, lugar = afuera ? String(d.lugar || '').trim() : '';
+  if (afuera && !lugar){ toast('Escribí dónde es la obra (ej: Ruta 3, acceso al barrio)', 'alert'); return; }
   const maq = [].concat(d.maq || []).filter(k => MAQ_OBRA[k]);
-  Store.cambiar(s => { s.obras.unshift({ id:uid(), userId:u.id, casa, porAdmin: !!porAdmin, tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(), maq,
+  Store.cambiar(s => { s.obras.unshift({ id:uid(), userId:u.id, casa, porAdmin: !!porAdmin, ...(afuera ? { afuera:true, lugar } : {}), tipo:d.tipo, etapa:+d.etapa, empresa:d.empresa.trim(), tel:d.tel.trim(), inicio:d.inicio, finEstimado:d.finEstimado, detalle:d.detalle.trim(), maq,
       estado:'activa', createdAt:Date.now(), ultima:Date.now(), historial:[{ at:Date.now(), etapa:+d.etapa, texto:d.detalle.trim() || 'Obra registrada', por:u.id }] });
-    notificar(s, { para:'todos', titulo:`Nueva obra en ${casa === 'Barrio' ? 'el barrio' : casa}`, texto:`${d.tipo}${maq.includes('pesada') ? ' · con maquinaria pesada' : maq.length === 1 && maq[0] === 'obreros' ? ' · solo obreros' : ''}${d.empresa.trim() ? ' · ' + d.empresa.trim() : ''}${d.inicio ? ' · desde ' + fechaCorta(d.inicio) : ''}${d.finEstimado ? ' hasta ' + fechaCorta(d.finEstimado) : ''}`, icon:'wrench', color:'wood', link:'obras' });
-    auditar(s, 'Registró una obra', `${casa} · ${d.tipo}`); });
+    notificar(s, { para:'todos', titulo: afuera ? `Obra fuera del barrio: ${lugar}` : `Nueva obra en ${casa === 'Barrio' ? 'el barrio' : casa}`, texto:`${d.tipo}${maq.includes('pesada') ? ' · con maquinaria pesada' : maq.length === 1 && maq[0] === 'obreros' ? ' · solo obreros' : ''}${d.empresa.trim() ? ' · ' + d.empresa.trim() : ''}${d.inicio ? ' · desde ' + fechaCorta(d.inicio) : ''}${d.finEstimado ? ' hasta ' + fechaCorta(d.finEstimado) : ''}`, icon:'wrench', color:'wood', link:'obras' });
+    auditar(s, 'Registró una obra', `${afuera ? OBRA_AFUERA + ' · ' + lugar : casa} · ${d.tipo}`); });
   cerrarHoja(); abrir('obras', 'activas'); toast('Obra publicada: ya la ve todo el barrio', 'wrench');
 };
 A['obra-aprobar'] = el => Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; o.estado = 'activa'; o.ultima = Date.now();
@@ -463,7 +513,7 @@ A['obra-aprobar'] = el => Store.cambiar(s => { const o = s.obras.find(x => x.id 
   notificar(s, { para:'todos', titulo:`Nueva obra en ${o.casa}`, texto:`${o.tipo} · ${o.empresa || ''}`, icon:'wrench', color:'wood', link:'obras' });
   auditar(s, 'Aprobó una obra', `${o.casa} · ${o.tipo}`, o.id); });
 A['obra-avance'] = el => { const o = Store.s.obras.find(x => x.id === el.dataset.id); if (!o) return;
-  hoja(`Obra de ${o.casa}`, `<form data-f="obra-avance" data-id="${o.id}"><div class="field"><label>Etapa</label><select name="etapa">${ETAPAS.map((e, i) => `<option value="${i}" ${i === o.etapa ? 'selected' : ''}>${e}</option>`).join('')}</select></div>
+  hoja(`Novedad de la obra · ${dondeObra(o)}`, `<form data-f="obra-avance" data-id="${o.id}"><div class="field"><label>Etapa</label><select name="etapa">${ETAPAS.map((e, i) => `<option value="${i}" ${i === o.etapa ? 'selected' : ''}>${e}</option>`).join('')}</select></div>
     <div class="field"><label>Novedad</label><textarea name="texto" required maxlength="300" placeholder="Ej: se terminó de hormigonar la platea"></textarea></div>${campoFoto('fotoObra')}
     <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`); };
 F['obra-avance'] = (d, form) => {
@@ -479,11 +529,26 @@ A['obra-hoy'] = el => hoja('Aviso de obra para hoy', `<form data-f="obra-hoy" da
 F['obra-hoy'] = (d, form) => {
   const maq = [].concat(d.maq || []).filter(k => MAQ_OBRA[k]);
   Store.cambiar(s => { const o = s.obras.find(x => x.id === form.dataset.id); if (!o) return; o.avisoHoy = { fecha:hoyISO(), texto:d.texto.trim(), hora:d.hora, maq };
-    notificar(s, { para:'todos', titulo:`Obra en ${o.casa}: ${d.texto.trim()}`, texto:`${d.hora ? `Desde las ${d.hora} h` : 'Hoy'}${maq.includes('pesada') ? ' · entra maquinaria pesada' : maq.includes('camiones') ? ' · entran camiones' : ''}`, icon:'truck', color:'warn', link:'obras' }); });
+    notificar(s, { para:'todos', titulo:`Obra en ${enObra(o)}: ${d.texto.trim()}`, texto:`${d.hora ? `Desde las ${d.hora} h` : 'Hoy'}${maq.includes('pesada') ? ' · entra maquinaria pesada' : maq.includes('camiones') ? ' · entran camiones' : ''}`, icon:'truck', color:'warn', link:'obras' }); });
   cerrarHoja(); toast('Aviso enviado', 'truck');
 };
 A['obra-pausa'] = el => Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; o.estado = 'pausada'; o.historial.push({ at:Date.now(), etapa:o.etapa, texto:'Pausada por la Administración', por:yo().id }); notificar(s, { para:o.userId, titulo:'Tu obra fue pausada', texto:'Consultá con la Administración', icon:'wrench', color:'danger', link:'obras' }); auditar(s, 'Pausó una obra', o.casa, o.id); });
 A['obra-reanudar'] = el => Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o) return; o.estado = 'activa'; o.historial.push({ at:Date.now(), etapa:o.etapa, texto:'Reanudada', por:yo().id }); });
+
+/* Desde el cartel "¿Terminaste la obra?": la cierra de una, esté en la etapa que esté. */
+A['obra-terminar'] = async el => {
+  const o0 = Store.s.obras.find(x => x.id === el.dataset.id);
+  if (!o0 || o0.estado !== 'activa' || esGuardia() || esSupervisor() || !(o0.userId === yo().id || esAdmin())) return;
+  if (!await confirmar('Terminar la obra', 'Sale de "En curso", de la pizarra y del mapa. Queda en "Terminadas".', { si:'Terminar' })) return;
+  Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o || o.estado !== 'activa') return;
+    o.etapa = ETAPAS.length - 1; o.estado = 'finalizada'; o.avisoHoy = null; o.ultima = Date.now();
+    listaDe(o, 'historial').push({ at:Date.now(), etapa:o.etapa, texto:'Obra terminada', por:yo().id });
+    auditar(s, 'Obra finalizada', o.casa, o.id); });
+  toast('Obra terminada: ya no figura en curso', 'check');
+};
+/* "Sigue igual": la obra vuelve a contar 30 días sin preguntar. */
+A['obra-sigue'] = el => Store.cambiar(s => { const o = s.obras.find(x => x.id === el.dataset.id); if (!o || !(o.userId === yo().id || esAdmin()) || esGuardia()) return;
+  o.ultima = Date.now(); listaDe(o, 'historial').push({ at:Date.now(), etapa:o.etapa, texto:'Sigue en ' + ETAPAS[o.etapa], por:yo().id }); });
 
 /* ---------- VIAJES COMPARTIDOS ---------- */
 const DESTINOS = ['Centro','Aeropuerto','Escuela','Cerro Castor','Río Grande','Tolhuin','Otro'];
@@ -547,6 +612,7 @@ A['nueva-infraccion'] = () => hoja('Registrar infracción', `<form data-f="infra
   ${campoPruebas('infPrb')}
   <button class="btn btn-danger btn-block">${I('send')}Notificar a la casa</button></form>`);
 document.addEventListener('change', e => { if (e.target.id === 'infCasa') sugerirNivel(); });
+document.addEventListener('change', e => { if (e.target.id === 'obraCasa' && $('#obraLugar')) $('#obraLugar').hidden = e.target.value !== OBRA_AFUERA; });
 function sugerirNivel(){ const c = $('#infCasa'), n = $('#infNivel'), s = $('#infSug'); if (!c || !n) return; n.value = nivelSugerido(c.value);
   const k = Store.s.infracciones.filter(i => i.casa === c.value && i.estado !== 'anulada' && Date.now() - i.at < 365 * DIA).length; s.textContent = `Sugerido por ${plural(k, 'antecedente')} en 12 meses`; }
 const _nuevaInf = A['nueva-infraccion']; A['nueva-infraccion'] = () => { _nuevaInf(); sugerirNivel(); };

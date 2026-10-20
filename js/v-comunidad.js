@@ -73,7 +73,13 @@ const icCorte = (p, cls = '') => { const c = corteDe(p); return c ? `<span class
    Hasta ahora lo del pizarrón quedaba para siempre (en la Pizarra del día
    de la portada se veía 24 horas, pero en el Pizarrón seguía). Ahora cada
    publicación se borra sola según qué es y quién la publicó:
-     · Alerta: 2 días · Aviso de la guardia: 3 días
+     · Alerta: 2 días
+     · Aviso de la guardia: se borra solo al terminar el día en que se
+       publicó, a la medianoche (pedido de Claudio, 20-10-2026: "se debe
+       borrar al día siguiente, no a las 24 h", para no andar borrando
+       avisos viejos). Antes duraba 3 días. La garita puede elegir que
+       dure más ("Hasta mañana" o "3 días", p. ej. un portón cerrado varios
+       días): siempre termina a las 0 h del último día (DURA_GUARDIA).
      · Aviso de un vecino: 7 días (de la Administración: 15)
      · Evento: el día siguiente al evento (sin fecha: 7 días)
      · Mascota o algo perdido: 30 días, o cuando el dueño toca "¡Apareció!"
@@ -86,8 +92,12 @@ const icCorte = (p, cls = '') => { const c = corteDe(p); return c ? `<span class
    El borrado lo hace el motor (regla "pizarron-vence", js/admin.js) una
    sola vez para todo el barrio; mientras tanto, lo vencido ya no se muestra.
    ========================================================= */
-const DURA_POST = { alerta:2, guardia:3, aviso:7, perdido:30, ofrezco:30, busco:30, mercado:15 };
+const DURA_POST = { alerta:2, guardia:1, aviso:7, perdido:30, ofrezco:30, busco:30, mercado:15 };
 const RENOVABLES = ['perdido', 'ofrezco', 'busco', 'mercado'];
+/* Cuántos días de calendario dura el aviso de la guardia (lo elige al publicar). */
+const DURA_GUARDIA = { 1:'Solo hoy', 2:'Hasta mañana', 3:'3 días' };
+const diasGuardia = p => DURA_GUARDIA[p && p.dura] ? +p.dura : 1;
+const venceGuardia = (desde, dias) => finDelDia(isoDe(new Date(desde)), dias - 1) + 1;
 function diasDelPost(p){
   if (p.autor === 'sistema') return 2;
   if (p.type === 'aviso' && usuario(p.autor)?.rol === 'admin') return 15;
@@ -100,6 +110,7 @@ function venceDelPost(p){
   if (p.resuelto) return p.resuelto + DIA;
   if (p.fijado) return 0;
   if (p.type === 'evento' && p.fecha) return new Date(sumarDias(p.fecha, 1) + 'T23:59').getTime();
+  if (p.type === 'guardia') return venceGuardia(p.renovado || p.createdAt || 0, diasGuardia(p));
   return (p.renovado || p.createdAt || 0) + diasDelPost(p) * DIA;
 }
 const postVencido = p => { const v = venceDelPost(p); return !!v && Date.now() >= v; };
@@ -107,7 +118,7 @@ function textoVencePost(p){
   const v = venceDelPost(p);
   if (!v) return 'Queda fijado arriba: no se borra solo mientras la Administración no lo desfije.';
   const d = new Date(v), dia = `${DIAS_L[d.getDay()].toLowerCase()} ${d.getDate()} de ${MESES_LARGO[d.getMonth() + 1] || MESES[d.getMonth()]}`;
-  return `Se borra solo el ${dia}${p.type === 'evento' && p.fecha ? ' (el día siguiente al evento)' : ` (a los ${plural(diasDelPost(p), 'día')})`}`;
+  return `Se borra solo el ${dia}${p.type === 'evento' && p.fecha ? ' (el día siguiente al evento)' : p.type === 'guardia' ? ` a las 0 h (${diasGuardia(p) === 1 ? 'los avisos de la guardia duran el día en que se publican' : DURA_GUARDIA[diasGuardia(p)].toLowerCase()})` : ` (a los ${plural(diasDelPost(p), 'día')})`}`;
 }
 /* Los avisos de la campanita de una publicación (el "Se busca a Toby") se van con ella. */
 function quitarAvisosDePost(s, p){
@@ -149,7 +160,7 @@ R.pizarron = {
       <div class="chips">${chip('todo','Todo')}${chip('guardia','Guardia')}${chip('aviso','Avisos')}${chip('alerta','Alertas')}${chip('evento','Eventos')}${chip('perdido','Perdidos')}${chip('servicios','Ofrezco / busco')}</div>
       ${f === 'todo' ? tarjetaServicios() : ''}
       ${ps.length ? `<div class="muro-cols">${ps.map(cardPost).join('')}</div>` : f === 'todo' ? vacio('muro', 'Por ahora no hay publicaciones. Si tenés algo para contar, prestar o avisar, tocá "Publicar en el pizarrón".') : `<div class="muro-cols">${vacio('muro', 'Todavía no hay nada acá.')}</div>`}
-      <p class="muted tiny" style="margin:10px 2px 0">${I('clock')} Cada publicación se borra sola a su tiempo: alertas 2 días, guardia 3, avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, y los eventos al día siguiente. Lo fijado queda. Quien publica la puede borrar antes con el tachito.</p>`;
+      <p class="muted tiny" style="margin:10px 2px 0">${I('clock')} Cada publicación se borra sola a su tiempo: alertas 2 días, guardia al terminar el día (a las 0 h; la garita puede elegir hasta 3 días), avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, y los eventos al día siguiente. Lo fijado queda. Quien publica la puede borrar antes con el tachito.</p>`;
   },
 };
 function cardPost(p){
@@ -244,6 +255,8 @@ A['nuevo-post'] = (el) => {
       <div class="field"><label>Hora</label><input type="time" name="horaEv"></div><div class="field"><label>Lugar</label><input name="lugar" maxlength="40" placeholder="Ej: casa del Lote 40"></div></div>
     <div id="extraServicio" ${['ofrezco','busco'].includes(pre) ? '' : 'hidden'} class="grid2"><div class="field"><label>Rubro</label><select name="category">${CATEGORIAS.map(c => `<option>${c}</option>`).join('')}</select></div>
       <div class="field"><label>Precio (opcional)</label><input name="price" maxlength="30" placeholder="$ por hora"></div></div>
+    <div id="extraGuardia" ${pre === 'guardia' ? '' : 'hidden'} class="field"><label>¿Cuánto dura?</label><div class="seg">${Object.entries(DURA_GUARDIA).map(([k, t]) => `<label><input type="radio" name="dura" value="${k}" ${k === '1' ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>
+      <div class="ayuda">Se borra solo a las 0 h del último día. "Solo hoy" sirve para casi todo; elegí más si dura varios días (un portón cerrado, una obra en la calle).</div></div>
     ${campoFoto('fotoPost')}
     <p class="muted tiny" style="margin:-4px 0 12px">Las alertas y los avisos de la guardia suenan y les llegan a todos. Si es una emergencia, usá el botón SOS.</p>
     <button class="btn btn-pri btn-block">${I('send')}Publicar</button></form>`);
@@ -253,6 +266,7 @@ document.addEventListener('change', e => {
     const v = e.target.value;
     $('#extraEvento').hidden = v !== 'evento';
     $('#extraServicio').hidden = !['ofrezco','busco'].includes(v);
+    $('#extraGuardia').hidden = v !== 'guardia';
   }
 });
 F['nuevo-post'] = d => {
@@ -262,12 +276,13 @@ F['nuevo-post'] = d => {
   const p = { id:uid(), type:d.type, title:d.title.trim(), body:(d.body || '').trim(), autor:u.id, createdAt:Date.now(), reactions:{}, comments:[], foto:fotoParaOtros(d.foto, 7) };
   if (d.type === 'evento'){ p.fecha = d.fecha || ''; p.horaEv = d.horaEv || ''; p.lugar = d.lugar || ''; p.voy = [u.id]; }
   if (d.type === 'ofrezco' || d.type === 'busco'){ p.category = d.category; p.price = (d.price || '').trim(); }
+  if (d.type === 'guardia' && DURA_GUARDIA[d.dura] && +d.dura > 1) p.dura = +d.dura;
   Store.cambiar(s => {
     s.posts.unshift(p);
     /* La guardia, la Administración y las alertas suenan en todos los celulares. */
     if (d.type === 'guardia' || d.type === 'alerta' || u.rol === 'admin')
       notificar(s, { para:'todos', titulo: d.type === 'guardia' ? `Guardia: ${p.title}` : d.type === 'alerta' ? `Alerta: ${p.title}` : p.title,
-        texto:p.body.slice(0, 100), icon:TIPOS_POST[d.type].icon, color:TIPOS_POST[d.type].c, link:'pizarron', sonido:true });
+        texto:p.body.slice(0, 100), icon:TIPOS_POST[d.type].icon, color:TIPOS_POST[d.type].c, link:'pizarron', sonido:true, ...(d.type === 'guardia' ? { vence:venceGuardia(p.createdAt, diasGuardia(p)) - 1 } : {}) });
     else if (d.type === 'perdido' || d.type === 'evento')
       notificar(s, { para:'todos', titulo:`${TIPOS_POST[d.type].n}: ${p.title}`, texto:`${u.casa}`, icon:TIPOS_POST[d.type].icon, color:TIPOS_POST[d.type].c, link:'pizarron', postId:p.id });
   });
@@ -428,7 +443,7 @@ const FAQ = [
   ['¿Cómo aviso que viene una visita?', 'En Tu casa → Autorizar una visita. Cargás el nombre (y la patente si viene en auto) y la app arma un código y un QR para mandarle por WhatsApp. La garita lo ve al instante, con tu nombre como quien autorizó. Si viene varias veces (empleada, personal de una obra), marcá "Viene varias veces": es un solo QR para todos esos días.', 'nuevo-pase', '', 'Autorizar una visita'],
   ['¿Cuánto tiempo queda mi historial de visitas?', 'En la app ves las visitas de los últimos {DIAS} días. Las anteriores no se pierden: pasan al archivo histórico del barrio, sin DNI, celular ni patente, y las ves cuando quieras en Mis visitas → "Ver mi historial completo". Así la app no baja todo cada vez que la abrís y sigue rápida.', 'abrir', 'visitas', 'Mis visitas'],
   ['¿Cómo pido el DEA (desfibrilador)?', 'Tocá el corazón que late de "DEA operativo", arriba a la derecha en la foto de la portada: se abre Emergencias. Ahí, al lado del corazón rojo, mantené apretado el botón verde SOLICITARLO durante 2 segundos y contestá SÍ. A la garita le salta la alarma con tu lote y tu apellido hasta que salen con el DEA; a vos te avisa cuando va en camino. Llamá también al 911.', 'abrir', 'emergencias', 'Ver Emergencias'],
-  ['¿Cómo aviso que tengo una obra?', 'En El barrio → Obras → Registrar mi obra. La ven al instante la Administración, la garita y todo el barrio, y aparece en la Pizarra del día mientras dure. Los días con mixer o camión mandá el "Aviso del día". La garita no la puede editar; la Administración sí.', 'abrir', 'obras', 'Obras'],
+  ['¿Cómo aviso que tengo una obra?', 'En El barrio → Obras → Registrar mi obra. La ven al instante la Administración, la garita y todo el barrio, y aparece en la Pizarra del día mientras dure. Los días con mixer o camión mandá el "Aviso del día". Cuando termina una etapa tocá "Paso siguiente"; en la última, "Terminar la obra" y sale sola de la lista. Si no se hace, "Eliminar" la borra en cualquier momento. Las obras de afuera que afectan al barrio (ruta, acceso, agua, luz, gas) las carga la Administración y salen con su lugar. La garita no la puede editar; la Administración sí.', 'abrir', 'obras', 'Obras'],
   ['¿Cómo aviso que viene un Uber o DiDi?', 'En Tu casa → Autorizar una visita, y en "¿Quién viene?" tocás "Uber, DiDi o taxi": se abre el aviso corto. Elegís la app, si te viene a buscar o trae algo, en cuánto llega y la patente (la ves en la app cuando el chofer acepta; si todavía no la sabés, la agregás después). La garita lo reconoce por la patente y te avisa cuando entra y cuando sale. El aviso vence solo.', 'nuevo-pase', '', 'Autorizar una visita'],
   ['¿Qué hago en una emergencia?', 'Mantené apretado el botón rojo SOS arriba a la derecha durante 3 segundos y elegí qué pasa. Salta en la garita, en la Administración y en las apps abiertas del barrio. Cuando se resuelva, tocá "Ya está solucionado". El DEA (desfibrilador) está en la garita y se pide desde Emergencias.', 'abrir', 'emergencias', 'Ver Emergencias'],
   ['¿Cómo pago las expensas?', 'En Tu casa → Mis expensas ves el saldo y el cupón del mes. Tocá la tarjeta para pagar por transferencia (alias y CBU a mano) y avisá el pago con el comprobante: la Administración lo confirma y te llega el recibo. Mientras no esté el pago online con Mercado Pago, si ya transferiste alcanza con tocar "Ya la pagué · marcarla como pagada": queda pagada y la Administración la confirma con el banco.', 'abrir', 'expensas', 'Mis expensas'],

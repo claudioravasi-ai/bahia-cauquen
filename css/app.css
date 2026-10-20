@@ -4160,6 +4160,9 @@ body.rk-arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .ob-etapa span{color:var(--muted);font-weight:700}
 .ob-ult{display:flex;gap:6px;align-items:flex-start;margin-top:8px;font-size:13px;color:var(--ink-2)}
 .ob-ult svg{width:14px;height:14px;flex:none;margin-top:3px;color:var(--muted)}
+.ob-pregunta{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+.ob-pregunta>svg{width:18px;height:18px;flex:none;margin-top:2px;color:var(--warn)}
+.ob-pregunta small{display:block;color:var(--ink-2);margin:2px 0 8px}
 .ob-elegir{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .ob-op{display:flex;gap:8px;align-items:center;padding:9px 10px;border-radius:14px;cursor:pointer;position:relative;isolation:isolate}
 .ob-op input{position:absolute;opacity:0;pointer-events:none}

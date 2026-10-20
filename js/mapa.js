@@ -357,7 +357,7 @@ function mapaFicha(l){
     if (d.sola){ const r = typeof revisionDeHoy === 'function' ? revisionDeHoy(d.sola) : null;
       partes.push(fila('sola', `<b>Casa sola hasta el ${esc(fechaCorta(d.sola.hasta))}</b><small>${r ? `Revisada hoy a las ${hora(r.at)} h · ${r.novedad ? 'con novedad' : 'en orden'}` : 'Hoy todavía no se revisó'}</small>${opera ? `<div class="btns" style="margin-top:6px"><button class="btn btn-xs ${r ? 'btn-sec' : 'btn-ok'}" data-a="casa-revisar" data-v="${esc(d.sola.casa)}">${I('check')}${r ? 'Otra vez' : 'Revisada'}</button></div>` : ''}`)); }
     if (d.paq.length) partes.push(fila('paq', `<b>${plural(d.paq.length, 'paquete', 'paquetes')} en la garita</b><small>${d.paq.map(p => esc(p.empresa || 'Paquete') + ' · llegó ' + hace(p.recibido)).join('<br>')}</small>`));
-    if (d.obra) partes.push(fila('obra', `<b>Obra: ${esc(d.obra.empresa || 'en curso')}</b><small>${d.obra.avisoHoy?.fecha === hoy ? 'Hoy: ' + esc(d.obra.avisoHoy.texto || '') : esc(d.obra.etapa || 'En curso')}</small>`));
+    if (d.obra) partes.push(fila('obra', `<b>Obra: ${esc(d.obra.empresa || 'en curso')}</b><small>${d.obra.avisoHoy?.fecha === hoy ? 'Hoy: ' + esc(d.obra.avisoHoy.texto || '') : esc((typeof ETAPAS !== 'undefined' && ETAPAS[d.obra.etapa]) || 'En curso')}</small>`));
   }
   const pases = [...(d?.adn || []), ...(d?.esp || [])];
   const cuentaLote = aLista(s.users).find(x => x && x.casa === 'Lote ' + l && x.estado === 'aprobado' && x.rol !== 'hotel');

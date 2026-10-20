@@ -42,7 +42,7 @@ const DISPAROS = {
              titulo:'Hoy hay trabajos en {lote}', texto:'{detalle}{hora}. Puede haber camiones y ruido en la calle: ¡gracias por la paciencia!',
              frase:() => 'una obra avisa trabajos para hoy',
              cosas:(r, s, hoy) => aLista(s.obras).filter(o => o && o.avisoHoy?.fecha === hoy)
-               .map(o => ({ id:o.id + '-' + hoy, lote:o.casa, datos:{ lote:o.casa || 'una obra', detalle:o.avisoHoy.texto || 'Trabajos de obra', hora:o.avisoHoy.hora ? ' desde las ' + o.avisoHoy.hora + ' h' : '' } })) },
+               .map(o => ({ id:o.id + '-' + hoy, lote:o.afuera ? '' : o.casa, datos:{ lote:(typeof enObra === 'function' ? enObra(o) : o.casa) || 'una obra', detalle:o.avisoHoy.texto || 'Trabajos de obra', hora:o.avisoHoy.hora ? ' desde las ' + o.avisoHoy.hora + ' h' : '' } })) },
 };
 const DESTINOS_REGLA = [
   ['todos', 'Todos los vecinos', 'users'], ['calle', 'Solo los vecinos de esa calle', 'pin'],
