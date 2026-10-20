@@ -144,7 +144,7 @@ F['camion-entra'] = d => {
   });
   /* El push llega aunque la app esté cerrada o la pantalla bloqueada, en
      todos los equipos que activaron los avisos (menos el de la garita). */
-  if (typeof Push !== 'undefined') Push.enviar({ para:'todos', titulo:'🚛 Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, link:'recoleccion', tag:'camion-' + viaje.id, sonido:'camion' });
+  if (typeof Push !== 'undefined') Push.enviar({ para:'todos', titulo:'🚛 Entró el camión de la basura', texto:`${hora(entra)} h · si todavía no sacaste las bolsas, es ahora.`, link:'recoleccion', tag:'camion-' + viaje.id, sonido:'camion', contar:'Camión' });
 
   cerrarHoja(); toast('Entrada registrada. Los vecinos ya fueron avisados.', 'tacho');
   Camion.revisar();
@@ -356,7 +356,7 @@ function avisarLotesCorreo(s, v, lotes){
 }
 /* Al celular, como un WhatsApp (sale con la app cerrada o la sesión cerrada). */
 const pushLotesCorreo = (v, ids) => { if (ids.length && typeof Push !== 'undefined')
-  Push.enviar({ para:ids, titulo:`${nombreCorreo(v)} va a tu casa`, texto:`Entró al barrio a las ${hora(v.entra)} h con un envío para tu lote.`, link:'mensajeria', tag:'correo-' + v.id, sonido:'correo' }); };
+  Push.enviar({ para:ids, titulo:`${nombreCorreo(v)} va a tu casa`, texto:`Entró al barrio a las ${hora(v.entra)} h con un envío para tu lote.`, link:'mensajeria', tag:'correo-' + v.id, sonido:'correo', contar:nombreCorreo(v) }); };
 const textoSinCuenta = l => l.length ? ` ${l.length === 1 ? 'El Lote ' + l[0] + ' no tiene' : 'Los lotes ' + l.join(', ') + ' no tienen'} cuentas en la app: avisá por teléfono.` : '';
 F['correo-entra'] = (d, form) => {
   const emp = form.dataset.emp; if (!EMPRESAS_CORREO[emp]) return;

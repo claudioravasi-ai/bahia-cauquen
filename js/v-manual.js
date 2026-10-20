@@ -126,13 +126,15 @@ const MANUAL_CAPS = [
 
   { id:'avisos', icon:'bell', color:'ok', para:'todos', t:'Activar los avisos al celular', s:'Para enterarte con el teléfono bloqueado', b:[
     ['p', 'Los avisos al celular (también llamados "notificaciones push") te llegan <b>aunque tengas la app cerrada y el teléfono bloqueado</b>, como un mensaje de WhatsApp: el camión de la basura, <b>un correo que va a tu casa</b>, un mensaje privado, un SOS, un aviso urgente de la Administración, lo que escribe la guardia y, si usás "Estoy bien", el recordatorio de la mañana.'],
+    ['p', '<b>Los tres más importantes suenan como una llamada</b>: cuando entra el <b>camión de la basura</b>, cuando un <b>correo va a tu casa</b> y cuando <b>alguien llegó sin avisar</b> a la garita, el teléfono suena y vibra <b>una y otra vez</b> (cada 4 segundos) hasta que tocás el aviso: el camión hasta 45 segundos, el correo hasta 1 minuto y la visita hasta 15 minutos. Al abrir la app deja de sonar. En iPhone suena una vez por aviso (es una regla de Apple); la visita que llegó sin avisar se repite cada 30 segundos.'],
     ['pasos', [
       'En iPhone, primero <b>instalá la app</b> (capítulo "Instalar la app en el teléfono"). Sin instalar, el iPhone no los deja llegar.',
       'Tocá tu foto o tus iniciales (arriba a la derecha) para abrir <b>Tu cuenta</b> y buscá <b>"Avisos en este equipo"</b> (o tocá la tarjeta "Activá los avisos" que aparece en la portada).',
       'Tocá <b>"Activar avisos"</b>.',
       'El teléfono pregunta si permitís las notificaciones: tocá <b>Permitir</b>.',
-      'Para comprobar, tocá <b>"Probar"</b> y bloqueá el teléfono: en unos segundos tiene que llegar un aviso de prueba.',
+      'Para comprobar, tocá <b>"Probar"</b> y <b>bloqueá el teléfono enseguida</b>: a los 10 segundos tiene que sonar y vibrar varias veces, igual que cuando entra el camión. Tocá el aviso para que deje de sonar.',
     ]],
+    ['ojo', 'warn', 'Si la prueba no suena con el teléfono bloqueado', '<b>Android:</b> mantené apretado el ícono de la app (o de Chrome) → Información de la app → <b>Notificaciones</b>: activadas, con <b>Sonido</b> y <b>Mostrar en pantalla</b> (ventana emergente); en <b>Batería</b> elegí <b>Sin restricciones</b>. <b>iPhone:</b> Ajustes → Notificaciones → Bahía Cauquén → <b>Sonidos</b> y <b>Pantalla bloqueada</b>; si usás "No molestar" o "Dormir", agregá la app a las permitidas, y que la tecla del costado no esté en silencio. Si el teléfono está en silencio o en "No molestar", ninguna app puede sonar. Cada vez que abrís la app, el teléfono queda anotado a tu cuenta (si en el mismo teléfono entraste con otra cuenta, los avisos van a la que usaste último).'],
     ['ojo', 'warn', 'Hay que hacerlo en cada equipo', 'Si usás la app en el celular y en la computadora, activalos en los dos. Si los bloqueaste sin querer, se habilitan desde la configuración del teléfono o del navegador: permisos del sitio → Notificaciones → Permitir.'],
   ] },
 
@@ -265,7 +267,7 @@ const MANUAL_CAPS = [
   { id:'correos', icon:'mail', color:'sky', para:'vecinos', t:'Correos en el barrio', s:'El camión de cada correo y el aviso "va a tu casa"', b:[
     ['p', 'Cuando entra un correo (Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro), la garita lo registra. Desde ese momento, a todos les <b>cruza por la pantalla un camión de correo</b> con los colores y el logo de esa empresa, con una bocina corta al entrar. Sigue pasando <b>hasta que la garita registra la salida</b>. Si hay varios adentro, pasan varios.'],
     ['h', 'Si va a tu casa'],
-    ['p', 'Si el correo le dice a la garita a qué casa va, a todas las cuentas de tu lote les llega <b>"Andreani va a tu casa"</b> (o la empresa que sea): al celular <b>como un WhatsApp</b>, aunque tengas la pantalla apagada, la app cerrada o la sesión cerrada (si activaste los avisos en ese equipo). Con la app abierta suena un aviso y su camión dice <b>"VA A TU CASA"</b>.'],
+    ['p', 'Si el correo le dice a la garita a qué casa va, a todas las cuentas de tu lote les llega <b>"Andreani va a tu casa"</b> (o la empresa que sea): al celular <b>como una llamada</b>: suena y vibra una y otra vez (hasta 1 minuto) hasta que lo tocás, aunque tengas la pantalla apagada, la app cerrada o la sesión cerrada (si activaste los avisos en ese equipo). Con la app abierta suena un aviso y su camión dice <b>"VA A TU CASA"</b>.'],
     ['p', 'Si no hay nadie en casa, avisale a la garita. Cuando el correo sale del barrio, el aviso se va solo.'],
     ['h', 'Lo que podés elegir'],
     ['lista', [
@@ -493,7 +495,7 @@ const MANUAL_CAPS = [
       '<b>Ángeles de la nieve</b>: vecinos que despejan la entrada de quien no puede palear (capítulo "Invierno y verano").',
       '<b>Manual y normas</b>: una sola puerta con dos solapas arriba. <b>Manual de uso</b> es este manual. <b>Normas y reglamentos</b> tiene el reglamento, la convivencia y las normas que rigen el barrio, con un buscador ("¿hasta qué hora puedo hacer obra?"); cada una se puede <b>descargar</b> para imprimir o guardar en PDF, o todas juntas.',
       '<b>Las cuentas del barrio</b>: en qué se gasta, mes a mes.',
-      '<b>Residuos</b>: los días del camión. {RESIDUOS} La víspera la pizarra avisa "Mañana pasa el camión" y cuando la garita registra la entrada, te llega el aviso "Entró el camión".',
+      '<b>Residuos</b>: los días del camión. {RESIDUOS} La víspera la pizarra avisa "Mañana pasa el camión" y cuando la garita registra la entrada, te llega el aviso "Entró el camión", que suena como una llamada (hasta 45 segundos o hasta que lo tocás). A la garita le aparece a cuántos celulares les sonó; si el aviso no salió, lo dice y conviene avisar a la Administración.',
       '<b>Correos en el barrio</b>: qué correo está adentro ahora (Correo Argentino, Andreani, OCA, OCASA, Mercado Libre u otro) y los que ya pasaron hoy (capítulo "Correos en el barrio").',
       '<b>Descargas</b>: aplicaciones, instructivos y planillas que comparte la Administración.',
     ]],

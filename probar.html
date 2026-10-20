@@ -828,7 +828,7 @@ const ESC = [
   pasos:[
   { lado:'b', txt:'La víspera, la pizarra ya avisó "Mañana pasa el camión". Hoy, cuando entra, la garita lo registra: tocá <b>Entró el camión</b>.', a:() => casaSimple(`<div class="ap-card">${it('🟡', 'Hoy pasa el camión de basura', 'Sacá las bolsas temprano')}</div>`),
     b:() => garita('Turno mañana · Guardia Ruiz') + ap(`<div class="ap-card"><h4>Camión de la basura</h4>${campo('Patente', 'AD 482 KT')}</div>`, btn('🚛 Entró el camión')) },
-  { lado:'b', hora:'08:41', txt:'A todo el barrio le llega el aviso (con el teléfono bloqueado también) y el camión cruza la pantalla mientras está adentro. Cuando termine, tocá <b>Salió el camión</b> en la garita.',
+  { lado:'b', hora:'08:41', txt:'A todo el barrio le llega el aviso: con el teléfono bloqueado <b>suena como una llamada</b>, una y otra vez, hasta que lo tocás, y la garita ve a cuántos celulares les sonó. El camión cruza la pantalla mientras está adentro. Cuando termine, tocá <b>Salió el camión</b> en la garita.',
     al(){ push('a', '🚛', 'Entró el camión de la basura', 'Si todavía no sacaste las bolsas, es ahora'); },
     a:() => `<div class="camion" aria-hidden="true">${CAMION}</div>` + casaSimple(`<div class="ap-card">${it('🚛', 'El camión está en el barrio', 'Entró 08:41')}</div>`, 1),
     b:() => garita('Turno mañana · Guardia Ruiz') + ap(aviso('warn', '🚛', 'Camión adentro desde las 08:41', 'AD 482 KT'), btn('Salió el camión')) },

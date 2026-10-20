@@ -794,7 +794,7 @@ const ESC = [
     a:() => inicioV('lucia', '', { saludo:'Buen día,', piz:[it('🟡', 'Hoy pasa el camión', 'Todos los residuos')] }), c:() => adminInicio(),
     d:() => inicioV('elsa', '', { saludo:'Buen día,', piz:[it('🟡', 'Hoy pasa el camión', 'Todos los residuos')] }),
     b:() => garita('Turno mañana · Guardia Ruiz') + ap(card('Camión de residuos', it('🚛', 'SEINCO · AD 312 PQ', 'Martes: todos los residuos')), btn('Entró el camión')) },
-  { lado:'a', txt:'A <b>todos</b> les llega el aviso y el camión cruza la pantalla. Lucía toca <b>Saco la bolsa</b>.',
+  { lado:'a', txt:'A <b>todos</b> les llega el aviso y el camión cruza la pantalla. Con el teléfono bloqueado <b>suena como una llamada</b>, una y otra vez, hasta que lo tocan; la garita ve a cuántos celulares les sonó. Lucía toca <b>Saco la bolsa</b>.',
     al(){ avisar('acd', '🚛', 'Entró el camión de residuos', '07:52 · sacá las bolsas'); },
     a:() => v('lucia', { campana:1 }) + camion + ap(hola('lucia', 'Buen día,'), aviso('warn', '🚛', 'El camión está en el barrio', 'Entró 07:52'), btn('Saco la bolsa', { cl:'ok' })),
     b:() => garita('Turno mañana · Guardia Ruiz') + ap(card('Camión', it('🚛', 'SEINCO', 'Entró 07:52', 'Adentro', 'warn')), btn('Salió el camión', { go:false, cl:'sec' })),

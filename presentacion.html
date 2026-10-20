@@ -600,7 +600,7 @@ const ESC = [
 
 { id:'camion', p:['garita', 'vecinos'], e:'🚛', t:'Pasa el camión de residuos', s:'La garita marca la entrada y a todos les llega el aviso', h:'07:52', pasos:[
   { l:'d', txt:'Llega el camión de residuos. El guardia toca <b>Entró el camión</b>.', b:'Entró el camión', s:{ d:() => bar('d', 'Camión de residuos') + ap(campo('Patente', 'AD 330 RS')) } },
-  { l:'a', txt:'A <b>todos</b> les llega el aviso y el camión cruza la pantalla. Lucía toca <b>Saco la bolsa</b>.', b:'Saco la bolsa',
+  { l:'a', txt:'A <b>todos</b> les llega el aviso y el camión cruza la pantalla. Con el teléfono bloqueado <b>suena como una llamada</b> hasta que lo tocan. Lucía toca <b>Saco la bolsa</b>.', b:'Saco la bolsa',
     al:[['d', 'a', '🚛', 'Entró el camión', 'Sacá la bolsa'], ['d', 'b', '🚛', 'Entró el camión', 'Sacá la bolsa'], ['d', 'e', '🚛', 'Entró el camión', '']],
     s:{ a:() => bar('a', 'Lucía') + ap(av('info', '🚛', 'El camión está en el barrio', 'Entró 07:52')), b:() => bar('b', 'Martín') + ap(av('info', '🚛', 'El camión está en el barrio', 'Entró 07:52')) } },
   { l:'d', h:'08:31', txt:'Cuando termina, el guardia toca <b>Salió el camión</b>: el aviso desaparece solo y queda en la bitácora.', b:'Salió el camión',

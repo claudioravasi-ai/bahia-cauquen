@@ -51,6 +51,13 @@ const Push = {
     'activo':       ['Avisos activados en este equipo', 'Te llegan aunque tengas el celular bloqueado: camión de la basura, un correo que va a tu casa, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
     'apagado':      ['Activá los avisos en este equipo', 'Para enterarte con el celular bloqueado: camión de la basura, un correo que va a tu casa, SOS, avisos urgentes, mensajes, "Estoy bien" y lo que escriba la guardia.'],
   },
+  /* Lo que se revisa en el teléfono para que el aviso suene fuerte, con la
+     pantalla apagada, como un WhatsApp (20-10-2026). */
+  comoQueSuene(){
+    return this.esIOS()
+      ? 'En el iPhone: <b>Ajustes → Notificaciones → Bahía Cauquén</b> → Permitir notificaciones, <b>Sonidos</b> y <b>Pantalla bloqueada</b> encendidos. Si usás <b>No molestar</b> o <b>Dormir</b> (la lunita), agregá Bahía Cauquén a las apps permitidas. Y el botón del costado del iPhone no tiene que estar en silencio (rayita naranja).'
+      : 'En Android: mantené apretado el ícono de la app (o de Chrome) → <b>Información de la app → Notificaciones</b>: activadas, con <b>Sonido</b> y <b>Mostrar en pantalla / ventana emergente</b>. En <b>Batería</b>, elegí <b>Sin restricciones</b>. Y que el teléfono no esté en <b>No molestar</b> o en silencio.';
+  },
   cargarSDK(){
     if (firebase.messaging) return Promise.resolve();
     if (this.cargando) return this.cargando;
@@ -98,9 +105,12 @@ const Push = {
     try { localStorage.removeItem(this.KEY); } catch(e){}
     toast('Este equipo ya no recibe avisos con la pantalla apagada', 'bell'); refrescar();
   },
-  /* Una vez por día se renueva la anotación (Google cambia los tokens de
-     vez en cuando, y así queda al día el rol y el lote). */
-  async alDia(){
+  /* Cada vez que se abre la app se renueva la anotación (antes, una vez por
+     día). Google cambia los tokens de vez en cuando, y si el mismo teléfono
+     se usó con otra cuenta (la garita, la Administración), el aviso iba a la
+     última cuenta anotada: ahora va siempre a la que está abierta. Es una
+     sola escritura chica. */
+  async alDia(forzar = false){
     try {
       if (this.estado() !== 'activo' || !yo()) return;
       /* Después de cerrar sesión (at = 0) se anota de nuevo en cuanto se
@@ -108,7 +118,7 @@ const Push = {
       const at = +(localStorage.getItem(this.KEY + '.at') || 0);
       /* Si cambió cómo hay que anotarlo (el lote se alquiló o dejó de estarlo), se anota ya. */
       const rol = typeof esPropDistancia === 'function' && esPropDistancia() ? 'propietario' : yo().rol;
-      if (Date.now() - at < DIA && localStorage.getItem(this.KEY + '.rol') === rol) return;
+      if (!forzar && Date.now() - at < 10 * MIN && localStorage.getItem(this.KEY + '.rol') === rol) return;
       await this.cargarSDK();
       const reg = await navigator.serviceWorker.ready;
       const t = await firebase.messaging().getToken({ vapidKey:Store.s.config.pushVapid, serviceWorkerRegistration:reg });
@@ -140,23 +150,31 @@ const Push = {
   },
   /* Pedirle al Apps Script que avise. Si falla, no pasa nada: el aviso ya
      está en la campanita y suena en las apps abiertas. */
-  enviar({ para = 'todos', titulo, texto = '', link = '', tag = '', urgente = false, sonido = '', incluirme = false }){
+  /* `contar` (20-10-2026): en la garita, el camión, el correo y "llegó sin
+     aviso" dicen a cuántos celulares salió el aviso, o que NO salió y por
+     qué. Antes un error quedaba escondido y nadie se enteraba. */
+  enviar({ para = 'todos', titulo, texto = '', link = '', tag = '', urgente = false, sonido = '', incluirme = false, contar = '' }){
+    const decir = (ok, txt) => { if (contar) toast(txt, ok ? 'bell' : 'alert'); };
     try {
-      if (typeof Nube === 'undefined' || !Nube.activa() || !Nube.uid) return;
+      if (typeof Nube === 'undefined' || !Nube.activa() || !Nube.uid) return Promise.resolve(null);
       const d = Correo.datos(), cfg = configFirebase();
-      if (!d || !d.url || !cfg) return;
-      fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      if (!d || !d.url || !cfg){ decir(false, `${contar}: el aviso al celular no salió (falta configurar el Apps Script en Ajustes → Correo)`); return Promise.resolve(null); }
+      return fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
         body: JSON.stringify({ accion:'push', clave:d.clave, db:cfg.databaseURL, para, excluir: incluirme ? '' : Nube.uid, titulo, texto, link, tag, urgente, sonido }) })
-        .then(r => r.json()).then(j => { if (j && !j.ok) console.warn('Aviso push:', j.error); }).catch(() => {});
-    } catch(e){}
+        .then(r => r.json()).then(j => {
+          if (j && !j.ok){ console.warn('Aviso push:', j.error); decir(false, `${contar}: el aviso al celular NO salió (${j.error || 'error'}). Avisá a la Administración.`); }
+          else if (j) decir(true, j.enviados ? `${contar}: el aviso sonó en ${plural(j.enviados, 'celular', 'celulares')}${j.fallidos ? ` (${j.fallidos} no lo recibieron)` : ''}` : `${contar}: nadie tiene los avisos activados para esto`);
+          return j;
+        }).catch(e => { decir(false, `${contar}: el aviso al celular no salió (sin internet)`); return null; });
+    } catch(e){ return Promise.resolve(null); }
   },
   /* Igual que enviar(), pero espera la respuesta: para la prueba de Ajustes. */
-  async enviarYContar({ para, titulo, texto = '', link = '', urgente = false, incluirme = true }){
+  async enviarYContar({ para, titulo, texto = '', link = '', urgente = false, incluirme = true, sonido = '', tag = '', espera = 0 }){
     const d = Correo.datos(), cfg = configFirebase();
     if (typeof Nube === 'undefined' || !Nube.activa() || !Nube.uid) throw new Error('En la demo no hay avisos push');
     if (!d || !d.url || !cfg) throw new Error('Falta configurar el correo (los avisos usan el mismo Apps Script)');
     const r = await fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-      body: JSON.stringify({ accion:'push', clave:d.clave, db:cfg.databaseURL, para, excluir: incluirme ? '' : Nube.uid, titulo, texto, link, tag:'prueba-' + Date.now(), urgente, sonido:'' }) });
+      body: JSON.stringify({ accion:'push', clave:d.clave, db:cfg.databaseURL, para, excluir: incluirme ? '' : Nube.uid, titulo, texto, link, tag: tag || 'prueba-' + Date.now(), urgente, sonido, espera }) });
     const j = await r.json();
     if (!j || !j.ok) throw new Error((j && j.error) || 'el Apps Script contestó que no');
     return j;
@@ -207,9 +225,16 @@ const Push = {
     setInterval(() => {
       if (!('serviceWorker' in navigator) || typeof Camion === 'undefined' || typeof Nube === 'undefined' || !Nube.arrancada) return;
       const camion = !!Camion.adentro(), correos = typeof Mensajeria !== 'undefined' ? Mensajeria.adentro().map(v => 'correo-' + v.id) : [];
-      navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(n => { const tag = String(n.tag || '');
+      navigator.serviceWorker.ready.then(reg => reg.getNotifications()).then(ns => ns.forEach(n => { const tag = String(n.tag || '').split('~')[0];
+        if (tag.startsWith('camion-prueba')) return;
         if ((tag.startsWith('camion-') && !camion) || (tag.startsWith('correo-') && !correos.includes(tag))) n.close(); })).catch(() => {});
     }, 60000);
+    /* Al abrir la app, el camión y el correo dejan de sonar en el teléfono
+       (ya se ven adentro): el aviso queda en la bandeja, callado. */
+    const callarSeries = () => { if (document.visibilityState !== 'visible' || !('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.ready.then(reg => reg.getNotifications().then(ns => { const bases = new Set(ns.map(n => String(n.tag || '')).filter(t => t.includes('~')).map(t => t.split('~')[0]));
+        bases.forEach(b => { if (reg.active) reg.active.postMessage({ callar:b }); }); })).catch(() => {}); };
+    document.addEventListener('visibilitychange', callarSeries); setTimeout(callarSeries, 1500);
     setInterval(() => this.cerrarResueltos(), 15000);
   },
 };
@@ -219,7 +244,9 @@ const Push = {
    silenciosas no justifican despertar un teléfono. */
 function empujarAviso(n){
   if (!n || !(n.sonido || n.urgente)) return;
-  Push.enviar({ para:n.para, titulo:n.titulo, texto:n.texto, link:n.link, tag:'n-' + n.id, urgente:n.urgente });
+  /* "Llegó sin aviso": la garita ve si el aviso sonó en los celulares del lote. */
+  const contar = /^llegada:/.test(n.link || '') && typeof esGuardia === 'function' && esGuardia() ? 'Aviso al lote' : '';
+  Push.enviar({ para:n.para, titulo:n.titulo, texto:n.texto, link:n.link, tag:'n-' + n.id, urgente:n.urgente, contar });
 }
 
 /* La tarjeta para activar los avisos, que va en "Tu cuenta" y en la portada. */
@@ -249,12 +276,18 @@ A['push-probar'] = async el => {
   if (typeof Sonido !== 'undefined'){ Sonido.tocar([[880, 0, .14], [1175, .14, .28]], 'sine', .16); Sonido.vibrar(120); }
   decir(`<div class="card plana small">${I('refresh')} Mandando la prueba a los equipos de tu cuenta…</div>`);
   if (!caja) toast('Mandando la prueba…', 'send');
+  /* PRUEBA CON EL TELÉFONO BLOQUEADO (20-10-2026): antes de mandarla se
+     anota este equipo otra vez en esta cuenta, y el aviso sale 10 segundos
+     después y suena igual que el camión (insiste como una llamada), así el
+     vecino bloquea el teléfono y escucha lo mismo que va a escuchar. */
   try {
-    const j = await Push.enviarYContar({ para:[yo().id], titulo:'Prueba de aviso', texto:'Si ves esto, los avisos al celular funcionan.', link:'inicio', incluirme:true });
-    const n = +j.enviados || 0, ios = Push.esIOS && Push.esIOS();
-    const txt = n ? `Salió a ${plural(n, 'equipo')} de tu cuenta. Aparece en unos segundos en la bandeja de avisos del teléfono.${ios ? '' : ' Si la app está abierta en pantalla, llega sin sonido (para no sonar dos veces). Para oírlo: tocá Probar y bloqueá el teléfono enseguida; en unos segundos suena.'}`
+    await Push.alDia(true);
+    decir(`<div class="card plana small">${I('lock')} <b>Bloqueá el teléfono ahora.</b> En 10 segundos tiene que sonar y vibrar varias veces, como cuando entra el camión.</div>`);
+    const j = await Push.enviarYContar({ para:[yo().id], titulo:'Prueba: así suena cuando entra el camión', texto:'Si lo oíste con el teléfono bloqueado, los avisos andan. Tocalo para que deje de sonar.', link:'inicio', incluirme:true, sonido:'camion', tag:'camion-prueba' + Date.now(), espera:10 });
+    const n = +j.enviados || 0;
+    const txt = n ? `Salió a ${plural(n, 'equipo')} de tu cuenta. ¿No sonó con el teléfono bloqueado? ${Push.comoQueSuene()}`
       : 'Tu cuenta no tiene ningún equipo anotado todavía. Tocá "Desactivar en este equipo" y después "Activar avisos" otra vez.';
-    decir(aviso(n ? 'ok' : 'warn', 'bell', n ? 'Prueba enviada' : 'No había a quién mandarla', esc(txt)));
+    decir(aviso(n ? 'ok' : 'warn', 'bell', n ? 'Prueba enviada' : 'No había a quién mandarla', txt));
     if (!caja) toast(n ? `Prueba enviada a ${plural(n, 'equipo')}` : 'Tu cuenta no tiene equipos anotados', 'bell');
   } catch(e){ decir(aviso('danger', 'alert', 'La prueba no salió', esc(e.message || 'sin respuesta del servidor'))); if (!caja) toast('La prueba no salió: ' + (e.message || ''), 'alert'); }
   if (b) b.disabled = false;

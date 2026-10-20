@@ -93,7 +93,8 @@ var RESPONDER_A = '';
 var TOPE_DIARIO = 80;
 
 /* Versión de este archivo: la app la lee para saber qué sabe hacer. */
-var VERSION_SCRIPT = 14;  /* 14 (15-10-2026): el parte del día de mantenimiento sale con un PDF adjunto (campo "pdf": {html, nombre}) */
+var VERSION_SCRIPT = 15;  /* 15 (20-10-2026): avisos push más rápidos (el tope diario se cuenta en memoria, sin leer toda la planilla), la prueba "con el teléfono bloqueado" (espera unos segundos antes de mandar) y un error de un aviso ya no borra los equipos anotados */
+/* 14 (15-10-2026): el parte del día de mantenimiento sale con un PDF adjunto (campo "pdf": {html, nombre}) */
 /* 13 (12-10-2026): más avisos por día (1500) y los urgentes (SOS, "llegó sin aviso") no se frenan hasta 4000; 12: cortes de luz, agua y gas a las 6 y a las 23; se borran las fotos y archivos de los mensajes vencidos */
 /* 11 (07-10-2026): equipos con la sesión cerrada reciben solo "un correo va a tu casa"; un equipo vale para la cuenta más nueva */
 
@@ -273,9 +274,14 @@ function mandarPush(d) {
      garita preguntando por una visita) recién se frena en 4000, para que un
      día movido no deje a nadie sin el aviso de un SOS. */
   var urgente = d.urgente === true || d.urgente === '1' || /^llegada/.test(String(d.link || '')) || String(d.sonido || '') === 'sos';
-  if (contarHoy('PUSH') >= (urgente ? 4000 : 1500)) return {ok: false, error: 'tope diario de avisos push alcanzado'};
+  if (pushHoy() >= (urgente ? 4000 : 1500)) return {ok: false, error: 'tope diario de avisos push alcanzado'};
   /* La dirección de la base queda guardada: la usa el reloj de "Estoy bien". */
   if (props.getProperty('BASE_URL') !== db) props.setProperty('BASE_URL', db);
+  /* La prueba "con el teléfono bloqueado" (20-10-2026): el vecino toca Probar
+     y bloquea el teléfono; el aviso sale unos segundos después, así se oye
+     como se va a oír el camión. Como mucho 20 segundos. */
+  var espera = Math.min(20, Math.max(0, +d.espera || 0));
+  if (espera) Utilities.sleep(espera * 1000);
   var destino = tokensDe(db, d.para, d.excluir, String(d.sonido || ''), d.link, d.titulo);
   if (!destino.equipos.length) return {ok: true, enviados: 0};
   var acceso = tokenGoogle('https://www.googleapis.com/auth/firebase.messaging');
@@ -293,13 +299,18 @@ function mandarPush(d) {
       payload: JSON.stringify({message: {token: e.t, data: datos,
         webpush: {headers: {Urgency: 'high', TTL: String(d.urgente ? 3600 : 10800)}}}})};
   });
-  var enviados = 0, borrar = {};
+  var enviados = 0, fallidos = 0, borrar = {};
   for (var i = 0; i < pedidos.length; i += 50) {
     var tanda = UrlFetchApp.fetchAll(pedidos.slice(i, i + 50));
     tanda.forEach(function (r, k) {
       var cod = r.getResponseCode(), e = destino.equipos[i + k];
       if (cod === 200) enviados++;
-      else if (cod === 404 || /UNREGISTERED|INVALID_ARGUMENT|NOT_FOUND/.test(r.getContentText())) borrar[e.uid + '/' + e.clave] = null;
+      /* Solo se saca el equipo cuando Google dice que ESE equipo ya no existe.
+         Antes también con cualquier INVALID_ARGUMENT, que Google devuelve
+         además cuando el aviso mismo tiene algo mal: un solo aviso así borraba
+         a todo el barrio de la lista y nadie recibía nada hasta el otro día. */
+      else if (cod === 404 || /UNREGISTERED|registration token/i.test(r.getContentText())) borrar[e.uid + '/' + e.clave] = null;
+      else fallidos++;
     });
   }
   /* Los equipos que ya no existen (se desinstaló la app, se borraron los
@@ -309,8 +320,9 @@ function mandarPush(d) {
       {method: 'patch', contentType: 'application/json', payload: JSON.stringify(borrar), muteHttpExceptions: true});
   }
   /* Los avisos de "Estoy bien" y del DEA no dejan nombres en el registro. */
-  registrar('PUSH', enviados + ' equipos', /^(bien-|dear-)/.test(datos.tag) ? 'aviso privado (Estoy bien / DEA)' : datos.titulo);
-  return {ok: true, enviados: enviados, borrados: Object.keys(borrar).length};
+  pushHoy(1);
+  registrar('PUSH', enviados + ' equipos' + (fallidos ? ' (' + fallidos + ' con error)' : ''), /^(bien-|dear-)/.test(datos.tag) ? 'aviso privado (Estoy bien / DEA)' : datos.titulo);
+  return {ok: true, enviados: enviados, borrados: Object.keys(borrar).length, fallidos: fallidos, de: destino.equipos.length};
 }
 
 /**
@@ -1015,6 +1027,21 @@ function registrar(resultado, para, detalle) {
   try {
     hojaRegistro().appendRow([new Date(), resultado, para, detalle || '']);
   } catch (e) { /* si el registro falla, el envío no debe fallar por eso */ }
+}
+
+/* El tope de avisos push del día, contado en la memoria del programa
+   (20-10-2026). Antes cada aviso leía la planilla de registro entera, que
+   crece todos los días, y el camión salía con segundos de demora. Si la
+   memoria se vacía (Google la limpia a las 6 horas), se cuenta una vez en la
+   planilla y se sigue desde ahí. */
+function pushHoy(sumar) {
+  var cache = CacheService.getScriptCache();
+  var clave = 'PUSHN-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd');
+  var n = cache.get(clave);
+  n = n === null ? contarHoy('PUSH') : +n;
+  if (sumar) { n += sumar; cache.put(clave, String(n), 21600); }
+  else if (cache.get(clave) === null) cache.put(clave, String(n), 21600);
+  return n;
 }
 
 function contarHoy(tipo) {

@@ -98,6 +98,23 @@ Si el lote está alquilado (o el propietario marcó "No vivo en el lote"), su eq
 expensas y comunicados de la Administración (no el camión, los correos ni el SOS). Lo que es para él,
 le llega siempre.
 
+## Suenan como una llamada (20-10-2026, versión 15)
+
+Pedido de Claudio: "entró el camión, tenía el celular bloqueado cargando y no sonó ni apareció el aviso".
+
+- **El camión, el correo que va a tu casa y "llegó sin avisar"** suenan y vibran **una y otra vez** (cada 4 segundos)
+  hasta que se toca el aviso: el camión hasta 45 segundos, el correo hasta 1 minuto, la visita hasta 15 minutos.
+  Al abrir la app deja de sonar (el aviso queda en la bandeja). En iPhone suena una vez por aviso (regla de Apple).
+- **La garita ve si salió**: al registrar el camión, un correo o una llegada sin aviso aparece
+  "el aviso sonó en N celulares", o "NO salió" con el motivo. Antes un error quedaba escondido.
+- **Probar** (Tu cuenta → Avisos) ahora espera 10 segundos antes de mandar: se toca, se bloquea el teléfono
+  y suena igual que el camión. Si no suena, la app dice qué revisar en Android o iPhone.
+- **El teléfono se anota de nuevo cada vez que se abre la app** (antes, una vez por día). Si en el mismo
+  teléfono se entró con otra cuenta (garita, Administración), los avisos iban a la última cuenta anotada.
+- `Codigo.gs` **versión 15**: los avisos salen más rápido (el tope del día ya no lee toda la planilla de
+  registro en cada aviso) y un aviso con un error ya no borra de la lista a todos los teléfonos del barrio
+  (antes pasaba con cualquier error "INVALID_ARGUMENT" de Google). Hay que pegarlo y hacer **Nueva versión**.
+
 ## Paso 3 — Cada vecino, en cada equipo
 
 **Tu cuenta (tu inicial, arriba a la derecha) → Avisos en este equipo → Activar avisos.** El navegador pide permiso: *Permitir*.
@@ -112,8 +129,9 @@ Con **Probar** llega un aviso de prueba a ese mismo equipo: bloqueá el teléfon
 
 ## Lo que NO se puede
 
-- Elegir el **sonido** del aviso: con la pantalla apagada suena el sonido de notificación
-  del teléfono. La melodía del camión de helados, la bocina de los correos y el aviso de "va a tu casa" suenan cuando la app está abierta (o se abre al tocar el aviso).
+- Elegir el **sonido** del aviso ni que suene con el teléfono en silencio o en "No molestar": con la
+  pantalla apagada suena el sonido de notificación del teléfono (repetido, en los tres avisos de arriba).
+  Una pantalla de llamada de verdad (a pantalla completa) solo la puede mostrar una app de tienda (Play Store / App Store). La melodía del camión de helados, la bocina de los correos y el aviso de "va a tu casa" suenan cuando la app está abierta (o se abre al tocar el aviso).
   Sí se elige la **vibración**: el camión tiene su propio ritmo.
 - Garantizar la entrega en equipos en **ahorro de batería extremo** o sin datos.
 

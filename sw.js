@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261018-224753';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261018-224753',
-  './js/firebase-config.js?v=20261018-224753', './js/icons.js?v=20261018-224753', './js/agenda.js?v=20261018-224753', './js/padron.js?v=20261018-224753', './js/core.js?v=20261018-224753', './js/seed.js?v=20261018-224753', './js/clima.js?v=20261018-224753', './js/calendario.js?v=20261018-224753',
-  './js/v-inicio.js?v=20261018-224753', './js/v-comunidad.js?v=20261018-224753', './js/v-gestion.js?v=20261018-224753', './js/admin.js?v=20261018-224753', './js/v-vecinos.js?v=20261018-224753', './js/v-expensas.js?v=20261018-224753', './js/v-plan.js?v=20261018-224753', './js/v-contable.js?v=20261018-224753', './js/v-servicio.js?v=20261018-224753', './js/v-legal.js?v=20261018-224753', './js/v-hotel.js?v=20261018-224753', './js/v-cuidados.js?v=20261018-224753', './js/v-casa.js?v=20261018-224753', './js/mapa.js?v=20261018-224753', './js/ronda-mapa.js?v=20261018-224753', './js/recorrido.js?v=20261018-224753', './js/reglas.js?v=20261018-224753', './js/asistente.js?v=20261018-224753', './js/v-manual.js?v=20261018-224753', './js/push.js?v=20261018-224753', './js/sismos.js?v=20261018-224753', './js/nube.js?v=20261018-224753', './js/adjuntos.js?v=20261018-224753', './js/historial.js?v=20261018-224753', './js/v-supervisor.js?v=20261018-224753', './js/guardia.js?v=20261018-224753', './js/mantenimiento.js?v=20261018-224753', './js/mant-vivo.js?v=20261018-224753', './js/relevos.js?v=20261018-224753', './js/app.js?v=20261018-224753',
+const CACHE = 'bhc-20261020-091829';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261020-091829',
+  './js/firebase-config.js?v=20261020-091829', './js/icons.js?v=20261020-091829', './js/agenda.js?v=20261020-091829', './js/padron.js?v=20261020-091829', './js/core.js?v=20261020-091829', './js/seed.js?v=20261020-091829', './js/clima.js?v=20261020-091829', './js/calendario.js?v=20261020-091829',
+  './js/v-inicio.js?v=20261020-091829', './js/v-comunidad.js?v=20261020-091829', './js/v-gestion.js?v=20261020-091829', './js/admin.js?v=20261020-091829', './js/v-vecinos.js?v=20261020-091829', './js/v-expensas.js?v=20261020-091829', './js/v-plan.js?v=20261020-091829', './js/v-contable.js?v=20261020-091829', './js/v-servicio.js?v=20261020-091829', './js/v-legal.js?v=20261020-091829', './js/v-hotel.js?v=20261020-091829', './js/v-cuidados.js?v=20261020-091829', './js/v-casa.js?v=20261020-091829', './js/mapa.js?v=20261020-091829', './js/ronda-mapa.js?v=20261020-091829', './js/recorrido.js?v=20261020-091829', './js/reglas.js?v=20261020-091829', './js/asistente.js?v=20261020-091829', './js/v-manual.js?v=20261020-091829', './js/push.js?v=20261020-091829', './js/sismos.js?v=20261020-091829', './js/nube.js?v=20261020-091829', './js/adjuntos.js?v=20261020-091829', './js/historial.js?v=20261020-091829', './js/v-supervisor.js?v=20261020-091829', './js/guardia.js?v=20261020-091829', './js/mantenimiento.js?v=20261020-091829', './js/mant-vivo.js?v=20261020-091829', './js/relevos.js?v=20261020-091829', './js/app.js?v=20261020-091829',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
@@ -90,11 +90,36 @@ async function insistirLlegada(base, titulo, op){
   }
   if (INSISTE.get(base) === marca) INSISTE.delete(base);
 }
+/* =========================================================
+   EL CAMIÓN Y EL CORREO TAMBIÉN SUENAN COMO UNA LLAMADA (pedido de Claudio,
+   20-10-2026: "entró el camión, tenía el celular bloqueado cargando y no
+   sonó; tiene que avisar como una llamada o un WhatsApp"). Igual que "Llegó
+   sin aviso": el teléfono lo vuelve a hacer sonar y vibrar cada 4 segundos
+   hasta que se toca o se desliza, como mucho 45 segundos el camión y 1
+   minuto el correo que va a tu casa. Cada vez se cierra el anterior y se
+   muestra uno nuevo (tag "camion-<id>~<hora>"), porque un aviso repetido
+   con el mismo nombre en muchos teléfonos llega mudo.
+   ========================================================= */
+const SUENA_COMO_LLAMADA = { camion:45000, correo:60000 };
+const cerrarSerie = base => self.registration.getNotifications().then(ns => ns.forEach(n => { if (String(n.tag || '').split('~')[0] === base) n.close(); }));
+async function insistirSerie(base, titulo, op, dura){
+  const fin = Date.now() + dura, marca = {}; INSISTE.set(base, marca);
+  while (INSISTE.get(base) === marca && Date.now() < fin){
+    await new Promise(r => setTimeout(r, 4000));
+    if (INSISTE.get(base) !== marca) break;
+    const ns = await self.registration.getNotifications();
+    if (!ns.some(n => String(n.tag || '').split('~')[0] === base)) break;    /* la tocó o la deslizó */
+    await cerrarSerie(base);
+    await self.registration.showNotification(titulo, { ...op, tag: base + '~' + Date.now(), timestamp: Date.now() });
+  }
+  if (INSISTE.get(base) === marca) INSISTE.delete(base);
+}
 self.addEventListener('message', e => {
   /* La app contestó (o la vio en pantalla): se calla y se saca de la bandeja. */
-  const b = e.data && e.data.callar; if (b){ INSISTE.delete(b); e.waitUntil(cerrarLlegada(b)); }
+  /* El camión y el correo solo dejan de sonar: el aviso queda en la bandeja. */
+  const b = e.data && e.data.callar; if (b){ INSISTE.delete(b); if (/^llegada-/.test(b)) e.waitUntil(cerrarLlegada(b)); }
 });
-self.addEventListener('notificationclose', e => { const b = baseLlegada(e.notification.data && e.notification.data.link); if (b) INSISTE.delete(b); });
+self.addEventListener('notificationclose', e => { const b = baseLlegada(e.notification.data && e.notification.data.link) || (e.notification.data && e.notification.data.serie); if (b) INSISTE.delete(b); });
 self.addEventListener('push', e => {
   let j = {};
   try { j = e.data ? e.data.json() : {}; } catch(err){ j = { data:{ texto: e.data ? e.data.text() : '' } }; }
@@ -133,13 +158,18 @@ self.addEventListener('push', e => {
       if (!iOS && aLaVista){ op.silent = true; delete op.vibrate; return mostrarLlegada(base, titulo, op); }
       return mostrarLlegada(base, titulo, op).then(() => insistirLlegada(base, titulo, op)); }
     if (!iOS && aLaVista){ op.silent = true; delete op.vibrate; }
+    const dura = SUENA_COMO_LLAMADA[d.sonido];
+    if (dura && op.tag && !op.silent){ const serie = op.tag;
+      const fuerte = { ...op, requireInteraction:true, renotify:true, tag: serie + '~' + Date.now(), data:{ ...op.data, serie },
+        vibrate: d.sonido === 'camion' ? [400, 120, 400, 120, 400, 120, 900] : [600, 150, 600, 150, 900] };
+      return cerrarSerie(serie).then(() => self.registration.showNotification(titulo, fuerte)).then(() => insistirSerie(serie, titulo, fuerte, dura)); }
     return self.registration.showNotification(titulo, op);
   }));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   let link = (e.notification.data && e.notification.data.link) || '';
-  const bl = baseLlegada(link); if (bl) INSISTE.delete(bl);
+  const bl = baseLlegada(link) || (e.notification.data && e.notification.data.serie); if (bl) INSISTE.delete(bl);
   if (/^llegada-fin:/.test(link)) link = 'visitas';
   if (/^llegada:/.test(link) && (e.action === 'si' || e.action === 'no' || e.action === 'noesta')) link = 'responder:' + link + ':' + e.action;
   if (/^visitas:no~/.test(link) && (e.action === 'cambiar' || e.action === 'nollega')) link = link + '~' + e.action;
