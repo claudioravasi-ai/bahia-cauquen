@@ -111,7 +111,7 @@ function estadoVan(v){
   const m = hotelMovs().find(x => x.vanId === v.id);
   return !m ? { adentro:true, desde:0, sin:true } : { adentro:m.tipo === 'in', desde:m.at };
 }
-const DESTINOS_HOTEL = { aeropuerto:['Aeropuerto', 'send'], puerto:['Puerto', 'drop'], centro:['Centro', 'pin'], excursion:['Excursión', 'tree'], otro:['Otro', 'car'] };
+const DESTINOS_HOTEL = { aeropuerto:['Aeropuerto', 'send'], puerto:['Puerto', 'barco'], centro:['Centro', 'pin'], excursion:['Excursión', 'tree'], otro:['Otro', 'car'] };
 const ESTADO_VIAJE = { programado:['Programado', 'sky'], en_curso:['En viaje', 'warn'], hecho:['Hecho', 'ok'], cancelado:['Cancelado', ''] };
 
 /* Cuándo tiene que salir la van, según el vuelo o el crucero. */
@@ -274,19 +274,69 @@ const chipsHotel = con => `<div class="chips">${CANALES_HOTEL.map(c => { const n
        un tablero como el del aeropuerto, con el botón de la van ya
        calculado.
    ========================================================= */
-const HotelVista = { hoyTab:'vuelos', filtro:'todos', abierto:'' };
+const HotelVista = { hoyTab:'vuelos', filtro:'porhacer', abierto:'' };
+/* QUÉ QUEDA POR HACER (pedido de Claudio, 20-10-2026: "si son las 19 h y
+   solo falta uno a las 20 h, que me muestre solo eso"). Por hacer = la van
+   que está en viaje, o la programada que todavía no tendría que haber
+   salido (con 15 min de gracia, como "Lo próximo"). La programada cuya hora
+   ya pasó y nadie registró en la garita queda como "Sin registrar": no se
+   cuenta como por hacer, pero se ve en "Todos". */
+const viajeSinRegistrar = x => x.estado === 'programado' && (x.fecha < hoyISO() || (x.fecha === hoyISO() && (minDe(x.sale) ?? 9999) < ahoraMin() - 15));
+const viajePorHacer = x => x.estado === 'en_curso' || (x.estado === 'programado' && !viajeSinRegistrar(x));
+const FILTROS_TRAS = { porhacer:viajePorHacer, viaje:x => x.estado === 'en_curso', hechos:x => x.estado === 'hecho', todos:() => true };
+/* Una botonera de pestañas con una pastilla de color que se desliza hasta
+   la elegida y una onda al tocar (idea de BetterSegmentedControl, 2,4k★, y
+   Segmentio, 2,5k★; el código es propio, solo CSS). La usan los filtros de
+   los traslados, los de huéspedes y Hoy en Ushuaia. Cada opción: k (clave),
+   t (texto), n (cantidad, opcional), ic (ícono, opcional), c (color). */
+function segmento(items, actual, accion, cls = ''){
+  const i = Math.max(0, items.findIndex(x => x.k === actual));
+  return `<div class="seg-vivo ${cls}" role="tablist" style="--n:${items.length};--i:${i};--sc:${items[i].c || 'var(--ink)'}"><span class="seg-ind" aria-hidden="true"></span>${items.map((x, j) =>
+    `<button type="button" role="tab" aria-selected="${j === i}" class="seg-b ${j === i ? 'on' : ''}" data-a="${accion}" data-v="${esc(x.k)}" style="--c:${x.c || 'var(--ink)'}">${x.ic ? I(x.ic) : ''}${x.n != null ? `<b class="seg-n">${x.n}</b>` : ''}<span class="seg-t">${x.t}</span></button>`).join('')}</div>`;
+}
 /* "en 1 h 20 min", "en 5 min", "ahora", "hace 10 min". */
 function faltaTexto(hhmm){
   const t = minDe(hhmm); if (t == null) return '';
   const d = t - ahoraMin(), a = Math.abs(d), txt = a >= 60 ? `${Math.floor(a / 60)} h${a % 60 ? ' ' + (a % 60) : ''}` : `${a} min`;
   return a < 2 ? 'ahora' : d > 0 ? 'en ' + txt : 'hace ' + txt;
 }
-function pulsoHotel(prox, hsHoy, hsSalen, info){
-  const k = (v, n, t, ic, cls) => `<button type="button" class="hp-kpi ${cls}" data-a="abrir" data-v="${v}">${I(ic)}<b>${n}</b><span>${t}</span></button>`;
-  return `<div class="hp-pulso">${k('hotel-traslados', prox, prox === 1 ? 'traslado por hacer' : 'traslados por hacer', 'car', 'k-wood')}
-    ${k('hotel-huespedes', hsHoy, 'llegan hoy', 'login', 'k-sky')}${k('hotel-huespedes', hsSalen, 'se van hoy', 'logout', 'k-accent')}
-    ${k('hotel-ficha', info.huespedesHoy || 0, 'huéspedes', 'users', 'k-ok')}</div>`;
+/* LA RECEPCIÓN EN VIVO, DE UN VISTAZO (pedido de Claudio, 20-10-2026:
+   "que en una sola mirada se vea todo lo que el hotel está en tiempo real").
+   Cuatro tarjetas que se tocan, cada una con su número que sube contando
+   cuando cambia, una línea que explica y una barra de avance (idea de las
+   tarjetas de tremor, 16k★, number-flow, 7,7k★, y el "Hoy: llegadas,
+   salidas, alojados" de los sistemas de hotel como QloApps, 14k★; el
+   código es propio):
+     · Traslados por hacer: solo lo que falta desde ahora, y el próximo.
+     · Llegan hoy: personas que hacen check-in hoy, y cuántas ya entraron.
+     · Se van hoy: check-out de hoy, y cuántas ya salieron.
+     · Alojados: los que siguen en el hotel (ni llegan ni se van hoy).
+   Cada una abre su lista con ese filtro puesto. */
+function huespedesDelDia(hoy = hoyISO()){
+  const hs = hotelHuespedes(), pax = ls => ls.reduce((a, h) => a + (+h.pax || 1), 0);
+  const llegan = hs.filter(h => h.desde === hoy), salen = hs.filter(h => h.hasta === hoy && h.desde <= hoy), estan = hs.filter(h => h.desde < hoy && h.hasta > hoy);
+  return { llegan, salen, estan, futuros:hs.filter(h => h.desde > hoy), pax };
 }
+function pulsoHotel(vs){
+  const hd = huespedesDelDia(), ph = vs.filter(viajePorHacer), hechos = vs.filter(x => x.estado === 'hecho').length, viaje = vs.filter(x => x.estado === 'en_curso').length;
+  const prox = ph.find(x => x.estado === 'programado'), pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  const nLl = hd.pax(hd.llegan), inLl = hd.pax(hd.llegan.filter(h => h.ingreso)), nSa = hd.pax(hd.salen), outSa = hd.pax(hd.salen.filter(h => h.salida)), nEs = hd.pax(hd.estan);
+  const k = ({ a, v, p, n, t, s, ic, c, barra, i }) => `<button type="button" class="hp-kpi ${n ? '' : 'cero'}" data-a="${a}" data-v="${v}" data-p="${p || ''}" style="--k:${c};--i:${i}">
+      <span class="hp-kpi-top"><span class="hp-kpi-ic">${I(ic)}</span><i class="hp-kpi-vivo" aria-hidden="true"></i></span>
+      <b class="dn-num" data-k="hp-${v}${p || ''}" data-n="${n}">${n}</b><span class="hp-kpi-t">${t}</span><small class="hp-kpi-s">${s}</small>
+      <span class="hp-kpi-barra" aria-hidden="true"><i style="width:${barra}%"></i></span></button>`;
+  return `<div class="hp-pulso" aria-label="El hotel ahora">
+    ${k({ a:'hkpi-tras', v:'porhacer', n:ph.length, t:ph.length === 1 ? 'traslado por hacer' : 'traslados por hacer', ic:'car', c:'var(--wood)', i:0,
+      s: viaje ? `${viaje} en viaje ahora${prox ? ' · después ' + esc(prox.sale) : ''}` : prox ? `próximo ${esc(prox.sale)} · ${esc(faltaTexto(prox.sale))}` : vs.length ? 'no queda nada por hoy' : 'sin traslados hoy', barra:pct(hechos, vs.length) })}
+    ${k({ a:'abrir', v:'hotel-huespedes', p:'llegan', n:nLl, t:'llegan hoy', ic:'login', c:'var(--sky)', i:1,
+      s: hd.llegan.length ? (inLl >= nLl ? 'ya entraron todos' : `${plural(hd.llegan.length, 'reserva')} · ${nLl - inLl} sin entrar`) : 'nadie anunciado', barra:pct(inLl, nLl) })}
+    ${k({ a:'abrir', v:'hotel-huespedes', p:'salen', n:nSa, t:'se van hoy', ic:'logout', c:'var(--accent)', i:2,
+      s: hd.salen.length ? (outSa >= nSa ? 'ya salieron todos' : `${plural(hd.salen.length, 'reserva')} · ${nSa - outSa} por salir`) : 'ningún check-out', barra:pct(outSa, nSa) })}
+    ${k({ a:'abrir', v:'hotel-huespedes', p:'estan', n:nEs, t:nEs === 1 ? 'alojado' : 'alojados', ic:'users', c:'var(--ok)', i:3,
+      s: hd.estan.length ? `en ${plural(hd.estan.length, 'reserva')} · siguen mañana` : 'nadie de estadía', barra: nEs ? 100 : 0 })}</div>`;
+}
+/* "Traslados por hacer": abre Vans y traslados con ese filtro puesto. */
+A['hkpi-tras'] = () => { HotelVista.filtro = 'porhacer'; abrir('hotel-traslados'); };
 /* La van que sale después: grande, con cuenta regresiva. */
 function proximaVan(vs){
   const ahora = ahoraMin(), x = vs.find(v => v.estado === 'en_curso') || vs.find(v => v.estado === 'programado' && (minDe(v.sale) ?? 9999) >= ahora - 15);
@@ -323,18 +373,17 @@ function rielDia(vs, dia){
 }
 /* La línea de tiempo: cada traslado se toca y se abre. */
 function lineaTraslados(vs, { dia = hoyISO(), acciones = false, max = 99 } = {}){
-  const F = { todos:() => true, pendientes:x => x.estado === 'programado', viaje:x => x.estado === 'en_curso', hechos:x => x.estado === 'hecho' };
-  const n = k => vs.filter(F[k]).length, f = F[HotelVista.filtro] ? HotelVista.filtro : 'todos', lista = vs.filter(F[f]).slice(0, max);
-  const chips = `<div class="hl-filtros" role="tablist">${[['todos', 'Todos'], ['pendientes', 'Pendientes'], ['viaje', 'En viaje'], ['hechos', 'Hechos']].map(([k, t]) =>
-    `<button type="button" role="tab" aria-selected="${k === f}" class="hl-f ${k === f ? 'on' : ''}" data-a="htras-filtro" data-v="${k}">${t}<span>${n(k)}</span></button>`).join('')}</div>`;
+  const F = FILTROS_TRAS, n = k => vs.filter(F[k]).length, f = F[HotelVista.filtro] ? HotelVista.filtro : 'porhacer', lista = vs.filter(F[f]).slice(0, max);
+  const chips = segmento([{ k:'porhacer', t:'Por hacer', c:'var(--wood)' }, { k:'viaje', t:'En viaje', c:'var(--warn)' }, { k:'hechos', t:'Hechos', c:'var(--ok)' }, { k:'todos', t:'Todos', c:'var(--sky)' }]
+    .map(x => ({ ...x, n:n(x.k) })), f, 'htras-filtro', 'apilado');
   const ahora = ahoraMin(), esHoy = dia === hoyISO();
   let marcoAhora = !esHoy;
   const filas = lista.map(x => {
-    const d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro, e = ESTADO_VIAJE[x.estado] || ESTADO_VIAJE.programado, van = hotelVans().find(v => v.id === x.vanId), aj = ajusteViaje(x);
+    const d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro, sinReg = viajeSinRegistrar(x), e = sinReg ? ['Sin registrar', 'danger'] : ESTADO_VIAJE[x.estado] || ESTADO_VIAJE.programado, van = hotelVans().find(v => v.id === x.vanId), aj = ajusteViaje(x);
     let linea = '';
     if (!marcoAhora && (minDe(x.sale) ?? 0) > ahora){ marcoAhora = true; linea = `<li class="hl-ahora"><span>${I('clock')} Ahora · ${hhmmDe(ahora)}</span></li>`; }
     const abierto = HotelVista.abierto === x.id;
-    return `${linea}<li class="hl-item e-${esc(x.estado)} ${abierto ? 'abierto' : ''}" id="tras-${esc(x.id)}">
+    return `${linea}<li class="hl-item e-${esc(x.estado)} ${sinReg ? 'sin-reg' : ''} ${abierto ? 'abierto' : ''}" id="tras-${esc(x.id)}">
       <span class="hl-hora"><b>${esc(x.sale || '—')}</b><small>${esHoy && x.estado === 'programado' ? esc(faltaTexto(x.sale)) : e[0]}</small></span>
       <span class="hl-nodo">${I(d[1])}</span>
       <div class="hl-card"><button type="button" class="hl-cab" data-a="hviaje-ver" data-id="${esc(x.id)}" aria-expanded="${abierto}">
@@ -350,7 +399,7 @@ function lineaTraslados(vs, { dia = hoyISO(), acciones = false, max = 99 } = {})
           ${esHotel() ? `<div class="btns"><button class="btn btn-xs btn-pri" data-a="hviaje-editar" data-id="${esc(x.id)}">${I('edit')}Editar</button>${van ? `<button class="btn btn-xs btn-sec" data-a="hvan-qr" data-id="${esc(van.id)}">${I('qr')}QR de la van</button>` : ''}</div>` : ''}</div>` : ''}</div></li>`;
   }).join('');
   const fin = !marcoAhora && lista.length ? `<li class="hl-ahora"><span>${I('clock')} Ahora · ${hhmmDe(ahora)}</span></li>` : '';
-  return `${chips}${lista.length ? `<ol class="hl-linea">${filas}${fin}</ol>` : `<div class="hl-vacio">${I('check')} ${vs.length ? 'Nada con ese filtro.' : `No hay traslados ese día.${esHotel() ? ' Se agregan con "+ Traslado", arriba.' : ''}`}</div>`}`;
+  return `${chips}${lista.length ? `<ol class="hl-linea">${filas}${fin}</ol>` : `<div class="hl-vacio">${I('check')} ${vs.length ? (f === 'porhacer' ? 'No queda nada por hacer: todo salió o ya se hizo.' : 'Nada con ese filtro.') : `No hay traslados ese día.${esHotel() ? ' Se agregan con "+ Traslado", arriba.' : ''}`}</div>`}`;
 }
 /* PASOS POR LA GARITA (pedido de Claudio, 11-10-2026: "hacele un diseño
    más innovador"). Un PORTÓN: arriba, cuántas salidas y entradas hubo y
@@ -372,12 +421,12 @@ function portonHotel(movs){
         <small>${v.patente ? `<span class="hp-chapa chica">${esc(chapaTexto(v.patente))}</span> ` : ''}${m.viaje ? esc(m.viaje) + ' · ' : ''}${haceTxt(m.at)}</small></span>
         <span class="pt-flecha" aria-hidden="true">${entra ? '→' : '←'}</span></div></li>`; }).join('')}</ol></div>`;
 }
-A['htras-filtro'] = el => { HotelVista.filtro = el.dataset.v || 'todos'; refrescar(); };
+A['htras-filtro'] = el => { HotelVista.filtro = FILTROS_TRAS[el.dataset.v] ? el.dataset.v : 'porhacer'; refrescar(); };
 A['hviaje-ver'] = el => {
   const id = el.dataset.id; HotelVista.abierto = HotelVista.abierto === id ? '' : id;
   /* El filtro no puede esconder el que se quiere ver. */
   const x = hotelViajes().find(v => v.id === id);
-  if (x && HotelVista.abierto && !({ todos:1, pendientes:x.estado === 'programado', viaje:x.estado === 'en_curso', hechos:x.estado === 'hecho' })[HotelVista.filtro]) HotelVista.filtro = 'todos';
+  if (x && HotelVista.abierto && !(FILTROS_TRAS[HotelVista.filtro] || FILTROS_TRAS.todos)(x)) HotelVista.filtro = 'todos';
   refrescar();
   setTimeout(() => { const li = document.getElementById('tras-' + id); if (li) li.scrollIntoView({ block:'nearest', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'auto' : 'smooth' }); }, 60);
 };
@@ -451,15 +500,15 @@ function hoyEnUshuaiaHotel(){
   const hoy = hoyISO();
   const cr = Cruceros.lista().filter(c => c.fecha >= hoy && c.fecha <= sumarDias(hoy, 2)).slice(0, 6);
   const ev = aLista(Store.s.eventosCiudad).filter(e => e && e.fecha >= hoy && e.fecha <= sumarDias(hoy, 7)).sort((a, b) => a.fecha.localeCompare(b.fecha)).slice(0, 5);
-  const tabs = [['vuelos', 'send', 'Vuelos', vuelosParaVan('D').length + vuelosParaVan('A').length], ['cruceros', 'drop', 'Cruceros', cr.length], ['eventos', 'calendar', 'Eventos', ev.length]];
-  const tab = tabs.some(t => t[0] === HotelVista.hoyTab) ? HotelVista.hoyTab : 'vuelos';
+  const tabs = [{ k:'vuelos', ic:'send', t:'Vuelos', n:vuelosParaVan('D').length + vuelosParaVan('A').length, c:'var(--sky)' }, { k:'cruceros', ic:'barco', t:'Cruceros', n:cr.length, c:'var(--brand)' }, { k:'eventos', ic:'calendar', t:'Eventos', n:ev.length, c:'var(--accent)' }];
+  const tab = tabs.some(t => t.k === HotelVista.hoyTab) ? HotelVista.hoyTab : 'vuelos';
   const cuerpo = tab === 'vuelos' ? `${tableroVuelos({ max:5 })}<button class="hu-todos" data-a="abrir" data-v="hotel-vuelos">${I('send')}Todos los vuelos de hoy${I('right')}</button>`
     : tab === 'cruceros' ? `<div class="hc-lista">${cr.length ? cr.map(tarjetaCrucero).join('')
-        : `<p class="hu-nada">${I('drop')} ${Cruceros.url() ? 'No hay recaladas en los próximos tres días.' : 'El cronograma de cruceros todavía no está conectado.'}</p>`}
-        <button class="hu-todos" data-a="abrir" data-v="cruceros">${I('drop')}Ver todos los cruceros${I('right')}</button></div>`
+        : `<p class="hu-nada">${I('barco')} ${Cruceros.url() ? 'No hay recaladas en los próximos tres días.' : 'El cronograma de cruceros todavía no está conectado.'}</p>`}
+        <button class="hu-todos" data-a="abrir" data-v="cruceros">${I('barco')}Ver todos los cruceros${I('right')}</button></div>`
     : `<div class="he-lista">${ev.length ? ev.map(tarjetaEventoCiudad).join('') : `<p class="hu-nada">${I('calendar')} Sin eventos cargados para esta semana.</p>`}
         <button class="hu-todos" data-a="abrir" data-v="ushuaia">${I('calendar')}Ushuaia hoy: agenda completa${I('right')}</button></div>`;
-  return `<div class="hu-caja"><div class="hu-tabs" role="tablist">${tabs.map(([k, ic, t, n]) => `<button type="button" role="tab" aria-selected="${k === tab}" class="hu-tab ${k === tab ? 'on' : ''}" data-a="hhoy-tab" data-v="${k}">${I(ic)}${t}${n ? `<span>${n}</span>` : ''}</button>`).join('')}</div>${cuerpo}</div>`;
+  return `<div class="hu-caja"><div class="hu-tabs">${segmento(tabs.map(x => ({ ...x, n:x.n || null })), tab, 'hhoy-tab', 'iconos')}</div><div class="hu-cuerpo" data-k="hu-${tab}">${cuerpo}</div></div>`;
 }
 /* Un crucero: el barco, su día, la estadía en el puerto (llega → sale) y
    los dos botones con la hora de la van ya calculada. */
@@ -498,17 +547,20 @@ A['hhoy-tab'] = el => { HotelVista.hoyTab = el.dataset.v || 'vuelos'; refrescar(
      · al abrir la portada, las tejas entran de a una (solo la primera vez).
    Con "reducir movimiento" del teléfono queda todo quieto.
    ========================================================= */
-function hotelEnLaApp({ prox = 0, promosPend = 0, sinLeer = 0 } = {}){
+function hotelEnLaApp({ promosPend = 0, sinLeer = 0 } = {}){
   const lotes = typeof lotesDelHotel === 'function' ? lotesDelHotel() : [];
   let exp = null;
   if (lotes.length){ const d = deudaGrupo(lotes), tot = totalDeuda(d), l = liquidacionesEmitidas().slice(-1)[0];
     exp = { t:'Expensas del hotel', s: tot > .5 ? `${plata(tot)} entre las ${lotes.length} UF${l ? ' · vence el ' + fechaCorta(vtoDe(l.periodo, 1)) : ''}` : `Las ${lotes.length} UF al día · cupones y recibos`, badge: tot > .5 ? '!' : '' }; }
   const rs = hotelRutinas().filter(r => r.activa !== false).length;
   const T = [
-    { v:'hotel-traslados', ic:'car', c:'wood', t:'Vans y traslados', s:'Aeropuerto, puerto, excursiones · con el QR de cada van', n:prox, grande:true },
-    { v:'hotel-vuelos', ic:'send', c:'sky', t:'Vuelos para las vans', s:'La hora de la van, ya calculada' },
+    /* Vans y traslados, Vuelos para las vans y Huéspedes ya no van acá:
+       están arriba, en las tarjetas en vivo, "Vans ahora" y Hoy en Ushuaia
+       (pedido de Claudio, 20-10-2026: "ventanas que redundan"). */
+    ...(typeof agendaDe === 'function' ? [(() => { const f = sumarDias(hoyISO(), 1), ag = agendaDe(f);
+      return { v:'hotel-agenda', ic:'calendar', c:'accent', t:'Agenda de mañana', s: !ag ? 'Se arma sola a las 22 h' : ag.estado === 'aprobada' ? `Aprobada${ag.recibido ? ' · la garita la recibió' : ''}` : 'Espera tu OK', badge: ag && ag.estado === 'pendiente' ? '!' : '' }; })(),
+      { v:'hotel-bitacora', ic:'book', c:'ok', t:'Bitácora del hotel', s:'El día paso a paso · PDF por correo a las 23:59' }] : []),
     { v:'hotel-rutinas', ic:'refresh', c:'ok', t:'Traslados automatizados', s: rs ? `${plural(rs, 'activo', 'activos')} · se arman solos` : 'Las salidas de siempre, una vez' },
-    { v:'hotel-huespedes', ic:'users', c:'accent', t:'Huéspedes', s:'Lista del día para la garita · se borran solos' },
     { v:'privado', p:'hotel', ic:'chat', c:'brand', t:'Comunicación interna', s:'Con la garita o la Administración', badge:sinLeer },
     { v:'hotel-promos', ic:'sparkle', c:'cobre', t:'Promociones', s:'Salen en la tira de todas las apps', badge:promosPend },
     { v:'hotel-eventos', ic:'star', c:'accent', t:'Eventos del hotel', s:'La garita se entera; los vecinos, si hace falta' },
@@ -537,16 +589,16 @@ R.hotel = {
   render(){
     if (!esHotel()) return R['hotel-vivo'].render();
     const hoy = hoyISO(), info = hotelInfo(), c = Clima.d?.c, vans = hotelVans();
-    const vs = viajesDelDia(hoy), prox = vs.filter(x => x.estado === 'programado' || x.estado === 'en_curso');
+    const vs = viajesDelDia(hoy);
     const ajustes = vs.filter(x => ajusteViaje(x));
     const evHoy = hotelEventos().filter(e => e.fecha === hoy);
-    const hsHoy = hotelHuespedes().filter(h => h.desde === hoy), hsSalen = hotelHuespedes().filter(h => h.hasta === hoy);
     const promosPend = promosViejasPend().length;
     const sinLeer = aLista(Store.s.privados).reduce((a, h) => a + aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length, 0);
     return `<div class="hotel-hero hp-hero"><img src="img/logo-noche.png" alt="" width="54" height="54">
         <div class="grow"><small>${fechaLarga(hoy)}</small><h1>${HOTEL_NOMBRE}</h1><span>Recepción${info.responsable ? ' · responsable: ' + esc(info.responsable) : ''}</span></div>
         ${c ? `<div class="hotel-temp"><b>${Math.round(c.temperature_2m)}°</b><small>${Clima.cod(c.weather_code)[0]}</small></div>` : ''}</div>
-      ${pulsoHotel(prox.length, hsHoy.length, hsSalen.length, info)}
+      ${pulsoHotel(vs)}
+      ${typeof bandaAgenda === 'function' ? bandaAgenda() : ''}
       <div class="inicio-lienzo">
         ${typeof mantHero === 'function' ? mantHero() : ''}
         ${ajustes.length || evHoy.length ? `<section class="bloque">${ajustes.map(x => { const aj = ajusteViaje(x); return aviso(aj.cancelado ? 'danger latido' : 'warn', 'clock', aj.cancelado ? `Vuelo ${esc(x.ref.nro)} cancelado` : `Cambió el ${esc(x.ref.nro)}: la van conviene que salga ${esc(aj.sale)}`, esc(textoViaje(x)), aj.cancelado ? '' : `<button class="btn btn-xs btn-pri" data-a="hviaje-ajustar" data-id="${esc(x.id)}" data-v="${esc(aj.sale)}">Ajustar a las ${esc(aj.sale)}</button>`); }).join('')}
@@ -559,11 +611,12 @@ R.hotel = {
             <div class="card hl-caja">${rielDia(vs, hoy)}${lineaTraslados(vs, { dia:hoy, max:8 })}</div></div>
         </section>
         <section class="bloque">${sec('Hoy en Ushuaia, para el hotel')}${hoyEnUshuaiaHotel()}</section>
-        <section class="bloque">${sec('El hotel en la app', '<span class="muted small">tocá y entrá</span>')}${hotelEnLaApp({ prox:prox.length, promosPend, sinLeer })}</section>
+        <section class="bloque">${sec('El hotel en la app', '<span class="muted small">tocá y entrá</span>')}${hotelEnLaApp({ promosPend, sinLeer })}</section>
         ${pieApp()}
       </div>`;
   },
-  alPintar(){ if (!Vuelos.d || Date.now() - Vuelos.d.t > Vuelos.cadencia()) Vuelos.pedir().then(() => { if (PILA.at(-1)?.id === 'hotel') refrescarPronto(); }).catch(() => {}); },
+  alPintar(){ if (typeof animarNumeros === 'function') animarNumeros();
+    if (!Vuelos.d || Date.now() - Vuelos.d.t > Vuelos.cadencia()) Vuelos.pedir().then(() => { if (PILA.at(-1)?.id === 'hotel') refrescarPronto(); }).catch(() => {}); },
 };
 
 /* =========================================================
@@ -959,22 +1012,32 @@ A['hrutina-borrar'] = async el => { if (!soloHotel()) return; const r = hotelRut
    ========================================================= */
 R['hotel-huespedes'] = {
   titulo:'Huéspedes', icon:'users', color:'sky', sub:'Solo los ven el hotel y la garita · se borran solos',
-  render(){
+  render(p){
     if (esAdmin()) return `<div class="card"><b style="font-size:22px">${hotelInfo().huespedesHoy || 0}</b> <span class="muted">huéspedes hoy en el hotel</span></div>
       <p class="muted small">${I('lock')} La lista con nombres la ven solo el hotel y la garita, que la necesita para dejar pasar. La Administración ve únicamente la cantidad (Ley 25.326: mínimo acceso).</p>`;
-    const hoy = hoyISO(), hs = hotelHuespedes().sort((a, b) => a.desde.localeCompare(b.desde) || a.nombre.localeCompare(b.nombre));
-    const llegan = hs.filter(h => h.desde === hoy), estan = hs.filter(h => h.desde < hoy && h.hasta >= hoy), futuros = hs.filter(h => h.desde > hoy);
+    /* Las tarjetas de la portada abren esta lista con un filtro puesto
+       (pedido de Claudio, 20-10-2026): "Llegan hoy" muestra solo a los que
+       llegan, "Se van hoy" solo a los que se van y "Alojados" solo a los
+       que siguen en el hotel. Arriba se cambia de filtro con un toque. */
+    const hoy = hoyISO(), hd = huespedesDelDia(hoy), orden = ls => ls.sort((a, b) => a.desde.localeCompare(b.desde) || a.nombre.localeCompare(b.nombre));
+    const G = { llegan:['Llegan hoy', hd.llegan, 'Nadie anunciado para hoy.', 'var(--sky)'], estan:['Alojados', hd.estan, 'No hay huéspedes de estadía: los de hoy llegan o se van.', 'var(--ok)'],
+      salen:['Se van hoy', hd.salen, 'Nadie hace check-out hoy.', 'var(--accent)'], ...(esHotel() ? { futuros:['Próximos', hd.futuros, 'No hay reservas cargadas para los próximos días.', 'var(--brand)'] } : {}) };
+    const f = G[p] ? p : 'todos';
     const fila = h => `<div class="it"><div class="txt"><b>${esc(h.nombre)}${+h.pax > 1 ? ` <small>(${h.pax})</small>` : ''}</b>
-        <span>${fechaCorta(h.desde)} → ${fechaCorta(h.hasta)}${h.patente ? ' · ' + esc(h.patente) : ''}${h.llegaVuelo ? ' · llega ' + esc(h.llegaVuelo) : ''}${h.saleVuelo ? ' · se va ' + esc(h.saleVuelo) : ''}${h.ingreso ? ` · ${I('check')} ingresó ${hora(h.ingreso)} h` : ''}</span></div>
+        <span>${fechaCorta(h.desde)} → ${fechaCorta(h.hasta)}${h.patente ? ' · ' + esc(h.patente) : ''}${h.llegaVuelo ? ' · llega ' + esc(h.llegaVuelo) : ''}${h.saleVuelo ? ' · se va ' + esc(h.saleVuelo) : ''}${h.ingreso ? ` · ${I('check')} ingresó ${hora(h.ingreso)} h` : ''}${h.salida ? ` · ${I('logout')} salió ${hora(h.salida)} h` : ''}</span></div>
       ${esGuardia() && h.desde <= hoy && !h.ingreso ? `<button class="btn btn-xs btn-ok" data-a="hhuesped-ingreso" data-id="${esc(h.id)}">${I('login')}Ingresó</button>` : ''}
+      ${esGuardia() && h.hasta === hoy && h.ingreso && !h.salida ? `<button class="btn btn-xs btn-sec" data-a="hhuesped-salida" data-id="${esc(h.id)}">${I('logout')}Salió</button>` : ''}
+      ${esHotel() && h.hasta >= hoy ? `<button class="icon-btn" data-a="hhuesped-pase" data-id="${esc(h.id)}" aria-label="Pase HUÉSPED DEL HOTEL por WhatsApp" title="Pase por WhatsApp">${I('qr')}</button>` : ''}
       ${esHotel() ? `<button class="icon-btn" data-a="hhuesped-editar" data-id="${esc(h.id)}" aria-label="Editar">${I('edit')}</button>` : ''}</div>`;
+    const grupo = k => { const [t, ls, nada] = G[k]; return f === 'todos' && !ls.length ? '' : `${sec(`${t} (${hd.pax(ls)} ${hd.pax(ls) === 1 ? 'persona' : 'personas'})`)}${ls.length ? `<div class="card lista">${orden(ls).map(fila).join('')}</div>` : vacio('users', nada)}`; };
+    const chips = segmento([...Object.entries(G).map(([k, g]) => ({ k, t:g[0].replace(' hoy', ''), n:hd.pax(g[1]), c:g[3] })), { k:'todos', t:'Todos', n:hd.pax([...hd.llegan, ...hd.estan, ...hd.salen.filter(h => h.desde !== hoy), ...(esHotel() ? hd.futuros : [])]), c:'var(--ink)' }], f, 'hhs-filtro', 'apilado');
     return `${esHotel() ? superficie({ a:'hhuesped-editar', icon:'plus', t:'Cargar un huésped', s:'Nombre, fechas, patente y vuelos (opcional)', cls:'acento' }) : ''}
-      ${sec(`Llegan hoy (${llegan.length})`)}${llegan.length ? `<div class="card lista">${llegan.map(fila).join('')}</div>` : vacio('users', 'Nadie anunciado para hoy.')}
-      ${estan.length ? sec(`En el hotel (${estan.length})`) + `<div class="card lista">${estan.map(fila).join('')}</div>` : ''}
-      ${futuros.length && esHotel() ? sec(`Próximos (${futuros.length})`) + `<div class="card lista">${futuros.map(fila).join('')}</div>` : ''}
+      ${chips}
+      <div class="hhs-lista" data-k="hhs-${f}">${f === 'todos' ? Object.keys(G).map(grupo).join('') || vacio('users', 'No hay huéspedes cargados.') : grupo(f)}</div>
       <p class="muted tiny" style="margin-top:12px">${I('lock')} Datos de terceros: se cargan solo los necesarios para el ingreso y los traslados, los ven únicamente el hotel y la garita y se borran solos al día siguiente del check-out. El hotel es responsable de informarle a su huésped que comparte estos datos con la guardia del barrio.</p>`;
   },
 };
+A['hhs-filtro'] = el => { const t = PILA.at(-1); if (t && t.id === 'hotel-huespedes') t.param = el.dataset.v || ''; refrescar(); };
 A['hhuesped-editar'] = el => {
   if (!soloHotel()) return;
   const h = hotelHuespedes().find(x => x.id === el.dataset.id) || { desde:hoyISO(), hasta:sumarDias(hoyISO(), 2), pax:1 };
@@ -983,7 +1046,7 @@ A['hhuesped-editar'] = el => {
       <div class="field"><label>Personas</label><input name="pax" type="number" min="1" max="30" value="${esc(h.pax || 1)}"></div></div>
     <div class="grid3"><div class="field"><label>Check-in</label><input type="date" name="desde" required value="${esc(h.desde)}"></div>
       <div class="field"><label>Check-out</label><input type="date" name="hasta" required value="${esc(h.hasta)}"></div>
-      <div class="field"><label>Patente (si viene en auto)</label><input name="patente" maxlength="10" style="text-transform:uppercase" value="${esc(h.patente || '')}"></div></div>
+      <div class="field"><label>Patente (auto propio o rentado)</label><input name="patente" maxlength="10" style="text-transform:uppercase" value="${esc(h.patente || '')}"></div></div>
     <div class="grid2"><div class="field"><label>Vuelo de llegada</label><input name="llegaVuelo" maxlength="10" style="text-transform:uppercase" value="${esc(h.llegaVuelo || '')}" placeholder="AR1880"></div>
       <div class="field"><label>Hora de llegada</label><input type="time" name="llegaHora" value="${esc(h.llegaHora || '')}"></div></div>
     <div class="grid2"><div class="field"><label>Vuelo de salida</label><input name="saleVuelo" maxlength="10" style="text-transform:uppercase" value="${esc(h.saleVuelo || '')}" placeholder="AR1881"></div>
@@ -995,14 +1058,183 @@ A['hhuesped-editar'] = el => {
 F['hhuesped'] = (d, form) => {
   if (!soloHotel()) return;
   if (d.hasta < d.desde){ toast('El check-out no puede ser antes del check-in', 'calendar'); return; }
-  const id = form.dataset.id;
+  const id = form.dataset.id; let nuevo = '';
   Store.cambiar(s => { s.hotelHuespedes = aLista(s.hotelHuespedes);
     const datos = { nombre:d.nombre.trim(), pax:+d.pax || 1, desde:d.desde, hasta:d.hasta, patente:normPatente(d.patente),
       llegaVuelo:normVuelo(d.llegaVuelo), llegaHora:d.llegaHora || '', saleVuelo:normVuelo(d.saleVuelo), saleHora:d.saleHora || '' };
     const x = id && s.hotelHuespedes.find(h => h.id === id);
-    if (x) Object.assign(x, datos); else s.hotelHuespedes.push({ id:'hh' + uid(), at:Date.now(), ...datos });
+    if (x){ Object.assign(x, datos); if (!x.codigo) x.codigo = codigoHuesped(); nuevo = x.id; }
+    else { nuevo = 'hh' + uid(); s.hotelHuespedes.push({ id:nuevo, at:Date.now(), codigo:codigoHuesped(), ...datos }); }
     trasladosDeHuespedes(s); });
-  cerrarHoja(); toast('Huésped guardado', 'users');
+  cerrarHoja(); toast('Huésped guardado: mandale su pase por WhatsApp', 'users');
+  if (!id && nuevo) setTimeout(() => A['hhuesped-pase']({ dataset:{ id:nuevo } }), 80);
+};
+/* EL PASE "HUÉSPED DEL HOTEL" (pedido de Claudio, 20-10-2026: "que el hotel
+   lo envíe a su WhatsApp como hacemos los vecinos con nuestras visitas, solo
+   que diga HUÉSPED DEL HOTEL y no visita"). Vale del check-in al check-out,
+   para entrar y salir cuantas veces quiera: a pie, en la van o en un auto
+   (propio o rentado: el hotel suma la patente al editarlo y la garita
+   también lo reconoce por la patente). El QR lleva solo un código al azar
+   ("BHC:G-XXXXXX"): ni el nombre, ni las fechas, ni nada del huésped. */
+/* LAS NORMAS DEL BARRIO EN LOS PASES DEL HOTEL (pedido de Claudio,
+   20-10-2026: "un barrio privado, donde se respetan las normas de
+   convivencia: 20 km/h, no fotografiar las casas, no afectar la flora ni la
+   fauna; agradable y a la vez educativo"). Van dibujadas en la tarjeta del
+   pase (como las indicaciones de una tarjeta de embarque), escritas en la
+   ventana del pase y resumidas en el texto de WhatsApp. */
+const NORMAS_PASE = [
+  { ic:'20', t:'Máximo 20 km/h', s:'Cruzan chicos, mascotas, zorros y aves' },
+  { ic:'foto', t:'Casas sin fotos', s:'La privacidad de los vecinos es su seguridad' },
+  { ic:'hoja', t:'Flora y fauna', s:'Sin arrancar plantas ni alimentar animales' },
+  { ic:'silencio', t:'Silencio', s:'Sin bocinas ni música fuerte: acá vive gente' },
+];
+const normasEscritoHtml = () => `<details class="card plana small normas-pase" data-k="normas-pase" open><summary><b>${I('sparkle')} Bienvenido/a a ${esc(Store.s.config.nombre || 'Bahía Cauquén')}: así se cuida el barrio</b></summary>
+  <p>Vas a entrar a un barrio donde viven familias, entre el bosque fueguino de lengas y ñires y la costa del Canal Beagle. Para que tu visita sea tan linda como el lugar, te pedimos cuatro gestos simples:</p>
+  <ul><li><b>A 20 km/h como máximo.</b> Por estas calles caminan chicos, vecinos con sus mascotas, y cruzan zorros, liebres y aves. A esa velocidad se frena a tiempo.</li>
+    <li><b>Las casas no se fotografían.</b> Para los vecinos, su casa es su lugar más privado, y cuidarla también es cuidar su seguridad. El paisaje, el canal y las montañas, sí: ¡son para disfrutarlos!</li>
+    <li><b>La naturaleza se mira y se cuida.</b> No arranques plantas ni flores, no alimentes ni persigas a los animales y llevate tu basura. Muchas aves anidan acá, y el bosque tarda décadas en crecer.</li>
+    <li><b>Convivencia:</b> sin bocinazos ni música fuerte, respetando el descanso de quienes viven acá.</li></ul>
+  <p style="margin:0"><b>Gracias por cuidar este lugar como si fuera tu casa. ¡Que lo disfrutes!</b></p></details>`;
+const NORMAS_WA = `\n\n🌿 *Así se cuida el barrio:*\n🚗 Máximo *20 km/h*: cruzan chicos, mascotas y fauna.\n📷 *No fotografíes las casas* de los vecinos.\n🌱 Cuidá la flora y la fauna: no arranques plantas ni alimentes animales.\n🤫 Sin bocinas ni música fuerte.\n¡Gracias por cuidarlo como si fuera tu casa!`;
+/* LA TARJETA DEL HOTEL, REDISEÑADA (pedido de Claudio, 20-10-2026: "más
+   innovadora, atractiva y amigable"). Como un pase de embarque de la
+   Patagonia, en los colores del Canal Beagle (azul noche, verde agua y
+   turquesa; sin naranja, pedido de Claudio): cielo con estrellas, montañas y el canal; un
+   saludo grande; las fechas como un vuelo (llega → se va) con la van en el
+   camino; el código en dos "asientos"; las normas del barrio como cuatro
+   stickers; y un talón troquelado con "Cómo llegar". Solo para los pases
+   del hotel (huéspedes y personal): el de las visitas sigue igual.
+   { contenido, codigo, etiqueta, saludo, nombre, tramo:[[k, v], [k, v]], chips:[...] } */
+async function tarjetaHotelPng({ contenido, codigo, etiqueta, saludo, nombre, tramo, chips = [] }){
+  const q = await cargarQR(); if (!q) return null;
+  const logo = await cargarLogoPase();
+  const qr = q(0, 'M'); qr.addData(contenido); qr.make();
+  const W = 1080, H = 2190, X = 60, CW = W - 120, n = qr.getModuleCount();
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  const F = (peso, px, fam = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif') => `${peso} ${px}px ${fam}`;
+  const redondo = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  const recortar = (t, ancho) => { t = String(t || ''); while (g.measureText(t).width > ancho && t.length > 3) t = t.slice(0, -2).trimEnd() + '…'; return t; };
+  /* el cielo: de la noche azul al atardecer cobre, con estrellas, montañas y el canal */
+  const cielo = g.createLinearGradient(0, 0, 0, H); cielo.addColorStop(0, '#0b1f3a'); cielo.addColorStop(.45, '#0d4f63'); cielo.addColorStop(.78, '#0d6b66'); cielo.addColorStop(1, '#5fc4b8'); g.fillStyle = cielo; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 70; i++){ const x = (i * 157) % W, y = (i * 89) % 900, r = i % 5 ? 1.6 : 3; g.globalAlpha = .3 + (i % 4) * .15; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } g.globalAlpha = 1;
+  g.fillStyle = '#ffe7a8'; g.beginPath(); g.arc(W - 120, 120, 44, 0, 7); g.fill(); g.fillStyle = cielo; g.beginPath(); g.arc(W - 100, 108, 40, 0, 7); g.fill();
+  const montes = (y, alt, col, fase) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, H); g.lineTo(0, y); for (let x = 0; x <= W; x += 90){ g.lineTo(x + 45, y - alt * (0.5 + 0.5 * Math.abs(Math.sin((x + fase) / 140)))); g.lineTo(x + 90, y - alt * 0.25); } g.lineTo(W, H); g.fill(); };
+  montes(H - 250, 160, 'rgba(13,43,69,.35)', 0); montes(H - 170, 110, 'rgba(13,43,69,.5)', 70);
+  g.fillStyle = 'rgba(11,31,58,.45)'; g.fillRect(0, H - 110, W, 110); g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 3;
+  for (let k = 0; k < 3; k++){ g.beginPath(); for (let x = 0; x <= W; x += 20) g.lineTo(x, H - 80 + k * 26 + Math.sin(x / 40 + k) * 5); g.stroke(); }
+  /* la tarjeta, con sombra, y el troquel con muescas */
+  const Y0 = 70, YT1 = 640, YT2 = 1950, Y1 = H - 70;
+  g.save(); g.shadowColor = 'rgba(0,0,0,.4)'; g.shadowBlur = 50; g.shadowOffsetY = 18; redondo(X, Y0, CW, Y1 - Y0, 48); g.fillStyle = '#fbfefd'; g.fill(); g.restore();
+  g.save(); redondo(X, Y0, CW, Y1 - Y0, 48); g.clip();
+  /* cabecera cobre con montañas */
+  const cab = g.createLinearGradient(X, Y0, X + CW, Y0 + 330); cab.addColorStop(0, '#0d2b45'); cab.addColorStop(.55, '#0d6b66'); cab.addColorStop(1, '#14968c'); g.fillStyle = cab; g.fillRect(X, Y0, CW, 330);
+  g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.moveTo(X, Y0 + 330); [[160, 210], [300, 270], [470, 170], [640, 280], [800, 190], [960, 250]].forEach(([dx, dy]) => g.lineTo(X + dx, Y0 + dy)); g.lineTo(X + CW, Y0 + 330); g.fill();
+  g.restore();
+  let tx = X + 48;
+  if (logo){ g.save(); g.beginPath(); g.arc(X + 48 + 40, Y0 + 78, 40, 0, 7); g.fillStyle = '#fff'; g.fill(); g.clip(); g.drawImage(logo, X + 48, Y0 + 38, 80, 80); g.restore(); tx += 100; }
+  g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = F(800, 34); g.fillText(HOTEL_NOMBRE, tx, Y0 + 72); g.globalAlpha = .85; g.font = F(600, 23); g.fillText(`Barrio ${Store.s.config.nombre || 'Bahía Cauquén'} · Ushuaia`, tx, Y0 + 106); g.globalAlpha = 1;
+  g.font = F(900, 22); const ew = g.measureText(etiqueta).width + 44; redondo(X + CW - 48 - ew, Y0 + 150, ew, 48, 24); g.fillStyle = '#ffd36b'; g.fill(); g.fillStyle = '#3a2a00'; g.textAlign = 'center'; g.fillText(etiqueta, X + CW - 48 - ew / 2, Y0 + 182);
+  g.textAlign = 'left'; g.fillStyle = '#fff'; g.font = F(700, 30); g.fillText(saludo, X + 48, Y0 + 238); g.font = F(900, 60); g.fillText(recortar(nombre, CW - 96), X + 48, Y0 + 300);
+  /* el tramo, como un vuelo: llega → se va, con la van en el camino */
+  const ty = Y0 + 400, colA = X + 56, colB = X + CW - 56;
+  g.fillStyle = '#7f9a96'; g.font = F(800, 21); g.fillText(tramo[0][0], colA, ty); g.textAlign = 'right'; g.fillText(tramo[1][0], colB, ty);
+  g.fillStyle = '#1b2a33'; g.font = F(900, 52); g.textAlign = 'left'; g.fillText(tramo[0][1], colA, ty + 60); g.textAlign = 'right'; g.fillText(tramo[1][1], colB, ty + 60);
+  g.textAlign = 'left'; const ax = colA + 270, bx = colB - 270, ay = ty + 40;
+  g.strokeStyle = '#b9dcd6'; g.lineWidth = 4; g.setLineDash([12, 12]); g.beginPath(); g.moveTo(ax, ay); g.quadraticCurveTo((ax + bx) / 2, ay - 60, bx, ay); g.stroke(); g.setLineDash([]);
+  const vx = (ax + bx) / 2, vy = ay - 30; g.fillStyle = '#0d6b66'; redondo(vx - 34, vy - 18, 68, 30, 9); g.fill(); g.fillStyle = '#9fd6ec'; redondo(vx - 26, vy - 13, 18, 11, 3); g.fill(); redondo(vx - 4, vy - 13, 18, 11, 3); g.fill();
+  g.fillStyle = '#1d2430'; [vx - 20, vx + 20].forEach(x => { g.beginPath(); g.arc(x, vy + 13, 8, 0, 7); g.fill(); });
+  /* los chips: personas, acceso */
+  let cx = colA; g.font = F(800, 22);
+  chips.forEach(t => { const w = g.measureText(t).width + 40; redondo(cx, ty + 96, w, 46, 23); g.fillStyle = '#e3f3f0'; g.fill(); g.fillStyle = '#0d5f5a'; g.fillText(t, cx + 20, ty + 127); cx += w + 12; });
+  /* troquel */
+  const troquel = y => { g.fillStyle = cielo; [X, X + CW].forEach(x => { g.beginPath(); g.arc(x, y, 30, 0, 7); g.fill(); }); g.strokeStyle = '#d3e6e2'; g.lineWidth = 4; g.setLineDash([16, 14]); g.beginPath(); g.moveTo(X + 46, y); g.lineTo(X + CW - 46, y); g.stroke(); g.setLineDash([]); };
+  troquel(YT1);
+  /* el QR en un marco con borde de colores */
+  const lado = 560, qx = (W - lado) / 2, qy = YT1 + 70, cel = lado / n;
+  const marco = g.createLinearGradient(qx, qy, qx + lado, qy + lado); marco.addColorStop(0, '#14968c'); marco.addColorStop(.5, '#1d7fb0'); marco.addColorStop(1, '#7a4bc2');
+  redondo(qx - 40, qy - 40, lado + 80, lado + 80, 40); g.fillStyle = marco; g.fill(); redondo(qx - 30, qy - 30, lado + 60, lado + 60, 32); g.fillStyle = '#fff'; g.fill();
+  g.fillStyle = '#16212a'; for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.isDark(r, k)) g.fillRect(Math.floor(qx + k * cel), Math.floor(qy + r * cel), Math.ceil(cel), Math.ceil(cel));
+  /* el código, en dos "asientos" */
+  const cy = qy + lado + 96; g.textAlign = 'center'; g.fillStyle = '#7f9a96'; g.font = F(800, 21); g.fillText('TU CÓDIGO PARA LA GARITA', W / 2, cy);
+  const partes = String(codigo).split(' ').filter(Boolean), pw = 230, gapP = 24, x0 = W / 2 - (partes.length * pw + (partes.length - 1) * gapP) / 2;
+  partes.forEach((p, i) => { const px = x0 + i * (pw + gapP); redondo(px, cy + 20, pw, 100, 22); g.fillStyle = '#1b2a33'; g.fill(); g.fillStyle = '#ffd36b'; g.font = F(900, 64, 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'); g.fillText(p, px + pw / 2, cy + 92); });
+  g.fillStyle = '#4f6662'; g.font = F(600, 23); g.fillText('Mostrá el QR o decí el código, al entrar y al salir', W / 2, cy + 168);
+  /* las normas, como cuatro stickers */
+  const ny = cy + 220; g.fillStyle = '#2f6b3a'; g.font = F(900, 25); g.fillText('EN EL BARRIO, NOS RESPETAMOS ENTRE TODOS', W / 2, ny + 6);
+  const ST = [['20', '#d33a3a', '#fde7e4', 'Máximo', '20 km/h'], ['foto', '#7a4bc2', '#efe6fb', 'Casas', 'sin fotos'], ['hoja', '#2f8f5b', '#e3f3e8', 'Cuidá flora', 'y fauna'], ['silencio', '#1d7fb0', '#e1f0f8', 'Silencio y', 'descanso']];
+  const sw = CW / 4;
+  ST.forEach(([ic, col, fondo, l1, l2], i) => { const ix = X + sw * i + sw / 2, iy = ny + 110;
+    g.save(); g.translate(ix, iy); g.rotate((i % 2 ? 1 : -1) * 0.06); g.beginPath(); g.arc(0, 0, 68, 0, 7); g.fillStyle = fondo; g.fill(); g.lineWidth = 5; g.strokeStyle = '#fff'; g.stroke();
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    if (ic === '20'){ g.beginPath(); g.arc(0, 0, 44, 0, 7); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 10; g.strokeStyle = col; g.stroke(); g.fillStyle = '#111'; g.font = F(900, 36); g.textAlign = 'center'; g.fillText('20', 0, 13); }
+    else { g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 6;
+      if (ic === 'foto'){ redondo(-26, -16, 52, 36, 8); g.stroke(); g.beginPath(); g.arc(0, 2, 10, 0, 7); g.stroke(); g.beginPath(); g.moveTo(-10, -16); g.lineTo(-5, -24); g.lineTo(6, -24); g.lineTo(10, -16); g.stroke(); g.strokeStyle = '#d33a3a'; g.lineWidth = 7; g.beginPath(); g.moveTo(-34, -34); g.lineTo(34, 34); g.stroke(); }
+      else if (ic === 'hoja'){ g.beginPath(); g.moveTo(-24, 26); g.bezierCurveTo(-32, -18, 6, -36, 28, -28); g.bezierCurveTo(32, 6, 4, 32, -24, 26); g.fill(); g.strokeStyle = fondo; g.lineWidth = 4; g.beginPath(); g.moveTo(-24, 26); g.quadraticCurveTo(0, 0, 18, -18); g.stroke(); }
+      else { g.beginPath(); g.moveTo(-26, -9); g.lineTo(-12, -9); g.lineTo(4, -24); g.lineTo(4, 24); g.lineTo(-12, 9); g.lineTo(-26, 9); g.closePath(); g.fill(); g.strokeStyle = '#d33a3a'; g.lineWidth = 6; g.beginPath(); g.moveTo(14, -12); g.lineTo(34, 12); g.moveTo(34, -12); g.lineTo(14, 12); g.stroke(); } }
+    g.restore(); g.textAlign = 'center'; g.fillStyle = '#1b2a33'; g.font = F(800, 25); g.fillText(l1, ix, iy + 112); g.fillText(l2, ix, iy + 142); });
+  g.fillStyle = '#5f7773'; g.font = F(600, 22); g.fillText('Por las calles cruzan chicos, mascotas, zorros y aves. ¡Gracias por cuidarlo!', W / 2, ny + 316);
+  troquel(YT2);
+  /* el talón: cómo llegar */
+  const sy = YT2 + 40; g.fillStyle = '#d33a3a'; const px = X + 90, py = sy + 96;
+  g.beginPath(); g.moveTo(px, py); g.bezierCurveTo(px - 34, py - 40, px - 30, py - 86, px, py - 86); g.bezierCurveTo(px + 30, py - 86, px + 34, py - 40, px, py); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(px, py - 58, 11, 0, 7); g.fill();
+  g.textAlign = 'left'; g.fillStyle = '#1b2a33'; g.font = F(900, 32); g.fillText('Cómo llegar', X + 150, sy + 40);
+  g.fillStyle = '#4f6662'; g.font = F(600, 24); g.fillText('Buscá en Google Maps:', X + 150, sy + 78); g.fillStyle = '#0d6b66'; g.font = F(900, 27); g.fillText('Barrio ' + (Store.s.config.nombre || 'Bahía Cauquén'), X + 150, sy + 114);
+  g.textAlign = 'right'; g.fillStyle = '#7f9a96'; g.font = F(800, 20); g.fillText('VÁLIDO EN LA GARITA', X + CW - 48, sy + 40); g.fillStyle = '#1b2a33'; g.font = F(900, 28); g.fillText('A pie o en auto', X + CW - 48, sy + 78);
+  return new Promise(ok => c.toBlob(ok, 'image/png'));
+}
+function codigoHuesped(){
+  const todos = EMP_ABC + EMP_NUM, usados = new Set(hotelHuespedes().map(h => h.codigo));
+  for (let k = 0; k < 50; k++){ const r = new Uint32Array(6); (crypto || window.msCrypto).getRandomValues(r);
+    const c = [...r].map(x => todos[x % todos.length]).join(''); if (/[A-Z]/.test(c) && /\d/.test(c) && !usados.has(c)) return c; }
+  return 'G' + Date.now().toString(36).toUpperCase().slice(-5);
+}
+const codHuespedLindo = c => String(c || '').replace(/^(.{3})(.{3})$/, '$1 $2');
+const huespedVigente = (h, hoy = hoyISO()) => h.desde <= hoy && h.hasta >= hoy && !h.salida;
+A['hhuesped-pase'] = el => {
+  if (!soloHotel()) return; let h = hotelHuespedes().find(x => x.id === el.dataset.id); if (!h) return;
+  if (!h.codigo){ const c = codigoHuesped(); Store.cambiar(s => { const x = aLista(s.hotelHuespedes).find(z => z.id === h.id); if (x && !x.codigo) x.codigo = c; }); h = { ...h, codigo:c }; }
+  hoja('Pase del huésped', `<div class="ticket hemp-cred"><div class="tk-top" style="background:linear-gradient(120deg,#0d2b45,#0d6b66 55%,#14968c)"><small>${I('star')} HUÉSPED DEL HOTEL · ${HOTEL_NOMBRE}</small><h3>${esc(h.nombre)}</h3><div style="opacity:.85;font-size:13px">${plural(+h.pax || 1, 'persona')} · ${fechaCorta(h.desde)} → ${fechaCorta(h.hasta)}</div></div>
+    <div class="bottom"><div class="qr-box" data-qr="BHC:G-${esc(h.codigo)}"></div><div class="muted tiny" style="margin-top:8px">Código</div><div class="codigo-grande hemp-cod">${esc(codHuespedLindo(h.codigo))}</div>
+      ${h.patente ? `<div class="cv-chapa lista" style="margin:10px auto 0;max-width:220px"><small>REPÚBLICA ARGENTINA</small><b>${esc(chapaTexto(h.patente))}</b></div>` : ''}</div></div>
+    <button class="btn btn-wa btn-block" style="margin-top:12px" data-a="hhuesped-wa" data-id="${esc(h.id)}">${I('share')}Mandárselo por WhatsApp</button>
+    ${normasEscritoHtml()}
+    <div class="card plana small" style="margin-top:12px;line-height:1.5"><b>Sirve para entrar y salir del barrio cuantas veces quiera</b>, hasta el check-out: a pie, en la van o en auto. Si alquila un auto, sumá la patente en "Editar" y la garita también lo reconoce por la patente. El QR no lleva datos: solo un código que la app reconoce.</div>`);
+  setTimeout(() => $$('#hoja [data-qr]').forEach(x => pintarQR(x, x.dataset.qr)), 60);
+};
+A['hhuesped-wa'] = el => {
+  const h = hotelHuespedes().find(x => x.id === el.dataset.id); if (!h || !h.codigo) return;
+  const texto = `🏨 *HUÉSPED DEL HOTEL · ${HOTEL_NOMBRE}*\n\nHola ${h.nombre}: este es tu pase para entrar y salir del Barrio ${Store.s.config.nombre} hasta el ${fechaCorta(h.hasta)}.\n\n🔑 Código: *${codHuespedLindo(h.codigo)}*\n\nEn la garita mostrá el QR o decí el código, a pie o en auto.${NORMAS_WA}\n\n📍 *Cómo llegar:* ${mapaCorto()}`;
+  const mes = f => fechaDe(f).toLocaleDateString('es-AR', { day:'numeric', month:'short' }).replace('.', '').toUpperCase();
+  compartirPase({ texto, contenido:'BHC:G-' + h.codigo, codigo:codHuespedLindo(h.codigo), titulo:HOTEL_NOMBRE, sub:h.nombre, archivo:`huesped-${h.codigo}.png`,
+    imagen:() => tarjetaHotelPng({ contenido:'BHC:G-' + h.codigo, codigo:codHuespedLindo(h.codigo), etiqueta:'HUÉSPED DEL HOTEL', saludo:+h.pax > 1 ? '¡Bienvenidos!' : '¡Bienvenido/a!', nombre:h.nombre,
+      tramo:[['LLEGA', mes(h.desde)], ['SE VA', mes(h.hasta)]], chips:[plural(+h.pax || 1, 'persona'), 'Entra y sale libre'] }),
+    datos:{ nombre:h.nombre, cuando:`${fechaCorta(h.desde)} al ${fechaCorta(h.hasta)}`, horario:'Entra y sale libre', etiqueta:'HUÉSPED DEL HOTEL', normas:NORMAS_PASE } });
+};
+/* En la garita: el QR del huésped (o el código que dice) abre su ficha con "Salió" / "Volvió". */
+const hMovsHuesped = h => aLista(Store.s.hotelMovs).filter(m => m && m.huespedId === h.id).sort((a, b) => b.at - a.at);
+const huespedAdentro = h => { const m = hMovsHuesped(h)[0]; return m ? m.tipo === 'in' : !!h.ingreso && !h.salida; };
+function hotelHuespedCodigo(txt){
+  if (!esGuardia()) return false;
+  const crudo = String(txt || '').toUpperCase().replace(/^BHC:/, '').replace(/[\s.]/g, ''), m = crudo.match(/^G-?([A-Z0-9]{6})$/); if (!m) return false;
+  const h = hotelHuespedes().find(x => x.codigo === m[1]);
+  if (!h){ if (crudo.includes('-')){ hoja('Pase desconocido', aviso('danger', 'x', 'Ese pase de huésped no vale', 'Puede ser de alguien que ya hizo el check-out. Consultá con la recepción del hotel.')); return true; } return false; }
+  const hoy = hoyISO(), vale = huespedVigente(h, hoy), dentro = huespedAdentro(h);
+  hoja('Huésped del hotel', `${vale ? aviso('ok', 'check', 'HUÉSPED DEL HOTEL · autorizado', `${esc(HOTEL_NOMBRE)} · hasta el ${fechaCorta(h.hasta)}`) : aviso('danger', 'x', 'EL PASE NO VALE HOY', h.salida ? 'Ya hizo el check-out.' : `Vale del ${fechaCorta(h.desde)} al ${fechaCorta(h.hasta)}. Consultá con la recepción del hotel.`)}
+    <div class="card"><b style="font-size:18px">${esc(h.nombre)}</b><div class="muted small">${plural(+h.pax || 1, 'persona')} · ${fechaCorta(h.desde)} → ${fechaCorta(h.hasta)}${h.patente ? ` · <span class="hp-chapa chica">${esc(chapaTexto(h.patente))}</span>` : ''}</div>
+      <div class="small" style="margin-top:4px">${dentro ? `${I('login')} <b>Adentro</b>` : `${I('logout')} Afuera`}</div></div>
+    ${vale ? `<div class="btns"><button class="btn btn-grande ${dentro ? 'btn-sec' : 'btn-ok'} grow" data-a="hhuesped-paso" data-id="${esc(h.id)}" data-v="${dentro ? 'out' : 'in'}">${I(dentro ? 'logout' : 'login')}${dentro ? 'Sale' : 'Entra'}</button>
+      <button class="btn btn-sec grow" data-a="hhuesped-paso" data-id="${esc(h.id)}" data-v="${dentro ? 'in' : 'out'}">No: ${dentro ? 'está entrando' : 'está saliendo'}</button></div>
+      <label class="check" style="margin-top:10px"><input type="checkbox" id="hhAPie"> Va a pie (sin auto)</label>` : ''}`);
+  return true;
+}
+A['hhuesped-paso'] = el => {
+  if (!soloGarita()) return;
+  const h = hotelHuespedes().find(x => x.id === el.dataset.id); if (!h) return;
+  const tipo = el.dataset.v === 'in' ? 'in' : 'out', at = Date.now(), aPie = !!($('#hhAPie') && $('#hhAPie').checked);
+  Store.cambiar(s => { s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:'hm' + uid(), huespedId:h.id, tipo, at, por:yo().id, ...(aPie ? { aPie:true } : {}) });
+    const x = aLista(s.hotelHuespedes).find(z => z.id === h.id); if (x && tipo === 'in' && !x.ingreso) x.ingreso = at;
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: huésped del hotel con su pase${aPie ? ' · a pie' : h.patente ? ' · ' + h.patente : ''}`, at }); });
+  cerrarHoja(); toast(`Huésped: ${tipo === 'in' ? 'entrada' : 'salida'} registrada`, tipo === 'in' ? 'login' : 'logout');
 };
 A['hhuesped-borrar'] = el => { if (!soloHotel()) return; Store.cambiar(s => { s.hotelHuespedes = aLista(s.hotelHuespedes).filter(h => h.id !== el.dataset.id); trasladosDeHuespedes(s); }); cerrarHoja(); toast('Borrado', 'trash'); };
 A['hhuesped-ingreso'] = el => {
@@ -1196,6 +1428,8 @@ function hotelValidar(pat){
   const em = typeof hotelEmpleados === 'function' ? hotelEmpleados().find(x => x.patente && normPatente(x.patente) === pat) : null;
   if (em) return hojaEmpleadoGarita(em, 'por su patente');
   const h = hotelHuespedes().find(x => normPatente(x.patente) === pat && x.desde <= hoyISO() && x.hasta >= hoyISO());
+  /* Con su pase (20-10-2026): la misma ficha que el QR, con "Entra" y "Sale" cada vez (auto propio o rentado). */
+  if (h && h.codigo) return hotelHuespedCodigo('BHC:G-' + h.codigo);
   if (h){ hoja('Huésped del hotel', `${aviso('ok', 'users', 'Huésped del ' + HOTEL_NOMBRE, `${fechaCorta(h.desde)} → ${fechaCorta(h.hasta)}`)}<div class="card"><b style="font-size:17px">${esc(h.nombre)}</b><div class="muted small">${esc(h.patente)} · ${plural(+h.pax || 1, 'persona')}</div></div>
       ${!h.ingreso ? `<button class="btn btn-ok btn-block btn-grande" data-a="hhuesped-ingreso" data-id="${esc(h.id)}">${I('login')}Registrar el ingreso</button>` : `<div class="card plana small">${I('check')} Ingresó a las ${hora(h.ingreso)} h</div>`}`); return true; }
   return false;
@@ -1390,7 +1624,8 @@ A['hemp-cred'] = el => {
       <ul style="margin:4px 0 0;padding-left:18px"><li><b>El QR pegado en el parabrisas</b> (del lado del acompañante): la garita lo lee con el celular.</li>
         <li><b>La patente</b>${e.patente ? '' : ' (si cargás la de su auto)'}: el lector de patentes de la garita lo reconoce.</li>
         <li><b>El código ${esc(codigoEmpLindo(e.codigo))}</b>: lo dice en la garita, a pie, en bici o en otro auto.</li></ul>
-      <p style="margin:6px 0 0">Vale para siempre, al entrar y al salir. Si la pierde o alguien la copió: Editar → "Perdió la credencial".</p></div>`);
+      <p style="margin:6px 0 0">Vale para siempre, al entrar y al salir. Si la pierde o alguien la copió: Editar → "Perdió la credencial".</p></div>
+    ${normasEscritoHtml()}`);
   setTimeout(() => $$('#hoja [data-qr]').forEach(x => pintarQR(x, x.dataset.qr)), 60);
 };
 A['hemp-imprimir'] = async el => {
@@ -1404,13 +1639,16 @@ A['hemp-imprimir'] = async el => {
     <div style="width:230px;margin:14px auto">${qr.createSvgTag({ cellSize:8, margin:2, scalable:true })}</div>
     <p style="margin:0;font-size:11px;color:#555">Código</p><p style="margin:0;font-size:30px;letter-spacing:4px;font-family:monospace"><b>${esc(codigoEmpLindo(e.codigo))}</b></p>
     ${e.patente ? `<p style="margin:8px 0 0;font-size:16px;letter-spacing:2px;font-family:monospace">${esc(chapaTexto(e.patente))}</p>` : ''}
-    <p style="margin:10px 0 0;color:#555;font-size:12px">Mostrar en la garita al entrar y al salir.</p></div>`, { pie:'Credencial permanente del hotel. Si se pierde, el hotel hace una nueva y esta deja de valer. No lleva el DNI.' });
+    <p style="margin:10px 0 0;color:#555;font-size:12px">Mostrar en la garita al entrar y al salir.</p>
+    <p style="margin:10px 0 0;padding:8px 10px;border-radius:10px;background:#f3f8f1;color:#2f6b3a;font-size:11.5px;line-height:1.45"><b>En el barrio:</b> máximo 20 km/h · no fotografiar las casas · cuidar la flora y la fauna · sin bocinas ni música fuerte.</p></div>`, { pie:'Credencial permanente del hotel. Si se pierde, el hotel hace una nueva y esta deja de valer. No lleva el DNI.' });
 };
 A['hemp-wa'] = el => {
   const e = hotelEmpleados().find(x => x.id === el.dataset.id); if (!e) return;
-  const texto = `🎟️ *Tu credencial para entrar al Barrio ${Store.s.config.nombre}*\n\nHola ${e.nombre}: sos personal del ${HOTEL_NOMBRE}.\n\n🔑 Código: *${codigoEmpLindo(e.codigo)}*\n\nEn la garita mostrá el QR de la imagen o decí el código, al entrar y al salir. Vale para siempre.\n\n📍 *Cómo llegar:* ${mapaCorto()}`;
-  compartirPase({ texto, contenido:'BHC:E-' + e.codigo, codigo:codigoEmpLindo(e.codigo), sub:`${HOTEL_NOMBRE} · ${hEmpNombre(e)}`, archivo:`credencial-${e.codigo}.png`,
-    datos:{ nombre:hEmpNombre(e), espera:HOTEL_NOMBRE, cuando: aLista(e.dias).length ? textoDias(e.dias) : 'Todos los días', horario: e.desde ? `${e.desde} a ${e.hasta} h` : 'Todo el día' } });
+  const texto = `🎟️ *Tu credencial para entrar al Barrio ${Store.s.config.nombre}*\n\nHola ${e.nombre}: sos personal del ${HOTEL_NOMBRE}.\n\n🔑 Código: *${codigoEmpLindo(e.codigo)}*\n\nEn la garita mostrá el QR de la imagen o decí el código, al entrar y al salir. Vale para siempre.${NORMAS_WA}\n\n📍 *Cómo llegar:* ${mapaCorto()}`;
+  compartirPase({ imagen:() => tarjetaHotelPng({ contenido:'BHC:E-' + e.codigo, codigo:codigoEmpLindo(e.codigo), etiqueta:'PERSONAL DEL HOTEL', saludo:`¡Hola, ${e.nombre}!`, nombre:hEmpNombre(e),
+      tramo:[['DÍAS', aLista(e.dias).length ? textoDias(e.dias) : 'Todos'], ['HORARIO', e.desde ? `${e.desde}–${e.hasta}` : 'Libre']], chips:[e.puesto || 'Personal del hotel', 'Credencial permanente'] }),
+    texto, contenido:'BHC:E-' + e.codigo, codigo:codigoEmpLindo(e.codigo), sub:`${HOTEL_NOMBRE} · ${hEmpNombre(e)}`, archivo:`credencial-${e.codigo}.png`,
+    datos:{ nombre:hEmpNombre(e), cuando: aLista(e.dias).length ? textoDias(e.dias) : 'Todos los días', horario: e.desde ? `${e.desde} a ${e.hasta} h` : 'Todo el día', etiqueta:'PERSONAL DEL HOTEL', normas:NORMAS_PASE } });
 };
 
 /* ---------- la garita: lo reconoce y marca la entrada o la salida ---------- */
@@ -1817,6 +2055,7 @@ R['hotel-vivo'] = {
       ${!esAdmin() ? `<section class="bloque">${sec('Atajos')}<div class="hvv-atajos">
         ${esGuardia() ? `<button type="button" data-a="abrir" data-v="hotel-huespedes">${I('users')}Huéspedes</button>` : ''}
         ${esGuardia() ? `<button type="button" data-a="abrir" data-v="hotel-empleados">${I('user')}Empleados</button>` : ''}
+        ${esGuardia() ? `<button type="button" data-a="abrir" data-v="hotel-agenda">${I('calendar')}Agenda del hotel</button><button type="button" data-a="abrir" data-v="hotel-bitacora">${I('book')}Bitácora del hotel</button>` : ''}
         <button type="button" data-a="abrir" data-v="hotel-proveedores">${I('box')}Proveedores</button>
         <button type="button" data-a="abrir" data-v="hotel-eventos">${I('star')}Eventos</button>
         <button type="button" data-a="abrir" data-v="hotel-emergencias">${I('siren')}Emergencias</button>

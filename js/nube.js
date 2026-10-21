@@ -89,15 +89,17 @@ const Nube = {
             /* 28-09: la copia privada de las cuotas de las 6 UF del hotel (js/v-expensas.js, HotelExp) */
             'hotelLiqs',
             /* 15-10: los empleados del hotel con su credencial y su DNI (js/v-hotel.js): solo el hotel y la garita */
-            'hotelEmpleados'],
+            'hotelEmpleados',
+            /* 20-10: la agenda inteligente (ag-<día>) y la bitácora diaria (bd-<día>) del hotel (js/hotel-diario.js): solo el hotel y la garita */
+            'hotelDiario'],
   },
   /* Qué baja cada rol. El hotel NO baja nada de los vecinos: solo lo
      público de la ciudad y lo suyo. */
   HOTEL_LEE: {
     hotel:   { barrio:['agenda','temporadas','feriados','contactos','documentos','cruceros','eventosCiudad','promos','camion','mantVivo'],
-               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs','hotelEmpleados'] },
+               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs','hotelEmpleados','hotelDiario'] },
     admin:   { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv','hotelPromos','hotelLiqs'] },
-    guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelEmpleados'] },
+    guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelEmpleados','hotelDiario'] },
     /* El supervisor de la guardia (07-10-2026) baja lo que la garita usa para
        trabajar y nada más: sin votaciones, expensas, pizarrón, compras,
        comunicados ni lo del hotel que no es de la garita (los huéspedes). */
@@ -153,6 +155,7 @@ const Nube = {
     hotelViajes:     { listas:['huespedes','dias'] },
     hotelProv:       { listas:['dias'] },
     hotelEmpleados:  { listas:['dias'] },
+    hotelDiario:     { listas:['items','pasos','controles','manana'], objetos:['mail','resumen'] },
     camion:          { listas:[] },
     mensajeria:      { listas:[] },
     guardiaAhora:    { listas:['guardias'] },

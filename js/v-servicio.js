@@ -645,6 +645,8 @@ function validarCodigoEspecial(txt){
   if (/^BHR1\./.test(String(txt || '').trim()) && !hayPaquetes()){ paqueteEnPausa(); return true; }
   if (/^BHR1\./.test(String(txt || '').trim())){ const pid = Retiro.paqueteId || ''; Retiro.paqueteId = ''; Retiro.alLeer(String(txt).trim(), pid); return true; }
   /* La credencial de un empleado del hotel (15-10-2026): su QR (E-…) o los 5 signos que dice. */
+  /* El pase HUÉSPED DEL HOTEL (20-10-2026): su QR (G-…) o los 6 signos que dice. */
+  if (typeof hotelHuespedCodigo === 'function' && hotelHuespedCodigo(txt)) return true;
   if (typeof hotelEmpCodigo === 'function' && hotelEmpCodigo(txt)) return true;
   const t = String(txt || '').trim().toUpperCase().replace(/^BHC:/, '').replace(/\s/g, '');
   const m = t.match(/^([FVH])-?([A-Z0-9]{6,})$/); if (!m) return false;

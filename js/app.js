@@ -93,6 +93,8 @@ VENTANAS_SUPERVISOR.add('hotel-rutinas');
    carga el hotel; la garita marca sus entradas y salidas. La Administración
    y la supervisión no los ven (tienen el DNI). */
 VENTANAS_HOTEL.add('hotel-empleados'); VENTANAS_GARITA.add('hotel-empleados');
+/* 20-10-2026: la agenda inteligente y la bitácora del hotel (js/hotel-diario.js): el hotel y la garita. */
+['hotel-agenda', 'hotel-bitacora'].forEach(v => { VENTANAS_HOTEL.add(v); VENTANAS_GARITA.add(v); });
 const ventanaPermitida = id => esHotel() ? VENTANAS_HOTEL.has(id) : esSupervisor() ? VENTANAS_SUPERVISOR.has(id) : esPropDistancia() ? VENTANAS_PROPIETARIO.has(id) : (!esGuardia() || (VENTANAS_GARITA.has(id) && (id === 'garita' || turnoListo())));
 function abrir(id, param = ''){
   if (!R[id]){ console.warn('Ventana desconocida:', id); toast('Esa sección todavía no está disponible', 'alert'); return; }
@@ -485,7 +487,12 @@ function morfarNodo(a, b){
   if (a.nodeType !== 1){ if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
   if (a.isEqualNode(b)) return;          /* igualito: no se toca (acá es donde se deja de titilar) */
   if (morfarIntacto(a, b)) return;
-  morfarAtributos(a, b, MORF_CLASES.filter(c => a.classList.contains(c)));
+  /* Una pestaña o un filtro (aria-selected / aria-pressed) dice en el dibujo
+     nuevo si está elegido: ahí "on" no se conserva. Antes se conservaba y,
+     al tocar otra pestaña, quedaban las dos marcadas (pedido de Claudio,
+     20-10-2026: "se ponen en negro y quedan todos marcados"). */
+  const conEstado = b.hasAttribute('aria-selected') || b.hasAttribute('aria-pressed');
+  morfarAtributos(a, b, MORF_CLASES.filter(c => a.classList.contains(c) && !(conEstado && c === 'on')));
   morfarHijos(a, b);
 }
 function morfarHijos(viejo, nuevo){
@@ -2264,6 +2271,7 @@ const PIEZAS = [
   ['js/v-legal.js',   () => typeof LEGAL],
   ['js/v-manual.js',   () => typeof MANUAL_CAPS],
   ['js/v-hotel.js',    () => typeof HotelMotor],
+  ['js/hotel-diario.js', () => typeof HotelDiario],
   ['js/v-cuidados.js', () => typeof Cuidado],
   ['js/v-casa.js',     () => typeof TAREAS_INVIERNO],
   ['js/mapa.js',      () => typeof mapaBarrio],

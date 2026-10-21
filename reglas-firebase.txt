@@ -601,7 +601,9 @@ PEGAR DESDE ACÁ
       /* 28-09: la copia de las cuotas de las 6 UF del hotel (solo sus UF). La escribe la Administración; la leen el hotel y la Administración. */
       "hotelLiqs":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
       /* 15-10: los empleados del hotel con su credencial y su DNI. Los escribe solo el hotel; los leen el hotel y la garita. */
-      "hotelEmpleados": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" }
+      "hotelEmpleados": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" },
+      /* 20-10: la agenda inteligente (ag-<día>) y la bitácora diaria (bd-<día>) del hotel. La leen y la escriben el hotel y la garita (la garita cierra el día y marca "Recibido"). */
+      "hotelDiario":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" }
     },
 
     /* 15-10: LA GUÍA DE LA RONDA para el teléfono del policía (sin cuenta):
@@ -636,6 +638,16 @@ PEGAR DESDE ACÁ
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 20-10-2026 (hay que volver a publicar): LA AGENDA Y LA BITÁCORA DEL HOTEL.
+- hotel/hotelDiario: la agenda inteligente que arma la app a las 22 h
+  (ag-<día>) y la bitácora del día que cierra la garita a las 23:59
+  (bd-<día>). La leen y la escriben SOLO el hotel y la garita. La
+  Administración, la supervisión y los vecinos no la ven. No lleva DNI,
+  nombres de huéspedes ni patentes de clientes en la bitácora.
+- Sin publicar estas reglas, la agenda no se guarda y la bitácora no se
+  cierra (el resto del hotel anda igual).
+-----------------------------------------------------------
 
 ✔ 18-10-2026 (NO hay que volver a publicar): la guía de la ronda se guarda
   además en ronda/guia/<resumen del código de 6 números> (25 letras), para

@@ -2815,8 +2815,9 @@ A['policia-constancia-ver'] = el => { const sv = [...serviciosPolicia(), ...aLis
   /* 18-10: se ve tal cual el PDF que le llega al policía. */
   constanciaImgs().then(im => {
     hoja('Constancia de servicio', `<iframe class="mv-parte-frame" title="Constancia de servicio" sandbox="allow-same-origin allow-modals"></iframe>
-      <button class="btn btn-pri btn-block" style="margin-top:10px" data-a="mv-parte-imprimir">${I('download')}Imprimir o guardar en PDF</button>`, { ancho:'820px' });
-    const f = $('#hoja .mv-parte-frame'); if (f) f.srcdoc = cpPdfDoc(constanciaPdfHtml(sv, im));
+      <button class="btn btn-pri btn-block" style="margin-top:10px" data-a="mv-parte-imprimir">${I('download')}Imprimir o guardar en PDF</button>
+      ${el.dataset.desde === 'hist' ? `<button class="btn btn-sec btn-block" style="margin-top:8px" data-a="hist-policias-volver">${I('left')}Volver a la lista de servicios</button>` : ''}`, { ancho:'820px' });
+    const f = $('#hoja .mv-parte-frame'); if (f){ encuadrarPdf(f); f.srcdoc = cpPdfDoc(constanciaPdfHtml(sv, im)); }
   }); };
 /* Un servicio en la ventana Turnos: se despliega con todo el recorrido. */
 function tarjetaServicio(sv, { conAcciones = true } = {}){
@@ -2832,7 +2833,9 @@ function tarjetaServicio(sv, { conAcciones = true } = {}){
       ${sv.rondas.map((r, i) => `<div><span class="muted">Ronda ${i + 1}</span><b>${hora(r.inicio)}${r.fin ? '–' + hora(r.fin) + ' (' + minutos(r.inicio, r.fin) + ' min)' : ' · en curso'} · ${esc(estadoRondaTxt(r))}${r.qr.length ? `<br><small class="muted">${r.qr.map(q => `${esc(q.n)} ${hora(q.at)}`).join(' · ')}</small>` : ''}</b></div>`).join('')}
       ${c ? `<div><span class="muted">Constancia</span><b>${c.ok ? `enviada a ${esc(c.para || sv.email)} · ${fechaHora(c.at)}` : `no salió: ${esc(c.error || '')}`}</b></div>` : ''}
       ${conAcciones ? `<div class="btns" style="margin-top:6px"><button class="btn btn-xs btn-sec" data-a="policia-constancia-ver" data-id="${esc(sv.id)}">${I('file')}Ver la constancia</button>
-        ${sv.sale && sv.email && sv.registroSale ? `<button class="btn btn-xs btn-sec" data-a="policia-constancia" data-id="${esc(sv.id)}">${I('mail')}${c && c.ok ? 'Reenviar' : 'Mandar'} la constancia</button>` : ''}</div>` : ''}
+        ${sv.sale && sv.email && sv.registroSale ? `<button class="btn btn-xs btn-sec" data-a="policia-constancia" data-id="${esc(sv.id)}">${I('mail')}${c && c.ok ? 'Reenviar' : 'Mandar'} la constancia</button>` : ''}</div>`
+        /* 20-10-2026: en "Servicios anteriores" también se abre la constancia de cada uno (pedido de Claudio). */
+        : sv.sale ? `<div class="btns" style="margin-top:6px"><button class="btn btn-xs btn-sec" data-a="policia-constancia-ver" data-id="${esc(sv.id)}" data-desde="hist">${I('file')}Ver la constancia</button></div>` : ''}
     </div></details>`;
 }
 /* En Turnos: los últimos 7 servicios; los anteriores, a pedido. */
@@ -2866,7 +2869,8 @@ function pintarHistPolicias(q){
     <div class="servicios-lista">${ls.slice(0, 200).map(sv => tarjetaServicio(sv, { conAcciones:false })).join('') || '<p class="muted small">Sin servicios.</p>'}</div>
     <button class="btn btn-sec btn-block" style="margin-top:10px" data-a="hist-policias-csv">${I('download')}Descargar la planilla (CSV)</button>`, { ancho:'640px' });
 }
-F['hist-policias-buscar'] = d => pintarHistPolicias(d.q || '');
+F['hist-policias-buscar'] = d => { Historial.qPolicia = d.q || ''; pintarHistPolicias(Historial.qPolicia); };
+A['hist-policias-volver'] = () => pintarHistPolicias(Historial.qPolicia || '');
 A['hist-policias-csv'] = () => csvDe([['ingreso','turno ingreso','salida','turno salida','policía','cargo','matrícula','guardias','rondas','incompletas','constancia'],
   ...aLista(Historial.servPolicia).map(x => [fechaHora(x.entra), x.turnoEntra || '', x.sale ? fechaHora(x.sale) : '', x.turnoSale || '', x.nombre, x.cargo || '', x.matricula || '', x.guardias.join(' / '), x.rondas.length, x.rondas.filter(r => r.incompleta).length, x.constancia && x.constancia.ok ? 'enviada' : ''])], `servicios-policia-${hoyISO()}.csv`);
 
@@ -2991,6 +2995,12 @@ function tareasGarita(){
   const petP = s.peticiones.filter(p => p.estado === 'pendiente');
   if (petP.length) add(0, 'edit', 'Peticiones de vecinos: recibir y firmar', lista3(petP, p => `${esc(p.casa || '')} · ${esc((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n.toLowerCase())}`), { v:'peticiones' });
 
+  /* La agenda del hotel para mañana (20-10-2026): un solo renglón hasta que
+     alguien toca "Recibido". Las tareas en sí no se repiten acá: los
+     huéspedes, vans y empleados salen solos el mismo día. */
+  if (typeof agendaDe === 'function'){ const ag = agendaDe(sumarDias(hoy, 1));
+    if (ag && ag.estado === 'aprobada'){ if (ag.recibido) hecho(`agenda del hotel de mañana recibida (${hora(ag.recibido.at)} h)`);
+      else add(2, 'calendar', 'Agenda del hotel para mañana: leerla y tocar "Recibido"', `${plural(aLista(ag.items).filter(x => x.est !== 'quitado').length, 'tarea')} · la aprobó la gerencia a las ${hora(ag.aprobadaAt)} h`, { v:'hotel-agenda' }); } }
   /* El camión, solo el día que pasa. */
   const dias = recoleccionDias(), dh = dias[new Date().getDay()], vol = typeof volsProximos === 'function' && volsProximos().find(v => v.fecha === hoy);
   if (dh || vol){ const ad = Camion.adentro(), paso = camionPasoHoy();

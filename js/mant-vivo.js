@@ -779,6 +779,6 @@ A['mv-parte'] = async el => {
   const png = await mvPlanoPng(aLista(j.puntos)), doc = mvPdfDoc(mvParteHtml(j, png));
   hoja('Parte del día', `<iframe class="mv-parte-frame" title="Parte del día" sandbox="allow-same-origin allow-modals"></iframe>
     <button class="btn btn-pri btn-block" style="margin-top:10px" data-a="mv-parte-imprimir">${I('download')}Imprimir o guardar en PDF</button>`, { ancho:'820px' });
-  const f = $('#hoja .mv-parte-frame'); if (f) f.srcdoc = doc;
+  const f = $('#hoja .mv-parte-frame'); if (f){ encuadrarPdf(f); f.srcdoc = doc; }
 };
 A['mv-parte-imprimir'] = () => { const f = $('#hoja .mv-parte-frame'); try { f.contentWindow.focus(); f.contentWindow.print(); } catch(e){ toast('No se pudo abrir la impresión', 'alert'); } };

@@ -77,6 +77,8 @@ const P = {
   door:'<path d="M13 4h5a2 2 0 0 1 2 2v14"/><path d="M2 20h20M13 20V3L6 5v15"/><path d="M10 12v.01"/>',
   tree:'<path d="M12 22v-5"/><path d="M12 2 5 12h4l-3 5h12l-3-5h4z"/>',
   bolt:'<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>',
+  /* 20-10-2026: el barco, para el puerto y los cruceros (antes era la gota y no se entendía). */
+  barco:'<path d="M3 15h18l-2.5 4.5a2 2 0 0 1-1.8 1H7.3a2 2 0 0 1-1.8-1Z"/><path d="M6 15V10h12v5"/><path d="M9 10V6h6v4"/><path d="M12 3v3"/>',
   drop:'<path d="M12 2.7s-7 7.3-7 12.3a7 7 0 0 0 14 0c0-5-7-12.3-7-12.3z"/>',
   clip:'<path d="m21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/>',
   lamp:'<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>',

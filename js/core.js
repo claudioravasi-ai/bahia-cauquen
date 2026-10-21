@@ -194,7 +194,7 @@ function migrar(s){
   const def = { users:[], posts:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[],
     avisos:[], correos:[], peticiones:[], auditoria:[], obras:[], dms:[], viajes:[], infracciones:[], proveedores:[],
     gastos:[], liquidaciones:[], pagos:[], recibos:[], impuestos:[], cruceros:[], reclamos:[], votaciones:[], sos:[], documentos:[], notifs:[], compras:[], solicitudesPase:[], promos:[], comunicados:[], camion:[], mensajeria:[], alertas:[], frecuentes:[], asientos:[], puntos:[], pasos:[], rondaCodigos:[],
-    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[], hotelEmpleados:[],
+    hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[], hotelEmpleados:[], hotelDiario:[],
     /* 08-10: el resumen de cada liquidación y las cuotas de cada lote (ExpLote, js/v-expensas.js) */
     liqResumen:[], cuotasLote:[], morosos:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[],
@@ -866,6 +866,20 @@ function hoja(titulo, html, { ancho } = {}){
   if (f && matchMedia('(pointer:fine)').matches) setTimeout(() => f.focus(), 60);
   return d;
 }
+/* EL VISOR DE LOS PDF (20-10-2026, pedido de Claudio: "que quede bien
+   encuadrado"). La constancia del policía, el parte de mantenimiento y la
+   bitácora del hotel se ven como una hoja A4 entera, achicada para que
+   entre en el recuadro, sobre un fondo gris. Solo en pantalla: al imprimir
+   o guardar en PDF sale en tamaño real. */
+function encuadrarPdf(f){
+  if (!f) return;
+  const ajustar = () => { try { const d = f.contentDocument; if (!d || !d.head) return;
+    const z = Math.max(.3, Math.min(1, (f.clientWidth - 24) / 794));
+    let st = d.getElementById('encuadre'); if (!st){ st = d.createElement('style'); st.id = 'encuadre'; d.head.appendChild(st); }
+    st.textContent = `@media screen{html{background:#e6ebee}body{box-sizing:border-box;width:794px;min-height:1123px;margin:12px auto!important;padding:28px 30px!important;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.18);zoom:${z.toFixed(3)}}}`; } catch(e){} };
+  f.addEventListener('load', ajustar); if (f.contentDocument && f.contentDocument.readyState === 'complete') ajustar();
+  window.addEventListener('resize', ajustar);
+}
 const cerrarHoja = () => { const d = $('#hoja'); if (d.open) d.close(); };
 function confirmar(titulo, texto, { si = 'Confirmar', peligro = false } = {}){
   return new Promise(ok => {
@@ -914,7 +928,8 @@ function cargarQR(){
    grandes y separados; abajo un mapita con el pin y "Cómo llegar".
    WhatsApp no deja que una imagen sea un botón: el mapa de Google se abre
    tocando el único enlace del mensaje, que va solo al final, con 📍.
-   `datos` (opcional): { nombre, espera, cuando, horario }.
+   `datos` (opcional): { nombre, espera, cuando, horario, etiqueta, tono }:
+   etiqueta y tono (dos colores) para el pase HUÉSPED DEL HOTEL (20-10-2026).
    ========================================================= */
 const codigoEspaciado = c => String(c || '').replace(/^(\d{3})(\d{3})$/, '$1 $2');
 let logoPase = null;
@@ -926,7 +941,8 @@ async function imagenQR(contenido, codigo, titulo = '', sub = '', datos = null){
   const n = qr.getModuleCount(), W = 1080, M = 54, CW = W - 2 * M;
   const d = datos || {}, tieneInfo = !!(d.espera || d.cuando || d.horario);
   const lado = 600, cel = lado / n;
-  const topH = 330, infoH = tieneInfo ? 170 : 0, qrY0 = M + topH + infoH + 70, codY = qrY0 + lado + 120, mapY = codY + 110, mapH = 230;
+  const normas = Array.isArray(d.normas) && d.normas.length ? d.normas.slice(0, 4) : null, normH = normas ? 640 : 0;
+  const topH = 330, infoH = tieneInfo ? 170 : 0, qrY0 = M + topH + infoH + 70, codY = qrY0 + lado + 120, mapY = codY + 110 + normH, mapH = 230;
   const H = mapY + mapH + M + 40;
   const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
   const F = (peso, px, fam = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif') => `${peso} ${px}px ${fam}`;
@@ -937,7 +953,8 @@ async function imagenQR(contenido, codigo, titulo = '', sub = '', datos = null){
   /* la tarjeta */
   g.save(); g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = 40; g.shadowOffsetY = 14; redondo(M, M, CW, H - 2 * M, 44); g.fillStyle = '#ffffff'; g.fill(); g.restore();
   g.save(); redondo(M, M, CW, H - 2 * M, 44); g.clip();
-  const tg = g.createLinearGradient(M, M, W - M, M + topH); tg.addColorStop(0, '#0d6b66'); tg.addColorStop(1, '#14968c'); g.fillStyle = tg; g.fillRect(M, M, CW, topH);
+  const tono = Array.isArray(d.tono) && d.tono.length === 2 ? d.tono : ['#0d6b66', '#14968c'];
+  const tg = g.createLinearGradient(M, M, W - M, M + topH); tg.addColorStop(0, tono[0]); tg.addColorStop(1, tono[1]); g.fillStyle = tg; g.fillRect(M, M, CW, topH);
   /* montañas suaves en la cabecera */
   g.fillStyle = 'rgba(255,255,255,.10)'; g.beginPath(); g.moveTo(M, M + topH); g.lineTo(M + 170, M + topH - 120); g.lineTo(M + 300, M + topH - 50); g.lineTo(M + 470, M + topH - 170); g.lineTo(M + 650, M + topH - 40); g.lineTo(M + 820, M + topH - 140); g.lineTo(W - M, M + topH - 60); g.lineTo(W - M, M + topH); g.fill();
   g.restore();
@@ -947,7 +964,7 @@ async function imagenQR(contenido, codigo, titulo = '', sub = '', datos = null){
   g.fillStyle = '#ffffff'; g.font = F(800, 34); g.fillText(titulo || ('Barrio ' + Store.s.config.nombre), tx, M + 70);
   g.globalAlpha = .85; g.font = F(600, 24); g.fillText(Store.s.config.ciudad || 'Ushuaia', tx, M + 104); g.globalAlpha = 1;
   /* etiqueta */
-  g.font = F(800, 22); const et = 'PASE DE INGRESO', ew = g.measureText(et).width + 40;
+  g.font = F(800, 22); const et = d.etiqueta || 'PASE DE INGRESO', ew = g.measureText(et).width + 40;
   redondo(W - M - 48 - ew, M + 46, ew, 46, 23); g.fillStyle = 'rgba(255,255,255,.18)'; g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(et, W - M - 48 - ew / 2, M + 77);
   g.textAlign = 'left'; g.globalAlpha = .8; g.font = F(700, 22); g.fillText(d.nombre ? 'BIENVENIDO/A' : 'PASE', M + 48, M + 190); g.globalAlpha = 1;
   g.font = F(800, 58); let nom = d.nombre || sub || 'Pase de ingreso'; while (g.measureText(nom).width > CW - 96 && nom.length > 4) nom = nom.slice(0, -2);
@@ -972,6 +989,41 @@ async function imagenQR(contenido, codigo, titulo = '', sub = '', datos = null){
   g.textAlign = 'center'; g.fillStyle = '#667775'; g.font = F(800, 22); g.fillText('CÓDIGO DE INGRESO', W / 2, codY - 46);
   g.fillStyle = '#0d6b66'; g.font = F(800, 92, 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'); g.fillText(codigoEspaciado(codigo), W / 2, codY + 40);
   g.fillStyle = '#3d4f4d'; g.font = F(600, 24); g.fillText('Mostrá el QR en la garita o decí el código', W / 2, codY + 84);
+  /* LAS NORMAS DEL BARRIO (20-10-2026, pedido de Claudio): en los pases que
+     hace el hotel, cuatro gestos con su dibujo, como las indicaciones de una
+     tarjeta de embarque: 20 km/h, no fotografiar casas, cuidar la flora y la
+     fauna, convivencia. Cada una: { ic:'20'|'foto'|'hoja'|'silencio', t, s }. */
+  if (normas){
+    /* 2 × 2 tarjetitas iguales: el dibujo centrado arriba, el título y la explicación centrados abajo. */
+    const ny = codY + 120, nx = M + 40, nw = CW - 80, nh = normH - 30, gap = 18, pad = 26;
+    const cw = (nw - 2 * pad - gap) / 2, chh = (nh - 92 - 56 - gap) / 2;
+    redondo(nx, ny, nw, nh, 30); g.fillStyle = '#eef6ec'; g.fill();
+    g.textAlign = 'center'; g.fillStyle = '#2f6b3a'; g.font = F(800, 24); g.fillText('EN EL BARRIO, NOS RESPETAMOS ENTRE TODOS', W / 2, ny + 56);
+    const envolver = (txt, x, y, ancho, alto, max = 2) => { const ls = []; let l = '';
+      String(txt).split(' ').forEach(p => { const t = l ? l + ' ' + p : p; if (g.measureText(t).width > ancho && l){ ls.push(l); l = p; } else l = t; }); if (l) ls.push(l);
+      const ver = ls.slice(0, max); if (ls.length > max){ let u = ver[max - 1] + '…'; while (g.measureText(u).width > ancho && u.length > 2) u = u.slice(0, -2) + '…'; ver[max - 1] = u; }
+      ver.forEach((t, k) => g.fillText(t, x, y + k * alto)); return ver.length; };
+    normas.forEach((nm, i) => {
+      const cx = nx + pad + (i % 2) * (cw + gap), cy = ny + 86 + Math.floor(i / 2) * (chh + gap), ix = cx + cw / 2, iy = cy + 62;
+      g.save(); g.shadowColor = 'rgba(47,107,58,.12)'; g.shadowBlur = 14; g.shadowOffsetY = 4; redondo(cx, cy, cw, chh, 24); g.fillStyle = '#ffffff'; g.fill(); g.restore();
+      /* el dibujo */
+      if (nm.ic === '20'){ g.beginPath(); g.arc(ix, iy, 40, 0, 7); g.fillStyle = '#fff'; g.fill(); g.lineWidth = 10; g.strokeStyle = '#d33a3a'; g.stroke();
+        g.fillStyle = '#111'; g.font = F(900, 34); g.fillText('20', ix, iy + 12); }
+      else { const col = nm.ic === 'hoja' ? '#2f8f5b' : nm.ic === 'foto' ? '#7a4bc2' : '#1d7fb0';
+        g.beginPath(); g.arc(ix, iy, 40, 0, 7); g.fillStyle = col; g.fill(); g.strokeStyle = '#fff'; g.fillStyle = '#fff'; g.lineWidth = 5; g.lineCap = 'round'; g.lineJoin = 'round';
+        if (nm.ic === 'foto'){ redondo(ix - 22, iy - 13, 44, 30, 7); g.stroke(); g.beginPath(); g.arc(ix, iy + 2, 8, 0, 7); g.stroke(); g.beginPath(); g.moveTo(ix - 9, iy - 13); g.lineTo(ix - 4, iy - 20); g.lineTo(ix + 5, iy - 20); g.lineTo(ix + 9, iy - 13); g.stroke();
+          g.strokeStyle = '#ffd36b'; g.lineWidth = 6; g.beginPath(); g.moveTo(ix - 27, iy - 27); g.lineTo(ix + 27, iy + 27); g.stroke(); }
+        else if (nm.ic === 'hoja'){ g.beginPath(); g.moveTo(ix - 19, iy + 20); g.bezierCurveTo(ix - 26, iy - 15, ix + 5, iy - 29, ix + 22, iy - 22); g.bezierCurveTo(ix + 26, iy + 5, ix + 3, iy + 26, ix - 19, iy + 20); g.fill();
+          g.strokeStyle = col; g.lineWidth = 3.5; g.beginPath(); g.moveTo(ix - 19, iy + 20); g.quadraticCurveTo(ix, iy, ix + 15, iy - 15); g.stroke(); }
+        else { g.beginPath(); g.moveTo(ix - 21, iy - 7); g.lineTo(ix - 10, iy - 7); g.lineTo(ix + 3, iy - 19); g.lineTo(ix + 3, iy + 19); g.lineTo(ix - 10, iy + 7); g.lineTo(ix - 21, iy + 7); g.closePath(); g.fill();
+          g.strokeStyle = '#ffd36b'; g.lineWidth = 5; g.beginPath(); g.moveTo(ix + 11, iy - 10); g.lineTo(ix + 27, iy + 10); g.moveTo(ix + 27, iy - 10); g.lineTo(ix + 11, iy + 10); g.stroke(); }
+        g.lineCap = 'butt'; }
+      /* el texto, centrado */
+      g.textAlign = 'center'; g.fillStyle = '#0f1f1e'; g.font = F(800, 27); envolver(nm.t, ix, iy + 84, cw - 40, 30, 1);
+      g.fillStyle = '#4a5d5a'; g.font = F(500, 21); envolver(nm.s, ix, iy + 116, cw - 44, 25, 2);
+    });
+    g.textAlign = 'center'; g.fillStyle = '#2f6b3a'; g.font = F(700, 22); g.fillText(d.normasPie || 'Gracias por cuidar este lugar como si fuera tu casa.', W / 2, ny + nh - 24);
+  }
   /* el mapita */
   const mx = M + 48, mw = 300, my = mapY;
   g.save(); redondo(mx, my, mw, mapH - 30, 26); g.clip();
@@ -998,8 +1050,9 @@ async function imagenQR(contenido, codigo, titulo = '', sub = '', datos = null){
    mandar la imagen (sin internet para dibujar el QR): ahí va el texto. En
    la computadora, que no adjunta desde la web, se baja la imagen y se abre
    WhatsApp vacío para adjuntarla. */
-async function compartirPase({ texto, contenido, codigo, titulo = '', sub = '', tel = '', archivo = 'pase-barrio.png', datos = null }){
-  const blob = await imagenQR(contenido, codigo, titulo, sub, datos).catch(() => null);
+async function compartirPase({ texto, contenido, codigo, titulo = '', sub = '', tel = '', archivo = 'pase-barrio.png', datos = null, imagen = null }){
+  /* `imagen` (opcional): una tarjeta propia (la del hotel, js/v-hotel.js) en vez de la de siempre. */
+  const blob = await (imagen ? imagen() : imagenQR(contenido, codigo, titulo, sub, datos)).catch(() => null);
   if (blob && navigator.canShare){
     const f = new File([blob], archivo, { type:'image/png' });
     if (navigator.canShare({ files:[f] })){ try { await navigator.share({ files:[f] }); return; } catch(e){ if (e.name === 'AbortError') return; } }
