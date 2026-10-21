@@ -90,7 +90,8 @@ F['policia-horario'] = d => {
   const ok = x => /^\d{2}:\d{2}$/.test(x || '');
   if (![d.semana, d.finde, d.hasta, d.hastaFinde].every(ok)) return toast('Revisá las horas', 'clock');
   Store.cambiar(s => { s.config.policiaHorario = { semana:d.semana, finde:d.finde, hasta:d.hasta, hastaFinde:d.hastaFinde }; auditar(s, 'Cambió el horario de la policía nocturna', `dom-jue ${d.semana} a ${d.hasta} · vie-sáb ${d.finde} a ${d.hastaFinde}`); });
-  toast('Horario de la policía guardado', 'check');
+  if (document.querySelector('#hoja .nh-form')) cerrarHoja();
+  toast('Horario de la policía guardado', 'check'); refrescar();
 };
 /* El turno de la garita que estaba abierto en un momento dado. */
 function turnoGaritaEn(at){

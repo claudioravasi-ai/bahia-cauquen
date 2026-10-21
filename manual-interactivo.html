@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b3c47">
+<title>Manual de uso interactivo · Barrio Bahía Cauquén</title>
+<meta name="description" content="Manual de uso interactivo de la app del Barrio Bahía Cauquén: la app de verdad, con datos de ejemplo, y una guía que marca qué tocar en cada función.">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!--
+  MANUAL DE USO INTERACTIVO (pedido de Claudio, 21-10-2026)
+  "Igual al de la app de quirófanos, con acceso desde la app debajo del nombre
+  del barrio y del vecino; que se abra aparte, con un botón para regresar, el
+  menú desplegable a la izquierda para saltar de función en función y el 100 %
+  de la interactividad de la app."
+  · En el medio está LA APP DE VERDAD (index.html?local&manual), con los datos
+    de ejemplo de la prueba: todo se puede tocar y funciona igual. No se
+    conecta a la base del barrio y guarda aparte (llaves "bhc.manual.…"), así
+    que practicar acá no toca nada real ni la sesión de la app.
+  · A la izquierda, las funciones por perfil (vecinos, garita, Administración,
+    hotel, supervisión). Al elegir una, el manual entra con la cuenta que
+    corresponde, abre la pantalla y la guía marca qué tocar: el botón titila,
+    lo demás se oscurece. Se avanza tocando en la app o con "Hacelo por mí".
+  · Sin "películas" automáticas: la guía espera a la persona (como el de HRU).
+  · Cada paso busca el botón en la pantalla; si no está, lo dice y deja seguir.
+-->
+<style>
+:root{
+  --bg:#eef3f2; --surf:#ffffff; --surf-2:#f5f8f7; --surf-3:#e6eeec;
+  --ink:#0f1f1e; --ink-2:#3d4f4d; --muted:#667775; --line:#dce5e3; --line-2:#c9d6d3;
+  --brand:#0d6b66; --brand-2:#14968c; --brand-soft:#d8eeea; --deep:#0b3c47;
+  --accent:#7445c0; --accent-soft:#eee6fa; --ok:#1b8f5a; --ok-soft:#dcf3e7; --warn:#b7790a; --warn-soft:#fcf0d2;
+  --danger:#d33a3a; --sky:#2b6fb3; --sky-soft:#e1edf9; --wood:#b85f24;
+  --marco:#15202a; --sombra:0 24px 60px rgba(11,60,71,.22);
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+    --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+    --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --deep:#0b3c47;
+    --accent:#b18cf0; --accent-soft:#2a2040; --ok:#4fd08f; --ok-soft:#133526; --warn:#f0b54a; --warn-soft:#3a2c10;
+    --danger:#f07171; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --marco:#000; --sombra:0 24px 60px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --surf-3:#1b2c30;
+  --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a; --line-2:#2b3f45;
+  --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --deep:#0b3c47;
+  --accent:#b18cf0; --accent-soft:#2a2040; --ok:#4fd08f; --ok-soft:#133526; --warn:#f0b54a; --warn-soft:#3a2c10;
+  --danger:#f07171; --sky:#7ab3ee; --sky-soft:#142a40; --wood:#e89a63; --marco:#000; --sombra:0 24px 60px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--body);background:var(--bg);color:var(--ink);overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+/* ---------- barra de arriba ---------- */
+.barra{height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;color:#fff;
+  background:linear-gradient(110deg,var(--deep),#0d6b66 55%,#5b3ea8);box-shadow:0 4px 18px rgba(11,60,71,.25);position:relative;z-index:20}
+.barra img{width:38px;height:38px;border-radius:50%;background:#fff;flex:none}
+.barra .tit{flex:1;min-width:0;line-height:1.15}
+.barra .tit b{display:block;font-size:16px;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barra .tit small{display:block;font-size:11.5px;opacity:.8;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bb{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 13px;border-radius:99px;border:1.5px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-weight:800;font-size:13px;white-space:nowrap}
+.bb:hover{background:rgba(255,255,255,.22)}
+.bb.volver{background:#fff;color:var(--deep);border-color:#fff}
+.bb svg{width:17px;height:17px}
+.bb-menu{display:none}
+/* ---------- tres columnas ---------- */
+.lienzo{display:grid;grid-template-columns:300px 1fr 360px;height:calc(100% - 58px)}
+/* el menú desplegable */
+.menu{background:var(--surf);border-right:1px solid var(--line);overflow:auto;padding:12px 10px 30px}
+.buscar{position:sticky;top:-12px;margin:-12px -10px 8px;padding:12px 10px 8px;background:var(--surf);z-index:1}
+.buscar input{width:100%;height:40px;border-radius:12px;border:1.5px solid var(--line-2);background:var(--surf-2);color:var(--ink);font:inherit;font-size:14px;padding:0 12px}
+.buscar input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.avance{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:700;margin:8px 2px 0}
+.avance i{flex:1;height:6px;border-radius:99px;background:var(--surf-3);overflow:hidden}
+.avance i b{display:block;height:100%;width:var(--p,0%);background:linear-gradient(90deg,var(--brand),var(--accent));transition:width .4s}
+.grupo{margin-top:6px;border-radius:14px}
+.grupo>summary{list-style:none;display:flex;align-items:center;gap:9px;padding:9px 8px;border-radius:12px;cursor:pointer;font-weight:800;font-size:14px}
+.grupo>summary::-webkit-details-marker{display:none}
+.grupo>summary:hover{background:var(--surf-2)}
+.grupo>summary .gi{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font-size:17px;background:var(--gc-soft,var(--brand-soft));flex:none}
+.grupo>summary .gn{flex:1}
+.grupo>summary small{font-size:11px;color:var(--muted);font-weight:700}
+.grupo>summary .fl{transition:transform .2s;color:var(--muted)}
+.grupo[open]>summary .fl{transform:rotate(90deg)}
+.lecc{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:7px 8px 7px 14px;margin:1px 0;border-radius:10px;font-size:13.5px;color:var(--ink-2);font-weight:600;position:relative}
+.lecc:hover{background:var(--surf-2);color:var(--ink)}
+.lecc .chk{width:18px;height:18px;border-radius:50%;border:2px solid var(--line-2);flex:none;display:grid;place-items:center;font-size:11px;color:#fff}
+.lecc.hecha .chk{background:var(--ok);border-color:var(--ok)}
+.lecc.on{background:var(--brand-soft);color:var(--ink);font-weight:800}
+.lecc.on::before{content:"";position:absolute;left:3px;top:8px;bottom:8px;width:4px;border-radius:4px;background:var(--brand)}
+.menu .pie{margin-top:16px;padding:10px;border-radius:12px;background:var(--surf-2);font-size:12px;color:var(--muted);line-height:1.45}
+.menu .pie button{margin-top:8px;border:1.5px solid var(--line-2);background:var(--surf);border-radius:10px;padding:6px 10px;font-weight:800;font-size:12px}
+/* el teléfono con la app */
+.escena{position:relative;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden;
+  background:radial-gradient(80% 60% at 50% 0%,color-mix(in srgb,var(--brand) 14%,transparent),transparent),var(--bg)}
+.escena .vista{position:absolute;top:12px;right:12px;display:flex;gap:4px;background:var(--surf);border:1px solid var(--line);border-radius:99px;padding:3px;z-index:2}
+.escena .vista button{border:0;background:none;border-radius:99px;padding:5px 11px;font-size:12px;font-weight:800;color:var(--muted)}
+.escena .vista button.on{background:var(--brand);color:#fff}
+.tel{position:relative;width:min(400px,100%);height:min(820px,100%);border-radius:44px;background:var(--marco);padding:12px;box-shadow:var(--sombra)}
+.tel::before{content:"";position:absolute;top:18px;left:50%;width:90px;height:22px;margin-left:-45px;border-radius:99px;background:#000;z-index:2;opacity:.9}
+.tel iframe{width:100%;height:100%;border:0;border-radius:34px;background:var(--surf);display:block}
+.escena.compu .tel{width:100%;height:100%;border-radius:16px;padding:6px}
+.escena.compu .tel::before{display:none}
+.escena.compu .tel iframe{border-radius:11px}
+.cargando{position:absolute;inset:12px;border-radius:34px;display:grid;place-content:center;text-align:center;gap:10px;background:var(--surf);color:var(--muted);font-weight:700;z-index:1;transition:opacity .3s}
+.cargando.fuera{opacity:0;pointer-events:none}
+.cargando i{width:36px;height:36px;margin:0 auto;border-radius:50%;border:4px solid var(--brand-soft);border-top-color:var(--brand);animation:gira .9s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+/* la guía */
+.guia{background:var(--surf);border-left:1px solid var(--line);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.g-cab{padding:16px 18px 12px;border-bottom:1px solid var(--line)}
+.g-cab .quien{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--gc,var(--brand));background:var(--gc-soft,var(--brand-soft));padding:4px 10px;border-radius:99px}
+.g-cab h1{font-size:21px;line-height:1.2;letter-spacing:-.4px;margin:10px 0 4px}
+.g-cab p{margin:0;color:var(--ink-2);font-size:13.5px;line-height:1.45}
+.puntos{display:flex;gap:5px;margin-top:12px}
+.puntos i{flex:1;height:5px;border-radius:99px;background:var(--surf-3);transition:background .3s}
+.puntos i.hecho{background:var(--ok)}.puntos i.on{background:var(--brand)}
+.g-paso{padding:16px 18px;flex:1;overflow:auto;min-height:0}
+.g-paso .np{font-size:12px;font-weight:800;color:var(--muted)}
+.g-paso h2{font-size:17px;margin:4px 0 8px;letter-spacing:-.2px}
+.g-paso .x{font-size:14.5px;line-height:1.55;color:var(--ink-2)}
+.g-paso .x b{color:var(--ink)}
+.toca{display:flex;align-items:center;gap:10px;margin-top:14px;padding:11px 12px;border-radius:14px;background:linear-gradient(100deg,#fff4c7,#ffe48a);color:#5a4300;font-weight:800;font-size:13.5px;animation:toca 1.6s ease-in-out infinite}
+.toca span{font-size:22px;animation:dedo 1s ease-in-out infinite}
+@keyframes toca{50%{box-shadow:0 0 0 6px rgba(255,207,51,.25)}}
+@keyframes dedo{50%{transform:translateY(-3px)}}
+.toca.mirar{background:var(--sky-soft);color:var(--sky);animation:none}.toca.mirar span{animation:none}
+.toca.listo{background:var(--ok-soft);color:var(--ok);animation:none}.toca.listo span{animation:none}
+.nohay{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--warn-soft);color:var(--warn);font-size:13px;font-weight:700;line-height:1.45}
+.g-btns{display:flex;gap:8px;padding:12px 18px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.gb{flex:1;min-width:0;height:44px;border-radius:12px;border:1.5px solid var(--line-2);background:var(--surf-2);font-weight:800;font-size:13.5px;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.gb:disabled{opacity:.4;cursor:default}
+.gb.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.gb.yo{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent);color:var(--accent)}
+.gb.late{animation:late 1.2s ease-in-out infinite}
+@keyframes late{50%{box-shadow:0 0 0 5px color-mix(in srgb,var(--brand) 25%,transparent)}}
+.fin{text-align:center;padding:24px 18px}
+.fin .conf{font-size:44px;animation:salta .8s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes salta{from{transform:scale(.3);opacity:0}}
+.fin h2{margin:8px 0 6px}
+.bienv{padding:20px 18px;overflow:auto}
+.bienv h1{font-size:22px;letter-spacing:-.4px;margin:0 0 8px}
+.bienv p{color:var(--ink-2);line-height:1.55;font-size:14px}
+.bienv .tarjetas{display:grid;gap:8px;margin-top:14px}
+.bienv .tj{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;border:1.5px solid var(--line);background:var(--surf-2);text-align:left;font-weight:800;font-size:14px}
+.bienv .tj:hover{border-color:var(--brand);transform:translateY(-1px)}
+.bienv .tj span{font-size:22px}
+.bienv .tj small{display:block;font-weight:600;color:var(--muted);font-size:12px}
+.seguro{margin-top:14px;display:flex;gap:8px;padding:10px 12px;border-radius:12px;background:var(--ok-soft);color:var(--ok);font-size:12.5px;font-weight:700;line-height:1.45}
+.velo-menu{display:none}
+/* ---------- tablet: el menú se abre con un botón ---------- */
+@media (max-width:1180px){
+  .lienzo{grid-template-columns:1fr 340px}
+  .bb-menu{display:inline-flex}
+  .menu{position:fixed;left:0;top:58px;bottom:0;width:min(320px,88vw);z-index:30;transform:translateX(-105%);transition:transform .25s;box-shadow:12px 0 40px rgba(0,0,0,.2)}
+  body.menu-abierto .menu{transform:none}
+  body.menu-abierto .velo-menu{display:block;position:fixed;inset:58px 0 0 0;background:rgba(5,15,20,.35);z-index:25}
+}
+/* ---------- celular: la app ocupa todo y la guía va abajo, plegable ---------- */
+@media (max-width:760px){
+  .barra{height:54px;padding:0 10px;gap:8px}
+  .barra img{width:32px;height:32px}
+  .barra .tit b{font-size:14.5px}
+  .barra .tit small{display:none}
+  .bb{height:36px;padding:0 10px;font-size:12.5px}
+  .bb .t-larga{display:none}
+  .lienzo{display:block;height:calc(100% - 54px);position:relative}
+  .menu{top:54px}
+  body.menu-abierto .velo-menu{inset:54px 0 0 0}
+  .escena{position:absolute;inset:0 0 var(--gh,236px) 0;padding:0}
+  .escena .vista{display:none}
+  .tel{width:100%;height:100%;border-radius:0;padding:0;box-shadow:none}
+  .tel::before{display:none}
+  .tel iframe{border-radius:0}
+  .cargando{inset:0;border-radius:0}
+  .guia{position:absolute;left:0;right:0;bottom:0;height:var(--gh,236px);border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.18);z-index:10;transition:height .25s}
+  body.guia-grande{--gh:62%}
+  .g-cab{padding:10px 14px 8px;position:relative}
+  .g-cab::before{content:"";position:absolute;top:5px;left:50%;width:40px;height:4px;margin-left:-20px;border-radius:9px;background:var(--line-2)}
+  .g-cab h1{font-size:16px;margin:6px 0 0}
+  .g-cab p{display:none}
+  body.guia-grande .g-cab p{display:block}
+  .puntos{margin-top:7px}
+  .g-paso{padding:8px 14px}
+  .g-paso h2{font-size:15px;margin:2px 0 4px}
+  .g-paso .x{font-size:13.5px;line-height:1.45}
+  .toca{margin-top:8px;padding:8px 10px;font-size:12.5px}
+  .g-btns{padding:8px 14px calc(10px + env(safe-area-inset-bottom));gap:6px}
+  .gb{height:40px;font-size:12.5px}
+  .bienv{padding:12px 14px}.bienv h1{font-size:17px}
+}
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+<header class="barra">
+  <button class="bb bb-menu" data-t="menu" aria-label="Abrir el menú de funciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="t-larga">Funciones</span></button>
+  <img src="icons/logo.png" alt="">
+  <div class="tit"><b>Manual de uso interactivo</b><small>Barrio Bahía Cauquén · la app de verdad, con datos de ejemplo</small></div>
+  <button class="bb" data-t="cero" title="Borra lo que practicaste y vuelve a los datos de ejemplo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="t-larga">Empezar de cero</span></button>
+  <button class="bb volver" data-t="volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Regresar<span class="t-larga">&nbsp;a la app</span></button>
+</header>
+<div class="lienzo">
+  <nav class="menu" id="menu" aria-label="Funciones de la app"></nav>
+  <div class="velo-menu" data-t="menu"></div>
+  <main class="escena" id="escena">
+    <div class="vista" role="group" aria-label="Cómo se ve"><button class="on" data-t="vista:tel">📱 Teléfono</button><button data-t="vista:compu">💻 Computadora</button></div>
+    <div class="tel"><div class="cargando" id="cargando"><i></i>Abriendo la app de práctica…</div>
+      <iframe id="app" title="La app del barrio, en modo práctica" src="about:blank"></iframe></div>
+  </main>
+  <aside class="guia" id="guia" aria-live="polite"></aside>
+</div>
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const dormir = ms => new Promise(r => setTimeout(r, ms));
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const params = new URLSearchParams(location.search);
+const VERSION = params.get('v') || '';
+
+/* =========================================================
+   LAS FUNCIONES, POR PERFIL
+   Cada lección: quién entra (q), en qué modo (m), qué pantalla abre (ir) y
+   los pasos. Un paso tiene título (t), texto (x), el botón que se marca
+   (s, un selector de la app) y qué se hace:
+     · h: 'tocar'    → se avanza al tocarlo en la app (o con "Hacelo por mí")
+     · h: 'escribir' → v es el texto de ejemplo para "Hacelo por mí"
+     · h: 'elegir'   → v es la opción de una lista
+     · sin h         → solo mirar: se avanza con "Siguiente"
+   "ENVIAR:<form>" es el botón de enviar de ese formulario.
+   QUIÉN VE CADA FUNCIÓN (Claudio, 21-10-2026): como el manual usa solo datos
+   de ejemplo, los vecinos, la garita y la Administración ven TODAS. El hotel
+   y la supervisión ven "Para empezar", lo suyo y lo que hacen con la garita
+   (ven: [...]), en un grupo "Con la garita".
+   ========================================================= */
+const G = [
+  { id:'empezar', n:'Para empezar', i:'✨', c:'var(--brand)', cs:'var(--brand-soft)', d:'Cómo es la app' },
+  { id:'vecino', con:'Con los vecinos', n:'Vecinos', i:'🏡', c:'var(--ok)', cs:'var(--ok-soft)', d:'Tu casa, tus visitas y el barrio' },
+  { id:'garita', con:'Con la garita', n:'Garita', i:'🛡️', c:'var(--sky)', cs:'var(--sky-soft)', d:'El turno, los ingresos y la ronda' },
+  { id:'admin', con:'Con la Administración', n:'Administración', i:'🗂️', c:'var(--accent)', cs:'var(--accent-soft)', d:'La gestión del barrio' },
+  { id:'hotel', con:'Con el hotel', n:'Hotel Los Cauquenes', i:'🏨', c:'var(--wood)', cs:'#fbe9dc', d:'Vans, huéspedes y empleados' },
+  { id:'supervision', con:'Con la supervisión', n:'Supervisión', i:'👁️', c:'#0b3c47', cs:'#dbe9ec', d:'Mirar la garita en vivo' },
+];
+const PERFILES = ['vecino', 'garita', 'admin', 'hotel', 'supervision'];
+const VE = PERFILES.includes(params.get('perfil')) ? params.get('perfil') : 'vecino';
+const VEN_TODO = ['vecino', 'garita', 'admin'].includes(VE);
+const puedeVer = x => VEN_TODO || x.g === 'empezar' || x.g === VE || ((x.ven || []).includes(VE) && x.g === 'garita');
+/* Primero "Para empezar", después lo propio y al final lo compartido. */
+const gruposEnOrden = () => [...G].sort((a, b) => (a.id === 'empezar' ? 0 : a.id === VE ? 1 : 2) - (b.id === 'empezar' ? 0 : b.id === VE ? 1 : 2));
+const nombreGrupo = g => VEN_TODO || g.id === 'empezar' || g.id === VE ? g.n : g.con;
+const visibles = () => L.filter(puedeVer);
+const QUIEN = { u_lucia:'Lucía · Lote 42 (vecina)', u_garita:'La garita', u_admin:'La Administración', u_hotel:'El hotel', u_super:'La supervisión' };
+const L = [
+  /* ---------------- para empezar ---------------- */
+  { id:'pantalla', g:'empezar', q:'u_lucia', t:'Conocer la pantalla', d:'El encabezado, la portada y cómo moverte.', p:[
+    { t:'El barrio y tu nombre', x:'Arriba a la izquierda están el <b>logo, el barrio y tu nombre</b> con tu lote. Tocarlo te lleva siempre al <b>inicio</b>. En la app de verdad, debajo dice <b>"Manual de uso interactivo"</b>: es este manual.', s:'#top .marca' },
+    { t:'La campanita', x:'La <b>campanita</b> junta tus avisos: visitas que llegaron, mensajes, el camión, la pizarra. El número rojo dice cuántos no leíste.', s:'#top [data-a="notifs"]' },
+    { t:'El botón SOS', x:'El botón rojo <b>SOS</b> es para una emergencia: se <b>mantiene apretado 3 segundos</b> y le llega a la garita, a la Administración y a los vecinos. En este manual es de práctica: no le llega a nadie.', s:'#sosBtn' },
+    { t:'Mi casa', x:'Las tarjetas grandes llevan a cada parte de la app. <b>Tocá "Mi casa"</b>: ahí está todo lo tuyo.', s:'#cuerpo [data-a="abrir"][data-v="casa"]', h:'tocar' },
+    { t:'Todo lo tuyo en un lugar', x:'Visitas, mensajes, expensas, "Estoy bien", peticiones, reclamos y tu perfil. Para volver, tocá la flecha de arriba o el nombre del barrio.', s:'#cuerpo' },
+  ] },
+  { id:'pizarra', g:'empezar', q:'u_lucia', t:'La pizarra del día y la campanita', d:'Enterarte de todo sin buscar.', p:[
+    { t:'La pizarra del día', x:'En la portada está la <b>Pizarra del día</b>: los avisos del barrio de hoy (el camión, cortes, obras, la guardia). <b>Tocá "Ver todo"</b>.', s:'#cuerpo [data-a="pizarra-toda"]', h:'tocar' },
+    { t:'Cada aviso en su color', x:'Rojo lo urgente, ámbar lo importante y verde lo de rutina. Tocá cualquiera para leerlo entero.', s:'#hoja, #cuerpo' },
+    { t:'La campanita', x:'Ahora <b>tocá la campanita</b>: son los avisos que son para vos.', s:'#top [data-a="notifs"]', h:'tocar', antes:'cerrarHoja()' },
+    { t:'Tus avisos', x:'Los nuevos arriba. Tocá uno y te lleva a donde corresponde (la visita, el mensaje, la expensa…).', s:'#hoja' },
+  ] },
+  { id:'cuenta', g:'empezar', q:'u_lucia', t:'Tu cuenta', d:'Contraseña, modo noche, avisos y salir.', p:[
+    { t:'Tu foto', x:'<b>Tocá tu foto</b>, arriba a la derecha.', s:'#top [data-a="mi-cuenta"]', h:'tocar' },
+    { t:'Todo lo de tu cuenta', x:'Cambiar la contraseña, el <b>modo noche</b>, activar los avisos al celular, tus datos, actualizar la app y salir.', s:'#hoja' },
+  ] },
+
+  /* ---------------- vecinos ---------------- */
+  { id:'visita', g:'vecino', ven:['garita'], q:'u_lucia', ir:'casa', t:'Autorizar una visita', d:'El código y el QR para la garita.', p:[
+    { t:'Nueva visita', x:'<b>Tocá "Autorizar una visita"</b>.', s:'#cuerpo [data-a="nuevo-pase"]', h:'tocar' },
+    { t:'Quién viene', x:'Escribí el <b>nombre</b> de la visita.', s:'#hoja form[data-f="nuevo-pase"] [name="nombre"]', h:'escribir', v:'Juan Pérez' },
+    { t:'Su DNI', x:'El <b>DNI</b> (si lo sabés) le ahorra tiempo en la garita.', s:'#hoja form[data-f="nuevo-pase"] [name="dni"]', h:'escribir', v:'30111222' },
+    { t:'Cuándo', x:'El <b>día y el horario</b> en que puede entrar. Si viene siempre (la empleada, el jardinero), tildá <b>"Viene siempre"</b> y elegí los días.', s:'#hoja form[data-f="nuevo-pase"] [name="fecha"]' },
+    { t:'Autorizar', x:'<b>Tocá el botón de abajo</b> para autorizarla.', s:'ENVIAR:nuevo-pase', h:'tocar' },
+    { t:'¡Listo el pase!', x:'Sale el <b>código y el QR</b>: mandáselo por WhatsApp. En la garita lo escanean y la visita pasa sin que te llamen.', s:'#hoja, #cuerpo' },
+  ] },
+  { id:'enlace', g:'vecino', ven:['garita'], q:'u_lucia', ir:'visitas', t:'Pasale un enlace a tu visita', d:'Que complete sus datos desde su celular.', p:[
+    { t:'El enlace', x:'<b>Tocá "Pasale un enlace a tu visita"</b>.', s:'#cuerpo [data-a="link-pedir"]', h:'tocar' },
+    { t:'Compartilo', x:'Mandáselo por WhatsApp: tu visita pone sus datos y le sale su QR al instante. A vos te llega el aviso para aprobarlo.', s:'#hoja [data-a="compartir-link"], #hoja' },
+  ] },
+  { id:'aviso-guardia', g:'vecino', ven:['garita'], q:'u_lucia', ir:'visitas', t:'Aviso rápido a la guardia', d:'Viene alguien sin QR: que te avisen cuando llegue.', p:[
+    { t:'El aviso', x:'Bajá hasta <b>"Aviso rápido a la guardia"</b> y tocalo.', s:'#cuerpo [data-a="aviso-guardia"]', h:'tocar' },
+    { t:'Quién viene', x:'Escribí quién viene (por ejemplo, "el plomero").', s:'#hoja form[data-f="aviso-guardia"] [name="nombre"]', h:'escribir', v:'El plomero' },
+    { t:'Avisar', x:'<b>Tocá el botón</b>: a la garita le aparece tu aviso al instante.', s:'ENVIAR:aviso-guardia', h:'tocar' },
+  ] },
+  { id:'viaje', g:'vecino', ven:['garita'], q:'u_lucia', ir:'visitas', t:'Me voy de viaje', d:'Tu casa en la lista de casas solas.', p:[
+    { t:'Casa sola', x:'<b>Tocá "Me voy de viaje"</b>.', s:'#cuerpo [data-a="modo-viaje"]', h:'tocar' },
+    { t:'Desde y hasta', x:'Elegí <b>desde y hasta cuándo</b>. La garita o el policía de la ronda la revisa una vez por día y te llega el aviso "Tu casa está en orden".', s:'#hoja form[data-f="modo-viaje"] [name="hasta"]' },
+    { t:'Un contacto', x:'Alguien a quien llamar si pasa algo.', s:'#hoja form[data-f="modo-viaje"] [name="contacto"]', h:'escribir', v:'Mi hermana 2901 15 555555' },
+    { t:'Guardar', x:'<b>Tocá el botón</b> para guardarlo.', s:'ENVIAR:modo-viaje', h:'tocar' },
+  ] },
+  { id:'emergencias', g:'vecino', ven:['garita', 'supervision'], q:'u_lucia', t:'Emergencias: SOS y DEA', d:'Qué hacer cuando algo pasa.', p:[
+    { t:'El SOS', x:'Ante una emergencia, <b>mantené apretado el SOS 3 segundos</b>: se llena de rojo, cuenta 3, 2, 1 y avisa. Acá es de práctica.', s:'#sosBtn' },
+    { t:'Emergencias', x:'<b>Tocá "Emergencias"</b>: los teléfonos útiles, el DEA y qué hacer.', s:'#cuerpo [data-a="abrir"][data-v="emergencias"]', h:'tocar' },
+    { t:'Todo a mano', x:'Llamar al 911, a la garita, pedir el DEA (desfibrilador) y los datos médicos de tu perfil.', s:'#cuerpo' },
+  ] },
+  { id:'estoybien', g:'vecino', ven:['garita'], q:'u_lucia', ir:'estoy-bien', t:'Estoy bien', d:'Un toque por día y alguien de confianza se entera.', p:[
+    { t:'Cómo funciona', x:'Si vivís solo o sola, tocás <b>"Estoy bien"</b> una vez por día. Si no lo tocás, la app avisa a quien vos elijas.', s:'#cuerpo' },
+    { t:'Configurarlo', x:'<b>Tocá "Configurar"</b> para elegir la hora y tus contactos.', s:'#cuerpo [data-a="bien-config"]', h:'tocar' },
+    { t:'Tus contactos', x:'Hasta tres personas de confianza, con su teléfono o correo, y la hora límite.', s:'#hoja form[data-f="bien-config"] [name="fn1"]', h:'escribir', v:'Ana (mi hija)' },
+  ] },
+  { id:'mensajes', g:'vecino', ven:['garita'], q:'u_lucia', ir:'mensajes', t:'Mensajes con la Administración y la garita', d:'Un chat privado y seguro.', p:[
+    { t:'Conversaciones', x:'Con la <b>Administración</b>, con la <b>garita</b> y con otros vecinos. <b>Tocá la de la Administración</b>.', s:'#cuerpo [data-a="abrir"][data-v="privado"]', h:'tocar' },
+    { t:'Escribí', x:'Escribí tu mensaje.', s:'#privIn', h:'escribir', v:'Hola, una consulta por el portón de servicio.' },
+    { t:'Mandar', x:'<b>Tocá enviar</b>. También podés adjuntar una foto o un archivo con el clip.', s:'ENVIAR:privado', h:'tocar' },
+  ] },
+  { id:'peticion', g:'vecino', ven:['garita'], q:'u_lucia', ir:'peticiones', t:'Peticiones a la garita', d:'Pedidos firmados: llaves, permisos, avisos.', p:[
+    { t:'Nueva petición', x:'<b>Tocá "Nueva petición"</b>.', s:'#cuerpo [data-a="nueva-peticion"]', h:'tocar' },
+    { t:'Qué pedís', x:'Elegí el tipo y escribí el detalle. La garita la recibe y la firma: te llega el aviso.', s:'#hoja' },
+  ] },
+  { id:'reclamo', g:'vecino', q:'u_lucia', ir:'reclamos', t:'Reclamos', d:'Algo roto o que no anda en el barrio.', p:[
+    { t:'Nuevo reclamo', x:'<b>Tocá "Nuevo reclamo"</b>.', s:'#cuerpo [data-a="nuevo-reclamo"]', h:'tocar' },
+    { t:'Contalo', x:'Qué pasa y dónde, con una foto si querés. Vas viendo en qué estado está hasta que se resuelve.', s:'#hoja' },
+  ] },
+  { id:'expensas', g:'vecino', q:'u_lucia', ir:'expensas', t:'Tus expensas', d:'Ver, pagar y avisar un pago.', p:[
+    { t:'Tu expensa', x:'El monto del mes, el vencimiento y lo que tenés pendiente.', s:'#cuerpo' },
+    { t:'Pagar por transferencia', x:'El <b>alias y el CBU</b> del barrio se copian con un toque.', s:'#cuerpo [data-a="copiar"]', h:'tocar' },
+  ] },
+  { id:'micasa', g:'vecino', ven:['garita'], q:'u_lucia', ir:'perfil', t:'Mi casa y mi credencial', d:'Tus datos, autos y mascotas.', p:[
+    { t:'Tu credencial', x:'<b>Tocá "Mi credencial"</b>: la mostrás en la garita para entrar.', s:'#cuerpo [data-a="mi-credencial"]', h:'tocar' },
+    { t:'La credencial', x:'Con tu foto, tu lote y un QR que cambia solo.', s:'#hoja' },
+    { t:'Un auto', x:'Ahora sumá un auto: <b>tocá "Sumar vehículo"</b>.', s:'#cuerpo [data-a="nuevo-vehiculo"]', h:'tocar', antes:'cerrarHoja()' },
+    { t:'La patente', x:'Con la patente, la garita te reconoce al entrar.', s:'#hoja form[data-f="vehiculo"] [name="patente"]', h:'escribir', v:'AB123CD' },
+    { t:'Guardar', x:'<b>Tocá el botón</b> para guardarlo.', s:'ENVIAR:vehiculo', h:'tocar' },
+  ] },
+  { id:'pizarron', g:'vecino', q:'u_lucia', ir:'pizarron', t:'El pizarrón del barrio', d:'Avisos entre vecinos.', p:[
+    { t:'Reaccionar', x:'Podés reaccionar con un toque. <b>Tocá 👍</b> en una publicación.', s:'#cuerpo [data-a="react"]', h:'tocar' },
+    { t:'Publicar', x:'<b>Tocá "Publicar"</b> para dejar tu aviso (vendo, busco, perdí…).', s:'#cuerpo [data-a="nuevo-post"]', h:'tocar' },
+    { t:'Tu publicación', x:'Elegí el tipo, escribí y publicá. Dura de 2 a 30 días según el tipo.', s:'#hoja' },
+  ] },
+  { id:'votar', g:'vecino', q:'u_lucia', ir:'votaciones', t:'Votaciones', d:'Votar desde el teléfono.', p:[
+    { t:'Elegí', x:'<b>Tocá una opción</b> para votar. Se vota por lote y queda el acta.', s:'#cuerpo [data-a="votar"]', h:'tocar' },
+    { t:'Tu voto', x:'Ves cómo va la votación y cuándo cierra.', s:'#cuerpo' },
+  ] },
+  { id:'camion', g:'vecino', ven:['garita'], q:'u_lucia', ir:'recoleccion', t:'El camión de residuos', d:'Qué días pasa y el aviso cuando entra.', p:[
+    { t:'Los días', x:'Qué días pasa y qué se saca cada día. Cuando la garita registra que entró, te suena el aviso para que saques las bolsas.', s:'#cuerpo' },
+  ] },
+  { id:'ciudad', g:'vecino', q:'u_lucia', ir:'ciudad', t:'Ushuaia y servicios', d:'Vuelos, cruceros, agenda y el municipio.', p:[
+    { t:'Lo de afuera', x:'La agenda de Ushuaia, los cruceros del día, el municipio y los sismos. <b>Tocá "Vuelos"</b>.', s:'#cuerpo [data-a="abrir"][data-v="vuelos"]', h:'tocar' },
+    { t:'Los vuelos de hoy', x:'Las llegadas y salidas del aeropuerto, en vivo.', s:'#cuerpo' },
+  ] },
+
+  /* ---------------- garita ---------------- */
+  { id:'turno', g:'garita', ven:['supervision'], q:'u_garita', sinTurno:true, t:'Empezar el turno', d:'Anotar quiénes están de guardia.', p:[
+    { t:'¿Quién entra?', x:'Al abrir la app, la garita anota <b>quién está de guardia</b>. Escribí tu nombre.', s:'#cuerpo form[data-f="abrir-turno"] [name="g"]', h:'escribir', v:'Juan Pérez' },
+    { t:'Empezar', x:'<b>Tocá el botón</b> para abrir el turno. Queda en el libro con la hora.', s:'ENVIAR:abrir-turno', h:'tocar' },
+    { t:'La garita', x:'Arriba, lo que <b>hoy no se puede olvidar</b> (se tilda solo); abajo, ingresos, el camión, los correos, el policía y la bitácora.', s:'#cuerpo' },
+  ] },
+  { id:'validar', g:'garita', ven:['vecino'], q:'u_garita', t:'Validar un QR o un código', d:'Dejar pasar a una visita autorizada.', p:[
+    { t:'El código', x:'Escaneá el QR con <b>"Escanear"</b> o escribí el <b>código, la patente o el DNI</b>.', s:'#qValidar', h:'escribir', v:{ js:"(aLista(Store.s.pases).find(p => p && p.codigo && !p.cancelado) || {}).codigo || '482913'" } },
+    { t:'Buscar', x:'<b>Tocá buscar</b>: aparece la visita con a qué casa va.', s:'ENVIARDE:#qValidar', h:'tocar' },
+    { t:'Que pase', x:'Si está bien, <b>"Entró"</b>: queda anotado con la hora y al vecino le llega el aviso.', s:'#hoja, #cuerpo' },
+  ] },
+  { id:'sinaviso', g:'garita', ven:['vecino'], q:'u_garita', t:'Llegó alguien sin aviso', d:'Preguntarle al vecino desde la app.', p:[
+    { t:'Sin aviso', x:'<b>Tocá "Llegó sin aviso"</b>.', s:'#cuerpo [data-a="llegada-nueva"]', h:'tocar' },
+    { t:'A qué casa va', x:'Elegís la casa y el nombre: al vecino le suena como una llamada y contesta "Que pase" o "No lo conozco".', s:'#hoja' },
+  ] },
+  { id:'camion-g', g:'garita', ven:['vecino'], q:'u_garita', t:'Entra el camión de residuos', d:'Un toque y todo el barrio se entera.', p:[
+    { t:'El camión', x:'<b>Tocá "Camión"</b> cuando entra.', s:'#cuerpo [data-a="camion-entra"]', h:'tocar' },
+    { t:'Aviso a todos', x:'A todos los vecinos les suena el aviso para sacar las bolsas.', s:'#hoja, #cuerpo' },
+  ] },
+  { id:'correo', g:'garita', ven:['vecino'], q:'u_garita', t:'Entra un correo', d:'Andreani, OCA, Mercado Libre…', p:[
+    { t:'Correos', x:'<b>Tocá "Correos"</b>.', s:'#cuerpo [data-a="correo-menu"]', h:'tocar' },
+    { t:'La empresa y las casas', x:'Elegí la empresa y, si te dicen, a qué casas va: a esas casas les llega "Un correo va a tu casa".', s:'#hoja' },
+  ] },
+  { id:'policia', g:'garita', ven:['supervision'], q:'u_garita', t:'Llega la policía nocturna', d:'Su ingreso, su tarjeta y su ronda con QR.', p:[
+    { t:'Ingreso', x:'<b>Tocá "Policía"</b> cuando llega.', s:'#cuerpo [data-a="policia-nuevo"]', h:'tocar' },
+    { t:'Nombre y apellido', x:'Su <b>nombre y apellido</b> (con una sola palabra no se registra: es lo que va en su constancia).', s:'#hoja form[data-f="policia-nuevo"] [name="nombre"]', h:'escribir', v:'Julio Gómez' },
+    { t:'Su cargo', x:'El <b>cargo</b> en la policía.', s:'#hoja form[data-f="policia-nuevo"] [name="cargo"]', h:'elegir', v:'Sargento' },
+    { t:'Registrar', x:'<b>Tocá el botón</b>: sale su tarjeta con el código de ronda para mandarle por WhatsApp. Las rondas las abre él solo al leer los QR.', s:'ENVIAR:policia-nuevo', h:'tocar' },
+  ] },
+  { id:'bitacora', g:'garita', ven:['supervision'], q:'u_garita', t:'Anotar en la bitácora', d:'El libro de guardia.', p:[
+    { t:'¿Qué querés anotar?', x:'En la bitácora de la garita elegí qué es: <b>Novedad</b> (lo de rutina), <b>Incidente</b> (lo grave: le suena a la Administración) o <b>Ronda</b>. <b>Tocá "Novedad"</b>.', s:'#cuerpo form[data-f="bitacora"] .bt-tipos label', h:'tocar' },
+    { t:'Escribí', x:'Escribí la novedad (o tocá una frase rápida).', s:'#bitTxt', h:'escribir', v:'Portón de servicio revisado, sin novedades.' },
+    { t:'Anotar', x:'<b>Tocá el botón</b>: queda con la hora y tu nombre, y va al parte del turno.', s:'ENVIAR:bitacora', h:'tocar' },
+  ] },
+  { id:'casas', g:'garita', ven:['vecino'], q:'u_garita', t:'Casas solas para revisar', d:'Los vecinos que están de viaje.', p:[
+    { t:'Casas solas', x:'<b>Tocá "Casas solas"</b> arriba.', s:'#cuerpo [data-a="garita-ir"][data-v="#garCasas"]', h:'tocar' },
+    { t:'Revisada', x:'Cuando pasás por una, tocás "Revisada" y al vecino le llega "Tu casa está en orden".', s:'#garCasas' },
+  ] },
+  { id:'turnos-g', g:'garita', ven:['supervision'], q:'u_garita', ir:'turnos', t:'Turnos y el calendario', d:'Buscar un parte por día, mes y año.', p:[
+    { t:'El calendario', x:'Elegís el <b>año, el mes y el día</b>. <b>Tocá el día de hoy</b>.', s:'#cuerpo .tc-d.hoy', h:'tocar' },
+    { t:'Ese día', x:'Se ve de 0 a 24 h con cada turno y el policía, y una tarjeta por turno con <b>"Ver el parte"</b>.', s:'#tcDia' },
+    { t:'Las noches del policía', x:'Más abajo, las últimas 14 noches con una bolita por ronda: verde completa con QR, ámbar incompleta y gris anotada por la garita.', s:'#cuerpo .nc-tira' },
+  ] },
+  { id:'van-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Pasa la van del hotel', d:'Marcar la salida y el regreso de cada traslado.', p:[
+    { t:'Las vans', x:'<b>Tocá "Vans"</b> arriba: los traslados que cargó el hotel para hoy.', s:'#cuerpo [data-a="garita-ir"][data-v=".vans-garita"]', h:'tocar' },
+    { t:'Salió y volvió', x:'Cuando pasa la van, tocás <b>"Salió"</b> y, a la vuelta, <b>"Volvió"</b>: el hotel lo ve al instante.', s:'#cuerpo .vans-garita' },
+  ] },
+  { id:'huesped-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Llega un huésped del hotel', d:'Con su pase, sin llamar al hotel.', p:[
+    { t:'Huéspedes por llegar', x:'En la garita está la lista de <b>huéspedes por llegar</b> hoy. Cuando llega uno, <b>tocá "Ingresó"</b> (si trae el pase del hotel, también se puede escanear).', s:'#cuerpo [data-a="hhuesped-ingreso"]', h:'tocar' },
+    { t:'Anotado', x:'Queda en los ingresos de hoy y en el libro de guardia con la hora, y el hotel lo ve al instante.', s:'#cuerpo' },
+  ] },
+  { id:'hotel-cliente', g:'garita', ven:['hotel'], q:'u_garita', t:'Va al hotel (restaurante o spa)', d:'Los clientes que llegan sin aviso.', p:[
+    { t:'Va al hotel', x:'<b>Tocá "Va al hotel"</b>.', s:'#cuerpo [data-a="hotel-cliente"]', h:'tocar' },
+    { t:'Para qué y cuántos', x:'La patente, para qué viene (desayuno, almuerzo, cena o spa) y cuántos son: al hotel le llega "Llegan 2 al restaurante".', s:'#hoja' },
+  ] },
+  { id:'cerrar', g:'garita', ven:['supervision'], q:'u_garita', t:'Cerrar el turno', d:'El parte sale solo.', p:[
+    { t:'Cerrar', x:'Al terminar, bajá hasta <b>"Cerrar el turno"</b> y tocalo.', s:'#cuerpo [data-a="cerrar-turno"]', h:'tocar' },
+    { t:'El parte', x:'Se arma solo el parte del turno con todo lo que pasó, y la supervisión le da el visto.', s:'#hoja, #cuerpo' },
+  ] },
+
+  /* ---------------- Administración ---------------- */
+  { id:'diaadia', g:'admin', q:'u_admin', m:'admin', t:'El día a día', d:'El barrio ahora, los pendientes y las salas.', p:[
+    { t:'El día en 10 segundos', x:'La primera vez que abrís la portada en el día pasan solas cinco tarjetas con lo más importante: la entrada, la ronda, los vecinos, las expensas y el hotel. <b>Tocá "El día en 10 segundos"</b> para verlo.', s:'#cuerpo .pv-play', h:'tocar' },
+    { t:'Las tarjetas', x:'Pasan solas cada 2 segundos, con los números que cuentan. Tocá a los costados para adelantar o volver, o la cruz para cerrar. Al terminar se cierra solo.', s:'#dia10, #cuerpo .pv' },
+    { t:'El semáforo del barrio', x:'Cuatro luces que laten: <b>garita, policía, hotel y expensas</b>. Verde está bien, ámbar pide mirar y rojo es urgente. Cada una te lleva a su lugar.', s:'#cuerpo .pv-semaforo', antes:'dia10Cerrar()' },
+    { t:'Los medidores', x:'Se llenan solos: <b>lotes al día</b>, la <b>meta de rondas</b> de la última noche y la <b>ocupación del hotel</b>.', s:'#cuerpo .pv-medidores' },
+    { t:'Los pendientes', x:'Reclamos, peticiones e inscripciones en <b>Nuevo, En curso y Resuelto</b>. Los reclamos se arrastran de columna desde la manijita; los demás se tocan y abren su lugar.', s:'#cuerpo .pv-tablero' },
+    { t:'Las salas', x:'Abajo, el día a día por <b>salas</b>, en mosaico y con su color: la que tiene algo pendiente se agranda y el número cuenta. <b>Tocá "Garita en vivo"</b>: ves lo mismo que la garita, sin poder tocar.', s:'#cuerpo [data-a="abrir"][data-v="garita"]', h:'tocar' },
+  ] },
+  { id:'padron', g:'admin', q:'u_admin', m:'admin', ir:'padron', t:'Padrón e inscripciones', d:'Los lotes y quién vive en cada uno.', p:[
+    { t:'El padrón', x:'Buscá por apellido, lote, DNI o correo. Las inscripciones nuevas esperan tu aprobación.', s:'#cuerpo' },
+  ] },
+  { id:'comunicado', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'comunicados', t:'Mandar un comunicado', d:'A todo el barrio o a algunos lotes.', p:[
+    { t:'Nuevo', x:'<b>Tocá "Nuevo comunicado"</b>.', s:'#cuerpo [data-a="nuevo-comunicado"]', h:'tocar' },
+    { t:'A quién y qué', x:'Elegís a quién le llega, escribís y adjuntás si hace falta. Les suena el aviso y queda en la pizarra.', s:'#hoja' },
+  ] },
+  { id:'reclamos-a', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'reclamos', t:'Reclamos en tablero', d:'Nuevo, en curso y resuelto.', p:[
+    { t:'Tablero', x:'<b>Tocá "Tablero"</b> para verlos por estado.', s:'#cuerpo [data-a="recl-vista"][data-v="tablero"]', h:'tocar' },
+    { t:'Gestionar', x:'Tocá un reclamo para cambiarle el estado o contestarle al vecino.', s:'#cuerpo' },
+  ] },
+  { id:'votacion-a', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'votaciones', t:'Armar una votación', d:'Consulta o asamblea, con su acta.', p:[
+    { t:'Nueva', x:'<b>Tocá "Nueva votación"</b>.', s:'#cuerpo [data-a="nueva-votacion"]', h:'tocar' },
+    { t:'La pregunta', x:'La pregunta, las opciones y hasta cuándo se vota. Al cerrar, sale el acta.', s:'#hoja' },
+  ] },
+  { id:'cobranzas', g:'admin', q:'u_admin', m:'admin', ir:'cobranzas', t:'Expensas y cobranzas', d:'Quién pagó y quién no.', p:[
+    { t:'Cobranzas', x:'Lo cobrado del mes, lo pendiente por lote y los avisos de pago para confirmar.', s:'#cuerpo' },
+  ] },
+  { id:'contabilidad', g:'admin', q:'u_admin', m:'admin', ir:'contabilidad', t:'Contabilidad', d:'Gastos, ingresos y la carpeta del contador.', p:[
+    { t:'El mes', x:'Ingresos y gastos del mes, y el cruce con las expensas.', s:'#cuerpo' },
+    { t:'Al contador', x:'<b>"Mandar al contador"</b> le manda la carpeta del mes.', s:'#cuerpo [data-a="mandar-contador"]' },
+  ] },
+  { id:'turnos-a', g:'admin', q:'u_admin', m:'admin', ir:'turnos', t:'Turnos y policía nocturna', d:'Horarios, noches y el mes del policía.', p:[
+    { t:'El horario del policía', x:'<b>Tocá "Cambiar el horario"</b>.', s:'#cuerpo [data-a="pn-horario"]', h:'tocar' },
+    { t:'Las dos noches', x:'Domingo a jueves y viernes y sábado, con la franja que se mueve, atajos y el total por semana.', s:'#hoja' },
+    { t:'El mes', x:'Abajo, <b>"Policía contratada"</b>: noches, horas y rondas completas del mes, para controlar lo que se le paga.', s:'#cuerpo .nm-card', antes:'cerrarHoja()' },
+  ] },
+  { id:'infracciones', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'infracciones', t:'Infracciones al reglamento', d:'Con sus pruebas y su historial.', p:[
+    { t:'Nueva', x:'<b>Tocá "Nueva infracción"</b>.', s:'#cuerpo [data-a="nueva-infraccion"]', h:'tocar' },
+    { t:'El hecho', x:'El lote, qué pasó, el nivel y las fotos de prueba. Las ve solo ese lote.', s:'#hoja' },
+  ] },
+
+  /* ---------------- hotel ---------------- */
+  { id:'hotel-portal', g:'hotel', ven:['garita'], q:'u_hotel', t:'El portal del hotel', d:'Llegan, se van, alojados y traslados.', p:[
+    { t:'Hoy', x:'Arriba, las tarjetas en vivo: quién llega, quién se va, alojados y traslados por hacer.', s:'#cuerpo' },
+    { t:'Un traslado', x:'<b>Tocá "Nuevo viaje"</b> para cargar una van al aeropuerto o al puerto.', s:'#cuerpo [data-a="hviaje-nuevo"]:not([data-v])', h:'tocar' },
+    { t:'La van', x:'La garita la ve y la deja pasar sin llamar.', s:'#hoja' },
+  ] },
+  { id:'huespedes', g:'hotel', ven:['garita'], q:'u_hotel', ir:'hotel-huespedes', t:'Huéspedes', d:'Su pase de embarque por WhatsApp.', p:[
+    { t:'Huéspedes', x:'Cargás a cada huésped y le sale su pase con las normas del barrio, para mandarle por WhatsApp.', s:'#cuerpo' },
+  ] },
+  { id:'empleados', g:'hotel', ven:['garita'], q:'u_hotel', ir:'hotel-empleados', t:'Empleados del hotel', d:'Una sola vez, con sus días.', p:[
+    { t:'Empleados', x:'Cada empleado una sola vez, con sus días de trabajo: entra con el QR del parabrisas, su patente o un código.', s:'#cuerpo' },
+  ] },
+
+  /* ---------------- supervisión ---------------- */
+  { id:'sup-vivo', g:'supervision', ven:['garita'], q:'u_super', t:'La garita en vivo', d:'El semáforo y el día en números.', p:[
+    { t:'El semáforo', x:'Garita conectada, el turno, el policía y las alertas, en verde, amarillo o rojo.', s:'#cuerpo' },
+    { t:'Mirar', x:'<b>Tocá "Garita"</b> para ver lo mismo que ve la garita.', s:'#cuerpo [data-a="sup-ir"][data-v="garita"]', h:'tocar' },
+  ] },
+  { id:'sup-parte', g:'supervision', ven:['garita'], q:'u_super', ir:'informe-servicio', t:'El parte y el visto', d:'Leer cada turno y darle el visto.', p:[
+    { t:'Los partes', x:'Cada turno cerrado espera tu <b>visto</b>, con o sin observaciones: queda como constancia.', s:'#cuerpo' },
+  ] },
+];
+
+/* =========================================================
+   EL MOTOR DE LA GUÍA
+   ========================================================= */
+const frame = $('#app');
+const ESTADO = { lec:null, i:0, hechas:new Set(), hechoPaso:false, tic:0, abierto:{} };
+try { ESTADO.hechas = new Set(JSON.parse(localStorage.getItem('bhcManualHechas') || '[]')); } catch(e){}
+const guardarHechas = () => { try { localStorage.setItem('bhcManualHechas', JSON.stringify([...ESTADO.hechas])); } catch(e){} };
+const W = () => frame.contentWindow;
+const D = () => frame.contentDocument;
+/* La app guarda sus cosas en variables propias (const): se leen desde adentro. */
+const en = code => W().eval(code);
+const lista = () => { try { return !!(W() && W().document.querySelector('#app') && en('typeof Store !== "undefined" && !!Store.s && typeof entrarComo === "function"')); } catch(e){ return false; } };
+
+function cargarApp(){
+  $('#cargando').classList.remove('fuera');
+  frame.src = `index.html?local&manual${VERSION ? '&v=' + encodeURIComponent(VERSION) : ''}`;
+}
+async function esperarApp(){
+  for (let i = 0; i < 200; i++){ if (lista()) { prepararAdentro(); $('#cargando').classList.add('fuera'); return true; } await dormir(100); }
+  return false;
+}
+/* Lo que la guía necesita adentro de la app: el estilo del foco y las ayudas. */
+function prepararAdentro(){
+  const d = D(); if (!d || d.getElementById('mi-estilo')) return;
+  const st = d.createElement('style'); st.id = 'mi-estilo';
+  st.textContent = `.mi-foco{outline:3px solid #ffcf33!important;outline-offset:3px!important;border-radius:12px;animation:miLate 1.3s ease-in-out infinite!important}
+    @keyframes miLate{0%,100%{box-shadow:0 0 0 0 rgba(255,207,51,.8)}50%{box-shadow:0 0 0 12px rgba(255,207,51,0)}}
+    #mi-velo{position:fixed;pointer-events:none;z-index:2147483000;border-radius:14px;box-shadow:0 0 0 9999px rgba(4,14,18,.42);transition:left .25s,top .25s,width .25s,height .25s,opacity .25s}
+    #mi-dedo{position:fixed;z-index:2147483001;pointer-events:none;font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));animation:miDedo 1s ease-in-out infinite;transition:left .25s,top .25s}
+    @keyframes miDedo{50%{transform:translate(-4px,-6px)}}
+    @media (prefers-reduced-motion:reduce){.mi-foco,#mi-dedo{animation:none!important}}`;
+  d.head.appendChild(st);
+  en(`window.__manual = {
+    como(id, modo){
+      try { cerrarHoja(); } catch(e){}
+      if (!yo() || yo().id !== id) entrarComo(id);
+      if (modo){ Store.sesion.modo = modo; Store.guardarSesion(); }
+      PILA.length = 0; pintar();
+    },
+    /* Con un turno abierto la garita sigue en él (como "Soy de ese turno: seguir"); si no hay, se abre uno. */
+    turno(){ const t = turnoAbierto(); if (t){ Store.sesion.turnoId = t.id; Store.guardarSesion(); } else { Store.sesion.turnoId = ''; F['abrir-turno']({ turno:turnoDeAhora().nombre, g:['Juan Pérez', 'Ana Gómez'] }); } PILA.length = 0; pintar(); },
+    sinTurno(){ Store.cambiar(s => { aLista(s.bitacora).forEach(b => { if (b && b.tipo === 'turno' && b.abre && !b.cerradoAt) b.cerradoAt = Date.now(); }); }); Store.sesion.turnoId = ''; Store.guardarSesion(); PILA.length = 0; pintar(); },
+    ir(v){ abrir(v); },
+  };`);
+  d.addEventListener('click', alTocarApp, true);
+}
+/* El botón de enviar de un formulario de la app. */
+function buscar(sel){
+  const d = D(); if (!d) return null;
+  const visible = el => el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
+  if (sel.startsWith('ENVIAR:')){ const f = d.querySelector(`#hoja[open] form[data-f="${sel.slice(7)}"], #cuerpo form[data-f="${sel.slice(7)}"]`);
+    const bs = f ? [...f.querySelectorAll('button:not([type="button"]), input[type="submit"]')].filter(visible) : []; return bs[bs.length - 1] || null; }
+  if (sel.startsWith('ENVIARDE:')){ const x = d.querySelector(sel.slice(9)), f = x && x.closest('form');
+    const bs = f ? [...f.querySelectorAll('button:not([type="button"]), input[type="submit"]')].filter(visible) : []; return bs[bs.length - 1] || null; }
+  for (const s of sel.split(/,\s*(?![^\[]*\])/)){
+    const xs = [...d.querySelectorAll(s)].filter(el => visible(el) && (s.startsWith('#hoja') ? d.querySelector('#hoja').open : true));
+    if (xs.length) return xs[0];
+  }
+  return null;
+}
+const pasoActual = () => ESTADO.lec && ESTADO.lec.p[ESTADO.i];
+function sacarFoco(){
+  const d = D(); if (!d) return;
+  d.querySelectorAll('.mi-foco').forEach(e => e.classList.remove('mi-foco'));
+  d.getElementById('mi-velo')?.remove(); d.getElementById('mi-dedo')?.remove();
+}
+/* Cada 200 ms: el foco sigue al botón (la app se redibuja, se desplaza). */
+let ultimoEl = null;
+function seguirFoco(){
+  const s = pasoActual(), d = D(); if (!s || !d || !lista()) return;
+  const el = buscar(s.s);
+  if (el !== ultimoEl){
+    sacarFoco(); ultimoEl = el;
+    if (el){ if (s.s !== '#cuerpo' && !/^#hoja(, #cuerpo)?$/.test(s.s)) el.classList.add('mi-foco'); try { el.scrollIntoView({ block:'center', behavior:'smooth' }); } catch(e){} }
+    pintarAviso(!el);
+  }
+  if (!el) return;
+  const enDialogo = !!el.closest('dialog'), hayDialogo = !!d.querySelector('dialog[open]');
+  const grande = el.id === 'cuerpo' || el.id === 'hoja' || el.tagName === 'DIALOG';
+  let v = d.getElementById('mi-velo'), dd = d.getElementById('mi-dedo');
+  if (enDialogo || hayDialogo || grande){ v?.remove(); } else {
+    if (!v){ v = d.createElement('div'); v.id = 'mi-velo'; d.body.appendChild(v); }
+    const r = el.getBoundingClientRect(), m = 6; Object.assign(v.style, { left:(r.left - m) + 'px', top:(r.top - m) + 'px', width:(r.width + 2 * m) + 'px', height:(r.height + 2 * m) + 'px' });
+  }
+  if (s.h === 'tocar' && !grande){
+    if (!dd){ dd = d.createElement('div'); dd.id = 'mi-dedo'; dd.textContent = '👆'; (el.closest('dialog') || d.body).appendChild(dd); }
+    const r = el.getBoundingClientRect(); Object.assign(dd.style, { left:(r.left + Math.min(r.width - 18, r.width / 2)) + 'px', top:(r.bottom - 8) + 'px' });
+  } else dd?.remove();
+  if ((s.h === 'escribir' || s.h === 'elegir') && el.value && String(el.value).trim() && !ESTADO.hechoPaso){ ESTADO.hechoPaso = true; pintarGuia(); }
+}
+function pintarAviso(falta){ const n = $('#nohay'); if (n) n.hidden = !falta; }
+function alTocarApp(e){
+  const s = pasoActual(); if (!s || s.h !== 'tocar') return;
+  const el = buscar(s.s); if (!el || !(el === e.target || el.contains(e.target))) return;
+  ESTADO.hechoPaso = true;
+  /* Un momento para que la app abra lo que corresponde antes de seguir. */
+  setTimeout(() => { if (pasoActual() === s) siguiente(); }, 650);
+}
+async function hacerPorMi(){
+  const s = pasoActual(); if (!s) return;
+  const el = buscar(s.s); if (!el) return;
+  if (s.h === 'tocar'){ el.click(); return; }
+  if (s.h === 'escribir' || s.h === 'elegir'){
+    let v = s.v; if (v && typeof v === 'object' && v.js){ try { v = en(v.js); } catch(e){ v = ''; } }
+    if (s.h === 'elegir' && el.tagName === 'SELECT'){ const o = [...el.options].find(o => o.value === v || o.textContent.trim() === v); if (o) el.value = o.value; }
+    else { const proto = el.tagName === 'TEXTAREA' ? W().HTMLTextAreaElement.prototype : W().HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, v); }
+    el.dispatchEvent(new (W().Event)('input', { bubbles:true })); el.dispatchEvent(new (W().Event)('change', { bubbles:true }));
+    ESTADO.hechoPaso = true; pintarGuia();
+  }
+}
+async function empezar(id){
+  const lec = L.find(x => x.id === id && puedeVer(x)); if (!lec) return;
+  ESTADO.lec = lec; ESTADO.i = 0; ESTADO.hechoPaso = false; ultimoEl = null;
+  document.body.classList.remove('menu-abierto');
+  pintarMenu(); pintarGuia(true);
+  history.replaceState(null, '', `#${id}`);
+  if (!await esperarApp()) return;
+  sacarFoco();
+  const M = '__manual';
+  en(`${M}.como(${JSON.stringify(lec.q)}, ${JSON.stringify(lec.m || (lec.q === 'u_admin' ? 'vecino' : ''))})`);
+  if (lec.q === 'u_garita') en(lec.sinTurno ? `${M}.sinTurno()` : `${M}.turno()`);
+  if (lec.ir) en(`${M}.ir(${JSON.stringify(lec.ir)})`);
+  await dormir(250);
+  correrAntes(); pintarGuia();
+}
+function correrAntes(){ const s = pasoActual(); if (s && s.antes){ try { en(s.antes); } catch(e){} } }
+function siguiente(){
+  if (!ESTADO.lec) return;
+  if (ESTADO.i < ESTADO.lec.p.length - 1){ ESTADO.i++; ESTADO.hechoPaso = false; ultimoEl = null; sacarFoco(); correrAntes(); pintarGuia(); return; }
+  ESTADO.hechas.add(ESTADO.lec.id); guardarHechas(); sacarFoco(); ESTADO.i = ESTADO.lec.p.length; pintarMenu(); pintarGuia();
+}
+function anterior(){ if (!ESTADO.lec || ESTADO.i === 0) return; ESTADO.i--; ESTADO.hechoPaso = false; ultimoEl = null; sacarFoco(); pintarGuia(); }
+function proxima(){ const vs = visibles(), i = vs.indexOf(ESTADO.lec); return vs.slice(i + 1).find(x => x.g === ESTADO.lec.g) || vs[i + 1] || null; }
+
+/* ---------- dibujar ---------- */
+function pintarMenu(){
+  const q = ($('#buscar')?.value || '').trim().toLowerCase();
+  const vs = visibles(), n = vs.length, h = vs.filter(x => ESTADO.hechas.has(x.id)).length;
+  const perfil = VE;
+  $('#menu').innerHTML = `<div class="buscar"><input id="buscar" type="search" placeholder="Buscar una función…" value="${esc(q)}" aria-label="Buscar una función">
+      <div class="avance"><span>${h} de ${n} vistas</span><i><b style="--p:${Math.round(h / n * 100)}%"></b></i></div></div>
+    ${gruposEnOrden().map(g => { const ls = vs.filter(x => x.g === g.id && (!q || (x.t + ' ' + x.d).toLowerCase().includes(q))); if (!ls.length) return '';
+      const abierto = q ? true : (ESTADO.abierto[g.id] ?? (ESTADO.lec ? ESTADO.lec.g === g.id : g.id === perfil || g.id === 'empezar'));
+      return `<details class="grupo" data-g="${g.id}" ${abierto ? 'open' : ''} style="--gc:${g.c};--gc-soft:${g.cs}"><summary><span class="gi">${g.i}</span><span class="gn">${nombreGrupo(g)}<br><small>${ls.filter(x => ESTADO.hechas.has(x.id)).length}/${ls.length} · ${g.d}</small></span><span class="fl">›</span></summary>
+        ${ls.map(x => `<button class="lecc ${ESTADO.hechas.has(x.id) ? 'hecha' : ''} ${ESTADO.lec === x ? 'on' : ''}" data-t="lec:${x.id}"><span class="chk">${ESTADO.hechas.has(x.id) ? '✓' : ''}</span>${esc(x.t)}</button>`).join('')}</details>`; }).join('')}
+    <div class="pie">Es <b>la app de verdad</b>, con datos de ejemplo: tocá lo que quieras, todo funciona. No se conecta a la base del barrio ni le llega nada a nadie.<br><button data-t="cero">↺ Empezar de cero</button></div>`;
+  const b = $('#buscar'); if (b && q){ b.focus(); b.setSelectionRange(q.length, q.length); }
+}
+function pintarGuia(cargando = false){
+  const lec = ESTADO.lec, g = lec ? G.find(x => x.id === lec.g) : null;
+  const guia = $('#guia');
+  if (!lec){
+    const gp = G.find(x => x.id === VE) || G[1], vs = visibles();
+    const primeras = [vs.find(x => x.g === 'empezar'), ...vs.filter(x => x.g === gp.id).slice(0, 3)].filter((x, i, a) => x && a.indexOf(x) === i);
+    guia.innerHTML = `<div class="bienv"><h1>¡Bienvenido al manual!</h1>
+      <p>En el teléfono está <b>la app del barrio de verdad</b>, con datos de ejemplo. Elegí una función en el menú${matchMedia('(max-width:1180px)').matches ? ' (botón <b>Funciones</b>, arriba)' : ' de la izquierda'} y la guía te marca <b>qué tocar</b>, paso a paso.</p>
+      <div class="tarjetas">${primeras.map(x => { const gg = G.find(y => y.id === x.g); return `<button class="tj" data-t="lec:${x.id}"><span>${gg.i}</span><div>${esc(x.t)}<small>${esc(x.d)}</small></div></button>`; }).join('')}</div>
+      <div class="seguro">🔒 Practicás sin miedo: no se conecta a la base del barrio, no le llega nada a nadie y no cambia tu sesión de la app.</div></div>`;
+    return;
+  }
+  guia.style.setProperty('--gc', g.c); guia.style.setProperty('--gc-soft', g.cs);
+  const n = lec.p.length, fin = ESTADO.i >= n;
+  const cab = `<div class="g-cab" data-t="guia-grande"><span class="quien">${g.i} ${esc(QUIEN[lec.q] || g.n)}</span><h1>${esc(lec.t)}</h1><p>${esc(lec.d)}</p>
+    <div class="puntos">${lec.p.map((_, j) => `<i class="${j < ESTADO.i ? 'hecho' : j === ESTADO.i ? 'on' : ''}"></i>`).join('')}</div></div>`;
+  if (fin){ const sig = proxima();
+    guia.innerHTML = `${cab}<div class="fin"><div class="conf">🎉</div><h2>¡Listo!</h2><p class="x" style="color:var(--ink-2)">Ya sabés <b>${esc(lec.t.toLowerCase())}</b>. Podés seguir tocando la app: todo funciona.</p></div>
+      <div class="g-btns"><button class="gb" data-t="otra">↺ Otra vez</button>${sig ? `<button class="gb pri late" data-t="lec:${sig.id}">Siguiente: ${esc(sig.t)} →</button>` : ''}</div>`;
+    return; }
+  const s = lec.p[ESTADO.i], accion = s.h === 'tocar' ? (ESTADO.hechoPaso ? ['listo', '✅', '¡Bien!'] : ['', '👆', 'Tocá en la app lo que titila'])
+    : s.h === 'escribir' ? (ESTADO.hechoPaso ? ['listo', '✅', 'Listo: tocá Siguiente'] : ['', '⌨️', 'Escribí en la casilla que titila']) : s.h === 'elegir' ? (ESTADO.hechoPaso ? ['listo', '✅', 'Listo: tocá Siguiente'] : ['', '👆', 'Elegí en la lista que titila']) : ['mirar', '👀', 'Mirá en la app y tocá Siguiente'];
+  guia.innerHTML = `${cab}<div class="g-paso"><span class="np">Paso ${ESTADO.i + 1} de ${n}</span><h2>${esc(s.t)}</h2><div class="x">${s.x}</div>
+      <div class="toca ${accion[0]}"><span>${accion[1]}</span>${cargando ? 'Abriendo la app…' : accion[2]}</div>
+      <div class="nohay" id="nohay" hidden>No encuentro ese botón en la pantalla (puede que la app esté en otra parte). Tocá <b>"Hacelo por mí"</b>, <b>"Siguiente"</b> o empezá la función otra vez.</div></div>
+    <div class="g-btns"><button class="gb" data-t="ant" ${ESTADO.i ? '' : 'disabled'}>← Atrás</button>
+      ${s.h ? `<button class="gb yo" data-t="yo">🪄 Hacelo por mí</button>` : ''}
+      <button class="gb pri ${!s.h || ESTADO.hechoPaso ? 'late' : ''}" data-t="sig">${ESTADO.i === n - 1 ? 'Terminar ✓' : 'Siguiente →'}</button></div>`;
+  ultimoEl = undefined;
+}
+
+/* ---------- Regresar a la app ---------- */
+function volverApp(){
+  const planB = () => { if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin){ history.back(); return; } location.href = './'; };
+  try {
+    if (window.opener && !window.opener.closed){ try { window.opener.focus(); } catch(e){} window.close(); setTimeout(() => { if (!window.closed) planB(); }, 400); return; }
+  } catch(e){}
+  planB();
+}
+async function deCero(){
+  if (!confirm('¿Empezar de cero? Se borra lo que practicaste y la app vuelve a los datos de ejemplo.')) return;
+  try { Object.keys(localStorage).filter(k => k.startsWith('bhc.manual.')).forEach(k => localStorage.removeItem(k)); } catch(e){}
+  ESTADO.hechas.clear(); guardarHechas();
+  cargarApp(); await esperarApp(); if (ESTADO.lec) empezar(ESTADO.lec.id); else pintarMenu();
+}
+
+/* ---------- toques ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-t]'); if (!b) return;
+  const t = b.dataset.t;
+  if (t === 'volver') return volverApp();
+  if (t === 'menu') return document.body.classList.toggle('menu-abierto');
+  if (t === 'cero') return deCero();
+  if (t === 'sig') return siguiente();
+  if (t === 'ant') return anterior();
+  if (t === 'yo') return hacerPorMi();
+  if (t === 'otra') return empezar(ESTADO.lec.id);
+  if (t === 'guia-grande') return matchMedia('(max-width:760px)').matches && document.body.classList.toggle('guia-grande');
+  if (t.startsWith('lec:')) return empezar(t.slice(4));
+  if (t.startsWith('vista:')){ $('#escena').classList.toggle('compu', t === 'vista:compu'); document.querySelectorAll('.vista button').forEach(x => x.classList.toggle('on', x === b)); }
+});
+document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details.grupo')) ESTADO.abierto[d.dataset.g] = d.open; }, true);
+document.addEventListener('input', e => { if (e.target.id === 'buscar') pintarMenu(); });
+frame.addEventListener('load', () => { ultimoEl = undefined; esperarApp(); });
+setInterval(seguirFoco, 200);
+
+cargarApp(); pintarMenu(); pintarGuia();
+{ const h = location.hash.slice(1); if (h && visibles().some(x => x.id === h)) empezar(h); }
+{ const gp = G.find(x => x.id === VE); const sm = $('.barra .tit small'); if (sm && gp) sm.textContent = `Barrio Bahía Cauquén · ${VEN_TODO ? 'todas las funciones' : 'para ' + gp.n.toLowerCase()} · la app de verdad, con datos de ejemplo`; }
+</script>
+</body>
+</html>

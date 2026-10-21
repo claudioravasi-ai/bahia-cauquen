@@ -118,13 +118,15 @@ function comprimir(file, max = 1000, q = .72){
    app real podía mezclar los datos de ejemplo con la sesión y la copia de
    la app real. Ahora la prueba tiene sus propias llaves y su propio canal. */
 const MODO_PRUEBA = /[?&]local\b/.test(location.search);
+/* El manual interactivo (manual-interactivo.html) usa la app de prueba con su guía al lado. */
+const MODO_MANUAL = MODO_PRUEBA && /[?&]manual\b/.test(location.search);
 const llavePrueba = k => MODO_PRUEBA ? k.replace(/^bhc\./, 'bhc.prueba.') : k;
 const Store = {
   KEY: llavePrueba('bhc.datos.v3'), SKEY: llavePrueba('bhc.sesion.v3'),
   s: null,           /* el estado compartido del barrio */
   sesion: null,      /* lo de este dispositivo: quién soy, preferencias */
   oyentes: [],
-  bc: ('BroadcastChannel' in window) ? new BroadcastChannel(MODO_PRUEBA ? 'bhc-prueba' : 'bhc') : null,
+  bc: ('BroadcastChannel' in window) ? new BroadcastChannel(MODO_MANUAL ? 'bhc-manual' : MODO_PRUEBA ? 'bhc-prueba' : 'bhc') : null,
 
   cargar(){
     try { this.s = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){ this.s = null; }

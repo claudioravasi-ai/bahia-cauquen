@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261020-215628">
+<link rel="stylesheet" href="css/app.css?v=20261021-150135">
 </head>
 <body>
 <div id="app"></div>
@@ -25,45 +25,60 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script>window.VERSION="20261020-215628";</script>
-<script src="js/firebase-config.js?v=20261020-215628"></script>
-<script src="js/icons.js?v=20261020-215628"></script>
-<script src="js/agenda.js?v=20261020-215628"></script>
-<script src="js/padron.js?v=20261020-215628"></script>
-<script src="js/core.js?v=20261020-215628"></script>
-<script src="js/seed.js?v=20261020-215628"></script>
-<script src="js/clima.js?v=20261020-215628"></script>
-<script src="js/calendario.js?v=20261020-215628"></script>
-<script src="js/v-inicio.js?v=20261020-215628"></script>
-<script src="js/v-comunidad.js?v=20261020-215628"></script>
-<script src="js/v-gestion.js?v=20261020-215628"></script>
-<script src="js/admin.js?v=20261020-215628"></script>
-<script src="js/v-vecinos.js?v=20261020-215628"></script>
-<script src="js/v-expensas.js?v=20261020-215628"></script>
-<script src="js/v-plan.js?v=20261020-215628"></script>
-<script src="js/v-contable.js?v=20261020-215628"></script>
-<script src="js/v-servicio.js?v=20261020-215628"></script>
-<script src="js/v-legal.js?v=20261020-215628"></script>
-<script src="js/v-hotel.js?v=20261020-215628"></script>
-<script src="js/hotel-diario.js?v=20261020-215628"></script>
-<script src="js/v-cuidados.js?v=20261020-215628"></script>
-<script src="js/v-casa.js?v=20261020-215628"></script>
-<script src="js/mapa.js?v=20261020-215628"></script>
-<script src="js/ronda-mapa.js?v=20261020-215628"></script>
-<script src="js/recorrido.js?v=20261020-215628"></script>
-<script src="js/reglas.js?v=20261020-215628"></script>
-<script src="js/asistente.js?v=20261020-215628"></script>
-<script src="js/v-manual.js?v=20261020-215628"></script>
-<script src="js/push.js?v=20261020-215628"></script>
-<script src="js/sismos.js?v=20261020-215628"></script>
-<script src="js/nube.js?v=20261020-215628"></script>
-<script src="js/adjuntos.js?v=20261020-215628"></script>
-<script src="js/historial.js?v=20261020-215628"></script>
-<script src="js/v-supervisor.js?v=20261020-215628"></script>
-<script src="js/guardia.js?v=20261020-215628"></script>
-<script src="js/mantenimiento.js?v=20261020-215628"></script>
-<script src="js/mant-vivo.js?v=20261020-215628"></script>
-<script src="js/relevos.js?v=20261020-215628"></script>
-<script src="js/app.js?v=20261020-215628"></script>
+<script>
+/* EL MANUAL INTERACTIVO (21-10-2026): manual-interactivo.html abre esta misma
+   app con ?local&manual, con los datos de ejemplo. Todo lo que guarda va a
+   llaves aparte ("bhc.manual.…"): practicar en el manual no toca la sesión
+   ni las preferencias de la app de verdad en ese teléfono. */
+if (/[?&]local\b/.test(location.search) && /[?&]manual\b/.test(location.search)) (function(){
+  const P = Storage.prototype, g = P.getItem, s = P.setItem, r = P.removeItem;
+  const k = x => /^bhc\./.test(x) && !/^bhc\.manual\./.test(x) ? 'bhc.manual.' + x.slice(4) : x;
+  P.getItem = function(x){ return g.call(this, k(String(x))); };
+  P.setItem = function(x, v){ return s.call(this, k(String(x)), v); };
+  P.removeItem = function(x){ return r.call(this, k(String(x))); };
+})();
+</script>
+<script>window.VERSION="20261021-150135";</script>
+<script src="js/firebase-config.js?v=20261021-150135"></script>
+<script src="js/icons.js?v=20261021-150135"></script>
+<script src="js/agenda.js?v=20261021-150135"></script>
+<script src="js/padron.js?v=20261021-150135"></script>
+<script src="js/core.js?v=20261021-150135"></script>
+<script src="js/seed.js?v=20261021-150135"></script>
+<script src="js/clima.js?v=20261021-150135"></script>
+<script src="js/calendario.js?v=20261021-150135"></script>
+<script src="js/v-inicio.js?v=20261021-150135"></script>
+<script src="js/v-comunidad.js?v=20261021-150135"></script>
+<script src="js/v-gestion.js?v=20261021-150135"></script>
+<script src="js/admin.js?v=20261021-150135"></script>
+<script src="js/v-vecinos.js?v=20261021-150135"></script>
+<script src="js/v-expensas.js?v=20261021-150135"></script>
+<script src="js/v-plan.js?v=20261021-150135"></script>
+<script src="js/v-contable.js?v=20261021-150135"></script>
+<script src="js/v-servicio.js?v=20261021-150135"></script>
+<script src="js/v-legal.js?v=20261021-150135"></script>
+<script src="js/v-hotel.js?v=20261021-150135"></script>
+<script src="js/hotel-diario.js?v=20261021-150135"></script>
+<script src="js/v-cuidados.js?v=20261021-150135"></script>
+<script src="js/v-casa.js?v=20261021-150135"></script>
+<script src="js/mapa.js?v=20261021-150135"></script>
+<script src="js/ronda-mapa.js?v=20261021-150135"></script>
+<script src="js/recorrido.js?v=20261021-150135"></script>
+<script src="js/reglas.js?v=20261021-150135"></script>
+<script src="js/asistente.js?v=20261021-150135"></script>
+<script src="js/v-manual.js?v=20261021-150135"></script>
+<script src="js/push.js?v=20261021-150135"></script>
+<script src="js/sismos.js?v=20261021-150135"></script>
+<script src="js/nube.js?v=20261021-150135"></script>
+<script src="js/adjuntos.js?v=20261021-150135"></script>
+<script src="js/historial.js?v=20261021-150135"></script>
+<script src="js/v-supervisor.js?v=20261021-150135"></script>
+<script src="js/guardia.js?v=20261021-150135"></script>
+<script src="js/mantenimiento.js?v=20261021-150135"></script>
+<script src="js/mant-vivo.js?v=20261021-150135"></script>
+<script src="js/relevos.js?v=20261021-150135"></script>
+<script src="js/turnos-vivo.js?v=20261021-150135"></script>
+<script src="js/portal-vivo.js?v=20261021-150135"></script>
+<script src="js/app.js?v=20261021-150135"></script>
 </body>
 </html>

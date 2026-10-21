@@ -600,11 +600,14 @@ function diaADia(u, s){
   const renglon = x => `<button class="dd-item" data-a="${x.a || 'abrir'}" data-v="${esc(x.v || '')}" data-p="${esc(x.p || '')}">
       <span class="dd-ic">${I(x.icon)}</span><span class="dd-txt"><b>${x.t}</b><small>${x.s}</small></span>
       ${x.badge ? `<span class="dd-alerta">${x.badge > 99 ? '99+' : x.badge}</span>` : x.n !== undefined && x.n !== '' ? `<span class="dd-n">${x.n}</span>` : ''}${I('right')}</button>`;
-  return `<div class="dd-cab"><h2>Día a día</h2><span>Ordenado por sala: lo de la garita, lo de los vecinos, lo que se comunica y los papeles.</span></div>
-    <div class="dd-salas">${SALAS.map(g => { const pend = g.items.reduce((a, x) => a + (+x.badge || 0), 0);
-      return `<section class="dd-sala dd-${g.color}" aria-label="${esc(g.t)}">
+  /* (21-10-2026) Arriba, el barrio ahora: semáforo, medidores y pendientes
+     (js/portal-vivo.js). Las salas van en MOSAICO: la que tiene algo
+     pendiente se agranda, con su color vivo, y el número cuenta. */
+  return `${typeof portalVivo === 'function' ? portalVivo() : ''}<div class="dd-cab"><h2>Día a día</h2><span>Ordenado por sala: lo de la garita, lo de los vecinos, lo que se comunica y los papeles.</span></div>
+    <div class="dd-salas dd-mosaico">${SALAS.map((g, i) => { const pend = g.items.reduce((a, x) => a + (+x.badge || 0), 0);
+      return `<section class="dd-sala dd-${g.color}${pend ? ' grande' : ''}" aria-label="${esc(g.t)}" style="--i:${i}">
         <header><span class="dd-sala-ic">${I(g.icon)}</span><div><h3>${g.t}</h3><p>${g.linea}</p></div>
-          ${pend ? `<span class="dd-pend" title="Piden atención">${pend > 99 ? '99+' : pend}</span>` : `<span class="dd-ok" title="Nada pendiente">${I('check')}</span>`}</header>
+          ${pend ? `<span class="dd-pend" title="Piden atención"><span class="dn-num" data-k="dd-${g.k}" data-n="${Math.min(pend, 99)}">${pend > 99 ? '99+' : pend}</span></span>` : `<span class="dd-ok" title="Nada pendiente">${I('check')}</span>`}</header>
         <div class="dd-items">${g.items.map(renglon).join('')}</div></section>`; }).join('')}</div>`;
 }
 /* Cada sección es una ventana de verdad, con su lomo y su vuelta atrás.
@@ -1228,7 +1231,12 @@ R.visitas = {
     /* El personal fijo va solo en su sección (no se repite en "Hoy"); primero los que vienen hoy. */
     const deHoyV = deHoy.filter(p => !fijos.includes(p));
     fijos.sort((a, b) => paseValidoEn(b, hoy) - paseValidoEn(a, hoy) || String(a.desde).localeCompare(String(b.desde)));
-    const llegadas = s.llegadas.filter(l => llegadaDeMiLote(l, u)).slice(0, 5);
+    /* (21-10-2026, pedido de Claudio) Las visitas y las "llegó sin aviso" se
+       van de Mis visitas 24 horas después de salir del barrio (las que no
+       vinieron o no pasaron, 24 h después de su horario o de la respuesta).
+       Siguen en "Ver mi historial completo". */
+    const ahoraMs = Date.now(), en24 = t => !!t && ahoraMs - t < DIA;
+    const llegadas = s.llegadas.filter(l => llegadaDeMiLote(l, u) && (l.estado === 'consultando' || llegadaAdentro(l) || en24(l.sale || l.respondido || l.at))).slice(0, 10);
     const pedidos = s.solicitudesPase.filter(r => r.hostId === u.id && r.estado === 'pendiente');
     return `
       ${superficie({ a:'link-pedir', icon:'share', color:'accent', t:'Pasale un enlace a tu visita', s:'Completa sus datos desde su celular y le sale su QR al instante' })}
@@ -1236,9 +1244,11 @@ R.visitas = {
       ${sec('Hoy')}${deHoyV.length ? deHoyV.map(p => tarjetaPase(p)).join('') : vacio('users', fijos.some(p => paseValidoEn(p, hoy)) ? 'No anunciaste visitas para hoy. Tu personal fijo está acá abajo.' : 'No anunciaste a nadie para hoy.')}
       ${fijos.length ? sec('Personal fijo', `<span class="muted small">${fijos.filter(p => paseValidoEn(p, hoy)).length ? plural(fijos.filter(p => paseValidoEn(p, hoy)).length, 'viene', 'vienen') + ' hoy' : ''}</span>`) + fijos.map(tarjetaFijo).join('') : ''}
       ${futuros.length ? sec('Próximas') + futuros.map(p => tarjetaPase(p)).join('') : ''}
-      ${(() => { const idas = s.pases.filter(p => paseDeMiLote(p, u) && !p.borrado && !deHoy.includes(p) && !futuros.includes(p) && !fijos.includes(p)
-          && (p.fechaFin || p.fecha) < hoy && (p.fechaFin || p.fecha) >= sumarDias(hoy, -60)).sort((a, b) => (b.fechaFin || b.fecha).localeCompare(a.fechaFin || a.fecha));
-        return idas.length ? sec('Visitas pasadas', `<span class="muted small">últimos 60 días</span>`) + idas.slice(0, 20).map(p => {
+      ${(() => { const finVisita = p => { const outs = Object.values(p.log || {}).map(l => l && +l.out).filter(Boolean); if (outs.length) return Math.max(...outs);
+          const d = fechaDe(p.fechaFin || p.fecha), [hh, mm] = String(p.hasta || '23:59').split(':').map(Number); d.setHours(hh || 23, mm || 0, 0, 0); return d.getTime(); };
+        const idas = s.pases.filter(p => paseDeMiLote(p, u) && !p.borrado && !deHoy.includes(p) && !futuros.includes(p) && !fijos.includes(p)
+          && (p.fechaFin || p.fecha) < hoy && en24(finVisita(p))).sort((a, b) => (b.fechaFin || b.fecha).localeCompare(a.fechaFin || a.fecha));
+        return idas.length ? sec('Visitas de ayer', `<span class="muted small">se van 24 h después de salir</span>`) + idas.slice(0, 20).map(p => {
           const dias = Object.keys(p.log || {}).sort(), ult = dias.at(-1), l = ult ? p.log[ult] : null;
           return tarjetaPase(p).replace(/<span class="estado [^"]*">[^<]*<\/span>/, `<span class="estado e-${p.cancelado ? 'cancelado' : l?.out ? 'salio' : l?.in ? 'adentro' : 'vencido'}">${p.cancelado ? 'Cancelado' : l?.out ? `Salió ${hora(l.out)}` : l?.in ? `Entró ${hora(l.in)}` : 'No vino'}</span>`);
         }).join('') : ''; })()}
@@ -1249,7 +1259,7 @@ R.visitas = {
       ${superficie({ a:'aviso-guardia', icon:'shield', color:'brand', t:'Aviso rápido a la guardia', s:'Viene una visita sin aviso ni QR: que me avisen cuando llegue' })}
       ${sec('Historial')}
       ${superficie({ a:'hist-mis-visitas', icon:'clock', color:'sky', t:'Ver mi historial completo', s:'Todas tus visitas desde el primer día. Se trae de la base solo cuando lo pedís.' })}
-      <p class="muted tiny" style="margin-top:14px">En la app quedan las visitas de los últimos ${Historial.diasVisitas()} días; las anteriores pasan al archivo histórico del barrio, sin DNI, celular ni patente (Ley 25.326), y las ves con el botón de arriba.</p>`;
+      <p class="muted tiny" style="margin-top:14px">Cada visita (y cada "llegó sin aviso") se va de acá 24 horas después de salir del barrio; las ves todas en "Ver mi historial completo". En la app quedan las de los últimos ${Historial.diasVisitas()} días; las anteriores pasan al archivo histórico del barrio, sin DNI, celular ni patente (Ley 25.326), y las ves con el botón de arriba.</p>`;
   },
 };
 /* =========================================================
@@ -1998,7 +2008,7 @@ async function mandarParteTurno(turnoId, nota = ''){
   const r = await Correo.enviarDetalle({ para:c.adminEmail, asunto:`Parte del turno ${t.turno} · ${fechaCorta(isoDe(new Date(t.at)))} · ${aLista(t.guardias).join(', ')}`, html:parteTurnoHtml(t, nota), tipo:'parte-turno' });
   toast(r.ok ? 'El parte del turno salió por correo a la Administración' : 'El parte del turno no salió por correo: ' + r.error, r.ok ? 'mail' : 'alert');
 }
-A['parte-ver'] = el => { const t = registrosTurno().find(x => x.id === el.dataset.id); if (!t) return;
+A['parte-ver'] = el => { const t = (typeof turnosDelCal === 'function' ? turnosDelCal() : registrosTurno()).find(x => x.id === el.dataset.id); if (!t) return;
   hoja(`Parte del turno ${t.turno}`, `<div class="card plana" style="padding:0;overflow:hidden">${parteTurnoHtml(t)}</div>
     ${esAdmin() && Store.s.config.adminEmail ? `<button class="btn btn-sec btn-block" style="margin-top:10px" data-a="parte-reenviar" data-id="${t.id}">${I('mail')}Mandármelo por correo</button>` : ''}
     ${esSupervisor() && t.cerradoAt && typeof vistoDe === 'function' && !vistoDe(t.id) ? `<button class="btn btn-pri btn-block" style="margin-top:10px" data-a="visto-parte" data-id="${t.id}">${I('eye')}Dar el visto</button>` : ''}`, { ancho:'640px' }); };
@@ -2087,7 +2097,7 @@ function bandaPolicia(){
         ${p.rondas.length ? `<div class="rondas">${p.rondas.map((r, i) => `<span class="ronda">${i + 1}. ${hora(r.inicio)}${r.fin ? '–' + hora(r.fin) + ' · ' + minutos(r.inicio, r.fin) + ' min' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}` : ''}${r.incompleta ? ' · <b>incompleta</b>' : ''}${guardia ? `<button class="x" data-a="policia-ronda-borrar" data-id="${p.id}" data-v="${r.id}" aria-label="Borrar la ronda">×</button>` : ''}</span>`).join('')}</div>` : ''}
         ${(() => { const r = rc || p.rondas.filter(x => x.pasos.length).slice(-1)[0]; return r && puntosActivos().length ? recorridoRonda(r) : ''; })()}
         ${guardia ? `<div class="pn-acc">
-          <button class="pn-b ${rc ? 'c-ok' : 'c-brand'}" data-a="policia-ronda" data-id="${p.id}">${I(rc ? 'check' : 'pin')}<span>${rc ? 'Terminó la ronda' : 'Sale a una ronda'}</span></button>
+          ${rc || !conPuntosQR() ? `<button class="pn-b ${rc ? 'c-ok' : 'c-brand'}" data-a="policia-ronda" data-id="${p.id}">${I(rc ? 'check' : 'pin')}<span>${rc ? 'Terminó la ronda' : 'Sale a una ronda'}</span></button>` : ''}
           ${codigoVigente(p.id) ? `<button class="pn-b c-wa" data-a="policia-codigo" data-id="${p.id}">${I('qr')}<span>Su tarjeta</span></button>` : `<button class="pn-b c-wa" data-a="policia-codigo-nuevo" data-id="${p.id}">${I('qr')}<span>Armar su tarjeta</span></button>`}
           <button class="pn-b c-wood" data-a="policia-salida" data-id="${p.id}">${I('logout')}<span>Se va</span></button></div>
           <div class="btns" style="margin-top:6px"><button class="btn btn-xs btn-sec" data-a="policia-ronda-mano" data-id="${p.id}">${I('edit')}Anotar ronda a mano</button>
@@ -2436,7 +2446,7 @@ A['policia-nuevo'] = () => {
     ${pnConocidos.length ? `<div class="pn-lbl">¿Quién llega? Si ya vino, tocalo y se completa todo</div>
       <div class="pn-conocidos">${pnConocidos.map((p, i) => `<button type="button" class="pn-c" data-a="pn-elegir" data-i="${i}" style="--c:${colorDe(p.nombre)}"><span class="pn-ini">${esc(inicialesDe(p.nombre))}</span><b>${esc(p.nombre)}</b><small>${esc(pnCargoMat(p)) || 'Sin cargo ni matrícula'}</small></button>`).join('')}</div>` : ''}
     <div class="pn-datos">
-      <div class="field"><label>Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="off" placeholder="Nombre y apellido"></div>
+      <div class="field"><label>Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="off" placeholder="Nombre y apellido" pattern=".*\\S+\\s+\\S+.*" title="Nombre y apellido completos"></div>
       <div class="grid2">${campoCargoPolicia()}<div class="field"><label>Matrícula / legajo</label><input name="matricula" maxlength="20" autocomplete="off"></div></div>
       <div class="grid2"><div class="field"><label>Celular (para su tarjeta)</label><input name="tel" type="tel" inputmode="tel" maxlength="20" autocomplete="off" placeholder="2901 15 123456"></div>
         <div class="field"><label>Correo (para su constancia)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off"></div></div></div>
@@ -2447,6 +2457,8 @@ A['policia-nuevo'] = () => {
 F['policia-nuevo'] = d => {
   const t = turnoAbierto(); if (!t) return;
   const k = claveNombre(d.nombre); if (!k) return toast('Falta el nombre', 'users');
+  /* (21-10-2026) Con una sola palabra ("Rojo") la constancia salía así: ahora pide nombre y apellido. */
+  if (k.split(' ').length < 2) return toast('Escribí nombre y apellido del policía (no solo el apellido)', 'users');
   const entra = d.cuando === 'otra' ? momentoDe(d.dia, d.entra) : Date.now();
   if (entra > Date.now() + 10 * MIN) return toast('El ingreso no puede ser más tarde que ahora: revisá el día y la hora', 'clock');
   if (Date.now() - entra > DIA) return toast('Revisá el día: el ingreso da más de 24 horas atrás', 'clock');
@@ -2535,8 +2547,15 @@ A['policia-codigo-nuevo'] = async el => {
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Se cambió el código de ronda del policía ${p.nombre}.`, at:Date.now() }); });
   mostrarCodigoRonda(p.id);
 };
+/* (21-10-2026) Con los QR puestos, las rondas las abre EL POLICÍA al leer el
+   primer punto: la garita ya no puede "sacarlo a una ronda" (pregunta de
+   Claudio: "¿la garita tiene la potestad de generar rondas?"). Solo puede
+   dar por terminada la que está en curso y, si el QR falló, anotar una a
+   mano con el motivo: esa queda gris y no cuenta para la meta. */
+const conPuntosQR = () => puntosActivos().length >= 2;
 A['policia-ronda'] = el => {
   const pid = el.dataset.id, ahora = Date.now();
+  { const t = turnoAbierto(), p0 = t && policiasDe(t).find(x => x.id === pid); if (conPuntosQR() && p0 && !rondaEnCurso(p0)) return toast('Las rondas se abren solas cuando el policía lee el primer QR', 'qr'); }
   let fin = null;
   let incompleta = false;
   cambiarPolicia(pid, (p, x, s) => {
@@ -2551,14 +2570,17 @@ A['policia-ronda'] = el => {
 A['policia-ronda-mano'] = el => hoja('Anotar una ronda', `<form data-f="policia-ronda-mano"><input type="hidden" name="pid" value="${esc(el.dataset.id)}">
   <div class="grid2"><div class="field"><label>Salió</label><input name="desde" type="time" required value="${horaInput(Date.now() - RONDA_MIN * MIN)}"></div>
     <div class="field"><label>Volvió</label><input name="hasta" type="time" required value="${horaInput(Date.now())}"></div></div>
-  <div class="ayuda" style="margin-bottom:12px">Para las rondas que no se anotaron en el momento. Una ronda caminando lleva unos ${RONDA_MIN} minutos.</div>
+  ${conPuntosQR() ? `<div class="field"><label>¿Por qué no quedó con los QR?</label><select name="motivo" required><option value="">Elegí el motivo</option>${['Un QR estaba roto o no se podía leer', 'El policía se quedó sin batería o sin señal', 'Recorrió el barrio en el auto', 'Otro motivo'].map(x => `<option>${x}</option>`).join('')}</select></div>` : ''}
+  <div class="ayuda" style="margin-bottom:12px">Para las rondas que no se anotaron en el momento. Una ronda caminando lleva unos ${RONDA_MIN} minutos.${conPuntosQR() ? ' Queda como <b>anotada por la garita</b>, con tu nombre y el motivo, y <b>no cuenta para la meta</b> de rondas completas.' : ''}</div>
   <button class="btn btn-pri btn-block">${I('check')}Anotar la ronda</button></form>`);
 F['policia-ronda-mano'] = d => {
   const inicio = horaPasada(d.desde); let fin = horaPasada(d.hasta);
   if (fin < inicio) fin += DIA;
   if (fin - inicio > 4 * HORA) return toast('Revisá las horas: la ronda da más de 4 horas', 'clock');
-  cambiarPolicia(d.pid, p => { p.rondas.push({ id:uid(), inicio, fin, aMano:true }); p.rondas.sort((a, b) => a.inicio - b.inicio); },
-    p => `Ronda del policía ${p.nombre} (anotada a mano): ${hora(inicio)} a ${hora(fin)} h (${minutos(inicio, fin)} min).`);
+  if (conPuntosQR() && !d.motivo) return toast('Elegí el motivo', 'edit');
+  const motivo = String(d.motivo || '').slice(0, 60), por = (yo() && yo().nombre) || '';
+  cambiarPolicia(d.pid, p => { p.rondas.push({ id:uid(), inicio, fin, aMano:true, ...(motivo ? { motivo } : {}), ...(por ? { por } : {}) }); p.rondas.sort((a, b) => a.inicio - b.inicio); },
+    p => `Ronda del policía ${p.nombre} (anotada a mano por ${por || 'la garita'}${motivo ? ': ' + motivo.charAt(0).toLowerCase() + motivo.slice(1) : ''}): ${hora(inicio)} a ${hora(fin)} h (${minutos(inicio, fin)} min). No cuenta para la meta.`);
   cerrarHoja(); toast('Ronda anotada', 'check');
 };
 A['policia-ronda-borrar'] = async el => {
@@ -2634,7 +2656,7 @@ function fotoRonda(r){
   const pasos = pasosDeRonda(r), vistos = new Set(), qr = [];
   pasos.forEach(x => { if (!vistos.has(x.punto)){ vistos.add(x.punto); qr.push({ n:nombrePunto(x.punto), at:pasoAt(x) }); } });
   const e = conQR(r) ? estadoRonda(r) : null;
-  return { id:r.id, inicio:r.inicio, fin:r.fin || 0, incompleta:!!r.incompleta, aMano:!!r.aMano, conQR:conQR(r), qr, total: e ? e.total : 0, faltan: e ? e.faltan : [], qrFoto:true };
+  return { id:r.id, inicio:r.inicio, fin:r.fin || 0, incompleta:!!r.incompleta, aMano:!!r.aMano, conQR:conQR(r), qr, total: e ? e.total : 0, faltan: e ? e.faltan : [], ...(r.motivo ? { motivo:r.motivo } : {}), ...(r.por ? { por:r.por } : {}), qrFoto:true };
 }
 /* Guarda la foto del servicio en el registro donde salió el policía. */
 function cerrarServicio(s, p){
@@ -2734,7 +2756,7 @@ function constanciaPdfHtml(sv, im = {}){
           <div style="font-size:12px;opacity:.95">${hora(r.inicio)}${r.fin ? ` a ${hora(r.fin)} h · ${minutos(r.inicio, r.fin)} minutos caminando el barrio` : ' h · en curso'}</div></td>
         <td align="right" style="padding:10px 14px"><span style="display:inline-block;background:#fff;color:${r.incompleta ? '#b91c1c' : col};font-size:10px;font-weight:800;letter-spacing:.08em;padding:5px 10px;border-radius:20px;white-space:nowrap">${r.incompleta ? '! ' : ok ? '✓ ' : ''}${estado}</span></td></tr></table>
       ${filas || faltan ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:4px 0">${filas}${faltan}</table>`
-        : `<div style="padding:12px 16px;font-size:12px;color:#334155">${r.aMano ? 'La garita anotó esta ronda a mano.' : 'Ronda registrada por la garita, sin lectura de QR.'}</div>`}</div>`;
+        : `<div style="padding:12px 16px;font-size:12px;color:#334155">${r.aMano ? `La garita anotó esta ronda a mano${r.motivo ? ' (' + esc(r.motivo.charAt(0).toLowerCase() + r.motivo.slice(1)) + ')' : ''}.` : 'Ronda registrada por la garita, sin lectura de QR.'}</div>`}</div>`;
   };
 
   const acciones = aLista(sv.acciones).slice(0, 14);
@@ -2904,7 +2926,7 @@ R.turnos = {
   titulo: 'Turnos de la garita', icon: 'clock', color: 'sky', sub: 'Horarios de la guardia y quién trabajó en cada uno',
   render(){
     if (!veGarita()) return vacio('lock', 'Solo para la garita, la Administración y la supervisión.');
-    const ts = turnosConfig(), hist = registrosTurno().slice(0, 40);
+    const ts = turnosConfig();
     const fila = i => { const t = ts[i] || {}; return `<div class="grid3 turno-edit"><div class="field"><label>Turno ${i + 1}${i >= 2 ? ' (opcional)' : ''}</label><input name="n${i}" value="${esc(t.nombre || '')}" maxlength="20" placeholder="${['Mañana', 'Día', 'Tarde', 'Noche'][i]}" ${i < 2 ? 'required' : ''}></div>
       <div class="field"><label>Desde</label><input type="time" name="d${i}" value="${esc(t.desde || '')}" ${i < 2 ? 'required' : ''}></div>
       <div class="field"><label>Hasta</label><input type="time" name="h${i}" value="${esc(t.hasta || '')}" ${i < 2 ? 'required' : ''}></div></div>`; };
@@ -2921,20 +2943,11 @@ R.turnos = {
         <p class="muted tiny" style="margin:0 0 10px">De 2 a 4 horarios, uno por guardia. <b>Pueden superponerse</b> (por ejemplo, Mañana de 7 a 15 y Día de 8 a 20) y uno puede pasar la medianoche (Noche de 23 a 7). Dejá vacíos los que no uses. El policía nocturno tiene su horario aparte, más abajo.</p>
         <button class="btn btn-pri btn-block">${I('check')}Guardar los horarios</button>
         <button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="turnos-base">${I('refresh')}Cargar 7–15, 8–20, 15–23 y 23–7</button></form></details>` : ''}
-      ${sec('Últimos turnos')}
-      ${hist.length ? `<div class="card">${hist.map(r => `<div class="lista"><div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('shield')}</span>
-        <div class="txt"><b>${esc(r.turno)} · ${esc(aLista(r.guardias).join(', '))}</b>
-        <span>${relDia(isoDe(new Date(r.at)))} de ${hora(r.at)} a ${r.cerradoAt ? hora(r.cerradoAt) + ' h' + (r.cierreAuto ? ' (se cerró al abrir el siguiente)' : '') : 'ahora · en curso'}${r.cerradoAt ? ` · <button class="link" data-a="parte-ver" data-id="${r.id}">Ver el parte</button>` : ''}</span>
-        ${typeof vistoRenglon === 'function' ? vistoRenglon(r) : ''}
-        ${policiasDe(r).map(p => `<span>${I('shield')} Policía ${esc(p.nombre)}${esc(pnCargoMat(p, '', ' · '))} · ${hora(p.entra)}${p.sale ? '–' + hora(p.sale) : p.paso ? ' · siguió en el turno siguiente' : ' · sigue'} · ${plural(p.rondas.length, 'ronda')}${p.rondas.length ? ': ' + p.rondas.map(x => hora(x.inicio) + (x.fin ? '–' + hora(x.fin) : '')).join(', ') : ''}</span>`).join('')}</div></div></div>`).join('')}</div>`
-        : vacio('clock', 'Todavía no se abrió ningún turno.')}
-      ${seccionPoliciaHorario()}
-      ${seccionServiciosPolicia()}
-      ${seccionPuntos()}
-      ${esAdmin() ? (() => { const ms = policiaDelMes(); return sec('Policía contratada · este mes') + (ms.length ? `<div class="card lista">${ms.map(p => `<div class="it"><div class="txt"><b>${esc(p.nombre)}${esc(pnCargoMat(p, '', ' · '))}</b>
-          <span>${plural(p.noches.size, 'servicio')} · ${p.horas.toFixed(1).replace('.', ',')} h · ${plural(p.rondas, 'ronda')}</span></div></div>`).join('')}</div>
-          <p class="muted tiny">Horas desde el ingreso hasta la salida anotados por la garita. Sirve para controlar lo que se le paga.</p>` : vacio('shield', 'Este mes la garita no anotó ingresos del policía.')); })() : ''}`;
+      ${sec('Últimos turnos', `<span class="muted small">elegí año, mes y día</span>`)}
+      ${typeof calTurnos === 'function' ? calTurnos() : ''}
+      ${typeof seccionNochePolicia === 'function' ? seccionNochePolicia() : seccionPoliciaHorario() + seccionServiciosPolicia() + seccionPuntos()}`;
   },
+  alPintar(){ if (typeof animarNumeros === 'function') animarNumeros(); if (typeof tvAlPintar === 'function') tvAlPintar(); },
 };
 F['turnos'] = d => {
   const ts = [0, 1, 2, 3].map(i => ({ nombre:String(d['n' + i] || '').trim(), desde:d['d' + i] || '', hasta:d['h' + i] || '' })).filter(t => t.nombre && t.desde && t.hasta);

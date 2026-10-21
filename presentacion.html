@@ -677,6 +677,19 @@ const ESC = [
     s:{ c:() => bar('c', 'Policía · este mes') + ap(anillos(3), it('👮', 'Sargento Julio Gómez', '8 h · 3 rondas completas', 'Meta cumplida', 'ok')), x:() => bar('poli', 'Correo', { av:'✉️' }) + ap(card('Constancia de servicio', it('📄', 'Constancia en PDF', 'Adjunta · 2 hojas'), it('🕙', 'Ingreso', '21:59'), it('🕕', 'Salida', '06:00'), it('🚓', '3 rondas', 'Cada una en su color, con la hora de cada QR'))) } },
 ], fin:'Ni planillas ni firmas: cada punto queda con su hora y todos saben que la ronda se hizo.' },
 
+/* 21-10-2026: Turnos rediseñado (las noches del policía y el calendario de turnos). */
+{ id:'noches', p:['admin', 'garita'], e:'📅', t:'Las noches del policía y el calendario de turnos', s:'Cada noche con sus rondas en colores, la meta, y los turnos por día, mes y año', h:'09:00', pasos:[
+  { l:'c', txt:'En <b>Turnos</b>, la Administración ve un <b>cielo de noche</b>: la luna cruza de la hora de entrada a la de salida, como un reloj, y abajo la semana del policía.', b:'Ver las noches',
+    s:{ c:() => bar('c', 'Turnos de la garita') + ap(av('info', '🌙', 'Policía nocturna · Noche del lunes', '21:59 a 06:00 h · en curso, 62 % de la noche'), card('Esta noche', it('👮', 'Julio Gómez', 'Sargento · desde las 21:59', '2 de 3', 'ok'))) } },
+  { l:'c', txt:'<b>Las noches del policía</b>: una tira con las últimas 14 noches y una bolita por ronda. <b>Verde</b> completa con QR, <b>ámbar</b> incompleta y <b>gris</b> anotada por la garita (esa no cuenta para la meta).', b:'Tocar la noche del lunes',
+    s:{ c:() => bar('c', 'Las noches del policía') + ap(card('Noche del lunes 19 al martes 20', it('🟢', 'Ronda 1 · 23:00 a 23:40', 'Completa con QR · 6/6'), it('🟢', 'Ronda 2 · 01:00 a 01:40', 'Completa con QR · 6/6'), it('🟢', 'Ronda 3 · 03:00 a 03:40', 'Completa con QR · 6/6'), it('⚪', 'Ronda 4 · 05:00 a 05:30', 'Anotada por la garita · QR roto · no cuenta'), it('🟠', 'Ronda 5 · 05:36 a 05:48', 'Incompleta · faltó Fondo del barrio')), av('ok', '✅', 'Meta cumplida', '3 de 3 completas con QR')) } },
+  { l:'c', txt:'Si el policía quedó anotado con una sola palabra ("Rojo"), sale en rojo <b>Falta el apellido</b>: con <b>Completar el nombre</b> la constancia se arma de nuevo con su nombre y apellido.', b:'Completar el nombre',
+    s:{ c:() => bar('c', 'Nombre del policía') + ap(av('warn', '⚠️', 'Falta el apellido', 'La constancia sale solo con "Rojo"'), card('Nombre y apellido completos', it('✍️', 'Julio Rojo', 'Así figura en su constancia')), av('ok', '📄', 'Constancia al día', 'Reenviala con un toque')) } },
+  { l:'c', txt:'<b>Últimos turnos</b> ya no es una lista larguísima: se elige el <b>año</b>, el <b>mes</b> y se toca el <b>día</b> en el calendario. Ese día se ve dibujado de 0 a 24 h, con cada turno y el policía, y su parte.', b:'Ver el domingo 18',
+    al:[['c', 'd', '📅', 'Calendario de turnos', 'Domingo 18 · 4 turnos · 1 incidente']],
+    s:{ c:() => bar('c', 'Últimos turnos') + ap(card('Domingo 18 de octubre', it('🌙', 'Noche · 22:00 a 07:00', 'Marta Díaz y Juan Sosa · policía, 3 rondas'), it('☀️', 'Tarde · 15:00 a 23:00', 'Luis Gómez'), it('☀️', 'Mañana · 07:00 a 15:00', 'Ana Pérez', '1 incidente', 'warn'))), d:() => bar('d', 'Turnos') + ap(av('info', '📅', 'El calendario también está en la garita', 'Para buscar un parte por fecha')) } },
+], fin:'Se entiende de un vistazo qué pasó cada noche y cada día, sin hojear listas.' },
+
 /* ---------------- MANTENIMIENTO ---------------- */
 { id:'mantentra', p:['mant', 'garita', 'vecinos'], e:'🦺', t:'Mantenimiento entra a trabajar', s:'Reloj de entrada en la garita y la cápsula animada en la portada', inv:'mant', h:'08:00', pasos:[
   { l:'d', txt:'Llega Raúl, de mantenimiento. En la garita, un toque: <b>Entrada</b>. Empieza a correr su reloj ("Adentro hace…").', b:'Entrada · Raúl',

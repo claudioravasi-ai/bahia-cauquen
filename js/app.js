@@ -526,16 +526,18 @@ function pintarTop(){
   const modo = modoActivo();
   const rol = { vecino:'Vecino/a', admin:'Administración', guardia:'Guardia', hotel:'Hotel', supervisor:'Supervisión' }[modo] || '';
   $('#top').classList.toggle('con-modo', puedeAdministrar());
+  $('#top').classList.toggle('con-manual', !MODO_MANUAL);
   /* Se retoca, no se rehace: si no, el logo, la foto de la cuenta y el
      puntito de "quién está en la app" parpadean cada vez que un vecino abre
      o cierra la app (que es todo el tiempo). */
   morfar($('#top'), `
-    <button class="marca" data-a="volver" data-i="0" aria-label="Ir al inicio">
-      <span class="logo">${LOGO}</span>
-      <span class="marca-txt"><b><span class="marca-pre">Barrio </span>${esc(Store.s.config.nombre)}</b>
+    <div class="marca">
+      <button class="marca-ir" data-a="volver" data-i="0" aria-label="Ir al inicio"><span class="logo">${LOGO}</span></button>
+      <span class="marca-txt"><button class="marca-ir marca-nom" data-a="volver" data-i="0" tabindex="-1" aria-hidden="true"><b><span class="marca-pre">Barrio </span>${esc(Store.s.config.nombre)}</b>
         <small><span class="en-vivo ${Conexion.estado}" title="${Conexion.texto()}"></span>${esc(u.nombre.split(' ')[0])}${modo === 'vecino' ? `<span class="casa"> · ${esc(u.casa)}${esPropDistancia() ? ' · propietario/a' : ''}</span>`
-          : `<span class="rol-chip">${rol}</span>${u.rol === 'supervisor' ? '' : `<span class="casa"> · ${esc(u.casa)}</span>`}`}</small></span>
-    </button>
+          : `<span class="rol-chip">${rol}</span>${u.rol === 'supervisor' ? '' : `<span class="casa"> · ${esc(u.casa)}</span>`}`}</small></button>
+        ${MODO_MANUAL ? '' : `<button class="manual-link" data-a="manual-interactivo" aria-label="Abrir el manual de uso interactivo">${I('book')}<span>Manual de uso interactivo</span><i aria-hidden="true">›</i></button>`}</span>
+    </div>
     ${esHotel() || esSupervisor() || esPropDistancia() ? '' : Presencia.chip()}
     ${puedeAdministrar() ? `<button class="modo-btn ${modo}" data-a="cambiar-modo" aria-label="Cambiar de modo">${I(modo === 'admin' ? 'sliders' : 'home')}<span>${modo === 'admin' ? 'Admin' : 'Vecino'}</span></button>` : ''}
     <button class="icon-btn" data-a="notifs" aria-label="Avisos">${I('bell')}${nl ? `<span class="dot-badge">${nl > 9 ? '9+' : nl}</span>` : ''}</button>
@@ -1286,7 +1288,7 @@ function pintarBienvenida(modo = 'inicio'){
         <button class="btn btn-pri btn-block btn-grande" data-a="bienvenida" data-v="entrar">${I('login')}Entrar</button>
         <button class="btn btn-sec btn-block btn-grande" data-a="bienvenida" data-v="registro">${I('user')}Soy vecino nuevo</button>
       </div>
-      ${nube ? '' : `<section class="grupo"><h3>Probar la demo</h3><div class="demo">
+      ${nube ? '' : MODO_MANUAL ? `<p class="grupo-ayuda">Elegí una función en el menú del manual: la guía entra por vos con la cuenta que corresponde.</p>` : `<section class="grupo"><h3>Probar la demo</h3><div class="demo">
         <button data-a="demo" data-v="u_claudio">Claudio · Lote 148</button>
         <button data-a="demo" data-v="u_lucia">Lucía · Lote 42</button>
         <button data-a="demo" data-v="u_diego">Diego · Lote 18</button>
@@ -1879,7 +1881,8 @@ function entrarComo(id){
   history.replaceState({ n:1 }, '');
   pintar();
   Motor.correr();
-  if (puedeAdministrar()) setTimeout(() => elegirModo({ alEntrar:true }), 250);
+  /* En el manual interactivo el modo lo elige la guía. */
+  if (puedeAdministrar() && !MODO_MANUAL) setTimeout(() => elegirModo({ alEntrar:true }), 250);
 }
 F['entrar'] = async (d, form) => {
   const email = (d.email || '').trim().toLowerCase();
@@ -2289,6 +2292,8 @@ const PIEZAS = [
   ['js/mantenimiento.js', () => typeof bandaMantenimiento],
   ['js/mant-vivo.js',  () => typeof MVBrazo],
   ['js/relevos.js',    () => typeof lineaGuardia],
+  ['js/turnos-vivo.js', () => typeof calTurnos],
+  ['js/portal-vivo.js', () => typeof portalVivo],
 ];
 function piezasQueFaltan(){
   const falta = [];
