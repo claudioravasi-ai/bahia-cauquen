@@ -155,6 +155,12 @@ QUÉ HACEN, EN CASTELLANO
    /ronda/fotos/<clave larga al azar>: no se puede listar, la escribe y la
    borra solo la Administración, y la baja solo quien la pide.
 
+8 septies. LA FICHA DE POLICÍAS (22-10-2026). /staff/policiasFicha tiene a
+   cada policía que viene al barrio: nombre y apellido, cargo, matrícula,
+   celular, correo y si "ya no viene". La leen y la escriben solo la garita
+   y la Administración (la supervisión no). Sirve para completar su
+   próximo ingreso; sus noches siguen en la bitácora.
+
 7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
    ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
    escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
@@ -533,6 +539,10 @@ PEGAR DESDE ACÁ
          están trabajando, en barrio/guardiaAhora, sin nombres ni DNI). */
       "mantenimiento": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
         "$id": { ".validate": "newData.child('id').val() === $id && newData.child('nombre').isString() && newData.child('nombre').val().length >= 1 && newData.child('nombre').val().length <= 40 && newData.child('apellido').isString() && newData.child('apellido').val().length >= 1 && newData.child('apellido').val().length <= 40 && newData.child('dni').isString() && newData.child('dni').val().matches(/^[0-9]{7,8}$/)" } },
+      /* La ficha de policías (22-10-2026): nombre, cargo, matrícula, celular,
+         correo y "ya no viene". Solo la garita y la Administración. */
+      "policiasFicha": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { ".validate": "newData.child('id').val() === $id && newData.child('nombre').isString() && newData.child('nombre').val().length >= 3 && newData.child('nombre').val().length <= 60" } },
       /* Los enlaces del brazo de mantenimiento (15-10-2026): uno por persona
          y por turno, 20 letras al azar, vence a las 16 h y se borra con la
          salida. Y la bitácora de mantenimiento: cada jornada (qué hizo,
@@ -638,6 +648,14 @@ PEGAR DESDE ACÁ
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 22-10-2026 (hay que volver a publicar): LA FICHA DE POLICÍAS.
+- staff/policiasFicha: nombre, cargo, matrícula, celular, correo y "ya no
+  viene" de cada policía (ver el punto 8 septies). La leen y la escriben
+  solo la garita y la Administración.
+- Sin publicar estas reglas, la ficha no se guarda en la base (anular un
+  ingreso anda igual: usa la bitácora, que ya estaba).
+-----------------------------------------------------------
 
 ✔ NUEVO 20-10-2026 (hay que volver a publicar): LA AGENDA Y LA BITÁCORA DEL HOTEL.
 - hotel/hotelDiario: la agenda inteligente que arma la app a las 22 h

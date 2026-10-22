@@ -2048,7 +2048,15 @@ function policiasConocidos(){
   const m = new Map();
   registrosTurno().slice().reverse().forEach(r => policiasDe(r).forEach(p => { const k = claveNombre(p.nombre); if (!k) return; const ya = m.get(k) || {};
     m.set(k, { nombre:p.nombre, cargo:p.cargo || ya.cargo || '', matricula:p.matricula || ya.matricula || '', tel:p.tel || ya.tel || '', email:p.email || ya.email || '' }); }));
-  return m;
+  /* La ficha de policías (22-10-2026, js/turnos-vivo.js) manda sobre lo que
+     quedó en los servicios, y "Ya no viene" lo saca de los botones. */
+  const fs = typeof fichaPolicias === 'function' ? fichaPolicias() : [];
+  if (!fs.length) return m;
+  const out = new Map(), usadas = new Set(), deFicha = f => ({ nombre:f.nombre, cargo:f.cargo || '', matricula:f.matricula || '', tel:f.tel || '', email:f.email || '' });
+  m.forEach((v, k) => { const f = fs.find(x => x.k === k || claveNombre(x.nombre) === k); if (!f){ out.set(k, v); return; }
+    if (usadas.has(f.id)) return; usadas.add(f.id); if (!f.noViene) out.set(claveNombre(f.nombre), deFicha(f)); });
+  fs.forEach(f => { if (!usadas.has(f.id) && !f.noViene) out.set(claveNombre(f.nombre), deFicha(f)); });
+  return out;
 }
 function resumenPolicia(t){
   const ps = policiasDe(t); if (!ps.length) return '';
@@ -2101,7 +2109,8 @@ function bandaPolicia(){
           ${codigoVigente(p.id) ? `<button class="pn-b c-wa" data-a="policia-codigo" data-id="${p.id}">${I('qr')}<span>Su tarjeta</span></button>` : `<button class="pn-b c-wa" data-a="policia-codigo-nuevo" data-id="${p.id}">${I('qr')}<span>Armar su tarjeta</span></button>`}
           <button class="pn-b c-wood" data-a="policia-salida" data-id="${p.id}">${I('logout')}<span>Se va</span></button></div>
           <div class="btns" style="margin-top:6px"><button class="btn btn-xs btn-sec" data-a="policia-ronda-mano" data-id="${p.id}">${I('edit')}Anotar ronda a mano</button>
-          ${codigoVigente(p.id) ? `<button class="btn btn-xs btn-sec" data-a="policia-codigo-nuevo" data-id="${p.id}">${I('refresh')}Código nuevo</button>` : ''}</div>` : ''}
+          ${codigoVigente(p.id) ? `<button class="btn btn-xs btn-sec" data-a="policia-codigo-nuevo" data-id="${p.id}">${I('refresh')}Código nuevo</button>` : ''}
+          ${typeof puedeAnular === 'function' ? `<button class="btn btn-xs btn-sec pf-anular" data-a="pn-anular" data-id="${p.id}">${I('trash')}Anular el ingreso</button>` : ''}</div>` : ''}
       </div>`; }).join('')}
     ${avisoSueltos}
   </div>`;
@@ -2464,7 +2473,7 @@ F['policia-nuevo'] = d => {
   if (Date.now() - entra > DIA) return toast('Revisá el día: el ingreso da más de 24 horas atrás', 'clock');
   const email = String(d.email || '').trim().toLowerCase();
   if (email && !correoValido(email)) return toast('Revisá el correo del policía', 'mail');
-  const ya = policiasConocidos().get(k) || {};
+  const ya = policiasConocidos().get(k) || (typeof fichaDe === 'function' && fichaDe(k)) || {};
   const cargo = cargoDelForm(d) || ya.cargo || '';
   if (!cargo) return toast('Falta el cargo del policía (agente, cabo, sargento…)', 'shield');
   const p = { id:uid(), nombre: ya.nombre || conMayusculas(d.nombre), cargo, matricula: String(d.matricula || '').trim() || ya.matricula || '', tel: String(d.tel || '').trim() || ya.tel || '',
@@ -2477,6 +2486,8 @@ F['policia-nuevo'] = d => {
   Store.cambiar(s => {
     const x = aLista(s.bitacora).find(b => b.id === t.id); if (!x) return;
     x.policias = [...policiasDe(x), p];
+    /* Si estaba en la ficha como "Ya no viene", vuelve a venir (22-10-2026). */
+    aLista(s.policiasFicha).forEach(f => { if (f && f.noViene && (f.k === k || claveNombre(f.nombre) === k)){ f.noViene = false; f.at = Date.now(); } });
     s.rondaCodigos = [...aLista(s.rondaCodigos).filter(c => c && c.vence > Date.now()), { id:p.codigo, pid:p.id, nombre:p.nombre, vence:Date.now() + CODIGO_VIGENCIA, g:guiaNueva }];
     s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Ingreso del policía ${p.nombre}${pnParen(p)} · ${fechaCorta(isoDe(new Date(entra)))} · turno ${p.turnoEntra} · ${hora(p.entra)} h.`, at:Date.now() });
   });

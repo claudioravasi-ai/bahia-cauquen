@@ -396,6 +396,7 @@ const L = [
     { t:'El calendario', x:'Elegís el <b>año, el mes y el día</b>. <b>Tocá el día de hoy</b>.', s:'#cuerpo .tc-d.hoy', h:'tocar' },
     { t:'Ese día', x:'Se ve de 0 a 24 h con cada turno y el policía, y una tarjeta por turno con <b>"Ver el parte"</b>.', s:'#tcDia' },
     { t:'Las noches del policía', x:'Más abajo, las últimas 14 noches con una bolita por ronda: verde completa con QR, ámbar incompleta y gris anotada por la garita.', s:'#cuerpo .nc-tira' },
+    { t:'Policías del barrio', x:'La ficha de cada policía: <b>"Editar"</b> corrige sus datos y <b>"Ya no viene"</b> lo saca de "¿Quién llega?". Un ingreso de prueba o anotado por error se borra con <b>"Anular el ingreso"</b> (la garita, solo en el turno abierto).', s:'#cuerpo .pf-card' },
   ] },
   { id:'van-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Pasa la van del hotel', d:'Marcar la salida y el regreso de cada traslado.', p:[
     { t:'Las vans', x:'<b>Tocá "Vans"</b> arriba: los traslados que cargó el hotel para hoy.', s:'#cuerpo [data-a="garita-ir"][data-v=".vans-garita"]', h:'tocar' },
@@ -448,7 +449,8 @@ const L = [
   { id:'turnos-a', g:'admin', q:'u_admin', m:'admin', ir:'turnos', t:'Turnos y policía nocturna', d:'Horarios, noches y el mes del policía.', p:[
     { t:'El horario del policía', x:'<b>Tocá "Cambiar el horario"</b>.', s:'#cuerpo [data-a="pn-horario"]', h:'tocar' },
     { t:'Las dos noches', x:'Domingo a jueves y viernes y sábado, con la franja que se mueve, atajos y el total por semana.', s:'#hoja' },
-    { t:'El mes', x:'Abajo, <b>"Policía contratada"</b>: noches, horas y rondas completas del mes, para controlar lo que se le paga.', s:'#cuerpo .nm-card', antes:'cerrarHoja()' },
+    { t:'Policías del barrio', x:'<b>"Policías del barrio"</b>: la ficha de cada policía. <b>"Editar"</b> corrige sus datos (su próximo ingreso sale con ellos) y <b>"Ya no viene"</b> lo saca de los botones de la garita sin borrar sus noches. Si un ingreso fue una prueba o un error, en su noche está <b>"Anular el ingreso"</b>.', s:'#cuerpo .pf-card', antes:'cerrarHoja()' },
+    { t:'El mes', x:'Abajo, <b>"Policía contratada"</b>: noches, horas y rondas completas del mes, para controlar lo que se le paga.', s:'#cuerpo .nm-card' },
   ] },
   { id:'infracciones', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'infracciones', t:'Infracciones al reglamento', d:'Con sus pruebas y su historial.', p:[
     { t:'Nueva', x:'<b>Tocá "Nueva infracción"</b>.', s:'#cuerpo [data-a="nueva-infraccion"]', h:'tocar' },

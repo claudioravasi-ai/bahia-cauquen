@@ -6372,3 +6372,16 @@ li.prox .rm-gn{background:#ff9a3d}
   .pv-play span,.pv-foco i,.pv-med-arco,.pv-luz,.pv-med,.pv-card,.dd-mosaico .dd-sala,.dd-mosaico .dd-pend,#dia10,.d10-t,.d10-e{animation:none!important}
   .d10-barras i.va b{animation:none;width:50%}
 }
+/* Ficha de policías y "Anular el ingreso" (22-10-2026, js/turnos-vivo.js) */
+.pf-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.pf-p{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:14px;background:var(--surface);animation:ncSube .35s both}
+.pf-p .nc-ini{background:var(--c);flex:none}
+.pf-p .grow{min-width:0}.pf-p b{display:block;line-height:1.25}.pf-p small{display:block;color:var(--muted);font-size:12.5px}
+.pf-p.no{opacity:.62;border-left-color:var(--line)}.pf-p.no .nc-ini{background:var(--muted)}
+.pf-no{margin-top:10px}.pf-no summary{cursor:pointer;font-weight:600;color:var(--muted);font-size:13.5px;padding:4px 2px}.pf-no .pf-lista{margin-top:8px}
+.pf-motivos{grid-template-columns:repeat(3,1fr)}
+@media (max-width:520px){.pf-motivos{grid-template-columns:1fr}}
+.pf-motivos input:checked+span{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 8%,var(--surface));box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 18%,transparent)}
+.pf-motivos input:checked+span svg.i{color:var(--danger)}
+.btn.pf-anular{color:var(--danger)}.btn.pf-anular svg.i{color:var(--danger)}
+.pn-resumen .pn-ini{display:grid;place-items:center;line-height:1}

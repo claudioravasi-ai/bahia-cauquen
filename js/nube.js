@@ -80,7 +80,9 @@ const Nube = {
             /* 14-10: el personal de mantenimiento del barrio, con su DNI (js/mantenimiento.js): garita y Administración */
             'mantenimiento',
             /* 15-10: los enlaces del brazo de mantenimiento y su bitácora (js/mant-vivo.js) */
-            'mantCodigos','mantJornadas'],
+            'mantCodigos','mantJornadas',
+            /* 22-10: la ficha de policías (js/turnos-vivo.js): garita y Administración */
+            'policiasFicha'],
     /* Lo del Hotel Los Cauquenes (26-09-2026), en hotel/<colección>/<id>.
        Cada parte la lee solo quien la necesita (ver HOTEL_LEE y las reglas):
        los huéspedes, solo el hotel y la garita; las promociones propuestas,

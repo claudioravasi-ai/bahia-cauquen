@@ -204,6 +204,8 @@ function migrar(s){
     alertasSup:[], vistos:[],
     /* 13-10: la guardia de ahora (pública) y cómo aparece cada guardia (js/guardia.js) */
     guardiaAhora:[], guardiaLooks:[], mantenimiento:[],
+    /* 22-10: la ficha de policías (js/turnos-vivo.js) */
+    policiasFicha:[],
     /* 15-10: mantenimiento en vivo (js/mant-vivo.js): puntos, enlaces, jornadas y, sin la base, los mensajes */
     mantVivo:[], mantCodigos:[], mantJornadas:[], mantChat:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];

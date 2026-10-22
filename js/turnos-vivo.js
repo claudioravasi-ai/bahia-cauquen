@@ -109,7 +109,8 @@ function servicioEnNoche(sv){
     ${cuenta.gar || cuenta.inc ? `<p class="nc-por">${I('info')} ${plural(sv.rondas.length, 'ronda anotada', 'rondas anotadas')}: ${[cuenta.ok && plural(cuenta.ok, 'completa con QR', 'completas con QR'), cuenta.inc && plural(cuenta.inc, 'incompleta', 'incompletas'), cuenta.gar && plural(cuenta.gar, 'anotada por la garita', 'anotadas por la garita')].filter(Boolean).join(', ')}. Para la meta cuentan ${c}.</p>` : ''}
     <div class="btns"><button class="btn btn-xs btn-sec" data-a="policia-constancia-ver" data-id="${esc(sv.id)}">${I('file')}Ver la constancia</button>
       ${sv.sale && sv.email && sv.registroSale ? `<button class="btn btn-xs btn-sec" data-a="policia-constancia" data-id="${esc(sv.id)}">${I('mail')}${cs && cs.ok ? 'Reenviar' : 'Mandar'} la constancia</button>` : ''}
-      <span class="pill ${!sv.sale ? 'p-accent' : cs && cs.ok ? 'p-ok' : sv.email ? 'p-warn' : ''}">${!sv.sale ? 'En servicio' : cs && cs.ok ? 'Constancia enviada' : sv.email ? 'Constancia sin enviar' : 'Sin correo'}</span></div>
+      <span class="pill ${!sv.sale ? 'p-accent' : cs && cs.ok ? 'p-ok' : sv.email ? 'p-warn' : ''}">${!sv.sale ? 'En servicio' : cs && cs.ok ? 'Constancia enviada' : sv.email ? 'Constancia sin enviar' : 'Sin correo'}</span>
+      ${puedeAnular(sv) ? `<button class="btn btn-xs btn-sec pf-anular" data-a="pn-anular" data-id="${esc(sv.id)}">${I('trash')}Anular el ingreso</button>` : ''}</div>
   </article>`;
 }
 function detalleNoche(svs){
@@ -130,6 +131,7 @@ function seccionNochePolicia(){
     ${sec('Las noches del policía', `<span class="muted small">tocá una noche</span>`)}
     <div class="card nc-noches">${tiraNoches(svs)}${detalleNoche(svs)}
       <button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="hist-policias">${I('clock')}Ver servicios anteriores</button></div>
+    ${seccionFichaPolicias()}
     ${seccionPuntos()}
     ${esAdmin() ? mesPolicia(svs) : ''}`;
 }
@@ -341,3 +343,162 @@ setInterval(() => {
   c.style.setProperty('--x', (8 + f * 84).toFixed(1) + '%'); c.style.setProperty('--y', (64 - Math.sin(f * Math.PI) * 46).toFixed(1) + '%'); c.style.setProperty('--f', f.toFixed(3));
   const em = c.querySelector('.nc-cab em'); if (em) em.textContent = `En curso · ${Math.round(f * 100)} % de la noche`;
 }, 30000);
+
+/* =========================================================
+   4. FICHA DE POLICÍAS Y "ANULAR EL INGRESO" (pedido de Claudio, 22-10-2026)
+   "Entré como policía yo y luego mi esposa para probar los QR de la ronda
+   y quiero borrar los dos ingresos." Y una ficha para editar sus datos.
+   · FICHA (staff/policiasFicha, solo garita y Administración): nombre,
+     cargo, matrícula, celular y correo de cada policía que viene. Manda
+     sobre lo que quedó en sus servicios: el próximo ingreso se completa
+     con la ficha. "Ya no viene" lo saca de los botones rápidos de
+     "¿Quién llega?" sin borrar sus noches (son la prueba de lo que se le
+     pagó); si vuelve a venir, se reactiva solo. Las constancias que ya
+     salieron no cambian: son documentos.
+   · ANULAR EL INGRESO, con motivo (fue una prueba / se anotó por error /
+     otro): el servicio desaparece de Turnos, de las noches, de los
+     medidores y de la meta; se dan de baja su código y su tarjeta y se
+     borran sus renglones de la bitácora y sus datos (nombre, matrícula,
+     celular, correo). Queda UN renglón sin datos personales: "Se anuló un
+     ingreso de policía (fue una prueba) · lo anuló la Administración".
+     La Administración anula cualquier servicio de los últimos 60 días;
+     la garita, solo los del turno abierto. La supervisión no.
+   ========================================================= */
+const fichaPolicias = () => aLista(Store.s.policiasFicha).filter(f => f && f.id);
+const fichaDe = k => fichaPolicias().find(f => f.k === k || claveNombre(f.nombre) === k) || null;
+/* Cada policía que vino (o que está en la ficha), uno solo por persona. */
+function policiasDelBarrio(){
+  const fs = fichaPolicias(), m = new Map();
+  serviciosPolicia().slice().reverse().forEach(sv => { const k = claveNombre(sv.nombre); if (!k) return;
+    const f = fs.find(x => x.k === k || claveNombre(x.nombre) === k), key = f ? 'f:' + f.id : k;
+    const ya = m.get(key) || { key, k, nombre:sv.nombre, cargo:'', matricula:'', tel:'', email:'', noches:0, ultima:0 };
+    ['cargo', 'matricula', 'tel', 'email'].forEach(c => { if (sv[c]) ya[c] = sv[c]; });
+    ya.nombre = sv.nombre; ya.noches++; ya.ultima = Math.max(ya.ultima, sv.entra); m.set(key, ya); });
+  fs.forEach(f => { const key = 'f:' + f.id, ya = m.get(key) || { key, k:f.k, noches:0, ultima:0 };
+    m.set(key, { ...ya, k:f.k, nombre:f.nombre, cargo:f.cargo || '', matricula:f.matricula || '', tel:f.tel || '', email:f.email || '', noViene:!!f.noViene, ficha:f.id }); });
+  return [...m.values()].sort((a, b) => (+!!a.noViene - +!!b.noViene) || b.ultima - a.ultima || a.nombre.localeCompare(b.nombre));
+}
+const puedeFicha = () => esAdmin() || esGuardia();
+function seccionFichaPolicias(){
+  if (!puedeFicha()) return '';
+  const ps = policiasDelBarrio(), vienen = ps.filter(p => !p.noViene), no = ps.filter(p => p.noViene);
+  const fila = p => `<li class="pf-p${p.noViene ? ' no' : ''}" style="--c:${colorDe(p.nombre)}"><span class="nc-ini">${esc(inicialesDe(p.nombre))}</span>
+      <span class="grow"><b>${esc(p.nombre)}</b><small>${esc(pnCargoMat(p, ' · ')) || 'Sin cargo ni matrícula · '}${p.noches ? `${plural(p.noches, 'noche')} · última ${fechaCorta(isoDe(new Date(p.ultima)))}` : 'todavía no vino'}${p.email ? '' : ' · sin correo'}</small></span>
+      <button class="btn btn-xs btn-sec" data-a="pf-editar" data-v="${esc(p.key)}">${I('edit')}Editar</button></li>`;
+  return `${sec('Policías del barrio', `<button class="btn btn-xs btn-sec" data-a="pf-editar" data-v="">${I('plus')}Agregar</button>`)}
+    <div class="card pf-card">
+      ${vienen.length ? `<ul class="pf-lista">${vienen.map(fila).join('')}</ul>` : `<p class="muted small" style="margin:0">${no.length ? 'No queda nadie en la lista de los que vienen.' : 'Todavía no vino ningún policía.'} Con "Agregar" podés anotarlo antes, así la garita lo elige con un toque.</p>`}
+      ${no.length ? `<details class="pf-no"><summary>${plural(no.length, 'policía que ya no viene', 'policías que ya no vienen')}</summary><ul class="pf-lista">${no.map(fila).join('')}</ul></details>` : ''}
+      <p class="muted tiny" style="margin:10px 0 0">Con estos datos se completa su próximo ingreso en "¿Quién llega?". "Ya no viene" lo saca de esos botones sin borrar sus noches. Las constancias que ya salieron no cambian.</p></div>`;
+}
+A['pf-editar'] = el => {
+  if (!puedeFicha()) return;
+  const p = el.dataset.v ? policiasDelBarrio().find(x => x.key === el.dataset.v) : null;
+  if (el.dataset.v && !p) return;
+  const v = p || { nombre:'', cargo:'', matricula:'', tel:'', email:'' };
+  hoja(p ? 'Ficha del policía' : 'Agregar un policía', `<form data-f="pf-guardar" class="pn-form"><input type="hidden" name="key" value="${esc(p ? p.key : '')}">
+    <div class="field"><label>Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="off" value="${esc(v.nombre)}" pattern=".*\\S+\\s+\\S+.*" title="Nombre y apellido completos"></div>
+    <div class="grid2">${campoCargoPolicia(v.cargo || '')}<div class="field"><label>Matrícula / legajo</label><input name="matricula" maxlength="20" autocomplete="off" value="${esc(v.matricula || '')}"></div></div>
+    <div class="grid2"><div class="field"><label>Celular (para su tarjeta)</label><input name="tel" type="tel" inputmode="tel" maxlength="20" autocomplete="off" value="${esc(v.tel || '')}"></div>
+      <div class="field"><label>Correo (para su constancia)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off" value="${esc(v.email || '')}"></div></div>
+    <button class="btn btn-pri btn-block">${I('check')}Guardar la ficha</button>
+    ${p ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="pf-noviene" data-v="${esc(p.key)}">${I(p.noViene ? 'refresh' : 'logout')}${p.noViene ? 'Vuelve a venir' : 'Ya no viene'}</button>` : ''}
+    <p class="muted tiny" style="margin:8px 0 0">Si está de servicio ahora, su servicio de esta noche toma los datos nuevos. Las noches anteriores y las constancias que ya salieron no cambian.</p></form>`);
+};
+/* Guarda (o crea) la ficha de un policía; devuelve false si no se pudo. */
+function guardarFicha(p, cambios){
+  const k = p ? p.k : claveNombre(cambios.nombre);
+  Store.cambiar(s => {
+    s.policiasFicha = aLista(s.policiasFicha);
+    let f = p && p.ficha && s.policiasFicha.find(x => x && x.id === p.ficha);
+    if (!f){ f = { id:uid(), k, nombre:p ? p.nombre : '', cargo:p ? p.cargo : '', matricula:p ? p.matricula : '', tel:p ? p.tel : '', email:p ? p.email : '' }; s.policiasFicha.push(f); }
+    Object.assign(f, cambios, { at:Date.now() });
+  });
+}
+F['pf-guardar'] = d => {
+  if (!puedeFicha()) return;
+  const p = d.key ? policiasDelBarrio().find(x => x.key === d.key) : null;
+  const nombre = conMayusculas(d.nombre || ''), k = claveNombre(nombre);
+  if (nombreIncompleto(nombre)) return toast('Escribí nombre y apellido del policía', 'users');
+  const otro = policiasDelBarrio().find(x => claveNombre(x.nombre) === k && (!p || x.key !== p.key));
+  if (otro) return toast(`Ya hay un policía con ese nombre en la ficha`, 'users');
+  const email = String(d.email || '').trim().toLowerCase();
+  if (email && !correoValido(email)) return toast('Revisá el correo del policía', 'mail');
+  const cambios = { nombre, cargo:cargoDelForm(d), matricula:String(d.matricula || '').trim(), tel:String(d.tel || '').trim(), email };
+  guardarFicha(p, cambios);
+  /* El que está de servicio ahora toma los datos nuevos (su constancia de esta noche sale con ellos). */
+  const t = turnoAbierto(), viejo = p ? p.nombre : '';
+  Store.cambiar(s => {
+    if (t && p){ const x = aLista(s.bitacora).find(b => b.id === t.id);
+      if (x){ x.policias = policiasDe(x).map(q => !q.sale && claveNombre(q.nombre) === claveNombre(viejo) ? { ...q, ...cambios } : q);
+        s.rondaCodigos = aLista(s.rondaCodigos).map(c => c && x.policias.some(q => q.id === c.pid && claveNombre(q.nombre) === k) ? { ...c, nombre } : c); } }
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:p ? `Se actualizó la ficha del policía ${nombre}.` : `Se agregó a la ficha el policía ${nombre}.`, at:Date.now() });
+  });
+  cerrarHoja(); toast('Ficha guardada', 'check'); refrescar();
+};
+A['pf-noviene'] = async el => {
+  if (!puedeFicha()) return;
+  const p = policiasDelBarrio().find(x => x.key === el.dataset.v); if (!p) return;
+  if (!p.noViene && !await confirmar('Ya no viene', `${esc(p.nombre)} deja de aparecer en los botones de "¿Quién llega?". Sus noches quedan como estaban. Si vuelve a venir, se reactiva solo al escribir su nombre.`, { si:'Ya no viene' })) return;
+  guardarFicha(p, { noViene:!p.noViene });
+  Store.cambiar(s => s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:p.noViene ? `El policía ${p.nombre} vuelve a venir.` : `El policía ${p.nombre} ya no viene (sale de los botones de ingreso).`, at:Date.now() }));
+  cerrarHoja(); toast(p.noViene ? `${p.nombre} vuelve a estar en los botones` : `${p.nombre} ya no aparece en los botones`, 'check'); refrescar();
+};
+
+/* ---------- anular un ingreso ---------- */
+const MOTIVOS_ANULAR = { prueba:'fue una prueba', error:'se anotó por error' };
+function puedeAnular(sv){
+  if (!sv) return false;
+  if (esAdmin()) return true;
+  const t = esGuardia() && turnoAbierto();
+  return !!t && policiasDe(t).some(p => p.id === sv.id);
+}
+A['pn-anular'] = el => {
+  const sv = serviciosPolicia().find(x => x.id === el.dataset.id); if (!puedeAnular(sv)) return;
+  const op = (v, ic, b, sm, on) => `<label><input type="radio" name="motivo" value="${v}" ${on ? 'checked' : ''}><span>${I(ic)}<em><b>${b}</b><small>${sm}</small></em></span></label>`;
+  hoja('Anular el ingreso', `<form data-f="pn-anular" class="pn-form"><input type="hidden" name="pid" value="${esc(sv.id)}">
+    <div class="pn-resumen"><span class="pn-ini lg" style="--c:${colorDe(sv.nombre)}">${esc(inicialesDe(sv.nombre))}</span>
+      <div class="grow"><b>${esc(sv.nombre)}</b><small>${esc(pnCargoMat(sv, ' · '))}${fechaCorta(isoDe(new Date(sv.entra)))} · ${hora(sv.entra)} → ${sv.sale ? hora(sv.sale) + ' h' : 'sigue de servicio'} · ${plural(sv.rondas.length, 'ronda')}</small></div></div>
+    <div class="pn-lbl">¿Por qué se anula?</div>
+    <div class="pn-hora pf-motivos" role="radiogroup">${op('prueba', 'qr', 'Fue una prueba', 'Para probar los QR', true)}${op('error', 'alert', 'Se anotó por error', 'No era este policía')}${op('otro', 'edit', 'Otro', 'Escribir el motivo')}</div>
+    <div class="field pf-otro" hidden style="margin-top:8px"><label>Motivo</label><input name="otro" maxlength="80" autocomplete="off" placeholder="Por ejemplo: se duplicó el ingreso"></div>
+    <div class="aviso a-warn" style="margin:12px 0">${I('alert')}<div class="txt"><b>Se borra todo su servicio y no se puede deshacer</b>Desaparece de Turnos, de las noches y de la meta; se dan de baja su código y su tarjeta, y se borran sus renglones de la bitácora y sus datos. Queda un solo renglón: "Se anuló un ingreso de policía", con el motivo.${sv.constancia && sv.constancia.ok ? ` La constancia que ya le llegó a ${esc(sv.constancia.para || 'su correo')} queda en esa casilla.` : ''}</div></div>
+    <button class="btn btn-danger btn-block">${I('trash')}Anular el ingreso</button></form>`);
+};
+document.addEventListener('change', e => {
+  const r = e.target; if (!r || r.name !== 'motivo' || !r.closest('.pf-motivos')) return;
+  const o = r.closest('form').querySelector('.pf-otro'); if (!o) return;
+  o.hidden = r.value !== 'otro'; const i = o.querySelector('input'); i.required = !o.hidden; if (!o.hidden) i.focus();
+});
+F['pn-anular'] = async d => {
+  const sv = serviciosPolicia().find(x => x.id === d.pid); if (!puedeAnular(sv)) return;
+  const motivo = d.motivo === 'otro' ? String(d.otro || '').trim().replace(/\s+/g, ' ').slice(0, 80) : MOTIVOS_ANULAR[d.motivo];
+  if (!motivo) return toast('Escribí el motivo', 'edit');
+  if (!await confirmar('¿Seguro?', `Se anula el ingreso de <b>${esc(sv.nombre)}</b> del ${fechaCorta(isoDe(new Date(sv.entra)))} (${esc(motivo)}). No se puede deshacer.`, { si:'Sí, anular', peligro:true })) return;
+  anularIngreso(sv, motivo);
+  toast('Ingreso anulado', 'check'); refrescar();
+};
+function anularIngreso(sv, motivo){
+  const nombre = sv.nombre, k = claveNombre(nombre), desde = sv.entra - MIN, hasta = (sv.sale || Date.now()) + 5 * MIN;
+  Store.cambiar(s => {
+    const pasos = new Set(), codigos = new Set(aLista(s.rondaCodigos).filter(c => c && c.pid === sv.id).map(c => c.id));
+    aLista(s.bitacora).forEach(b => { if (!b || b.tipo !== 'turno' || !b.abre) return;
+      const ps = policiasDe(b), p = ps.find(q => q.id === sv.id); if (!p) return;
+      p.rondas.forEach(r => r.pasos.forEach(id => pasos.add(id)));
+      b.policias = ps.filter(q => q.id !== sv.id);
+      if (b.texto && b.texto.includes(nombre)) b.texto = b.texto.split(nombre).join('(ingreso anulado)'); });
+    bajarCodigo(s, sv.id);
+    /* Sus renglones (ingreso, rondas, salida, cargo…): fuera, con su nombre. */
+    s.bitacora = aLista(s.bitacora).filter(b => !(b && b.tipo !== 'turno' && b.at >= desde && b.at <= hasta && String(b.texto || '').includes(nombre)));
+    /* Los pasos de sus QR: la base deja borrarlos solo a la Administración. */
+    if (esAdmin()) s.pasos = aLista(s.pasos).filter(x => !(x && (pasos.has(x.id) || codigos.has(x.c))));
+    /* La copia de su constancia en la bandeja de correos de la app (la que ya le llegó queda en su casilla). */
+    const mails = new Set([sv.email, sv.constancia && sv.constancia.para].filter(Boolean));
+    if (mails.size) s.correos = aLista(s.correos).filter(c => !(c && c.tipo === 'policia-servicio' && mails.has(c.para) && c.at >= desde));
+    /* Si no vino nunca más (era una prueba), sale también de la ficha. */
+    const queda = aLista(s.bitacora).some(b => b && b.tipo === 'turno' && b.abre && policiasDe(b).some(q => claveNombre(q.nombre) === k));
+    if (!queda) s.policiasFicha = aLista(s.policiasFicha).filter(f => !(f && (f.k === k || claveNombre(f.nombre) === k)));
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Se anuló un ingreso de policía (${motivo}) · ingreso del ${fechaCorta(isoDe(new Date(sv.entra)))} a las ${hora(sv.entra)} h · lo anuló ${esAdmin() ? 'la Administración' : 'la garita'}.`, at:Date.now() });
+  });
+  if (typeof Historial !== 'undefined' && Historial.servPolicia) Historial.servPolicia = aLista(Historial.servPolicia).filter(x => x.id !== sv.id);
+}
