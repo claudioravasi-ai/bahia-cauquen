@@ -110,20 +110,51 @@ function semanaInforme(sab, svsTodos = serviciosPolicia()){
   t.pctHub = rondas ? Math.round(t.conQR / rondas * 100) : 0;
   return { sab, dias, t, obs: observacionesSemana(dias, t) };
 }
-/* Lo que conviene que la supervisión mire, en frases cortas. */
+/* Lo que conviene que la supervisión mire (rediseño, 22-10-2026: "los
+   'para tener en cuenta' tienen un diseño malo"). Ya no es una lista de
+   frases: son tarjetas por tema (noches sin policía, ingresos tarde, meta,
+   puntos sin leer, pausas largas, rondas sin QR), cada una con su número
+   grande y los días o los puntos como fichitas. */
+const IP_OBS = {
+  sin:   ['alerta', 'moon',  'Noches sin policía',       '#dc2626', '#fde8e8'],
+  tarde: ['aviso',  'alert', 'Ingresos tarde',            '#ea580c', '#fff0e5'],
+  meta:  ['aviso',  'pin',   'Noches sin la meta',        '#d97706', '#fdf3e2'],
+  puntos:['aviso',  'qr',    'Puntos sin leer',           '#c026d3', '#fbe8fd'],
+  pausa: ['aviso',  'clock', 'Pausas largas entre rondas','#7c3aed', '#f2ecfe'],
+  sinqr: ['info',   'edit',  'Rondas sin QR',             '#2563eb', '#e9f0fd'],
+  ok:    ['ok',     'check', 'Semana sin observaciones',  '#16a34a', '#e8f6ec'],
+};
 function observacionesSemana(dias, t){
-  const o = [], nom = d => `${DIAS_L[fechaDe(d.iso).getDay()]} ${fechaDe(d.iso).getDate()}`;
+  const o = [], dc = d => `${DIAS[fechaDe(d.iso).getDay()]} ${fechaDe(d.iso).getDate()}`, add = (k, n, sub, chips) => o.push({ k, n, sub, chips });
   const sin = dias.filter(d => d.estado === 'sin');
-  if (sin.length) o.push(['alerta', `${sin.length === 1 ? 'La noche del ' : 'Las noches del '}${sin.map(nom).join(', ')} no se registró el ingreso de ningún policía.`]);
-  dias.filter(d => d.tarde != null && d.tarde > 10).forEach(d => o.push(['aviso', `La noche del ${nom(d)} el ingreso fue a las ${hora(d.svs[0].entra)} h, ${d.tarde} minutos después del horario (${hora(d.prog.desde)} h).`]));
-  dias.filter(d => d.estado === 'parcial').forEach(d => o.push(['aviso', `La noche del ${nom(d)} se completaron ${d.completas} de ${t.meta} rondas con QR.`]));
+  if (sin.length) add('sin', sin.length, sin.length === 1 ? 'no se registró ningún ingreso' : 'no se registró ningún ingreso', sin.map(dc));
+  const tarde = dias.filter(d => d.tarde != null && d.tarde > 10);
+  if (tarde.length) add('tarde', tarde.length, 'más de 10 minutos después del horario', tarde.map(d => `${dc(d)} · ${hora(d.svs[0].entra)} h (+${d.tarde} min)`));
+  const par = dias.filter(d => d.estado === 'parcial');
+  if (par.length) add('meta', par.length, `menos de ${t.meta} rondas completas con QR`, par.map(d => `${dc(d)} · ${d.completas}/${t.meta}`));
   const faltan = {}; dias.forEach(d => d.rondas.forEach(r => r.faltan.forEach(n => { faltan[n] = (faltan[n] || 0) + 1; })));
-  Object.entries(faltan).sort((a, b) => b[1] - a[1]).slice(0, 3).forEach(([n, k]) => o.push(['aviso', `El punto "${n}" quedó sin leer en ${plural(k, 'ronda')} de la semana.`]));
-  dias.forEach(d => { const rs = d.rondas.filter(r => r.inicio); for (let k = 1; k < rs.length; k++){ const h = (rs[k].inicio - (rs[k - 1].fin || rs[k - 1].inicio)) / HORA;
-    if (h >= 3){ o.push(['aviso', `La noche del ${nom(d)} pasaron ${Math.floor(h)} h ${Math.round(h % 1 * 60)} min entre una ronda y la siguiente (${hora(rs[k - 1].fin || rs[k - 1].inicio)} a ${hora(rs[k].inicio)} h).`]); break; } } });
-  if (t.sinQR) o.push(['info', `${plural(t.sinQR, 'ronda se anotó', 'rondas se anotaron')} sin los QR del hub digital (a mano o por la garita).`]);
-  if (!o.length && t.noches) o.push(['ok', 'Semana sin observaciones: todas las noches hubo policía, a horario y con las rondas completas.']);
+  const fs = Object.entries(faltan).sort((a, b) => b[1] - a[1]);
+  if (fs.length) add('puntos', fs.length, 'quedaron sin leer en alguna ronda', fs.slice(0, 6).map(([n, k]) => `${n} ×${k}`));
+  const pausas = []; dias.forEach(d => { const rs = d.rondas.filter(r => r.inicio); for (let k = 1; k < rs.length; k++){ const a = rs[k - 1].fin || rs[k - 1].inicio, h = (rs[k].inicio - a) / HORA;
+    if (h >= 3) pausas.push(`${dc(d)} · ${Math.floor(h)} h ${String(Math.round(h % 1 * 60)).padStart(2, '0')} (${hora(a)}–${hora(rs[k].inicio)})`); } });
+  if (pausas.length) add('pausa', pausas.length, '3 horas o más sin empezar otra ronda', pausas);
+  if (t.sinQR){ const pd = dias.filter(d => d.sinQR).map(d => `${dc(d)} ×${d.sinQR}`); add('sinqr', t.sinQR, 'anotadas a mano o por la garita, sin el hub digital', pd); }
+  if (!o.length && t.noches) add('ok', '✓', 'todas las noches con policía, a horario y con las rondas completas', []);
   return o;
+}
+/* Las tarjetas, en la app. */
+const ipObsApp = obs => `<div class="ip-obs">${obs.map(x => { const [tono, ic, tt, col, claro] = IP_OBS[x.k];
+  return `<div class="ip-o t-${tono}" style="--c:${col};--cl:${claro}"><div class="ip-o-cab"><span class="ip-o-ic">${I(ic)}</span><b class="ip-o-n">${x.n}</b></div>
+    <div class="ip-o-t">${tt}</div><small>${esc(x.sub)}</small>${x.chips.length ? `<div class="ip-o-chips">${x.chips.map(c => `<span>${esc(c)}</span>`).join('')}</div>` : ''}</div>`; }).join('')}</div>`;
+/* Las mismas tarjetas, en el PDF (tablas de dos columnas). */
+function ipObsPdf(obs){
+  const tarjeta = x => { const [, , tt, col, claro] = IP_OBS[x.k];
+    return `<div style="border-radius:14px;background:${claro};border-left:6px solid ${col};padding:10px 12px;page-break-inside:avoid">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:12px;font-weight:800;color:${col}">${tt}</td><td align="right" style="font-size:24px;font-weight:800;color:${col};line-height:1">${x.n}</td></tr></table>
+      <div style="font-size:10px;color:#475569;margin:2px 0 6px">${esc(x.sub)}</div>
+      ${x.chips.map(c => `<span style="display:inline-block;background:#fff;border:1px solid ${col};color:#0b1f3a;font-size:9.5px;font-weight:700;border-radius:20px;padding:2px 8px;margin:0 4px 4px 0">${esc(c)}</span>`).join('')}</div>`; };
+  const filas = []; for (let k = 0; k < obs.length; k += 2) filas.push(obs.slice(k, k + 2));
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0 8px">${filas.map(f => `<tr><td width="50%" valign="top" style="padding-right:5px">${tarjeta(f[0])}</td><td width="50%" valign="top" style="padding-left:5px">${f[1] ? tarjeta(f[1]) : ''}</td></tr>`).join('')}</table>`;
 }
 
 /* ---------- 2. el PDF ---------- */
@@ -190,7 +221,6 @@ function ipPdfHtml(sem, im = {}){
         ].filter(Boolean).join(' · ') || '<span style="color:#64748b">de servicio, sin movimientos</span>'}</td></tr>`).join('')}</table></div></div>`;
   };
 
-  const OBS = { alerta:['#dc2626', '!'], aviso:['#d97706', '!'], info:['#2563eb', 'i'], ok:['#16a34a', '✓'] };
   return `<div style="font-family:Arial,Helvetica,sans-serif;color:#0b1f3a;max-width:720px;margin:0 auto;font-size:12px;line-height:1.45">
   <div style="border-radius:18px;overflow:hidden;background:#0b1f3a">
     ${im.portada ? `<img src="${im.portada}" width="720" style="display:block;width:100%;height:auto" alt="El barrio ${barrio} de noche">` : ''}
@@ -213,10 +243,7 @@ function ipPdfHtml(sem, im = {}){
   ${tit('Las 7 noches')}${semaforo}
   <table cellpadding="0" cellspacing="0" style="margin-top:6px;font-size:9.5px;color:#5b6b80"><tr>${['ok', 'parcial', 'sin', 'curso'].map(k => `<td style="padding-right:12px"><span style="display:inline-block;width:9px;height:9px;border-radius:5px;background:${IP_EST[k][0]}"></span> ${IP_EST[k][1]}</td>`).join('')}<td>· el número: rondas completas con QR / meta</td></tr></table>
 
-  ${sem.obs.length ? `<div style="page-break-inside:avoid">${tit('Para tener en cuenta')}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1.5px solid #dbe3ee;border-radius:14px">${sem.obs.map(([k, txt], j) => `<tr style="background:${j % 2 ? '#fff' : '#f7f9fc'}">
-      <td width="36" valign="top" style="padding:7px 0 7px 12px"><div style="width:20px;height:20px;border-radius:10px;background:${OBS[k][0]};color:#fff;font-size:11px;font-weight:800;text-align:center;line-height:20px">${OBS[k][1]}</div></td>
-      <td style="padding:7px 14px 7px 4px;font-size:11.5px;color:#1e293b">${esc(txt)}</td></tr>`).join('')}</table></div>` : ''}
+  ${sem.obs.length ? `${tit('Para tener en cuenta')}${ipObsPdf(sem.obs)}` : ''}
 
   <div style="page-break-inside:avoid">${tit('Franjas horarias de la semana')}${calor}</div>
 
@@ -239,7 +266,7 @@ function ipCorreoHtml(sem){
     <p style="margin:0 0 12px">Buen día. A la Supervisión de Adicionales Policiales: les enviamos el informe de la policía adicional del Barrio ${esc(Store.s.config.nombre)}, noches ${esc(ipRango(sem.sab))}. El detalle de cada noche (ingresos, salidas, rondas con y sin QR y lo que pasó en cada franja horaria) va en el <b>PDF adjunto</b>.</p>
     <table width="100%" cellpadding="0" cellspacing="6" style="border-collapse:separate;margin:0 0 10px"><tr>${dato('Noches', t.noches + '/7', '#7c3aed')}${dato('Horas', Math.round(t.horas / HORA), '#2563eb')}${dato('Rondas', t.rondas, '#0d9488')}${dato('Con QR', t.pctHub + ' %', '#e11d48')}</tr></table>
     <table width="100%" cellpadding="0" cellspacing="4" style="border-collapse:separate;margin:0 0 12px"><tr>${sem.dias.map(d => `<td style="background:${d.estado === 'futura' ? '#e2e8f0' : IP_EST[d.estado][0]};color:#fff;border-radius:8px;text-align:center;padding:6px 2px;font-size:11px;font-weight:700">${DIAS[fechaDe(d.iso).getDay()]} ${fechaDe(d.iso).getDate()}<br>${d.svs.length ? d.completas + '/' + t.meta : '—'}</td>`).join('')}</tr></table>
-    ${sem.obs.filter(o => o[0] !== 'info').slice(0, 4).map(o => `<p style="margin:0 0 6px;color:${o[0] === 'ok' ? '#15803d' : '#b45309'}">• ${esc(o[1])}</p>`).join('')}
+    ${sem.obs.slice(0, 5).map(x => `<p style="margin:0 0 6px;color:${IP_OBS[x.k][3]}"><b>${IP_OBS[x.k][2]}: ${x.n}</b>${x.chips.length ? ' · ' + esc(x.chips.slice(0, 3).join(' · ')) : ''}</p>`).join('')}
     <p style="margin:12px 0 0;color:#334155">Si no ven el archivo adjunto, pídanlo a la Administración del barrio.</p>`);
 }
 
@@ -327,7 +354,7 @@ const ipSabados = () => { const hoy = hoyISO(), ult = sabadoDe(hoy), prox = fech
 function tarjetaInformePolicia(){
   if (!esStaff()) return '';
   return `<button class="ip-tarjeta" data-a="ip-abrir"><span class="ip-t-ic">${I('file')}</span>
-    <span class="grow"><b>Informe semanal de la policía</b><small>Sale solo el sábado, al registrarse la salida del policía del viernes · en PDF a ${esc(correoSupervisionPolicia())}</small></span>${I('right')}</button>`;
+    <span class="grow"><b>Informe semanal de la policía</b><small>Sale solo el sábado, al registrarse la salida del policía del viernes · en PDF a la Supervisión de Adicionales Policiales</small></span>${I('right')}</button>`;
 }
 A['ip-abrir'] = () => {
   if (!esStaff()) return;
@@ -355,18 +382,24 @@ A['ip-abrir'] = () => {
     <div class="ip-lbl">Franjas de 2 horas · QR del hub digital leídos</div>
     <div class="ip-calor"><span></span>${IP_FRANJAS.map(h => `<span class="ip-ch">${ipHH(h)}</span>`).join('')}
       ${sem.dias.map(z => `<span class="ip-cd" style="--c:${IP_COLORES[z.i][0]}">${DIAS[fechaDe(z.iso).getDay()]}</span>${z.franjas.map(f => `<span class="ip-c ${f.hay ? 'hay' : ''}" style="--a:${f.qr ? (.25 + .75 * f.qr / maxQR).toFixed(2) : 0}" title="${ipFranjaTxt(f.h)}: ${f.qr} QR">${f.qr || ''}</span>`).join('')}`).join('')}</div>
-    ${sem.obs.length ? `<div class="ip-lbl">Para tener en cuenta</div><ul class="ip-obs">${sem.obs.map(([k, txt]) => `<li class="o-${k}">${I(k === 'ok' ? 'check' : k === 'info' ? 'info' : 'alert')}<span>${esc(txt)}</span></li>`).join('')}</ul>` : ''}
-    <div class="ip-envio">${I('mail')}<div class="grow"><b>Para: ${esc(correoSupervisionPolicia())}</b><small>${enCurso ? 'Sale solo el sábado, al registrarse la salida del policía de la noche del viernes (o a las 12, si no vino nadie).' : 'Para ver si salió y la copia exacta: "Informes enviados".'}</small></div></div>
+    ${sem.obs.length ? `<div class="ip-lbl">Para tener en cuenta</div>${ipObsApp(sem.obs)}` : ''}
+    <div class="ip-envio">${I('mail')}<div class="grow"><b>Para: la Supervisión de Adicionales Policiales</b><small>${enCurso ? 'Sale solo el sábado, al registrarse la salida del policía de la noche del viernes (o a las 12, si no vino nadie).' : 'Para ver si salió y la copia exacta: "Informes enviados".'}</small></div></div>
     <div class="btns"><button class="btn btn-pri grow" data-a="ip-pdf">${I('file')}Ver el PDF</button><button class="btn btn-sec grow" data-a="ip-enviados">${I('clock')}Informes enviados</button></div>
-    ${enCurso ? '' : `<button class="btn btn-sec btn-block" style="margin-top:8px" data-a="ip-mandar">${I('mail')}Mandarlo ahora a la supervisión</button>`}
-    ${esAdmin() ? `<form class="linea-form" data-f="ip-destino" style="margin-top:10px"><input name="email" type="email" inputmode="email" maxlength="80" value="${esc(correoSupervisionPolicia())}" aria-label="Correo de la supervisión de la policía"><button class="btn btn-sec">Cambiar el correo</button></form>` : ''}
-    <p class="muted tiny" style="margin:10px 0 0">${I('lock')} Del policía lleva solo nombre, cargo y matrícula. Lo demás de la garita va solo como cantidad, sin datos de vecinos ni de visitas. El mismo correo recibe la constancia del policía que no deja el suyo.</p></div>`, { ancho:'760px' });
+    ${esAdmin() ? `<div class="btns" style="margin-top:8px">${enCurso ? '' : `<button class="btn btn-sec grow" data-a="ip-mandar">${I('mail')}Mandarlo ahora</button>`}<button class="btn btn-sec grow" data-a="ip-correo">${I('edit')}Cambiar el correo</button></div>` : ''}
+    <p class="muted tiny" style="margin:10px 0 0">${I('lock')} Del policía lleva solo nombre, cargo y matrícula. Lo demás de la garita va solo como cantidad, sin datos de vecinos ni de visitas. El mismo correo recibe la constancia del policía que no deja el suyo.${esAdmin() ? '' : ' Lo manda la app sola; mandarlo de nuevo o cambiar el correo lo hace la Administración.'}</p></div>`, { ancho:'760px' });
 };
 A['ip-semana'] = el => { IPV.sab = el.dataset.v; IPV.dia = -1; A['ip-abrir'](); };
 A['ip-dia'] = el => { const i = +el.dataset.v; IPV.dia = IPV.dia === i ? -1 : i; A['ip-abrir'](); };
+/* Mandarlo a mano y cambiar el correo: solo la Administración (pedido de Claudio, 22-10: la garita lo ve, pero no lo manda). */
+A['ip-correo'] = () => {
+  if (!esAdmin()) return;
+  hoja('Correo de la supervisión', `<form data-f="ip-destino"><div class="field"><label>Correo de la Supervisión de Adicionales Policiales</label><input name="email" type="email" inputmode="email" maxlength="80" required autocomplete="off" value="${esc(correoSupervisionPolicia())}"></div>
+    <p class="muted tiny" style="margin:0 0 12px">A este correo sale el informe de cada sábado, y la constancia diaria del policía que no deja el suyo.</p>
+    <div class="btns"><button type="button" class="btn btn-sec grow" data-a="ip-abrir">Cancelar</button><button class="btn btn-pri grow">${I('check')}Guardar</button></div></form>`);
+};
 A['ip-mandar'] = async () => {
-  if (!esStaff()) return;
-  if (!await confirmar('Mandar el informe', `Sale por correo a <b>${esc(correoSupervisionPolicia())}</b> el informe de las noches ${esc(ipRango(IPV.sab))}, con el PDF adjunto. La Administración recibe el aviso y la copia queda en "Informes enviados".`, { si:'Mandarlo' })) return A['ip-abrir']();
+  if (!esAdmin()) return;
+  if (!await confirmar('Mandar el informe', `Sale por correo a <b>la Supervisión de Adicionales Policiales</b> el informe de las noches ${esc(ipRango(IPV.sab))}, con el PDF adjunto. La Administración recibe el aviso y la copia queda en "Informes enviados".`, { si:'Mandarlo' })) return A['ip-abrir']();
   toast('Armando el informe…', 'file');
   await InformePolicia.mandar(IPV.sab, { avisar:true });
   A['ip-abrir']();
@@ -388,7 +421,7 @@ A['ip-enviados'] = async () => {
   const MOT = { salida:'solo, al salir el policía del viernes', mediodia:'solo, el sábado a las 12' };
   hoja('Informes enviados', `${ls.length ? `<ul class="ip-env">${ls.map(x => { const r = x.resumen || {};
       return `<li><button type="button" data-a="ip-copia" data-v="${esc(x.id)}"><span class="ic ic-${x.ok ? 'ok' : x.enviando ? 'warn' : 'danger'}">${I(x.ok ? 'check' : 'alert')}</span>
-        <span class="grow"><b>Noches ${esc(ipRango(x.semana))}</b><small>${x.ok ? 'Enviado' : x.enviando ? 'Armándose' : 'No salió'} el ${fechaCorta(isoDe(new Date(x.at)))} ${hora(x.at)} h a ${esc(x.para || '')}${MOT[x.motivo] ? ' · ' + MOT[x.motivo] : ' · a mano'}${x.error ? ' · ' + esc(x.error) : ''}</small>
+        <span class="grow"><b>Noches ${esc(ipRango(x.semana))}</b><small>${x.ok ? 'Enviado' : x.enviando ? 'Armándose' : 'No salió'} el ${fechaCorta(isoDe(new Date(x.at)))} ${hora(x.at)} h a la Supervisión${MOT[x.motivo] ? ' · ' + MOT[x.motivo] : ' · a mano'}${x.error ? ' · ' + esc(x.error) : ''}</small>
         <small>${r.noches != null ? `${r.noches}/7 noches · ${r.horas} h · ${plural(r.rondas || 0, 'ronda')} · ${r.pctHub || 0} % con QR` : ''}</small></span>${I('right')}</button></li>`; }).join('')}</ul>`
     : vacio('file', 'Todavía no salió ningún informe semanal.')}
     <p class="muted tiny">${I('lock')} La copia se trae solo a este equipo, cuando la pedís. Se muestran los últimos 26 sábados.</p>

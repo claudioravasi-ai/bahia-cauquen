@@ -2032,7 +2032,18 @@ const bandaTurno = () => {
    bitácora. Si el policía sigue cuando cambia el turno, pasa al que entra.
    ========================================================= */
 const RONDA_MIN = 20, RONDA_LARGA = 40;
-const policiasDe = t => aLista(t && t.policias).filter(p => p && p.id).map(p => ({ ...p, rondas: aLista(p.rondas).filter(r => r && r.inicio).map(r => ({ ...r, pasos: aLista(r.pasos) })) }));
+/* (22-10-2026) Un ingreso anulado deja su marca en el renglón "Se anuló…"
+   (campo `anula`): aunque otro equipo con una copia vieja vuelva a escribir
+   el turno con ese policía adentro, no aparece en ningún lado y se borra
+   del turno la próxima vez que se guarde. Era el "lo tuve que borrar dos
+   veces" y el "en la garita la sigo viendo". */
+let anuladosCache = { arr:null, n:-1, set:new Set() };
+function policiasAnulados(){
+  const b = Store.s && Store.s.bitacora;
+  if (anuladosCache.arr !== b || anuladosCache.n !== aLista(b).length) anuladosCache = { arr:b, n:aLista(b).length, set:new Set(aLista(b).filter(x => x && x.anula).map(x => x.anula)) };
+  return anuladosCache.set;
+}
+const policiasDe = t => aLista(t && t.policias).filter(p => p && p.id && !policiasAnulados().has(p.id)).map(p => ({ ...p, rondas: aLista(p.rondas).filter(r => r && r.inicio).map(r => ({ ...r, pasos: aLista(r.pasos) })) }));
 const policiasAdentro = t => policiasDe(t).filter(p => !p.sale && !p.paso);
 const rondaEnCurso = p => p.rondas.find(r => !r.fin) || null;
 const minutos = (a, b) => Math.max(1, Math.round((b - a) / MIN));
@@ -2944,11 +2955,16 @@ R.turnos = {
     const fila = i => { const t = ts[i] || {}; return `<div class="grid3 turno-edit"><div class="field"><label>Turno ${i + 1}${i >= 2 ? ' (opcional)' : ''}</label><input name="n${i}" value="${esc(t.nombre || '')}" maxlength="20" placeholder="${['Mañana', 'Día', 'Tarde', 'Noche'][i]}" ${i < 2 ? 'required' : ''}></div>
       <div class="field"><label>Desde</label><input type="time" name="d${i}" value="${esc(t.desde || '')}" ${i < 2 ? 'required' : ''}></div>
       <div class="field"><label>Hasta</label><input type="time" name="h${i}" value="${esc(t.hasta || '')}" ${i < 2 ? 'required' : ''}></div></div>`; };
-    return `${bandaTurno()}
-      ${sec('La guardia de hoy')}
-      <div class="card" style="padding:12px 12px 8px">${typeof lineaGuardia === 'function' ? lineaGuardia() : ''}</div>
-      ${sec('Quién hace cada horario')}
-      <div class="card turnos-quien">${ts.map(t => { const q = quienesDelTurno(t.nombre);
+    /* REDISEÑO (pedido de Claudio, 22-10-2026): "hay mucha información y se
+       hace muy difícil encontrar rápido lo principal". Arriba, lo de ahora en
+       tarjetas grandes (cada una lleva a su pestaña); abajo, pestañas: Hoy ·
+       Policía · Calendario · Equipo (· Mes, la Administración). Se dibuja
+       solo la pestaña elegida: menos para leer y menos para dibujar. Ideas:
+       el "quién está de guardia ahora" de linkedin/oncall (1,3k★), la
+       pastilla que se desliza de Segmentio (2,5k★) y las vistas en pestañas
+       de Plane (61k★); solo la idea, el código es propio. */
+    const tab = tvTab();
+    const quien = () => `      <div class="card turnos-quien">${ts.map(t => { const q = quienesDelTurno(t.nombre);
         return `<div class="tq-fila ${q && q.abierto ? 'ahora' : ''}"><div class="tq-cab"><b>${esc(t.nombre)}</b><span class="muted">${t.desde} a ${t.hasta} h</span>${q && q.abierto ? '<span class="pill p-ok">En curso</span>' : ''}</div>
           <div class="tq-nombres">${q ? `${q.guardias.map(n => `<span class="chip-nombre">${I('user')}${esc(n)}</span>`).join('')}<small class="muted">${q.abierto ? 'desde las ' + hora(q.at) + ' h' : 'último: ' + relDia(isoDe(new Date(q.at))).toLowerCase()}</small>` : '<small class="muted">Todavía no se anotó quién lo hace.</small>'}</div></div>`; }).join('')}
         <p class="muted tiny" style="margin:8px 0 0">Los nombres salen de lo que anota cada turno al empezar. ${esAdmin() ? 'Los horarios se cambian abajo.' : 'Los horarios los define la Administración.'}</p></div>
@@ -2956,10 +2972,15 @@ R.turnos = {
         ${[0, 1, 2, 3].map(fila).join('')}
         <p class="muted tiny" style="margin:0 0 10px">De 2 a 4 horarios, uno por guardia. <b>Pueden superponerse</b> (por ejemplo, Mañana de 7 a 15 y Día de 8 a 20) y uno puede pasar la medianoche (Noche de 23 a 7). Dejá vacíos los que no uses. El policía nocturno tiene su horario aparte, más abajo.</p>
         <button class="btn btn-pri btn-block">${I('check')}Guardar los horarios</button>
-        <button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="turnos-base">${I('refresh')}Cargar 7–15, 8–20, 15–23 y 23–7</button></form></details>` : ''}
-      ${sec('Últimos turnos', `<span class="muted small">elegí año, mes y día</span>`)}
-      ${typeof calTurnos === 'function' ? calTurnos() : ''}
-      ${typeof seccionNochePolicia === 'function' ? seccionNochePolicia() : seccionPoliciaHorario() + seccionServiciosPolicia() + seccionPuntos()}`;
+        <button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="turnos-base">${I('refresh')}Cargar 7–15, 8–20, 15–23 y 23–7</button></form></details>` : ''}`;
+    const panel = tab === 'policia' ? (typeof seccionNochePolicia === 'function' ? seccionNochePolicia('noche') : seccionPoliciaHorario() + seccionServiciosPolicia())
+      : tab === 'calendario' ? `${sec('Últimos turnos', `<span class="muted small">elegí año, mes y día</span>`)}${typeof calTurnos === 'function' ? calTurnos() : ''}`
+      : tab === 'equipo' ? `${sec('Quién hace cada horario')}${quien()}${typeof seccionNochePolicia === 'function' ? seccionNochePolicia('equipo') : seccionPuntos()}`
+      : tab === 'mes' ? (typeof seccionNochePolicia === 'function' ? seccionNochePolicia('mes') : '')
+      : `${bandaTurno()}${sec('La guardia de hoy')}<div class="card" style="padding:12px 12px 8px">${typeof lineaGuardia === 'function' ? lineaGuardia() : ''}</div>`;
+    return `${tvResumen()}
+      ${segmento(TV_TABS().map(([k, t, ic, c]) => ({ k, t, ic, c })), tab, 'tv-tab', 'tg-pestanas')}
+      <div class="tv-panel" data-tab="${tab}">${panel}</div>`;
   },
   alPintar(){ if (typeof animarNumeros === 'function') animarNumeros(); if (typeof tvAlPintar === 'function') tvAlPintar(); },
 };

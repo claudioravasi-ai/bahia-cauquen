@@ -49,7 +49,47 @@ function claseRonda(r){
 const RONDA_TXT = { ok:'Completa con QR', inc:'Incompleta', gar:'Anotada por la garita', curso:'En curso' };
 const completasDe = sv => sv.rondas.filter(r => claseRonda(r) === 'ok').length;
 
-const TV = { noche:'', mes:'', dia:'', extra:{}, trayendo:'' };
+const TV = { noche:'', mes:'', dia:'', extra:{}, trayendo:'', tab:'' };
+
+/* ---------- 0. arriba de todo: lo de ahora, y las pestañas (22-10-2026) ---------- */
+const TV_TABS = () => [['hoy', 'Hoy', 'clock', 'var(--brand)'], ['policia', 'Policía', 'shield', 'var(--accent)'], ['calendario', 'Calendario', 'calendar', 'var(--sky)'],
+  ['equipo', 'Equipo', 'users', 'var(--wood)'], ...(esAdmin() ? [['mes', 'Mes', 'wallet', 'var(--ok)']] : [])];
+function tvTab(){
+  const ks = TV_TABS().map(x => x[0]);
+  if (!ks.includes(TV.tab)){ let g = ''; try { g = sessionStorage.getItem('bhc.tv.tab') || ''; } catch(e){} TV.tab = ks.includes(g) ? g : 'hoy'; }
+  return TV.tab;
+}
+A['tv-tab'] = el => { TV.tab = el.dataset.v; try { sessionStorage.setItem('bhc.tv.tab', TV.tab); } catch(e){} refrescar(); window.scrollTo({ top:0, behavior:'smooth' }); };
+/* Cuánto va del turno abierto (de su horario), de 0 a 1. */
+function avanceTurno(t){
+  const c = turnosConfig().find(x => x.nombre === t.turno); if (!c) return null;
+  const a = new Date(t.at), [dh, dm] = c.desde.split(':').map(Number), [hh, hm] = c.hasta.split(':').map(Number);
+  const ini = new Date(a); ini.setHours(dh, dm, 0, 0); if (ini - a > 6 * HORA) ini.setDate(ini.getDate() - 1);
+  const fin = new Date(ini); fin.setHours(hh, hm, 0, 0); if (fin <= ini) fin.setDate(fin.getDate() + 1);
+  return { f: Math.min(1, Math.max(0, (Date.now() - ini) / (fin - ini))), hasta: c.hasta };
+}
+function tvResumen(){
+  const t = turnoAbierto(), n = nochePolicia(), svs = serviciosPolicia(), meta = rondaMeta();
+  const adentro = svs.filter(sv => !sv.sale), hoy = hoyISO(), ini = fechaDe(hoy).getTime();
+  const lineas = aLista(Store.s.bitacora).filter(b => b && b.at >= ini);
+  const inc = lineas.filter(b => b.tipo === 'incidente').length, turnosHoy = lineas.filter(b => b.tipo === 'turno' && b.abre).length;
+  const noches = [6, 5, 4, 3, 2, 1, 0].map(i => { const iso = sumarDias(nocheDe(Date.now()), -i), ss = svs.filter(sv => nocheDe(sv.entra) === iso), c = ss.reduce((k, sv) => k + completasDe(sv), 0);
+    return { iso, hay: ss.length, c, cls: !ss.length ? (i === 0 && !n.ahora ? 'fut' : 'sin') : c >= meta ? 'ok' : 'med' }; });
+  const conPol = noches.filter(x => x.hay).length;
+  const av = t && avanceTurno(t), g = t ? aLista(t.guardias) : [];
+  const pol = adentro[0], rp = pol ? pol.rondas : [];
+  const k = (tab, cls, ic, lbl, big, sub, extra = '') => `<button type="button" class="tv-k ${cls}" data-a="tv-tab" data-v="${tab}"><span class="tv-k-cab">${I(ic)}<small>${lbl}</small></span><b>${big}</b><span class="tv-k-sub">${sub}</span>${extra}</button>`;
+  return `<div class="tv-resumen">
+    ${k('hoy', 'k-turno', 'clock', 'Turno ahora', t ? esc(t.turno) : 'Sin turno', t ? `${plural(g.length, 'guardia')} · desde las ${hora(t.at)} h` : 'Nadie abrió el turno',
+      av ? `<span class="tv-k-barra"><i style="width:${(av.f * 100).toFixed(0)}%"></i></span><span class="tv-k-sub">hasta las ${esc(av.hasta)} h</span>` : '')}
+    ${k('policia', 'k-pol', 'shield', 'Policía', pol ? esc(String(pol.nombre).split(/\s+/)[0]) : n.ahora ? 'Sin ingreso' : 'Viene ' + hora(n.desde),
+      pol ? `entró ${hora(pol.entra)} h · ${completasDe(pol)} de ${meta} rondas` : n.ahora ? 'en horario y todavía no llegó' : `${horarioNocheTxt(n)}`,
+      pol ? `<span class="tv-k-bolas">${Array.from({ length:Math.max(meta, rp.length) }, (_, j) => `<i class="${rp[j] ? 'r-' + claseRonda(rp[j]) : ''}"></i>`).join('')}</span>` : '')}
+    ${k('policia', 'k-sem', 'moon', 'Últimas 7 noches', `${conPol}/7`, `con policía · ${noches.filter(x => x.cls === 'ok').length} con la meta`,
+      `<span class="tv-k-noches">${noches.map(x => `<i class="${x.cls}" title="${esc(nocheTitulo(x.iso))}"></i>`).join('')}</span>`)}
+    ${k('calendario', inc ? 'k-inc' : 'k-cal', inc ? 'alert' : 'calendar', 'Hoy en la garita', inc ? plural(inc, 'incidente') : plural(turnosHoy, 'turno'), inc ? 'tocá para ver el día' : 'sin incidentes · ver el calendario')}
+  </div>`;
+}
 
 /* ---------- 1. el cielo de la noche ---------- */
 function cieloNoche(){
@@ -121,8 +161,19 @@ function detalleNoche(svs){
 A['tv-noche'] = el => { TV.noche = el.dataset.v; refrescar(); };
 
 /* Lo que va en Turnos, desde "Policía nocturna" hasta abajo. */
-function seccionNochePolicia(){
+function seccionNochePolicia(parte = 'todo'){
   const h = policiaHorario(), svs = serviciosPolicia();
+  /* (22-10-2026) Turnos va en pestañas: "Policía" muestra la noche, "Equipo" la ficha y los puntos, "Mes" lo contratado. */
+  if (parte === 'equipo') return `${seccionFichaPolicias()}${seccionPuntos()}`;
+  if (parte === 'mes') return esAdmin() ? mesPolicia(svs) : '';
+  if (parte === 'noche') return `${sec('Policía nocturna')}
+    <div class="card nc-card">${cieloNoche()}
+      ${semanaPolicia()}
+      ${esAdmin() ? `<button class="nh-boton" data-a="pn-horario"><span class="nh-reloj" aria-hidden="true"><i></i><i></i></span><span class="grow"><b>Cambiar el horario</b><small>Dom. a jue. ${esc(h.semana)}–${esc(h.hasta)} · Vie. y sáb. ${esc(h.finde)}–${esc(h.hastaFinde)}</small></span>${I('right')}</button>` : ''}</div>
+    ${typeof tarjetaInformePolicia === 'function' ? tarjetaInformePolicia() : ''}
+    ${sec('Las noches del policía', `<span class="muted small">tocá una noche</span>`)}
+    <div class="card nc-noches">${tiraNoches(svs)}${detalleNoche(svs)}
+      <button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="hist-policias">${I('clock')}Ver servicios anteriores</button></div>`;
   return `${sec('Policía nocturna')}
     <div class="card nc-card">${cieloNoche()}
       ${semanaPolicia()}
@@ -155,13 +206,24 @@ function mesPolicia(svs){
   return `${sec('Policía contratada', `<span class="nm-mes"><button class="icon-btn" data-a="tv-mes" data-v="-1" aria-label="Mes anterior" ${i > 0 ? '' : 'disabled'}>${I('left')}</button><b>${MESES_TV[m - 1]} ${y}</b><button class="icon-btn" data-a="tv-mes" data-v="1" aria-label="Mes siguiente" ${i < meses.length - 1 ? '' : 'disabled'}>${I('right')}</button></span>`)}
     <div class="card nm-card">
       <div class="nm-kpis">${kpi('noches', noches.size, 'noches', 'con policía', 'sky')}${kpi('horas', Math.round(horas), 'horas', 'de servicio', 'accent')}${kpi('ok', ok, 'rondas', 'completas con QR', 'ok')}${kpi('meta', conMeta, 'noches', `con la meta de ${meta}`, 'warn')}</div>
-      ${ps.length ? ps.map(p => `<div class="nm-p" style="--c:${colorDe(p.nombre)}"><span class="nc-ini">${esc(inicialesDe(p.nombre))}</span>
+      ${ps.length ? ps.map(p => `<div class="nm-p" style="--c:${colorDe(p.nombre)}" role="button" tabindex="0" data-a="nm-pol" data-v="${esc(claveNombre(p.nombre))}" title="Ver sus noches de ${MESES_TV[m - 1]}"><span class="nc-ini">${esc(inicialesDe(p.nombre))}</span>
         <div class="grow"><b>${esc(p.nombre)}${nombreIncompleto(p.nombre) ? ' <span class="nc-falta corto">falta el apellido</span>' : ''}</b><small>${esc(pnCargoMat(p, ' · '))}${plural(Object.keys(p.noches).length, 'noche')} · ${p.horas.toFixed(1).replace('.', ',')} h · ${p.ok} de ${p.rondas} rondas completas</small>
           <div class="nm-cal" role="img" aria-label="Noches de ${esc(p.nombre)} en ${MESES_TV[m - 1]}">${Array.from({ length:dm }, (_, j) => { const d = `${TV.mes}-${String(j + 1).padStart(2, '0')}`, v = p.noches[d];
             return `<i class="${v == null ? '' : v >= meta ? 'meta' : v ? 'media' : 'cero'}" title="${j + 1}: ${v == null ? 'no vino' : v + ' completas'}" style="--j:${j}"></i>`; }).join('')}</div></div></div>`).join('')
         : `<p class="muted small" style="margin:8px 2px 0">En ${MESES_TV[m - 1]} la garita no anotó ingresos del policía.</p>`}
       <p class="muted tiny" style="margin:10px 0 0">Horas desde el ingreso hasta la salida que anotó la garita; cada cuadradito es una noche del mes (verde: cumplió la meta · ámbar: menos rondas completas · rojo: ninguna completa). Sirve para controlar lo que se le paga.</p></div>`;
 }
+/* (22-10-2026) Tocar un policía del mes: sus noches, cada una con "Anular el ingreso"
+   (si fue una prueba o un error, sale de "Policía contratada"). */
+A['nm-pol'] = el => {
+  if (!esAdmin()) return;
+  const ls = serviciosPolicia().filter(sv => claveNombre(sv.nombre) === el.dataset.v && nocheDe(sv.entra).slice(0, 7) === TV.mes).sort((a, b) => a.entra - b.entra);
+  if (!ls.length) return;
+  const [y, m] = TV.mes.split('-').map(Number);
+  hoja(ls[0].nombre, `<p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'noche')} en ${MESES_TV[m - 1]} ${y}. Si alguna fue una prueba o se anotó por error, anulala y deja de contar.</p>
+    <ul class="nm-noches">${ls.map(sv => `<li><span class="grow"><b>${esc(nocheTitulo(nocheDe(sv.entra)))}</b><small>${hora(sv.entra)} → ${sv.sale ? hora(sv.sale) + ' h' : 'sigue de servicio'} · ${plural(sv.rondas.length, 'ronda')} · ${completasDe(sv)} completas</small></span>
+      <button class="btn btn-xs btn-sec pf-anular" data-a="pn-anular" data-id="${esc(sv.id)}">${I('trash')}Anular</button></li>`).join('')}</ul>`);
+};
 A['tv-mes'] = el => { const svs = serviciosPolicia(), ms = [...new Set([hoyISO().slice(0, 7), ...svs.map(sv => nocheDe(sv.entra).slice(0, 7))])].sort();
   const i = ms.indexOf(TV.mes) + +el.dataset.v; if (ms[i]){ TV.mes = ms[i]; refrescar(); } };
 
@@ -475,9 +537,16 @@ F['pn-anular'] = async d => {
   const sv = serviciosPolicia().find(x => x.id === d.pid); if (!puedeAnular(sv)) return;
   const motivo = d.motivo === 'otro' ? String(d.otro || '').trim().replace(/\s+/g, ' ').slice(0, 80) : MOTIVOS_ANULAR[d.motivo];
   if (!motivo) return toast('Escribí el motivo', 'edit');
+  const otros = serviciosPolicia().filter(x => x.id !== sv.id && claveNombre(x.nombre) === claveNombre(sv.nombre) && puedeAnular(x));
   if (!await confirmar('¿Seguro?', `Se anula el ingreso de <b>${esc(sv.nombre)}</b> del ${fechaCorta(isoDe(new Date(sv.entra)))} (${esc(motivo)}). No se puede deshacer.`, { si:'Sí, anular', peligro:true })) return;
   anularIngreso(sv, motivo);
-  toast('Ingreso anulado', 'check'); refrescar();
+  /* (22-10-2026) Si la misma persona tiene otros ingresos (dos pruebas, un
+     ingreso duplicado), se ofrece anularlos también: antes quedaba el otro y
+     parecía que el primero no se había borrado. */
+  if (otros.length && await confirmar(`${sv.nombre} tiene ${plural(otros.length, 'ingreso más', 'ingresos más')}`,
+      `${otros.map(x => `<b>${fechaCorta(isoDe(new Date(x.entra)))} ${hora(x.entra)} h</b>`).join(', ')}. ¿Los anulás también (${esc(motivo)})? Si no, sigue apareciendo en Turnos con esas noches.`, { si:'Anular todos', peligro:true }))
+    otros.forEach(x => anularIngreso(x, motivo));
+  toast(otros.length ? 'Ingresos anulados' : 'Ingreso anulado', 'check'); refrescar();
 };
 function anularIngreso(sv, motivo){
   const nombre = sv.nombre, k = claveNombre(nombre), desde = sv.entra - MIN, hasta = (sv.sale || Date.now()) + 5 * MIN;
@@ -499,7 +568,7 @@ function anularIngreso(sv, motivo){
     /* Si no vino nunca más (era una prueba), sale también de la ficha. */
     const queda = aLista(s.bitacora).some(b => b && b.tipo === 'turno' && b.abre && policiasDe(b).some(q => claveNombre(q.nombre) === k));
     if (!queda) s.policiasFicha = aLista(s.policiasFicha).filter(f => !(f && (f.k === k || claveNombre(f.nombre) === k)));
-    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Se anuló un ingreso de policía (${motivo}) · ingreso del ${fechaCorta(isoDe(new Date(sv.entra)))} a las ${hora(sv.entra)} h · lo anuló ${esAdmin() ? 'la Administración' : 'la garita'}.`, at:Date.now() });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', anula:sv.id, texto:`Se anuló un ingreso de policía (${motivo}) · ingreso del ${fechaCorta(isoDe(new Date(sv.entra)))} a las ${hora(sv.entra)} h · lo anuló ${esAdmin() ? 'la Administración' : 'la garita'}.`, at:Date.now() });
   });
   if (typeof Historial !== 'undefined' && Historial.servPolicia) Historial.servPolicia = aLista(Historial.servPolicia).filter(x => x.id !== sv.id);
 }
