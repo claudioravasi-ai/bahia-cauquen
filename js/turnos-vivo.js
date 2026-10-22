@@ -73,20 +73,25 @@ function tvResumen(){
   const adentro = svs.filter(sv => !sv.sale), hoy = hoyISO(), ini = fechaDe(hoy).getTime();
   const lineas = aLista(Store.s.bitacora).filter(b => b && b.at >= ini);
   const inc = lineas.filter(b => b.tipo === 'incidente').length, turnosHoy = lineas.filter(b => b.tipo === 'turno' && b.abre).length;
-  const noches = [6, 5, 4, 3, 2, 1, 0].map(i => { const iso = sumarDias(nocheDe(Date.now()), -i), ss = svs.filter(sv => nocheDe(sv.entra) === iso), c = ss.reduce((k, sv) => k + completasDe(sv), 0);
-    return { iso, hay: ss.length, c, cls: !ss.length ? (i === 0 && !n.ahora ? 'fut' : 'sin') : c >= meta ? 'ok' : 'med' }; });
+  /* (22-10-2026, "Policía y Últimas 7 noches son más o menos lo mismo"): la
+     segunda tarjeta ahora es la SEMANA DEL INFORME (de sábado a viernes) y
+     abre el informe semanal; "Policía" lleva a la noche de hoy. */
+  const hoyN = nocheDe(Date.now()), sab = typeof sabadoDe === 'function' ? (fechaDe(hoyN).getDay() === 6 ? sumarDias(hoyN, 7) : sumarDias(sabadoDe(hoyN), 7)) : sumarDias(hoyN, 1);
+  const noches = [7, 6, 5, 4, 3, 2, 1].map(i => { const iso = sumarDias(sab, -i), ss = svs.filter(sv => nocheDe(sv.entra) === iso), c = ss.reduce((k, sv) => k + completasDe(sv), 0);
+    return { iso, hay: ss.length, c, cls: iso > hoyN || (iso === hoyN && !ss.length) ? 'fut' : !ss.length ? 'sin' : c >= meta ? 'ok' : 'med' }; });
+  const pasadas = noches.filter(x => x.cls !== 'fut').length;
   const conPol = noches.filter(x => x.hay).length;
   const av = t && avanceTurno(t), g = t ? aLista(t.guardias) : [];
   const pol = adentro[0], rp = pol ? pol.rondas : [];
-  const k = (tab, cls, ic, lbl, big, sub, extra = '') => `<button type="button" class="tv-k ${cls}" data-a="tv-tab" data-v="${tab}"><span class="tv-k-cab">${I(ic)}<small>${lbl}</small></span><b>${big}</b><span class="tv-k-sub">${sub}</span>${extra}</button>`;
+  const k = (tab, cls, ic, lbl, big, sub, extra = '') => `<button type="button" class="tv-k ${cls}" ${tab === 'informe' ? `data-a="ip-abrir" data-v="${sab}"` : `data-a="tv-tab" data-v="${tab}"`}><span class="tv-k-cab">${I(ic)}<small>${lbl}</small></span><b>${big}</b><span class="tv-k-sub">${sub}</span>${extra}</button>`;
   return `<div class="tv-resumen">
     ${k('hoy', 'k-turno', 'clock', 'Turno ahora', t ? esc(t.turno) : 'Sin turno', t ? `${plural(g.length, 'guardia')} · desde las ${hora(t.at)} h` : 'Nadie abrió el turno',
       av ? `<span class="tv-k-barra"><i style="width:${(av.f * 100).toFixed(0)}%"></i></span><span class="tv-k-sub">hasta las ${esc(av.hasta)} h</span>` : '')}
     ${k('policia', 'k-pol', 'shield', 'Policía', pol ? esc(String(pol.nombre).split(/\s+/)[0]) : n.ahora ? 'Sin ingreso' : 'Viene ' + hora(n.desde),
       pol ? `entró ${hora(pol.entra)} h · ${completasDe(pol)} de ${meta} rondas` : n.ahora ? 'en horario y todavía no llegó' : `${horarioNocheTxt(n)}`,
       pol ? `<span class="tv-k-bolas">${Array.from({ length:Math.max(meta, rp.length) }, (_, j) => `<i class="${rp[j] ? 'r-' + claseRonda(rp[j]) : ''}"></i>`).join('')}</span>` : '')}
-    ${k('policia', 'k-sem', 'moon', 'Últimas 7 noches', `${conPol}/7`, `con policía · ${noches.filter(x => x.cls === 'ok').length} con la meta`,
-      `<span class="tv-k-noches">${noches.map(x => `<i class="${x.cls}" title="${esc(nocheTitulo(x.iso))}"></i>`).join('')}</span>`)}
+    ${k(typeof tarjetaInformePolicia === 'function' && esStaff() ? 'informe' : 'policia', 'k-sem', 'file', 'Esta semana · informe', `${conPol}/${pasadas || 7}`, `noches con policía · ${noches.filter(x => x.cls === 'ok').length} con la meta`,
+      `<span class="tv-k-noches">${noches.map(x => `<i class="${x.cls}" title="${esc(nocheTitulo(x.iso))}"><em>${DIAS[fechaDe(x.iso).getDay()].charAt(0)}</em></i>`).join('')}</span><span class="tv-k-sub tv-k-ir">Ver el informe semanal ${I('right')}</span>`)}
     ${k('calendario', inc ? 'k-inc' : 'k-cal', inc ? 'alert' : 'calendar', 'Hoy en la garita', inc ? plural(inc, 'incidente') : plural(turnosHoy, 'turno'), inc ? 'tocá para ver el día' : 'sin incidentes · ver el calendario')}
   </div>`;
 }

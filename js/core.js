@@ -168,16 +168,35 @@ const Store = {
     this.s = nuevo; if (cfg) this.s.config = cfg;
   },
   cfgPropia(){ return typeof Nube !== 'undefined' && Nube.activa() && Nube.configLista && this.s ? this.s.config : null; },
+  /* SIN ESPACIO EN EL EQUIPO (arreglado el 22-10-2026). Antes, si la copia
+     local no entraba, salía el cartel "se quedó sin espacio" y el cambio NO
+     viajaba a la base del barrio: por eso un "Anular el ingreso" hecho desde
+     la Administración no se borraba y había que repetirlo. Ahora el cambio
+     va SIEMPRE a la base, y la copia de este equipo (que solo sirve para
+     abrir rápido) se achica: se dejan afuera las colecciones más pesadas,
+     que igual vuelven a bajar de la base al abrir. */
   guardar(){
-    try {
-      localStorage.setItem(this.KEY, JSON.stringify(this.s));
-    } catch(e){
-      toast('El dispositivo se quedó sin espacio. Borrá publicaciones con fotos viejas.', 'alert');
-      return false;
-    }
-    if (this.bc) this.bc.postMessage('cambio');
+    let ok = true;
+    /* Si ya hubo que achicarla, se guarda directamente achicada (no se reintenta la grande en cada cambio). */
+    const copia = this.sinLugar ? { ...this.s, ...Object.fromEntries([...this.sinLugar].map(k => [k, []])) } : this.s;
+    try { localStorage.setItem(this.KEY, JSON.stringify(copia)); }
+    catch(e){ ok = this.guardarLiviano(); }
+    if (this.bc && ok) this.bc.postMessage('cambio');
     if (typeof Nube !== 'undefined' && Nube.activa()) Nube.guardar();
-    return true;
+    return ok;
+  },
+  guardarLiviano(){
+    const enNube = typeof Nube !== 'undefined' && Nube.activa();
+    const deNube = enNube ? new Set([...Nube.ZONAS.barrio, ...Nube.ZONAS.privado, ...Nube.ZONAS.staff, ...Nube.ZONAS.hotel, 'notifs']) : new Set(['correos', 'auditoria']);
+    const pesos = Object.keys(this.s).filter(k => deNube.has(k) && Array.isArray(this.s[k])).map(k => [k, JSON.stringify(this.s[k]).length]).sort((a, b) => b[1] - a[1]);
+    const copia = { ...this.s };
+    for (const [k] of pesos){
+      copia[k] = [];
+      try { localStorage.setItem(this.KEY, JSON.stringify(copia)); this.sinLugar = new Set(pesos.slice(0, pesos.findIndex(x => x[0] === k) + 1).map(x => x[0])); console.warn('Copia local achicada: sin', [...this.sinLugar].join(', ')); return true; } catch(e){}
+    }
+    if (!this.avisoEspacio){ this.avisoEspacio = true;
+      toast(enNube ? 'Este equipo tiene poco espacio libre: los cambios se guardan igual en la base del barrio, pero conviene liberar lugar en el teléfono o la computadora.' : 'El dispositivo se quedó sin espacio. Borrá publicaciones con fotos viejas.', 'alert'); }
+    return false;
   },
   guardarSesion(){
     try { sessionStorage.setItem(llavePrueba('bhc.pestana'), this.sesion.userId || ''); } catch(e){}

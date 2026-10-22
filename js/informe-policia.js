@@ -356,9 +356,12 @@ function tarjetaInformePolicia(){
   return `<button class="ip-tarjeta" data-a="ip-abrir"><span class="ip-t-ic">${I('file')}</span>
     <span class="grow"><b>Informe semanal de la policía</b><small>Sale solo el sábado, al registrarse la salida del policía del viernes · en PDF a la Supervisión de Adicionales Policiales</small></span>${I('right')}</button>`;
 }
-A['ip-abrir'] = () => {
+A['ip-abrir'] = el => {
   if (!esStaff()) return;
-  const sabs = ipSabados(); if (!sabs.includes(IPV.sab)) IPV.sab = sabs[0];
+  const sabs = ipSabados();
+  /* Desde la tarjeta "Esta semana" de Turnos: abre esa semana. */
+  if (el && el.dataset && /^\d{4}-\d{2}-\d{2}$/.test(el.dataset.v || '')){ IPV.sab = sabs.includes(el.dataset.v) ? el.dataset.v : sabs[0]; IPV.dia = -1; }
+  if (!sabs.includes(IPV.sab)) IPV.sab = sabs[0];
   const sem = semanaInforme(IPV.sab), t = sem.t, d = sem.dias[IPV.dia] || null;
   const enCurso = IPV.sab >= hoyISO();
   const maxQR = Math.max(1, ...sem.dias.flatMap(z => z.franjas.map(f => f.qr)));
