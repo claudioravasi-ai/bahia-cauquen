@@ -143,6 +143,8 @@ let pnConocidos = [];
 A['pn-elegir'] = el => {
   const p = pnConocidos[+el.dataset.i], f = el.closest('form'); if (!p || !f) return;
   ['nombre', 'matricula', 'tel', 'email'].forEach(k => { if (f[k]) f[k].value = p[k] || ''; });
+  /* Sin correo propio, el de la supervisión de la policía (22-10-2026). */
+  if (f.email && !f.email.value && typeof correoSupervisionPolicia === 'function') f.email.value = correoSupervisionPolicia();
   pnPonerCargo(f, p.cargo || '');
   f.querySelectorAll('.pn-c.on').forEach(b => b.classList.remove('on')); el.classList.add('on');
   f.querySelector('.pn-datos')?.classList.add('lleno');

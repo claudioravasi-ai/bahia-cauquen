@@ -131,6 +131,7 @@ function seccionNochePolicia(){
     ${sec('Las noches del policía', `<span class="muted small">tocá una noche</span>`)}
     <div class="card nc-noches">${tiraNoches(svs)}${detalleNoche(svs)}
       <button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="hist-policias">${I('clock')}Ver servicios anteriores</button></div>
+    ${typeof tarjetaInformePolicia === 'function' ? tarjetaInformePolicia() : ''}
     ${seccionFichaPolicias()}
     ${seccionPuntos()}
     ${esAdmin() ? mesPolicia(svs) : ''}`;

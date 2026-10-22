@@ -2293,6 +2293,7 @@ const PIEZAS = [
   ['js/mant-vivo.js',  () => typeof MVBrazo],
   ['js/relevos.js',    () => typeof lineaGuardia],
   ['js/turnos-vivo.js', () => typeof calTurnos],
+  ['js/informe-policia.js', () => typeof semanaInforme],
   ['js/portal-vivo.js', () => typeof portalVivo],
 ];
 function piezasQueFaltan(){

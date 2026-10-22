@@ -2458,7 +2458,7 @@ A['policia-nuevo'] = () => {
       <div class="field"><label>Nombre y apellido</label><input name="nombre" required maxlength="60" autocomplete="off" placeholder="Nombre y apellido" pattern=".*\\S+\\s+\\S+.*" title="Nombre y apellido completos"></div>
       <div class="grid2">${campoCargoPolicia()}<div class="field"><label>Matrícula / legajo</label><input name="matricula" maxlength="20" autocomplete="off"></div></div>
       <div class="grid2"><div class="field"><label>Celular (para su tarjeta)</label><input name="tel" type="tel" inputmode="tel" maxlength="20" autocomplete="off" placeholder="2901 15 123456"></div>
-        <div class="field"><label>Correo (para su constancia)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off"></div></div></div>
+        <div class="field"><label>Correo (para su constancia)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off" value="${esc(correoSupervisionPolicia())}" title="Si el policía no deja el suyo, la constancia va a la supervisión de la policía"></div></div></div>
     ${elegirCuando('Hora de ingreso', 'entra')}
     <button class="btn btn-pri btn-block btn-grande">${I('shield')}Registrar el ingreso y armar su tarjeta</button>
     <p class="muted tiny" style="margin:8px 0 0">Su tarjeta lleva el <b>código de ronda</b> de esta noche y un QR: sin eso, los QR de los puntos no registran nada (un vecino que escanee un punto no puede hacer pasar una ronda). Al irse, le llega por correo la constancia de su servicio.</p></form>`);
@@ -2471,13 +2471,14 @@ F['policia-nuevo'] = d => {
   const entra = d.cuando === 'otra' ? momentoDe(d.dia, d.entra) : Date.now();
   if (entra > Date.now() + 10 * MIN) return toast('El ingreso no puede ser más tarde que ahora: revisá el día y la hora', 'clock');
   if (Date.now() - entra > DIA) return toast('Revisá el día: el ingreso da más de 24 horas atrás', 'clock');
+  /* (22-10-2026) Si no deja su correo, la constancia va a la supervisión de la policía. */
   const email = String(d.email || '').trim().toLowerCase();
   if (email && !correoValido(email)) return toast('Revisá el correo del policía', 'mail');
   const ya = policiasConocidos().get(k) || (typeof fichaDe === 'function' && fichaDe(k)) || {};
   const cargo = cargoDelForm(d) || ya.cargo || '';
   if (!cargo) return toast('Falta el cargo del policía (agente, cabo, sargento…)', 'shield');
   const p = { id:uid(), nombre: ya.nombre || conMayusculas(d.nombre), cargo, matricula: String(d.matricula || '').trim() || ya.matricula || '', tel: String(d.tel || '').trim() || ya.tel || '',
-    email: email || ya.email || '', entra, turnoEntra: turnoGaritaEn(entra), rondas:[] };
+    email: (email && email !== correoSupervisionPolicia() ? email : ya.email || email) || correoSupervisionPolicia(), entra, turnoEntra: turnoGaritaEn(entra), rondas:[] };
   if (policiasAdentro(t).some(q => claveNombre(q.nombre) === k)) return toast('Ese policía ya está anotado en este turno', 'users');
   p.codigo = codigoRondaNuevo();
   /* La guía de la ronda (puntos, lugar y fotos chicas) para su teléfono: js/ronda-mapa.js. */
@@ -2627,6 +2628,8 @@ F['policia-salida'] = d => {
     p => `Salida del policía ${p.nombre}${pnParen(p)} · ${fechaCorta(isoDe(new Date(p.sale)))} · turno ${turnoSale} · ${hora(p.sale)} h · ${plural(p.rondas.length, 'ronda')} en el servicio.`);
   cerrarHoja(); toast('Salida anotada. El servicio quedó en Turnos.', 'check');
   mandarConstanciaPolicia(d.pid);
+  /* El sábado, la salida del policía del viernes manda sola el informe semanal a la supervisión (js/informe-policia.js). */
+  if (typeof InformePolicia !== 'undefined') InformePolicia.alSalir(d.pid);
 };
 
 /* =========================================================
@@ -2781,8 +2784,8 @@ function constanciaPdfHtml(sv, im = {}){
     ${im.portada ? `<img src="${im.portada}" width="720" style="display:block;width:100%;height:auto" alt="El barrio ${barrio} de noche">` : ''}
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>
       ${im.logo ? `<td width="76" style="padding:16px 0 18px 20px"><img src="${im.logo}" width="58" height="58" style="display:block;border-radius:29px;background:#fff" alt=""></td>` : ''}
-      <td style="padding:16px 20px 18px;color:#fff"><div style="font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#f5b70a">Barrio ${barrio} · Seguridad nocturna</div>
-        <div style="font-size:27px;font-weight:800;line-height:1.15;margin-top:3px">Constancia de servicio</div>
+      <td style="padding:16px 20px 18px;color:#fff"><div style="font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:#f5b70a">Barrio ${barrio} · Seguridad nocturna · Para el policía</div>
+        <div style="font-size:27px;font-weight:800;line-height:1.15;margin-top:3px">Constancia diaria de servicio</div>
         <div style="font-size:12.5px;color:#c7d3e6;margin-top:2px">Policía adicional · ${esc(cpNoche(sv.entra, sv.sale))}</div></td>
       <td width="120" align="right" style="padding:16px 20px 18px 0;color:#c7d3e6;font-size:10px;line-height:1.5">N.º ${nro || '—'}<br>Emitida el<br><b style="color:#fff">${fechaCorta(isoDe(new Date()))} · ${hora(Date.now())} h</b></td></tr></table>
   </div>
@@ -2826,7 +2829,7 @@ const cpPdfDoc = cuerpo => `<!DOCTYPE html><html><head><meta charset="utf-8"><ti
 function constanciaCorreoHtml(sv){
   const c = Store.s.config, n = sv.rondas.length, pila = esc(String(sv.nombre || '').trim().split(/\s+/)[0] || sv.nombre);
   const dato = (t, v) => `<td width="33%" style="padding:10px 12px;background:#f3f6fb;border-radius:12px;text-align:center"><div style="font-size:11px;color:#5b6b80;text-transform:uppercase;letter-spacing:.08em">${t}</div><div style="font-size:18px;font-weight:800;color:#0b1f3a">${v}</div></td>`;
-  return Correo.plantilla('Tu constancia de servicio', `
+  return Correo.plantilla('Tu constancia diaria de servicio', `
     <p style="margin:0 0 12px">¡Hola, ${pila}! Gracias por cuidar el Barrio ${esc(c.nombre)}. Te adjuntamos en <b>PDF</b> la constancia de tu servicio de la ${esc(cpNoche(sv.entra, sv.sale).replace(/^Noche del /, 'noche del '))}, con cada ronda y la hora de cada punto.</p>
     <table width="100%" cellpadding="0" cellspacing="6" style="border-collapse:separate;margin:0 0 12px"><tr>${dato('Ingreso', hora(sv.entra) + ' h')}${dato('Salida', sv.sale ? hora(sv.sale) + ' h' : '—')}${dato('Rondas', n)}</tr></table>
     <p style="margin:0;color:#334155">Si no ves el archivo adjunto, pedile a la garita que te la muestre en la app.</p>`);
@@ -2836,7 +2839,7 @@ async function mandarConstanciaPolicia(pid, { avisar = true } = {}){
   if (!sv.email){ if (avisar) toast('El policía no dejó correo: la constancia no salió (queda en Turnos)', 'mail'); return; }
   /* 18-10: el correo corto y la constancia completa en PDF adjunto. */
   const im = await constanciaImgs();
-  const r = await Correo.enviarDetalle({ para:sv.email, asunto:`Constancia de servicio · Barrio ${Store.s.config.nombre} · ${fechaCorta(isoDe(new Date(sv.entra)))}`, html:constanciaCorreoHtml(sv), tipo:'policia-servicio',
+  const r = await Correo.enviarDetalle({ para:sv.email, asunto:`Constancia diaria de servicio · Barrio ${Store.s.config.nombre} · ${fechaCorta(isoDe(new Date(sv.entra)))}`, html:constanciaCorreoHtml(sv), tipo:'policia-servicio',
     pdf:{ html:cpPdfDoc(constanciaPdfHtml(sv, im)), nombre:`Constancia ${isoDe(new Date(sv.entra))} ${sv.nombre}.pdf`.replace(/\s+/g, ' ') } });
   /* Queda anotado en su registro si salió o no (se ve en Turnos). */
   Store.cambiar(s => { const x = aLista(s.bitacora).find(b => b.id === sv.registroSale); if (!x) return; x.policias = policiasDe(x);

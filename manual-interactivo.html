@@ -449,6 +449,7 @@ const L = [
   { id:'turnos-a', g:'admin', q:'u_admin', m:'admin', ir:'turnos', t:'Turnos y policía nocturna', d:'Horarios, noches y el mes del policía.', p:[
     { t:'El horario del policía', x:'<b>Tocá "Cambiar el horario"</b>.', s:'#cuerpo [data-a="pn-horario"]', h:'tocar' },
     { t:'Las dos noches', x:'Domingo a jueves y viernes y sábado, con la franja que se mueve, atajos y el total por semana.', s:'#hoja' },
+    { t:'Informe semanal', x:'<b>"Informe semanal de la policía"</b>: sale solo cada sábado, al registrarse la salida del policía del viernes, en PDF a la Supervisión de Adicionales Policiales. Acá ves la semana, cada noche, el PDF y la copia de los que ya salieron.', s:'#cuerpo .ip-tarjeta', antes:'cerrarHoja()' },
     { t:'Policías del barrio', x:'<b>"Policías del barrio"</b>: la ficha de cada policía. <b>"Editar"</b> corrige sus datos (su próximo ingreso sale con ellos) y <b>"Ya no viene"</b> lo saca de los botones de la garita sin borrar sus noches. Si un ingreso fue una prueba o un error, en su noche está <b>"Anular el ingreso"</b>.', s:'#cuerpo .pf-card', antes:'cerrarHoja()' },
     { t:'El mes', x:'Abajo, <b>"Policía contratada"</b>: noches, horas y rondas completas del mes, para controlar lo que se le paga.', s:'#cuerpo .nm-card' },
   ] },
