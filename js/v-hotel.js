@@ -109,7 +109,41 @@ const minDe = h => /^\d{1,2}:\d{2}$/.test(String(h || '')) ? minutosDe(h) : null
 /* Dónde está cada van: por su último paso registrado en la garita. */
 function estadoVan(v){
   const m = hotelMovs().find(x => x.vanId === v.id);
-  return !m ? { adentro:true, desde:0, sin:true } : { adentro:m.tipo === 'in', desde:m.at };
+  return !m ? { adentro:true, desde:0, sin:true } : { adentro:m.tipo === 'in', desde:m.at, mov:m };
+}
+/* ¿CUÁNDO VUELVE LA VAN? (pedido de Claudio, 22-10-2026: "la Van 2 que
+   muestra afuera, ¿cómo sé dónde está?"). La app no tiene GPS: sabe que
+   salió por la garita y con qué traslado. Con eso y los tiempos de la
+   Ficha del hotel estima el regreso:
+     · aeropuerto o puerto, llevar: ida y vuelta más 10 min para bajar;
+     · aeropuerto, buscar: aterriza + espera + viaje de vuelta;
+     · puerto, buscar: ida y vuelta más el desembarque;
+     · centro, excursión u otro: la hora de "Vuelve a las…" del traslado
+       (o de la nota, "Vuelve a las 23 h"); si no la tiene, no se inventa.
+   Devuelve 'HH:MM' o ''. */
+function regresoViaje(x, info = hotelInfo()){
+  if (!x) return '';
+  if (x.vuelve) return x.vuelve;
+  const m = String(x.nota || '').match(/vuelve\s+(?:a\s+las\s+)?(\d{1,2})(?:[:.](\d{2}))?/i);
+  if (m) return `${String(+m[1] % 24).padStart(2, '0')}:${m[2] || '00'}`;
+  const sale = x.salioAt ? new Date(x.salioAt).getHours() * 60 + new Date(x.salioAt).getMinutes() : minDe(x.sale);
+  if (sale == null) return '';
+  const aero = +info.trayAero || 20, puerto = +info.trayPuerto || 15;
+  if (x.destino === 'aeropuerto'){
+    if (x.sentido !== 'buscar') return hhmmDe(sale + 2 * aero + 10);
+    const at = x.ref && x.ref.hora ? minDe(x.ref.hora) : null;
+    return hhmmDe(at != null ? Math.max(sale + aero, at + (+info.esperaArribo || 15)) + aero : sale + 2 * aero + 30);
+  }
+  if (x.destino === 'puerto') return hhmmDe(sale + 2 * puerto + (x.sentido === 'buscar' ? (+info.desembarque || 45) : 10));
+  return '';
+}
+/* Lo que se sabe de una van afuera: el traslado en viaje, a qué hora salió
+   y cuándo vuelve (con "se atrasó" si pasaron 20 min de esa hora). */
+function vanAfuera(v, e = estadoVan(v)){
+  if (e.adentro) return null;
+  const x = viajesDelDia().find(y => y.vanId === v.id && y.estado === 'en_curso') || null;
+  const vuelve = regresoViaje(x), t = minDe(vuelve);
+  return { x, que: x ? textoViaje(x) : (e.mov && e.mov.viaje) || '', salio: e.desde ? hora(e.desde) : '', vuelve, tarde: t != null && ahoraMin() > t + 20 };
 }
 const DESTINOS_HOTEL = { aeropuerto:['Aeropuerto', 'send'], puerto:['Puerto', 'barco'], centro:['Centro', 'pin'], excursion:['Excursión', 'tree'], otro:['Otro', 'car'] };
 const ESTADO_VIAJE = { programado:['Programado', 'sky'], en_curso:['En viaje', 'warn'], hecho:['Hecho', 'ok'], cancelado:['Cancelado', ''] };
@@ -139,7 +173,7 @@ function ajusteViaje(x){
   return Math.abs(minutosDe(sug) - minutosDe(x.sale)) >= 10 ? { sale:sug, v } : null;
 }
 const textoViaje = x => { const d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro;
-  return `${x.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${d[0].toLowerCase()}${x.ref && x.ref.tipo === 'vuelo' ? ' · vuelo ' + x.ref.nro + (x.ref.hora ? ' ' + x.ref.hora : '') : x.ref && x.ref.tipo === 'crucero' ? ' · ' + conMayusculasBarco(x.ref.barco) : x.ref && x.ref.desc && x.ref.tipo !== 'rutina' ? ' · ' + x.ref.desc : ''}`; };
+  return `${x.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${d[0].toLowerCase()}${x.ref && x.ref.tipo === 'vuelo' ? ' · vuelo ' + x.ref.nro + (x.ref.hora ? ' ' + x.ref.hora : '') : x.ref && x.ref.tipo === 'crucero' ? ' · crucero ' + conMayusculasBarco(x.ref.barco) : x.ref && x.ref.desc && x.ref.tipo !== 'rutina' ? ' · ' + x.ref.desc : ''}`; };
 const viajesDelDia = (f = hoyISO()) => hotelViajes().filter(x => x.fecha === f && x.estado !== 'cancelado').sort((a, b) => (a.sale || '99').localeCompare(b.sale || '99'));
 
 /* =========================================================
@@ -353,12 +387,14 @@ function proximaVan(vs){
 }
 /* Una van, dibujada, con su chapa y su estado. */
 function vanViva(v, { acciones = false } = {}){
-  const e = estadoVan(v), prox = viajesDelDia().find(x => x.vanId === v.id && x.estado === 'programado');
-  const hace = e.sin ? 'sin pasos registrados' : `${e.adentro ? 'adentro' : 'afuera'} desde las ${hora(e.desde)}`;
+  const e = estadoVan(v), prox = viajesDelDia().find(x => x.vanId === v.id && x.estado === 'programado' && (minDe(x.sale) ?? 9999) >= ahoraMin() - 15);
+  const fu = vanAfuera(v, e);
+  const hace = e.sin ? 'sin pasos registrados' : fu ? `salió ${fu.salio} h${fu.que ? ' · ' + fu.que : ' · sin traslado programado'}` : `adentro desde las ${hora(e.desde)}`;
   return `<div class="hp-van ${e.adentro ? 'adentro' : 'afuera'}">
     <div class="hp-van-arte">${VAN_SVG}<span class="hp-van-luz">${e.adentro ? 'Adentro' : 'Afuera'}</span></div>
     <div class="hp-van-txt"><b>${esc(v.nombre)}</b><span class="hp-chapa">${esc(chapaTexto(v.patente || ''))}</span>
       <small>${esc(hace)}${v.chofer ? ' · ' + esc(v.chofer) : ''}</small>
+      ${fu ? `<small class="hp-van-vuelve ${fu.tarde ? 'tarde' : ''}">${I('login')} ${fu.vuelve ? `${fu.tarde ? 'Tendría que haber vuelto' : 'Vuelve'} ~${esc(fu.vuelve)} h` : 'Sin hora de regreso: avisá al chofer'}</small>` : ''}
       <small class="hp-van-prox">${prox ? `${I('clock')} Próximo: ${esc(prox.sale || '—')} · ${esc((DESTINOS_HOTEL[prox.destino] || DESTINOS_HOTEL.otro)[0])}` : `${I('check')} Sin traslados pendientes`}</small></div>
     ${acciones && esHotel() ? `<div class="hp-van-acc"><button class="btn btn-xs btn-sec" data-a="hvan-qr" data-id="${esc(v.id)}">${I('qr')}QR</button><button class="btn btn-xs btn-sec" data-a="hvan-editar" data-id="${esc(v.id)}">${I('edit')}Editar</button>${v.telChofer ? `<a class="btn btn-xs btn-sec" href="tel:${esc(String(v.telChofer).replace(/[^\d+]/g, ''))}">${I('phone')}Chofer</a>` : ''}</div>` : ''}</div>`;
 }
@@ -793,7 +829,7 @@ function bandaVansGarita(opera){
     const tarde = x.estado === 'programado' && x.sale && ahoraMin() > minutosDe(x.sale) + 15;
     return `<div class="vg-fila ${curso ? 'curso' : ''} ${tarde ? 'tarde' : ''}"><div class="vg-hora"><b>${esc(x.sale || '—')}</b><small>${curso ? 'en viaje' : 'sale'}</small></div>
       <div class="grow"><b>${I(d[1])} ${esc(textoViaje(x))}</b>
-        <small>${v ? `${esc(v.nombre)} · <span class="mono">${esc(v.patente || '')}</span>` : 'van sin asignar'}${choferDe(x) ? ' · ' + esc(choferDe(x)) : ''} · ${plural(+x.pax || 0, 'pasajero')}${curso && x.salioAt ? ` · salió ${hora(x.salioAt)} h` : ''}${tarde ? ' · <b>se atrasó</b>' : ''}</small>
+        <small>${v ? `${esc(v.nombre)} · <span class="mono">${esc(v.patente || '')}</span>` : 'van sin asignar'}${choferDe(x) ? ' · ' + esc(choferDe(x)) : ''} · ${plural(+x.pax || 0, 'pasajero')}${curso && x.salioAt ? ` · salió ${hora(x.salioAt)} h${regresoViaje(x) ? ` · vuelve ~${esc(regresoViaje(x))} h` : ''}` : ''}${tarde ? ' · <b>se atrasó</b>' : ''}</small>
         ${aj ? `<small class="hv-alerta">${I(aj.cancelado ? 'alert' : 'clock')} ${aj.cancelado ? 'El vuelo figura CANCELADO' : `El vuelo cambió: conviene salir ${esc(aj.sale)}`}</small>` : ''}</div>
       ${opera ? `<button class="btn btn-sm ${curso ? 'btn-ok' : 'btn-pri'}" data-a="hviaje-mov" data-id="${esc(x.id)}" data-v="${curso ? 'in' : 'out'}">${I(curso ? 'login' : 'logout')}${curso ? 'Volvió' : 'Salió'}</button>`
         : `<span class="pill ${curso ? 'p-warn' : 'p-sky'}">${curso ? 'En viaje' : 'Programado'}</span>`}</div>`; };
@@ -2137,6 +2173,10 @@ function hotelDemo(s){
     { id:'hr1', rutina:true, activa:true, nombre:'Aeropuerto de la mañana', dias:[1, 2, 3, 4, 5], sale:'07:30', destino:'aeropuerto', sentido:'llevar', pax:6, vanId:'hv1', chofer:'Ramón', desde:D(-10), hasta:'', nota:'', at:n - 10 * DIA },
     { id:'hr2', rutina:true, activa:true, nombre:'Centro, ida y vuelta', dias:[1, 2, 3, 4, 5, 6, 0], sale:'19:00', destino:'centro', sentido:'llevar', pax:8, vanId:'hv2', chofer:'Julio', desde:D(-10), hasta:'', nota:'Vuelve a las 23 h', at:n - 10 * DIA }];
   generarRutinas(s);
+  /* La Van 2 que figura afuera es la del centro de las 19 h: después de esa
+     hora sale con ese traslado "En viaje"; antes, es una salida suelta. */
+  const c19 = s.hotelViajes.find(x => x.id === `hr-hr2-${h}`), ahora = new Date(), a19 = new Date(ahora); a19.setHours(19, 4, 0, 0);
+  if (c19 && ahora >= a19 && ahora.getHours() < 23){ c19.estado = 'en_curso'; c19.salioAt = +a19; s.hotelMovs[0].at = +a19; }
   s.hotelEventos = [{ id:'he1', titulo:'Cena de gala del congreso', tipo:'cena', asistentes:80, fecha:D(1), desde:'20:30', hasta:'01:00', ingreso:'Con la van del hotel desde el centro', estacionamiento:'Dentro del predio del hotel', musicaHasta:'00:30', nota:'', avisarVecinos:true, at:n - DIA }];
   s.hotelProv = [
     { id:'hp1', empresa:'Lavandería Austral', rubro:'Lavandería', personal:'Carlos Díaz', patentes:'AB111CD', tel:'', dias:[1, 3, 5], desde:'08:00', hasta:'12:00', artVence:D(120), seguroVence:D(200), codigo:'H-PRV1DEMO', estado:'activo', revisado:true, at:n - 20 * DIA },

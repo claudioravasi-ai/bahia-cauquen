@@ -137,7 +137,11 @@ button{font:inherit;color:inherit;cursor:pointer}
 .toca.listo{background:var(--ok-soft);color:var(--ok);animation:none}.toca.listo span{animation:none}
 .nohay{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--warn-soft);color:var(--warn);font-size:13px;font-weight:700;line-height:1.45}
 .g-btns{display:flex;gap:8px;padding:12px 18px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
-.gb{flex:1;min-width:0;height:44px;border-radius:12px;border:1.5px solid var(--line-2);background:var(--surf-2);font-weight:800;font-size:13.5px;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.gb{flex:1;min-width:0;min-height:44px;padding:4px 10px;border-radius:12px;border:1.5px solid var(--line-2);background:var(--surf-2);font-weight:800;font-size:13.5px;line-height:1.15;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-align:center;overflow-wrap:anywhere}
+/* Los botones de la guía nunca se salen de su marco (Claudio, 22-10-2026):
+   el texto baja a un segundo renglón si no entra y "Atrás" queda en flecha
+   en el celular, para dejarle lugar a "Hacelo por mí". */
+.gb .gb-ic{flex:none}
 .gb:disabled{opacity:.4;cursor:default}
 .gb.pri{background:var(--brand);border-color:var(--brand);color:#fff}
 .gb.yo{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent);color:var(--accent)}
@@ -195,7 +199,9 @@ button{font:inherit;color:inherit;cursor:pointer}
   .g-paso .x{font-size:13.5px;line-height:1.45}
   .toca{margin-top:8px;padding:8px 10px;font-size:12.5px}
   .g-btns{padding:8px 14px calc(10px + env(safe-area-inset-bottom));gap:6px}
-  .gb{height:40px;font-size:12.5px}
+  .gb{min-height:40px;font-size:12.5px;padding:3px 8px;gap:4px}
+  .gb[data-t="ant"]{flex:0 0 auto;padding:0 12px}
+  .gb[data-t="ant"] .gb-t{display:none}
   .bienv{padding:12px 14px}.bienv h1{font-size:17px}
 }
 @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
@@ -253,7 +259,10 @@ const G = [
 const PERFILES = ['vecino', 'garita', 'admin', 'hotel', 'supervision'];
 const VE = PERFILES.includes(params.get('perfil')) ? params.get('perfil') : 'vecino';
 const VEN_TODO = ['vecino', 'garita', 'admin'].includes(VE);
-const puedeVer = x => VEN_TODO || x.g === 'empezar' || x.g === VE || ((x.ven || []).includes(VE) && x.g === 'garita');
+/* "Para empezar" entra como Lucía (vecina): el hotel y la supervisión no lo
+   ven, porque su pantalla es otra (Claudio, 22-10-2026). Cada uno tiene su
+   propio "Conocer la pantalla" en su grupo. */
+const puedeVer = x => VEN_TODO || (x.g === 'empezar' && x.q !== 'u_lucia') || x.g === VE || ((x.ven || []).includes(VE) && x.g === 'garita');
 /* Primero "Para empezar", después lo propio y al final lo compartido. */
 const gruposEnOrden = () => [...G].sort((a, b) => (a.id === 'empezar' ? 0 : a.id === VE ? 1 : 2) - (b.id === 'empezar' ? 0 : b.id === VE ? 1 : 2));
 const nombreGrupo = g => VEN_TODO || g.id === 'empezar' || g.id === VE ? g.n : g.con;
@@ -462,10 +471,19 @@ const L = [
   ] },
 
   /* ---------------- hotel ---------------- */
-  { id:'hotel-portal', g:'hotel', ven:['garita'], q:'u_hotel', t:'El portal del hotel', d:'Llegan, se van, alojados y traslados.', p:[
-    { t:'Hoy', x:'Arriba, las tarjetas en vivo: quién llega, quién se va, alojados y traslados por hacer.', s:'#cuerpo' },
-    { t:'Un traslado', x:'<b>Tocá "Nuevo viaje"</b> para cargar una van al aeropuerto o al puerto.', s:'#cuerpo [data-a="hviaje-nuevo"]:not([data-v])', h:'tocar' },
-    { t:'La van', x:'La garita la ve y la deja pasar sin llamar.', s:'#hoja' },
+  { id:'hotel-portal', g:'hotel', ven:['garita'], q:'u_hotel', t:'Conocer la pantalla del hotel', d:'El portal de la recepción: hoy, las vans y los traslados.', p:[
+    { t:'Arriba', x:'Arriba a la izquierda, el barrio y <b>Recepción</b>: tocarlo te lleva siempre al inicio. A la derecha, la <b>campanita</b> (tus avisos), tu cuenta y el botón rojo <b>Garita</b>: para una urgencia (médica, seguridad, incendio) le avisa a la guardia al instante y tiene a mano el 911 y el 107.', s:'#top .marca' },
+    { t:'Hoy en números', x:'Las cuatro tarjetas en vivo: <b>traslados por hacer</b>, huéspedes que <b>llegan</b>, los que <b>se van</b> y los <b>alojados</b>. Cada una se toca y abre la lista.', s:'#cuerpo .hp-pulso' },
+    { t:'Lo próximo', x:'La van que sale después, con su <b>cuenta regresiva</b>. Tocala para ver el traslado: van, chofer y pasajeros.', s:'#cuerpo .hp-prox' },
+    { t:'Las vans ahora', x:'Cada van dice si está <b>adentro</b> o <b>afuera</b> del barrio según su <b>último paso por la garita</b> (la app no sigue a la van por GPS). Si está <b>afuera</b>, dice a qué hora salió, con qué traslado y <b>cuándo vuelve</b> (se pone en rojo si se atrasó). Abajo, su próximo traslado.', s:'#cuerpo .hp-vans' },
+    { t:'Traslados de hoy', x:'La línea de <b>6 a 24 h</b> con un punto por traslado y la marca de <b>ahora</b>. Abajo, la lista: por hacer, en viaje y hechos. Los <b>automatizados</b> (los de todos los días) se arman solos; los de <b>una sola vez</b> los cargás vos.', s:'#cuerpo .hr-riel' },
+    { t:'Cargar un traslado', x:'<b>Tocá "Traslado"</b> (el botón que titila) para cargar una van al aeropuerto, al puerto, al centro o a una excursión.', s:'#cuerpo [data-a="hviaje-nuevo"]:not([data-v])', h:'tocar' },
+    { t:'¿Una vez o todos los días?', x:'<b>Nuevo traslado</b> es para un día y una hora: un vuelo, un crucero, una excursión. <b>Traslados automatizados</b> son las salidas de siempre (por ejemplo, el aeropuerto de la mañana): se cargan una vez y se repiten solos. La garita ve cada traslado y deja pasar la van sin llamar.', s:'#hoja' },
+  ] },
+  { id:'agenda-hotel', g:'hotel', q:'u_hotel', ir:'hotel-agenda', t:'La agenda de las 22 h', d:'Lo de mañana, ya programado: OK, cambiar o quitar.', p:[
+    { t:'Todas las noches, sola', x:'En la app de verdad, <b>todas las noches a las 22 h</b> suena, llega el aviso y <b>se abre sola</b> esta ventana con lo que la app programó para mañana: huéspedes que llegan y se van, vans y traslados, eventos, personal y proveedores. En este manual no se abre sola (taparía la lección que estés haciendo): la abrís desde la teja <b>"Agenda de mañana"</b>.', s:'#cuerpo' },
+    { t:'Cada tarea', x:'Cada renglón tiene <b>✓</b> (OK), <b>✎</b> (cambiar la hora o el texto) y <b>✕</b> (quitar). <b>Tocá ✓</b> en la primera (si todavía dice "Armarla ahora", tocá ese botón primero).', s:'#cuerpo [data-a="ag-ok"], #cuerpo [data-a="ag-armar"]', h:'tocar' },
+    { t:'Dar el OK a todo', x:'<b>"Dar el OK a todo y guardar"</b> la aprueba: un traslado que quitaste se cancela y uno con otra hora sale a esa hora. A la garita le llega "Lo que llega del hotel mañana". <b>"Más tarde"</b> la deja esperando en la portada.', s:'#cuerpo [data-a="ag-aprobar"], #cuerpo .ag-pie, #cuerpo' },
   ] },
   { id:'huespedes', g:'hotel', ven:['garita'], q:'u_hotel', ir:'hotel-huespedes', t:'Huéspedes', d:'Su pase de embarque por WhatsApp.', p:[
     { t:'Huéspedes', x:'Cargás a cada huésped y le sale su pase con las normas del barrio, para mandarle por WhatsApp.', s:'#cuerpo' },
@@ -658,8 +676,8 @@ function pintarGuia(cargando = false){
   guia.innerHTML = `${cab}<div class="g-paso"><span class="np">Paso ${ESTADO.i + 1} de ${n}</span><h2>${esc(s.t)}</h2><div class="x">${s.x}</div>
       <div class="toca ${accion[0]}"><span>${accion[1]}</span>${cargando ? 'Abriendo la app…' : accion[2]}</div>
       <div class="nohay" id="nohay" hidden>No encuentro ese botón en la pantalla (puede que la app esté en otra parte). Tocá <b>"Hacelo por mí"</b>, <b>"Siguiente"</b> o empezá la función otra vez.</div></div>
-    <div class="g-btns"><button class="gb" data-t="ant" ${ESTADO.i ? '' : 'disabled'}>← Atrás</button>
-      ${s.h ? `<button class="gb yo" data-t="yo">🪄 Hacelo por mí</button>` : ''}
+    <div class="g-btns"><button class="gb" data-t="ant" ${ESTADO.i ? '' : 'disabled'} aria-label="Paso anterior"><span class="gb-ic">←</span><span class="gb-t">Atrás</span></button>
+      ${s.h ? `<button class="gb yo" data-t="yo"><span class="gb-ic">🪄</span><span>Hacelo por mí</span></button>` : ''}
       <button class="gb pri ${!s.h || ESTADO.hechoPaso ? 'late' : ''}" data-t="sig">${ESTADO.i === n - 1 ? 'Terminar ✓' : 'Siguiente →'}</button></div>`;
   ultimoEl = undefined;
 }

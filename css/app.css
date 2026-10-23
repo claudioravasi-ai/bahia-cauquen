@@ -3056,6 +3056,9 @@ button.srv-fila{cursor:pointer}
 .hp-chapa.chica{font-size:10.5px;border-top-width:3px}
 .hp-van-txt small{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
 .hp-van-prox{display:flex!important;gap:4px;align-items:center;color:var(--ink-2)!important;font-weight:600}
+.hp-van-vuelve{display:flex!important;gap:4px;align-items:center;color:var(--wood)!important;font-weight:700}
+.hp-van-vuelve.tarde{color:var(--danger)!important}
+.hp-van-vuelve svg{width:13px;height:13px;flex:none}
 .hp-van-prox svg{width:13px;height:13px;flex:none}
 .hp-van-acc{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 @keyframes hpAnda{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
