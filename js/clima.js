@@ -74,3 +74,56 @@ const Clima = {
   },
 };
 Clima.leerCache();
+
+/* =========================================================
+   EL AGUA DEL CANAL BEAGLE (pedido de Claudio, 23-10-2026: "la temperatura
+   del agua en tiempo real, con el dato más preciso, en el portal de
+   ingreso donde están los datos del tiempo").
+   No hay una boya pública en el Canal Beagle que mande la temperatura en
+   vivo. El dato más preciso que se puede leer gratis es el del modelo del
+   océano de Copernicus Marine (Mercator, cuadros de unos 8 km, con un
+   decimal), que Open-Meteo entrega por hora junto con la altura de las
+   olas. Se pide el cuadro de mar más cercano al barrio (cell_selection=sea)
+   y se guarda una hora en este equipo. No lleva datos de nadie.
+   Ideas de WeatherMaster (3,1k★, GPL-3.0: la tarjeta del mar con su
+   tendencia) y de wttr.in (30,7k★, Apache-2.0: todo en un renglón); el
+   código es propio.
+   ========================================================= */
+const Agua = {
+  LAT: -54.86, LON: -68.30, KEY: 'bhc.agua',
+  d: null, cargando: null,
+  leerCache(){ try { const c = JSON.parse(localStorage.getItem(this.KEY)); if (c && c.t) this.d = c; } catch(e){} },
+  fresco(){ return this.d && Date.now() - this.d.t < HORA; },
+  pedir(){
+    if (this.fresco()) return Promise.resolve(this.d);
+    if (this.cargando) return this.cargando;
+    const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${this.LAT}&longitude=${this.LON}` +
+      `&current=sea_surface_temperature,wave_height&hourly=sea_surface_temperature&past_days=1&forecast_days=1` +
+      `&cell_selection=sea&timezone=America%2FArgentina%2FUshuaia`;
+    this.cargando = fetch(url).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+      const c = j.current || {}, temp = c.sea_surface_temperature;
+      if (temp == null) return this.d;
+      /* La de hace 24 horas, para decir si sube o baja. */
+      const h = j.hourly || {}, i = aLista(h.time).indexOf(c.time && c.time.slice(0, 13) + ':00');
+      const ayer = i >= 24 ? h.sea_surface_temperature[i - 24] : null;
+      this.d = { t: Date.now(), temp, ayer: ayer ?? null, olas: c.wave_height ?? null };
+      try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
+      return this.d;
+    }).catch(() => this.d).finally(() => { this.cargando = null; });
+    return this.cargando;
+  },
+  grados(v){ return v == null ? '' : v.toLocaleString('es-AR', { minimumFractionDigits:1, maximumFractionDigits:1 }) + '°'; },
+  /* "baja 0,2° desde ayer", "igual que ayer" o nada. */
+  tendencia(){
+    const d = this.d; if (!d || d.ayer == null) return '';
+    const dif = Math.round((d.temp - d.ayer) * 10) / 10;
+    return Math.abs(dif) < .1 ? 'igual que ayer' : `${dif > 0 ? 'sube' : 'baja'} ${Math.abs(dif).toLocaleString('es-AR', { maximumFractionDigits:1 })}° desde ayer`;
+  },
+  html(){
+    const d = this.d; if (!d || d.temp == null) return '';
+    const tend = this.tendencia();
+    return `${I('drop')}<b>${this.grados(d.temp)}</b><span>agua del Canal Beagle${tend ? ' · ' + tend : ''}</span>`;
+  },
+  FUENTE: 'Modelo del océano de Copernicus Marine (Mercator, cuadros de unos 8 km) vía Open-Meteo. Se actualiza cada hora; no es una boya.',
+};
+Agua.leerCache();

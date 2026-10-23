@@ -3246,6 +3246,8 @@ function bloqueIngresosHoy(lista, opera){
      cierra cuando pasa el autito, y los totales del día (entraron,
      salieron, adentro); las cuentas por tipo en fichas de color, y la línea
      del día con una flecha verde para lo que entra y gris para lo que sale. */
+  /* "Todo lo que entró y salió hoy": a la vista solo los últimos 3; el resto, plegado (pedido de Claudio,
+     23-10-2026: "un desplegable para el total del día; si no, es una página larga"). */
   const salidas = movs.filter(m => m.sale).length, adn = lista.filter(p => estadoPase(p) === 'adentro').length + aLista(s.llegadas).filter(llegadaAdentro).length;
   return `<span id="garIngresos" class="ancla"></span><section class="ing2">
     <div class="ing2-cab">
@@ -3259,8 +3261,8 @@ function bloqueIngresosHoy(lista, opera){
       return `<div class="it"><span class="ic ic-wood" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('star')}</span><div class="txt"><b>${esc(h.nombre || 'Huésped')}</b><span>${h.patente ? esc(h.patente) + ' · ' : ''}${plural(+h.pax || 1, 'persona')} · ${va ? 'se va hoy' : 'llega hoy'}</span></div>
         ${opera ? `<button class="btn btn-xs ${va ? 'btn-sec' : 'btn-ok'}" data-a="${va ? 'hhuesped-salida' : 'hhuesped-ingreso'}" data-id="${esc(h.id)}">${I(va ? 'logout' : 'login')}${va ? 'Salió' : 'Ingresó'}</button>` : `<span class="pill p-sky">${va ? 'Se va hoy' : 'Llega hoy'}</span>`}</div>`; }).join('')}</div>` : ''}
     <div class="lbl ing-sub">Todo lo que entró y salió hoy</div>
-    ${movs.length ? `<div class="ing2-linea">${movs.slice(0, 30).map(filaMov).join('')}</div>
-      ${movs.length > 30 ? `<details class="ing-mas" data-k="ing-mas"><summary>Ver los ${movs.length - 30} anteriores</summary><div class="ing2-linea">${movs.slice(30).map(filaMov).join('')}</div></details>` : ''}`
+    ${movs.length ? `<div class="ing2-linea">${movs.slice(0, 3).map(filaMov).join('')}</div>
+      ${movs.length > 3 ? `<details class="ing-mas" data-k="ing-mas"><summary>${I('clock')} Ver todo el día (${plural(movs.length - 3, 'movimiento más', 'movimientos más')})</summary><div class="ing2-linea">${movs.slice(3).map(filaMov).join('')}</div></details>` : ''}`
       : vacio('gate', nAnun ? 'Todavía no entró ni salió nadie hoy.' : 'Nadie anunciado y todavía no entró ni salió nadie hoy.')}</section>`;
 }
 /* =========================================================

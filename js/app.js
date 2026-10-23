@@ -1307,7 +1307,8 @@ function pintarBienvenida(modo = 'inicio'){
         <div class="portal-lema"><h1>El barrio inteligente<br>del fin del mundo</h1>
           ${(() => { const cl = Clima.d?.c; if (!cl) return '';
             const [desc, ico] = Clima.cod(cl.weather_code);
-            return `<div class="portal-clima">${I(ico)}<b>${Math.round(cl.temperature_2m)}°</b><span>${esc(desc)} · ráfagas ${Math.round(cl.wind_gusts_10m)} km/h</span></div>`; })()}</div>
+            return `<div class="portal-clima">${I(ico)}<b>${Math.round(cl.temperature_2m)}°</b><span>${esc(desc)} · ráfagas ${Math.round(cl.wind_gusts_10m)} km/h</span></div>`; })()}
+          ${typeof Agua !== 'undefined' ? `<div class="portal-clima portal-agua" id="portalAgua" title="${esc(Agua.FUENTE)}" ${Agua.html() ? '' : 'hidden'}>${Agua.html()}</div>` : ''}</div>
         <div class="portal-caja">
           <header class="portal-cab"><h2>${esc(titulo)}</h2><p>${esc(bajada)}</p></header>
           ${cuerpo}
@@ -2232,6 +2233,8 @@ function rutaPublica(){
    cuando llega: nunca frena la apertura de la app. */
 function datosDeAfuera(){
   Clima.pedir().then(() => { aplicarTema(); refrescarPronto(); });
+  /* El agua del Canal Beagle: si el portal de ingreso está a la vista, se pone en el lugar. */
+  if (typeof Agua !== 'undefined') Agua.pedir().then(() => { const el = document.getElementById('portalAgua'); if (el && Agua.html()){ el.innerHTML = Agua.html(); el.hidden = false; } });
   Vuelos.pedir().then(() => refrescarPronto()).catch(() => {});
   if (typeof Cruceros !== 'undefined') Cruceros.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});
   if (typeof Promos !== 'undefined') Promos.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});

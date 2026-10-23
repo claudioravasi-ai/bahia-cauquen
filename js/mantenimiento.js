@@ -78,20 +78,24 @@ function bandaMantenimiento(opera){
   const ls = mantLista().sort((a, b) => (!!b.adentro - !!a.adentro) || mantNombre(a).localeCompare(mantNombre(b), 'es'));
   const n = ls.filter(m => m.adentro).length;
   if (!ls.length && !opera) return '';
-  return `<section class="mt" id="garMant" aria-label="Personal de mantenimiento">
-    <div class="mt-cab">
+  /* PLEGADA (pedido de Claudio, 23-10-2026: "dejalo solo en título y si uno quiere verlo, que se
+     despliegue"). Arriba queda el título con cuántos hay adentro; la lista y los botones, al tocarla.
+     data-k: al redibujar queda como la dejó la garita. */
+  return `<details class="mt" id="garMant" data-k="garMant" aria-label="Personal de mantenimiento">
+    <summary class="mt-cab">
       <span class="mt-escena" aria-hidden="true">${mantEngranaje('g1')}${mantEngranaje('g2')}<span class="mt-llave">${I('wrench')}</span></span>
       <span class="mt-tit"><small>Personal de mantenimiento</small><b>${n ? `${plural(n, 'trabajando', 'trabajando')} en el barrio` : ls.length ? 'Nadie adentro' : 'Cargalos una sola vez'}</b>
-        <span>${ls.length ? `${plural(ls.length, 'persona')} en la lista · ${opera ? 'un toque para la entrada, otro para la salida' : 'lo marca la garita'}` : 'Nombre, apellido y DNI: quedan grabados y después se editan cuando quieras.'}</span></span>
+        <span>${ls.length ? `${plural(ls.length, 'persona')} en la lista · tocá para ${opera ? 'marcar la entrada o la salida' : 'ver la lista'}` : 'Tocá para cargarlos: nombre, apellido y DNI.'}</span></span>
       ${n ? `<span class="mt-n" aria-label="${n} adentro">${n}</span>` : ''}
-    </div>
+      <span class="mt-flecha" aria-hidden="true">${I('right')}</span>
+    </summary>
     ${ls.length ? `<div class="mt-lista">${ls.map((m, i) => tarjetaMant(m, opera, i) + (typeof mvDespliegue === 'function' ? mvDespliegue(m) : '')).join('')}</div>` : ''}
     <div class="mt-pie">
       <button type="button" class="mt-mas" data-a="mt-editar">${I('plus')}Agregar a alguien</button>
       ${ls.length ? `<button type="button" class="mt-hist" data-a="abrir" data-v="mantenimiento">${I('clock')}Movimientos de hoy</button>` : ''}
       ${typeof R !== 'undefined' && R['mant-bitacora'] ? `<button type="button" class="mt-hist" data-a="abrir" data-v="mant-bitacora">${I('book')}Bitácora</button>` : ''}
       ${n && typeof mvPersonas === 'function' ? `<button type="button" class="mt-hist" data-a="mant-ver">${I('map')}En vivo</button>` : ''}</div>
-  </section>`;
+  </details>`;
 }
 
 /* La ventana completa: buscador, la lista y los movimientos de hoy. */

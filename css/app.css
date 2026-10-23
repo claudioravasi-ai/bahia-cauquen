@@ -6505,3 +6505,19 @@ li.prox .rm-gn{background:#ff9a3d}
 .vg-mas > summary .muted{font-weight:500;font-size:12px}
 .vg-mas .vg-lista{padding:0 8px 8px}
 .vg-atras > summary{color:var(--warn)}
+
+/* EL AGUA DEL CANAL BEAGLE en el portal de ingreso (23-10-2026), debajo del clima. */
+.portal-agua{margin-top:8px;background:rgba(8,40,60,.46)}
+.portal-agua[hidden]{display:none}
+.portal-agua svg.i{color:#7fd3ff}
+.vg-sinvans{margin:4px 0 8px;font-size:12.5px;color:var(--ink-2);line-height:1.4}
+.vg-sinvans svg{width:14px;height:14px;vertical-align:-2px}
+.ing-mas summary svg{width:14px;height:14px;vertical-align:-2px;margin-right:4px}
+
+/* MANTENIMIENTO PLEGADO en la garita (23-10-2026): solo el título; se despliega al tocarlo. */
+details.mt > summary.mt-cab{cursor:pointer;list-style:none}
+details.mt > summary.mt-cab::-webkit-details-marker{display:none}
+.mt-flecha{margin-left:auto;flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.22)}
+.mt-flecha svg{width:18px;height:18px;transition:transform .2s}
+details.mt[open] .mt-flecha svg{transform:rotate(90deg)}
+.mt-n + .mt-flecha{margin-left:8px}

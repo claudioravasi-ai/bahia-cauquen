@@ -287,7 +287,14 @@ const HotelMotor = {
   correr(){
     const u = yo(); if (!u) return;
     if (esGuardia()) return this.garita();
-    if (u.rol !== 'hotel' || HotelEjemplo.activo()) return;
+    if (u.rol !== 'hotel') return;
+    /* (23-10-2026, tarde) El servicio regular al centro se carga de verdad aunque el hotel esté mirando el
+       ejemplo (antes el ejemplo lo mostraba, pero en la base no había nada y la garita no lo veía). */
+    if (HotelEjemplo.activo()){
+      if (!hotelInfo().servicioRegular && !aLista(Store.s.hotelViajes).some(x => x && x.rutina && /^hrsr-/.test(x.id || '')))
+        Store.cambiar(s => { sembrarServicioRegular(s); guardarInfo(s, { servicioRegular:hoyISO() }); });
+      return;
+    }
     const hoy = hoyISO(), ahora = ahoraMin(), info = hotelInfo(), avisos = [];
     viajesDelDia(hoy).filter(x => x.estado === 'programado').forEach(x => {
       const aj = ajusteViaje(x);
@@ -324,7 +331,8 @@ const HotelMotor = {
       /* Con lo de verdad (Store.s), no con el ejemplo que puede estar a la vista. */
       const reales = aLista(Store.s.hotelViajes).filter(Boolean);
       const viejos = reales.some(x => !x.rutina && x.fecha < hoyISO() && (x.estado === 'programado' || x.estado === 'en_curso'));
-      const sembrar = !hotelInfo().servicioRegular && !reales.some(x => x.rutina && (x.regular || /^hrsr-/.test(x.id || ''))) && vansReales().length;
+      /* (23-10-2026, tarde) Sin esperar a que el hotel cargue sus vans: antes no se cargaba nada y la garita no veía el servicio. */
+      const sembrar = !hotelInfo().servicioRegular && !reales.some(x => x.rutina && (x.regular || /^hrsr-/.test(x.id || '')));
       if (viejos || sembrar) Store.cambiar(s => { if (sembrar) sembrarServicioRegular(s); cerrarViajesViejos(s); });
     }
     if (!this.marcar('limpieza-movs-' + hoyISO())) return;
@@ -864,9 +872,12 @@ A['hvan-mov'] = el => {
   if (el.dataset.pax === undefined) return pedirPaxVan(el.dataset.id, tipo, el.dataset.p || '');
   moverVan(el.dataset.id, tipo, el.dataset.p || '', el.dataset.pax === '' ? null : +el.dataset.pax);
 };
+/* Mientras el hotel no cargó sus vans, la garita marca igual: "la van del hotel" (vanId 'sin-van'). */
+const VAN_SIN_CARGAR = { id:'sin-van', nombre:'La van del hotel', patente:'' };
+const vanOGenerica = id => hotelVans().find(x => x.id === id) || (id === 'sin-van' ? VAN_SIN_CARGAR : null);
 function pedirPaxVan(vanId, tipo, viajeId = ''){
   if (!soloGarita()) return;
-  const v = hotelVans().find(x => x.id === vanId); if (!v) return;
+  const v = vanOGenerica(vanId); if (!v) return;
   const x = viajeId ? hotelViajes().find(y => y.id === viajeId) : null;
   const b = (pax, t, cls = '') => `<button type="button" class="vp-b ${cls}" data-a="hvan-mov" data-id="${esc(vanId)}" data-v="${tipo}" data-p="${esc(viajeId)}" data-pax="${pax}">${t}</button>`;
   hoja(`${v.nombre} ${tipo === 'in' ? 'volvió' : 'salió'}`, `<p class="muted small" style="margin:0 0 12px">${x ? `${esc(x.sale || '')} h · ${esc(textoViaje(x))} · ` : ''}<span class="mono">${esc(v.patente || '')}</span></p>
@@ -877,7 +888,7 @@ function pedirPaxVan(vanId, tipo, viajeId = ''){
 }
 function moverVan(vanId, tipo, viajeId = '', pax = null){
   if (!soloGarita()) return;
-  const v = hotelVans().find(x => x.id === vanId); if (!v) return;
+  const v = vanOGenerica(vanId); if (!v) return;
   const at = Date.now(), ahora = ahoraMin(), hoy = hoyISO();
   let viaje = null;
   Store.cambiar(s => {
@@ -886,14 +897,14 @@ function moverVan(vanId, tipo, viajeId = '', pax = null){
     if (tipo === 'out'){
       viaje = elegido || vs.filter(x => x.estado === 'programado' && (!x.vanId || x.vanId === v.id) && (!x.sale || Math.abs(minutosDe(x.sale) - ahora) <= 90))
         .sort((a, b) => (!!b.vanId - !!a.vanId) || Math.abs(minutosDe(a.sale || '12:00') - ahora) - Math.abs(minutosDe(b.sale || '12:00') - ahora))[0] || null;
-      if (viaje){ viaje.estado = 'en_curso'; viaje.salioAt = at; viaje.vanId = viaje.vanId || v.id; if (pax != null) viaje.paxSale = pax; }
+      if (viaje){ viaje.estado = 'en_curso'; viaje.salioAt = at; if (v.id !== 'sin-van') viaje.vanId = viaje.vanId || v.id; if (pax != null) viaje.paxSale = pax; }
     } else {
-      viaje = elegido || vs.find(x => x.estado === 'en_curso' && x.vanId === v.id) || null;
+      viaje = elegido || vs.find(x => x.estado === 'en_curso' && (x.vanId === v.id || (v.id === 'sin-van' && !x.vanId))) || null;
       if (viaje){ viaje.estado = 'hecho'; viaje.volvioAt = at; if (pax != null) viaje.paxVuelve = pax; }
     }
     const px = paxTexto(pax);
     s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:'hm' + uid(), vanId:v.id, tipo, at, por:yo().id, viaje: viaje ? textoViaje(viaje) : '', ...(pax != null ? { pax } : {}) });
-    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: van del hotel ${v.nombre} (${v.patente})${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, at });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: ${v.id === 'sin-van' ? 'la van del hotel' : `van del hotel ${v.nombre} (${v.patente})`}${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, at });
     const h = hotelId(); if (h) notificar(s, { para:[h], titulo:`${v.nombre} ${tipo === 'in' ? 'entró al barrio' : 'salió del barrio'}`, texto:`${hora(at)} h${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, icon:'car', color:'wood', link:'hotel-traslados', push:false });
   });
   cerrarHoja(); toast(`${v.nombre}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada${pax != null ? ' · ' + paxTexto(pax) : ''}`, tipo === 'in' ? 'login' : 'logout');
@@ -904,7 +915,7 @@ A['hviaje-mov'] = el => {
   const x = hotelViajes().find(v => v.id === el.dataset.id); if (!x) return;
   const tipo = el.dataset.v === 'in' ? 'in' : 'out', vans = hotelVans();
   if (x.vanId || vans.length === 1) return pedirPaxVan(x.vanId || vans[0].id, tipo, x.id);
-  if (!vans.length) return toast('El hotel todavía no cargó sus vans', 'car');
+  if (!vans.length) return pedirPaxVan('sin-van', tipo, x.id);
   hoja('¿Qué van sale?', `<p class="muted small" style="margin:0 0 10px">${esc(x.sale || '')} h · ${esc(textoViaje(x))}</p>
     ${vans.map(v => `<button class="superficie" data-a="hvan-mov" data-id="${esc(v.id)}" data-v="${tipo}" data-p="${esc(x.id)}"><span class="ic ic-wood">${I('car')}</span><span class="txt"><b>${esc(v.nombre)}</b><small class="mono">${esc(v.patente || '')}${v.chofer ? ' · ' + esc(v.chofer) : ''}</small></span>${I('right')}</button>`).join('')}`);
 };
@@ -968,6 +979,7 @@ function bandaVansGarita(opera){
     <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="row" style="gap:8px">${I('car')}Vans del hotel · hoy</b>
       <span class="muted small">${pend.length ? plural(pend.length, 'salida pendiente', 'salidas pendientes') : vs.length ? 'todas hechas' : 'sin traslados programados'}${hechos.length ? ` · ${plural(hechos.length, 'hecha', 'hechas')}` : ''}</span></div>
     ${conteoVansHTML({ chico:true })}
+    ${!vans.length ? `<p class="vg-sinvans">${I('info')} El hotel todavía no cargó sus vans: se marca igual, como "la van del hotel". Cuando las cargue (Vans y traslados → Agregar van), cada paso dice cuál fue.</p>` : ''}
     ${(() => { if (!pend.length) return '';
       /* LA LISTA CORTA (23-10-2026): a la vista, las vans afuera, lo atrasado
          de la última hora y media y las 2 próximas salidas; el resto del día,
