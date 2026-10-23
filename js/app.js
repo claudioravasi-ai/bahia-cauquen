@@ -2584,3 +2584,47 @@ A['comunicado-visto'] = el => {
   $('#comunicado')?.remove();
   setTimeout(mostrarComunicado, 400);            /* si hay otro esperando, sigue */
 };
+
+/* =========================================================
+   EL DIAGNÓSTICO DE TOQUES (23-10-2026, Claudio: "en el iPad el primer
+   clic va bien y los otros no responden, en cualquier portal", aun con
+   los datos del sitio borrados). Desde acá no hay un iPad para probar, así
+   que la app lo cuenta en pantalla: se abre la app con ?diag en la
+   dirección (queda prendido en esa pestaña hasta cerrarla) y aparece un
+   recuadro que anota cada toque (dónde cayó, qué había debajo del dedo,
+   si el botón hizo algo), los errores, y un "latido" que se mueve dos
+   veces por segundo: si el latido se para, la app está congelada; si
+   sigue y los toques no llegan, es otra cosa. Con una captura del
+   recuadro se sabe dónde está la traba. No guarda ni manda nada.
+   ========================================================= */
+const Diag = {
+  on: (() => { try { if (/[?&]diag\b/.test(location.search)) sessionStorage.setItem('bhc.diag', '1'); return sessionStorage.getItem('bhc.diag') === '1'; } catch(e){ return /[?&]diag\b/.test(location.search); } })(),
+  log: [], el: null, latidos: 0, ultimoLatido: Date.now(), maxPausa: 0,
+  quien(t){ if (!t || !t.tagName) return String(t); const a = t.closest && t.closest('[data-a],[data-f],button,a,summary,input,label');
+    const x = a || t; return `${x.tagName.toLowerCase()}${x.id ? '#' + x.id : ''}${x.dataset && x.dataset.a ? '[' + x.dataset.a + ']' : ''}${x.className && typeof x.className === 'string' ? '.' + x.className.trim().split(/\s+/).slice(0, 2).join('.') : ''}`.slice(0, 60); },
+  anotar(t){ this.log.unshift(`${new Date().toLocaleTimeString('es-AR', { hourCycle:'h23' })} ${t}`); this.log.length = Math.min(this.log.length, 14); this.pintar(); },
+  pintar(){
+    if (!this.el){ this.el = document.createElement('div'); this.el.id = 'diagCaja';
+      this.el.style.cssText = 'position:fixed;left:6px;right:6px;bottom:6px;z-index:99999;max-height:46vh;overflow:auto;background:rgba(0,0,0,.82);color:#9fffb0;font:11px/1.35 ui-monospace,Menlo,monospace;padding:8px;border-radius:10px;pointer-events:none;white-space:pre-wrap';
+      document.body.appendChild(this.el); }
+    /* Con una hoja abierta (un <dialog> modal), el recuadro va adentro de la hoja: si no, queda tapado. */
+    const d = document.getElementById('hoja'), dueno = d && d.open ? d : document.body; if (this.el.parentNode !== dueno) dueno.appendChild(this.el);
+    const pausa = Date.now() - this.ultimoLatido;
+    this.el.textContent = `DIAGNÓSTICO · latido ${this.latidos}${pausa > 1500 ? ' · ¡PARADO ' + Math.round(pausa / 1000) + ' s!' : ''} · pausa máx ${Math.round(this.maxPausa)} ms · v ${window.VERSION || ''}\n${navigator.userAgent.replace(/Mozilla\/5\.0 /, '').slice(0, 120)} · toques ${navigator.maxTouchPoints}\nhoja ${typeof hojaAbierta === 'function' && hojaAbierta() ? 'ABIERTA' : 'cerrada'} · ventanas ${typeof PILA !== 'undefined' ? PILA.map(v => v.id).join('>') : ''}\n` + this.log.join('\n');
+  },
+  arrancar(){
+    if (!this.on || this.andando) return; this.andando = true;
+    let antes = performance.now();
+    setInterval(() => { const ahora = performance.now(), p = ahora - antes - 500; antes = ahora; if (p > this.maxPausa) this.maxPausa = p; this.latidos++; this.ultimoLatido = Date.now(); this.pintar(); }, 500);
+    const fino = e => { const t = e.touches && e.touches[0] || e.changedTouches && e.changedTouches[0] || e;
+      const abajo = isFinite(t.clientX) ? document.elementFromPoint(t.clientX, t.clientY) : null;
+      return `${e.type} en ${this.quien(e.target)}${abajo && abajo !== e.target && !(e.target.contains && e.target.contains(abajo)) ? ' · ARRIBA: ' + this.quien(abajo) : ''}${isFinite(t.clientX) ? ` (${Math.round(t.clientX)},${Math.round(t.clientY)})` : ''}`; };
+    ['touchstart', 'pointerdown', 'click'].forEach(ev => document.addEventListener(ev, e => this.anotar(fino(e)), { capture:true, passive:true }));
+    document.addEventListener('click', e => { const el = e.target.closest && e.target.closest('[data-a]'); if (el) setTimeout(() => this.anotar(`  → hizo [${el.dataset.a}]${e.defaultPrevented ? '' : ' (sin preventDefault)'}`), 0); });
+    window.addEventListener('error', e => this.anotar('ERROR ' + (e.message || '')));
+    window.addEventListener('unhandledrejection', e => this.anotar('PROMESA ' + ((e.reason && e.reason.message) || e.reason)));
+    this.anotar('diagnóstico prendido: tocá varias cosas y sacá una captura');
+  },
+};
+document.addEventListener('DOMContentLoaded', () => Diag.arrancar());
+if (document.readyState !== 'loading') Diag.arrancar();

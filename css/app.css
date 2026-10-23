@@ -6548,3 +6548,5 @@ details.mt[open] .mt-flecha svg{transform:rotate(90deg)}
 /* La van que entra: la misma escena dada vuelta (de derecha a izquierda); el cartel queda al derecho. */
 .van-arranca.entra{transform:scaleX(-1)}
 .van-arranca.entra .va-cartel{transform:translate(-50%,-6px) scaleX(-1)}
+/* iPad / iPhone (23-10-2026): sin la espera del doble toque para hacer zoom, cada toque es un toque. */
+html{touch-action:manipulation}

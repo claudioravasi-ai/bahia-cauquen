@@ -606,6 +606,7 @@ const MANUAL_CAPS = [
   { id:'problemas', icon:'wrench', color:'warn', para:'todos', t:'Si algo no anda', s:'Soluciones rápidas', b:[
     ['lista', [
       '<b>Una ventana no abre o la app quedó rara</b>: Tu cuenta → <b>Actualizar la app</b>.',
+      '<b>Los toques no responden</b> (por ejemplo en un iPad): abrí la app con <b>?diag</b> al final de la dirección (por ejemplo …/index.html?diag). Abajo aparece un recuadro negro que anota cada toque, si el botón hizo algo y un "latido": si el latido se para, la app está congelada. Tocá varias cosas, sacá una captura y mandásela a quien mantiene la app. No guarda ni manda nada, y se apaga al cerrar la pestaña.',
       '<b>Equipo con poco lugar libre</b> (pasa sobre todo en iPad): los cambios viajan igual a la base del barrio. La app primero borra las prácticas del Manual de uso interactivo y su propia copia vieja; si aun así no hay lugar, deja de guardar la copia en el equipo por 5 minutos y sigue andando, sin trabarse. Sale una sola vez el cartel "Este equipo tiene poco espacio libre": conviene liberar lugar (fotos, videos, apps que no se usan).',
       '<b>No me llegan los avisos</b>: revisá el capítulo "Activar los avisos al celular". En iPhone, la app tiene que estar instalada.',
       '<b>El puntito del encabezado está rojo</b>: no hay internet. Lo que hagas se manda solo cuando vuelva la conexión.',
