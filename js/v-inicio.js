@@ -2258,7 +2258,7 @@ function procesarPasos(){
 const Ronda = {
   KEY:'bhc.ronda',
   leer(){ try { const r = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return r && r.c && Date.now() - r.at < CODIGO_VIGENCIA ? r : null; } catch(e){ return null; } },
-  guardar(c, nombre){ try { localStorage.setItem(this.KEY, JSON.stringify({ c, nombre, at:Date.now() })); } catch(e){} },
+  guardar(c, nombre, g){ try { localStorage.setItem(this.KEY, JSON.stringify({ c, nombre, at:Date.now(), ...(g ? { g } : {}) })); } catch(e){} },
   olvidar(){ try { localStorage.removeItem(this.KEY); } catch(e){} },
 };
 /* El enlace que recibe el policía por WhatsApp: deja el teléfono listo. */
@@ -2267,7 +2267,7 @@ function pintarRondaHabilitar(ruta){
   /* "#/ronda/guia": volver a ver el recorrido guardado en este teléfono. */
   if (c === 'guia') return pintarGuiaPolicia(typeof RondaGuia !== 'undefined' ? RondaGuia.leer() : null, Ronda.leer());
   const ok = /^\d{6}$/.test(c || ''), nombre = decodeURIComponent(n || '');
-  if (ok) Ronda.guardar(c, nombre);
+  if (ok) Ronda.guardar(c, nombre, token);
   $('#app').innerHTML = `<section class="bienvenida" id="puntoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
     <h1 style="font-size:28px">${I('shield')} Ronda de esta noche</h1>
@@ -2310,6 +2310,17 @@ function pintarPunto(codigo, yaBusco){
     try { const ng = await Promise.race([RondaGuia.bajar(null, c), new Promise(ok => setTimeout(() => ok(null), 6000))]); if (ng && aLista(ng.pts).length){ RondaGuia.guardar(ng); return ng; } } catch(e){}
     return null;
   };
+  /* LA GUÍA SE PONE AL DÍA SOLA (pedido de Claudio, 23-10-2026: "al policía
+     no le salían las fotos"). Antes el teléfono bajaba la guía una vez y la
+     usaba toda la noche: si la Administración sacaba o cambiaba las fotos de
+     los puntos después de que el policía abrió su enlace, él seguía con la
+     guía vieja, sin fotos. Ahora, con señal, cada QR vuelve a pedirla por
+     detrás (unos KB) y, si cambió, la guarda y vuelve a dibujar el punto. */
+  if (g && r && !yaBusco && navigator.onLine !== false && typeof RondaGuia !== 'undefined')
+    Promise.race([RondaGuia.bajar(r.g || null, r.c), new Promise(ok => setTimeout(() => ok(null), 8000))]).then(ng => {
+      if (!ng || !aLista(ng.pts).length || JSON.stringify(ng.pts) === JSON.stringify(g.pts)) return;
+      RondaGuia.guardar(ng); const f = $('#puntoForm'); if (f && !f.hidden && !f.querySelector('button:disabled')) pintarPunto(codigo, true);
+    }).catch(() => {});
   if (!g && r && !yaBusco) bajarGuia(r.c).then(ng => { const f = $('#puntoForm'); if (ng && f && !f.hidden && !f.querySelector('button:disabled')) pintarPunto(codigo, true); });
   $('#app').innerHTML = `<section class="bienvenida" id="puntoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>

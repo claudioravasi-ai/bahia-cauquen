@@ -55,7 +55,12 @@ function armarAgenda(f){
     `${plural(+h.pax || 1, 'persona')}${h.llegaVuelo ? ' · vuelo ' + h.llegaVuelo : ''}${h.patente ? ' · en auto' : ''} · la garita ya lo tiene en su lista`, { tipo:'huesped', id:h.id }));
   hotelHuespedes().filter(h => h.hasta === f && h.desde < f).forEach(h => add('sa-' + h.id, 'salen', h.saleHora, `Check-out de ${h.nombre}`,
     `${plural(+h.pax || 1, 'persona')}${h.saleVuelo ? ' · vuelo ' + h.saleVuelo : ''} · la garita marca la salida`, { tipo:'huesped', id:h.id }));
-  hotelViajes().filter(x => x.fecha === f && x.estado === 'programado').forEach(x => { const van = hotelVans().find(v => v.id === x.vanId);
+  /* (23-10-2026) El servicio regular al centro va en UN renglón (si no eran 9 iguales cada noche).
+     Quitarlo de la agenda no cancela nada: un viaje suelto se cancela desde la lista de traslados. */
+  const esRegular = x => /^hrsr-/.test(x.deRutina || '');
+  const regs = hotelViajes().filter(x => x.fecha === f && x.estado === 'programado' && esRegular(x)).sort((a, b) => (a.sale || '').localeCompare(b.sale || ''));
+  if (regs.length) add('vj-regular-' + f, 'vans', regs[0].sale, 'Servicio regular al centro', `${plural(regs.length, 'viaje')}: ${regs.map(x => x.sale).join(', ')} · la garita marca cada salida y vuelta`);
+  hotelViajes().filter(x => x.fecha === f && x.estado === 'programado' && !esRegular(x)).forEach(x => { const van = hotelVans().find(v => v.id === x.vanId);
     add('vj-' + x.id, 'vans', x.sale, textoViaje(x), `${van ? van.nombre : 'todavía sin van'} · ${plural(+x.pax || 0, 'pasajero')}${x.deRutina ? ' · automatizado' : x.auto ? ' · armado con los vuelos' : ''}`, { tipo:'viaje', id:x.id }); });
   hotelEventos().filter(e => e.fecha === f).forEach(e => add('ev-' + e.id, 'eventos', e.desde, e.titulo,
     `${plural(+e.asistentes || 0, 'invitado')}${e.musicaHasta ? ' · música hasta las ' + e.musicaHasta : ''}${e.publicado ? ' · vecinos avisados' : ''}`, { tipo:'evento', id:e.id }));
@@ -241,7 +246,7 @@ function bitacoraDelDia(f, { garita = false } = {}){
   const enDia = at => at && isoDe(new Date(at)) === f, P = [], add = (at, k, t) => P.push({ at, k, t });
   const vans = aLista(Store.s.hotelVans).filter(Boolean), emps = hotelEmpleados();
   aLista(Store.s.hotelMovs).filter(m => m && enDia(m.at)).forEach(m => {
-    if (m.vanId){ const v = vans.find(x => x.id === m.vanId) || {}; add(m.at, 'vans', `${v.nombre || 'Una van'} ${m.tipo === 'in' ? 'volvió al barrio' : 'salió del barrio'}${m.viaje ? ' · ' + m.viaje : ''}`); }
+    if (m.vanId){ const v = vans.find(x => x.id === m.vanId) || {}; add(m.at, 'vans', `${v.nombre || 'Una van'} ${m.tipo === 'in' ? 'volvió al barrio' : 'salió del barrio'}${m.viaje ? ' · ' + m.viaje : ''}${m.pax != null && typeof paxTexto === 'function' ? ' · ' + paxTexto(m.pax) : ''}`); }
     else if (m.empId){ const e = emps.find(x => x.id === m.empId); add(m.at, 'personal', `${m.tipo === 'in' ? 'Entró' : 'Salió'} ${e ? `${hEmpNombre(e)}${e.puesto ? ' (' + e.puesto + ')' : ''}` : 'un empleado del hotel'}`); }
     else if (m.huespedId) add(m.at, m.tipo === 'in' ? 'llegan' : 'salen', `Un huésped ${m.tipo === 'in' ? 'volvió' : 'salió'} con su pase${m.aPie ? ', a pie' : ''}`);
   });
@@ -249,6 +254,10 @@ function bitacoraDelDia(f, { garita = false } = {}){
   const vs = aLista(Store.s.hotelViajes).filter(x => x && !x.rutina && x.fecha === f);
   const atDe = hhmm => { const m = minDe(hhmm); return m == null ? 0 : fechaDe(f).getTime() + m * 60000; };
   vs.filter(x => x.estado === 'cancelado').forEach(x => add(atDe(x.sale) || fechaDe(f).getTime(), 'vans', `Traslado cancelado: ${textoViaje(x)}${x.sale ? ' (' + x.sale + ' h)' : ''}`));
+  /* (23-10-2026) Lo que la garita no marcó: con la oblea la van pasa sola, así que queda dicho "sin marcar" (no es una falta del hotel). */
+  const pasoHora = x => { const t = x.estado === 'en_curso' ? (minDe(regresoViaje(x)) ?? (minDe(x.sale) != null ? minDe(x.sale) + 180 : null)) : minDe(x.sale); return t != null && t + 60 < ahoraMin(); };
+  const sinMarcar = vs.filter(x => x.estado === 'sin_marcar' || ((x.estado === 'programado' || x.estado === 'en_curso') && (f < hoyISO() || (f === hoyISO() && pasoHora(x)))));
+  sinMarcar.forEach(x => add(atDe(x.sale) || fechaDe(f).getTime(), 'vans', `Sin marcar en la garita: ${textoViaje(x)}${x.sale ? ' (' + x.sale + ' h)' : ''}${x.estado === 'en_curso' || x.sinMarcar === 'vuelta' ? ' · salió, no se marcó la vuelta' : ''}`));
   hotelEventos().filter(e => e.fecha === f).forEach(e => add(atDe(e.desde) || fechaDe(f).getTime() + 12 * 3600000, 'eventos', `Evento: ${e.titulo} · ${plural(+e.asistentes || 0, 'invitado')}${e.musicaHasta ? ' · música hasta las ' + e.musicaHasta : ''}`));
   hotelDiario().filter(a => a.tipo === 'agenda' && a.estado === 'aprobada' && enDia(a.aprobadaAt)).forEach(a => { const r = a.resumen || {};
     add(a.aprobadaAt, 'otro', `La gerencia aprobó la agenda del ${fechaCorta(a.fecha)} · ${plural(r.ok || 0, 'tarea')}${r.cambios ? ` · ${plural(r.cambios, 'cambio')} a mano` : ''}`); });
@@ -261,11 +270,12 @@ function bitacoraDelDia(f, { garita = false } = {}){
     else if (b.tipo !== 'acceso' && /hotel/i.test(b.texto || '')){ obs++; add(b.at, 'obs', `Observación de la garita: ${String(b.texto).slice(0, 140)}`); }
   });
   P.sort((a, b) => a.at - b.at);
-  const vansMovs = P.filter(p => p.k === 'vans' && !/cancelado/i.test(p.t)).length;
+  const vansMovs = P.filter(p => p.k === 'vans' && !/cancelado|sin marcar/i.test(p.t)).length;
+  const cv = typeof conteoVans === 'function' ? conteoVans(f, f) : null;
   const provMal = hotelProvs().filter(p => p.estado !== 'suspendido' && estadoProv(p, f)[0] === 'danger');
   const evs = hotelEventos().filter(e => e.fecha === f);
   const controles = [
-    { ok:true, t: vansMovs ? `Las vans pasaron ${vansMovs} veces por la garita, todas registradas` : 'Sin movimientos de vans para revisar' },
+    { ok:true, t: vansMovs ? `Las vans pasaron ${vansMovs} veces por la garita${cv ? ` (${plural(cv.salidas, 'salida')} y ${plural(cv.entradas, 'entrada')}, ${plural(cv.huespedesSalen + cv.huespedesEntran, 'huésped', 'huéspedes')} a bordo)` : ''}${sinMarcar.length ? `; ${plural(sinMarcar.length, 'viaje quedó', 'viajes quedaron')} sin marcar` : ', todas registradas'}` : sinMarcar.length ? `${plural(sinMarcar.length, 'viaje', 'viajes')} sin marcar en la garita` : 'Sin movimientos de vans para revisar' },
     { ok:!provMal.length, t: provMal.length ? `${plural(provMal.length, 'proveedor')} con la ART o el seguro vencidos: ${provMal.map(p => p.empresa).join(', ')}` : 'Proveedores con ART y seguro al día' },
     { ok:true, t:'Huéspedes anunciados a la garita antes de llegar' },
     ...evs.map(e => ({ ok:true, t:`Evento "${e.titulo}" avisado${e.musicaHasta ? `, con música hasta las ${e.musicaHasta}` : ''}` })),

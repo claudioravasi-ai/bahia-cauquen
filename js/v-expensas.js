@@ -150,6 +150,19 @@ function cuentaLote(lote){
   return { movs, saldo, informado, porAcreditar:informado };
 }
 const saldoLote = lote => cuentaLote(lote).saldo;
+/* LA CUENTA SE MUESTRA CUANDO LLEGÓ ENTERA (pedido de Claudio, 23-10-2026:
+   "al conectarse aparece que las expensas de septiembre las tengo impagas y
+   a los segundos desaparece"). Al abrir la app, las expensas del mes y los
+   pagos bajan de la base por separado: si llegaba primero la expensa, por
+   unos segundos la cuenta daba "debe" y salía el aviso rojo. Ahora, hasta
+   que llegaron las liquidaciones, las cuotas y los pagos (o pasaron 30 s),
+   no se avisa nada y Mis expensas dice "Trayendo tu cuenta…". */
+const cuentasBajadas = () => {
+  if (typeof Nube === 'undefined' || !Nube.activa()) return true;
+  if (!Nube.arrancada) return false;
+  if (Date.now() - (Nube.arranqueAt || 0) > 30000) return true;
+  return [...(Nube.esperados || [])].filter(k => /(liquidaciones|liqResumen|pagos|cuotasLote)$/.test(k)).every(k => Nube.listos.has(k));
+};
 const miLote = () => yo()?.casa || '';
 
 /* Lo que hay que pagar este mes, con el recargo si ya pasó el primer
@@ -206,6 +219,7 @@ function completarRepartos(){
    se le sigue recordando.
    ========================================================= */
 function estadoVencimiento(lote){
+  if (!cuentasBajadas()) return null;
   const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || !lote) return null;
   const cuenta = cuentaLote(lote), deuda = Math.round((cuenta.saldo - cuenta.informado) * 100) / 100;
   if (deuda <= .5) return null;
@@ -456,6 +470,8 @@ R.expensas = {
   },
 };
 function carpetaVecino(lote, { ajena = false } = {}){
+  if (!cuentasBajadas()){ if (typeof refrescarPronto === 'function') setTimeout(refrescarPronto, 1500);
+    return `<div class="card plana center muted" style="padding:28px 16px">${I('refresh')} Trayendo tu cuenta de la base del barrio…</div>`; }
   const cuenta = cuentaLote(lote), pagar = aPagar(lote), c = cfgExp();
   const L = lote && typeof LOTES !== 'undefined' ? LOTES.find(x => 'Lote ' + x.lote === lote) : null;
   const emitidas = liquidacionesEmitidas().slice().reverse();
@@ -522,6 +538,7 @@ function carpetaVecino(lote, { ajena = false } = {}){
    ========================================================= */
 function expensasHotel(){
   const lotes = lotesDelHotel(); if (!lotes.length) return vacio('wallet', 'No hay unidades del hotel en el padrón.');
+  if (!cuentasBajadas()){ if (typeof refrescarPronto === 'function') setTimeout(refrescarPronto, 1500); return `<div class="card plana center muted" style="padding:28px 16px">${I('refresh')} Trayendo la cuenta de la base del barrio…</div>`; }
   const d = deudaGrupo(lotes), total = totalDeuda(d), c = cfgExp();
   const uf = lotes.map(l => ({ lote:l, L:LOTES.find(x => 'Lote ' + x.lote === l), cu:cuentaLote(l) }));
   const saldo = Math.round(uf.reduce((a, x) => a + x.cu.saldo, 0) * 100) / 100, informado = Math.round(uf.reduce((a, x) => a + x.cu.informado, 0) * 100) / 100;

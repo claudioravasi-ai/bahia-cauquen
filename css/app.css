@@ -6467,3 +6467,29 @@ li.prox .rm-gn{background:#ff9a3d}
 .tv-k-noches i{position:relative;display:grid;place-items:end center}.tv-k-noches i em{font-style:normal;font-size:8.5px;font-weight:800;color:rgba(255,255,255,.85);position:absolute;bottom:-12px}
 .tv-k-noches i.fut{background:transparent;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
 .tv-k.k-sem .tv-k-noches{margin-bottom:12px}.tv-k-ir{display:flex;align-items:center;gap:2px;font-weight:700}.tv-k-ir svg{width:13px;height:13px}
+
+/* EL SERVICIO REGULAR AL CENTRO (23-10-2026): la fila de la hora se resalta
+   (sin animación: en el iPad pesan), el "¿vacía o con huéspedes?" y el conteo. */
+.vg-fila.ahora{border-color:var(--brand);background:var(--brand-soft);box-shadow:0 0 0 2px var(--brand-soft)}
+.vg-fila .grow > small.vg-ya{color:var(--brand);font-weight:700}
+.vg-fila .grow > small.vg-ya svg{width:13px;height:13px;vertical-align:-2px}
+.vp-grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:8px}
+.vp-b{min-height:52px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);color:var(--ink);font:700 18px var(--font);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.vp-b.vacia{grid-column:1/-1;font-size:16px;background:var(--surface);border-style:dashed}
+.vp-b.vacia svg{width:18px;height:18px}
+.vp-b.nose{width:100%;min-height:44px;font-size:14px;font-weight:600;color:var(--ink-2)}
+.vp-b:active{transform:scale(.97)}
+.cv2-chico{margin:6px 0 8px;font-size:12.5px;color:var(--ink-2)}
+.cv2-chico svg{width:14px;height:14px;vertical-align:-2px}
+.cv2{padding:12px 14px}
+.cv2-cab{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 10px;margin-bottom:8px}
+.cv2-cab b{display:flex;align-items:center;gap:6px}
+.cv2-cab b svg{width:16px;height:16px}
+.cv2-cab small{color:var(--ink-2);font-size:12px}
+.cv2-fila{display:grid;grid-template-columns:minmax(64px,auto) repeat(4,1fr);gap:6px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.cv2-t{font-weight:700;font-size:13px}
+.cv2-fila span:not(.cv2-t){display:flex;flex-direction:column;align-items:center;text-align:center}
+.cv2-fila b{font-size:18px;line-height:1.1}
+.cv2-fila small{font-size:11px;color:var(--ink-2)}
+.cv2-fila .falta b{color:var(--warn)}
+@media (max-width:380px){.cv2-fila{grid-template-columns:repeat(4,1fr)}.cv2-t{grid-column:1/-1}}

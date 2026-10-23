@@ -109,6 +109,10 @@ const minDe = h => /^\d{1,2}:\d{2}$/.test(String(h || '')) ? minutosDe(h) : null
 /* Dónde está cada van: por su último paso registrado en la garita. */
 function estadoVan(v){
   const m = hotelMovs().find(x => x.vanId === v.id);
+  /* (23-10-2026) Una salida de un día anterior que nadie cerró ya no deja la
+     van "afuera para siempre": las vans entran y salen solas con la oblea,
+     así que a la mañana siguiente se la da por adentro (supuesto). */
+  if (m && m.tipo === 'out' && isoDe(new Date(m.at)) < hoyISO()) return { adentro:true, desde:m.at, mov:m, supuesto:true };
   return !m ? { adentro:true, desde:0, sin:true } : { adentro:m.tipo === 'in', desde:m.at, mov:m };
 }
 /* ¿CUÁNDO VUELVE LA VAN? (pedido de Claudio, 22-10-2026: "la Van 2 que
@@ -146,7 +150,65 @@ function vanAfuera(v, e = estadoVan(v)){
   return { x, que: x ? textoViaje(x) : (e.mov && e.mov.viaje) || '', salio: e.desde ? hora(e.desde) : '', vuelve, tarde: t != null && ahoraMin() > t + 20 };
 }
 const DESTINOS_HOTEL = { aeropuerto:['Aeropuerto', 'send'], puerto:['Puerto', 'barco'], centro:['Centro', 'pin'], excursion:['Excursión', 'tree'], otro:['Otro', 'car'] };
-const ESTADO_VIAJE = { programado:['Programado', 'sky'], en_curso:['En viaje', 'warn'], hecho:['Hecho', 'ok'], cancelado:['Cancelado', ''] };
+const ESTADO_VIAJE = { programado:['Programado', 'sky'], en_curso:['En viaje', 'warn'], hecho:['Hecho', 'ok'], cancelado:['Cancelado', ''], sin_marcar:['Sin marcar', 'warn'] };
+
+/* =========================================================
+   EL SERVICIO REGULAR AL CENTRO (pedido de Claudio, 23-10-2026)
+   Las vans del hotel tienen una oblea en el parabrisas que les abre la
+   barrera sola: nadie está obligado a registrarlas. Pero salen siempre a
+   la misma hora (cartel del hotel "Servicio regular transfer Hotel - Centro
+   de Ushuaia"): con ese horario a la vista, la garita marca "Salió" y
+   "Volvió" en un toque y dice si iba vacía o con huéspedes (cuántos).
+     · Los 9 viajes de todos los días se cargan solos como traslados
+       automatizados (una sola vez: si el hotel después los cambia, los
+       pausa o los borra, no vuelven). "vuelve" es la hora en que la van
+       sale del centro de regreso (parada: Av. Maipú 465).
+     · Lo que nadie marcó se cierra solo al día siguiente como "sin marcar"
+       (ver cerrarViajesViejos): la van nunca queda "afuera para siempre".
+     · Conteo del día y del mes: salidas, entradas y huéspedes (solo
+       números, sin nombres). Lo ven el hotel, la garita y la Administración.
+   ========================================================= */
+const SERVICIO_REGULAR = [['08:10', '08:30'], ['10:00', '10:30'], ['13:00', '13:30'], ['14:00', '15:30'], ['16:10', '16:30'], ['17:10', '17:30'], ['19:00', '19:30'], ['22:00', '22:30'], ['23:10', '23:30']];
+const rutinasRegulares = () => SERVICIO_REGULAR.map(([sale, vuelve]) => ({ id:'hrsr-' + sale.replace(':', ''), rutina:true, activa:true, regular:true,
+  nombre:'Servicio regular al centro', dias:[1, 2, 3, 4, 5, 6, 0], sale, vuelve, destino:'centro', sentido:'llevar', pax:0, vanId:'', chofer:'', desde:hoyISO(), hasta:'',
+  nota:'Parada en el centro: Av. Maipú 465', at:Date.now() }));
+/* Se cargan una sola vez: con la marca en la ficha del hotel, o si ya hay alguno. */
+function sembrarServicioRegular(s){
+  const info = hotelInfo();
+  if (info.servicioRegular || aLista(s.hotelViajes).some(x => x && x.rutina && (x.regular || /^hrsr-/.test(x.id || '')))) return 0;
+  s.hotelViajes = aLista(s.hotelViajes).concat(rutinasRegulares());
+  generarRutinas(s);
+  return SERVICIO_REGULAR.length;
+}
+/* Lo de días anteriores que quedó sin marcar se cierra como "sin marcar". */
+function cerrarViajesViejos(s){
+  const hoy = hoyISO(); let n = 0;
+  aLista(s.hotelViajes).forEach(x => { if (x && !x.rutina && x.fecha && x.fecha < hoy && (x.estado === 'programado' || x.estado === 'en_curso')){
+    x.sinMarcar = x.estado === 'en_curso' ? 'vuelta' : 'salida'; x.estado = 'sin_marcar'; x.cerradoAt = Date.now(); n++; } });
+  return n;
+}
+/* Cuántos iban en la van, en palabras. */
+const paxTexto = n => n == null || n === '' ? '' : +n === 0 ? 'vacía' : `con ${plural(+n, 'huésped', 'huéspedes')}`;
+/* EL CONTEO: salidas, entradas, huéspedes y viajes sin marcar, entre dos fechas (inclusive). */
+function conteoVans(desde, hasta){
+  const movs = hotelMovs().filter(m => m.vanId && isoDe(new Date(m.at)) >= desde && isoDe(new Date(m.at)) <= hasta);
+  const c = { salidas:0, entradas:0, conHuespedes:0, vacias:0, huespedesSalen:0, huespedesEntran:0,
+    sinMarcar: hotelViajes().filter(x => x.fecha >= desde && x.fecha <= hasta && (x.estado === 'sin_marcar' || (x.fecha === hoyISO() && x.estado === 'programado' && x.sale && minutosDe(x.sale) + 60 < ahoraMin()))).length };
+  movs.forEach(m => { const out = m.tipo === 'out'; c[out ? 'salidas' : 'entradas']++;
+    if (m.pax == null) return; if (+m.pax > 0){ c.conHuespedes++; c[out ? 'huespedesSalen' : 'huespedesEntran'] += +m.pax; } else c.vacias++; });
+  return c;
+}
+function conteoVansHTML({ chico = false } = {}){
+  if (!hotelVans().length && !hotelRutinas().length) return '';
+  const hoy = hoyISO(), d = conteoVans(hoy, hoy), m = conteoVans(hoy.slice(0, 8) + '01', hoy);
+  const fila = (t, c) => `<div class="cv2-fila"><span class="cv2-t">${t}</span>
+    <span><b>${c.salidas}</b><small>salidas</small></span><span><b>${c.entradas}</b><small>entradas</small></span>
+    <span><b>${c.huespedesSalen + c.huespedesEntran}</b><small>huéspedes</small></span><span class="${c.sinMarcar ? 'falta' : ''}"><b>${c.sinMarcar}</b><small>sin marcar</small></span></div>`;
+  if (chico) return `<p class="cv2-chico">${I('car')} Hoy: <b>${plural(d.salidas, 'salida')}</b> · <b>${plural(d.entradas, 'entrada')}</b> · <b>${plural(d.huespedesSalen + d.huespedesEntran, 'huésped', 'huéspedes')}</b> en las vans${d.sinMarcar ? ` · <b>${d.sinMarcar} sin marcar</b>` : ''}</p>`;
+  return `<div class="card cv2"><div class="cv2-cab"><b>${I('car')} Las vans por la garita</b><small>Lo que marca la garita · solo números, sin nombres</small></div>
+    ${fila('Hoy', d)}${fila(new Date().toLocaleDateString('es-AR', { month:'long' }).replace(/^./, x => x.toUpperCase()), m)}
+    <p class="muted tiny" style="margin:6px 0 0">Huéspedes: ${d.huespedesSalen} salieron y ${d.huespedesEntran} entraron hoy (${m.huespedesSalen} y ${m.huespedesEntran} en el mes). ${m.vacias ? `${plural(m.vacias, 'viaje vacío', 'viajes vacíos')} en el mes.` : ''}</p></div>`;
+}
 
 /* Cuándo tiene que salir la van, según el vuelo o el crucero. */
 function salidaVuelo(v, info = hotelInfo()){
@@ -239,10 +301,13 @@ const HotelMotor = {
     });
     const hs = hotelHuespedes(), viejos = hs.filter(h => h.hasta && h.hasta < sumarDias(hoy, -1));
     const hoyN = hs.filter(h => h.desde <= hoy && h.hasta >= hoy).reduce((a, h) => a + (+h.pax || 1), 0);
-    const hayCambios = viejos.length || avisos.length || info.huespedesHoy !== hoyN || info.huespedesDia !== hoy;
+    const hayCambios = viejos.length || avisos.length || info.huespedesHoy !== hoyN || info.huespedesDia !== hoy || !info.servicioRegular || aLista(Store.s.hotelViajes).some(x => x && !x.rutina && x.fecha < hoy && (x.estado === 'programado' || x.estado === 'en_curso'));
     Store.cambiar(s => {
       if (viejos.length){ const fuera = new Set(viejos.map(h => h.id)); s.hotelHuespedes = aLista(s.hotelHuespedes).filter(h => !fuera.has(h.id)); }
       trasladosDeHuespedes(s);
+      /* (23-10-2026) El servicio regular al centro, una sola vez (queda la marca en la ficha). */
+      if (!info.servicioRegular){ sembrarServicioRegular(s); guardarInfo(s, { servicioRegular:hoy }); }
+      cerrarViajesViejos(s);
       generarRutinas(s);
       if (info.huespedesHoy !== hoyN || info.huespedesDia !== hoy) guardarInfo(s, { huespedesHoy:hoyN, huespedesDia:hoy });
       avisos.forEach(a => notificar(s, { para:[u.id], titulo:a.titulo, texto:a.texto, icon:'car', color: a.urgente ? 'danger' : 'wood', link:'hotel-traslados', sonido:true, urgente:a.urgente }));
@@ -254,8 +319,17 @@ const HotelMotor = {
      días se van. */
   garita(){
     if (rutinasQueFaltan(2).length) Store.cambiar(s => { generarRutinas(s, 2); });
+    /* (23-10-2026) El servicio regular al centro y el cierre de lo que quedó sin marcar. */
+    if (!Nube.activa || !Nube.activa() || Nube.listoParaMotor()){
+      /* Con lo de verdad (Store.s), no con el ejemplo que puede estar a la vista. */
+      const reales = aLista(Store.s.hotelViajes).filter(Boolean);
+      const viejos = reales.some(x => !x.rutina && x.fecha < hoyISO() && (x.estado === 'programado' || x.estado === 'en_curso'));
+      const sembrar = !hotelInfo().servicioRegular && !reales.some(x => x.rutina && (x.regular || /^hrsr-/.test(x.id || ''))) && vansReales().length;
+      if (viejos || sembrar) Store.cambiar(s => { if (sembrar) sembrarServicioRegular(s); cerrarViajesViejos(s); });
+    }
     if (!this.marcar('limpieza-movs-' + hoyISO())) return;
-    const lim = Date.now() - 30 * DIA;
+    /* 40 días (23-10-2026): el conteo del mes necesita el mes entero. */
+    const lim = Date.now() - 40 * DIA;
     if (hotelMovs().some(m => m.at < lim)) Store.cambiar(s => { s.hotelMovs = aLista(s.hotelMovs).filter(m => m && m.at >= lim); });
   },
 };
@@ -586,7 +660,8 @@ A['hhoy-tab'] = el => { HotelVista.hoyTab = el.dataset.v || 'vuelos'; refrescar(
 function hotelEnLaApp({ promosPend = 0, sinLeer = 0 } = {}){
   const lotes = typeof lotesDelHotel === 'function' ? lotesDelHotel() : [];
   let exp = null;
-  if (lotes.length){ const d = deudaGrupo(lotes), tot = totalDeuda(d), l = liquidacionesEmitidas().slice(-1)[0];
+  if (lotes.length && typeof cuentasBajadas === 'function' && !cuentasBajadas()) exp = { t:'Expensas del hotel', s:'Trayendo la cuenta…' };
+  else if (lotes.length){ const d = deudaGrupo(lotes), tot = totalDeuda(d), l = liquidacionesEmitidas().slice(-1)[0];
     exp = { t:'Expensas del hotel', s: tot > .5 ? `${plata(tot)} entre las ${lotes.length} UF${l ? ' · vence el ' + fechaCorta(vtoDe(l.periodo, 1)) : ''}` : `Las ${lotes.length} UF al día · cupones y recibos`, badge: tot > .5 ? '!' : '' }; }
   const rs = hotelRutinas().filter(r => r.activa !== false).length;
   const T = [
@@ -608,9 +683,11 @@ function hotelEnLaApp({ promosPend = 0, sinLeer = 0 } = {}){
     { v:'vecinos', ic:'pin', c:'sky', t:'Direcciones del barrio', s:'Para guiar a un huésped' },
     { v:'hotel-ficha', ic:'sliders', c:'sky', t:'Ficha del hotel', s:'Responsable, tiempos de traslado, DEA' },
     { v:'agenda', ic:'book', c:'cobre', t:'Agenda de Ushuaia', s:'Taxis, comidas, farmacias' },
-    { v:'documentos', ic:'file', c:'brand', t:'Normas', s:'Reglamento y convivencia' },
     { v:'hotel-convenio', ic:'clipboard', c:'wood', t:'Convenio con el barrio', s:'Modelo de convivencia y servicios' },
-    { v:'manual', ic:'book', c:'accent', t:'Manual de uso', s:'El capítulo del hotel' },
+    /* Normas y Manual de uso eran dos tejas que llevaban a la misma ventana
+       con dos solapas (pedido de Claudio, 23-10-2026: "son lo mismo,
+       unificalo"): una sola puerta, como en El barrio. */
+    { v:'manual', ic:'book', c:'accent', t:'Manual y normas', s:'Cómo usar la app · reglamento y convivencia' },
   ];
   const primera = !HotelVista.hapVista; HotelVista.hapVista = true;
   return `<div class="hap ${primera ? 'entra' : ''}">${T.map((x, i) => { const b = +x.badge || (x.badge === '!' ? '!' : 0);
@@ -672,6 +749,7 @@ R['hotel-traslados'] = {
         ${esHotel() ? `<button class="btn btn-sm btn-pri" data-a="hviaje-nuevo">${I('plus')}Traslado</button>` : ''}</div>
       ${(() => { const rs = hotelRutinas(), act = rs.filter(r => r.activa !== false).length; if (!rs.length && !esHotel()) return '';
         return `<button type="button" class="ht-auto" data-a="abrir" data-v="hotel-rutinas"><span class="ht-auto-ic">${I('refresh')}</span><span class="grow"><b>${rs.length ? plural(act, 'traslado automatizado', 'traslados automatizados') : 'Traslados automatizados'}</b><small>${rs.length ? `Se arman solos cada día${rs.length > act ? ` · ${rs.length - act} en pausa` : ''}` : 'Las salidas de siempre, cargadas una vez'}</small></span>${I('right')}</button>`; })()}
+      ${dia === hoy ? conteoVansHTML() : ''}
       <div class="ht-dias" role="tablist">${[0, 1, 2, 3, 4, 5, 6].map(i => sumarDias(hoy, i)).map(d => { const t = diaTxt(d), n = cuantos(d);
         return `<button type="button" role="tab" aria-selected="${d === dia}" class="ht-dia ${d === dia ? 'on' : ''}" data-a="abrir" data-v="hotel-traslados" data-p="${d}"><small>${esc(t.sem)}</small><b>${t.n}</b>${n ? `<span>${n}</span>` : '<i></i>'}</button>`; }).join('')}</div>
       <div class="card hl-caja">${rielDia(vs.filter(x => x.estado !== 'cancelado'), dia)}${lineaTraslados(vs.filter(x => x.estado !== 'cancelado'), { dia, acciones:true })}</div>
@@ -778,8 +856,26 @@ A['hqr-imprimir'] = async el => {
 /* La garita registra el paso de una van: el traslado que le tocaba se
    actualiza solo. Si viene de la solapa de las vans, trae el traslado
    exacto (`data-p`); si no, se busca el más cercano en hora. */
-A['hvan-mov'] = el => moverVan(el.dataset.id, el.dataset.v === 'in' ? 'in' : 'out', el.dataset.p || '');
-function moverVan(vanId, tipo, viajeId = ''){
+/* ¿VACÍA O CON HUÉSPEDES? (pedido de Claudio, 23-10-2026). Antes de anotar
+   el paso, la garita dice en un toque cuántos huéspedes iban: así se cuenta
+   cuántos entran y salen del barrio. "No se ve" deja el paso sin ese dato. */
+A['hvan-mov'] = el => {
+  const tipo = el.dataset.v === 'in' ? 'in' : 'out';
+  if (el.dataset.pax === undefined) return pedirPaxVan(el.dataset.id, tipo, el.dataset.p || '');
+  moverVan(el.dataset.id, tipo, el.dataset.p || '', el.dataset.pax === '' ? null : +el.dataset.pax);
+};
+function pedirPaxVan(vanId, tipo, viajeId = ''){
+  if (!soloGarita()) return;
+  const v = hotelVans().find(x => x.id === vanId); if (!v) return;
+  const x = viajeId ? hotelViajes().find(y => y.id === viajeId) : null;
+  const b = (pax, t, cls = '') => `<button type="button" class="vp-b ${cls}" data-a="hvan-mov" data-id="${esc(vanId)}" data-v="${tipo}" data-p="${esc(viajeId)}" data-pax="${pax}">${t}</button>`;
+  hoja(`${v.nombre} ${tipo === 'in' ? 'volvió' : 'salió'}`, `<p class="muted small" style="margin:0 0 12px">${x ? `${esc(x.sale || '')} h · ${esc(textoViaje(x))} · ` : ''}<span class="mono">${esc(v.patente || '')}</span></p>
+    <p style="margin:0 0 8px"><b>¿Cómo ${tipo === 'in' ? 'vino' : 'iba'}?</b></p>
+    <div class="vp-grilla">${b(0, `${I('car')}Vacía`, 'vacia')}${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15].map(n => b(n, n)).join('')}</div>
+    <p class="muted tiny" style="margin:10px 0 8px">El número es la cantidad de huéspedes (sin contar al chofer). Solo se guarda el número, sin nombres.</p>
+    ${b('', 'No se ve: anotar sin el número', 'nose')}`);
+}
+function moverVan(vanId, tipo, viajeId = '', pax = null){
   if (!soloGarita()) return;
   const v = hotelVans().find(x => x.id === vanId); if (!v) return;
   const at = Date.now(), ahora = ahoraMin(), hoy = hoyISO();
@@ -790,23 +886,24 @@ function moverVan(vanId, tipo, viajeId = ''){
     if (tipo === 'out'){
       viaje = elegido || vs.filter(x => x.estado === 'programado' && (!x.vanId || x.vanId === v.id) && (!x.sale || Math.abs(minutosDe(x.sale) - ahora) <= 90))
         .sort((a, b) => (!!b.vanId - !!a.vanId) || Math.abs(minutosDe(a.sale || '12:00') - ahora) - Math.abs(minutosDe(b.sale || '12:00') - ahora))[0] || null;
-      if (viaje){ viaje.estado = 'en_curso'; viaje.salioAt = at; viaje.vanId = viaje.vanId || v.id; }
+      if (viaje){ viaje.estado = 'en_curso'; viaje.salioAt = at; viaje.vanId = viaje.vanId || v.id; if (pax != null) viaje.paxSale = pax; }
     } else {
       viaje = elegido || vs.find(x => x.estado === 'en_curso' && x.vanId === v.id) || null;
-      if (viaje){ viaje.estado = 'hecho'; viaje.volvioAt = at; }
+      if (viaje){ viaje.estado = 'hecho'; viaje.volvioAt = at; if (pax != null) viaje.paxVuelve = pax; }
     }
-    s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:'hm' + uid(), vanId:v.id, tipo, at, por:yo().id, viaje: viaje ? textoViaje(viaje) : '' });
-    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: van del hotel ${v.nombre} (${v.patente})${viaje ? ' · ' + textoViaje(viaje) : ''}`, at });
-    const h = hotelId(); if (h) notificar(s, { para:[h], titulo:`${v.nombre} ${tipo === 'in' ? 'entró al barrio' : 'salió del barrio'}`, texto:`${hora(at)} h${viaje ? ' · ' + textoViaje(viaje) : ''}`, icon:'car', color:'wood', link:'hotel-traslados', push:false });
+    const px = paxTexto(pax);
+    s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:'hm' + uid(), vanId:v.id, tipo, at, por:yo().id, viaje: viaje ? textoViaje(viaje) : '', ...(pax != null ? { pax } : {}) });
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: van del hotel ${v.nombre} (${v.patente})${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, at });
+    const h = hotelId(); if (h) notificar(s, { para:[h], titulo:`${v.nombre} ${tipo === 'in' ? 'entró al barrio' : 'salió del barrio'}`, texto:`${hora(at)} h${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, icon:'car', color:'wood', link:'hotel-traslados', push:false });
   });
-  cerrarHoja(); toast(`${v.nombre}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada`, tipo === 'in' ? 'login' : 'logout');
+  cerrarHoja(); toast(`${v.nombre}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada${pax != null ? ' · ' + paxTexto(pax) : ''}`, tipo === 'in' ? 'login' : 'logout');
 }
 /* Desde la solapa: el traslado sin van asignada pregunta cuál sale. */
 A['hviaje-mov'] = el => {
   if (!soloGarita()) return;
   const x = hotelViajes().find(v => v.id === el.dataset.id); if (!x) return;
   const tipo = el.dataset.v === 'in' ? 'in' : 'out', vans = hotelVans();
-  if (x.vanId || vans.length === 1) return moverVan(x.vanId || vans[0].id, tipo, x.id);
+  if (x.vanId || vans.length === 1) return pedirPaxVan(x.vanId || vans[0].id, tipo, x.id);
   if (!vans.length) return toast('El hotel todavía no cargó sus vans', 'car');
   hoja('¿Qué van sale?', `<p class="muted small" style="margin:0 0 10px">${esc(x.sale || '')} h · ${esc(textoViaje(x))}</p>
     ${vans.map(v => `<button class="superficie" data-a="hvan-mov" data-id="${esc(v.id)}" data-v="${tipo}" data-p="${esc(x.id)}"><span class="ic ic-wood">${I('car')}</span><span class="txt"><b>${esc(v.nombre)}</b><small class="mono">${esc(v.patente || '')}${v.chofer ? ' · ' + esc(v.chofer) : ''}</small></span>${I('right')}</button>`).join('')}`);
@@ -827,17 +924,21 @@ function bandaVansGarita(opera){
   const vanDe = x => vans.find(v => v.id === x.vanId);
   const fila = x => { const v = vanDe(x), d = DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro, aj = ajusteViaje(x), curso = x.estado === 'en_curso';
     const tarde = x.estado === 'programado' && x.sale && ahoraMin() > minutosDe(x.sale) + 15;
-    return `<div class="vg-fila ${curso ? 'curso' : ''} ${tarde ? 'tarde' : ''}"><div class="vg-hora"><b>${esc(x.sale || '—')}</b><small>${curso ? 'en viaje' : 'sale'}</small></div>
-      <div class="grow"><b>${I(d[1])} ${esc(textoViaje(x))}</b>
-        <small>${v ? `${esc(v.nombre)} · <span class="mono">${esc(v.patente || '')}</span>` : 'van sin asignar'}${choferDe(x) ? ' · ' + esc(choferDe(x)) : ''} · ${plural(+x.pax || 0, 'pasajero')}${curso && x.salioAt ? ` · salió ${hora(x.salioAt)} h${regresoViaje(x) ? ` · vuelve ~${esc(regresoViaje(x))} h` : ''}` : ''}${tarde ? ' · <b>se atrasó</b>' : ''}</small>
+    /* (23-10-2026) Cuando llega la hora (5 min antes de salir, o de la vuelta) la fila se resalta, sin alarmas ni sonidos. */
+    const t = ahoraMin(), vuelve = curso ? minDe(regresoViaje(x)) : null;
+    const ahora = !tarde && ((x.estado === 'programado' && x.sale && t >= minutosDe(x.sale) - 5 && t <= minutosDe(x.sale) + 15) || (curso && vuelve != null && t >= vuelve - 5));
+    return `<div class="vg-fila ${curso ? 'curso' : ''} ${tarde ? 'tarde' : ''} ${ahora ? 'ahora' : ''}"><div class="vg-hora"><b>${esc(x.sale || '—')}</b><small>${curso ? 'en viaje' : 'sale'}</small></div>
+      <div class="grow"><b>${I(d[1])} ${esc(textoViaje(x))}${x.deRutina && /^hrsr-/.test(x.deRutina) ? ' · servicio regular' : ''}</b>${ahora ? `<small class="vg-ya">${I('clock')} ${curso ? 'Es la hora de la vuelta' : 'Es la hora de salir'}</small>` : ''}
+        <small>${v ? `${esc(v.nombre)} · <span class="mono">${esc(v.patente || '')}</span>` : 'van sin asignar'}${choferDe(x) ? ' · ' + esc(choferDe(x)) : ''}${+x.pax ? ' · ' + plural(+x.pax, 'pasajero') : ''}${curso && x.salioAt ? ` · salió ${hora(x.salioAt)} h${x.paxSale != null ? ' ' + paxTexto(x.paxSale) : ''}${regresoViaje(x) ? ` · vuelve ~${esc(regresoViaje(x))} h` : ''}` : !curso && x.vuelve ? ` · vuelve del centro ${esc(x.vuelve)} h` : ''}${tarde ? ' · <b>se atrasó</b>' : ''}</small>
         ${aj ? `<small class="hv-alerta">${I(aj.cancelado ? 'alert' : 'clock')} ${aj.cancelado ? 'El vuelo figura CANCELADO' : `El vuelo cambió: conviene salir ${esc(aj.sale)}`}</small>` : ''}</div>
       ${opera ? `<button class="btn btn-sm ${curso ? 'btn-ok' : 'btn-pri'}" data-a="hviaje-mov" data-id="${esc(x.id)}" data-v="${curso ? 'in' : 'out'}">${I(curso ? 'login' : 'logout')}${curso ? 'Volvió' : 'Salió'}</button>`
         : `<span class="pill ${curso ? 'p-warn' : 'p-sky'}">${curso ? 'En viaje' : 'Programado'}</span>`}</div>`; };
   return `<div class="card vans-garita">
     <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="row" style="gap:8px">${I('car')}Vans del hotel · hoy</b>
       <span class="muted small">${pend.length ? plural(pend.length, 'salida pendiente', 'salidas pendientes') : vs.length ? 'todas hechas' : 'sin traslados programados'}${hechos.length ? ` · ${plural(hechos.length, 'hecha', 'hechas')}` : ''}</span></div>
+    ${conteoVansHTML({ chico:true })}
     ${pend.length ? `<div class="vg-lista">${pend.map(fila).join('')}</div>` : ''}
-    ${hechos.length ? `<details class="vg-hechos" data-k="vans-hechas"><summary class="muted small">Hechas hoy (${hechos.length})</summary>${hechos.map(x => { const v = vanDe(x); return `<div class="small" style="margin:4px 0">${I('check')} ${esc(x.sale || '—')} · ${esc(textoViaje(x))}${v ? ' · ' + esc(v.nombre) : ''} · salió ${x.salioAt ? hora(x.salioAt) : '—'} · volvió ${x.volvioAt ? hora(x.volvioAt) : '—'}</div>`; }).join('')}</details>` : ''}
+    ${hechos.length ? `<details class="vg-hechos" data-k="vans-hechas"><summary class="muted small">Hechas hoy (${hechos.length})</summary>${hechos.map(x => { const v = vanDe(x); return `<div class="small" style="margin:4px 0">${I('check')} ${esc(x.sale || '—')} · ${esc(textoViaje(x))}${v ? ' · ' + esc(v.nombre) : ''} · salió ${x.salioAt ? hora(x.salioAt) : '—'}${x.paxSale != null ? ' ' + paxTexto(x.paxSale) : ''} · volvió ${x.volvioAt ? hora(x.volvioAt) : '—'}${x.paxVuelve != null ? ' ' + paxTexto(x.paxVuelve) : ''}</div>`; }).join('')}</details>` : ''}
     ${vans.length ? `<div class="vg-vans"><span class="muted tiny">Salida o entrada sin traslado programado:</span>${vans.map(v => { const e = estadoVan(v);
       return `<span class="vg-van">${esc(v.nombre)} <span class="mono muted">${esc(v.patente || '')}</span> · ${e.adentro ? 'en el barrio' : 'afuera'}${opera ? ` <button class="btn btn-xs btn-sec" data-a="hvan-mov" data-id="${esc(v.id)}" data-v="${e.adentro ? 'out' : 'in'}">${e.adentro ? 'Salió' : 'Entró'}</button>` : ''}</span>`; }).join('')}</div>` : ''}
   </div>`;
@@ -948,7 +1049,7 @@ function generarRutinas(s, dias = 7){
   s.hotelViajes = aLista(s.hotelViajes);
   const rs = s.hotelViajes.filter(x => x && x.rutina);
   rs.forEach(r => {
-    const datos = { sale:r.sale || '', destino:r.destino, sentido:r.sentido, pax:+r.pax || 0, vanId:r.vanId || '', chofer:r.chofer || '', nota:r.nota || '' };
+    const datos = { sale:r.sale || '', vuelve:r.vuelve || '', destino:r.destino, sentido:r.sentido, pax:+r.pax || 0, vanId:r.vanId || '', chofer:r.chofer || '', nota:r.nota || '' };
     for (let k = 0; k < dias; k++){
       const f = sumarDias(hoy, k), id = `hr-${r.id}-${f}`, x = s.hotelViajes.find(v => v && v.id === id);
       if (!rutinaVale(r, f)){
@@ -974,7 +1075,7 @@ R['hotel-rutinas'] = {
       return `<article class="ru-card ${pausa ? 'pausa' : ''}">
         <div class="ru-cab"><span class="ru-hora"><b>${esc(r.sale || '—')}</b><small>sale</small></span>
           <span class="ru-ic">${I(d[1])}</span>
-          <div class="grow"><b>${esc(nombreRutina(r))}</b><small>${r.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${esc(d[0].toLowerCase())} · ${plural(+r.pax || 0, 'pasajero')}${r.nota ? ' · ' + esc(r.nota) : ''}</small></div>
+          <div class="grow"><b>${esc(nombreRutina(r))}</b><small>${r.sentido === 'buscar' ? 'Buscar en' : 'Llevar a'} ${esc(d[0].toLowerCase())}${r.vuelve ? ` · vuelve ${esc(r.vuelve)} h` : ''}${+r.pax ? ' · ' + plural(+r.pax, 'pasajero') : ''}${r.nota ? ' · ' + esc(r.nota) : ''}</small></div>
           <span class="pill ${pausa ? 'p-warn' : 'p-ok'}">${pausa ? 'En pausa' : 'Activo'}</span></div>
         <div class="ru-dias" aria-label="${esc(textoDias(ds))}">${DIAS_SEM.map(x => `<i class="${ds.includes(x) ? 'on' : ''}">${INI_DIA[x]}</i>`).join('')}<span>${esc(textoDias(ds))}</span></div>
         <div class="ru-datos"><span>${I('car')} ${van ? `${esc(van.nombre)} <span class="hp-chapa chica">${esc(chapaTexto(van.patente || ''))}</span>` : '<em>Van sin asignar</em>'}</span>
@@ -1000,7 +1101,8 @@ A['hrutina-editar'] = el => {
     <div class="field"><label>Qué días</label><div class="ru-rapidos"><button type="button" class="chip" data-a="hrutina-dias" data-v="1,2,3,4,5,6,0">Todos los días</button><button type="button" class="chip" data-a="hrutina-dias" data-v="1,2,3,4,5">Lunes a viernes</button><button type="button" class="chip" data-a="hrutina-dias" data-v="6,0">Fines de semana</button></div>
       <div class="seg dias-sel">${DIAS_SEM.map(d => `<label><input type="checkbox" name="dias" value="${d}" ${ds.includes(d) ? 'checked' : ''}><span>${DIAS[d]}</span></label>`).join('')}</div></div>
     <div class="grid2"><div class="field"><label>Sale la van</label><input type="time" name="sale" required value="${esc(r.sale || '')}"></div>
-      <div class="field"><label>Pasajeros (aprox.)</label><input type="number" name="pax" min="0" max="60" value="${esc(r.pax || 1)}"></div></div>
+      <div class="field"><label>Vuelve (sale de allá, opcional)</label><input type="time" name="vuelve" value="${esc(r.vuelve || '')}"></div></div>
+    <div class="field"><label>Pasajeros (aprox.)</label><input type="number" name="pax" min="0" max="60" value="${esc(r.pax ?? 1)}"></div>
     <div class="grid2"><div class="field"><label>Van</label><select name="vanId"><option value="">Sin asignar</option>${vans.map(v => `<option value="${esc(v.id)}" ${r.vanId === v.id ? 'selected' : ''}>${esc(v.nombre)} · ${esc(v.patente)}</option>`).join('')}</select></div>
       ${campoChofer(r.chofer || '')}</div>
     <div class="grid2"><div class="field"><label>Desde</label><input type="date" name="desde" value="${esc(r.desde || hoyISO())}" required></div>
@@ -1019,7 +1121,7 @@ F['hrutina'] = (d, form) => {
   if (d.hasta && d.hasta < d.desde) return toast('La fecha "hasta" tiene que ser después de "desde"', 'calendar');
   const id = form.dataset.id;
   Store.cambiar(s => { s.hotelViajes = aLista(s.hotelViajes);
-    const datos = { nombre:(d.nombre || '').trim(), dias:DIAS_SEM.filter(x => dias.includes(x)), sale:d.sale, destino:d.destino, sentido:d.sentido, pax:+d.pax || 0, vanId:d.vanId || '', chofer:(d.chofer || '').trim(), desde:d.desde || hoyISO(), hasta:d.hasta || '', nota:(d.nota || '').trim() };
+    const datos = { nombre:(d.nombre || '').trim(), dias:DIAS_SEM.filter(x => dias.includes(x)), sale:d.sale, vuelve:d.vuelve || '', destino:d.destino, sentido:d.sentido, pax:+d.pax || 0, vanId:d.vanId || '', chofer:(d.chofer || '').trim(), desde:d.desde || hoyISO(), hasta:d.hasta || '', nota:(d.nota || '').trim() };
     const r = id && s.hotelViajes.find(x => x && x.id === id && x.rutina);
     if (r) Object.assign(r, datos, { editado:Date.now() }); else s.hotelViajes.push({ id:'hr' + uid(), rutina:true, activa:true, at:Date.now(), ...datos });
     generarRutinas(s);
@@ -2082,6 +2184,7 @@ R['hotel-vivo'] = {
       <section class="bloque">${proximaVan(vs)}</section>
       <section class="bloque">${sec('La ruta de hoy', `<button class="link" data-a="abrir" data-v="hotel-traslados">Todos los días</button>`)}
         <div class="card hl-caja">${rielDia(vs, hoy)}${lineaTraslados(vs, { dia:hoy })}</div></section>
+      <section class="bloque">${conteoVansHTML()}</section>
       ${esGuardia() ? `<section class="bloque">${sec(`Huéspedes por llegar (${hs.filter(x => x.desde === hoy && !x.ingreso).length})`, `<button class="link" data-a="abrir" data-v="hotel-huespedes">Lista completa</button>`)}${hs.filter(x => x.desde === hoy && !x.ingreso).length ? `<div class="card lista">${hs.filter(x => x.desde === hoy && !x.ingreso).map(x => `<div class="it"><div class="txt"><b>${esc(x.nombre)}</b><span>${x.patente ? esc(x.patente) + ' · ' : ''}${plural(+x.pax || 1, 'persona')}</span></div><button class="btn btn-xs btn-ok" data-a="hhuesped-ingreso" data-id="${esc(x.id)}">${I('login')}Ingresó</button></div>`).join('')}</div>` : `<div class="card plana small">${I('check')} No quedan huéspedes por llegar hoy.</div>`}</section>` : ''}
       <section class="bloque hv-dos">
         <div>${sec('Las vans ahora')}${vans.length ? `<div class="hp-vans">${vans.map(v => vanViva(v)).join('')}</div>` : vacio('car', 'El hotel no cargó vans.')}</div>
@@ -2163,7 +2266,7 @@ function hotelDemo(s){
     { id:'hv1', nombre:'Van 1', patente:'AD123XY', modelo:'Mercedes Sprinter blanca', plazas:15, chofer:'Ramón', telChofer:'2901 15 111111', codigo:'H-VAN1DEMO', activa:true, at:n - 9 * DIA },
     { id:'hv2', nombre:'Van 2', patente:'AE456ZW', modelo:'Renault Master gris', plazas:12, chofer:'Julio', telChofer:'', codigo:'H-VAN2DEMO', activa:true, at:n - 9 * DIA },
   ];
-  s.hotelMovs = [{ id:'hm1', vanId:'hv2', tipo:'out', at:n - 50 * MIN, por:'u_garita', viaje:'Llevar a centro' }];
+  s.hotelMovs = [{ id:'hm1', vanId:'hv2', tipo:'out', at:n - 50 * MIN, por:'u_garita', viaje:'Llevar a centro', pax:5 }];
   s.hotelHuespedes = [
     { id:'hh1', nombre:'Familia Rossi', pax:4, desde:h, hasta:D(3), patente:'', llegaVuelo:'AR1880', llegaHora:'13:05', saleVuelo:'AR1881', saleHora:'15:40', at:n - 2 * DIA },
     { id:'hh2', nombre:'Martina Olsen', pax:2, desde:D(-1), hasta:D(1), patente:'AC987QP', llegaVuelo:'', saleVuelo:'', at:n - 3 * DIA },
@@ -2171,12 +2274,25 @@ function hotelDemo(s){
   ];
   s.hotelViajes = [{ id:'ht1', vanId:'hv1', fecha:h, sale:'17:30', destino:'puerto', sentido:'llevar', ref:{ tipo:'crucero', barco:'Ushuaia expedition' }, pax:6, huespedes:[], nota:'', estado:'programado', at:n - DIA },
     { id:'hr1', rutina:true, activa:true, nombre:'Aeropuerto de la mañana', dias:[1, 2, 3, 4, 5], sale:'07:30', destino:'aeropuerto', sentido:'llevar', pax:6, vanId:'hv1', chofer:'Ramón', desde:D(-10), hasta:'', nota:'', at:n - 10 * DIA },
-    { id:'hr2', rutina:true, activa:true, nombre:'Centro, ida y vuelta', dias:[1, 2, 3, 4, 5, 6, 0], sale:'19:00', destino:'centro', sentido:'llevar', pax:8, vanId:'hv2', chofer:'Julio', desde:D(-10), hasta:'', nota:'Vuelve a las 23 h', at:n - 10 * DIA }];
+    /* El servicio regular al centro (23-10-2026): los 9 viajes del cartel del hotel, en la Van 2. */
+    ...rutinasRegulares().map(r => ({ ...r, vanId:'hv2', chofer:'Julio', desde:D(-10), at:n - 10 * DIA }))];
   generarRutinas(s);
-  /* La Van 2 que figura afuera es la del centro de las 19 h: después de esa
-     hora sale con ese traslado "En viaje"; antes, es una salida suelta. */
-  const c19 = s.hotelViajes.find(x => x.id === `hr-hr2-${h}`), ahora = new Date(), a19 = new Date(ahora); a19.setHours(19, 4, 0, 0);
-  if (c19 && ahora >= a19 && ahora.getHours() < 23){ c19.estado = 'en_curso'; c19.salioAt = +a19; s.hotelMovs[0].at = +a19; }
+  /* EL SERVICIO REGULAR DE HOY, SEGÚN LA HORA (23-10-2026): los viajes que
+     ya pasaron, hechos (salió y volvió, con cuántos huéspedes), y el que
+     está en la calle, "En viaje" con la Van 2 afuera. Antes de las 08:10, la
+     Van 2 figura afuera con una salida suelta. */
+  { const ahoraM = new Date().getHours() * 60 + new Date().getMinutes(), at = hhmm => fechaDe(h).getTime() + minutosDe(hhmm) * 60000, PAX = [3, 0, 5, 2, 0, 4, 6, 1, 2];
+    s.hotelMovs = [];
+    SERVICIO_REGULAR.forEach(([sale, vuelve], i) => {
+      const x = s.hotelViajes.find(v => v.id === `hr-hrsr-${sale.replace(':', '')}-${h}`); if (!x || minutosDe(sale) > ahoraM) return;
+      const salio = at(sale) + 3 * MIN, volvio = at(vuelve) + 16 * MIN;
+      x.salioAt = salio; x.vanId = 'hv2'; x.paxSale = PAX[i];
+      s.hotelMovs.unshift({ id:'hm' + i + 'o', vanId:'hv2', tipo:'out', at:salio, por:'u_garita', viaje:textoViaje(x), pax:PAX[i] });
+      if (volvio > Date.now()){ x.estado = 'en_curso'; return; }
+      x.estado = 'hecho'; x.volvioAt = volvio; x.paxVuelve = PAX[(i + 4) % 9];
+      s.hotelMovs.unshift({ id:'hm' + i + 'i', vanId:'hv2', tipo:'in', at:volvio, por:'u_garita', viaje:textoViaje(x), pax:PAX[(i + 4) % 9] });
+    });
+    if (!s.hotelMovs.length) s.hotelMovs = [{ id:'hm1', vanId:'hv2', tipo:'out', at:n - 50 * MIN, por:'u_garita', viaje:'Llevar a centro', pax:5 }]; }
   s.hotelEventos = [{ id:'he1', titulo:'Cena de gala del congreso', tipo:'cena', asistentes:80, fecha:D(1), desde:'20:30', hasta:'01:00', ingreso:'Con la van del hotel desde el centro', estacionamiento:'Dentro del predio del hotel', musicaHasta:'00:30', nota:'', avisarVecinos:true, at:n - DIA }];
   s.hotelProv = [
     { id:'hp1', empresa:'Lavandería Austral', rubro:'Lavandería', personal:'Carlos Díaz', patentes:'AB111CD', tel:'', dias:[1, 3, 5], desde:'08:00', hasta:'12:00', artVence:D(120), seguroVence:D(200), codigo:'H-PRV1DEMO', estado:'activo', revisado:true, at:n - 20 * DIA },

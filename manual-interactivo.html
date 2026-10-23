@@ -409,9 +409,12 @@ const L = [
     { t:'Las noches del policía', x:'Más abajo, las últimas 14 noches con una bolita por ronda: verde completa con QR, ámbar incompleta y gris anotada por la garita (pestaña <b>Policía</b>).', s:'#cuerpo .nc-tira', antes:"TV.tab='policia';refrescar()" },
     { t:'Policías del barrio', x:'La ficha de cada policía: <b>"Editar"</b> corrige sus datos y <b>"Ya no viene"</b> lo saca de "¿Quién llega?". Un ingreso de prueba o anotado por error se borra con <b>"Anular el ingreso"</b> (la garita, solo en el turno abierto). Está en la pestaña <b>Equipo</b>.', s:'#cuerpo .pf-card', antes:"TV.tab='equipo';refrescar()" },
   ] },
-  { id:'van-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Pasa la van del hotel', d:'Marcar la salida y el regreso de cada traslado.', p:[
+  { id:'van-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Pasa la van del hotel', d:'Salió o volvió, y si iba vacía o con huéspedes.', p:[
     { t:'Las vans', x:'<b>Tocá "Vans"</b> arriba: los traslados que cargó el hotel para hoy.', s:'#cuerpo [data-a="garita-ir"][data-v=".vans-garita"]', h:'tocar' },
-    { t:'Salió y volvió', x:'Cuando pasa la van, tocás <b>"Salió"</b> y, a la vuelta, <b>"Volvió"</b>: el hotel lo ve al instante.', s:'#cuerpo .vans-garita' },
+    { t:'El servicio regular', x:'Están los 9 viajes de todos los días al centro (08:10 a 23:10) y los demás traslados. Cuando llega la hora, la fila <b>se resalta</b>, sin alarmas.', s:'#cuerpo .vans-garita .vg-lista' },
+    { t:'Salió', x:'Cuando pasa la van, <b>tocá "Salió"</b> (o "Volvió" a la vuelta).', s:'#cuerpo .vans-garita [data-a="hviaje-mov"]', h:'tocar' },
+    { t:'¿Vacía o con huéspedes?', x:'<b>Tocá "Vacía"</b> o cuántos huéspedes iban. Se guarda solo el número; "No se ve" la anota sin el número. El hotel lo ve al instante.', s:'#hoja .vp-b.vacia, #hoja', h:'tocar' },
+    { t:'El conteo', x:'Arriba de la lista, lo del día: salidas, entradas, huéspedes y viajes sin marcar. Lo que nadie marcó se cierra solo a la noche como <b>"sin marcar"</b>.', s:'#cuerpo .vans-garita .cv2-chico, #cuerpo .vans-garita' },
   ] },
   { id:'huesped-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Llega un huésped del hotel', d:'Con su pase, sin llamar al hotel.', p:[
     { t:'Huéspedes por llegar', x:'En la garita está la lista de <b>huéspedes por llegar</b> hoy. Cuando llega uno, <b>tocá "Ingresó"</b> (si trae el pase del hotel, también se puede escanear).', s:'#cuerpo [data-a="hhuesped-ingreso"]', h:'tocar' },

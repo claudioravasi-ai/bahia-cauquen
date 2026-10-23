@@ -175,14 +175,30 @@ const Store = {
      va SIEMPRE a la base, y la copia de este equipo (que solo sirve para
      abrir rápido) se achica: se dejan afuera las colecciones más pesadas,
      que igual vuelven a bajar de la base al abrir. */
-  guardar(){
+  /* LA COPIA DEL EQUIPO, SIN TRABAR LA PANTALLA (pedido de Claudio,
+     23-10-2026: "en el iPad se traba la app"). Cada cambio escribía al
+     instante la copia ENTERA de los datos en el equipo (en la garita, varios
+     MB): en un iPad eso congela la pantalla un momento por cada toque, y con
+     el lugar casi lleno, mucho más. Ahora el cambio viaja a la base del
+     barrio en el acto (igual que antes) y la copia del equipo se escribe una
+     sola vez cada 1,5 s aunque haya muchos cambios seguidos, y siempre antes
+     de cerrar o pasar a otra app. Quien llama a guardar() directo la escribe
+     en el momento. */
+  guardar({ despues = false } = {}){
+    if (typeof Nube !== 'undefined' && Nube.activa()) Nube.guardar();
+    if (despues){ if (!this.copiaPend) this.copiaPend = setTimeout(() => this.guardarCopia(), 1500); return true; }
+    return this.guardarCopia();
+  },
+  guardarCopia(){
+    clearTimeout(this.copiaPend); this.copiaPend = 0;
+    /* Sin lugar ni achicándola: por 5 minutos ni se intenta (ver guardarLiviano). */
+    if (this.sinCopiaHasta > Date.now()) return false;
     let ok = true;
     /* Si ya hubo que achicarla, se guarda directamente achicada (no se reintenta la grande en cada cambio). */
     const copia = this.sinLugar ? { ...this.s, ...Object.fromEntries([...this.sinLugar].map(k => [k, []])) } : this.s;
     try { localStorage.setItem(this.KEY, JSON.stringify(copia)); }
     catch(e){ ok = this.guardarLiviano(); }
     if (this.bc && ok) this.bc.postMessage('cambio');
-    if (typeof Nube !== 'undefined' && Nube.activa()) Nube.guardar();
     return ok;
   },
   guardarLiviano(){
@@ -190,10 +206,29 @@ const Store = {
     const deNube = enNube ? new Set([...Nube.ZONAS.barrio, ...Nube.ZONAS.privado, ...Nube.ZONAS.staff, ...Nube.ZONAS.hotel, 'notifs']) : new Set(['correos', 'auditoria']);
     const pesos = Object.keys(this.s).filter(k => deNube.has(k) && Array.isArray(this.s[k])).map(k => [k, JSON.stringify(this.s[k]).length]).sort((a, b) => b[1] - a[1]);
     const copia = { ...this.s };
-    for (const [k] of pesos){
-      copia[k] = [];
-      try { localStorage.setItem(this.KEY, JSON.stringify(copia)); this.sinLugar = new Set(pesos.slice(0, pesos.findIndex(x => x[0] === k) + 1).map(x => x[0])); console.warn('Copia local achicada: sin', [...this.sinLugar].join(', ')); return true; } catch(e){}
+    /* (23-10-2026, tarde: "en el iPad el toque funciona una sola vez y queda
+       tildada") Primero se libera lo que sobra en el equipo: las prácticas
+       del Manual de uso interactivo y de la prueba (bhc.manual.*,
+       bhc.prueba.*), que comparten el lugar con la app de verdad, y la copia
+       vieja de los datos, que igual vuelve a bajar de la base. */
+    if (enNube && !MODO_MANUAL && !MODO_PRUEBA) try {
+      Object.keys(localStorage).filter(k => /^bhc\.(manual|prueba)\./.test(k) || k === this.KEY).forEach(k => localStorage.removeItem(k));
+    } catch(e){}
+    /* (23-10-2026) Antes probaba sacando de a una colección y volviendo a
+       escribir todo cada vez: con el iPad lleno eran decenas de copias
+       enteras por cada cambio y la app se congelaba. Ahora saca de una las
+       más pesadas hasta que lo que queda pese menos de la mitad, y prueba
+       pocas veces. */
+    let total = pesos.reduce((a, x) => a + x[1], 0), i = 0;
+    const meta = [total / 2, total / 4, 0];
+    for (const m of meta){
+      while (i < pesos.length && total > m){ copia[pesos[i][0]] = []; total -= pesos[i][1]; i++; }
+      try { localStorage.setItem(this.KEY, JSON.stringify(copia)); this.sinLugar = new Set(pesos.slice(0, i).map(x => x[0])); console.warn('Copia local achicada: sin', [...this.sinLugar].join(', ')); return true; } catch(e){}
     }
+    /* Ni así entra: con la base del barrio, la copia del equipo se deja de
+       escribir por 5 minutos (la app sigue andando y todo viaja a la base);
+       antes se volvía a intentar en cada toque y el iPad se congelaba. */
+    if (enNube) this.sinCopiaHasta = Date.now() + 5 * 60000;
     if (!this.avisoEspacio){ this.avisoEspacio = true;
       toast(enNube ? 'Este equipo tiene poco espacio libre: los cambios se guardan igual en la base del barrio, pero conviene liberar lugar en el teléfono o la computadora.' : 'El dispositivo se quedó sin espacio. Borrá publicaciones con fotos viejas.', 'alert'); }
     return false;
@@ -206,10 +241,14 @@ const Store = {
     try { localStorage.setItem(this.SKEY, JSON.stringify(this.sesion)); } catch(e){}
   },
   /* Toda escritura pasa por acá: cambia, guarda y redibuja. */
-  cambiar(fn){ fn(this.s); this.guardar(); this.avisar(false); },
+  cambiar(fn){ fn(this.s); this.guardar({ despues:true }); this.avisar(false); },
   avisar(remoto){ this.oyentes.forEach(f => f(remoto)); },
   alCambiar(f){ this.oyentes.push(f); },
 };
+
+/* La copia que quedó esperando (Store.guardar con despues) se escribe antes de cerrar o pasar a otra app. */
+['pagehide', 'beforeunload'].forEach(ev => window.addEventListener(ev, () => { if (Store.copiaPend) Store.guardarCopia(); }));
+document.addEventListener('visibilitychange', () => { if (document.hidden && Store.copiaPend) Store.guardarCopia(); });
 
 function migrar(s){
   const def = { users:[], posts:[], privados:[], pases:[], llegadas:[], paquetes:[], bitacora:[],
