@@ -55,12 +55,11 @@ function armarAgenda(f){
     `${plural(+h.pax || 1, 'persona')}${h.llegaVuelo ? ' · vuelo ' + h.llegaVuelo : ''}${h.patente ? ' · en auto' : ''} · la garita ya lo tiene en su lista`, { tipo:'huesped', id:h.id }));
   hotelHuespedes().filter(h => h.hasta === f && h.desde < f).forEach(h => add('sa-' + h.id, 'salen', h.saleHora, `Check-out de ${h.nombre}`,
     `${plural(+h.pax || 1, 'persona')}${h.saleVuelo ? ' · vuelo ' + h.saleVuelo : ''} · la garita marca la salida`, { tipo:'huesped', id:h.id }));
-  /* (23-10-2026) El servicio regular al centro va en UN renglón (si no eran 9 iguales cada noche).
-     Quitarlo de la agenda no cancela nada: un viaje suelto se cancela desde la lista de traslados. */
+  /* (23-10-2026, tarde) Cada viaje del servicio regular al centro va en su renglón, con su vuelta:
+     así la gerencia cambia la hora de uno a último momento (✎) y la garita lo ve al instante. */
   const esRegular = x => /^hrsr-/.test(x.deRutina || '');
-  const regs = hotelViajes().filter(x => x.fecha === f && x.estado === 'programado' && esRegular(x)).sort((a, b) => (a.sale || '').localeCompare(b.sale || ''));
-  if (regs.length) add('vj-regular-' + f, 'vans', regs[0].sale, 'Servicio regular al centro', `${plural(regs.length, 'viaje')}: ${regs.map(x => x.sale).join(', ')} · la garita marca cada salida y vuelta`);
-  hotelViajes().filter(x => x.fecha === f && x.estado === 'programado' && !esRegular(x)).forEach(x => { const van = hotelVans().find(v => v.id === x.vanId);
+  hotelViajes().filter(x => x.fecha === f && x.estado === 'programado').forEach(x => { const van = hotelVans().find(v => v.id === x.vanId);
+    if (esRegular(x)){ it.push({ id:'vj-' + x.id, k:'vans', h:x.sale || '', t:'Servicio regular al centro', s:`vuelve del centro ${x.vuelve || '—'} h · ${van ? van.nombre : 'van sin asignar'} · la garita marca la salida y la vuelta`, auto:1, est:'', vu:x.vuelve || '', ref:{ tipo:'viaje', id:x.id } }); return; }
     add('vj-' + x.id, 'vans', x.sale, textoViaje(x), `${van ? van.nombre : 'todavía sin van'} · ${plural(+x.pax || 0, 'pasajero')}${x.deRutina ? ' · automatizado' : x.auto ? ' · armado con los vuelos' : ''}`, { tipo:'viaje', id:x.id }); });
   hotelEventos().filter(e => e.fecha === f).forEach(e => add('ev-' + e.id, 'eventos', e.desde, e.titulo,
     `${plural(+e.asistentes || 0, 'invitado')}${e.musicaHasta ? ' · música hasta las ' + e.musicaHasta : ''}${e.publicado ? ' · vecinos avisados' : ''}`, { tipo:'evento', id:e.id }));
@@ -102,7 +101,7 @@ function agendaHtml(f, { garita = esGuardia() } = {}){
   const estrellas = Array.from({ length:12 }, (_, i) => `<i style="left:${(i * 37) % 100}%;top:${(i * 53) % 70}%;animation-delay:${(i * .17).toFixed(2)}s"></i>`).join('');
   const fila = (x, i) => { const c = agCat(x.k);
     if (AgendaVista.editando === x.id && !lista) return `<li class="ag-it editando" style="--c:${c[2]}"><form data-f="ag-editar" data-id="${esc(x.id)}" data-fecha="${f}" class="ag-ed">
-      <input type="time" name="h" value="${esc(x.h)}" aria-label="Hora"><input name="t" value="${esc(x.t)}" maxlength="80" required aria-label="Tarea">
+      <input type="time" name="h" value="${esc(x.h)}" aria-label="${x.vu != null ? 'Sale' : 'Hora'}">${x.vu != null ? `<label class="ag-vu">vuelve<input type="time" name="vu" value="${esc(x.vu)}" aria-label="Vuelve del centro"></label>` : ''}<input name="t" value="${esc(x.t)}" maxlength="80" required aria-label="Tarea">
       <button class="btn btn-pri btn-sm">${I('check')}Guardar</button><button type="button" class="btn btn-sec btn-sm" data-a="ag-cancelar-ed" data-v="${f}">Cancelar</button></form></li>`;
     return `<li class="ag-it ${x.est === 'ok' ? 'ok' : ''} ${x.est === 'quitado' ? 'quitado' : ''} ${AgendaVista.recien === x.id ? 'recien' : ''}" style="--c:${c[2]};--i:${i}">
       <span class="ag-h"><b>${esc(x.h || 'En el día')}</b><small>${esc(c[0])}</small></span>
@@ -190,9 +189,26 @@ A['ag-luego'] = () => { cerrarHoja(); toast('Te queda en "Agenda de mañana": da
 A['ag-armar'] = el => { if (!soloHotelAg()) return; const f = el.dataset.v;
   Store.cambiar(s => { s.hotelDiario = aLista(s.hotelDiario); if (!s.hotelDiario.some(x => x && x.id === 'ag-' + f)) s.hotelDiario.push({ id:'ag-' + f, tipo:'agenda', fecha:f, estado:'pendiente', items:agendaAlDia(f, null), at:Date.now() }); });
   HotelDiario.repintar(f); };
-F['ag-editar'] = (d, form) => { if (!soloHotelAg()) return; const f = form.dataset.fecha, id = form.dataset.id;
-  agMod(f, ag => { const x = ag.items.find(z => z.id === id); if (!x) return; x.h = d.h || x.h; x.t = String(d.t || x.t).trim().slice(0, 80); x.edit = 1; x.est = 'ok'; });
-  AgendaVista.editando = ''; AgendaVista.recien = id; HotelDiario.repintar(f); };
+/* (23-10-2026, tarde) Cambiar la hora de una van en la agenda la cambia EN EL ACTO en el traslado
+   (y su vuelta, si es del servicio regular): la garita lo ve enseguida y le llega el aviso. Antes el
+   cambio esperaba al "Dar el OK a todo". */
+F['ag-editar'] = (d, form) => { if (!soloHotelAg()) return; const f = form.dataset.fecha, id = form.dataset.id; let cambio = '';
+  agMod(f, (ag, s) => { const x = ag.items.find(z => z.id === id); if (!x) return; x.h = d.h || x.h; x.t = String(d.t || x.t).trim().slice(0, 80); x.edit = 1; x.est = 'ok';
+    if (x.vu != null && /^\d{2}:\d{2}$/.test(d.vu || '')){ x.vu = d.vu; x.s = String(x.s || '').replace(/vuelve del centro [^ ]+ h/, `vuelve del centro ${x.vu} h`); }
+    const v = x.ref && x.ref.tipo === 'viaje' ? aLista(s.hotelViajes).find(y => y && y.id === x.ref.id) : null;
+    if (!v || v.estado !== 'programado') return;
+    const antes = `${v.sale || '—'}${v.vuelve ? ' (vuelve ' + v.vuelve + ')' : ''}`;
+    if (/^\d{2}:\d{2}$/.test(x.h) && x.h !== v.sale){ v.sale = x.h; v.saleAMano = true; v.aMano = true; }
+    if (x.vu && x.vu !== v.vuelve){ v.vuelve = x.vu; v.aMano = true; }
+    const ahora = `${v.sale || '—'}${v.vuelve ? ' (vuelve ' + v.vuelve + ')' : ''}`;
+    if (ahora === antes) return;
+    cambio = `${textoViaje(v)}: ${antes} → ${ahora}`;
+    const garitas = aLista(s.users).filter(u => u && u.rol === 'guardia' && u.estado === 'aprobado').map(u => u.id);
+    if (garitas.length) notificar(s, { para:garitas, titulo:`El hotel cambió una van del ${f === hoyISO() ? 'día de hoy' : fechaCorta(f)}`, texto:`Sale ${v.sale} h${v.vuelve ? ' y vuelve ' + v.vuelve + ' h' : ''} (antes ${antes}) · ${textoViaje(v)}`, icon:'car', color:'wood', link:'garita', sonido:true });
+    auditar(s, 'El hotel cambió la hora de una van en la agenda', cambio);
+  });
+  AgendaVista.editando = ''; AgendaVista.recien = id; HotelDiario.repintar(f);
+  if (cambio) toast('Cambiado: la garita ya lo ve', 'car'); };
 F['ag-agregar'] = (d, form) => { if (!soloHotelAg()) return; const f = form.dataset.fecha, id = 'mn-' + uid();
   agMod(f, ag => { ag.items.push({ id, k:AG_CATS[d.k] ? d.k : 'otro', h:d.h || '', t:String(d.t || '').trim().slice(0, 80), s:'Agregada por la gerencia', mano:1, est:'ok' }); agOrden(ag.items); });
   AgendaVista.agregando = false; AgendaVista.recien = id; HotelDiario.repintar(f); };

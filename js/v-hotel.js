@@ -180,6 +180,15 @@ function sembrarServicioRegular(s){
   generarRutinas(s);
   return SERVICIO_REGULAR.length;
 }
+/* La garita lo carga a mano si todavía no está (ignora la marca: solo si no hay ninguno). */
+A['hsr-cargar'] = async () => {
+  if (!soloGarita()) return;
+  if (aLista(Store.s.hotelViajes).some(x => x && x.rutina && /^hrsr-/.test(x.id || ''))) return toast('El servicio regular ya está cargado', 'check');
+  if (!await confirmar('Cargar el servicio regular al centro', 'Los 9 viajes de todos los días del cartel del hotel: sale 08:10, 10:00, 13:00, 14:00, 16:10, 17:10, 19:00, 22:00 y 23:10, y vuelve del centro 20 o 30 minutos después. El hotel los puede cambiar o pausar desde su portal.', { si:'Cargarlos' })) return;
+  Store.cambiar(s => { s.hotelViajes = aLista(s.hotelViajes).concat(rutinasRegulares()); generarRutinas(s);
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:'La garita cargó el servicio regular de las vans del hotel al centro (9 viajes por día).', at:Date.now() }); });
+  toast('Listo: el servicio regular al centro quedó cargado', 'car');
+};
 /* Lo de días anteriores que quedó sin marcar se cierra como "sin marcar". */
 function cerrarViajesViejos(s){
   const hoy = hoyISO(); let n = 0;
@@ -716,7 +725,8 @@ R.hotel = {
     const promosPend = promosViejasPend().length;
     const sinLeer = aLista(Store.s.privados).reduce((a, h) => a + aLista(h.msgs).filter(m => m.from !== 'vecino' && !m.leido).length, 0);
     return `<div class="hotel-hero hp-hero"><img src="img/logo-noche.png" alt="" width="54" height="54">
-        <div class="grow"><small>${fechaLarga(hoy)}</small><h1>${HOTEL_NOMBRE}</h1><span>Recepción${info.responsable ? ' · responsable: ' + esc(info.responsable) : ''}</span></div>
+        <div class="grow"><small>${fechaLarga(hoy)}</small><h1>${HOTEL_NOMBRE}</h1><span>Recepción${info.responsable ? ' · responsable: ' + esc(info.responsable) : ''}</span>
+          ${typeof Agua !== 'undefined' && Agua.d && Agua.d.temp != null ? `<span class="hp-agua" title="${esc(Agua.FUENTE)}">${I('drop')}Agua del Canal Beagle <b>${Agua.grados(Agua.d.temp)}</b>${Agua.tendencia() ? ' · ' + esc(Agua.tendencia()) : ''}</span>` : ''}</div>
         ${c ? `<div class="hotel-temp"><b>${Math.round(c.temperature_2m)}°</b><small>${Clima.cod(c.weather_code)[0]}</small></div>` : ''}</div>
       ${pulsoHotel(vs)}
       ${typeof bandaAgenda === 'function' ? bandaAgenda() : ''}
@@ -908,6 +918,72 @@ function moverVan(vanId, tipo, viajeId = '', pax = null){
     const h = hotelId(); if (h) notificar(s, { para:[h], titulo:`${v.nombre} ${tipo === 'in' ? 'entró al barrio' : 'salió del barrio'}`, texto:`${hora(at)} h${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, icon:'car', color:'wood', link:'hotel-traslados', push:false });
   });
   cerrarHoja(); toast(`${v.nombre}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada${pax != null ? ' · ' + paxTexto(pax) : ''}`, tipo === 'in' ? 'login' : 'logout');
+  vanArranca(tipo, v, pax);
+}
+/* =========================================================
+   LA VAN QUE ARRANCA (pedido de Claudio, 23-10-2026: "al marcar la salida o
+   la entrada, que aparezca la van animada sobre la pantalla de la garita,
+   que salga de izquierda a derecha acelerada, con ruido a motor como si
+   tomara carrera, y deje una estela de humo que desaparece en uno o dos
+   segundos"). Va en su propia capa, por encima de todo y sin tapar los
+   toques (pointer-events: none): la garita puede seguir trabajando. El
+   motor se arma con el sonido del equipo (WebAudio, nada que bajar) y
+   respeta "sin sonido". Con "reducir movimiento" del teléfono, solo suena.
+   ========================================================= */
+function vanArranca(tipo, v, pax){
+  if (document.hidden) return;
+  motorArranca();
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelector('.van-arranca')?.remove();
+  /* La que sale va de izquierda a derecha; la que entra, al revés (pedido de Claudio): la escena se da vuelta entera. */
+  const entra = tipo === 'in';
+  const capa = document.createElement('div'); capa.className = 'van-arranca' + (entra ? ' entra' : ''); capa.setAttribute('aria-hidden', 'true');
+  capa.innerHTML = `<div class="va-van"><span class="va-cartel">${tipo === 'in' ? 'Entró' : 'Salió'} · ${esc(v.nombre || 'la van')}${pax != null ? ' · ' + esc(paxTexto(pax)) : ''}</span>${VAN_SVG}</div>`;
+  document.body.appendChild(capa);
+  const van = capa.querySelector('.va-van'), t0 = performance.now();
+  /* El humo sale del caño de escape (atrás, abajo) mientras la van corre. */
+  /* (23-10-2026, "que haya más humo") Dos o tres bocanadas cada 30 ms, más grandes, y una nube fuerte en el acelerón. */
+  const bocanada = (r, grande = false) => {
+    const p = document.createElement('i'); p.className = 'va-humo' + (grande ? ' grande' : '');
+    /* En la escena dada vuelta, la x se cuenta desde la derecha de la pantalla. */
+    p.style.left = Math.round((entra ? innerWidth - r.right : r.left) + r.width * (.02 + Math.random() * .06)) + 'px'; p.style.top = Math.round(r.top + r.height * (.62 + Math.random() * .2)) + 'px';
+    p.style.setProperty('--s', ((grande ? 1.4 : .8) + Math.random() * .9).toFixed(2)); p.style.setProperty('--dy', Math.round(-8 - Math.random() * 40) + 'px'); p.style.setProperty('--dx', Math.round(-50 - Math.random() * 70) + 'px');
+    capa.appendChild(p); setTimeout(() => p.remove(), 2300);
+  };
+  const humo = setInterval(() => {
+    const r = van.getBoundingClientRect(); if (r.right < 0 || r.left > innerWidth){ if (performance.now() - t0 > 900) clearInterval(humo); return; }
+    const n = 2 + (Math.random() < .5 ? 1 : 0); for (let i = 0; i < n; i++) bocanada(r);
+  }, 30);
+  /* el acelerón en el lugar: una nube grande justo antes de salir disparada */
+  setTimeout(() => { const r = van.getBoundingClientRect(); for (let i = 0; i < 7; i++) bocanada(r, true); }, 700);
+  setTimeout(() => { clearInterval(humo); capa.remove(); }, 3800);
+}
+/* El motor: arranca grave, acelera y se va (un diente de sierra que sube de
+   tono, con su "tac-tac" de cilindros y un soplido de escape al salir). */
+function motorArranca(){
+  if (Store.sesion?.sinSonido || typeof Sonido === 'undefined') return;
+  const ctx = Sonido.despertar(); if (!ctx || ctx.state !== 'running') return;
+  try {
+    const t = ctx.currentTime, fin = t + 2.1, sal = ctx.createGain(); sal.connect(ctx.destination);
+    sal.gain.setValueAtTime(.0001, t); sal.gain.exponentialRampToValueAtTime(.22, t + .08);
+    sal.gain.setValueAtTime(.22, t + .5); sal.gain.exponentialRampToValueAtTime(.3, t + 1.2); sal.gain.exponentialRampToValueAtTime(.0001, fin);
+    const filtro = ctx.createBiquadFilter(); filtro.type = 'lowpass'; filtro.frequency.setValueAtTime(380, t); filtro.frequency.exponentialRampToValueAtTime(1600, t + 1.5); filtro.connect(sal);
+    /* el motor: ralentí, un acelerón y la carrera */
+    const o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(42, t); o.frequency.linearRampToValueAtTime(70, t + .22); o.frequency.linearRampToValueAtTime(48, t + .5);
+    o.frequency.exponentialRampToValueAtTime(190, t + 1.6); o.frequency.exponentialRampToValueAtTime(140, fin);
+    /* el golpeteo de los cilindros: un temblor del volumen que se acelera con el motor */
+    const tac = ctx.createGain(); tac.gain.value = .55; const lfo = ctx.createOscillator(), prof = ctx.createGain();
+    lfo.frequency.setValueAtTime(14, t); lfo.frequency.exponentialRampToValueAtTime(48, t + 1.6); prof.gain.value = .45; lfo.connect(prof); prof.connect(tac.gain);
+    o.connect(tac); tac.connect(filtro);
+    /* el soplido del escape (ruido) */
+    const n = Math.floor(ctx.sampleRate * 2.2), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * .35;
+    const ruido = ctx.createBufferSource(); ruido.buffer = buf; const rg = ctx.createGain();
+    rg.gain.setValueAtTime(.0001, t); rg.gain.exponentialRampToValueAtTime(.5, t + .55); rg.gain.exponentialRampToValueAtTime(.0001, fin);
+    ruido.connect(rg); rg.connect(filtro);
+    [o, lfo, ruido].forEach(x => { x.start(t); x.stop(fin + .05); });
+  } catch(e){}
 }
 /* Desde la solapa: el traslado sin van asignada pregunta cuál sale. */
 A['hviaje-mov'] = el => {
@@ -941,7 +1017,11 @@ function viajeEsLaHora(x, t = ahoraMin()){
    van que está afuera y cuándo vuelve, la próxima salida). Tocarla baja a
    la lista. */
 function tarjetaVansGarita(tarjeta){
-  if (!hotelVans().length && !hotelRutinas().length) return '';
+  /* (23-10-2026, tarde) Siempre a la vista en la garita: si todavía no hay ningún traslado, lo dice y,
+     con un toque, carga el servicio regular al centro (antes no aparecía nada y no se sabía por qué). */
+  if (!hotelVans().length && !hotelRutinas().length) return esGuardia()
+    ? tarjeta({ cls:'tg-van', ic:'car', tag:'Vans del hotel', t:'Sin traslados cargados', x:'Tocá para cargar el servicio regular al centro (9 viajes por día)', a:'hsr-cargar' })
+    : tarjeta({ cls:'tg-van', ic:'car', tag:'Vans del hotel', t:'Sin traslados cargados', x:'Los carga el hotel o la garita' });
   const vs = viajesDelDia(hoyISO()), t = ahoraMin(), vans = hotelVans();
   const vanDe = x => vans.find(v => v.id === x.vanId);
   const ya = vs.find(x => viajeEsLaHora(x, t)), afuera = vs.filter(x => x.estado === 'en_curso');

@@ -6521,3 +6521,30 @@ details.mt > summary.mt-cab::-webkit-details-marker{display:none}
 .mt-flecha svg{width:18px;height:18px;transition:transform .2s}
 details.mt[open] .mt-flecha svg{transform:rotate(90deg)}
 .mt-n + .mt-flecha{margin-left:8px}
+/* El agua del Canal Beagle en la portada de adentro (23-10-2026): como el sismo, en azul de mar. */
+.sismo-hero.agua-hero{background:rgba(8,52,78,.62);border-color:rgba(127,211,255,.4);cursor:default}
+.sismo-hero.agua-hero svg.i{color:#7fd3ff}
+.sismo-hero.agua-hero + .sismo-hero{margin-top:6px}
+/* La vuelta de la van en la agenda de las 22 h (23-10-2026). */
+.ag-vu{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-2)}
+/* El agua del Canal Beagle en la cabecera del hotel (23-10-2026), debajo de la recepción. */
+.hp-agua{display:inline-flex !important;align-items:center;gap:5px;margin-top:4px;padding:3px 10px;border-radius:999px;background:rgba(8,52,78,.55);border:1px solid rgba(127,211,255,.35);font-size:12px}
+.hp-agua svg.i{width:13px;height:13px;color:#7fd3ff}
+.hp-agua b{font-weight:800}
+
+/* LA VAN QUE ARRANCA en la garita (23-10-2026): sale de izquierda a derecha acelerando, con estela de humo. */
+.van-arranca{position:fixed;inset:0;z-index:3000;pointer-events:none;overflow:hidden}
+.va-van{position:absolute;left:0;top:44%;width:150px;transform:translateX(-110%);animation:vaCarrera 2.4s linear forwards}
+.va-van .cv-van{display:block;width:100%;height:auto;filter:drop-shadow(0 10px 14px rgba(0,0,0,.35));animation:vaTiembla .08s linear 12 alternate}
+.va-van .cv-van circle:nth-of-type(odd){transform-box:fill-box;transform-origin:center}
+.va-cartel{position:absolute;left:50%;bottom:100%;transform:translate(-50%,-6px);white-space:nowrap;padding:4px 10px;border-radius:999px;background:var(--wood);color:#fff;font:800 11.5px var(--font);box-shadow:0 6px 16px rgba(0,0,0,.25)}
+.va-humo{position:absolute;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;background:radial-gradient(circle,rgba(110,116,124,.85) 0%,rgba(140,146,154,.6) 40%,rgba(170,176,184,0) 70%);transform:scale(var(--s,1));animation:vaHumo 2.1s ease-out forwards}
+.va-humo.grande{width:40px;height:40px;margin:-20px 0 0 -20px}
+/* primero un acelerón en el lugar, después la carrera hasta salir por la derecha */
+@keyframes vaCarrera{0%{transform:translateX(-110%);animation-timing-function:cubic-bezier(.2,.8,.4,1)}22%{transform:translateX(6vw)}24%{transform:translateX(5.4vw)}26%{transform:translateX(6vw)}28%{transform:translateX(5.6vw)}34%{transform:translateX(6vw);animation-timing-function:cubic-bezier(.6,0,.95,.3)}100%{transform:translateX(118vw)}}
+@keyframes vaTiembla{from{transform:translateY(0)}to{transform:translateY(-2px)}}
+@keyframes vaHumo{0%{opacity:.95;transform:translate(0,0) scale(calc(var(--s,1)*.6))}60%{opacity:.55}100%{opacity:0;transform:translate(var(--dx,-70px),var(--dy,-20px)) scale(calc(var(--s,1)*3.4))}}
+@media (prefers-reduced-motion:reduce){.van-arranca{display:none}}
+/* La van que entra: la misma escena dada vuelta (de derecha a izquierda); el cartel queda al derecho. */
+.van-arranca.entra{transform:scaleX(-1)}
+.van-arranca.entra .va-cartel{transform:translate(-50%,-6px) scaleX(-1)}

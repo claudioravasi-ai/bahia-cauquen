@@ -2036,7 +2036,7 @@ const SOLO_GARITA = {
   acciones: new Set(['escanear', 'llegada-nueva', 'paquete-nuevo', 'paquete-entregar', 'paquete-entregado', 'retiro-escanear', 'retiro-manual',
     'pase-in', 'pase-out', 'aviso-visto', 'ronda-casa', 'camion-entra', 'camion-sale', 'correo-menu', 'correo-elegir', 'correo-sale', 'correo-lotes', 'policia-nuevo', 'policia-codigo', 'policia-codigo-nuevo',
     'policia-ronda', 'policia-ronda-mano', 'policia-ronda-borrar', 'policia-salida', 'policia-cargo', 'sos-voy', 'sos-atendida', 'sos-cerrar', 'dea-voy', 'frec-mov', 'cerrar-turno', 'guardia-sale',
-    'hvan-mov', 'hviaje-mov', 'hprov-mov', 'hemp-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer', 'llegada-salio', 'hotel-cliente', 'hc-camara', 'hc-salio']),
+    'hvan-mov', 'hviaje-mov', 'hsr-cargar', 'hprov-mov', 'hemp-mov', 'hhuesped-ingreso', 'hhuesped-salida', 'sos-pedir-hotel', 'pase-vencido', 'casa-revisar', 'aviso-llego', 'garita-voz', 'patente-camara', 'patente-leer', 'llegada-salio', 'hotel-cliente', 'hc-camara', 'hc-salio']),
   formularios: new Set(['validar', 'patente-buscar', 'llegada', 'paquete', 'retiro-qr', 'retiro-manual', 'recibir-peticion', 'bitacora', 'camion-entra', 'correo-entra', 'correo-lotes',
     'policia-nuevo', 'policia-ronda-mano', 'policia-salida', 'policia-cargo', 'abrir-turno', 'cerrar-turno', 'casa-revisada', 'guardia-entra', 'guardia-sale', 'hotel-cliente']),
 };
@@ -2234,7 +2234,9 @@ function rutaPublica(){
 function datosDeAfuera(){
   Clima.pedir().then(() => { aplicarTema(); refrescarPronto(); });
   /* El agua del Canal Beagle: si el portal de ingreso está a la vista, se pone en el lugar. */
-  if (typeof Agua !== 'undefined') Agua.pedir().then(() => { const el = document.getElementById('portalAgua'); if (el && Agua.html()){ el.innerHTML = Agua.html(); el.hidden = false; } });
+  if (typeof Agua !== 'undefined') Agua.pedir().then(() => { const el = document.getElementById('portalAgua'); if (el && Agua.html()){ el.innerHTML = Agua.html(); el.hidden = false; }
+    /* Y adentro, en la portada: se redibuja sola con el dato nuevo. */
+    if (yo()) refrescarPronto(); });
   Vuelos.pedir().then(() => refrescarPronto()).catch(() => {});
   if (typeof Cruceros !== 'undefined') Cruceros.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});
   if (typeof Promos !== 'undefined') Promos.pedir().then(v => { if (v) refrescarPronto(); }).catch(() => {});

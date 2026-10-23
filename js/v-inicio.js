@@ -1044,6 +1044,7 @@ R.inicio = {
             <span>${I('zap')}Ráfagas ${Math.round(c.wind_gusts_10m)}</span>
             <span>${I('sunrise')}${sol.sale}</span><span>${I('sunset')}${sol.pone}</span></div>`
           : `<div class="clima-datos una"><span>${I('cloud')}Cargando el clima de Ushuaia…</span></div>`}
+        ${typeof aguaHero === 'function' ? aguaHero() : ''}
         ${sismoHero()}
       </div>
     </div>`;

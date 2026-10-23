@@ -93,7 +93,8 @@ const Agua = {
   LAT: -54.86, LON: -68.30, KEY: 'bhc.agua',
   d: null, cargando: null,
   leerCache(){ try { const c = JSON.parse(localStorage.getItem(this.KEY)); if (c && c.t) this.d = c; } catch(e){} },
-  fresco(){ return this.d && Date.now() - this.d.t < HORA; },
+  /* Se vuelve a pedir cada media hora (el modelo cambia cada hora): con la app abierta, el dato se pone al día solo. */
+  fresco(){ return this.d && Date.now() - this.d.t < 30 * MIN; },
   pedir(){
     if (this.fresco()) return Promise.resolve(this.d);
     if (this.cargando) return this.cargando;
@@ -124,6 +125,13 @@ const Agua = {
     const tend = this.tendencia();
     return `${I('drop')}<b>${this.grados(d.temp)}</b><span>agua del Canal Beagle${tend ? ' · ' + tend : ''}</span>`;
   },
+  /* Para la portada de adentro, a lo ancho debajo del viento y el sol, como el sismo (23-10-2026). */
+  hero(){
+    const d = this.d; if (!d || d.temp == null) return '';
+    const tend = this.tendencia(), olas = d.olas != null ? `olas de ${Math.round(d.olas * 100)} cm` : '';
+    return `<div class="sismo-hero agua-hero" title="${esc(this.FUENTE)}">${I('drop')}<span><b>Agua del Canal Beagle ${this.grados(d.temp)}${tend ? ' · ' + tend : ''}</b><small>${[olas, 'actualizado ' + hace(d.t)].filter(Boolean).join(' · ')}</small></span></div>`;
+  },
   FUENTE: 'Modelo del océano de Copernicus Marine (Mercator, cuadros de unos 8 km) vía Open-Meteo. Se actualiza cada hora; no es una boya.',
 };
 Agua.leerCache();
+const aguaHero = () => Agua.hero();
