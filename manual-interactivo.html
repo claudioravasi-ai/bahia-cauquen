@@ -410,8 +410,8 @@ const L = [
     { t:'Policías del barrio', x:'La ficha de cada policía: <b>"Editar"</b> corrige sus datos y <b>"Ya no viene"</b> lo saca de "¿Quién llega?". Un ingreso de prueba o anotado por error se borra con <b>"Anular el ingreso"</b> (la garita, solo en el turno abierto). Está en la pestaña <b>Equipo</b>.', s:'#cuerpo .pf-card', antes:"TV.tab='equipo';refrescar()" },
   ] },
   { id:'van-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Pasa la van del hotel', d:'Salió o volvió, y si iba vacía o con huéspedes.', p:[
-    { t:'Las vans', x:'<b>Tocá "Vans"</b> arriba: los traslados que cargó el hotel para hoy.', s:'#cuerpo [data-a="garita-ir"][data-v=".vans-garita"]', h:'tocar' },
-    { t:'El servicio regular', x:'Están los 9 viajes de todos los días al centro (08:10 a 23:10) y los demás traslados. Cuando llega la hora, la fila <b>se resalta</b>, sin alarmas.', s:'#cuerpo .vans-garita .vg-lista' },
+    { t:'Las vans', x:'<b>Tocá la tarjeta "Vans del hotel"</b>, arriba: dice lo de ahora (es la hora, la van que está afuera o la próxima salida) y te baja a la lista.', s:'#cuerpo .tg-van', h:'tocar' },
+    { t:'El servicio regular', x:'A la vista, la van afuera y las <b>2 próximas salidas</b>; el resto del día (de los 9 viajes al centro, 08:10 a 23:10) está plegado en <b>"Más tarde hoy"</b>. Cuando llega la hora, la fila <b>se resalta</b>, sin alarmas.', s:'#cuerpo .vans-garita .vg-lista' },
     { t:'Salió', x:'Cuando pasa la van, <b>tocá "Salió"</b> (o "Volvió" a la vuelta).', s:'#cuerpo .vans-garita [data-a="hviaje-mov"]', h:'tocar' },
     { t:'¿Vacía o con huéspedes?', x:'<b>Tocá "Vacía"</b> o cuántos huéspedes iban. Se guarda solo el número; "No se ve" la anota sin el número. El hotel lo ve al instante.', s:'#hoja .vp-b.vacia, #hoja', h:'tocar' },
     { t:'El conteo', x:'Arriba de la lista, lo del día: salidas, entradas, huéspedes y viajes sin marcar. Lo que nadie marcó se cierra solo a la noche como <b>"sin marcar"</b>.', s:'#cuerpo .vans-garita .cv2-chico, #cuerpo .vans-garita' },

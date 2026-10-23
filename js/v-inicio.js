@@ -3106,7 +3106,9 @@ function tareasGarita(){
 
   /* Vans del hotel. */
   if (typeof viajesDelDia === 'function' && viajesDelDia(hoy).length){ const vp = viajesDelDia(hoy).filter(x => x.estado !== 'hecho'), vh = viajesDelDia(hoy).length - vp.length;
-    if (vp.length) add(1, 'car', `Vans del hotel: ${plural(vp.length, 'traslado', 'traslados')} por marcar`, `${vp[0].sale ? 'El próximo sale a las ' + esc(vp[0].sale) + ' · ' : ''}marcá cada salida y regreso`, { ir:'.vans-garita' }, { hora:vp[0].sale || '' });
+    /* (23-10-2026) "El próximo" es el que todavía no pasó: antes decía el primero del día aunque fuera de la mañana. */
+    const px = vp.find(x => x.estado === 'programado' && x.sale && minutosDe(x.sale) + 15 >= ahoraMin()) || null;
+    if (vp.length) add(1, 'car', `Vans del hotel: ${plural(vp.length, 'traslado', 'traslados')} por marcar`, `${px ? 'El próximo sale a las ' + esc(px.sale) + ' · ' : ''}marcá cada salida y regreso`, { ir:'.vans-garita' }, { hora:(px || vp[0]).sale || '' });
     if (vh) hecho(plural(vh, 'traslado del hotel', 'traslados del hotel')); }
 
   /* Casas solas. */
@@ -3302,7 +3304,9 @@ function tiraGarita(opera){
   /* correos */
   const cor = typeof Mensajeria !== 'undefined' ? Mensajeria.adentro() : [];
   const tCor = tarjeta({ cls:'tg-cor', ic:'mail', tag:'Correos', t: cor.length ? plural(cor.length, 'adentro', 'adentro') : 'Ninguno adentro', x: cor.length ? esc(cor.map(nombreCorreo).join(', ')) : opera ? 'Tocá para registrar la entrada' : 'Andreani, OCA, Correo Argentino…', a: opera ? 'correo-menu' : cor.length ? 'garita-ir' : '', v: opera ? '' : '#garCorreos', on: cor.length > 0, n: cor.length || '' });
-  return `<div class="tg" role="group" aria-label="Turno, policía, camión y correos">${tTurno}${tPol}${tCam}${tCor}</div>`;
+  /* 23-10: las vans del hotel, a lo ancho debajo de las cuatro (js/v-hotel.js). */
+  const tVan = typeof tarjetaVansGarita === 'function' ? tarjetaVansGarita(tarjeta) : '';
+  return `<div class="tg" role="group" aria-label="Turno, policía, camión, correos y vans del hotel">${tTurno}${tPol}${tCam}${tCor}${tVan}</div>`;
 }
 /* EL CONTROL DE ACCESO (rediseño, pedido de Claudio, 12-10-2026: "con
    colores vivos, algo como el ingreso de las vans, con una barrera que se
@@ -3362,10 +3366,10 @@ R.garita = {
       ${opera ? '' : `<div class="garita-vivo">${I('eye')}<div class="grow"><b>Garita en vivo · solo para mirar</b><span>Registrar ingresos${hayPaquetes() ? ', paquetes' : ''}, el camión, los correos, el policía, la bitácora y las peticiones es tarea exclusiva de la garita. Desde acá se ve todo al instante, sin tocar nada.</span></div>
         <button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esSupervisor() ? 'supGarita' : 'interno'}">${I('chat')}Escribirle a la garita</button></div>`}
       ${tiraGarita(opera)}
+      ${typeof bandaVansGarita === 'function' ? bandaVansGarita(opera) : ''}
       ${bandaPolicia()}
       ${typeof bandaMantenimiento === 'function' ? bandaMantenimiento(opera) : ''}
       ${typeof bandaCorreos === 'function' ? bandaCorreos(opera, true) : ''}
-      ${typeof bandaVansGarita === 'function' ? bandaVansGarita(opera) : ''}
       ${typeof bandaHotel === 'function' ? bandaHotel(opera) : ''}
       ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
       ${typeof bandaCuidadoGarita === 'function' ? bandaCuidadoGarita() : ''}

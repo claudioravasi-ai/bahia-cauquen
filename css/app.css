@@ -6493,3 +6493,15 @@ li.prox .rm-gn{background:#ff9a3d}
 .cv2-fila small{font-size:11px;color:var(--ink-2)}
 .cv2-fila .falta b{color:var(--warn)}
 @media (max-width:380px){.cv2-fila{grid-template-columns:repeat(4,1fr)}.cv2-t{grid-column:1/-1}}
+
+/* LA TARJETA "VANS DEL HOTEL" (23-10-2026): a lo ancho, debajo de las cuatro de arriba de la garita. */
+.tg-van{grid-column:1/-1;min-height:0;--tg:linear-gradient(140deg,#c98a4b 0%,#7a4a22 100%);--tgs:rgba(122,74,34,.3)}
+.tg-van:not(.on){--tg:linear-gradient(140deg,#b08560 0%,#6b5038 100%)}
+.tg-van.ahora{box-shadow:0 0 0 3px #fff inset,0 6px 18px var(--tgs)}
+.vg-mas{margin-top:8px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.vg-mas > summary{cursor:pointer;padding:10px 12px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap;list-style:none}
+.vg-mas > summary::-webkit-details-marker{display:none}
+.vg-mas > summary svg{width:15px;height:15px}
+.vg-mas > summary .muted{font-weight:500;font-size:12px}
+.vg-mas .vg-lista{padding:0 8px 8px}
+.vg-atras > summary{color:var(--warn)}
