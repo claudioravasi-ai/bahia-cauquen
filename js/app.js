@@ -2397,20 +2397,42 @@ function pintarEspera(titulo = 'Conectando con el barrio…', texto = 'Un segund
    informa el tamaño nuevo un momento después. Si la página quedó corrida,
    se la vuelve arriba (el que se desplaza es el lienzo, nunca la página).
    ========================================================= */
+/* LOS TOQUES QUE CAÍAN CORRIDOS EN EL iPad (23-10-2026; la captura de
+   Claudio con ?diag: tocaba "Entrar" y el toque caía en el casillero de la
+   contraseña, unos 90 px más arriba; el primer toque andaba y los demás
+   "no respondían"). Al tocar un casillero, Safari corre la página entera
+   para hacerle lugar al teclado; la app tiene la página fija (overflow
+   hidden) y, al volver, lo que se ve queda en un lugar y lo que se toca en
+   otro. Ahora: la altura es la de la parte VISIBLE de la pantalla
+   (visualViewport, sin el teclado), la página se devuelve siempre a su
+   lugar (también con un casillero abierto) y el casillero se acerca dentro
+   de su propia ventana, que sí se desliza bien. Con zoom de dos dedos no se
+   toca nada. */
 const Alto = {
   medir(){
-    const h = window.innerHeight; if (!h) return;
+    const vv = window.visualViewport, zoom = vv && vv.scale > 1.01;
+    const h = vv && !zoom ? Math.round(vv.height) : window.innerHeight; if (!h) return;
     document.documentElement.style.setProperty('--alto', h + 'px');
-    const enCampo = document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-    if (!enCampo && (window.scrollY || document.documentElement.scrollTop)) window.scrollTo(0, 0);
+    if (zoom) return;
+    const de = document.documentElement, b = document.body;
+    if (window.scrollY || de.scrollTop || (b && b.scrollTop) || (vv && vv.offsetTop > .5)){
+      window.scrollTo(0, 0); de.scrollTop = 0; if (b) b.scrollTop = 0;
+      const a = document.activeElement;
+      /* El casillero se acerca UNA vez por foco (si no, acercarlo y volver a correr la página daba vueltas). */
+      if (a && a !== this.acercado && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){ this.acercado = a; try { a.scrollIntoView({ block:'center' }); window.scrollTo(0, 0); de.scrollTop = 0; } catch(e){} }
+    }
   },
   pronto(){ this.medir(); [60, 350, 900].forEach(ms => setTimeout(() => this.medir(), ms)); },
   arrancar(){
     this.pronto();
     ['resize', 'orientationchange', 'pageshow', 'focus'].forEach(ev => window.addEventListener(ev, () => this.pronto()));
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.pronto(); });
-    /* Al cerrar el teclado, Safari deja la página corrida hacia arriba. */
-    document.addEventListener('focusout', () => setTimeout(() => this.medir(), 120));
+    /* Al abrir y al cerrar el teclado, Safari corre la página. */
+    document.addEventListener('focusin', () => [80, 400].forEach(ms => setTimeout(() => this.medir(), ms)));
+    document.addEventListener('focusout', () => { this.acercado = null; [120, 450].forEach(ms => setTimeout(() => this.medir(), ms)); });
+    let pend = 0; const ya = () => { if (pend) return; pend = requestAnimationFrame(() => { pend = 0; this.medir(); }); };
+    if (window.visualViewport){ visualViewport.addEventListener('resize', ya); visualViewport.addEventListener('scroll', ya); }
+    window.addEventListener('scroll', ya, { passive:true });
   },
 };
 
@@ -2610,7 +2632,9 @@ const Diag = {
     /* Con una hoja abierta (un <dialog> modal), el recuadro va adentro de la hoja: si no, queda tapado. */
     const d = document.getElementById('hoja'), dueno = d && d.open ? d : document.body; if (this.el.parentNode !== dueno) dueno.appendChild(this.el);
     const pausa = Date.now() - this.ultimoLatido;
-    this.el.textContent = `DIAGNÓSTICO · latido ${this.latidos}${pausa > 1500 ? ' · ¡PARADO ' + Math.round(pausa / 1000) + ' s!' : ''} · pausa máx ${Math.round(this.maxPausa)} ms · v ${window.VERSION || ''}\n${navigator.userAgent.replace(/Mozilla\/5\.0 /, '').slice(0, 120)} · toques ${navigator.maxTouchPoints}\nhoja ${typeof hojaAbierta === 'function' && hojaAbierta() ? 'ABIERTA' : 'cerrada'} · ventanas ${typeof PILA !== 'undefined' ? PILA.map(v => v.id).join('>') : ''}\n` + this.log.join('\n');
+    const vv = window.visualViewport;
+    const corrida = `página corrida ${Math.round(window.scrollY)} · vista ${vv ? Math.round(vv.offsetTop) + '/' + Math.round(vv.height) + ' zoom ' + vv.scale.toFixed(2) : '—'} · alto ${innerHeight}/${getComputedStyle(document.documentElement).getPropertyValue('--alto')}`;
+    this.el.textContent = `${corrida}\nDIAGNÓSTICO · latido ${this.latidos}${pausa > 1500 ? ' · ¡PARADO ' + Math.round(pausa / 1000) + ' s!' : ''} · pausa máx ${Math.round(this.maxPausa)} ms · v ${window.VERSION || ''}\n${navigator.userAgent.replace(/Mozilla\/5\.0 /, '').slice(0, 120)} · toques ${navigator.maxTouchPoints}\nhoja ${typeof hojaAbierta === 'function' && hojaAbierta() ? 'ABIERTA' : 'cerrada'} · ventanas ${typeof PILA !== 'undefined' ? PILA.map(v => v.id).join('>') : ''}\n` + this.log.join('\n');
   },
   arrancar(){
     if (!this.on || this.andando) return; this.andando = true;

@@ -73,8 +73,51 @@ const sabadoDe = iso => sumarDias(iso, -((fechaDe(iso).getDay() + 1) % 7));
 const ipRango = sab => { const a = fechaDe(sumarDias(sab, -7)), b = fechaDe(sumarDias(sab, -1)), m = d => MESES_TV[d.getMonth()];
   return `del sábado ${a.getDate()}${a.getMonth() !== b.getMonth() ? ' de ' + m(a) : ''} al viernes ${b.getDate()} de ${m(b)} de ${b.getFullYear()}`; };
 
+/* ---------- 0. los nombres que NO van en el informe (pedido de Claudio, 24-10-2026) ----------
+   "No debe llevar el nombre de los que se hicieron para probar o los
+   eliminados: este sábado salió Mónica Ponzio y eso fue prueba y eliminada."
+   Anular un ingreso ya lo sacaba, pero un nombre de prueba anotado como
+   guardia de la garita, o una cuenta dada de baja, seguían saliendo.
+     · La Administración saca un nombre desde el informe ("Sacar un nombre")
+       y la baja de una cuenta (Administración → Vecinos → Dar de baja) lo
+       saca sola. Se quita como policía (todo su servicio), como guardia de la
+       garita y de las notas de la noche.
+     · La marca es un renglón de la bitácora con `quita`: lo leen la garita y
+       la Administración (la garita es la que suele mandar el informe) y no
+       lleva el nombre, solo una huella (hashTxt): el libro no lo vuelve a
+       mostrar. "Volver a ponerlo" borra la marca. */
+const ipHuella = n => { const k = claveNombre(n); return k ? 'n' + hashTxt(k).toString(36) : ''; };
+let ipFueraCache = { arr:null, n:-1, set:new Set() };
+function ipFuera(){
+  const b = Store.s && Store.s.bitacora;
+  if (ipFueraCache.arr !== b || ipFueraCache.n !== aLista(b).length) ipFueraCache = { arr:b, n:aLista(b).length, set:new Set(aLista(b).filter(x => x && x.quita).map(x => x.quita)) };
+  return ipFueraCache.set;
+}
+const ipEstaFuera = n => { const h = ipHuella(n); return !!h && ipFuera().has(h); };
+/* Las cuentas que la Administración dio de baja antes de esto (están en la
+   auditoría, que baja solo en su equipo): se marcan una vez. */
+function ipMarcarBajas(){
+  if (!esAdmin() || !Store.s) return;
+  const nuevas = [...new Set(aLista(Store.s.auditoria).filter(x => x && x.accion === 'Dio de baja a un vecino').map(x => String(x.detalle || '').split(' · ')[0].trim()).filter(Boolean))].filter(n => !ipEstaFuera(n) && ipNombreUsado(n));
+  if (nuevas.length) Store.cambiar(s => nuevas.forEach(n => ipMarcaFuera(s, n, 'se dio de baja la cuenta')));
+}
+/* ¿Ese nombre estuvo alguna vez de policía o de guardia? (si no, no hace falta marcarlo) */
+const ipNombreUsado = n => { const k = claveNombre(n); return !!k && (guardiasConocidos().has(k) || serviciosPolicia().some(sv => claveNombre(sv.nombre) === k)); };
+function ipMarcaFuera(s, nombre, motivo){
+  const h = ipHuella(nombre); if (!h || aLista(s.bitacora).some(x => x && x.quita === h)) return;
+  s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', quita:h, texto:`Se sacó un nombre del informe semanal de la policía (${motivo}) · lo sacó la Administración.`, at:Date.now() });
+}
+
 /* ---------- 1. los números de la semana ---------- */
-function semanaInforme(sab, svsTodos = serviciosPolicia()){
+/* Los servicios de la semana sin los nombres sacados: fuera el policía, y
+   fuera de los guardias de la garita y de las notas. */
+function ipServiciosLimpios(svs = serviciosPolicia()){
+  if (!ipFuera().size) return svs;
+  const nombres = [...new Set(svs.flatMap(sv => [sv.nombre, ...aLista(sv.guardias)]))].filter(ipEstaFuera).map(normTxt);
+  const tiene = t => nombres.some(n => normTxt(t).includes(n));
+  return svs.filter(sv => !ipEstaFuera(sv.nombre)).map(sv => ({ ...sv, guardias: aLista(sv.guardias).filter(g => !ipEstaFuera(g)), acciones: aLista(sv.acciones).filter(a => !tiene(a.texto)) }));
+}
+function semanaInforme(sab, svsTodos = ipServiciosLimpios()){
   const meta = rondaMeta(), ahora = Date.now(), lineas = aLista(Store.s.bitacora).filter(Boolean);
   const dias = [7, 6, 5, 4, 3, 2, 1].map((n, i) => {
     const iso = sumarDias(sab, -n), prog = nocheQueEmpieza(fechaDe(iso));
@@ -312,6 +355,7 @@ const InformePolicia = {
      consulta chiquita (una línea del índice) cada 30 minutos, solo ese día. */
   tic(){
     if (!Store.s || !yo() || this.enviando || !(esGuardia() || esAdmin())) return;
+    if (esAdmin() && !this.bajas){ this.bajas = true; try { ipMarcarBajas(); } catch(e){ console.warn('Informe: bajas', e); } }
     if (IPCopia.enBase() && !Nube.listoParaMotor()) return;
     const hoy = hoyISO(); if (fechaDe(hoy).getDay() !== 6 || this.hecho[hoy] || Date.now() < conHoraDe(fechaDe(hoy), '12:00')) return;
     try { const k = 'bhc.ip.' + hoy, v = +localStorage.getItem(k) || 0; if (Date.now() - v < 30 * MIN) return; localStorage.setItem(k, String(Date.now())); } catch(e){}
@@ -358,12 +402,14 @@ function tarjetaInformePolicia(){
 }
 A['ip-abrir'] = el => {
   if (!esStaff()) return;
+  if (esAdmin()) ipMarcarBajas();
   const sabs = ipSabados();
   /* Desde la tarjeta "Esta semana" de Turnos: abre esa semana. */
   if (el && el.dataset && /^\d{4}-\d{2}-\d{2}$/.test(el.dataset.v || '')){ IPV.sab = sabs.includes(el.dataset.v) ? el.dataset.v : sabs[0]; IPV.dia = -1; }
   if (!sabs.includes(IPV.sab)) IPV.sab = sabs[0];
   const sem = semanaInforme(IPV.sab), t = sem.t, d = sem.dias[IPV.dia] || null;
-  const enCurso = IPV.sab >= hoyISO();
+  /* El sábado la semana ya cerró (noches del sábado al viernes): se puede mandar de nuevo. */
+  const enCurso = IPV.sab > hoyISO();
   const maxQR = Math.max(1, ...sem.dias.flatMap(z => z.franjas.map(f => f.qr)));
   const kp = (ic, n, txt, sub, cl) => `<div class="ip-k ${cl}">${I(ic)}<b>${n}</b><span>${txt}</span><small>${sub}</small></div>`;
   hoja('Informe semanal de la policía', `<div class="ip">
@@ -388,7 +434,8 @@ A['ip-abrir'] = el => {
     ${sem.obs.length ? `<div class="ip-lbl">Para tener en cuenta</div>${ipObsApp(sem.obs)}` : ''}
     <div class="ip-envio">${I('mail')}<div class="grow"><b>Para: la Supervisión de Adicionales Policiales</b><small>${enCurso ? 'Sale solo el sábado, al registrarse la salida del policía de la noche del viernes (o a las 12, si no vino nadie).' : 'Para ver si salió y la copia exacta: "Informes enviados".'}</small></div></div>
     <div class="btns"><button class="btn btn-pri grow" data-a="ip-pdf">${I('file')}Ver el PDF</button><button class="btn btn-sec grow" data-a="ip-enviados">${I('clock')}Informes enviados</button></div>
-    ${esAdmin() ? `<div class="btns" style="margin-top:8px">${enCurso ? '' : `<button class="btn btn-sec grow" data-a="ip-mandar">${I('mail')}Mandarlo ahora</button>`}<button class="btn btn-sec grow" data-a="ip-correo">${I('edit')}Cambiar el correo</button></div>` : ''}
+    ${esAdmin() ? `<div class="btns" style="margin-top:8px">${enCurso ? '' : `<button class="btn btn-sec grow" data-a="ip-mandar">${I('mail')}Mandarlo ahora</button>`}<button class="btn btn-sec grow" data-a="ip-correo">${I('edit')}Cambiar el correo</button></div>
+      <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="ip-nombres">${I('users')}Sacar un nombre (prueba o dado de baja)</button>` : ''}
     <p class="muted tiny" style="margin:10px 0 0">${I('lock')} Del policía lleva solo nombre, cargo y matrícula. Lo demás de la garita va solo como cantidad, sin datos de vecinos ni de visitas. El mismo correo recibe la constancia del policía que no deja el suyo.${esAdmin() ? '' : ' Lo manda la app sola; mandarlo de nuevo o cambiar el correo lo hace la Administración.'}</p></div>`, { ancho:'760px' });
 };
 A['ip-semana'] = el => { IPV.sab = el.dataset.v; IPV.dia = -1; A['ip-abrir'](); };
@@ -433,6 +480,32 @@ A['ip-enviados'] = async () => {
 A['ip-copia'] = async el => {
   try { const c = await IPCopia.copia(el.dataset.v); if (!c || !c.html) return toast('Esa copia no está en la base', 'alert'); ipVerPdf(c.html, 'ip-enviados'); }
   catch(e){ toast('No se pudo traer la copia: ' + e.message, 'alert'); }
+};
+/* Sacar del informe un nombre de prueba o dado de baja (solo la Administración). */
+A['ip-nombres'] = () => {
+  if (!esAdmin()) return;
+  const sab = IPV.sab, de = serviciosPolicia().filter(sv => { const n = nocheDe(sv.entra); return n >= sumarDias(sab, -7) && n <= sumarDias(sab, -1); });
+  const vistos = new Map(), sumar = (n, como) => { const k = claveNombre(n); if (!k) return; const x = vistos.get(k) || { n, como:new Set() }; x.como.add(como); vistos.set(k, x); };
+  de.forEach(sv => { sumar(sv.nombre, 'policía'); aLista(sv.guardias).forEach(g => sumar(g, 'garita')); });
+  const ls = [...vistos.values()].sort((a, b) => a.n.localeCompare(b.n, 'es'));
+  hoja('Sacar un nombre del informe', `<p class="muted small" style="margin:0 0 10px">Los nombres que aparecen en el informe de las noches ${esc(ipRango(sab))}. Si uno fue una <b>prueba</b> o ya no está (se dio de baja), sacalo: no sale más como policía, como guardia de la garita ni en las notas, en ningún informe.</p>
+    ${ls.length ? `<ul class="ip-env">${ls.map(x => { const fuera = ipEstaFuera(x.n);
+      return `<li><button type="button" data-a="ip-nombre" data-v="${esc(x.n)}" data-fuera="${fuera ? 1 : ''}"><span class="ic ic-${fuera ? 'danger' : 'ok'}">${I(fuera ? 'x' : 'user')}</span>
+        <span class="grow"><b>${esc(x.n)}</b><small>${[...x.como].join(' y ')}${fuera ? ' · <b>sacado del informe</b>' : ''}</small></span><span class="pill">${fuera ? 'Volver a poner' : 'Sacar'}</span></button></li>`; }).join('')}</ul>`
+    : vacio('users', 'En esta semana no hay nombres.')}
+    <p class="muted tiny">${I('lock')} La marca queda en el libro de guardia sin el nombre. Dar de baja una cuenta que estuvo de guardia o de policía la saca sola. Después, si el informe ya salió, tocá "Mandarlo ahora" para que la supervisión reciba el corregido.</p>
+    <button class="btn btn-sec btn-block" data-a="ip-abrir">${I('left')}Volver al informe</button>`);
+};
+A['ip-nombre'] = async el => {
+  if (!esAdmin()) return;
+  const n = el.dataset.v, fuera = !!el.dataset.fuera;
+  if (!fuera && !await confirmar('Sacar del informe', `<b>${esc(n)}</b> no sale más en el informe semanal de la policía: ni como policía (con todo su servicio), ni como guardia de la garita, ni en las notas.`, { si:'Sacarlo', peligro:true })) return A['ip-nombres']();
+  Store.cambiar(s => {
+    if (fuera){ const h = ipHuella(n); s.bitacora = aLista(s.bitacora).filter(x => !(x && x.quita === h)); }
+    else ipMarcaFuera(s, n, 'fue una prueba o ya no está');
+  });
+  toast(fuera ? 'Vuelve a salir en el informe' : 'Sacado del informe. Si ya salió, tocá "Mandarlo ahora".', 'check');
+  A['ip-nombres']();
 };
 F['ip-destino'] = d => {
   if (!esAdmin()) return;

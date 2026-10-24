@@ -624,6 +624,8 @@ A['nueva-clave'] = el => { const c = generarClave(); Store.cambiar(s => { const 
 A['baja-vecino'] = async el => {
   if (!await confirmar('Dar de baja', 'Se borran sus datos personales, sus mensajes privados y sus pases. Lo que publicó en el pizarrón queda sin nombre.', { si:'Dar de baja', peligro:true })) return;
   Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); auditar(s, 'Dio de baja a un vecino', `${x.nombre} · ${x.casa}`, x.id); avisoLoteAlquilado(s, { ...x, estado:'baja' }, false);
+    /* Si estuvo de guardia o de policía (una prueba), no sale más en el informe semanal de la policía (js/informe-policia.js). */
+    if (typeof ipMarcaFuera === 'function' && ipNombreUsado(x.nombre)) ipMarcaFuera(s, x.nombre, 'se dio de baja la cuenta');
     s.privados = s.privados.filter(h => h.userId !== x.id); s.pases = s.pases.filter(p => p.hostId !== x.id); s.users = s.users.filter(z => z.id !== x.id); });
   cerrarHoja(); toast('Vecino dado de baja', 'trash');
 };
