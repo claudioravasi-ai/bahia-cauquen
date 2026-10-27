@@ -771,6 +771,7 @@ R['hotel-traslados'] = {
       <div class="ht-dias" role="tablist">${[0, 1, 2, 3, 4, 5, 6].map(i => sumarDias(hoy, i)).map(d => { const t = diaTxt(d), n = cuantos(d);
         return `<button type="button" role="tab" aria-selected="${d === dia}" class="ht-dia ${d === dia ? 'on' : ''}" data-a="abrir" data-v="hotel-traslados" data-p="${d}"><small>${esc(t.sem)}</small><b>${t.n}</b>${n ? `<span>${n}</span>` : '<i></i>'}</button>`; }).join('')}</div>
       <div class="card hl-caja">${rielDia(vs.filter(x => x.estado !== 'cancelado'), dia)}${lineaTraslados(vs.filter(x => x.estado !== 'cancelado'), { dia, acciones:true })}</div>
+      ${dia === hoy && typeof vaTarjetas === 'function' ? vaTarjetas(false) : ''}
       ${sec('Vans', esHotel() ? `<button class="link" data-a="hvan-editar">+ Van</button>` : '')}
       ${vans.length ? `<div class="hp-vans">${vans.map(v => vanViva(v, { acciones:true })).join('')}</div>`
         : esHotel() ? garajeVacio() : vacio('car', 'El hotel todavía no cargó sus vans.')}
@@ -896,15 +897,21 @@ function pedirPaxVan(vanId, tipo, viajeId = ''){
     <p class="muted tiny" style="margin:10px 0 8px">El número es la cantidad de huéspedes (sin contar al chofer). Solo se guarda el número, sin nombres.</p>
     ${b('', 'No se ve: anotar sin el número', 'nose')}`);
 }
-function moverVan(vanId, tipo, viajeId = '', pax = null){
+/* (27-10-2026) `op` viene del chofer de la van (js/van-chofer.js): el paso
+   se anota solo (auto), con un id fijo para no anotarlo dos veces, el
+   detalle de quiénes iban a bordo y el chofer. */
+function moverVan(vanId, tipo, viajeId = '', pax = null, op = {}){
   if (!soloGarita()) return;
   const v = vanOGenerica(vanId); if (!v) return;
+  if (op.movId && aLista(Store.s.hotelMovs).some(m => m && m.id === op.movId)) return;
   const at = Date.now(), ahora = ahoraMin(), hoy = hoyISO();
   let viaje = null;
   Store.cambiar(s => {
     const vs = aLista(s.hotelViajes).filter(x => x.fecha === hoy);
     const elegido = viajeId ? vs.find(x => x.id === viajeId && x.estado === (tipo === 'out' ? 'programado' : 'en_curso')) : null;
-    if (tipo === 'out'){
+    /* (27-10) Lo que avisó el chofer no se adivina: es ese traslado o ninguno, y la van es la que manejó. */
+    if (op.sinAdivinar){ viaje = elegido; if (viaje){ if (v.id !== 'sin-van') viaje.vanId = v.id; if (tipo === 'out'){ viaje.estado = 'en_curso'; viaje.salioAt = at; if (pax != null) viaje.paxSale = pax; } else { viaje.estado = 'hecho'; viaje.volvioAt = at; if (pax != null) viaje.paxVuelve = pax; } } }
+    else if (tipo === 'out'){
       viaje = elegido || vs.filter(x => x.estado === 'programado' && (!x.vanId || x.vanId === v.id) && (!x.sale || Math.abs(minutosDe(x.sale) - ahora) <= 90))
         .sort((a, b) => (!!b.vanId - !!a.vanId) || Math.abs(minutosDe(a.sale || '12:00') - ahora) - Math.abs(minutosDe(b.sale || '12:00') - ahora))[0] || null;
       if (viaje){ viaje.estado = 'en_curso'; viaje.salioAt = at; if (v.id !== 'sin-van') viaje.vanId = viaje.vanId || v.id; if (pax != null) viaje.paxSale = pax; }
@@ -913,12 +920,16 @@ function moverVan(vanId, tipo, viajeId = '', pax = null){
       if (viaje){ viaje.estado = 'hecho'; viaje.volvioAt = at; if (pax != null) viaje.paxVuelve = pax; }
     }
     const px = paxTexto(pax);
-    s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:'hm' + uid(), vanId:v.id, tipo, at, por:yo().id, viaje: viaje ? textoViaje(viaje) : '', ...(pax != null ? { pax } : {}) });
-    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: ${v.id === 'sin-van' ? 'la van del hotel' : `van del hotel ${v.nombre} (${v.patente})`}${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, at });
-    const h = hotelId(); if (h) notificar(s, { para:[h], titulo:`${v.nombre} ${tipo === 'in' ? 'entró al barrio' : 'salió del barrio'}`, texto:`${hora(at)} h${viaje ? ' · ' + textoViaje(viaje) : ''}${px ? ' · ' + px : ''}`, icon:'car', color:'wood', link:'hotel-traslados', push:false });
+    s.hotelMovs = aLista(s.hotelMovs); s.hotelMovs.unshift({ id:op.movId || 'hm' + uid(), vanId:v.id, tipo, at, por:yo().id, viaje: viaje ? textoViaje(viaje) : '', ...(pax != null ? { pax } : {}), ...(op.abordo ? { abordo:op.abordo, auto:1 } : {}) });
+    const det = `${op.detalle ? ' · ' + op.detalle : px ? ' · ' + px : ''}${op.chofer ? ' · chofer ' + op.chofer : ''}`;
+    s.bitacora.unshift({ id: op.movId ? 'b-' + op.movId : uid(), autor:yo().id, tipo:'acceso', texto:`${tipo === 'in' ? 'Ingreso' : 'Egreso'}: ${v.id === 'sin-van' ? 'la van del hotel' : `van del hotel ${v.nombre} (${v.patente})`}${viaje ? ' · ' + textoViaje(viaje) : ''}${det}`, at });
+    const h = hotelId(); if (h) notificar(s, { para:[h], titulo:`${v.nombre} ${tipo === 'in' ? 'entró al barrio' : 'salió del barrio'}`, texto:`${hora(at)} h${viaje ? ' · ' + textoViaje(viaje) : ''}${det}`, icon:'car', color:'wood', link:'hotel-traslados', push:false });
+    if (op.enCambio) op.enCambio(s, at);
   });
-  cerrarHoja(); toast(`${v.nombre}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada${pax != null ? ' · ' + paxTexto(pax) : ''}`, tipo === 'in' ? 'login' : 'logout');
-  vanArranca(tipo, v, pax);
+  if (!op.auto) cerrarHoja();
+  toast(`${v.nombre}: ${tipo === 'in' ? 'entrada' : 'salida'} registrada${op.detalle ? ' · ' + op.detalle : pax != null ? ' · ' + paxTexto(pax) : ''}`, tipo === 'in' ? 'login' : 'logout');
+  if (op.auto && typeof vcGuardarYa === 'function') vcGuardarYa();
+  vanArranca(tipo, v, op.abordo ? null : pax, op.abordo);
 }
 /* =========================================================
    LA VAN QUE ARRANCA (pedido de Claudio, 23-10-2026: "al marcar la salida o
@@ -930,7 +941,7 @@ function moverVan(vanId, tipo, viajeId = '', pax = null){
    motor se arma con el sonido del equipo (WebAudio, nada que bajar) y
    respeta "sin sonido". Con "reducir movimiento" del teléfono, solo suena.
    ========================================================= */
-function vanArranca(tipo, v, pax){
+function vanArranca(tipo, v, pax, abordo = null){
   if (document.hidden) return;
   motorArranca();
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -938,7 +949,7 @@ function vanArranca(tipo, v, pax){
   /* La que sale va de izquierda a derecha; la que entra, al revés (pedido de Claudio): la escena se da vuelta entera. */
   const entra = tipo === 'in';
   const capa = document.createElement('div'); capa.className = 'van-arranca' + (entra ? ' entra' : ''); capa.setAttribute('aria-hidden', 'true');
-  capa.innerHTML = `<div class="va-van"><span class="va-cartel">${tipo === 'in' ? 'Entró' : 'Salió'} · ${esc(v.nombre || 'la van')}${pax != null ? ' · ' + esc(paxTexto(pax)) : ''}</span>${VAN_SVG}</div>`;
+  capa.innerHTML = `<div class="va-van"><span class="va-cartel">${tipo === 'in' ? 'Entró' : 'Salió'} · ${esc(v.nombre || 'la van')}${pax != null ? ' · ' + esc(paxTexto(pax)) : ''}${abordo ? ' · ' + plural(abordo.total, 'pasajero') : ''}</span>${VAN_SVG}</div>`;
   document.body.appendChild(capa);
   const van = capa.querySelector('.va-van'), t0 = performance.now();
   /* El humo sale del caño de escape (atrás, abajo) mientras la van corre. */
@@ -1022,6 +1033,12 @@ function tarjetaVansGarita(tarjeta){
   if (!hotelVans().length && !hotelRutinas().length) return esGuardia()
     ? tarjeta({ cls:'tg-van', ic:'car', tag:'Vans del hotel', t:'Sin traslados cargados', x:'Tocá para cargar el servicio regular al centro (9 viajes por día)', a:'hsr-cargar' })
     : tarjeta({ cls:'tg-van', ic:'car', tag:'Vans del hotel', t:'Sin traslados cargados', x:'Los carga el hotel o la garita' });
+  /* (27-10-2026) Lo que manda el chofer de la van va primero: quiénes van a bordo, en vivo. */
+  const va = typeof vaVisibles === 'function' ? vaVisibles().find(m => !vgDe(m.id).movAt) : null;
+  if (va){ const r = vaResumen(va), d = va.gps && va.gps.d;
+    return tarjeta({ cls:'tg-van ahora' + (r.nivel !== 'ok' ? ' va-alerta' : ''), ic:'car', tag:'Vans del hotel', a:'garita-ir', v:'.vans-garita', on:true, n:r.total || '',
+      t:`${esc(va.van)} ${va.estado === 'subiendo' ? 'subiendo' : va.sentido === 'out' ? 'sale' : 'viene'}: ${plural(r.total, 'pasajero')}`,
+      x: va.sentido === 'in' && d != null && va.estado !== 'subiendo' ? `a ${vcKm(d)} · ${vcEta(d)}${r.x ? ` · ${r.x} sin QR` : ''}` : esc(vaTexto(r).replace(/^\d+ pasajeros? a bordo: ?/, '')) || 'Tocá para ver la lista' }); }
   const vs = viajesDelDia(hoyISO()), t = ahoraMin(), vans = hotelVans();
   const vanDe = x => vans.find(v => v.id === x.vanId);
   const ya = vs.find(x => viajeEsLaHora(x, t)), afuera = vs.filter(x => x.estado === 'en_curso');
@@ -1059,6 +1076,7 @@ function bandaVansGarita(opera){
     <div class="row" style="justify-content:space-between;gap:8px;flex-wrap:wrap"><b class="row" style="gap:8px">${I('car')}Vans del hotel · hoy</b>
       <span class="muted small">${pend.length ? plural(pend.length, 'salida pendiente', 'salidas pendientes') : vs.length ? 'todas hechas' : 'sin traslados programados'}${hechos.length ? ` · ${plural(hechos.length, 'hecha', 'hechas')}` : ''}</span></div>
     ${conteoVansHTML({ chico:true })}
+    ${typeof vaTarjetas === 'function' ? vaTarjetas(opera) : ''}
     ${!vans.length ? `<p class="vg-sinvans">${I('info')} El hotel todavía no cargó sus vans: se marca igual, como "la van del hotel". Cuando las cargue (Vans y traslados → Agregar van), cada paso dice cuál fue.</p>` : ''}
     ${(() => { if (!pend.length) return '';
       /* LA LISTA CORTA (23-10-2026): a la vista, las vans afuera, lo atrasado
@@ -1812,6 +1830,7 @@ R['hotel-empleados'] = {
         <div class="btns" style="margin-top:10px">
           ${esGuardia() ? (st.adentro || hEmpPuedeEntrar(e) ? `<button class="btn btn-sm ${st.adentro ? 'btn-sec' : 'btn-ok'}" data-a="hemp-mov" data-id="${esc(e.id)}" data-v="${st.adentro ? 'out' : 'in'}">${I(st.adentro ? 'logout' : 'login')}${st.adentro ? 'Salió' : 'Entró'}</button>` : `<span class="pill p-danger">${I('calendar')}Hoy no es su día</span>`) : ''}
           ${esHotel() ? `<button class="btn btn-xs btn-pri" data-a="hemp-cred" data-id="${esc(e.id)}">${I('qr')}Credencial</button>
+            <button class="btn btn-xs btn-sec" data-a="vc-enlace" data-id="${esc(e.id)}">${I('car')}${typeof vcCodigoDe === 'function' && vcCodigoDe(e.id) ? 'Enlace de chofer ✓' : 'Enlace de chofer'}</button>
             <button class="btn btn-xs btn-sec" data-a="hemp-editar" data-id="${esc(e.id)}">${I('edit')}Editar</button>` : ''}</div></div>`; };
     return `${esHotel() ? `<div class="hemp-intro"><span class="hemp-intro-ic">${I('qr')}</span><div class="grow"><b>Cargalos una vez y sirve para siempre</b>
           <small>Cada empleado entra al barrio con su QR en el parabrisas, con la patente de su auto o diciendo su código en la garita. Si pierde la credencial, generás una nueva y la vieja deja de valer.</small></div></div>

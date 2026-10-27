@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vans a bordo</title>
+<meta name="description" content="Demo con tres teléfonos: el chofer de la van escanea a cada pasajero y la garita ve en vivo quién va a bordo, desde que lee el QR del parabrisas hasta que sale y vuelve a entrar al barrio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+/* LA DEMO DE LAS VANS (27-10-2026). Tres teléfonos: el del chofer y el de
+   la garita son la app de verdad (en modo demo, con datos inventados que
+   viven solo en este navegador); el del medio es el pasajero que muestra su
+   pase. La guía de arriba hace cada paso ("Hacelo por mí") o se puede tocar
+   directamente adentro de los teléfonos. */
+:root{
+  --bg:#edf2f1; --surf:#ffffff; --surf-2:#f5f8f7; --ink:#0f1f1e; --ink-2:#3d4f4d; --muted:#667775; --line:#dce5e3;
+  --brand:#0d6b66; --brand-2:#14968c; --brand-soft:#d8eeea; --deep:#0b3c47;
+  --ok:#1b8f5a; --ok-soft:#dcf3e7; --danger:#d33a3a; --warn:#b7790a; --warn-soft:#fcf0d2; --sky:#2b6fb3; --wood:#b85f24;
+  --marco:#1b2629; --sombra:0 24px 60px rgba(11,60,71,.22);
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a;
+    --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --ok:#4fd08f; --ok-soft:#133526; --warn:#f0b54a; --warn-soft:#3a2c10;
+    --marco:#000; --sombra:0 24px 60px rgba(0,0,0,.5); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1315; --surf:#111c1f; --surf-2:#152326; --ink:#e6eeec; --ink-2:#b4c3c0; --muted:#83979a; --line:#20313a;
+  --brand:#3cbfb2; --brand-2:#59d4c6; --brand-soft:#123936; --ok:#4fd08f; --ok-soft:#133526; --warn:#f0b54a; --warn-soft:#3a2c10;
+  --marco:#000; --sombra:0 24px 60px rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15.5px;line-height:1.5;-webkit-font-smoothing:antialiased;padding:0 16px 40px}
+h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.02em}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+:focus-visible{outline:2.5px solid var(--brand-2);outline-offset:2px;border-radius:8px}
+.envol{max-width:1240px;margin:0 auto}
+.cabeza{margin:16px 0 14px;border-radius:24px;padding:22px 22px 20px;color:#fff;background:linear-gradient(120deg,#0b3c47,#0d6b66 55%,#b85f24);display:grid;gap:10px}
+.cabeza small{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:12px;opacity:.85}
+.cabeza h1{font-size:clamp(26px,4.4vw,42px);font-weight:800;line-height:1.05}
+.cabeza p{max-width:760px;opacity:.92}
+.acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.b{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:14px;font-weight:800;background:#fff;color:#0b3c47}
+.b.sec{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.4)}
+.b:disabled{opacity:.5;cursor:default}
+/* la guía */
+.guia{position:sticky;top:8px;z-index:5;background:var(--surf);border:1px solid var(--line);border-radius:20px;padding:14px 16px;box-shadow:0 10px 30px rgba(11,60,71,.12);display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center}
+.paso-n{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:var(--brand-soft);color:var(--brand);font-weight:800;font-size:20px;font-variant-numeric:tabular-nums}
+.paso-n small{display:block;font-size:10px;font-weight:700;color:var(--muted);line-height:1;margin-top:-4px}
+.paso-t b{display:block;font-size:17px;line-height:1.25}
+.paso-t span{display:block;color:var(--ink-2);font-size:14px;margin-top:2px}
+.paso-b{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.pb{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:10px 16px;border-radius:14px;font-weight:800;background:var(--brand);color:#fff}
+.pb.sec{background:var(--surf-2);color:var(--ink);border:1px solid var(--line)}
+.pb:disabled{opacity:.45;cursor:default}
+.barra{grid-column:1/-1;height:6px;border-radius:99px;background:var(--surf-2);overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand-2),var(--wood));transition:width .4s}
+/* los teléfonos */
+.tabs{display:none;gap:6px;margin:14px 0 0}
+.tabs button{flex:1;min-height:44px;border-radius:12px;font-weight:800;background:var(--surf);border:1px solid var(--line)}
+.tabs button[aria-selected="true"]{background:var(--brand);color:#fff;border-color:var(--brand)}
+.tels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:18px}
+.tel-col{display:flex;flex-direction:column;align-items:center;gap:10px}
+.tel-et{display:flex;align-items:center;gap:8px;font-weight:800}
+.tel-et i{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-style:normal;font-size:16px;background:var(--surf);border:1px solid var(--line)}
+.tel-et small{display:block;font-weight:600;color:var(--muted);font-size:12px;line-height:1.2}
+.tel{position:relative;width:100%;max-width:380px;height:760px;border-radius:44px;padding:12px;background:var(--marco);box-shadow:var(--sombra);transition:box-shadow .3s,transform .3s}
+.tel.toca{box-shadow:0 0 0 4px var(--brand-2),var(--sombra);transform:translateY(-3px)}
+.tel::before{content:"";position:absolute;top:18px;left:50%;width:90px;height:22px;margin-left:-45px;border-radius:99px;background:#000;z-index:2}
+.tel iframe,.tel .pas{width:100%;height:100%;border:0;border-radius:34px;display:block;background:#07141a}
+.cargando{position:absolute;inset:12px;border-radius:34px;display:grid;place-items:center;background:#07141a;color:#cbd5e1;font-weight:700;z-index:1;text-align:center;padding:20px}
+.cargando[hidden]{display:none}
+/* el teléfono del pasajero */
+.pas{overflow:auto;color:#eaf4f2;padding:52px 16px 20px;display:flex;flex-direction:column;gap:14px;background:radial-gradient(120% 60% at 0% 0%,rgba(20,150,140,.25),transparent 60%),#0b1a20}
+.pas-cab small{display:block;opacity:.7;font-size:12px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.pas-cab b{font-size:20px}
+.pase{border-radius:22px;overflow:hidden;background:#fff;color:#0f1f1e;box-shadow:0 14px 34px rgba(0,0,0,.35)}
+.pase-top{padding:14px 16px;color:#fff;background:linear-gradient(120deg,#0d2b45,#0d6b66 55%,#14968c)}
+.pase-top small{font-weight:800;letter-spacing:.08em;font-size:11px;opacity:.9}
+.pase-top h3{font-size:22px;margin-top:2px}
+.pase-top span{font-size:13px;opacity:.85}
+.pase.emp .pase-top{background:linear-gradient(120deg,#3a1f0c,#b85f24)}
+.pase.viejo .pase-top{background:linear-gradient(120deg,#3f3f46,#71717a)}
+.pase-qr{padding:16px;display:grid;place-items:center;gap:6px}
+.pase-qr .qr{width:180px;height:180px}
+.pase-qr .qr svg{width:100%;height:100%}
+.pase-qr code{font-family:var(--mono);font-weight:600;font-size:18px;letter-spacing:.12em}
+.parab{border-radius:40px 40px 16px 16px;height:180px;position:relative;background:linear-gradient(170deg,#bfe6f3,#5aa7c4 55%,#2d6f87);box-shadow:inset 0 -14px 0 rgba(0,0,0,.18)}
+.parab .qr{position:absolute;right:26px;bottom:22px;width:96px;height:96px;background:#fff;padding:6px;border-radius:10px}
+.parab .qr svg{width:100%;height:100%}
+.parab span{position:absolute;left:20px;bottom:24px;font-weight:800;color:#06303d;background:rgba(255,255,255,.75);padding:4px 10px;border-radius:10px;font-size:13px}
+.gente{display:flex;gap:10px;justify-content:center;font-size:54px;padding:10px 0}
+.nota-p{padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:14px}
+.mostrar{min-height:58px;border-radius:18px;font-weight:800;font-size:17px;color:#04211e;background:linear-gradient(135deg,#59d4c6,#14968c);box-shadow:0 10px 24px rgba(20,150,140,.35)}
+.mostrar:disabled{opacity:.45}
+.ruta{position:relative;height:120px;border-radius:18px;background:linear-gradient(180deg,#123036,#0b1a20);overflow:hidden}
+.ruta::before{content:"";position:absolute;left:14px;right:14px;top:58px;height:4px;border-radius:2px;background:repeating-linear-gradient(90deg,#fbbf24 0 14px,transparent 14px 26px)}
+.ruta .van{position:absolute;top:36px;font-size:36px;transition:left .9s ease-out}
+.ruta .gar{position:absolute;right:10px;top:30px;font-size:34px}
+.ruta small{position:absolute;left:14px;bottom:10px;font-weight:700}
+/* los pasos */
+details.lista{margin-top:18px;background:var(--surf);border:1px solid var(--line);border-radius:18px;padding:12px 16px}
+details.lista summary{cursor:pointer;font-weight:800}
+.lista ol{margin:10px 0 0;padding-left:22px;display:grid;gap:4px}
+.lista li{color:var(--ink-2)}
+.lista li.hecho{color:var(--ok)}
+.lista li.ahora{color:var(--ink);font-weight:800}
+.pie{margin-top:16px;color:var(--muted);font-size:13px;text-align:center}
+@media (max-width:900px){
+  .tabs{display:flex}
+  .tels{grid-template-columns:1fr}
+  .tel-col{display:none}
+  .tel-col.ver{display:flex}
+  .tel{height:min(760px,calc(100dvh - 230px));min-height:520px}
+  .guia{grid-template-columns:1fr;top:0;padding:10px 12px;gap:8px;border-radius:0 0 18px 18px;margin:0 -16px}
+  .paso-n{display:none}
+  .paso-t b{font-size:15px}
+  .paso-t span{font-size:12.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pb{min-height:40px;padding:8px 12px}
+  .paso-b{grid-column:1/-1;justify-content:stretch}
+  .paso-b .pb{flex:1;justify-content:center}
+}
+@media (prefers-reduced-motion:reduce){.tel,.ruta .van,.barra i{transition:none}}
+</style>
+</head>
+<body>
+<div class="envol">
+  <header class="cabeza">
+    <small>🚐 Hotel Los Cauquenes · Barrio Bahía Cauquén</small>
+    <h1>Las vans, con quién va a bordo</h1>
+    <p>El chofer escanea el QR del parabrisas para empezar su turno y el de cada pasajero al subir. La garita ve en vivo cuántos van, quiénes son huéspedes o empleados, y por qué suben los que no tienen QR. Probalo paso a paso o tocá los teléfonos.</p>
+    <div class="acc"><button class="b" id="bTodo">▶ Ver todo seguido</button><button class="b sec" id="bReiniciar">↺ Empezar de nuevo</button><button class="b sec" id="bCompartir">Compartir con la garita y los choferes</button></div>
+  </header>
+
+  <section class="guia" aria-live="polite">
+    <div class="paso-n" id="pN">1<small>de 18</small></div>
+    <div class="paso-t"><b id="pT">Preparando los teléfonos…</b><span id="pX">Un segundo.</span></div>
+    <div class="paso-b"><button class="pb" id="bHacer" disabled>Hacelo por mí ▶</button><button class="pb sec" id="bSig" disabled>Siguiente →</button></div>
+    <div class="barra"><i id="pBarra"></i></div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Teléfonos">
+    <button role="tab" data-t="chofer" aria-selected="true">🚐 Chofer</button><button role="tab" data-t="pas" aria-selected="false">🧳 Pasajero</button><button role="tab" data-t="garita" aria-selected="false">🛡️ Garita</button>
+  </nav>
+  <div class="tels">
+    <div class="tel-col ver" data-col="chofer"><div class="tel-et"><i>🚐</i><div>Ramón, chofer de la Van 1<small>Su enlace de chofer, sin usuario ni contraseña</small></div></div>
+      <div class="tel" id="tChofer"><div class="cargando" id="cChofer">Abriendo el enlace del chofer…</div><iframe id="fChofer" title="Teléfono del chofer" src="about:blank"></iframe></div></div>
+    <div class="tel-col" data-col="pas"><div class="tel-et"><i>🧳</i><div>El pasajero<small>Huésped o empleado, con su pase en el teléfono</small></div></div>
+      <div class="tel" id="tPas"><div class="pas" id="pas"></div></div></div>
+    <div class="tel-col" data-col="garita"><div class="tel-et"><i>🛡️</i><div>La garita<small>Lo ve todo en vivo</small></div></div>
+      <div class="tel" id="tGarita"><div class="cargando" id="cGarita">Abriendo la garita…</div><iframe id="fGarita" title="Teléfono de la garita" src="about:blank"></iframe></div></div>
+  </div>
+
+  <details class="lista"><summary>Los 18 pasos de la demo</summary><ol id="lista"></ol></details>
+  <p class="pie">Demo con datos inventados: todo queda en este navegador y no toca la app del barrio. Los nombres son de ejemplo.</p>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const dormir = ms => new Promise(r => setTimeout(r, ms));
+const TOK = 'demochoferramon23456';
+const fC = $('#fChofer'), fG = $('#fGarita');
+const C = () => fC.contentWindow, G = () => fG.contentWindow;
+const enC = code => C().eval(code), enG = code => G().eval(code);
+let paso = 0, ocupado = false, corriendo = false;
+
+/* ---------- el pasajero ---------- */
+const PASES = {
+  van:    { tipo:'van', codigo:'BHC:H-VAN1DEMO', t:'Van 1 · AD 123 XY' },
+  rossi:  { tipo:'h', codigo:'BHC:G-FAM4R1', nombre:'Familia Rossi', sub:'4 personas · hasta el sábado', cod:'FAM 4R1' },
+  olsen:  { tipo:'h', codigo:'BHC:G-MOL2N7', nombre:'Martina Olsen', sub:'2 personas · hasta mañana', cod:'MOL 2N7' },
+  laura:  { tipo:'e', codigo:'BHC:E-LGM42', nombre:'Laura Gómez', sub:'Mucama', cod:'LGM 42' },
+  pedro:  { tipo:'e', codigo:'BHC:E-PSZ73', nombre:'Pedro Suárez', sub:'Cocina', cod:'PSZ 73' },
+  viejo:  { tipo:'viejo', codigo:'BHC:G-PIB9X3', nombre:'Pablo Ibáñez', sub:'Se fue ayer (check-out)', cod:'PIB 9X3' },
+};
+function qrSvg(txt){ try { const q = qrcode(0, 'M'); q.addData(txt); q.make(); return q.createSvgTag({ cellSize:6, margin:1, scalable:true }); } catch(e){ return ''; } }
+function pintarPas(v){
+  const p = $('#pas'); let h = '';
+  if (!v) h = `<div class="pas-cab"><small>Pasajero</small><b>Esperando la van</b></div><p class="nota-p">Cada huésped tiene su pase del hotel (llega por WhatsApp) y cada empleado su credencial. En la van, se lo muestran al chofer.</p>`;
+  else if (v.tipo === 'van') h = `<div class="pas-cab"><small>El parabrisas</small><b>El QR de la Van 1</b></div><div class="parab"><span>${v.t}</span><div class="qr">${qrSvg(v.codigo)}</div></div>
+    <p class="nota-p">Las vans tienen oblea y la barrera se abre sola, pero siguen con su QR en el parabrisas: lo escanea el chofer para empezar su turno.</p>`;
+  else if (v.tipo === 'sinqr') h = `<div class="pas-cab"><small>Sin QR</small><b>${v.t}</b></div><div class="gente">${v.e}</div><p class="nota-p">No tienen pase. El chofer los suma con "+ Sin QR" y escribe por qué suben: la garita lo ve en amarillo.</p>`;
+  else if (v.tipo === 'ruta') h = `<div class="pas-cab"><small>En la ruta</small><b>Volviendo al barrio</b></div><div class="ruta"><span class="van" style="left:${v.pct}%">🚐</span><span class="gar">🛡️</span><small>${v.t}</small></div>
+    <p class="nota-p">El teléfono del chofer le manda a la garita solo la distancia (no la ubicación). A 2 km la garita recibe el aviso; en la barrera, la entrada se anota sola.</p>`;
+  else h = `<div class="pas-cab"><small>${v.tipo === 'e' ? 'Credencial de empleado' : 'Pase de huésped'}</small><b>${v.nombre}</b></div>
+    <div class="pase ${v.tipo === 'e' ? 'emp' : v.tipo === 'viejo' ? 'viejo' : ''}"><div class="pase-top"><small>${v.tipo === 'e' ? 'PERSONAL DEL HOTEL' : 'HUÉSPED DEL HOTEL'} · Los Cauquenes</small><h3>${v.nombre}</h3><span>${v.sub}</span></div>
+      <div class="pase-qr"><div class="qr">${qrSvg(v.codigo)}</div><code>${v.cod}</code></div></div>`;
+  if (v && v.codigo) h += `<button class="mostrar" id="bMostrar">📲 Mostrarle el QR al chofer</button>`;
+  p.innerHTML = h;
+  const b = $('#bMostrar'); if (b) b.onclick = () => hacer();
+}
+
+/* ---------- ayudas para manejar los teléfonos de adentro ---------- */
+const doc = w => w.document;
+async function esperar(fn, ms = 15000){ const t0 = Date.now(); while (Date.now() - t0 < ms){ try { if (fn()) return true; } catch(e){} await dormir(120); } return false; }
+async function tocar(w, sel, ms = 4000){
+  let el = null; await esperar(() => (el = doc(w).querySelector(sel)) && !el.disabled, ms);
+  if (!el) throw new Error('No encontré ' + sel);
+  el.scrollIntoView({ block:'center', behavior:'smooth' }); await dormir(250); el.click(); await dormir(350);
+}
+async function leer(cod, cuantos){
+  enC(`VanChofer.leido(${JSON.stringify(cod)})`);
+  if (cuantos){ await tocar(C(), `#hoja[open] [data-a="vc-cuantos"][data-v="${cuantos}"]`); }
+  await dormir(900);
+}
+async function sinQr(motivo, n, txt){
+  const b = doc(C()).querySelector('[data-a="vc-sinqr"]'); if (b){ b.scrollIntoView({ block:'center', behavior:'smooth' }); await dormir(300); }
+  enC(`A['vc-sinqr']({ dataset:{} })`);
+  await esperar(() => doc(C()).querySelector('#hoja[open] form[data-f="vc-sinqr"]'));
+  const f = doc(C()).querySelector('#hoja[open] form[data-f="vc-sinqr"]');
+  f.querySelector(`input[name="motivo"][value="${motivo}"]`).checked = true;
+  const nn = f.querySelector(`input[name="n"][value="${n}"]`); if (nn) nn.checked = true;
+  f.querySelector('input[name="txt"]').value = txt;
+  await dormir(500); f.requestSubmit(); await dormir(700);
+}
+async function cerrarViaje(){ await tocar(C(), '[data-a="vc-cerrar"]'); await tocar(C(), '#hoja[open] [data-r="1"]'); await dormir(900); }
+/* Después de que el teléfono quedó a la vista (en el celular se muestra de a uno). */
+function verEnGarita(sel = '.va-card'){ setTimeout(() => { try { const el = doc(G()).querySelector(sel); if (el) el.scrollIntoView({ block:'start', behavior:'smooth' }); } catch(e){} }, 250); }
+async function gps(d){ enC(`VanChofer.gpsDist(${d})`); const pct = Math.max(2, Math.min(78, 78 - d / 70)); pintarPas({ tipo:'ruta', pct, t: d >= 1000 ? `a ${(d / 1000).toFixed(1).replace('.', ',')} km de la garita` : `a ${d} m de la garita` }); verEnGarita(); await dormir(1300); }
+
+/* ---------- los pasos ---------- */
+const PASOS = [
+  { quien:'chofer', t:'Ramón abre su enlace de chofer', x:'El hotel se lo mandó una sola vez por WhatsApp (Empleados del hotel → Enlace de chofer). No necesita usuario ni contraseña.', pas:null, hacer: async () => { await dormir(600); } },
+  { quien:'pas', t:'Escanea el QR del parabrisas de la Van 1', x:'Con eso empieza su turno: la app sabe qué van maneja y con qué patente.', pas:PASES.van,
+    hacer: async () => { await tocar(C(), '[data-a="vc-escanear"][data-v="van"]'); await dormir(600); await leer(PASES.van.codigo); } },
+  { quien:'chofer', t:'La app propone el viaje que toca', x:'Según el horario del servicio regular: sale del barrio, Hotel → Centro. Si no es ese, se cambia con un toque.', pas:null,
+    hacer: async () => { await tocar(C(), '[data-a="vc-empezar"]'); } },
+  { quien:'pas', t:'Suben los Rossi: un pase para 4', x:'Pantalla verde de un vistazo. Como el pase es de la familia, la app pregunta cuántos suben.', pas:PASES.rossi,
+    hacer: async () => { await leer(PASES.rossi.codigo, 4); } },
+  { quien:'pas', t:'Sube Martina (su pase es para 2, sube 1)', x:'Ya van 5 huéspedes.', pas:PASES.olsen, hacer: async () => { await leer(PASES.olsen.codigo, 1); } },
+  { quien:'pas', t:'Laura, mucama, con su credencial', x:'Empleada del hotel ✓.', pas:PASES.laura, hacer: async () => { await leer(PASES.laura.codigo); } },
+  { quien:'pas', t:'Pedro, de la cocina, con su credencial', x:'Ya van 2 empleados.', pas:PASES.pedro, hacer: async () => { await leer(PASES.pedro.codigo); } },
+  { quien:'pas', t:'Laura muestra su QR otra vez, sin querer', x:'"Ya subió": el mismo QR nunca se cuenta dos veces.', pas:PASES.laura, hacer: async () => { enC('VanChofer.ultimoLeido = ""'); await leer(PASES.laura.codigo); await dormir(800); } },
+  { quien:'pas', t:'Alguien muestra un pase viejo', x:'Pantalla roja: ya hizo el check-out. El chofer elige "No sube" (o "Sube igual" y lo explica: la garita lo vería en rojo).', pas:PASES.viejo,
+    hacer: async () => { enC(`VanChofer.leido(${JSON.stringify(PASES.viejo.codigo)})`); await dormir(1600); await tocar(C(), '[data-a="vc-nosube"]'); } },
+  { quien:'chofer', t:'Dos acompañantes sin QR', x:'"+ Sin QR": el chofer elige el motivo, cuántos son y lo explica para la garita.', pas:{ tipo:'sinqr', t:'2 amigos de los Rossi', e:'🧍🧍' },
+    hacer: async () => { await sinQr('acomp', 2, 'Amigos de la familia Rossi'); } },
+  { quien:'garita', t:'La garita lo ve en vivo mientras suben', x:'9 a bordo: 5 huéspedes ✓, 2 empleados ✓ y 2 sin QR ⚠ con su motivo. Nadie tuvo que llamar a nadie.', pas:null,
+    hacer: async () => { verEnGarita(); await dormir(1200); } },
+  { quien:'chofer', t:'Cierra y avisa a la garita', x:'Revisa el resumen y toca "Cerrar y avisar". La salida se anota sola en la garita (con la van que arranca).', pas:null,
+    hacer: async () => { await cerrarViaje(); verEnGarita(); } },
+  { quien:'garita', t:'La garita da el OK', x:'O "Detener y revisar": al chofer le aparece en rojo que pare en la barrera.', pas:null,
+    hacer: async () => { verEnGarita(); await tocar(G(), '.va-card [data-a="va-resp"][data-v="ok"]'); await dormir(800); } },
+  { quien:'chofer', t:'En el centro: prepara la vuelta', x:'"Llegué al centro". La app ya propone la vuelta: entra al barrio, Centro (Av. Maipú 465) → Hotel.', pas:null,
+    hacer: async () => { await tocar(C(), '[data-a="vc-listo"]'); await tocar(C(), '[data-a="vc-empezar"]'); } },
+  { quien:'pas', t:'Para volver suben 7', x:'Los 4 Rossi, Martina con su acompañante (su pase es para 2) y una visita de un vecino sin QR.', pas:PASES.rossi,
+    hacer: async () => { await leer(PASES.rossi.codigo, 4); pintarPas(PASES.olsen); await dormir(500); await leer(PASES.olsen.codigo, 2); pintarPas({ tipo:'sinqr', t:'Visita del lote 148', e:'🧍' }); await sinQr('visita', 1, 'Va a la casa del lote 148'); } },
+  { quien:'chofer', t:'Cierra: la garita sabe que vienen 7', x:'Antes de que la van llegue, la garita ya sabe quién viene.', pas:null, hacer: async () => { await cerrarViaje(); } },
+  { quien:'garita', t:'El GPS avisa que viene', x:'Solo viaja la distancia a la garita. A 2 km, la garita recibe el aviso con sonido: "Van 1 llegando".', pas:{ tipo:'ruta', pct:4, t:'Saliendo del centro' },
+    hacer: async () => { for (const d of [5200, 3400, 1900, 900, 400]) await gps(d); } },
+  { quien:'garita', t:'Llega a la barrera: la entrada se anota sola', x:'La barrera se abre con la oblea y la garita ya tiene todo: quiénes entraron, a qué hora y con qué chofer. En la bitácora queda el conteo, sin nombres.', pas:{ tipo:'ruta', pct:78, t:'En la barrera' },
+    hacer: async () => { await gps(120); await dormir(1500); verEnGarita('.va-card, .cv2-chico'); } },
+];
+$('#lista').innerHTML = PASOS.map((p, i) => `<li data-i="${i}">${p.t}</li>`).join('');
+
+function verTel(q){
+  document.querySelectorAll('.tel').forEach(t => t.classList.remove('toca'));
+  const t = { chofer:'#tChofer', pas:'#tPas', garita:'#tGarita' }[q]; if (t) $(t).classList.add('toca');
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.t === q)));
+  document.querySelectorAll('.tel-col').forEach(c => c.classList.toggle('ver', c.dataset.col === q));
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => verTel(b.dataset.t));
+function mostrarPaso(){
+  const p = PASOS[paso];
+  $('#pN').innerHTML = `${Math.min(paso + 1, PASOS.length)}<small>de ${PASOS.length}</small>`;
+  $('#pBarra').style.width = (paso / PASOS.length * 100) + '%';
+  document.querySelectorAll('#lista li').forEach(li => { const i = +li.dataset.i; li.className = i < paso ? 'hecho' : i === paso ? 'ahora' : ''; });
+  if (!p){ $('#pT').textContent = '¡Listo! Secuencia completa'; $('#pX').textContent = 'Salió con 9 y entró con 7. Podés tocar los teléfonos para probar o empezar de nuevo.'; $('#bHacer').disabled = true; $('#bSig').disabled = true; $('#pBarra').style.width = '100%'; return; }
+  $('#pT').textContent = `${paso + 1}. ${p.t}`; $('#pX').textContent = p.x;
+  $('#bHacer').disabled = ocupado; $('#bSig').disabled = ocupado;
+  if ('pas' in p) pintarPas(p.pas);
+  verTel(p.quien);
+}
+async function hacer(){
+  if (ocupado || !PASOS[paso]) return;
+  ocupado = true; mostrarPaso();
+  try { await PASOS[paso].hacer(); } catch(e){ console.warn('Paso de la demo', e); }
+  ocupado = false; paso++; mostrarPaso();
+}
+$('#bHacer').onclick = () => hacer();
+$('#bSig').onclick = () => { if (ocupado) return; paso = Math.min(PASOS.length, paso + 1); mostrarPaso(); };
+$('#bTodo').onclick = async () => { if (corriendo) return; corriendo = true; $('#bTodo').disabled = true;
+  while (paso < PASOS.length && corriendo){ await hacer(); await dormir(1300); } corriendo = false; $('#bTodo').disabled = false; };
+$('#bReiniciar').onclick = () => { corriendo = false; preparar(); };
+$('#bCompartir').onclick = async () => {
+  const url = location.href.split('#')[0], texto = 'Así va a funcionar el control de pasajeros de las vans del hotel: el chofer escanea el QR de cada pasajero y la garita ve en vivo quién va a bordo. Probalo:';
+  if (navigator.share){ try { await navigator.share({ title:'Las vans, con quién va a bordo', text:texto, url }); return; } catch(e){ if (e && e.name === 'AbortError') return; } }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto + ' ' + url), '_blank', 'noopener');
+};
+
+/* ---------- preparar: la garita primero (arma los datos), después el chofer ---------- */
+async function preparar(){
+  ocupado = true; paso = 0; mostrarPaso(); $('#pT').textContent = 'Preparando los teléfonos…'; $('#pX').textContent = 'Un segundo.';
+  $('#bHacer').disabled = true; $('#bSig').disabled = true;
+  $('#cChofer').hidden = false; $('#cGarita').hidden = false;
+  try { Object.keys(localStorage).filter(k => /^bhc\.demo\./.test(k)).forEach(k => localStorage.removeItem(k));
+        Object.keys(sessionStorage).filter(k => /^bhc\.demo\./.test(k)).forEach(k => sessionStorage.removeItem(k)); } catch(e){}
+  fC.src = 'about:blank';
+  fG.src = 'index.html?local&demo=garita';
+  await new Promise(r => fG.onload = r);
+  await esperar(() => enG('typeof Store !== "undefined" && !!Store.s && typeof entrarComo === "function" && typeof VanPases !== "undefined"'));
+  enG(`(async () => {
+    try { cerrarHoja(); } catch(e){}
+    entrarComo('u_garita');
+    const t = turnoAbierto(); if (t){ Store.sesion.turnoId = t.id; Store.guardarSesion(); } else { Store.sesion.turnoId = ''; F['abrir-turno']({ turno:turnoDeAhora().nombre, g:['Juan Pérez', 'Ana Gómez'] }); }
+    const hoy = hoyISO(), n = Date.now();
+    Store.cambiar(s => {
+      const h = id => aLista(s.hotelHuespedes).find(x => x.id === id);
+      if (h('hh1')) Object.assign(h('hh1'), { codigo:'FAM4R1', hasta:sumarDias(hoy, 4) });
+      if (h('hh2')) Object.assign(h('hh2'), { codigo:'MOL2N7', hasta:sumarDias(hoy, 1) });
+      s.hotelHuespedes = aLista(s.hotelHuespedes).filter(x => x.id !== 'hh9').concat({ id:'hh9', nombre:'Pablo Ibáñez', pax:1, desde:sumarDias(hoy, -3), hasta:sumarDias(hoy, -1), salida:n - 20 * HORA, codigo:'PIB9X3', at:n - 4 * DIA });
+      s.hotelEmpleados = [
+        { id:'hed1', nombre:'Laura', apellido:'Gómez', puesto:'Mucama', dni:'', tel:'', dias:[], codigo:'LGM42', at:n - 30 * DIA },
+        { id:'hed2', nombre:'Pedro', apellido:'Suárez', puesto:'Cocina', dni:'', tel:'', dias:[], codigo:'PSZ73', at:n - 30 * DIA },
+        { id:'hed3', nombre:'Ramón', apellido:'Paz', puesto:'Chofer', dni:'', tel:'', dias:[], codigo:'RPZ15', at:n - 30 * DIA } ];
+      s.choferCodigos = [{ id:'${TOK}', empId:'hed3', nombre:'Ramón P.', vence:n + 120 * DIA, at:n }];
+      s.vanAbordo = []; s.vanGarita = [{ id:'geo', lat:-54.82, lon:-68.36, at:n }];
+    });
+    VanPases.firma = ''; await VanPases.alDia(); Store.guardarCopia();
+    PILA.length = 0; pintar();
+    window.__listo = true;
+  })()`);
+  await esperar(() => G().__listo === true);
+  $('#cGarita').hidden = true;
+  fC.src = 'index.html?local&demo=chofer#/van/' + TOK;
+  await new Promise(r => fC.onload = r);
+  await esperar(() => enC('typeof VanChofer !== "undefined" && VanChofer.estado === "listo"'));
+  $('#cChofer').hidden = true;
+  ocupado = false; mostrarPaso();
+}
+preparar();
+</script>
+</body>
+</html>

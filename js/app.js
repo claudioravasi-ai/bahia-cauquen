@@ -555,7 +555,7 @@ function pintar(){
   aplicarTema();
   /* El QR de un punto de ronda abre su pantallita aunque el teléfono tenga
      una sesión abierta: nada la tapa hasta que se cierra. */
-  if (/^#\/(punto|ronda|qr|pedir|cal|mant)\//.test(location.hash)){ rutaPublica(); return; }
+  if (/^#\/(punto|ronda|qr|pedir|cal|mant|van)\//.test(location.hash)){ rutaPublica(); return; }
   const u = yo();
   if (!u){ PILA.length = 0; return pintarBienvenida(); }
   if (!$('#lienzo')){
@@ -2226,6 +2226,8 @@ function rutaPublica(){
   if (h.startsWith('#/ronda/')){ if (!$('#puntoPublico')) pintarRondaHabilitar(h.slice(8)); return true; }
   /* El brazo de los chicos de mantenimiento (15-10-2026, js/mant-vivo.js). */
   if (h.startsWith('#/mant/')){ pintarMantBrazo(h.slice(7)); return true; }
+  /* El chofer de la van del hotel (27-10-2026, js/van-chofer.js). */
+  if (h.startsWith('#/van/')){ pintarVanChofer(h.slice(6)); return true; }
   return false;
 }
 
@@ -2300,6 +2302,7 @@ const PIEZAS = [
   ['js/turnos-vivo.js', () => typeof calTurnos],
   ['js/informe-policia.js', () => typeof semanaInforme],
   ['js/portal-vivo.js', () => typeof portalVivo],
+  ['js/van-chofer.js', () => typeof VanChofer],
 ];
 function piezasQueFaltan(){
   const falta = [];

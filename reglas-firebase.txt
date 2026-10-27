@@ -124,6 +124,23 @@ QUÉ HACEN, EN CASTELLANO
    vecinos ven solo cuántos están trabajando y desde qué hora, en
    /barrio/guardiaAhora (campos "mant" y "mantDesde"), sin nombres ni DNI.
 
+8 octies. EL CHOFER DE LA VAN DEL HOTEL (27-10-2026). El hotel le manda a
+   cada chofer su enlace (/hotel/choferCodigos: 20 letras al azar, vale 120
+   días o hasta que el hotel lo da de baja). El teléfono entra como ANÓNIMO
+   y se anota en /choferSesion/<su id> con la clave.
+   - /hotel/vanPases: una ficha por pase vigente (huésped, empleado o van),
+     guardada bajo una huella SHA-256 del código, con nombre e inicial del
+     apellido y fechas o días. La escriben el hotel y la garita. El chofer
+     NO puede listar la carpeta: lee solo la ficha del QR que tiene adelante.
+   - /hotel/vanAbordo: quiénes van a bordo en cada viaje. La escribe el
+     chofer (solo los suyos, con su enlace vigente); la leen el hotel y la
+     garita; la garita la borra a los 7 días.
+   - /hotel/vanGarita: la respuesta de la garita ("OK" o "detener"), la hora
+     del paso y la ubicación de la garita (para el aviso de llegada). La
+     escribe la garita; el chofer lee la de su viaje.
+   - El GPS del chofer: solo viaja la distancia a la garita, nunca la
+     ubicación.
+
 8 quinquies. MANTENIMIENTO EN VIVO (15-10-2026). Al marcar la entrada de
    alguien de mantenimiento, la garita crea un enlace secreto
    (/staff/mantCodigos: 20 letras al azar, solo esa persona, vence a las 16 h
@@ -589,6 +606,14 @@ PEGAR DESDE ACÁ
        "anónimo" (sin cuenta) y se anota acá con la clave de su enlace: vale
        solo si la clave está vigente y es de esa persona. Cada uno lee y
        escribe solo lo suyo. */
+    /* EL TELÉFONO DEL CHOFER DE LA VAN (27-10-2026). Entra como "anónimo" y se anota con la clave de su enlace (vigente). */
+    "choferSesion": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['tok', 'at']) && newData.child('tok').isString() && root.child('hotel/choferCodigos').child(newData.child('tok').val()).child('vence').val() > now && newData.child('at').val() === now"
+      }
+    },
     "mantSesion": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -631,7 +656,20 @@ PEGAR DESDE ACÁ
       /* 15-10: los empleados del hotel con su credencial y su DNI. Los escribe solo el hotel; los leen el hotel y la garita. */
       "hotelEmpleados": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" },
       /* 20-10: la agenda inteligente (ag-<día>) y la bitácora diaria (bd-<día>) del hotel. La leen y la escriben el hotel y la garita (la garita cierra el día y marca "Recibido"). */
-      "hotelDiario":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" }
+      "hotelDiario":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      /* 27-10: EL CHOFER DE LA VAN. Los enlaces de los choferes: los escribe y los lista solo el hotel; cada enlace lo lee quien tiene su clave de 20 letras. */
+      "choferCodigos":  { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')",
+        "$tok": { ".read": "auth != null", ".validate": "newData.hasChildren(['id', 'empId', 'nombre', 'vence']) && newData.child('id').val() === $tok && newData.child('vence').isNumber()" } },
+      /* Las fichas de los pases, bajo la huella del código: las escriben el hotel y la garita; el chofer con su enlace vigente lee SOLO la ficha cuya huella conoce (la carpeta no se lista). */
+      "vanPases":       { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$h": { ".read": "(auth != null && root.child('choferSesion').child(auth.uid).child('tok').isString() && root.child('hotel/choferCodigos').child(root.child('choferSesion').child(auth.uid).child('tok').val()).child('vence').val() > now)" } },
+      /* Quiénes van a bordo: cada viaje lo escribe el chofer que lo empezó (con su enlace vigente); lo leen el hotel y la garita; la garita los borra a los 7 días. */
+      "vanAbordo":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$id": { ".write": "(auth != null && root.child('choferSesion').child(auth.uid).child('tok').isString() && root.child('hotel/choferCodigos').child(root.child('choferSesion').child(auth.uid).child('tok').val()).child('vence').val() > now) && newData.exists() && newData.child('uid').val() === auth.uid && newData.child('tok').val() === root.child('choferSesion').child(auth.uid).child('tok').val() && (!data.exists() || data.child('uid').val() === auth.uid)",
+          ".validate": "!newData.exists() || (newData.hasChildren(['id', 'uid', 'vid', 'sentido', 'estado', 'at']) && newData.child('id').val() === $id)" } },
+      /* La respuesta de la garita (OK / detener, la hora del paso) y la ubicación de la garita ("geo"): la escribe la garita; el chofer lee la de su viaje. */
+      "vanGarita":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$id": { ".read": "(auth != null && root.child('choferSesion').child(auth.uid).child('tok').isString() && root.child('hotel/choferCodigos').child(root.child('choferSesion').child(auth.uid).child('tok').val()).child('vence').val() > now)" } }
     },
 
     /* 15-10: LA GUÍA DE LA RONDA para el teléfono del policía (sin cuenta):
@@ -697,6 +735,13 @@ HASTA ACÁ
   además en ronda/guia/<resumen del código de 6 números> (25 letras), para
   el policía que puso el código a mano sin abrir el enlace. Entra en la
   misma regla de ronda/guia que ya está publicada.
+
+✔ NUEVO 27-10-2026 (hay que volver a publicar): EL CHOFER DE LA VAN.
+  Bloques nuevos: hotel/choferCodigos, hotel/vanPases, hotel/vanAbordo,
+  hotel/vanGarita y choferSesion (ver el punto 8 octies). Usa el acceso
+  "Anónimo" que ya está habilitado para mantenimiento. Sin publicarlo, el
+  enlace del chofer dice "Este enlace ya no vale" y la garita no ve quién
+  va a bordo (todo lo demás anda igual).
 
 ✔ NUEVO 17-10-2026 (hay que volver a publicar): LAS FOTOS GRANDES DE LOS
   PUNTOS DE LA RONDA. Bloque nuevo: ronda/fotos (dentro de "ronda", al

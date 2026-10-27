@@ -150,7 +150,7 @@ const HotelDiario = {
     }
     const a2 = agendaDe(f);
     /* En el manual interactivo no se abre sola: taparía la lección. */
-    if (!MODO_MANUAL && a2 && a2.estado === 'pendiente' && document.visibilityState === 'visible' && !hojaAbierta() && HotelMotor.marcar('ag-abrir-' + f)){ AgendaVista.cat = 'todo'; setTimeout(() => this.abrir(f), 600); }
+    if (!MODO_MANUAL && !MODO_DEMO && a2 && a2.estado === 'pendiente' && document.visibilityState === 'visible' && !hojaAbierta() && HotelMotor.marcar('ag-abrir-' + f)){ AgendaVista.cat = 'todo'; setTimeout(() => this.abrir(f), 600); }
   },
   /* En la garita: a las 23:59 (o a la mañana siguiente, si estaba apagada) cierra el día del hotel. */
   deLaGarita(){
@@ -159,7 +159,7 @@ const HotelDiario = {
     if (f && !bitacoraHotelDe(f) && cuentaHotel() && HotelMotor.marcar('bd-' + f + '-' + this.device)) this.cerrarDia(f);
     /* La agenda que aprobó el hotel se le abre a la garita (una vez por equipo) hasta que alguien toca "Recibido". */
     const ag = [sumarDias(hoy, 1), hoy].map(agendaDe).find(a => a && a.estado === 'aprobada' && !a.recibido && (a.fecha !== hoy || ahora < 12 * 60));
-    if (!MODO_MANUAL && ag && document.visibilityState === 'visible' && !hojaAbierta() && (typeof turnoListo !== 'function' || turnoListo()) && HotelMotor.marcar('ag-g-' + ag.fecha + '-' + ag.aprobadaAt)){ AgendaVista.cat = 'todo'; setTimeout(() => this.abrir(ag.fecha), 600); }
+    if (!MODO_MANUAL && !MODO_DEMO && ag && document.visibilityState === 'visible' && !hojaAbierta() && (typeof turnoListo !== 'function' || turnoListo()) && HotelMotor.marcar('ag-g-' + ag.fecha + '-' + ag.aprobadaAt)){ AgendaVista.cat = 'todo'; setTimeout(() => this.abrir(ag.fecha), 600); }
     if (HotelMotor.marcar('bd-limpieza-' + hoy)){ const lim = sumarDias(hoy, -90);
       if (hotelDiario().some(x => x.fecha < lim)) Store.cambiar(s => { s.hotelDiario = aLista(s.hotelDiario).filter(x => x && !(x.fecha < lim)); }); }
   },

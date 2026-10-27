@@ -120,13 +120,15 @@ function comprimir(file, max = 1000, q = .72){
 const MODO_PRUEBA = /[?&]local\b/.test(location.search);
 /* El manual interactivo (manual-interactivo.html) usa la app de prueba con su guía al lado. */
 const MODO_MANUAL = MODO_PRUEBA && /[?&]manual\b/.test(location.search);
+/* La demo de las vans (demo-vans.html): varios teléfonos a la vez, sin carteles de bienvenida. */
+const MODO_DEMO = MODO_PRUEBA && /[?&]demo=[a-z]+/.test(location.search);
 const llavePrueba = k => MODO_PRUEBA ? k.replace(/^bhc\./, 'bhc.prueba.') : k;
 const Store = {
   KEY: llavePrueba('bhc.datos.v3'), SKEY: llavePrueba('bhc.sesion.v3'),
   s: null,           /* el estado compartido del barrio */
   sesion: null,      /* lo de este dispositivo: quién soy, preferencias */
   oyentes: [],
-  bc: ('BroadcastChannel' in window) ? new BroadcastChannel(MODO_MANUAL ? 'bhc-manual' : MODO_PRUEBA ? 'bhc-prueba' : 'bhc') : null,
+  bc: ('BroadcastChannel' in window) ? new BroadcastChannel(MODO_MANUAL ? 'bhc-manual' : MODO_PRUEBA && /[?&]demo=/.test(location.search) ? 'bhc-demo' : MODO_PRUEBA ? 'bhc-prueba' : 'bhc') : null,
 
   cargar(){
     try { this.s = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){ this.s = null; }

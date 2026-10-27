@@ -188,7 +188,7 @@ A['dia10-ir'] = el => { DIA10.i = Math.max(0, DIA10.i + +el.dataset.v); dia10Pin
     const u = yo(), clave = `bhc.admin.dia10.${u ? u.id : ''}`;
     let visto = '';
     try { visto = localStorage.getItem(clave) || ''; } catch(e){ visto = hoyISO(); }
-    if (visto !== hoyISO() && !(typeof MODO_MANUAL !== 'undefined' && MODO_MANUAL) && !document.querySelector('dialog[open]')){
+    if (visto !== hoyISO() && !(typeof MODO_MANUAL !== 'undefined' && (MODO_MANUAL || MODO_DEMO)) && !document.querySelector('dialog[open]')){
       try { localStorage.setItem(clave, hoyISO()); } catch(e){}
       setTimeout(() => { if (document.querySelector('#cuerpo .pv') && !document.querySelector('dialog[open]')) dia10Abrir(); }, 700);
     }

@@ -93,15 +93,18 @@ const Nube = {
             /* 15-10: los empleados del hotel con su credencial y su DNI (js/v-hotel.js): solo el hotel y la garita */
             'hotelEmpleados',
             /* 20-10: la agenda inteligente (ag-<día>) y la bitácora diaria (bd-<día>) del hotel (js/hotel-diario.js): solo el hotel y la garita */
-            'hotelDiario'],
+            'hotelDiario',
+            /* 27-10: el chofer de la van (js/van-chofer.js): los enlaces de los choferes (solo el hotel), las fichas de los pases
+               (bajo una huella: el chofer lee solo la del QR que tiene adelante), quiénes van a bordo y la respuesta de la garita */
+            'choferCodigos','vanPases','vanAbordo','vanGarita'],
   },
   /* Qué baja cada rol. El hotel NO baja nada de los vecinos: solo lo
      público de la ciudad y lo suyo. */
   HOTEL_LEE: {
     hotel:   { barrio:['agenda','temporadas','feriados','contactos','documentos','cruceros','eventosCiudad','promos','camion','mantVivo'],
-               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs','hotelEmpleados','hotelDiario'] },
+               hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelPromos','hotelLiqs','hotelEmpleados','hotelDiario','choferCodigos','vanPases','vanAbordo','vanGarita'] },
     admin:   { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelProv','hotelPromos','hotelLiqs'] },
-    guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelEmpleados','hotelDiario'] },
+    guardia: { hotel:['hotelInfo','hotelVans','hotelMovs','hotelViajes','hotelEventos','hotelHuespedes','hotelProv','hotelEmpleados','hotelDiario','vanPases','vanAbordo','vanGarita'] },
     /* El supervisor de la guardia (07-10-2026) baja lo que la garita usa para
        trabajar y nada más: sin votaciones, expensas, pizarrón, compras,
        comunicados ni lo del hotel que no es de la garita (los huéspedes). */
@@ -157,6 +160,8 @@ const Nube = {
     hotelViajes:     { listas:['huespedes','dias'] },
     hotelProv:       { listas:['dias'] },
     hotelEmpleados:  { listas:['dias'] },
+    vanPases:        { listas:['dias'] },
+    vanAbordo:       { listas:['pax'] },
     hotelDiario:     { listas:['items','pasos','controles','manana'], objetos:['mail','resumen'] },
     camion:          { listas:[] },
     mensajeria:      { listas:[] },
