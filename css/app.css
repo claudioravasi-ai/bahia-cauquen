@@ -6644,8 +6644,6 @@ body.vc-modo{background:#07141a}
 .vc-cam-vista{position:relative;aspect-ratio:4/3;max-height:42vh;width:100%;display:grid;place-items:center}
 .vc-cam-vista video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .vc-cam-marco{position:absolute;width:56%;aspect-ratio:1;border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.35);border:3px solid rgba(89,212,198,.9);pointer-events:none}
-.vc-cam-demo{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:16px;color:#cbd5e1;z-index:1;max-width:70%}
-.vc-cam-demo svg{width:28px;height:28px}.vc-cam-demo small{font-size:12px;opacity:.8}
 .vc-cam-pie{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0b1d24}
 .vc-cam-pie small{flex:1;opacity:.85}
 .vc-cam-pie button{padding:8px 14px;border-radius:12px;font-weight:800;background:rgba(255,255,255,.12);color:#fff}

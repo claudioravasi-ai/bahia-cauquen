@@ -60,7 +60,6 @@ const VC_VIGENCIA = 120 * DIA;
 const VC_RETENCION = 7 * DIA;
 const VC_CERCA = 2000;      /* a 2 km la garita recibe el aviso "llegando" */
 const VC_LLEGO = 150;       /* a 150 m se anota la entrada sola */
-const VC_DEMO = MODO_DEMO;
 const vcNube = () => typeof Nube !== 'undefined' && Nube.activa() && !!Nube.db;
 /* "Martina Olsen" → "Martina O." */
 const vcCorto = n => { const p = String(n || '').trim().split(/\s+/).filter(Boolean); return p.length > 1 ? `${p[0]} ${p[p.length - 1][0].toUpperCase()}.` : (p[0] || ''); };
@@ -386,12 +385,11 @@ const VanChofer = {
   /* ---- la cámara, abierta mientras suben (lee uno detrás de otro) ---- */
   camHtml(modo){
     if (!this.cam || this.cam.modo !== modo) return '';
-    return `<div class="vc-cam"><div class="vc-cam-vista" id="vcCamLugar">${VC_DEMO ? `<div class="vc-cam-demo">${I('camera')}<b>Cámara de la demo</b><small>En el teléfono del pasajero, tocá "Mostrarle el QR al chofer".</small></div>` : ''}<span class="vc-cam-marco"></span></div>
+    return `<div class="vc-cam"><div class="vc-cam-vista" id="vcCamLugar"><span class="vc-cam-marco"></span></div>
       <div class="vc-cam-pie"><small>${modo === 'van' ? 'Apuntá al QR del parabrisas' : 'Apuntá al QR de cada pasajero: lee uno detrás de otro'}</small><button type="button" data-a="vc-cam-cerrar">Listo</button></div></div>`;
   },
   async camAbrir(modo){
     this.cam = { modo }; this.repintar();
-    if (VC_DEMO) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ this.cam = null; this.repintar(); return toast('Este teléfono no puede usar la cámara. Escribí el código.', 'scan'); }
     const nativo = 'BarcodeDetector' in window, lector = nativo ? null : await cargarJsQR();
     if (!nativo && !lector){ this.cam = null; this.repintar(); return toast('Sin conexión para cargar el lector de QR. Escribí el código.', 'scan'); }
@@ -427,7 +425,7 @@ const VanChofer = {
     this.ultimoLeido = txt; this.ultimoAt = Date.now();
     this.leido(txt);
   },
-  /* ---- lo leído (también lo que se escribe a mano, y lo que manda la demo) ---- */
+  /* ---- lo leído (también lo que se escribe a mano) ---- */
   async leido(txt){
     const cod = vcCodigo(txt), modo = this.cam ? this.cam.modo : (!this.st.turno ? 'van' : 'pax');
     if (!this.st.turno || modo === 'van') return this.leidoVan(cod);
@@ -526,7 +524,7 @@ const VanChofer = {
   },
   /* ---- el aviso de llegada (solo la distancia) ---- */
   gpsArrancar(){
-    if (VC_DEMO || this.gpsId != null) return;
+    if (this.gpsId != null) return;
     if (!navigator.geolocation){ this.gpsEstado = 'no'; return; }
     this.gpsId = navigator.geolocation.watchPosition(p => { this.gpsEstado = 'ok'; if (this.geo) this.gpsDist(vcDistancia(p.coords.latitude, p.coords.longitude, this.geo.lat, this.geo.lon)); },
       e => { this.gpsEstado = e.code === 1 ? 'denegado' : 'error'; this.repintar(); }, { enableHighAccuracy:true, maximumAge:10000, timeout:30000 });

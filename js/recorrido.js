@@ -62,7 +62,7 @@ const Recorrido = {
   /* Se llama después de cada dibujo: arranca solo la primera vez, en la pantalla principal de cada perfil. */
   quizas(){
     /* En el manual interactivo guía el manual, no el recorrido de bienvenida. */
-    if (MODO_MANUAL || MODO_DEMO || this.abierto() || this.espera) return;
+    if (MODO_MANUAL || this.abierto() || this.espera) return;
     const p = this.perfilActual(); if (!p || this.visto(p)) return;
     const vista = PILA[PILA.length - 1]?.id || 'inicio';
     if (p === 'garita' ? !(vista === 'garita' || vista === 'inicio') || !$('#qValidar') : vista !== 'inicio') return;
