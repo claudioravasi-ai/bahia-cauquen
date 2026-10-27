@@ -1794,7 +1794,7 @@ function estadoEmp(e){
 }
 const hEmpAdentro = () => hotelEmpleados().filter(e => estadoEmp(e).adentro);
 const hEmpHoy = e => { const ini = new Date(); ini.setHours(0, 0, 0, 0); return hEmpMovs(e).filter(m => m.at >= +ini).reverse(); };
-const hEmpHoyTxt = e => { const ms = hEmpHoy(e); return ms.length ? 'Hoy: ' + ms.map(m => `${m.tipo === 'in' ? 'entró' : 'salió'} ${hora(m.at)}`).join(' · ') : ''; };
+const hEmpHoyTxt = e => { const ms = hEmpHoy(e); return ms.length ? 'Hoy: ' + ms.map(m => `${m.tipo === 'in' ? 'entró' : 'salió'} ${hora(m.at)}${m.chofer ? ' manejando la van' : m.enVan ? ' en la van' : ''}`).join(' · ') : ''; };
 const hEmpHorario = e => `${aLista(e.dias).length ? textoDias(e.dias) : 'Cualquier día'}${e.desde && e.hasta ? ` · ${e.desde} a ${e.hasta} h` : ''}`;
 const hEmpIniciales = e => ((e.nombre || '?')[0] + ((e.apellido || '')[0] || '')).toUpperCase();
 /* LOS DÍAS AUTORIZADOS (Claudio, 15-10-2026: "los empleados del hotel le

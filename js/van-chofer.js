@@ -295,13 +295,13 @@ const VanChofer = {
   repintar(){
     if (!this.activo || this.estado !== 'listo') return;
     const c = $('#vanChofer'); if (!c) return this.pintar();
-    const sc = window.scrollY, video = this.cam && $('#vcVideo');
+    const sc = c.scrollTop, video = this.cam && $('#vcVideo');
     /* La cámara no se corta al redibujar: el video se saca y se vuelve a poner. */
     if (video) video.remove();
     c.innerHTML = this.cuerpo();
     const lugar = $('#vcCamLugar'); if (video && lugar) lugar.appendChild(video); else if (this.cam) this.camEnganchar();
     this.pintarFlash();
-    scrollTo(0, sc);
+    c.scrollTop = sc;
   },
   marca(){ return `<span class="vc-logo">${I('car')}</span><div class="grow"><small>${esc(HOTEL_NOMBRE)}</small><b>Chofer de la van</b></div>`; },
   cuerpo(){
@@ -310,13 +310,33 @@ const VanChofer = {
     return `<header class="vc-cab">${this.marca()}${red}</header>
       ${!t ? this.sinTurno() : a ? this.viaje(a) : this.conTurno(t)}`;
   },
+  /* EMPEZAR EL TURNO (rediseño, pedido de Claudio, 27-10-2026: "más innovador y atractivo").
+     La van de frente, de noche, con las luces prendidas y el QR del parabrisas
+     que titila. Al tocar "Escanear", la cámara se abre ADENTRO del parabrisas
+     y una línea de luz lo recorre: se entiende solo dónde apuntar. */
   sinTurno(){
-    return `<div class="vc-hola"><small>Hola,</small><b>${esc(this.nombre().split(' ')[0])}</b></div>
-      <div class="vc-paso"><div class="vc-parabrisas" aria-hidden="true"><span class="vc-pb-qr">${I('qr')}</span></div>
-        <b>Escaneá el QR del parabrisas de tu van</b><small>Así la garita sabe qué van manejás en este turno.</small>
-        ${this.camHtml('van')}
-        ${this.cam ? '' : `<button type="button" class="vc-boton" data-a="vc-escanear" data-v="van">${I('scan')}Escanear el QR de la van</button>`}
-        <button type="button" class="vc-link" data-a="vc-tipear" data-v="van">No puedo escanear: escribir el código</button></div>`;
+    const h = new Date().getHours(), saludo = h < 6 ? 'Buenas noches' : h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+    const prox = SERVICIO_REGULAR.find(([sa]) => minutosDe(sa) >= ahoraMin() - 5), cam = !!(this.cam && this.cam.modo === 'van');
+    return `<div class="vc-bienv"><small>${saludo},</small><b>${esc(this.nombre().split(' ')[0])}</b>
+        <span>${prox ? `${I('clock')}Próxima salida al centro: <em>${esc(prox[0])}</em>` : `${I('clock')}Sin más salidas del servicio regular hoy`}</span></div>
+      <ol class="vc-ruta3" aria-label="Los pasos del viaje"><li class="on"><i>1</i>Tu van</li><li><i>2</i>Pasajeros</li><li><i>3</i>Garita</li></ol>
+      <div class="vc-frente${cam ? ' cam' : ''}" aria-hidden="${cam ? 'false' : 'true'}">
+        <div class="vc-f-noche"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="vc-f-van">
+          <div class="vc-f-techo"></div>
+          <div class="vc-f-vidrio"${cam ? ' id="vcCamLugar"' : ''}>
+            ${cam ? '<span class="vc-f-mira"><i></i></span><i class="vc-f-laser"></i>' : `<i class="vc-f-brillo"></i><span class="vc-f-qr">${I('qr')}</span><span class="vc-f-globo">acá está el QR</span>`}
+          </div>
+          <div class="vc-f-cuerpo"><span class="vc-f-luz"></span><span class="vc-f-parrilla"><i></i><i></i><i></i></span><span class="vc-f-luz"></span></div>
+          <div class="vc-f-paragolpe"><span class="vc-f-chapa">TU VAN</span></div>
+          <div class="vc-f-ruedas"><i></i><i></i></div>
+        </div>
+        <div class="vc-f-haz"></div>
+      </div>
+      <p class="vc-f-txt">${cam ? '<b>Apuntá al QR del parabrisas</b>, del lado del acompañante. Se lee solo.' : '<b>Escaneá el QR del parabrisas</b> para empezar tu turno: así la garita sabe qué van manejás.'}</p>
+      ${cam ? `<button type="button" class="vc-b2 vc-ancho" data-a="vc-cam-cerrar">${I('x')}Cancelar</button>`
+        : `<button type="button" class="vc-boton" data-a="vc-escanear" data-v="van">${I('scan')}Escanear el QR de la van</button>`}
+      <button type="button" class="vc-link vc-centro" data-a="vc-tipear" data-v="van">${I('edit')}No puedo escanear: escribir el código</button>`;
   },
   /* El viaje que toca según el horario: después de una salida, su vuelta. */
   proximo(){
@@ -342,21 +362,23 @@ const VanChofer = {
     const cab = `<div class="vc-viaje-cab ${sale ? 'sale' : 'entra'}"><span class="vc-dir">${I(sale ? 'logout' : 'login')}${sale ? 'SALE DEL BARRIO' : 'ENTRA AL BARRIO'}</span><b>${esc(a.sale || hora(a.at))}</b><small>${esc(a.van)} · ${esc(a.pat)}</small></div>`;
     const chips = vaChips(r);
     if (subiendo) return `${cab}
-      <div class="vc-cuenta"><b data-vc-total>${r.total}</b><span>${r.total === 1 ? 'pasajero a bordo' : 'pasajeros a bordo'}</span></div>
-      <div class="va-chips grande">${chips || '<span class="muted">Todavía no subió nadie</span>'}</div>
+      <div class="vc-cuenta"><b data-vc-total>${r.total}</b><span>${r.total === 1 ? 'pasajero a bordo' : 'pasajeros a bordo'}</span><small>${I('car')}Vos vas aparte: no te contás</small></div>
+      ${chips ? `<div class="va-chips grande">${chips}</div>` : ''}
       ${this.camHtml('pax')}
       <div class="vc-acciones">${this.cam ? '' : `<button type="button" class="vc-boton" data-a="vc-escanear" data-v="pax">${I('scan')}Escanear pasajero</button>`}
-        <button type="button" class="vc-b2" data-a="vc-sinqr">${I('plus')}Sin QR</button><button type="button" class="vc-b2" data-a="vc-tipear" data-v="pax">${I('edit')}Escribir código</button></div>
-      ${this.lista(a, true)}
-      <div class="vc-fijo"><button type="button" class="vc-boton ok" data-a="vc-cerrar" ${r.total ? '' : 'disabled'}>${I('send')}Cerrar y avisar a la garita${r.total ? ` · ${r.total}` : ''}</button>
-        <button type="button" class="vc-link" data-a="vc-anular">Anular este viaje</button></div>`;
+        <div class="vc-dos"><button type="button" class="vc-b3" data-a="vc-sinqr"><span>${I('plus')}</span><b>Sin QR</b><small>con su motivo</small></button>
+          <button type="button" class="vc-b3" data-a="vc-tipear" data-v="pax"><span>${I('edit')}</span><b>Escribir código</b><small>si no lee el QR</small></button></div></div>
+      <div class="vc-fijo">${r.total ? `<button type="button" class="vc-boton ok" data-a="vc-cerrar">${I('send')}<span>Cerrar y avisar a la garita</span><em>${r.total}</em></button>`
+        : `<button type="button" class="vc-boton vacia" data-a="vc-cerrar">${I('car')}<span>Cerrar y avisar: ${sale ? 'sale' : 'viene'} vacía</span></button>`}
+        <button type="button" class="vc-link" data-a="vc-anular">Anular este viaje</button></div>
+      ${r.total ? `<h3 class="vc-tit">A bordo <em>${r.total}</em></h3>${this.lista(a, true)}` : ''}`;
     /* Ya avisado: la respuesta de la garita y, en la vuelta, el aviso de llegada. */
     const g = this.resp || {}, entro = !!g.movAt;
     const estado = g.resp === 'detener' && !entro ? `<div class="vc-resp bad">${I('siren')}<b>La garita te pide que pares en la barrera</b><small>Quiere revisar a los pasajeros. Esperá a que te habiliten.</small></div>`
-      : sale && g.movAt ? `<div class="vc-resp ok">${I('check')}<b>${g.resp === 'ok' ? 'La garita dio el OK · ¡buen viaje!' : 'La garita ya anotó tu salida'}</b><small>Salida anotada a las ${hora(g.movAt)} con ${plural(r.total, 'pasajero')}.</small></div>`
-      : !sale && entro ? `<div class="vc-resp ok">${I('check')}<b>Entraste al barrio</b><small>La garita anotó tu entrada a las ${hora(g.movAt)} con ${plural(r.total, 'pasajero')}.</small></div>`
+      : sale && g.movAt ? `<div class="vc-resp ok">${I('check')}<b>${g.resp === 'ok' ? 'La garita dio el OK · ¡buen viaje!' : 'La garita ya anotó tu salida'}</b><small>Salida anotada a las ${hora(g.movAt)} ${r.total ? 'con ' + plural(r.total, 'pasajero') : 'con la van vacía'}.</small></div>`
+      : !sale && entro ? `<div class="vc-resp ok">${I('check')}<b>Entraste al barrio</b><small>La garita anotó tu entrada a las ${hora(g.movAt)} ${r.total ? 'con ' + plural(r.total, 'pasajero') : 'con la van vacía'}.</small></div>`
       : g.resp === 'ok' ? `<div class="vc-resp ok">${I('check')}<b>La garita dio el OK</b><small>${sale ? '¡Buen viaje!' : 'Te espera en la barrera.'}</small></div>`
-      : `<div class="vc-resp espera">${I('send')}<b>Avisado a la garita</b><small>${plural(r.total, 'pasajero')} a bordo. La garita lo está viendo en vivo.</small></div>`;
+      : `<div class="vc-resp espera">${I('send')}<b>Avisado a la garita</b><small>${r.total ? plural(r.total, 'pasajero') + ' a bordo' : 'Va vacía'}. La garita lo está viendo en vivo.</small></div>`;
     const gps = !sale && !entro ? this.gpsHtml(a) : '';
     const fin = sale ? `<button type="button" class="vc-boton" data-a="vc-listo">${I('pin')}Llegué al centro: preparar la vuelta</button>`
       : entro ? `<button type="button" class="vc-boton ok" data-a="vc-listo">${I('check')}Listo</button>`
@@ -390,12 +412,12 @@ const VanChofer = {
   },
   async camAbrir(modo){
     this.cam = { modo }; this.repintar();
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ this.cam = null; this.repintar(); return toast('Este teléfono no puede usar la cámara. Escribí el código.', 'scan'); }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return this.sinCamara(modo, 'Este teléfono no puede usar la cámara.');
     const nativo = 'BarcodeDetector' in window, lector = nativo ? null : await cargarJsQR();
-    if (!nativo && !lector){ this.cam = null; this.repintar(); return toast('Sin conexión para cargar el lector de QR. Escribí el código.', 'scan'); }
+    if (!nativo && !lector) return this.sinCamara(modo, 'Sin conexión para cargar el lector de QR.');
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } }); }
-    catch(e){ this.cam = null; this.repintar(); return toast('No se pudo usar la cámara', 'camera'); }
+    catch(e){ return this.sinCamara(modo, 'No se pudo usar la cámara (no hay o no se dio permiso).'); }
     if (!this.cam){ stream.getTracks().forEach(t => t.stop()); return; }
     const v = document.createElement('video'); v.id = 'vcVideo'; v.playsInline = true; v.muted = true; v.setAttribute('playsinline', ''); v.srcObject = stream;
     Object.assign(this.cam, { stream, v, det: nativo ? new BarcodeDetector({ formats:['qr_code'] }) : null, lector, lienzo:document.createElement('canvas') });
@@ -406,6 +428,14 @@ const VanChofer = {
       setTimeout(ciclo, 220);
     };
     ciclo();
+  },
+  /* Sin cámara no se traba nadie: se abre directo "escribir el código". */
+  sinCamara(modo, por){
+    /* Si mientras tanto se cerró la cámara o se abrió otra ventana (cerrar el viaje), no se pisa nada. */
+    if (!this.cam || this.cam.modo !== modo) return;
+    this.cam = null; this.repintar();
+    if (hojaAbiertaVc()) return toast(`${por} Escribí el código con "Escribir código".`, 'camera');
+    A['vc-tipear']({ dataset:{ v:modo, por } });
   },
   camEnganchar(){ const c = this.cam, l = $('#vcCamLugar'); if (c && c.v && l && c.v.parentNode !== l) l.appendChild(c.v); },
   async camLeer(c){
@@ -444,6 +474,8 @@ const VanChofer = {
     if (!p || (p.t !== 'h' && p.t !== 'e')) return this.mostrar({ cls:'bad', ic:'x', t: p && p.t === 'v' ? 'Es el QR de una van' : 'Pase no válido', x: p ? 'Escaneá el pase del pasajero.' : 'No es de un huésped ni de un empleado del hotel, o ya se dio de baja.', sube:!p });
     const ev = vcEvaluar(p);
     if (!ev.ok) return this.mostrar({ cls:'bad', ic:'x', t:ev.msg, x:`${p.t === 'h' ? 'Huésped' : 'Empleado'}: ${p.n}. ${ev.sub}`, sube:true, motivoTxt:`${ev.msg} (${p.n})` });
+    /* (27-10) El chofer va aparte: su propia credencial no suma un pasajero. */
+    if (p.t === 'e' && this.cod && p.ref && p.ref === this.cod.empId) return this.mostrar({ cls:'warn', ic:'car', t:'Sos vos, el chofer', x:'El chofer va aparte: no cuenta como pasajero. Tu salida y tu entrada se anotan solas con la van.' });
     const ya = aLista(a.pax).filter(x => x.k === id).length, cupo = p.t === 'h' ? (+p.pax || 1) : 1;
     if (ya >= cupo) return this.mostrar({ cls:'warn', ic:'refresh', t: cupo > 1 ? `Ya subieron los ${cupo}` : 'Ya subió', x:`${p.n}: ese QR ya está a bordo. No se cuenta dos veces.` });
     const base = { k:id, t:p.t, n:p.n, ref:p.ref || '', ...(p.puesto ? { puesto:p.puesto } : {}), ...(ev.av ? { av:ev.av } : {}) };
@@ -503,7 +535,7 @@ const VanChofer = {
   /* ---- el viaje ---- */
   empezar(){
     const t = this.st.turno, p = this.proximo(); if (!t) return;
-    this.st.actual = { id:'va' + uid(), uid:this.uid, tok:this.tok, chofer:this.nombre(), vid:t.vid, van:t.van, pat:t.pat, sentido:p.sentido, sale:p.sale || '', fecha:hoyISO(), at:Date.now(), estado:'subiendo', pax:[] };
+    this.st.actual = { id:'va' + uid(), uid:this.uid, tok:this.tok, chofer:this.nombre(), ...(this.cod && this.cod.empId ? { cemp:this.cod.empId } : {}), vid:t.vid, van:t.van, pat:t.pat, sentido:p.sentido, sale:p.sale || '', fecha:hoyISO(), at:Date.now(), estado:'subiendo', pax:[] };
     this.st.forzar = null; this.resp = null;
     this.subir(); this.oirGarita(this.st.actual.id);
     this.camAbrir('pax');
@@ -550,8 +582,8 @@ A['vc-escanear'] = el => VanChofer.camAbrir(el.dataset.v === 'van' ? 'van' : 'pa
 A['vc-cam-cerrar'] = () => VanChofer.camCerrar();
 A['vc-flash-x'] = () => { VanChofer.flash = null; VanChofer.repintar(); };
 A['vc-tipear'] = el => {
-  const van = el.dataset.v === 'van';
-  hoja(van ? 'Código de la van' : 'Código del pasajero', `<form data-f="vc-tipeado" class="vc-form"><input type="hidden" name="modo" value="${van ? 'van' : 'pax'}">
+  const van = el.dataset.v === 'van', por = el.dataset.por || '';
+  hoja(van ? 'Código de la van' : 'Código del pasajero', `${por ? `<p class="vc-por">${I('camera')}${esc(por)} Escribí el código: anda igual.</p>` : ''}<form data-f="vc-tipeado" class="vc-form"><input type="hidden" name="modo" value="${van ? 'van' : 'pax'}">
     <div class="field"><label>${van ? 'El código que está abajo del QR del parabrisas (H-…)' : 'Los 6 signos del pase del huésped o los 5 de la credencial del empleado'}</label>
       <input name="c" required autocomplete="off" autocapitalize="characters" maxlength="14" class="mono" placeholder="${van ? 'H-XXXXXXXX' : 'ABC 123'}" style="font-size:22px;letter-spacing:2px"></div>
     <button class="btn btn-pri btn-block btn-grande">${I('check')}Verificar</button></form>`);
@@ -591,8 +623,9 @@ A['vc-horario'] = () => { const p = VanChofer.proximo(), sale = p.sentido === 'o
 A['vc-hora'] = el => { const p = VanChofer.proximo(); VanChofer.st.forzar = { sentido:p.sentido, sale:el.dataset.v || '' }; VanChofer.guardarSt(); cerrarHoja(); VanChofer.repintar(); };
 A['vc-cerrar'] = async () => {
   const a = VanChofer.st.actual; if (!a) return; const r = vaResumen(a);
+  if (VanChofer.cam) VanChofer.camCerrar();
   if (r.p) return toast('Hay pasajeros por verificar: esperá a que vuelva la señal o bajalos', 'clock');
-  if (!await confirmar('Cerrar y avisar a la garita', `<b style="font-size:20px">${plural(r.total, 'pasajero')} a bordo</b><br>${esc(vaTexto(r))}<br><span class="muted small">${a.sentido === 'out' ? 'Sale del barrio' : 'Entra al barrio'} · ${esc(a.van)} · ${esc(a.pat)}</span>`, { si:'Cerrar y avisar' })) return;
+  if (!await confirmar('Cerrar y avisar a la garita', `<b style="font-size:20px">${r.total ? plural(r.total, 'pasajero') + ' a bordo' : `La van ${a.sentido === 'out' ? 'sale' : 'viene'} vacía`}</b><br>${esc(vaTexto(r))}<br><span class="muted small">${a.sentido === 'out' ? 'Sale del barrio' : 'Entra al barrio'} · ${esc(a.van)} · ${esc(a.pat)}</span>`, { si:'Cerrar y avisar' })) return;
   VanChofer.cerrar();
 };
 A['vc-anular'] = async () => {
@@ -622,6 +655,8 @@ function vaResumen(m){
   return r;
 }
 function vaTexto(r){
+  /* (27-10) "A veces vienen solas las vans": se cierra igual, vacía. */
+  if (!r.total) return 'Vacía, sin pasajeros';
   const partes = [r.h && plural(r.h, 'huésped', 'huéspedes'), r.e && plural(r.e, 'empleado'), r.x && `${r.x} sin QR (${Object.entries(r.motivos).map(([k, n]) => vcMotivoN(k, n)).join(', ')})`, r.p && `${r.p} por verificar`].filter(Boolean);
   return `${plural(r.total, 'pasajero')} a bordo${partes.length ? ': ' + partes.join(', ') : ''}`;
 }
@@ -647,7 +682,7 @@ function vaTarjeta(m, opera){
     <div class="va-cab"><span class="va-dir ${sale ? 'sale' : 'entra'}">${I(sale ? 'logout' : 'login')}${sale ? 'SALE' : 'ENTRA'}</span>
       <div class="grow"><b>${esc(m.van)} · <span class="mono">${esc(m.pat)}</span></b><small>${esc(m.chofer)}${m.sale ? ' · ' + esc(m.sale) + ' h' : ''} · ${sale ? 'Hotel → Centro' : 'Centro → Hotel'}</small></div>
       <span class="va-estado">${subiendo ? '<i></i>' : ''}${esc(estado)}</span></div>
-    <div class="va-cuerpo"><div class="va-num"><b>${r.total}</b><small>a bordo</small></div><div class="va-chips">${vaChips(r) || '<span class="muted small">Todavía no subió nadie</span>'}</div></div>
+    <div class="va-cuerpo"><div class="va-num"><b>${r.total}</b><small>${r.total === 1 ? 'pasajero' : 'pasajeros'}</small><small class="va-mas">+ chofer</small></div><div class="va-chips">${vaChips(r) || `<span class="muted small">${subiendo ? 'Todavía no subió nadie' : 'Vacía, sin pasajeros'}</span>`}</div></div>
     ${Object.keys(cuenta).length ? `<ul class="va-motivos">${Object.entries(cuenta).map(([t, n]) => `<li>${I('alert')}${n > 1 ? `<b>${n}</b> · ` : ''}${esc(t)}</li>`).join('')}</ul>` : ''}
     ${!sale && !g.movAt && m.estado === 'cerrado' ? (d != null ? `<div class="va-gps ${d <= VC_CERCA ? 'cerca' : ''}"><span>${I('pin')}${d <= VC_LLEGO ? 'Llegando a la barrera' : 'a ' + vcKm(d) + ' de la garita'}</span><b>${vcEta(d)}</b><div class="vc-g-barra"><i style="width:${Math.max(4, Math.min(100, 100 - d / 80))}%"></i></div></div>`
       : `<p class="va-nota">${I('pin')}${geo.lat ? 'Esperando la señal del GPS del chofer…' : 'Para el aviso de llegada por GPS, la garita marca su ubicación una vez.'}${opera && !geo.lat ? ` <button type="button" class="link" data-a="va-geo">Marcar la garita acá</button>` : ''}</p>`) : ''}
@@ -699,6 +734,9 @@ function vaPaso(m){
       vgPoner(s, m.id, { movAt:at, tipo });
       /* Cada huésped (una vez por pase) y cada empleado: "salió en la Van 1". */
       const vistos = new Set();
+      /* (27-10) El chofer también sale y entra con la van (como empleado, marcado "chofer"). */
+      if (m.cemp && aLista(s.hotelEmpleados).some(e => e && e.id === m.cemp)){ vistos.add(m.cemp);
+        s.hotelMovs.unshift({ id:`hm-${m.id}-${m.cemp}`, empId:m.cemp, tipo, at, por:yo().id, enVan:m.vid, chofer:1 }); }
       aLista(m.pax).forEach(p => { if (!p.ref || vistos.has(p.ref) || (p.t !== 'h' && p.t !== 'e')) return; vistos.add(p.ref);
         s.hotelMovs.unshift({ id:`hm-${m.id}-${p.ref}`, ...(p.t === 'h' ? { huespedId:p.ref } : { empId:p.ref }), tipo, at, por:yo().id, enVan:m.vid }); });
     } });
