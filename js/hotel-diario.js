@@ -279,10 +279,10 @@ function bitacoraDelDia(f, { garita = false } = {}){
     add(a.aprobadaAt, 'otro', `La gerencia aprobó la agenda del ${fechaCorta(a.fecha)} · ${plural(r.ok || 0, 'tarea')}${r.cambios ? ` · ${plural(r.cambios, 'cambio')} a mano` : ''}`); });
   hotelDiario().filter(a => a.tipo === 'agenda' && a.recibido && enDia(a.recibido.at)).forEach(a => add(a.recibido.at, 'otro', `La garita recibió la agenda del ${fechaCorta(a.fecha)}`));
   /* Solo la garita ve el libro de guardia: los clientes de spa y restaurante y sus observaciones sobre el hotel. */
-  const cli = { spa:0, resto:0 }; let obs = 0;
+  const cli = { spa:0, resto:0, recep:0 }; let obs = 0;
   if (garita) aLista(Store.s.bitacora).filter(b => b && enDia(b.at)).forEach(b => {
-    if (b.hc){ const n = +b.hc.n || 1, spa = b.hc.m === 'spa'; cli[spa ? 'spa' : 'resto'] += n; add(b.at, 'spa', `Llegaron ${n} ${spa ? 'al spa' : 'al restaurante'}${!spa && typeof hcMotivo === 'function' ? ' · ' + hcMotivo(b.hc.m)[1] : ''}`); }
-    else if (b.hcRef) add(b.at, 'spa', 'Se fueron clientes del restaurante o del spa');
+    if (b.hc){ const n = +b.hc.n || 1, m = b.hc.m, spa = m === 'spa', rec = m === 'recepcion'; cli[spa ? 'spa' : rec ? 'recep' : 'resto'] += n; add(b.at, 'spa', `Llegaron ${n} ${spa ? 'al spa' : rec ? 'a la recepción' : 'al restaurante'}${!spa && !rec && typeof hcMotivo === 'function' ? ' · ' + hcMotivo(m)[1] : ''}`); }
+    else if (b.hcRef) add(b.at, 'spa', 'Se fueron clientes del restaurante, del spa o de la recepción');
     else if (b.tipo !== 'acceso' && /hotel/i.test(b.texto || '')){ obs++; add(b.at, 'obs', `Observación de la garita: ${String(b.texto).slice(0, 140)}`); }
   });
   P.sort((a, b) => a.at - b.at);
@@ -302,7 +302,7 @@ function bitacoraDelDia(f, { garita = false } = {}){
   if (racha) for (let i = 1; i < 90; i++){ const b = bitacoraHotelDe(sumarDias(f, -i)); if (b && +b.nota === 10) racha++; else break; }
   const pax = ls => ls.reduce((a, h) => a + (+h.pax || 1), 0);
   const resumen = { traslados:vs.filter(x => x.estado !== 'cancelado').length, hechos:vs.filter(x => x.estado === 'hecho').length, cancelados:vs.filter(x => x.estado === 'cancelado').length,
-    llegaron:pax(hotelHuespedes().filter(h => enDia(h.ingreso))), sefueron:pax(hotelHuespedes().filter(h => enDia(h.salida))), personal:P.filter(p => p.k === 'personal' && /^Entró/.test(p.t)).length, spa:cli.spa, resto:cli.resto };
+    llegaron:pax(hotelHuespedes().filter(h => enDia(h.ingreso))), sefueron:pax(hotelHuespedes().filter(h => enDia(h.salida))), personal:P.filter(p => p.k === 'personal' && /^Entró/.test(p.t)).length, spa:cli.spa, resto:cli.resto, recep:cli.recep };
   const m = sumarDias(f, 1), agM = agendaDe(m);
   const manana = (agM ? aLista(agM.items).filter(x => x.est !== 'quitado') : armarAgenda(m)).slice(0, 9).map(x => ({ h:x.h, t:x.k === 'llegan' && x.auto ? 'Llega un huésped' : x.k === 'salen' && x.auto ? 'Check-out de un huésped' : x.t }));
   return { id:'bd-' + f, tipo:'bitacora', fecha:f, pasos:P.map(p => ({ ...p, t:String(p.t).slice(0, 180) })), resumen, controles, nota, racha, obs,
@@ -330,7 +330,7 @@ function bitacoraHotelHtml(b){
     <td width="120" align="center" style="padding:14px 20px 14px 0"><div style="width:96px;height:96px;border-radius:48px;background:${b.nota === 10 ? '#2f8f5b' : b.nota >= 7 ? '#d99a1a' : '#d1453b'};color:#fff;text-align:center"><div style="padding-top:24px;font-size:26px;font-weight:800;line-height:1">${b.nota}/10</div><div style="font-size:9px;letter-spacing:.1em;margin-top:5px">CONVIVENCIA</div></div></td></tr></table>
   <div style="height:5px;background:#c46a2c"></div>
   <table width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0 4px;border-collapse:separate"><tr>
-    ${kpi(r.traslados || 0, 'traslados', `${r.hechos || 0} hechos${r.cancelados ? ' · ' + r.cancelados + ' cancel.' : ''}`, '#c46a2c')}${kpi(r.llegaron || 0, 'llegaron', 'huéspedes', '#1d7fb0')}${kpi(r.sefueron || 0, 'se fueron', 'huéspedes', '#7a4bc2')}${kpi(r.personal || 0, 'entradas', 'del personal', '#2f8f5b')}${kpi((r.spa || 0) + (r.resto || 0), 'clientes', `${r.resto || 0} resto · ${r.spa || 0} spa`, '#d14b6a')}</tr></table>
+    ${kpi(r.traslados || 0, 'traslados', `${r.hechos || 0} hechos${r.cancelados ? ' · ' + r.cancelados + ' cancel.' : ''}`, '#c46a2c')}${kpi(r.llegaron || 0, 'llegaron', 'huéspedes', '#1d7fb0')}${kpi(r.sefueron || 0, 'se fueron', 'huéspedes', '#7a4bc2')}${kpi(r.personal || 0, 'entradas', 'del personal', '#2f8f5b')}${kpi((r.spa || 0) + (r.resto || 0) + (r.recep || 0), 'clientes', `${r.resto || 0} resto · ${r.spa || 0} spa${r.recep ? ' · ' + r.recep + ' recep.' : ''}`, '#d14b6a')}</tr></table>
   ${cab('Paso a paso, en orden', '#0d2b45')}
   ${b.pasos.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${b.pasos.slice(0, 60).map(p => `<tr><td width="46" valign="top" style="padding:5px 0;font-weight:800;color:#0d2b45">${hora(p.at)}</td>
       <td width="16" valign="top" style="padding:8px 0 0"><div style="width:10px;height:10px;border-radius:5px;background:${C[p.k] || '#0d6b66'}"></div></td>
@@ -373,7 +373,7 @@ R['hotel-bitacora'] = {
       <div class="bh-cab"><div class="grow"><small>${esc(diaLargo(f))}</small><b>${guardada ? `Cerrada a las ${hora(guardada.at)} h` : f === hoy ? 'En curso: se cierra sola a las 23:59' : 'Sin cerrar'}</b>
         ${guardada && guardada.mail ? `<span class="small ${guardada.mail.ok ? '' : 'muted'}">${I('mail')} ${guardada.mail.ok ? 'Enviada por correo a las ' + hora(guardada.mail.at) + ' h' : 'No salió por correo: ' + esc(guardada.mail.error || '')}</span>` : ''}</div>
         <span class="bh-nota ${b.nota === 10 ? 'diez' : ''}"><b>${guardada ? b.nota : '—'}</b><small>/10</small></span></div>
-      <div class="bh-kpis">${[['traslados', r.traslados, 'car', 'wood'], ['llegaron', r.llegaron, 'login', 'sky'], ['se fueron', r.sefueron, 'logout', 'accent'], ['del personal', r.personal, 'users', 'ok'], ['clientes', (r.spa || 0) + (r.resto || 0), 'sparkle', 'danger']]
+      <div class="bh-kpis">${[['traslados', r.traslados, 'car', 'wood'], ['llegaron', r.llegaron, 'login', 'sky'], ['se fueron', r.sefueron, 'logout', 'accent'], ['del personal', r.personal, 'users', 'ok'], ['clientes', (r.spa || 0) + (r.resto || 0) + (r.recep || 0), 'sparkle', 'danger']]
         .map(([t, n, ic, c]) => `<div class="bh-k c-${c}">${I(ic)}<b>${n || 0}</b><small>${t}</small></div>`).join('')}</div>
       ${!guardada && !esGuardia() ? `<p class="muted tiny">${I('info')} Los clientes de spa y restaurante y las observaciones de la garita se suman al cierre de las 23:59.</p>` : ''}
       ${sec('Paso a paso, en orden')}

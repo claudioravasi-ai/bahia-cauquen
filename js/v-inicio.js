@@ -3605,19 +3605,19 @@ F['llegada'] = d => {
 };
 /* =========================================================
    "VA AL HOTEL" EN UN TOQUE (pedido de Claudio, 18-10-2026)
-   La gente que viene a desayunar, almorzar, merendar, cenar o al spa del
-   hotel no es visita de nadie y nadie sabe cuándo ni cuántos vienen. La
+   La gente que viene a desayunar, almorzar, merendar, cenar, al spa del
+   hotel o a averiguar algo en la recepción (28-10-2026) no es visita de nadie y nadie sabe cuándo ni cuántos vienen. La
    garita los anota en unos 10 segundos: patente (con la cámara o
    escrita), para qué viene y cuántos son. Al hotel le llega en vivo
    "Llegan 2 al restaurante · Fiat Cronos AB 123 CD", y queda en el libro
    de guardia como "Cliente del hotel". Mientras están adentro se ven en la
    garita con "Salió". El hotel no ve nada más que ese aviso.
    ========================================================= */
-const HC_MOTIVOS = [['desayuno', 'Desayuno', '☕'], ['almuerzo', 'Almuerzo', '🍽️'], ['merienda', 'Merienda', '🧁'], ['cena', 'Cena', '🍷'], ['spa', 'Spa', '💆']];
+const HC_MOTIVOS = [['desayuno', 'Desayuno', '☕'], ['almuerzo', 'Almuerzo', '🍽️'], ['merienda', 'Merienda', '🧁'], ['cena', 'Cena', '🍷'], ['spa', 'Spa', '💆'], ['recepcion', 'Recepción', '🛎️']];
 const hcMotivo = m => HC_MOTIVOS.find(x => x[0] === m) || HC_MOTIVOS[1];
 /* Lo que se sugiere según la hora (se cambia con un toque). */
 const hcSugerido = (h = new Date().getHours() + new Date().getMinutes() / 60) => h >= 5 && h < 11 ? 'desayuno' : h >= 11 && h < 15.5 ? 'almuerzo' : h >= 15.5 && h < 19.5 ? 'merienda' : 'cena';
-const hcLugar = m => m === 'spa' ? 'al spa' : 'al restaurante';
+const hcLugar = m => m === 'spa' ? 'al spa' : m === 'recepcion' ? 'a la recepción' : 'al restaurante';
 const hcPat = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
 let hcBorrador = null, patenteDestino = null;
 /* Los clientes del hotel que entraron hoy y todavía no salieron (salen del libro de guardia). */

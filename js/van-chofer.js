@@ -25,10 +25,14 @@
      suben. Los que no tienen QR se suman con "+ Sin QR" y su motivo.
    · Sin señal: lo leído queda anotado "por verificar" y se verifica solo
      cuando vuelve la señal.
-   · "Cerrar y avisar a la garita": la garita lo ve en vivo y contesta "OK"
-     o "Detener y revisar". La salida se anota sola en la garita; la
-     entrada, sola cuando el GPS del chofer llega a la garita (o con un
-     toque de la garita).
+   · "Cerrar y avisar a la garita": la garita lo ve en vivo y toca la
+     tarjeta para desplegar a cada pasajero (huésped, empleado, sin QR y a
+     qué corresponde).
+   · (28-10, Claudio) Si todos tienen permiso (o va vacía), la van no para:
+     la garita solo toca SALIÓ / ENTRÓ cuando cruza la barrera. Si alguno no
+     tiene permiso, la garita recibe la pantalla roja que titila "Van con
+     pasaje sin autorización", ve a todos y decide: "Detener para revisar"
+     o "Autorizar: pasa sin parar"; después toca SALIÓ / ENTRÓ.
    · El aviso de llegada: en la vuelta, el teléfono del chofer manda SOLO
      la distancia a la garita (ni la ubicación ni el recorrido) y la garita
      ve "llegando, a 1,2 km".
@@ -75,6 +79,12 @@ const vcMotivo = k => vcMotivoDe(k).n;
 /* "2 acompañantes de huéspedes", "1 visita de un vecino", "1 con otro motivo" */
 const vcMotivoN = (k, n) => `${n} ${n === 1 && k !== 'otro' ? vcMotivoDe(k).n.toLowerCase() : vcMotivoDe(k).p}`;
 
+/* (28-10, Claudio) Los viajes fuera del horario regular (puerto, aeropuerto…): el chofer elige el destino. */
+const VC_DESTINOS = [['aeropuerto', 'Aeropuerto', '✈️'], ['puerto', 'Puerto', '⚓'], ['excursion', 'Excursión', '🏔️']];
+const vcDestino = d => !d ? '' : d.k === 'otro' ? String(d.txt || 'Otro destino') : ((VC_DESTINOS.find(x => x[0] === d.k) || [, 'Otro destino'])[1]) + (d.txt ? ` (${d.txt})` : '');
+const vcRuta = m => { const sale = m.sentido === 'out';
+  if (m.dest) return sale ? `Hotel → ${vcDestino(m.dest)}` : `${vcDestino(m.dest)} → Hotel`;
+  return m.sale ? (sale ? 'Hotel → Centro' : 'Centro → Hotel') : (sale ? 'Sale del hotel · fuera de horario' : 'Vuelve al hotel · fuera de horario'); };
 /* Lo que trae el QR (o lo que se escribe): "BHC:G-ABC123" huésped, "BHC:E-K7M3P" empleado, "BHC:H-…" van. */
 function vcCodigo(txt){
   const t = String(txt || '').toUpperCase().replace(/^BHC:/, '').replace(/[\s.]/g, ''); let m;
@@ -342,6 +352,7 @@ const VanChofer = {
   proximo(){
     const t = ahoraMin(), ult = aLista(this.st.hechos).slice(-1)[0];
     if (this.st.forzar) return this.st.forzar;
+    if (ult && ult.sentido === 'out' && ult.dest) return { sentido:'in', sale:'', dest:ult.dest };
     if (ult && ult.sentido === 'out'){ const r = SERVICIO_REGULAR.find(([s]) => s === ult.sale); return { sentido:'in', sale: r ? r[1] : '' }; }
     const prox = SERVICIO_REGULAR.find(([s]) => minutosDe(s) >= t - 20);
     return { sentido:'out', sale: prox ? prox[0] : '' };
@@ -350,16 +361,16 @@ const VanChofer = {
     const p = this.proximo(), sale = p.sentido === 'out', hs = aLista(this.st.hechos);
     return `<div class="vc-van"><span class="vc-v-ic">${I('car')}</span><div class="grow"><b>${esc(t.van)}</b><small>Tu turno desde las ${hora(t.desde)}</small></div><span class="vc-chapa">${esc(typeof chapaTexto === 'function' ? chapaTexto(t.pat) : t.pat)}</span></div>
       <div class="vc-prox ${sale ? 'sale' : 'entra'}"><small>Próximo viaje</small>
-        <div class="vc-p-fila"><b class="vc-p-hora">${esc(p.sale || '—')}</b><span class="vc-dir">${I(sale ? 'logout' : 'login')}${sale ? 'SALE DEL BARRIO' : 'ENTRA AL BARRIO'}</span></div>
-        <p>${sale ? 'Hotel → Centro de Ushuaia (Av. Maipú 465)' : 'Centro (Av. Maipú 465) → Hotel'}</p>
+        <div class="vc-p-fila"><b class="vc-p-hora${p.sale ? '' : ' chica'}">${esc(p.sale || (p.dest ? 'A coordinar' : '—'))}</b><span class="vc-dir">${I(sale ? 'logout' : 'login')}${sale ? 'SALE DEL BARRIO' : 'ENTRA AL BARRIO'}</span></div>
+        <p>${p.dest || !p.sale ? esc(vcRuta(p)) : sale ? 'Hotel → Centro de Ushuaia (Av. Maipú 465)' : 'Centro (Av. Maipú 465) → Hotel'}</p>
         <button type="button" class="vc-boton" data-a="vc-empezar">${I('users')}Empezar a subir pasajeros</button>
         <div class="vc-p-otros"><button type="button" data-a="vc-sentido">${I('refresh')}${sale ? 'Es una entrada' : 'Es una salida'}</button><button type="button" data-a="vc-horario">${I('clock')}Otro horario</button></div></div>
-      ${hs.length ? `<div class="vc-hechos"><small>Hoy</small>${hs.slice().reverse().map(h => `<div class="vc-h-fila"><span class="vc-dir chica ${h.sentido === 'out' ? 'sale' : 'entra'}">${h.sentido === 'out' ? 'Salió' : 'Entró'}</span><b>${esc(h.sale || hora(h.at))}</b><span class="grow">${plural(h.total, 'pasajero')}</span>${h.problema ? `<span class="vc-tag warn">${I('alert')}</span>` : `<span class="vc-tag ok">${I('check')}</span>`}</div>`).join('')}</div>` : ''}
+      ${hs.length ? `<div class="vc-hechos"><small>Hoy</small>${hs.slice().reverse().map(h => `<div class="vc-h-fila"><span class="vc-dir chica ${h.sentido === 'out' ? 'sale' : 'entra'}">${h.sentido === 'out' ? 'Salió' : 'Entró'}</span><b>${esc(h.sale || hora(h.at))}</b><span class="grow">${h.dest ? esc(vcDestino(h.dest)) + ' · ' : ''}${plural(h.total, 'pasajero')}</span>${h.problema ? `<span class="vc-tag warn">${I('alert')}</span>` : `<span class="vc-tag ok">${I('check')}</span>`}</div>`).join('')}</div>` : ''}
       <div class="vc-pie"><button type="button" class="vc-link" data-a="vc-cambiar-van">${I('car')}Cambiar de van</button><button type="button" class="vc-link" data-a="vc-terminar">${I('logout')}Terminar mi turno</button></div>`;
   },
   viaje(a){
     const r = vaResumen(a), sale = a.sentido === 'out', subiendo = a.estado === 'subiendo';
-    const cab = `<div class="vc-viaje-cab ${sale ? 'sale' : 'entra'}"><span class="vc-dir">${I(sale ? 'logout' : 'login')}${sale ? 'SALE DEL BARRIO' : 'ENTRA AL BARRIO'}</span><b>${esc(a.sale || hora(a.at))}</b><small>${esc(a.van)} · ${esc(a.pat)}</small></div>`;
+    const cab = `<div class="vc-viaje-cab ${sale ? 'sale' : 'entra'}"><span class="vc-dir">${I(sale ? 'logout' : 'login')}${sale ? 'SALE DEL BARRIO' : 'ENTRA AL BARRIO'}</span><b>${esc(a.sale || hora(a.at))}</b><small>${esc(a.van)} · ${esc(a.pat)}${a.dest ? ' · ' + esc(vcRuta(a)) : ''}</small></div>`;
     const chips = vaChips(r);
     if (subiendo) return `${cab}
       <div class="vc-cuenta"><b data-vc-total>${r.total}</b><span>${r.total === 1 ? 'pasajero a bordo' : 'pasajeros a bordo'}</span><small>${I('car')}Vos vas aparte: no te contás</small></div>
@@ -377,7 +388,7 @@ const VanChofer = {
     const estado = g.resp === 'detener' && !entro ? `<div class="vc-resp bad">${I('siren')}<b>La garita te pide que pares en la barrera</b><small>Quiere revisar a los pasajeros. Esperá a que te habiliten.</small></div>`
       : sale && g.movAt ? `<div class="vc-resp ok">${I('check')}<b>${g.resp === 'ok' ? 'La garita dio el OK · ¡buen viaje!' : 'La garita ya anotó tu salida'}</b><small>Salida anotada a las ${hora(g.movAt)} ${r.total ? 'con ' + plural(r.total, 'pasajero') : 'con la van vacía'}.</small></div>`
       : !sale && entro ? `<div class="vc-resp ok">${I('check')}<b>Entraste al barrio</b><small>La garita anotó tu entrada a las ${hora(g.movAt)} ${r.total ? 'con ' + plural(r.total, 'pasajero') : 'con la van vacía'}.</small></div>`
-      : g.resp === 'ok' ? `<div class="vc-resp ok">${I('check')}<b>La garita dio el OK</b><small>${sale ? '¡Buen viaje!' : 'Te espera en la barrera.'}</small></div>`
+      : g.resp === 'ok' ? `<div class="vc-resp ok">${I('check')}<b>La garita te autorizó</b><small>Pasá sin detenerte. ${sale ? '¡Buen viaje!' : ''}</small></div>`
       : `<div class="vc-resp espera">${I('send')}<b>Avisado a la garita</b><small>${r.total ? plural(r.total, 'pasajero') + ' a bordo' : 'Va vacía'}. La garita lo está viendo en vivo.</small></div>`;
     const gps = !sale && !entro ? this.gpsHtml(a) : '';
     const fin = sale ? `<button type="button" class="vc-boton" data-a="vc-listo">${I('pin')}Llegué al centro: preparar la vuelta</button>`
@@ -537,7 +548,7 @@ const VanChofer = {
   /* ---- el viaje ---- */
   empezar(){
     const t = this.st.turno, p = this.proximo(); if (!t) return;
-    this.st.actual = { id:'va' + uid(), uid:this.uid, tok:this.tok, chofer:this.nombre(), ...(this.cod && this.cod.empId ? { cemp:this.cod.empId } : {}), vid:t.vid, van:t.van, pat:t.pat, sentido:p.sentido, sale:p.sale || '', fecha:hoyISO(), at:Date.now(), estado:'subiendo', pax:[] };
+    this.st.actual = { id:'va' + uid(), uid:this.uid, tok:this.tok, chofer:this.nombre(), ...(this.cod && this.cod.empId ? { cemp:this.cod.empId } : {}), vid:t.vid, van:t.van, pat:t.pat, sentido:p.sentido, sale:p.sale || '', ...(p.dest ? { dest:p.dest } : {}), fecha:hoyISO(), at:Date.now(), estado:'subiendo', pax:[] };
     this.st.forzar = null; this.resp = null;
     this.subir(); this.oirGarita(this.st.actual.id);
     this.camAbrir('pax');
@@ -553,7 +564,7 @@ const VanChofer = {
   listo(){
     const a = this.st.actual; if (!a) return;
     const r = vaResumen(a);
-    this.st.hechos = aLista(this.st.hechos).concat({ id:a.id, sentido:a.sentido, sale:a.sale, total:r.total, problema:r.problema, at:a.at });
+    this.st.hechos = aLista(this.st.hechos).concat({ id:a.id, sentido:a.sentido, sale:a.sale, ...(a.dest ? { dest:a.dest } : {}), total:r.total, problema:r.problema, at:a.at });
     this.st.actual = null; this.oyendo = ''; this.resp = null; this.gpsParar(); this.guardarSt(); this.repintar();
   },
   /* ---- el aviso de llegada (solo la distancia) ---- */
@@ -617,11 +628,21 @@ F['vc-sinqr'] = d => {
 A['vc-bajo'] = el => { const a = VanChofer.st.actual; if (!a) return; a.pax = aLista(a.pax).filter(p => p.i !== el.dataset.v); VanChofer.subir(); VanChofer.repintar(); toast('Se bajó: ya no cuenta', 'logout'); };
 A['vc-empezar'] = () => VanChofer.empezar();
 A['vc-sentido'] = () => { const p = VanChofer.proximo(), sale = p.sentido === 'out';
+  if (p.dest){ VanChofer.st.forzar = { sentido: sale ? 'in' : 'out', sale:'', dest:p.dest }; VanChofer.guardarSt(); VanChofer.repintar(); return; }
   const r = sale ? SERVICIO_REGULAR.find(([, v]) => minutosDe(v) >= ahoraMin() - 20) : SERVICIO_REGULAR.find(([s]) => minutosDe(s) >= ahoraMin() - 20);
   VanChofer.st.forzar = { sentido: sale ? 'in' : 'out', sale: r ? r[sale ? 1 : 0] : '' }; VanChofer.guardarSt(); VanChofer.repintar(); };
 A['vc-horario'] = () => { const p = VanChofer.proximo(), sale = p.sentido === 'out';
   hoja('¿Qué viaje es?', `<p class="muted small" style="margin:0 0 10px">${sale ? 'Salidas del hotel al centro' : 'Vueltas del centro al hotel'} (servicio regular)</p>
-    <div class="vc-c-grilla horas">${SERVICIO_REGULAR.map(r => r[sale ? 0 : 1]).map(h => `<button type="button" class="${h === p.sale ? 'on' : ''}" data-a="vc-hora" data-v="${h}">${h}</button>`).join('')}<button type="button" data-a="vc-hora" data-v="">Fuera de horario</button></div>`); };
+    <div class="vc-c-grilla horas">${SERVICIO_REGULAR.map(r => r[sale ? 0 : 1]).map(h => `<button type="button" class="${h === p.sale ? 'on' : ''}" data-a="vc-hora" data-v="${h}">${h}</button>`).join('')}<button type="button" class="vc-fuera" data-a="vc-fuera">Fuera de horario: puerto, aeropuerto…</button></div>`); };
+A['vc-fuera'] = () => {
+  hoja('¿Adónde va?', `<form data-f="vc-destino"><p class="muted small" style="margin:0 0 10px">Viaje fuera del horario regular. La garita lo ve con su destino.</p>
+    <div class="vc-c-grilla vc-dest">${VC_DESTINOS.map(([k, t, e]) => `<button type="button" data-a="vc-dest" data-v="${k}"><em>${e}</em>${t}</button>`).join('')}</div>
+    <label class="hc-lbl" style="display:block;margin-top:14px">Otro destino</label>
+    <div class="vc-dest-otro"><input name="txt" maxlength="40" autocomplete="off" placeholder="Ej.: Estancia Harberton" aria-label="Otro destino"><button class="btn btn-pri">${I('check')}Listo</button></div></form>`);
+};
+const vcPonerDestino = dest => { const p = VanChofer.proximo(); VanChofer.st.forzar = { sentido:p.sentido, sale:'', dest }; VanChofer.guardarSt(); cerrarHoja(); VanChofer.repintar(); toast(`Viaje fuera de horario: ${vcDestino(dest)}`, 'car'); };
+A['vc-dest'] = el => vcPonerDestino({ k:el.dataset.v });
+F['vc-destino'] = d => { const txt = String(d.txt || '').trim().slice(0, 40); if (!txt) return toast('Escribí el destino o tocá uno de arriba', 'edit'); vcPonerDestino({ k:'otro', txt }); };
 A['vc-hora'] = el => { const p = VanChofer.proximo(); VanChofer.st.forzar = { sentido:p.sentido, sale:el.dataset.v || '' }; VanChofer.guardarSt(); cerrarHoja(); VanChofer.repintar(); };
 A['vc-cerrar'] = async () => {
   const a = VanChofer.st.actual; if (!a) return; const r = vaResumen(a);
@@ -653,7 +674,9 @@ function vaResumen(m){
   const ps = aLista(m.pax), r = { total:ps.length, h:0, e:0, x:0, p:0, rech:0, av:0, motivos:{} };
   ps.forEach(p => { if (p.t === 'h') r.h++; else if (p.t === 'e'){ r.e++; if (p.av) r.av++; } else if (p.t === '?') r.p++; else { r.x++; if (p.rech) r.rech++; r.motivos[p.motivo || 'otro'] = (r.motivos[p.motivo || 'otro'] || 0) + 1; } });
   r.problema = r.x > 0 || r.av > 0 || r.p > 0;
-  r.nivel = r.rech ? 'bad' : r.problema ? 'warn' : 'ok';
+  /* (28-10) Sin autorización = sin QR, con un pase que no vale o un empleado al que hoy no le toca. */
+  r.sinAut = r.x + r.av;
+  r.nivel = r.sinAut ? 'bad' : r.problema ? 'warn' : 'ok';
   return r;
 }
 function vaTexto(r){
@@ -662,8 +685,8 @@ function vaTexto(r){
   const partes = [r.h && plural(r.h, 'huésped', 'huéspedes'), r.e && plural(r.e, 'empleado'), r.x && `${r.x} sin QR (${Object.entries(r.motivos).map(([k, n]) => vcMotivoN(k, n)).join(', ')})`, r.p && `${r.p} por verificar`].filter(Boolean);
   return `${plural(r.total, 'pasajero')} a bordo${partes.length ? ': ' + partes.join(', ') : ''}`;
 }
-const vaChips = r => [r.h && `<span class="ok">${I('check')}${plural(r.h, 'huésped', 'huéspedes')}</span>`, r.e && `<span class="${r.av ? 'warn' : 'ok'}">${I('check')}${plural(r.e, 'empleado')}</span>`,
-  r.x && `<span class="${r.rech ? 'bad' : 'warn'}">${I('alert')}${r.x} sin QR</span>`, r.p && `<span class="pend">${I('clock')}${r.p} por verificar</span>`].filter(Boolean).join('');
+const vaChips = r => [r.h && `<span class="ok">${I('check')}${plural(r.h, 'huésped', 'huéspedes')}</span>`, r.e && `<span class="${r.av ? 'bad' : 'ok'}">${I(r.av ? 'alert' : 'check')}${plural(r.e, 'empleado')}</span>`,
+  r.x && `<span class="bad">${I('alert')}${r.x} sin QR</span>`, r.p && `<span class="pend">${I('clock')}${r.p} por verificar</span>`].filter(Boolean).join('');
 /* Lo que la garita tiene que ver ahora: lo que está subiendo, lo avisado y lo que viene (hasta un rato después de pasar). */
 function vaVisibles(){
   const ahora = Date.now();
@@ -674,41 +697,80 @@ function vaTarjetas(opera){
   const ms = vaVisibles(); if (!ms.length) return '';
   return `<div class="va-lista">${ms.map(m => vaTarjeta(m, opera)).join('')}</div>`;
 }
+/* (28-10, Claudio) La garita toca la tarjeta y se despliegan todos los pasajeros. */
+const VA_ABIERTAS = new Set();
+const vaPendiente = m => { const g = vgDe(m.id); return m.estado !== 'subiendo' && !g.movAt; };
+const vaAlerta = m => vaPendiente(m) && vaResumen(m).sinAut > 0 && !vgDe(m.id).resp;
+function vaFila(p){
+  const tt = p.t === 'h' ? ['Huésped', 'p-ok'] : p.t === 'e' ? [p.av ? 'Empleado ⚠' : 'Empleado', p.av ? 'p-danger' : 'p-ok'] : p.t === '?' ? ['Por verificar', ''] : [p.rech ? 'Pase no válido' : 'Sin QR', 'p-danger'];
+  const nombre = p.t === 'x' ? vcMotivo(p.motivo) : p.n || 'QR leído sin señal';
+  return `<li class="va-l-fila${p.t === 'x' || p.av ? ' sin' : ''}"><span class="pill ${tt[1]}">${tt[0]}</span><span class="grow"><b>${esc(nombre)}</b>${p.puesto || p.av || p.txt ? `<small>${esc([p.puesto, p.av, p.txt].filter(Boolean).join(' · '))}</small>` : ''}</span><small class="muted">${hora(p.at)}</small></li>`;
+}
+/* Primero los que no tienen permiso (lo que la garita tiene que mirar), después el resto. */
+const vaOrden = m => aLista(m.pax).slice().sort((a, b) => ((b.t === 'x' || !!b.av) - (a.t === 'x' || !!a.av)) || a.at - b.at);
 function vaTarjeta(m, opera){
-  const r = vaResumen(m), g = vgDe(m.id), sale = m.sentido === 'out', subiendo = m.estado === 'subiendo';
+  const r = vaResumen(m), g = vgDe(m.id), sale = m.sentido === 'out', subiendo = m.estado === 'subiendo', alerta = vaAlerta(m);
+  const abierta = VA_ABIERTAS.has(m.id) || alerta;
   const estado = g.movAt ? `${sale ? 'Salió' : 'Entró'} ${hora(g.movAt)} h` : subiendo ? 'subiendo pasajeros' : m.estado === 'llego' ? 'en la barrera' : sale ? 'avisó: sale ahora' : 'viene en camino';
   const d = m.gps && m.gps.d, geo = vgDe('geo');
   const motivos = aLista(m.pax).filter(p => p.t === 'x' || p.av).map(p => p.t === 'x' ? `${vcMotivo(p.motivo)}${p.txt ? ': ' + p.txt : ''}` : `${p.n}: ${p.av}`);
   const cuenta = {}; motivos.forEach(t => { cuenta[t] = (cuenta[t] || 0) + 1; });
-  return `<article class="va-card ${r.nivel}${subiendo ? ' vivo' : ''}" data-va="${esc(m.id)}">
+  const cartel = g.movAt ? '' : r.sinAut ? `<div class="va-cartel-aut bad">${I('siren')}<b>Van con pasaje sin autorización</b><small>${plural(r.sinAut, 'pasajero')} sin permiso${g.resp === 'ok' ? ' · lo autorizaste' : g.resp === 'detener' ? ' · le pediste que pare' : ' · decidí si la parás o la autorizás'}</small></div>`
+    : !subiendo && !r.p ? `<div class="va-cartel-aut ok">${I('check')}<b>${r.total ? 'Todos los pasajeros con permiso' : 'Va vacía'}</b><small>Pasa sin detenerse${opera ? `: tocá ${sale ? 'SALIÓ' : 'ENTRÓ'} cuando cruce la barrera` : ''}</small></div>` : '';
+  const btnPaso = `<button type="button" class="btn btn-grande va-paso ${sale ? 'sale' : 'entra'}" data-a="va-entro" data-id="${esc(m.id)}">${I(sale ? 'logout' : 'login')}${sale ? 'SALIÓ' : 'ENTRÓ'} LA VAN</button>`;
+  const btns = !opera || g.movAt || subiendo ? '' : alerta
+    ? `<button type="button" class="btn btn-ok" data-a="va-resp" data-id="${esc(m.id)}" data-v="ok">${I('check')}Autorizar: pasa sin parar</button>
+       <button type="button" class="btn btn-danger" data-a="va-resp" data-id="${esc(m.id)}" data-v="detener">${I('siren')}Detener para revisar</button>`
+    : btnPaso;
+  return `<article class="va-card ${r.nivel}${subiendo ? ' vivo' : ''}${alerta ? ' alarma' : ''}${abierta ? ' abierta' : ''}" data-va="${esc(m.id)}">
+    <button type="button" class="va-toca" data-a="va-abrir" data-id="${esc(m.id)}" aria-expanded="${abierta}">
     <div class="va-cab"><span class="va-dir ${sale ? 'sale' : 'entra'}">${I(sale ? 'logout' : 'login')}${sale ? 'SALE' : 'ENTRA'}</span>
-      <div class="grow"><b>${esc(m.van)} · <span class="mono">${esc(m.pat)}</span></b><small>${esc(m.chofer)}${m.sale ? ' · ' + esc(m.sale) + ' h' : ''} · ${sale ? 'Hotel → Centro' : 'Centro → Hotel'}</small></div>
+      <div class="grow"><b>${esc(m.van)} · <span class="mono">${esc(m.pat)}</span></b><small>${esc(m.chofer)}${m.sale ? ' · ' + esc(m.sale) + ' h' : ''} · ${esc(vcRuta(m))}</small></div>
       <span class="va-estado">${subiendo ? '<i></i>' : ''}${esc(estado)}</span></div>
-    <div class="va-cuerpo"><div class="va-num"><b>${r.total}</b><small>${r.total === 1 ? 'pasajero' : 'pasajeros'}</small><small class="va-mas">+ chofer</small></div><div class="va-chips">${vaChips(r) || `<span class="muted small">${subiendo ? 'Todavía no subió nadie' : 'Vacía, sin pasajeros'}</span>`}</div></div>
-    ${Object.keys(cuenta).length ? `<ul class="va-motivos">${Object.entries(cuenta).map(([t, n]) => `<li>${I('alert')}${n > 1 ? `<b>${n}</b> · ` : ''}${esc(t)}</li>`).join('')}</ul>` : ''}
+    <div class="va-cuerpo"><div class="va-num"><b>${r.total}</b><small>${r.total === 1 ? 'pasajero' : 'pasajeros'}</small><small class="va-mas">+ chofer</small></div><div class="va-chips">${vaChips(r) || `<span class="muted small">${subiendo ? 'Todavía no subió nadie' : 'Vacía, sin pasajeros'}</span>`}</div>
+      ${r.total ? `<span class="va-flecha">${I('right')}<small>${abierta ? 'Ocultar' : 'Ver'} pasajeros</small></span>` : ''}</div></button>
+    ${cartel}
+    ${r.total && abierta ? `<ul class="va-l va-l-in">${vaOrden(m).map(vaFila).join('')}</ul><p class="muted tiny va-l-nota">${I('lock')} Solo nombre e inicial del apellido. La lista se borra sola a los 7 días.</p>`
+      : Object.keys(cuenta).length ? `<ul class="va-motivos">${Object.entries(cuenta).map(([t, n]) => `<li>${I('alert')}${n > 1 ? `<b>${n}</b> · ` : ''}${esc(t)}</li>`).join('')}</ul>` : ''}
     ${!sale && !g.movAt && m.estado === 'cerrado' ? (d != null ? `<div class="va-gps ${d <= VC_CERCA ? 'cerca' : ''}"><span>${I('pin')}${d <= VC_LLEGO ? 'Llegando a la barrera' : 'a ' + vcKm(d) + ' de la garita'}</span><b>${vcEta(d)}</b><div class="vc-g-barra"><i style="width:${Math.max(4, Math.min(100, 100 - d / 80))}%"></i></div></div>`
       : `<p class="va-nota">${I('pin')}${geo.lat ? 'Esperando la señal del GPS del chofer…' : 'Para el aviso de llegada por GPS, la garita marca su ubicación una vez.'}${opera && !geo.lat ? ` <button type="button" class="link" data-a="va-geo">Marcar la garita acá</button>` : ''}</p>`) : ''}
-    ${g.resp ? `<p class="va-resp ${g.resp}">${I(g.resp === 'ok' ? 'check' : 'siren')}${g.resp === 'ok' ? 'Le diste el OK' : 'Le pediste que pare a revisar'} · ${hora(g.respAt)} h</p>` : ''}
-    <div class="va-btns">${opera && !g.resp && (sale || !g.movAt) ? `<button type="button" class="btn btn-sm btn-ok" data-a="va-resp" data-id="${esc(m.id)}" data-v="ok">${I('check')}OK, que pase</button>
-        <button type="button" class="btn btn-sm btn-danger-soft" data-a="va-resp" data-id="${esc(m.id)}" data-v="detener">${I('siren')}Detener y revisar</button>
-        ${!sale && !g.movAt && m.estado !== 'subiendo' ? `<button type="button" class="btn btn-sm btn-sec" data-a="va-entro" data-id="${esc(m.id)}">${I('login')}Entró</button>` : ''}` : ''}
-      <button type="button" class="btn btn-sm btn-sec" data-a="va-ver" data-id="${esc(m.id)}">${I('list')}Ver la lista</button></div></article>`;
+    ${g.resp ? `<p class="va-resp ${g.resp}">${I(g.resp === 'ok' ? 'check' : 'siren')}${g.resp === 'ok' ? 'La autorizaste: pasa sin parar' : 'Le pediste que pare a revisar'} · ${hora(g.respAt)} h</p>` : ''}
+    ${btns ? `<div class="va-btns">${btns}</div>` : ''}</article>`;
 }
+A['va-abrir'] = el => { const id = el.dataset.id; if (VA_ABIERTAS.has(id)) VA_ABIERTAS.delete(id); else VA_ABIERTAS.add(id); refrescar(); };
 A['va-ver'] = el => {
   const m = vanAbordo().find(x => x.id === el.dataset.id); if (!m) return; const r = vaResumen(m);
-  const fila = p => { const tt = p.t === 'h' ? ['Huésped', 'p-ok'] : p.t === 'e' ? ['Empleado', p.av ? 'p-warn' : 'p-ok'] : p.t === '?' ? ['Por verificar', ''] : [p.rech ? 'Pase no válido' : 'Sin QR', p.rech ? 'p-danger' : 'p-warn'];
-    return `<li class="va-l-fila"><span class="pill ${tt[1]}">${tt[0]}</span><span class="grow"><b>${esc(p.t === 'x' ? vcMotivo(p.motivo) : p.n || 'QR leído sin señal')}</b>${p.puesto || p.av || p.txt ? `<small>${esc([p.puesto, p.av, p.txt].filter(Boolean).join(' · '))}</small>` : ''}</span><small class="muted">${hora(p.at)}</small></li>`; };
-  hoja(`${m.van} · ${m.sentido === 'out' ? 'sale' : 'entra'}`, `<p class="muted small" style="margin:0 0 6px">${esc(m.chofer)} · ${esc(m.pat)}${m.sale ? ' · ' + esc(m.sale) + ' h' : ''}</p>
-    <p style="margin:0 0 10px"><b>${esc(vaTexto(r))}</b></p><ul class="va-l">${aLista(m.pax).map(fila).join('')}</ul>
+  hoja(`${m.van} · ${m.sentido === 'out' ? 'sale' : 'entra'}`, `<p class="muted small" style="margin:0 0 6px">${esc(m.chofer)} · ${esc(m.pat)}${m.sale ? ' · ' + esc(m.sale) + ' h' : ''} · ${esc(vcRuta(m))}</p>
+    <p style="margin:0 0 10px"><b>${esc(vaTexto(r))}</b></p><ul class="va-l">${vaOrden(m).map(vaFila).join('')}</ul>
     <p class="muted tiny" style="margin-top:10px">${I('lock')} Solo nombre e inicial del apellido. La lista se borra sola a los 7 días; en la bitácora queda el conteo, sin nombres.</p>`);
+};
+/* (28-10) LA PANTALLA ROJA QUE TITILA: van con pasaje sin autorización. */
+function vaAlarma(m){
+  if (document.getElementById('vaAlarma')) return;
+  const r = vaResumen(m), sale = m.sentido === 'out', el = document.createElement('div');
+  el.id = 'vaAlarma'; el.className = 'va-alarma'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-label', 'Van con pasaje sin autorización');
+  el.innerHTML = `<div class="va-al-caja">${I('siren')}<h2>VAN CON PASAJE SIN AUTORIZACIÓN</h2>
+    <p><b>${esc(m.van)} · ${esc(m.pat)}</b> · ${sale ? 'SALE del barrio' : 'ENTRA al barrio'} · ${esc(vcRuta(m))} · ${esc(m.chofer)}</p>
+    <p class="va-al-n">${plural(r.total, 'pasajero')} · <b>${plural(r.sinAut, 'sin permiso', 'sin permiso')}</b></p>
+    <button type="button" class="btn btn-grande" data-a="va-alarma-ver" data-id="${esc(m.id)}">${I('list')}Ver los pasajeros</button></div>`;
+  document.body.appendChild(el);
+  try { Sonido.tocar([[880, 0, .25], [660, .3, .25], [880, .6, .25], [660, .9, .3]], 'square', .22, true); Sonido.vibrar([300, 120, 300, 120, 300]); } catch(e){}
+}
+A['va-alarma-ver'] = el => {
+  const id = el.dataset.id; document.getElementById('vaAlarma')?.remove(); VA_ABIERTAS.add(id);
+  if (typeof abrir === 'function' && !document.querySelector(`[data-va="${CSS.escape(id)}"]`)) abrir('garita');
+  setTimeout(() => { refrescar(); document.querySelector(`[data-va="${CSS.escape(id)}"]`)?.scrollIntoView({ block:'start', behavior:'smooth' }); }, 80);
 };
 A['va-resp'] = el => {
   if (!soloGarita()) return;
   const id = el.dataset.id, v = el.dataset.v === 'ok' ? 'ok' : 'detener';
   Store.cambiar(s => { vgPoner(s, id, { resp:v, respAt:Date.now(), por:yo().id }); }); vcGuardarYa();
-  toast(v === 'ok' ? 'OK enviado al chofer' : 'Le avisamos al chofer que pare en la barrera', v === 'ok' ? 'check' : 'siren');
+  document.getElementById('vaAlarma')?.remove();
+  toast(v === 'ok' ? 'Autorizada: el chofer pasa sin parar. Cuando cruce, tocá SALIÓ o ENTRÓ' : 'Le avisamos al chofer que pare en la barrera', v === 'ok' ? 'check' : 'siren');
 };
-A['va-entro'] = el => { if (!soloGarita()) return; const m = vanAbordo().find(x => x.id === el.dataset.id); if (m) vaPaso(m); };
+/* (28-10, Claudio) La van no para: la garita solo toca SALIÓ o ENTRÓ cuando cruza la barrera. */
+A['va-entro'] = el => { if (!soloGarita()) return; const m = vanAbordo().find(x => x.id === el.dataset.id); if (!m) return;
+  vaPaso(m); VA_ABIERTAS.delete(m.id); toast(`${m.van}: ${m.sentido === 'out' ? 'salida' : 'entrada'} anotada`, m.sentido === 'out' ? 'logout' : 'login'); };
 A['va-geo'] = () => {
   if (!soloGarita()) return;
   if (!navigator.geolocation) return toast('Este equipo no tiene ubicación', 'pin');
@@ -731,7 +793,7 @@ function vaPaso(m){
   /* El traslado del servicio regular que corresponde: la salida por su hora, la vuelta por la del centro. */
   const vs = aLista(Store.s.hotelViajes).filter(x => x && x.fecha === hoyISO() && /^hrsr-/.test(x.deRutina || ''));
   const viaje = !m.sale ? null : tipo === 'out' ? vs.find(x => x.estado === 'programado' && x.sale === m.sale) : vs.find(x => x.estado === 'en_curso' && (x.vuelve || regresoViaje(x)) === m.sale);
-  moverVan(m.vid, tipo, viaje ? viaje.id : '', r.h, { auto:true, movId, sinAdivinar:true, detalle:vaTexto(r), chofer:m.chofer, abordo:{ h:r.h, e:r.e, x:r.x, total:r.total },
+  moverVan(m.vid, tipo, viaje ? viaje.id : '', r.h, { auto:true, movId, sinAdivinar:true, detalle:(m.dest ? `${vcRuta(m)} (fuera de horario) · ` : '') + vaTexto(r), chofer:m.chofer, abordo:{ h:r.h, e:r.e, x:r.x, total:r.total },
     enCambio:(s, at) => {
       vgPoner(s, m.id, { movAt:at, tipo });
       /* Cada huésped (una vez por pase) y cada empleado: "salió en la Van 1". */
@@ -751,13 +813,13 @@ function vaRevisar(){
   vaVisibles().forEach(m => {
     const g = vgDe(m.id), r = vaResumen(m);
     if (m.estado === 'subiendo' && vaUnaVez(m.id + ':sube')){ toast(`${m.van}: ${m.chofer} está subiendo pasajeros (${m.sentido === 'out' ? 'sale' : 'entra'})`, 'car'); try { Sonido.tocar([[660, 0, .15], [880, .15, .2]]); } catch(e){} }
-    if (m.estado !== 'subiendo' && r.problema && vaUnaVez(m.id + ':prob')){ toast(`${m.van}: ${r.x ? r.x + ' sin QR' : 'revisar la lista'} · ${vaTexto(r)}`, 'alert'); try { Sonido.tocar([[520, 0, .2], [390, .22, .3]], 'triangle', .2, true); } catch(e){} }
     if (g.movAt) return;
-    if (m.sentido === 'out' && m.estado === 'cerrado') vaPaso(m);
+    /* (28-10) Todos con permiso (o vacía): aviso y la garita toca SALIÓ / ENTRÓ. Alguno sin permiso: pantalla roja que titila. */
+    if (vaAlerta(m)){ if (vaUnaVez(m.id + ':alarma') && esGuardia()) vaAlarma(m); }
+    else if (m.estado !== 'subiendo' && vaUnaVez(m.id + ':avisada')){ toast(`${m.van} ${m.sentido === 'out' ? 'sale' : 'entra'}${m.dest ? ' (' + vcRuta(m) + ')' : ''}: ${r.problema ? vaTexto(r) : r.total ? 'todos con permiso · ' + plural(r.total, 'pasajero') : 'vacía'}. Tocá ${m.sentido === 'out' ? 'SALIÓ' : 'ENTRÓ'} cuando cruce`, 'car'); try { Sonido.tocar([[660, 0, .15], [990, .16, .22]], 'sine', .2, true); } catch(e){} }
     if (m.sentido === 'in' && m.estado !== 'subiendo'){
       const d = m.gps && m.gps.d;
       if (d != null && d <= VC_CERCA && vaUnaVez(m.id + ':cerca')){ toast(`${m.van} llegando: a ${vcKm(d)} · ${plural(r.total, 'pasajero')}`, 'pin'); try { Sonido.tocar([[740, 0, .14], [988, .14, .14], [1175, .28, .2]], 'sine', .2, true); } catch(e){} }
-      if (m.estado === 'llego' || (d != null && d <= VC_LLEGO)) vaPaso(m);
     }
   });
   /* A los 7 días se borra la lista; queda el paso en la bitácora (sin nombres). */

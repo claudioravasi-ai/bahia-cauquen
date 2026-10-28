@@ -5894,7 +5894,7 @@ li.prox .rm-gn{background:#ff9a3d}
 .hc-chapa{flex:1;min-width:0;font-size:22px;font-weight:800;letter-spacing:.12em;text-align:center;text-transform:uppercase;border:3px solid #1f2937;border-top-width:12px;border-top-color:#1d4ed8;border-radius:10px;background:#fff;color:#111;padding:6px 8px}
 .hc-auto{width:100%;margin-top:8px}
 .hc-lbl{margin:14px 0 6px;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.hc-motivos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.hc-motivos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
 .hc-motivos label{cursor:pointer;animation:bg2Pop .4s cubic-bezier(.3,1.4,.5,1) both;animation-delay:calc(var(--i,0) * 50ms)}
 .hc-motivos input,.hc-pers input{position:absolute;opacity:0;pointer-events:none}
 .hc-motivos span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 2px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);transition:transform .15s,background .15s,box-shadow .15s}
@@ -6676,6 +6676,12 @@ body.vc-modo{background:#07141a}
 .vc-c-grilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-top:10px}
 .vc-c-grilla button{min-height:64px;border-radius:16px;font-size:24px;font-weight:800;background:var(--surf-2);border:2px solid var(--line)}
 .vc-c-grilla button.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.vc-c-grilla .vc-fuera{grid-column:1/-1;font-size:15px;min-height:52px}
+.vc-c-grilla.vc-dest{grid-template-columns:repeat(3,minmax(0,1fr))}
+.vc-c-grilla.vc-dest button{font-size:14.5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:78px}
+.vc-c-grilla.vc-dest em{font-style:normal;font-size:26px;line-height:1}
+.vc-dest-otro{display:flex;gap:8px;margin-top:6px}.vc-dest-otro input{flex:1;min-width:0}
+.vc-p-hora.chica{font-size:28px!important}
 .vc-c-grilla.horas button{font-size:18px;min-height:52px}
 .vc-motivos{display:flex;flex-direction:column;gap:6px}
 .vc-motivos label,.vc-cant label{cursor:pointer}
@@ -6730,6 +6736,34 @@ body.vc-modo{background:#07141a}
 .va-resp{margin:8px 0 0;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}.va-resp svg{width:15px;height:15px}
 .va-resp.ok{color:var(--ok)}.va-resp.detener{color:var(--danger)}
 .va-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+/* (28-10) La tarjeta se toca y se despliegan los pasajeros; SALIÓ / ENTRÓ grande; la alarma roja que titila. */
+.va-toca{all:unset;display:block;width:100%;box-sizing:border-box;cursor:pointer;border-radius:12px}
+.va-toca:focus-visible{outline:2.5px solid var(--brand-2);outline-offset:3px}
+.va-cuerpo .va-chips{flex:1;min-width:0}
+.va-flecha{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--brand);font-weight:800;flex:none}
+.va-flecha svg{width:20px;height:20px;transform:rotate(90deg);transition:transform .2s}.va-card.abierta .va-flecha svg{transform:rotate(-90deg)}
+.va-flecha small{font-size:11px;white-space:nowrap}
+.va-l-in{margin-top:10px;padding:2px 10px;border-radius:12px;background:var(--surface,#fff);border:1px solid var(--line)}
+.va-l-in .va-l-fila:first-child{border-top:0}
+.va-l-fila.sin{background:var(--danger-soft);margin:0 -10px;padding:8px 10px}
+.va-l-nota{margin:6px 0 0}
+.va-cartel-aut{margin-top:10px;padding:9px 12px;border-radius:12px;display:grid;grid-template-columns:auto 1fr;gap:0 8px;align-items:center}
+.va-cartel-aut svg{width:20px;height:20px;grid-row:span 2}.va-cartel-aut small{font-size:12.5px;opacity:.9}
+.va-cartel-aut.ok{background:var(--ok-soft);color:var(--ok)}
+.va-cartel-aut.bad{background:var(--danger);color:#fff;text-transform:none}.va-cartel-aut.bad b{text-transform:uppercase;letter-spacing:.03em}
+.va-btns .btn{flex:1 1 150px}
+.va-paso{flex:1 1 100%!important;justify-content:center;color:#fff;font-weight:900;letter-spacing:.05em;font-size:17px;min-height:54px;border:0;background:var(--brand)}
+.va-paso.entra{background:var(--sky)}
+.va-card.alarma{animation:vaAlarmaBorde 1s steps(2,jump-none) infinite}
+@keyframes vaAlarmaBorde{0%{box-shadow:0 0 0 4px var(--danger)}100%{box-shadow:0 0 0 4px transparent}}
+.va-alarma{position:fixed;inset:0;z-index:2147480500;display:grid;place-items:center;padding:16px;color:#fff;background:#c4161c;animation:vaTitila .9s steps(2,jump-none) infinite}
+@keyframes vaTitila{0%{background:#c4161c}100%{background:#5a0a0d}}
+.va-al-caja{max-width:440px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.va-al-caja>svg{width:72px;height:72px}
+.va-al-caja h2{margin:0;font-size:clamp(24px,7vw,34px);line-height:1.1;font-weight:900;letter-spacing:.02em}
+.va-al-caja p{margin:0;font-size:16px}.va-al-n{font-size:18px!important}
+.va-al-caja .btn{width:100%;justify-content:center;background:#fff;color:#c4161c;font-weight:900;border:0;min-height:56px;font-size:18px}
+@media (prefers-reduced-motion:reduce){ .va-alarma{animation:none} .va-card.alarma{animation:none;box-shadow:0 0 0 4px var(--danger)} }
 .va-l{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .va-l-fila{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
 .va-l-fila b{display:block}.va-l-fila small{color:var(--muted);font-size:12.5px}

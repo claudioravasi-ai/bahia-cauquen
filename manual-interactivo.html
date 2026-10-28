@@ -420,19 +420,21 @@ const L = [
   ] },
   { id:'van-abordo', g:'garita', ven:['hotel'], q:'u_garita', t:'La van con pasajeros a bordo', d:'El chofer escanea a cada pasajero y la garita lo ve en vivo.', p:[
     { t:'En vivo', x:'Cuando el chofer de la van escanea a los pasajeros, aparece esta tarjeta arriba de la lista de las vans: <b>SALE</b> o <b>ENTRA</b>, la van con su patente, el chofer, la hora y <b>"subiendo pasajeros"</b> mientras suben. Te llega un aviso con un sonido corto.', s:'#cuerpo .va-card', antes:"__manual.abordo('out', 'subiendo')" },
-    { t:'Cuántos van', x:'El número grande es cuántos <b>pasajeros</b> van a bordo. Abajo dice <b>"+ chofer"</b>: el chofer va aparte, no se cuenta, y su salida y su entrada como empleado se anotan solas con la van.', s:'#cuerpo .va-card .va-num' },
-    { t:'Quiénes son', x:'<b>Verde</b>: huéspedes y empleados con su QR. <b>Amarillo</b>: los que suben sin QR, o un empleado al que hoy no le toca trabajar. <b>Rojo</b>: alguien con un pase que no vale (el chofer lo dejó subir y lo explicó).', s:'#cuerpo .va-card .va-chips' },
-    { t:'El motivo', x:'Por cada uno sin QR, el motivo que escribió el chofer. Acá: 2 acompañantes, "Amigos de la familia Rossi".', s:'#cuerpo .va-card .va-motivos' },
-    { t:'Ver la lista', x:'<b>Tocá "Ver la lista"</b>: cada pasajero con su nombre e inicial del apellido y la hora en que subió.', s:'#cuerpo .va-card [data-a="va-ver"]', h:'tocar' },
-    { t:'La lista', x:'Solo lo mínimo: nombre e inicial, si es huésped, empleado o sin QR. La lista se borra sola a los 7 días; en la bitácora queda el conteo, sin nombres.', s:'#hoja' },
-    { t:'OK o detener', x:'<b>Tocá "OK, que pase"</b>: al chofer le aparece en verde "La garita dio el OK". Con <b>"Detener y revisar"</b> le aparece en rojo que pare en la barrera.', s:'#cuerpo .va-card [data-a="va-resp"][data-v="ok"]', h:'tocar', antes:'cerrarHoja()' },
-    { t:'Se anota solo', x:'Cuando el chofer toca "Cerrar y avisar", <b>la salida se anota sola</b> en la bitácora, con quiénes iban y el chofer, y la van cruza la pantalla. Si la van va <b>vacía</b>, el chofer cierra igual y queda "Vacía, sin pasajeros".', s:'#cuerpo .va-card' },
+    { t:'Cuántos van', x:'El número grande es cuántos <b>pasajeros</b> van a bordo. Abajo dice <b>"+ chofer"</b>: el chofer va aparte, no se cuenta, y su salida y su entrada como empleado se anotan con la van.', s:'#cuerpo .va-card .va-num' },
+    { t:'Quiénes son', x:'<b>Verde</b>: huéspedes y empleados con su QR, con permiso. <b>Rojo</b>: sin permiso (sin QR, con un pase que no vale o un empleado al que hoy no le toca trabajar).', s:'#cuerpo .va-card .va-chips' },
+    { t:'La pantalla roja', x:'El chofer cerró y avisó, y hay <b>2 sin permiso</b>: la pantalla se pone <b>roja y titila</b>: <b>"VAN CON PASAJE SIN AUTORIZACIÓN"</b>, con la van, si sale o entra y cuántos no tienen permiso.', s:'#vaAlarma', antes:"__manual.abordo('out', 'cerrado')" },
+    { t:'Ver los pasajeros', x:'<b>Tocá "Ver los pasajeros"</b>.', s:'#vaAlarma [data-a="va-alarma-ver"]', h:'tocar' },
+    { t:'Todos a la vista', x:'La tarjeta se despliega con <b>todos</b>: primero, en rojo, los que no tienen permiso y <b>a qué corresponden</b> ("Acompañante de un huésped · Amigos de la familia Rossi"); después los huéspedes y empleados con QR. Solo nombre e inicial del apellido.', s:'#cuerpo .va-card .va-l-in' },
+    { t:'Vos decidís', x:'<b>"Detener para revisar"</b>: al chofer le aparece en rojo que pare en la barrera. <b>"Autorizar: pasa sin parar"</b>: le aparece en verde. <b>Tocá "Autorizar"</b>.', s:'#cuerpo .va-card [data-a="va-resp"][data-v="ok"]', h:'tocar' },
+    { t:'SALIÓ LA VAN', x:'La van no para. Cuando cruza la barrera, <b>tocá "SALIÓ LA VAN"</b>.', s:'#cuerpo .va-card [data-a="va-entro"]', h:'tocar' },
+    { t:'Anotado', x:'Queda <b>"Salió"</b> con la hora, en la bitácora con quiénes iban y el chofer, y la van cruza la pantalla. Si la van va <b>vacía</b>, el chofer cierra igual y queda "Vacía, sin pasajeros".', s:'#cuerpo .va-card' },
   ] },
-  { id:'van-llega', g:'garita', ven:['hotel'], q:'u_garita', t:'La van viene: aviso de llegada', d:'Antes de que llegue, ya sabés quién viene.', p:[
-    { t:'Viene en camino', x:'En la parada del centro, el chofer escanea a los que suben y avisa. La tarjeta dice <b>ENTRA</b> y <b>"viene en camino"</b>: antes de que la van llegue ya sabés quién viene.', s:'#cuerpo .va-card', antes:"__manual.abordo('in', 'cerrado', 1800)" },
-    { t:'A cuánto está', x:'El teléfono del chofer manda <b>solo la distancia</b> a la garita, nunca dónde está: <b>"a 1,8 km · ~3 min"</b>. A 2 km suena el aviso <b>"Van 1 llegando"</b>. A 150 m la entrada <b>se anota sola</b>.', s:'#cuerpo .va-card .va-gps' },
-    { t:'Quiénes vuelven', x:'Los mismos colores: 6 huéspedes ✓ y 1 sin QR, una visita para el lote 148.', s:'#cuerpo .va-card .va-chips' },
-    { t:'Si no hay GPS', x:'Si el teléfono del chofer no tiene ubicación, <b>tocá "Entró"</b> cuando pase la barrera. (El chofer también puede tocar "Ya pasé la garita".)', s:'#cuerpo .va-card [data-a="va-entro"]', h:'tocar' },
+  { id:'van-llega', g:'garita', ven:['hotel'], q:'u_garita', t:'La van viene: todos con permiso', d:'Antes de que llegue, ya sabés quién viene. No para.', p:[
+    { t:'Viene en camino', x:'En la parada del centro, el chofer escanea a los que suben y avisa. La tarjeta dice <b>ENTRA</b> y <b>"viene en camino"</b>: antes de que la van llegue ya sabés quién viene.', s:'#cuerpo .va-card', antes:"__manual.abordo('in', 'cerrado', 1800, true)" },
+    { t:'Todos con permiso', x:'En verde: <b>"Todos los pasajeros con permiso"</b>. Te llega el aviso con un sonido corto y la van <b>no para</b> en la garita.', s:'#cuerpo .va-card .va-cartel-aut' },
+    { t:'Quiénes son', x:'<b>Tocá la tarjeta</b>: se despliega cada pasajero, si es huésped o empleado.', s:'#cuerpo .va-card .va-toca', h:'tocar' },
+    { t:'A cuánto está', x:'El teléfono del chofer manda <b>solo la distancia</b> a la garita, nunca dónde está: <b>"a 1,8 km · ~3 min"</b>. A 2 km suena el aviso <b>"Van 1 llegando"</b>. Si no tiene GPS, el chofer toca "Ya pasé la garita".', s:'#cuerpo .va-card .va-gps' },
+    { t:'ENTRÓ LA VAN', x:'Cuando cruza la barrera, <b>tocá "ENTRÓ LA VAN"</b>.', s:'#cuerpo .va-card [data-a="va-entro"]', h:'tocar' },
     { t:'Entró', x:'Queda anotado: <b>"Entró"</b> con la hora, en la bitácora con quiénes venían, y los huéspedes y el chofer vuelven a figurar adentro.', s:'#cuerpo .va-card' },
     { t:'La ubicación de la garita', x:'Para el aviso por distancia, la garita marca su ubicación <b>una sola vez</b> con <b>"Marcar la garita acá"</b> (aparece en la tarjeta de la vuelta mientras no esté marcada). Se guarda solo ese punto.', s:'#cuerpo .vans-garita' },
   ] },
@@ -440,9 +442,9 @@ const L = [
     { t:'Huéspedes por llegar', x:'En la garita está la lista de <b>huéspedes por llegar</b> hoy. Cuando llega uno, <b>tocá "Ingresó"</b> (si trae el pase del hotel, también se puede escanear).', s:'#cuerpo [data-a="hhuesped-ingreso"]', h:'tocar' },
     { t:'Anotado', x:'Queda en los ingresos de hoy y en el libro de guardia con la hora, y el hotel lo ve al instante.', s:'#cuerpo' },
   ] },
-  { id:'hotel-cliente', g:'garita', ven:['hotel'], q:'u_garita', t:'Va al hotel (restaurante o spa)', d:'Los clientes que llegan sin aviso.', p:[
+  { id:'hotel-cliente', g:'garita', ven:['hotel'], q:'u_garita', t:'Va al hotel (restaurante, spa o recepción)', d:'Los clientes que llegan sin aviso.', p:[
     { t:'Va al hotel', x:'<b>Tocá "Va al hotel"</b>.', s:'#cuerpo [data-a="hotel-cliente"]', h:'tocar' },
-    { t:'Para qué y cuántos', x:'La patente, para qué viene (desayuno, almuerzo, cena o spa) y cuántos son: al hotel le llega "Llegan 2 al restaurante".', s:'#hoja' },
+    { t:'Para qué y cuántos', x:'La patente, para qué viene (desayuno, almuerzo, merienda, cena, spa o <b>Recepción</b>, si va a averiguar algo) y cuántos son: al hotel le llega "Llegan 2 al restaurante" o "Llega 1 a la recepción".', s:'#hoja' },
   ] },
   { id:'cerrar', g:'garita', ven:['supervision'], q:'u_garita', t:'Cerrar el turno', d:'El parte sale solo.', p:[
     { t:'Cerrar', x:'Al terminar, bajá hasta <b>"Cerrar el turno"</b> y tocalo.', s:'#cuerpo [data-a="cerrar-turno"]', h:'tocar' },
@@ -570,10 +572,17 @@ const L = [
     { t:'Listos para salir', x:'Subieron 9: 5 huéspedes, 2 empleados y 2 sin QR.', s:'#vanChofer .vc-cuenta', antes:"__manual.chofer('subiendo')" },
     { t:'Cerrar y avisar', x:'<b>Tocá "Cerrar y avisar a la garita"</b>.', s:'#vanChofer [data-a="vc-cerrar"]', h:'tocar' },
     { t:'Revisar y confirmar', x:'El resumen de quiénes van. <b>Tocá "Cerrar y avisar"</b>.', s:'#hoja [data-r="1"]', h:'tocar' },
-    { t:'Avisado', x:'La garita lo está viendo en vivo. La salida <b>se anota sola</b>.', s:'#vanChofer .vc-resp' },
-    { t:'Si la garita pide parar', x:'Si la garita toca "Detener y revisar", aparece en <b>rojo</b>: "La garita te pide que pares en la barrera".', s:'#vanChofer .vc-resp', antes:"__manual.garita({ resp:'detener', respAt:Date.now() })" },
+    { t:'Avisado', x:'La garita lo está viendo en vivo. Si todos tienen permiso, pasás <b>sin parar</b> y la garita anota la salida cuando cruzás.', s:'#vanChofer .vc-resp' },
+    { t:'Si la garita pide parar', x:'Si alguno no tiene permiso y la garita toca "Detener para revisar", aparece en <b>rojo</b>: "La garita te pide que pares en la barrera".', s:'#vanChofer .vc-resp', antes:"__manual.garita({ resp:'detener', respAt:Date.now() })" },
     { t:'El OK', x:'Cuando la garita da el OK, aparece en <b>verde</b>: <b>"La garita dio el OK · ¡buen viaje!"</b>.', s:'#vanChofer .vc-resp', antes:"__manual.garita({ resp:'ok', respAt:Date.now(), movAt:Date.now(), tipo:'out' })" },
     { t:'En el centro', x:'Al llegar a la parada de Av. Maipú 465, <b>tocá "Llegué al centro: preparar la vuelta"</b>.', s:'#vanChofer [data-a="vc-listo"]', h:'tocar' },
+  ] },
+  { id:'chofer-fuera', g:'chofer', q:'u_hotel', quien:'Ramón, el chofer', t:'Un viaje fuera de horario (puerto, aeropuerto)', d:'Cuando no es el servicio regular al centro.', p:[
+    { t:'El próximo viaje', x:'La app propone el viaje del servicio regular al centro. Esta vez la van va al <b>aeropuerto</b>.', s:'#vanChofer .vc-prox', antes:"__manual.chofer('turno')" },
+    { t:'Otro horario', x:'<b>Tocá "Otro horario"</b>.', s:'#vanChofer [data-a="vc-horario"]', h:'tocar' },
+    { t:'Fuera de horario', x:'<b>Tocá "Fuera de horario"</b>.', s:'#hoja [data-a="vc-fuera"]', h:'tocar' },
+    { t:'¿Adónde va?', x:'<b>Tocá "Aeropuerto"</b>. Si es otro lugar, se escribe abajo (por ejemplo, "Estancia Harberton") y "Listo".', s:'#hoja [data-a="vc-dest"][data-v="aeropuerto"]', h:'tocar' },
+    { t:'Listo', x:'Ahora dice <b>"A coordinar · Hotel → Aeropuerto"</b>. Se suben los pasajeros igual que siempre, y la garita lo ve con su destino. La vuelta se propone sola: <b>Aeropuerto → Hotel</b>.', s:'#vanChofer .vc-prox' },
   ] },
   { id:'chofer-vuelta', g:'chofer', q:'u_hotel', quien:'Ramón, el chofer', t:'La vuelta (también vacía)', d:'Avisar quién viene y el aviso de llegada.', p:[
     { t:'La vuelta', x:'Después de una salida, la app propone su vuelta: <b>ENTRA AL BARRIO</b>, Centro → Hotel.', s:'#vanChofer .vc-prox', antes:"__manual.chofer('centro')" },
@@ -582,7 +591,7 @@ const L = [
     { t:'Cerrar vacía', x:'Sin pasajeros, el botón dice <b>"Cerrar y avisar: viene vacía"</b>. <b>Tocalo</b>.', s:'#vanChofer [data-a="vc-cerrar"]', h:'tocar' },
     { t:'Confirmar', x:'<b>Tocá "Cerrar y avisar"</b>.', s:'#hoja [data-r="1"]', h:'tocar' },
     { t:'La garita sabe que venís', x:'Mientras viaja, el teléfono le manda a la garita <b>solo la distancia</b> (nunca dónde está): "a 1,8 km". A 2 km le suena el aviso.', s:'#vanChofer .vc-gps', antes:'VanChofer.gpsDist(1800)' },
-    { t:'Entraste', x:'A 150 m de la garita la entrada <b>se anota sola</b>. Si no hay GPS, el chofer toca "Ya pasé la garita".', s:'#vanChofer .vc-resp', antes:"VanChofer.gpsDist(120);__manual.garita({ movAt:Date.now(), tipo:'in' })" },
+    { t:'Entraste', x:'Cuando cruzás la barrera, la garita toca <b>"ENTRÓ LA VAN"</b> y te aparece "Entraste al barrio". Si no hay GPS, tocá "Ya pasé la garita".', s:'#vanChofer .vc-resp', antes:"VanChofer.gpsDist(120);__manual.garita({ movAt:Date.now(), tipo:'in' })" },
     { t:'Listo', x:'<b>Tocá "Listo"</b>: la app propone el próximo viaje.', s:'#vanChofer [data-a="vc-listo"]', h:'tocar' },
     { t:'Fin del turno', x:'Al terminar el día, <b>"Terminar mi turno"</b>: la van queda libre. Ramón sale del barrio como empleado, con su credencial.', s:'#vanChofer .vc-pie' },
   ] },
@@ -678,12 +687,14 @@ function prepararAdentro(){
     /* Ramón como empleado del hotel, para la lección del enlace. */
     empleadoChofer(){ this.datosChofer(); refrescar(); },
     /* Una tarjeta "a bordo" de ejemplo para la garita y el hotel. */
-    abordo(sentido, estado, d){
+    abordo(sentido, estado, d, todosOk){
       const n = Date.now(), P = (t, x) => Object.assign({ i:'p' + uid(), at:n, t }, x);
+      document.getElementById('vaAlarma')?.remove(); VA_VISTO.clear(); VA_ABIERTAS.clear(); try { sessionStorage.removeItem('bhc.va.vistos'); } catch(e){}
       Store.cambiar(s => { s.vanAbordo = aLista(s.vanAbordo).filter(x => x.id !== 'va-manual'); s.vanGarita = aLista(s.vanGarita).filter(x => x.id !== 'va-manual');
         s.vanAbordo.push({ id:'va-manual', uid:'manual', tok:'manual', chofer:'Ramón P.', vid:'hv1', van:'Van 1', pat:'AD123XY', sentido, sale: sentido === 'out' ? '16:10' : '16:30', fecha:hoyISO(), at:n, upd:n, estado, ...(d != null ? { gps:{ d, at:n } } : {}),
           pax: sentido === 'out' ? [P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Martina O.' }), P('e', { n:'Laura G.', puesto:'Mucama' }), P('e', { n:'Pedro S.', puesto:'Cocina' }), P('x', { motivo:'acomp', txt:'Amigos de la familia Rossi' }), P('x', { motivo:'acomp', txt:'Amigos de la familia Rossi' })]
-            : [P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Martina O.' }), P('h', { n:'Martina O.' }), P('x', { motivo:'visita', txt:'Va a la casa del lote 148' })] }); });
+            : [P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Familia R.' }), P('h', { n:'Martina O.' }), P('h', { n:'Martina O.' }), P('x', { motivo:'visita', txt:'Va a la casa del lote 148' })] });
+        if (todosOk){ const x = s.vanAbordo[s.vanAbordo.length - 1]; x.pax = x.pax.filter(p => p.t !== 'x').concat(P('e', { n:'Laura G.', puesto:'Mucama' })); } });
       refrescar();
     },
   };`);

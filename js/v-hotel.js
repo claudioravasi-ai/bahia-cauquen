@@ -1038,7 +1038,7 @@ function tarjetaVansGarita(tarjeta){
   if (va){ const r = vaResumen(va), d = va.gps && va.gps.d;
     return tarjeta({ cls:'tg-van ahora' + (r.nivel !== 'ok' ? ' va-alerta' : ''), ic:'car', tag:'Vans del hotel', a:'garita-ir', v:'.vans-garita', on:true, n:r.total || '',
       t:`${esc(va.van)} ${va.estado === 'subiendo' ? 'subiendo' : va.sentido === 'out' ? 'sale' : 'viene'}: ${plural(r.total, 'pasajero')}`,
-      x: va.sentido === 'in' && d != null && va.estado !== 'subiendo' ? `a ${vcKm(d)} · ${vcEta(d)}${r.x ? ` · ${r.x} sin QR` : ''}` : esc(vaTexto(r).replace(/^\d+ pasajeros? a bordo: ?/, '')) || 'Tocá para ver la lista' }); }
+      x: r.sinAut && va.estado !== 'subiendo' ? `${plural(r.sinAut, 'pasajero')} sin autorización · tocá para decidir` : va.sentido === 'in' && d != null && va.estado !== 'subiendo' ? `a ${vcKm(d)} · ${vcEta(d)}` : esc(vaTexto(r).replace(/^\d+ pasajeros? a bordo: ?/, '')) || 'Tocá para ver la lista' }); }
   const vs = viajesDelDia(hoyISO()), t = ahoraMin(), vans = hotelVans();
   const vanDe = x => vans.find(v => v.id === x.vanId);
   const ya = vs.find(x => viajeEsLaHora(x, t)), afuera = vs.filter(x => x.estado === 'en_curso');
