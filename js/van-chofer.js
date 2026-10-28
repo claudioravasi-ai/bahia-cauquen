@@ -412,6 +412,8 @@ const VanChofer = {
   },
   async camAbrir(modo){
     this.cam = { modo }; this.repintar();
+    /* En el Manual de uso interactivo no se usa la cámara: se escribe el código. */
+    if (typeof MODO_MANUAL !== 'undefined' && MODO_MANUAL) return this.sinCamara(modo, 'En el manual no se usa la cámara.');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return this.sinCamara(modo, 'Este teléfono no puede usar la cámara.');
     const nativo = 'BarcodeDetector' in window, lector = nativo ? null : await cargarJsQR();
     if (!nativo && !lector) return this.sinCamara(modo, 'Sin conexión para cargar el lector de QR.');
