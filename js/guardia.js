@@ -116,17 +116,46 @@ document.addEventListener('change', e => {
    garita, en el libro de guardia y en la constancia. */
 const CARGOS_POLICIA = ['Agente', 'Cabo', 'Cabo primero', 'Sargento', 'Sargento primero', 'Suboficial principal', 'Suboficial mayor',
   'Oficial ayudante', 'Oficial subinspector', 'Oficial inspector', 'Oficial principal', 'Subcomisario', 'Comisario', 'Comisario inspector', 'Comisario mayor', 'Comisario general', 'Comandante'];
-function campoCargoPolicia(v = ''){
-  const otro = v && !CARGOS_POLICIA.includes(v);
-  return `<div class="field pn-cargo"><label>Cargo en la policía</label><select name="cargo" required>
-      <option value="">Elegí el cargo</option>${CARGOS_POLICIA.map(c => `<option ${c === v ? 'selected' : ''}>${c}</option>`).join('')}<option value="otro" ${otro ? 'selected' : ''}>Otro (escribirlo)</option></select>
-    <input name="cargoOtro" maxlength="30" autocomplete="off" placeholder="Escribí el cargo" value="${otro ? esc(v) : ''}" ${otro ? '' : 'hidden'} style="margin-top:6px"></div>`;
+/* "OTROS" (pedido de Claudio, 29-10-2026): el cargo que se escribe a mano se
+   acomoda como los de la lista (primera letra en mayúscula, el resto en
+   minúscula), entra al desplegable al instante y queda en él para las
+   próximas veces: sale de los policías ya anotados (servicios y ficha), así
+   que no hace falta guardarlo aparte. */
+const cargoComoLista = t => { const x = String(t || '').trim().replace(/\s+/g, ' ').slice(0, 30).toLocaleLowerCase('es'); return x ? x[0].toLocaleUpperCase('es') + x.slice(1) : ''; };
+const mismoCargo = (a, b) => cargoComoLista(a) === cargoComoLista(b);
+function cargosPolicia(v = ''){
+  const extra = [];
+  const sumar = c => { const x = cargoComoLista(c); if (x && !CARGOS_POLICIA.some(b => mismoCargo(b, x)) && !extra.some(b => mismoCargo(b, x))) extra.push(x); };
+  try { if (typeof policiasDelBarrio === 'function') policiasDelBarrio().forEach(p => sumar(p.cargo)); } catch (e) {}
+  sumar(v);
+  return [...CARGOS_POLICIA, ...extra.sort((a, b) => a.localeCompare(b, 'es'))];
 }
-const cargoDelForm = d => String(d.cargo === 'otro' ? d.cargoOtro || '' : d.cargo || '').trim().slice(0, 30);
+function campoCargoPolicia(v = ''){
+  const lista = cargosPolicia(v), elegido = v ? lista.find(c => mismoCargo(c, v)) || '' : '';
+  return `<div class="field pn-cargo"><label>Cargo en la policía</label><select name="cargo" required>
+      <option value="">Elegí el cargo</option>${lista.map(c => `<option ${c === elegido ? 'selected' : ''}>${esc(c)}</option>`).join('')}<option value="otro">Otros (escribir el cargo)</option></select>
+    <input name="cargoOtro" maxlength="30" autocomplete="off" placeholder="Escribí el cargo y tocá afuera" hidden style="margin-top:6px"></div>`;
+}
+const cargoDelForm = d => cargoComoLista(d.cargo === 'otro' ? d.cargoOtro : d.cargo);
+/* Lo escrito en "Otros" pasa a ser una opción más del desplegable, ya elegida. */
+function pnSumarCargo(box){
+  const sel = box && box.querySelector('[name=cargo]'), o = box && box.querySelector('[name=cargoOtro]');
+  const x = o && cargoComoLista(o.value); if (!sel || !x) return;
+  let op = [...sel.options].find(z => z.value !== 'otro' && z.value && mismoCargo(z.value, x));
+  if (!op){ op = new Option(x, x); sel.insertBefore(op, sel.querySelector('option[value=otro]')); }
+  sel.value = op.value; o.value = ''; o.hidden = true; o.required = false;
+}
 document.addEventListener('change', e => {
-  const sel = e.target; if (!sel || sel.name !== 'cargo' || !sel.closest('.pn-cargo')) return;
-  const o = sel.closest('.pn-cargo').querySelector('[name=cargoOtro]'); if (!o) return;
-  o.hidden = sel.value !== 'otro'; o.required = sel.value === 'otro'; if (!o.hidden) o.focus();
+  const t = e.target; if (!t || !t.closest || !t.closest('.pn-cargo')) return;
+  if (t.name === 'cargoOtro') return pnSumarCargo(t.closest('.pn-cargo'));
+  if (t.name !== 'cargo') return;
+  const o = t.closest('.pn-cargo').querySelector('[name=cargoOtro]'); if (!o) return;
+  o.hidden = t.value !== 'otro'; o.required = t.value === 'otro'; if (!o.hidden) o.focus();
+});
+/* Con Enter en la casilla, lo suma a la lista en vez de mandar el formulario. */
+document.addEventListener('keydown', e => {
+  const t = e.target; if (e.key !== 'Enter' || !t || t.name !== 'cargoOtro' || !t.closest('.pn-cargo')) return;
+  e.preventDefault(); pnSumarCargo(t.closest('.pn-cargo'));
 });
 /* "Sargento · Mat. 1234" (texto, sin escapar), con lo que haya. */
 const pnCargoMat = (p, fin = '', ini = '') => { const t = [p && p.cargo, p && p.matricula ? 'Mat. ' + p.matricula : ''].filter(Boolean).join(' · '); return t ? ini + t + fin : ''; };
@@ -134,9 +163,11 @@ const pnCargoMat = (p, fin = '', ini = '') => { const t = [p && p.cargo, p && p.
 const pnParen = p => { const t = [p && p.cargo ? String(p.cargo).toLowerCase() : '', p && p.matricula ? 'mat. ' + p.matricula : ''].filter(Boolean).join(', '); return t ? ` (${t})` : ''; };
 function pnPonerCargo(f, v){
   if (!f || !f.cargo) return;
-  const otro = v && !CARGOS_POLICIA.includes(v);
-  f.cargo.value = !v ? '' : otro ? 'otro' : v;
-  if (f.cargoOtro){ f.cargoOtro.hidden = !otro; f.cargoOtro.required = !!otro; f.cargoOtro.value = otro ? v : ''; }
+  const sel = f.cargo, x = cargoComoLista(v);
+  let op = x && [...sel.options].find(z => z.value !== 'otro' && z.value && mismoCargo(z.value, x));
+  if (x && !op){ op = new Option(x, x); sel.insertBefore(op, sel.querySelector('option[value=otro]')); }
+  sel.value = op ? op.value : '';
+  if (f.cargoOtro){ f.cargoOtro.hidden = true; f.cargoOtro.required = false; f.cargoOtro.value = ''; }
 }
 /* Los que ya vinieron, para tocar y completar todo de una. */
 let pnConocidos = [];
