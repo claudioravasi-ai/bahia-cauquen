@@ -4950,7 +4950,7 @@ body.rk-arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .bt-frases{display:flex;gap:6px;overflow-x:auto;margin:10px 0 8px;padding-bottom:2px}
 .bt-frases .chip{flex:none;font-size:12.5px}
 .bt-linea{display:flex;gap:8px;align-items:flex-end}
-.bt-linea textarea{flex:1;min-height:46px;resize:vertical;border-radius:14px}
+.bt-linea textarea{flex:1;min-height:46px;max-height:45vh;resize:vertical;border-radius:14px;field-sizing:content}
 .bt-mandar{flex:none;width:50px;height:50px;border-radius:16px;border:0;display:grid;place-items:center;color:#fff;background:linear-gradient(140deg,var(--brand-2),var(--brand));box-shadow:0 6px 16px color-mix(in srgb,var(--brand) 30%,transparent)}
 .bt-mandar:active{transform:scale(.94)}
 .bt-siempre{margin:8px 0 0;font-size:12.5px;font-weight:700;color:var(--danger);display:flex;gap:6px;align-items:center}
@@ -4985,7 +4985,7 @@ body.rk-arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .bt-meta{display:flex;align-items:center;gap:8px;margin-bottom:2px}
 .bt-meta time{font-size:12px;font-weight:800;color:var(--ink-2)}
 .bt-meta em{font-style:normal;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--surface))}
-.bt-txt p{margin:0;font-size:14px;overflow-wrap:anywhere}
+.bt-txt p{margin:0;font-size:14px;overflow-wrap:anywhere;white-space:pre-wrap}
 .bt-txt small{display:block;margin-top:3px;font-size:11.5px;color:var(--muted)}
 .bt-it.c-danger .bt-txt{background:color-mix(in srgb,var(--danger) 6%,var(--surface))}
 .bt-it.c-danger .bt-punto i{animation:btLate 1.8s ease-in-out infinite}

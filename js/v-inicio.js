@@ -1932,7 +1932,7 @@ A['cerrar-turno'] = () => {
   const t = turnoAbierto();
   hoja('Cerrar el turno', `<form data-f="cerrar-turno">
     ${t ? `<p class="small" style="margin:0 0 12px">Turno <b>${esc(t.turno)}</b> · ${esc(aLista(t.guardias).join(', '))} · desde las ${hora(t.at)} h.</p>` : ''}
-    <div class="field"><label>Novedades para el turno que entra (opcional)</label><textarea name="nota" maxlength="500" placeholder="Ej: quedó un paquete para el lote 40; el portón del fondo cierra mal."></textarea></div>
+    <div class="field"><label>Novedades para el turno que entra (opcional)</label><textarea name="nota" placeholder="Ej: quedó un paquete para el lote 40; el portón del fondo cierra mal."></textarea></div>
     ${policiasAdentro(t).length ? `<div class="field"><label>Policía que sigue en el barrio</label>${policiasAdentro(t).map(p => `<label class="check"><input type="checkbox" name="polSale" value="${esc(p.id)}"><span>${esc(p.nombre)} ya se fue (anotar la salida ahora)</span></label>`).join('')}
       <div class="ayuda">Si sigue de servicio, dejalo sin tildar: pasa al turno que entra con sus rondas.</div></div>` : ''}
     <button class="btn btn-pri btn-block">${I('check')}Cerrar el turno y anotar el siguiente</button>
@@ -1994,7 +1994,7 @@ function parteTurnoHtml(t, nota = ''){
       ${hayPaquetes() ? fila('Paquetes', String(cuenta(/paquete/i))) : ''}
       ${fila('SOS', String(cuenta(/^SOS/)))}
     </table>
-    ${nota ? `<p style="background:#fff7e0;border-radius:10px;padding:10px 12px;margin:0 0 14px"><b>Novedades para el turno siguiente:</b><br>${esc(nota)}</p>` : ''}
+    ${nota ? `<p style="background:#fff7e0;border-radius:10px;padding:10px 12px;margin:0 0 14px;white-space:pre-wrap"><b>Novedades para el turno siguiente:</b><br>${esc(nota)}</p>` : ''}
     ${ps.length ? `<h3 style="font-size:15px;margin:16px 0 6px">Policía contratada</h3>${ps.map(p => `<p style="margin:0 0 8px"><b>${esc(p.nombre)}</b>${esc(pnCargoMat(p, '', ' · '))} · ingresó ${hora(p.entra)} h${p.sale ? ' · salió ' + hora(p.sale) + ' h' : p.paso ? ' · siguió en el turno siguiente' : ' · sigue en el barrio'}<br>
       ${p.rondas.length ? p.rondas.map((r, i) => `Ronda ${i + 1}${r.incompleta ? ' (INCOMPLETA)' : ''}: ${hora(r.inicio)}${r.fin ? ' a ' + hora(r.fin) + ' (' + minutos(r.inicio, r.fin) + ' min)' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}: ${pasosDeRonda(r).map(x => esc(nombrePunto(x.punto)) + ' ' + hora(x.at)).join(', ')}` : ''}`).join('<br>') : 'Sin rondas anotadas.'}</p>`).join('')}` : ''}
     <h3 style="font-size:15px;margin:16px 0 6px">Bitácora del turno</h3>
@@ -4137,7 +4137,7 @@ function bitEscribirHtml({ plegado = false } = {}){
   return `<form data-f="bitacora" class="bt-escribe${plegado ? ' bg2-escribe' + (abierto ? ' abierto' : '') : ''}">${plegado ? `<p class="bg2-pregunta">${I('edit')}¿Qué querés anotar?</p>` : ''}
         <div class="bt-tipos" role="radiogroup" aria-label="Qué querés anotar">${Object.entries(ESCRIBIR_BIT).map(([k, t], i) => `<label class="c-${t.c}"><input type="radio" name="tipo" value="${k}" ${k === tipo ? 'checked' : ''}><span>${I(t.ic)}<b>${t.n}</b></span></label>`).join('')}</div>
         <div class="bt-frases" id="bitFrases">${(ESCRIBIR_BIT[tipo] || ESCRIBIR_BIT.novedad).frases.map(f => `<button type="button" class="chip" data-a="bit-frase" data-v="${esc(f)}">${esc(f.trim())}${/ $/.test(f) ? '…' : ''}</button>`).join('')}</div>
-        <div class="bt-linea"><textarea name="texto" id="bitTxt" required maxlength="300" rows="2" placeholder="${esc((ESCRIBIR_BIT[tipo] || ESCRIBIR_BIT.novedad).ph)}"></textarea><button class="bt-mandar" aria-label="Anotar en el libro">${I('send')}</button></div>
+        <div class="bt-linea"><textarea name="texto" id="bitTxt" required rows="2" placeholder="${esc((ESCRIBIR_BIT[tipo] || ESCRIBIR_BIT.novedad).ph)}"></textarea><button class="bt-mandar" aria-label="Anotar en el libro">${I('send')}</button></div>
         <label class="check bt-avisar" style="margin:8px 0 0" ${tipo === 'incidente' ? 'hidden' : ''}><input type="checkbox" name="avisar"><span>Que le suene también a la Administración</span></label>
         <p class="bt-siempre" ${tipo === 'incidente' ? '' : 'hidden'}>${I('bell')} El incidente le suena siempre a la Administración, con el aviso en rojo.</p></form>`;
 }

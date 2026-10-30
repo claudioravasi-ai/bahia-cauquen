@@ -134,7 +134,7 @@ A['guardia-sale'] = el => {
   hoja(`Sale ${String(r.n).split(' ')[0]}`, `<form data-f="guardia-sale">
     <input type="hidden" name="n" value="${esc(r.n)}">
     <p class="small" style="margin:0 0 12px"><b>${esc(r.n)}</b> · ${esc(r.h)}${h ? ' · ' + rangoHorario(h) : ''} · entró ${hora(r.entra || t.at)} h.</p>
-    <div class="field"><label>Novedades para el que sigue (opcional)</label><textarea name="nota" maxlength="500" placeholder="Ej: quedó un paquete para el lote 40; el portón del fondo cierra mal."></textarea></div>
+    <div class="field"><label>Novedades para el que sigue (opcional)</label><textarea name="nota" placeholder="Ej: quedó un paquete para el lote 40; el portón del fondo cierra mal."></textarea></div>
     <div class="field"><label>¿Entra alguien en su lugar?</label><div class="turno-fila"><input name="en" list="guardiasListaSale" autocomplete="off" maxlength="50" placeholder="Nombre (opcional)">
       <select name="eh" class="turno-h" aria-label="Horario">${turnosConfig().map(x => `<option value="${esc(x.nombre)}" ${x.nombre === sug.nombre ? 'selected' : ''}>${esc(x.nombre)} ${hhCorto(x.desde)}–${hhCorto(x.hasta)}</option>`).join('')}</select></div>
       <datalist id="guardiasListaSale">${[...guardiasConocidos().values()].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
