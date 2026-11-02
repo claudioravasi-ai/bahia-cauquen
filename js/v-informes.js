@@ -106,6 +106,17 @@ const CorreoCopia = {
     const h = c.pdfHtml || (v && v.p ? await this.unzip(v.p) : '');
     return h ? { html:await this.conFotos(h), nombre } : null;
   },
+  /* El servicio de una constancia vieja. Se busca por la noche que dice el
+     asunto, no por la hora: la garita puede cargar la salida horas después. Si
+     ya no está en lo que tiene el equipo, se traen solo esos días del libro. */
+  async servicioDe(c){
+    const dia = String(c.asunto || '').split(' · ').pop();
+    const cerca = l => l.filter(x => x.sale && fechaCorta(isoDe(new Date(x.entra))) === dia)
+      .sort((a, b) => (b.email === c.para) - (a.email === c.para) || Math.abs(a.sale - c.at) - Math.abs(b.sale - c.at))[0];
+    const sv = cerca(serviciosPolicia()); if (sv || !Historial.hayNube()) return sv;
+    const regs = Object.values((await Nube.db.ref('staff/bitacora').orderByChild('at').startAt(c.at - 3 * DIA).endAt(c.at + DIA).get()).val() || {}).filter(Boolean);
+    return cerca(serviciosPolicia(regs.filter(b => b.tipo === 'turno' && b.abre), regs));
+  },
   /* Lo que se ve al tocar "PDF": primero el archivo que se adjuntó; en los
      correos viejos, lo que todavía se puede sacar de la base; si el correo no
      llevaba adjunto, el correo tal cual llegó. */
@@ -116,10 +127,10 @@ const CorreoCopia = {
     const pdf = c.pdfHtml || (v && v.p ? await this.unzip(v.p) : '');
     if (pdf) return { doc:await conFotos(pdf), nota:'Es el PDF que salió adjunto, tal cual.' };
     if (this.MISMO_CUERPO.includes(c.tipo) && html) return { doc:(c.tipo === 'bitacora-hotel' ? bhPdfDoc : mvPdfDoc)(html), nota:'Es el PDF que salió adjunto, tal cual.' };
-    if (c.tipo === 'informe-policia'){ const i = (await IPCopia.lista()).find(x => x && Math.abs((x.at || 0) - c.at) < 15 * MIN), cp = i && await IPCopia.copia(i.id);
+    if (c.tipo === 'informe-policia'){ const i = (await IPCopia.lista()).filter(x => x && Math.abs((x.at || 0) - c.at) < 6 * HORA).sort((a, b) => Math.abs(a.at - c.at) - Math.abs(b.at - c.at))[0], cp = i && await IPCopia.copia(i.id);
       if (cp && cp.html) return { doc:await conFotos(cp.html), nota:'Es el PDF que salió adjunto, de la copia del informe semanal.' }; }
-    if (c.tipo === 'policia-servicio'){ const sv = serviciosPolicia().find(x => x.email === c.para && x.sale && Math.abs(x.sale - c.at) < 15 * MIN);
-      if (sv) return { doc:cpPdfDoc(constanciaPdfHtml(sv, await constanciaImgs())), nota:'Es la constancia rearmada con los datos del libro de guardia: este correo es anterior al guardado del PDF.' }; }
+    if (c.tipo === 'policia-servicio'){ const sv = await this.servicioDe(c);
+      if (sv) return { doc:cpPdfDoc(constanciaPdfHtml(sv, await constanciaImgs())), nota:'Es la constancia completa, rearmada con el libro de guardia: este correo es anterior al guardado del PDF, así que la fecha de emisión es la de hoy.' }; }
     if (!html) return null;
     return { doc:docCorreo(c.asunto || 'Correo', html), nota:c.pdfNombre || ['informe-admin', 'informe-servicio', 'informe-policia', 'policia-servicio'].includes(c.tipo) ? 'Este correo es anterior al guardado del PDF: se ve el texto del correo, no el adjunto.' : 'Este correo no llevaba PDF adjunto: se ve tal cual llegó.' };
   },
