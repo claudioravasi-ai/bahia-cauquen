@@ -2015,6 +2015,7 @@ async function mandarParteTurno(turnoId, nota = '', { aPedido = false } = {}){
 }
 A['parte-ver'] = el => { const t = (typeof turnosDelCal === 'function' ? turnosDelCal() : registrosTurno()).find(x => x.id === el.dataset.id); if (!t) return;
   hoja(`Parte del turno ${t.turno}`, `<div class="card plana" style="padding:0;overflow:hidden">${parteTurnoHtml(t)}</div>
+    <button class="btn btn-pri btn-block" style="margin-top:10px" data-a="parte-pdf" data-id="${t.id}">${I('download')}Ver en PDF</button>
     ${esAdmin() && Store.s.config.adminEmail ? `<button class="btn btn-sec btn-block" style="margin-top:10px" data-a="parte-reenviar" data-id="${t.id}">${I('mail')}Mandármelo por correo</button>` : ''}
     ${esSupervisor() && t.cerradoAt && typeof vistoDe === 'function' && !vistoDe(t.id) ? `<button class="btn btn-pri btn-block" style="margin-top:10px" data-a="visto-parte" data-id="${t.id}">${I('eye')}Dar el visto</button>` : ''}`, { ancho:'640px' }); };
 A['parte-reenviar'] = el => { mandarParteTurno(el.dataset.id, '', { aPedido:true }); cerrarHoja(); };

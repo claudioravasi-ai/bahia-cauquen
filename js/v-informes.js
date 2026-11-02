@@ -31,7 +31,8 @@
      · Por correo va sin lotes ni nombres de vecinos: los deudores van como
        total y el texto del libro se tapa con taparDatos (js/v-supervisor.js).
      · Las copias de correos las lee solo la Administración y vencen a los
-       400 días. Los "Estoy bien" a familiares no se guardan nunca.
+       400 días (o al pasar los últimos 2.000 correos). Los "Estoy bien" a
+       familiares no se guardan nunca.
 
    Ideas de apps con más de 1000 estrellas en GitHub (solo la idea, el código
    es propio): la tira de días de colores de uptime-kuma (93k★, MIT), el saldo
@@ -58,7 +59,7 @@ const grupoCorreo = tipo => CORREO_GRUPOS.find(g => g[3].includes(tipo)) || ['ot
 const taparMail = m => String(m || '').replace(/^(.).*?(@.*)$/, '$1•••$2');
 
 const CorreoCopia = {
-  DIAS:400, MISMO_CUERPO:['bitacora-hotel', 'parte-mantenimiento'],
+  DIAS:400, TOPE:2000, MISMO_CUERPO:['bitacora-hotel', 'parte-mantenimiento'],
   enBase: () => typeof Nube !== 'undefined' && Nube.activa() && !!Nube.db,
   async zip(txt){
     const st = new Blob([txt]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -77,13 +78,21 @@ const CorreoCopia = {
     const c = aLista(Store.s.correos).find(x => x && x.id === id);
     if (!c || !c.html || c.estado !== 'enviado') return false;
     try {
-      const z = await this.zip(c.html); if (z.length > 400000) return false;
+      const z = await this.zip(await this.achicarFotos(c.html)); if (z.length > 400000) return false;
       /* El PDF del hotel y el de mantenimiento son el mismo texto del correo. */
       const p = pdf && !this.MISMO_CUERPO.includes(c.tipo) ? await this.zip(pdf) : '';
       await Nube.db.ref('staff/correosCopia/' + id).update({ z, at:c.at, ...(p && p.length <= 400000 ? { p } : {}) });
       Store.cambiar(s => { const x = aLista(s.correos).find(y => y && y.id === id); if (x){ x.html = ''; x.copia = true; } });
       return true;
     } catch(e){ console.warn('No se guardó la copia del correo', e); return false; }
+  },
+  /* El plano del parte de mantenimiento es una imagen que no se comprime y sola
+     pesa más que todo el resto: en la copia va más liviana. El correo no cambia. */
+  async achicarFotos(html){
+    const m = /data:image\/png;base64,[A-Za-z0-9+/=]{20000,}/.exec(html); if (!m) return html;
+    try { return html.replace(m[0], await new Promise((ok, mal) => { const i = new Image(); i.onload = () => { const c = document.createElement('canvas'), k = Math.min(1, 900 / i.width); c.width = i.width * k; c.height = i.height * k;
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(i, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', .55)); }; i.onerror = mal; i.src = m[0]; })); }
+    catch(e){ return html; }
   },
   /* Si el correo no salió, su PDF se guarda igual: el reintento lo necesita y
      no queda en la lista que baja sola. El del hotel y mantenimiento no hace
@@ -131,19 +140,26 @@ const CorreoCopia = {
       if (cp && cp.html) return { doc:await conFotos(cp.html), nota:'Es el PDF que salió adjunto, de la copia del informe semanal.' }; }
     if (c.tipo === 'policia-servicio'){ const sv = await this.servicioDe(c);
       if (sv) return { doc:cpPdfDoc(constanciaPdfHtml(sv, await constanciaImgs())), nota:'Es la constancia completa, rearmada con el libro de guardia: este correo es anterior al guardado del PDF, así que la fecha de emisión es la de hoy.' }; }
+    /* El parte de turno nunca llevó PDF. Los que salieron con la plantilla vieja
+       se rearman con la nueva desde el libro de guardia (se detectan por la tapa). */
+    if (c.tipo === 'parte-turno' && !html.includes('border-radius:16px 16px 0 0')){ const [tit, dia, gu] = String(c.asunto || '').split(' · ');
+      const ls = registrosTurno().filter(t => `Parte del turno ${t.turno}` === tit && fechaCorta(isoDe(new Date(t.at))) === dia), t = ls.find(x => aLista(x.guardias).join(', ') === gu) || ls[0];
+      if (t) return { doc:docParte(t), nota:'Salió con el diseño anterior y sin PDF. Acá se ve rearmado con el diseño nuevo, desde el libro de guardia.' }; }
     if (!html) return null;
     return { doc:docCorreo(c.asunto || 'Correo', html), nota:c.pdfNombre || ['informe-admin', 'informe-servicio', 'informe-policia', 'policia-servicio'].includes(c.tipo) ? 'Este correo es anterior al guardado del PDF: se ve el texto del correo, no el adjunto.' : 'Este correo no llevaba PDF adjunto: se ve tal cual llegó.' };
   },
   /* Una vez por día, en el equipo de la Administración: pasa los correos
      viejos a copia, de a pocos, y borra los que ya vencieron. */
   async aliviar(n = 25){
-    const lista = aLista(Store.s.correos).filter(Boolean), lim = Date.now() - this.DIAS * DIA;
-    const vencidos = lista.filter(c => c.at < lim);
+    const lista = aLista(Store.s.correos).filter(Boolean).sort((a, b) => b.at - a.at), lim = Date.now() - this.DIAS * DIA;
+    /* La línea y su copia se van juntas: si no, la copia queda en la base sin
+       que nadie pueda llegar a ella. Son 400 días o los últimos TOPE correos. */
+    const vencidos = lista.filter((c, i) => c.at < lim || i >= this.TOPE), fuera = new Set(vencidos.map(c => c.id));
     if (vencidos.length){
-      if (this.enBase()) await Promise.all(vencidos.filter(c => c.copia).map(c => Nube.db.ref('staff/correosCopia/' + c.id).remove().catch(() => {})));
-      Store.cambiar(s => { s.correos = aLista(s.correos).filter(c => c && c.at >= lim); });
+      if (this.enBase()) await Promise.all(vencidos.filter(c => c.copia || c.pdfNombre).map(c => Nube.db.ref('staff/correosCopia/' + c.id).remove().catch(() => {})));
+      Store.cambiar(s => { s.correos = aLista(s.correos).filter(c => c && !fuera.has(c.id)); });
     }
-    for (const c of lista.filter(x => x.at >= lim && x.html && x.estado === 'enviado').slice(0, n)) if (!await this.guardar(c.id)) break;
+    for (const c of lista.filter(x => !fuera.has(x.id) && x.html && x.estado === 'enviado').slice(0, n)) if (!await this.guardar(c.id)) break;
   },
 };
 REGLAS.push({ id:'correos-aliviar', n:'Cada día → la copia de los correos sale de la lista que baja sola',
@@ -164,6 +180,7 @@ function docPdf({ titulo, sello, color = '#0d6b66', cuerpo }){
     <td align="right" style="text-align:right;padding:0 0 6px"><span style="border:1.5px solid ${color};color:${color};border-radius:6px;padding:2px 8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:7.5pt">${esc(sello)}</span></td></tr></table>${cuerpo}</body></html>`;
 }
 const docCorreo = (titulo, html) => `<!DOCTYPE html><html lang="es-AR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>@page{size:A4;margin:8mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{margin:0}</style></head><body>${html}</body></html>`;
+const docParte = t => docCorreo(`Parte del turno ${t.turno}`, parteTurnoHtml(t).replace('<!--sello-->', ' · Administración'));
 /* Muestra un documento adentro de la app, tal cual, listo para imprimir o guardar en PDF. */
 function verDoc(titulo, doc, nota = ''){
   hoja(titulo, `${nota ? `<p class="muted small" style="margin:0 0 8px">${nota}</p>` : ''}<iframe class="mv-parte-frame" title="${esc(titulo)}" sandbox="allow-same-origin allow-modals"></iframe>
@@ -431,9 +448,10 @@ R['correos-enviados'] = {
         return `<div class="ce-fila"><time><b>${fechaCorta(isoDe(new Date(c.at)))}</b><span>${hora(c.at)} h</span></time>
           <span class="ce-ic">${I(gr[2])}</span><div class="ce-txt"><b>${esc(c.asunto || '(sin asunto)')}</b><small>${esc(gr[1])} · ${esc(taparMail(c.para))}</small></div>${est(c)}
           <button class="btn btn-xs btn-sec" data-a="correo-traer" data-id="${esc(c.id)}">${I('download')}PDF</button></div>`; }).join('')}</div>` : vacio('mail', 'Todavía no salió ningún correo.')}
-      <p class="muted tiny" style="margin-top:10px">${I('lock')} Solo los ve la Administración y se guardan 400 días. Los avisos "Estoy bien" a familiares no quedan acá.</p>`;
+      <p class="muted tiny" style="margin-top:10px">${I('lock')} Solo los ve la Administración y se guardan 400 días, hasta los últimos 2.000. Los avisos "Estoy bien" a familiares no quedan acá.</p>`;
   },
 };
+A['parte-pdf'] = el => { const t = registrosTurno().find(x => x.id === el.dataset.id); if (t) verDoc(`Parte del turno ${t.turno}`, docParte(t)); };
 A['correo-traer'] = async el => {
   const c = aLista(Store.s.correos).find(x => x && x.id === el.dataset.id); if (!c) return;
   toast('Trayendo el correo…', 'mail');

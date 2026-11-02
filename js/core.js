@@ -1369,7 +1369,7 @@ const Correo = {
     const reg = { id:uid(), para, asunto, html, tipo, at:Date.now(), estado:'pendiente', intentos:0, ...(pdf ? { pdfNombre:adjunto.nombre } : {}) };
     /* Sin la base (modo prueba), el PDF queda acá mismo. */
     if (anota && pdf && typeof CorreoCopia !== 'undefined' && !CorreoCopia.enBase()) reg.pdfHtml = pdfCopia || adjunto.html;
-    if (anota) Store.cambiar(s => { s.correos.unshift(reg); if (s.correos.length > 1000) s.correos.length = 1000; });
+    if (anota) Store.cambiar(s => { s.correos.unshift(reg); if (s.correos.length > 2500) s.correos.length = 2500; });  /* el recorte de verdad, con su copia, lo hace CorreoCopia.aliviar */
     if (!this.configurado()) await this.traerPublico();
     const d = this.datos();
     if (!d){ const error = 'El envío automático no está configurado (Ajustes → Correo): quedó en la bandeja de salida.'; if (anota && pdf && typeof CorreoCopia !== 'undefined') CorreoCopia.reservar(reg.id, pdfCopia || adjunto.html); if (anota) Store.cambiar(s => { const x = s.correos.find(c => c.id === reg.id); if (x) x.error = error; }); return { ok:false, error }; }
