@@ -1,0 +1,2300 @@
+/* =========================================================
+   Gestión: peticiones firmadas a la garita, reclamos,
+   votaciones, mensajes privados, documentos, expensas, residuos,
+   agenda, Ushuaia, vuelos y Mi casa.
+   ========================================================= */
+
+/* ---------- FIRMA MANUSCRITA EN PANTALLA ---------- */
+const firmaHTML = id => `<div class="firma-box"><canvas id="${id}" class="firma" width="600" height="220"></canvas>
+  <div class="row" style="justify-content:space-between;margin-top:6px"><span class="muted tiny">Firmá con el dedo o el mouse</span><button type="button" class="btn btn-xs btn-sec" data-a="firma-borrar" data-v="${id}">Borrar</button></div></div>`;
+function iniciarFirma(id){
+  const c = document.getElementById(id); if (!c || c._ok) return; c._ok = true; c._vacia = true;
+  const ctx = c.getContext('2d');
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() || '#0f1f1e';
+  ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = color;
+  let dib = false, ult = null;
+  const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  c.addEventListener('pointerdown', e => { dib = true; ult = pos(e); c.setPointerCapture(e.pointerId); e.preventDefault(); });
+  c.addEventListener('pointermove', e => { if (!dib) return; const p = pos(e); ctx.beginPath(); ctx.moveTo(ult[0], ult[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); ult = p; c._vacia = false; });
+  ['pointerup','pointercancel'].forEach(t => c.addEventListener(t, () => { dib = false; }));
+}
+A['firma-borrar'] = el => { const c = document.getElementById(el.dataset.v); if (c){ c.getContext('2d').clearRect(0, 0, c.width, c.height); c._vacia = true; } };
+/* La firma se guarda en negro sobre transparente, chica, para que pese poco. */
+function leerFirma(id){
+  const c = document.getElementById(id); if (!c || c._vacia) return null;
+  const o = document.createElement('canvas'); o.width = 300; o.height = 110;
+  const x = o.getContext('2d'); x.drawImage(c, 0, 0, 300, 110);
+  const img = x.getImageData(0, 0, 300, 110);
+  for (let i = 0; i < img.data.length; i += 4) if (img.data[i + 3]) { img.data[i] = img.data[i + 1] = img.data[i + 2] = 20; }
+  x.putImageData(img, 0, 0);
+  return o.toDataURL('image/png');
+}
+async function sello(obj){
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(obj)));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch(e){ return ''; }
+}
+function auditar(s, accion, detalle, ref = ''){
+  s.auditoria.unshift({ id:uid(), at:Date.now(), por:Store.sesion.userId, accion, detalle, ref });
+  if (s.auditoria.length > 3000) s.auditoria.length = 3000;
+}
+
+/* ---------- PETICIONES A LA GARITA ---------- */
+const TIPOS_PET = {
+  /* "correo" no se ofrece mientras los paquetes estén en pausa (hayPaquetes, core.js). */
+  correo:   { n:'Recibir correo o paquetes', icon:'box', ej:'Recibir y guardar los paquetes a mi nombre mientras no estoy.' },
+  nopasar:  { n:'No dejar pasar a alguien', icon:'x', ej:'No autorizar el ingreso de: (nombre, DNI, patente).' },
+  viaje:    { n:'Estoy de viaje', icon:'lock', ej:'La casa queda sola. Contacto de emergencia: …' },
+  llave:    { n:'Dejar / retirar una llave', icon:'key', ej:'Dejo una llave en la garita para …' },
+  permiso:  { n:'Permiso de ingreso especial', icon:'users', ej:'Autorizo a … a ingresar con … (herramientas, vehículo, etc.).' },
+  otro:     { n:'Otra petición', icon:'info', ej:'' },
+};
+const ESTADO_PET = { pendiente:['Pendiente de recepción','warn'], en_funciones:['En funciones','ok'], cerrada:['Cerrada','muted'] };
+R.peticiones = {
+  titulo: 'Peticiones a la garita', icon: 'shield', color: 'brand', sub: 'Con firma del vecino y de la guardia',
+  render(f){
+    const u = yo(), s = Store.s, staff = veGarita();
+    let lista = staff ? s.peticiones.slice() : s.peticiones.filter(p => p.userId === u.id);
+    const filtro = f || (staff ? 'pendiente' : 'todas');
+    if (filtro !== 'todas') lista = lista.filter(p => p.estado === filtro);
+    const n = e => (staff ? s.peticiones : s.peticiones.filter(p => p.userId === u.id)).filter(p => p.estado === e).length;
+    return `${!staff ? superficie({ a:'nueva-peticion', icon:'edit', t:'Nueva petición a la garita', s:'Queda firmada por vos y por el guardia que la recibe', cls:'acento' }) : ''}
+      ${esAdmin() || esSupervisor() ? `<p class="muted small" style="margin:0 0 10px">${I('eye')} Son los pedidos que los vecinos le hacen <b>por escrito y firmados</b> a la garita: no dejar pasar a alguien, que se van de viaje, dejar una llave, recibir paquetes. <b>Los recibe y los firma la garita</b>; desde ${esSupervisor() ? 'la supervisión' : 'la Administración'} solo se miran.</p>` : ''}
+      <div class="chips">${[['pendiente','Pendientes'],['en_funciones','En funciones'],['cerrada','Cerradas'],['todas','Todas']].map(([k, t]) =>
+        `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="peticiones" data-p="${k}">${t}${k !== 'todas' && n(k) ? `<span class="n">${n(k)}</span>` : ''}</button>`).join('')}</div>
+      ${lista.length ? lista.map(p => { const t = TIPOS_PET[p.tipo] || TIPOS_PET.otro, e = ESTADO_PET[p.estado], v = usuario(p.userId) || {};
+        return `<button class="superficie" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-${e[1] === 'muted' ? 'brand' : e[1]}">${I(t.icon)}</span>
+          <span class="txt"><b>${esc(t.n)}</b><small>${staff ? `<b style="display:inline;color:var(--ink)">${esc(v.casa || '')}</b> · ` : ''}${esc(p.texto.slice(0, 70))}${p.texto.length > 70 ? '…' : ''}</small>
+          <small>${e[0]} · ${hace(p.at)}</small></span>${I('right')}</button>`; }).join('') : vacio('shield', staff ? 'No hay peticiones en este estado.' : 'Todavía no hiciste peticiones.')}
+      <p class="muted tiny" style="margin-top:14px">Cada petición guarda las dos firmas, la fecha y hora, y un sello digital (SHA-256) que permite comprobar que nadie la modificó después.</p>`;
+  },
+};
+A['nueva-peticion'] = el => {
+  const tipos = Object.entries(TIPOS_PET).filter(([k]) => k !== 'correo' || hayPaquetes());
+  const t0 = tipos.some(([k]) => k === el?.dataset?.v) ? el.dataset.v : tipos[0][0], hoy = hoyISO();
+  hoja('Nueva petición a la garita', `<form data-f="peticion">
+    <div class="field"><label>Tipo</label><select name="tipo" id="petTipo">${tipos.map(([k, t]) => `<option value="${k}" ${k === t0 ? 'selected' : ''}>${t.n}</option>`).join('')}</select></div>
+    <div class="field"><label>Qué le pedís a la guardia</label><textarea name="texto" id="petTexto" required maxlength="600" placeholder="${esc(TIPOS_PET[t0].ej)}"></textarea></div>
+    <div class="grid2"><div class="field"><label>Desde</label><input type="date" name="desde" value="${hoy}" required></div><div class="field"><label>Hasta (opcional)</label><input type="date" name="hasta" min="${hoy}"></div></div>
+    <div class="field"><label>Tu firma</label>${firmaHTML('firmaVecino')}</div>
+    <button class="btn btn-pri btn-block">${I('send')}Firmar y enviar</button></form>`);
+  iniciarFirma('firmaVecino');
+};
+document.addEventListener('change', e => { if (e.target.id === 'petTipo'){ const t = $('#petTexto'); if (t) t.placeholder = TIPOS_PET[e.target.value].ej; } });
+F['peticion'] = async d => {
+  const firma = leerFirma('firmaVecino');
+  if (!firma){ toast('Falta tu firma', 'edit'); return; }
+  const u = yo();
+  const p = { id:uid(), userId:u.id, casa:u.casa, tipo:d.tipo, texto:d.texto.trim(), desde:d.desde, hasta:d.hasta || '', at:Date.now(), estado:'pendiente', firmaVecino:firma };
+  p.selloVecino = await sello({ id:p.id, userId:p.userId, casa:p.casa, tipo:p.tipo, texto:p.texto, desde:p.desde, hasta:p.hasta, at:p.at, firma });
+  Store.cambiar(s => {
+    s.peticiones.unshift(p);
+    if (p.tipo === 'viaje' && typeof guardarAusencia === 'function') guardarAusencia(s, u, { desde:p.desde, hasta:p.hasta || sumarDias(p.desde, 7), contacto:'', nota:p.texto });
+    auditar(s, 'Petición creada y firmada por el vecino', `${TIPOS_PET[p.tipo].n} · ${u.casa}`, p.id);
+    notificar(s, { para:'rol:guardia', ref:'peticiones:' + p.id, titulo:`Petición de ${u.casa}`, texto:TIPOS_PET[p.tipo].n + ' · falta tu firma de recepción', icon:'edit', color:'warn', urgente:true, link:'peticiones', sonido:true });
+  });
+  cerrarHoja(); abrir('peticiones', 'todas'); toast('Petición enviada a la garita', 'shield');
+};
+A['ver-peticion'] = el => {
+  const p = Store.s.peticiones.find(x => x.id === el.dataset.id); if (!p) return;
+  const t = TIPOS_PET[p.tipo] || TIPOS_PET.otro, v = usuario(p.userId) || {}, g = usuario(p.recibe) || {}, e = ESTADO_PET[p.estado];
+  hoja(t.n, `<div class="row wrap" style="margin-bottom:10px"><span class="pill p-${e[1] === 'muted' ? 'brand' : e[1]}">${e[0]}</span><span class="muted small">${esc(v.casa || p.casa)} · ${esc(v.nombre || '')}</span></div>
+    <div class="card plana" style="white-space:pre-wrap">${esc(p.texto)}</div>
+    <p class="small muted" style="margin:0 0 12px">Vigencia: desde ${fechaCorta(p.desde)}${p.hasta ? ' hasta ' + fechaCorta(p.hasta) : ''}</p>
+    <div class="firmas"><div><div class="lbl">Firma del vecino</div><img src="${p.firmaVecino}" alt="Firma del vecino" class="firma-img"><div class="tiny muted">${fechaHora(p.at)}</div><div class="tiny mono muted">Sello ${esc((p.selloVecino || '').slice(0, 16))}…</div></div>
+      <div><div class="lbl">Recepción de la guardia</div>${p.firmaGuardia ? `<img src="${p.firmaGuardia}" alt="Firma de la guardia" class="firma-img"><div class="tiny muted">${esc(g.nombre || '')} · ${fechaHora(p.recibidaAt)}</div><div class="tiny mono muted">Sello ${esc((p.selloGuardia || '').slice(0, 16))}…</div>` : `<div class="firma-img vacia">Sin recibir</div>`}</div></div>
+    ${p.estado === 'pendiente' && esGuardia() ? `<form data-f="recibir-peticion" data-id="${p.id}" style="margin-top:14px"><div class="field"><label>Tu firma de recepción</label>${firmaHTML('firmaGuardia')}</div>
+      <div class="field"><label>Observación (opcional)</label><input name="obs" maxlength="200"></div><button class="btn btn-ok btn-block">${I('check')}Recibir y poner en funciones</button></form>` : ''}
+    ${p.obs ? `<p class="small" style="margin:12px 0 0"><b>Observación de la guardia:</b> ${esc(p.obs)}</p>` : ''}
+    ${p.estado === 'pendiente' && esAdmin() ? `<div class="card plana small" style="margin-top:14px">${I('eye')} La recibe y la firma la garita. Desde la Administración se ve, sin firmar.</div>` : ''}
+    ${p.estado === 'en_funciones' && (p.userId === yo().id || esGuardia()) ? `<button class="btn btn-sec btn-block" style="margin-top:14px" data-a="cerrar-peticion" data-id="${p.id}">Dar por cumplida / cerrar</button>` : ''}
+    <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="verificar-peticion" data-id="${p.id}">${I('shield')}Verificar sellos</button>`);
+  if (p.estado === 'pendiente' && esGuardia()) iniciarFirma('firmaGuardia');
+};
+F['recibir-peticion'] = async (d, form) => {
+  const firma = leerFirma('firmaGuardia');
+  if (!firma){ toast('Falta la firma de recepción', 'edit'); return; }
+  const id = form.dataset.id, g = yo(), at = Date.now();
+  const p0 = Store.s.peticiones.find(x => x.id === id); if (!p0 || p0.estado !== 'pendiente') return;
+  /* La observación se sella igual que se guarda (sin espacios al final).
+     Antes se sellaba tal cual se escribió y se guardaba recortada: el
+     teclado del celular deja un espacio al final y "Verificar sellos" decía
+     que los datos no coincidían (Claudio, 12-10-2026). */
+  const obs = String(d.obs || '').trim();
+  const s2 = await sello({ id, selloVecino:p0.selloVecino, recibe:g.id, recibidaAt:at, obs, firma });
+  Store.cambiar(s => {
+    const p = s.peticiones.find(x => x.id === id); if (!p) return;
+    Object.assign(p, { estado:'en_funciones', recibe:g.id, recibidaAt:at, firmaGuardia:firma, selloGuardia:s2, obs });
+    auditar(s, 'Petición recibida y firmada por la guardia', `${TIPOS_PET[p.tipo].n} · ${p.casa} · ${g.nombre}`, p.id);
+    s.bitacora.unshift({ id:uid(), autor:g.id, tipo:'novedad', texto:`Petición de ${p.casa} recibida: ${TIPOS_PET[p.tipo].n}.`, at });
+    notificar(s, { para:p.userId, titulo:'La guardia recibió tu petición', texto:`${TIPOS_PET[p.tipo].n} · ya está en funciones`, icon:'check', color:'ok', link:'peticiones' });
+  });
+  cerrarHoja(); toast('Recibida y en funciones', 'check');
+};
+A['cerrar-peticion'] = el => {
+  /* La cierra el vecino que la pidió o la garita; la Administración no. */
+  const p0 = Store.s.peticiones.find(x => x.id === el.dataset.id);
+  if (p0 && p0.userId !== yo().id && !soloGarita()) return;
+  Store.cambiar(s => { const p = s.peticiones.find(x => x.id === el.dataset.id); if (!p) return; p.estado = 'cerrada'; p.cerradaAt = Date.now(); p.cierra = yo().id;
+    auditar(s, 'Petición cerrada', `${TIPOS_PET[p.tipo].n} · ${p.casa}`, p.id); });
+  cerrarHoja(); toast('Petición cerrada', 'check');
+};
+A['verificar-peticion'] = async el => {
+  const p = Store.s.peticiones.find(x => x.id === el.dataset.id); if (!p) return;
+  const v = await sello({ id:p.id, userId:p.userId, casa:p.casa, tipo:p.tipo, texto:p.texto, desde:p.desde, hasta:p.hasta, at:p.at, firma:p.firmaVecino });
+  const okV = v === p.selloVecino;
+  let okG = true;
+  /* Las firmadas antes del 12-10-2026 pudieron sellarse con espacios
+     alrededor de la observación (ver recibir-peticion): se prueban esas
+     variantes, que no cambian lo que dice. */
+  if (p.firmaGuardia){ const o = p.obs || ''; okG = false;
+    for (const v of [o, o + ' ', ' ' + o, o + '  ', ' ' + o + ' ', o + '\n'])
+      if ((await sello({ id:p.id, selloVecino:p.selloVecino, recibe:p.recibe, recibidaAt:p.recibidaAt, obs:v, firma:p.firmaGuardia })) === p.selloGuardia){ okG = true; break; } }
+  toast(okV && okG ? 'Sellos correctos: la petición no fue modificada' : 'ATENCIÓN: los datos no coinciden con el sello', okV && okG ? 'shield' : 'alert');
+};
+
+/* ---------- RECLAMOS (privados entre el vecino y la Administración) ---------- */
+const CAT_RECL = {
+  alumbrado:['Alumbrado','lamp'], calles:['Calles, nieve y hielo','snow'], agua:['Agua y cloacas','drop'], verdes:['Espacios verdes','tree'],
+  seguridad:['Seguridad','shield'], convivencia:['Convivencia (ruidos, mascotas, tránsito)','users'], residuos:['Residuos','truck'],
+  mantenimiento:['Mantenimiento de partes comunes','wrench'], porton:['Portón, barrera y accesos','gate'], otro:['Otro','info'],
+};
+/* El seguimiento de un reclamo, en cuatro pasos: reportado → asignado (ya
+   tiene responsable y fecha estimada) → en curso → resuelto. La clave
+   "abierto" se conserva para los reclamos que ya estaban cargados. */
+const EST_RECL = { abierto:['Reportado','warn'], asignado:['Asignado','accent'], en_curso:['En curso','sky'], resuelto:['Resuelto','ok'] };
+const PASOS_RECL = ['abierto', 'asignado', 'en_curso', 'resuelto'];
+const pasosReclamo = r => { const i = Math.max(0, PASOS_RECL.indexOf(r.estado));
+  return `<div class="pasos-recl">${PASOS_RECL.map((k, j) => `<span class="${j < i ? 'hecho' : j === i ? 'ahora' : ''}"><i></i>${EST_RECL[k][0]}</span>`).join('')}</div>`; };
+function tarjetaReclamo(r){
+  const u = yo(), c = CAT_RECL[r.categoria] || CAT_RECL.otro, e = EST_RECL[r.estado] || EST_RECL.abierto, dias = Math.floor((Date.now() - r.createdAt) / DIA);
+  return `<div class="card"><div class="row" style="align-items:flex-start"><span class="ic ic-${e[1]}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none">${I(c[1])}</span>
+          <div class="grow"><b style="font-size:15px">${esc(r.titulo)}</b><div class="muted small">${c[0]}${esAdmin() ? ' · ' + esc(r.anonimo ? 'Anónimo para los vecinos' : autorVisible(r.userId).casa) : ''} · ${dias ? `hace ${dias} d` : 'hoy'}${r.publico ? ' · Publicado en el pizarrón' : ''}</div></div>
+          <span class="pill p-${e[1]}">${e[0]}</span></div>
+          ${pasosReclamo(r)}
+          ${r.responsable || r.fechaEstimada ? `<div class="small" style="margin-top:8px">${r.responsable ? `${I('user')} <b>${esc(r.responsable)}</b>` : ''}${r.fechaEstimada ? `${r.responsable ? ' · ' : ''}${I('calendar')} ${r.estado === 'resuelto' ? 'estimado para' : 'fecha estimada:'} <b>${fechaLarga(r.fechaEstimada)}</b>${r.estado !== 'resuelto' && r.fechaEstimada < hoyISO() ? ' <span class="pill p-danger">atrasado</span>' : ''}` : ''}</div>` : ''}
+          ${r.lugar ? `<div class="small" style="margin-top:8px">${I('pin')} ${r.coords ? `<a href="https://www.google.com/maps?q=${esc(r.coords)}" target="_blank" rel="noopener">${esc(r.lugar)}</a>` : esc(r.lugar)}</div>` : ''}
+          <p class="small" style="margin:8px 0 0;color:var(--ink-2)">${esc(r.detalle)}</p>${fotoHTML(r.foto, 'post-foto')}
+          <div class="timeline">${(r.historial || []).map(h => `<div class="ev"><b>${EST_RECL[h.estado]?.[0] || ''}</b> · ${esc(h.texto)}<small>${esc(autorVisible(h.por).nombre)} · ${hace(h.at)}</small></div>`).join('')}</div>
+          ${/* EL VECINO CONFIRMA (11-10-2026): si quedó resuelto, "Sí, gracias"; si no, "Sigue igual" lo vuelve a abrir solo y le avisa a la Administración. */
+            r.estado === 'resuelto' && r.userId === u.id && !r.confirmado && !esStaff() ? `<div class="recl-confirma"><b>¿Quedó resuelto?</b><div class="btns"><button class="btn btn-sm btn-ok" data-a="recl-ok" data-id="${r.id}">${I('check')}Sí, gracias</button><button class="btn btn-sm btn-danger-soft" data-a="recl-sigue" data-id="${r.id}">${I('alert')}Sigue igual</button></div></div>`
+            : r.estado === 'resuelto' && r.confirmado ? `<p class="small" style="margin:10px 0 0;color:var(--ok)">${I('check')} ${r.userId === u.id ? 'Confirmaste' : 'El vecino confirmó'} que quedó resuelto</p>` : ''}
+          <div class="btns" style="margin-top:12px">${r.publico && r.userId !== u.id && !esStaff() ? `<button class="btn btn-sm ${r.apoyos?.includes(u.id) ? 'btn-accent' : 'btn-sec'}" data-a="apoyar" data-id="${r.id}">${I('users')}Me pasa también · ${r.apoyos?.length || 0}</button>` : r.apoyos?.length ? `<span class="pill">${I('users')}${plural(r.apoyos.length, 'vecino más', 'vecinos más')}</span>` : ''}
+            ${esAdmin() ? `<button class="btn btn-sm btn-pri" data-a="gestionar-reclamo" data-id="${r.id}">${I('edit')}Actualizar</button>` : ''}</div></div>`;
+}
+R.reclamos = {
+  titulo: 'Reclamos', icon: 'clipboard', color: 'warn', sub: () => esAdmin() ? 'Todos los reclamos del barrio' : 'Privados entre vos y la Administración',
+  get ancha(){ return esAdmin() && reclVista !== 'lista'; },
+  render(f){
+    const u = yo(), s = Store.s;
+    if (esAdmin() && reclVista !== 'lista') return vistaReclamos() + tableroReclamos();
+    let ls = esAdmin() ? s.reclamos.slice() : s.reclamos.filter(r => r.userId === u.id || r.publico);
+    const filtro = f || 'activos';
+    /* Un reclamo resuelto sigue en "Activos" hasta que el vecino que lo hizo confirma si quedó bien. */
+    const espera = r => r.estado === 'resuelto' && !r.confirmado && r.userId === u.id && !esStaff();
+    if (filtro === 'activos') ls = ls.filter(r => r.estado !== 'resuelto' || espera(r)); else if (filtro === 'resuelto') ls = ls.filter(r => r.estado === 'resuelto');
+    ls.sort((a, b) => (b.apoyos?.length || 0) - (a.apoyos?.length || 0) || b.createdAt - a.createdAt);
+    return `${!esStaff() ? superficie({ a:'nuevo-reclamo', icon:'plus', t:'Hacer un reclamo', s:'Solo lo ven vos y la Administración', cls:'acento' }) : ''}
+      ${!esStaff() ? superficie({ a:'avistamiento', icon:'eye', color:'ok', t:'Vi un zorro, perros sueltos…', s:'Aviso rápido de avistamiento' }) : ''}
+      ${esAdmin() ? vistaReclamos() : ''}
+      <div class="chips">${[['activos','Activos'],['resuelto','Resueltos'],['todos','Todos']].map(([k, t]) => `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="reclamos" data-p="${k}">${t}</button>`).join('')}</div>
+      ${ls.length ? ls.map(tarjetaReclamo).join('') : vacio('clipboard', 'No hay reclamos acá.')}`;
+  },
+};
+A['nuevo-reclamo'] = () => hoja('Nuevo reclamo', `<form data-f="reclamo">
+  <div class="field"><label>Tema</label><select name="categoria" id="reclCat">${Object.entries(CAT_RECL).map(([k, c]) => `<option value="${k}">${c[0]}</option>`).join('')}</select></div>
+  <div class="field"><label>Título</label><input name="titulo" required maxlength="80" placeholder="Ej: Luminaria apagada"></div>
+  <div class="field"><label>Detalle</label><textarea name="detalle" required maxlength="800"></textarea></div>
+  <div class="field"><label>¿Dónde?</label><div class="linea-form"><input name="lugar" id="reclLugar" maxlength="80" placeholder="Calle 3, frente a la casa 12"><button type="button" class="btn btn-sec" data-a="recl-ubicacion" title="Usar dónde estoy">${I('pin')}</button></div>
+    <input type="hidden" name="coords" id="reclCoords"><div class="ayuda" id="reclUbiTxt">Con el botón se anota el lugar exacto con el GPS del teléfono.</div></div>
+  ${campoFoto('fotoRecl')}
+  <label class="check" id="anonBox" hidden><input type="checkbox" name="anonimo"><span>Si la Administración le manda un recordatorio amable al vecino, que no sepa que fui yo.</span></label>
+  <button class="btn btn-pri btn-block" style="margin-top:8px">${I('send')}Enviar a la Administración</button></form>`);
+document.addEventListener('change', e => { if (e.target.id === 'reclCat'){ const b = $('#anonBox'); if (b) b.hidden = e.target.value !== 'convivencia'; } });
+F['reclamo'] = d => {
+  const u = yo();
+  Store.cambiar(s => {
+    const r = { id:uid(), userId:u.id, categoria:d.categoria, titulo:d.titulo.trim(), detalle:d.detalle.trim(), lugar:(d.lugar || '').trim() || (d.coords ? 'Ubicación del GPS' : ''), coords:d.coords || '', foto:fotoParaOtros(d.foto, 45), anonimo:!!d.anonimo,
+      estado:'abierto', apoyos:[], createdAt:Date.now(), historial:[{ at:Date.now(), por:u.id, estado:'abierto', texto:'Reclamo creado' }] };
+    s.reclamos.unshift(r);
+    notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:`Reclamo: ${r.titulo}`, texto:`${CAT_RECL[r.categoria][0]} · ${u.casa}`, icon:'clipboard', color:'warn', link:'reclamos' });
+  });
+  cerrarHoja(); toast('Reclamo enviado. Te avisamos cada novedad.', 'send');
+};
+A['recl-ubicacion'] = () => {
+  const txt = $('#reclUbiTxt');
+  if (!navigator.geolocation){ toast('Este equipo no tiene GPS', 'pin'); return; }
+  if (txt) txt.textContent = 'Buscando la ubicación…';
+  navigator.geolocation.getCurrentPosition(p => {
+    const c = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`;
+    const i = $('#reclCoords'), l = $('#reclLugar'); if (i) i.value = c;
+    if (l && !l.value.trim()) l.value = 'Ubicación del GPS';
+    if (txt) txt.textContent = `Anotado: ${c} (±${Math.round(p.coords.accuracy)} m)`;
+  }, () => { if (txt) txt.textContent = 'No se pudo tomar la ubicación: escribí el lugar.'; }, { enableHighAccuracy:true, timeout:10000 });
+};
+A['apoyar'] = el => { const u = yo(); Store.cambiar(s => { const r = s.reclamos.find(x => x.id === el.dataset.id); if (!r) return; r.apoyos = r.apoyos || []; const i = r.apoyos.indexOf(u.id); i >= 0 ? r.apoyos.splice(i, 1) : r.apoyos.push(u.id); }); };
+A['gestionar-reclamo'] = el => {
+  const r = Store.s.reclamos.find(x => x.id === el.dataset.id); if (!r) return;
+  /* Desde el tablero llega con el estado nuevo ya elegido y el mensaje para el vecino escrito (se puede cambiar). */
+  const nuevo = EST_RECL[el.dataset.estado] ? el.dataset.estado : r.estado;
+  hoja(nuevo !== r.estado ? `Pasar a «${EST_RECL[nuevo][0]}»` : 'Actualizar reclamo', `<form data-f="gestionar-reclamo" data-id="${r.id}">
+    <p class="muted small" style="margin:0 0 10px">${esc(r.titulo)} · ${esc(r.anonimo ? 'Anónimo' : autorVisible(r.userId).casa)}</p>
+    <div class="field"><label>Estado</label><div class="seg" id="reclSeg">${Object.entries(EST_RECL).map(([k, e]) => `<label><input type="radio" name="estado" value="${k}" ${nuevo === k ? 'checked' : ''}><span>${e[0]}</span></label>`).join('')}</div></div>
+    <div class="grid2"><div class="field"><label>Responsable</label><input name="responsable" maxlength="60" list="reclResp" value="${esc(r.responsable || '')}" placeholder="Quién lo resuelve"></div>
+      <div class="field"><label>Fecha estimada</label><input name="fechaEstimada" type="date" value="${esc(r.fechaEstimada || '')}"></div></div>
+    <datalist id="reclResp">${aLista(Store.s.proveedores).map(p => `<option>${esc(p.empresa)}${p.rubro ? ' (' + esc(p.rubro) + ')' : ''}</option>`).join('')}<option>Mantenimiento del barrio</option><option>Garita</option><option>Administración</option></datalist>
+    <div class="field"><label>Mensaje para el vecino</label><textarea name="texto" id="reclTexto" required maxlength="400" placeholder="Ej: El electricista viene el viernes.">${nuevo !== r.estado ? esc(RECL_MSJ[nuevo] || '') : ''}</textarea>
+      <div class="ayuda">${nuevo !== r.estado ? 'Ya viene escrito: cambialo si querés y tocá "Guardar y avisar".' : 'Al elegir otro estado se escribe solo un mensaje de ejemplo.'}</div></div>
+    <label class="check"><input type="checkbox" name="publico" ${r.publico ? 'checked' : ''}><span>Es de interés general: publicarlo en el pizarrón (sin el nombre del vecino)</span></label>
+    ${r.categoria === 'convivencia' ? `<hr class="sep"><div class="field"><label>Recordatorio amable a una casa (opcional)</label><select name="casaAviso"><option value="">No mandar</option>${opcionesLotes()}</select>
+      <div class="ayuda">Le llega un aviso cordial con la norma de convivencia, sin decir quién reclamó.</div></div>` : ''}
+    <button class="btn btn-pri btn-block">${I('check')}Guardar y avisar</button></form>`);
+};
+/* Al cambiar el estado en la hoja, si el mensaje está vacío o es uno automático, se escribe el del estado nuevo. */
+document.addEventListener('change', e => { if (e.target.name !== 'estado' || !e.target.closest('#reclSeg')) return;
+  const t = $('#reclTexto'); if (t && (!t.value.trim() || Object.values(RECL_MSJ).includes(t.value.trim()))) t.value = RECL_MSJ[e.target.value] || ''; });
+F['gestionar-reclamo'] = (d, form) => {
+  Store.cambiar(s => {
+    const r = s.reclamos.find(x => x.id === form.dataset.id); if (!r) return;
+    const resp = String(d.responsable || '').trim(), fe = d.fechaEstimada || '';
+    const cambios = [resp && resp !== r.responsable ? `Responsable: ${resp}` : '', fe && fe !== r.fechaEstimada ? `Fecha estimada: ${fechaLarga(fe)}` : ''].filter(Boolean).join(' · ');
+    r.responsable = resp; r.fechaEstimada = fe;
+    /* Si se le puso responsable y seguía como "reportado", pasa solo a "asignado". */
+    if (d.estado === 'abierto' && resp) d.estado = 'asignado';
+    r.estado = d.estado; r.historial.push({ at:Date.now(), por:yo().id, estado:d.estado, texto:d.texto.trim() + (cambios ? ` (${cambios})` : '') });
+    const para = [r.userId, ...(r.apoyos || [])];
+    notificar(s, { para, titulo:`Reclamo ${EST_RECL[d.estado][0].toLowerCase()}: ${r.titulo}`, texto:d.texto.trim(), icon:'clipboard', color:EST_RECL[d.estado][1], link:'reclamos' });
+    if (d.publico && !r.publico){ r.publico = true;
+      s.posts.unshift({ id:uid(), type:'aviso', title:r.titulo, body:`${d.texto.trim()}${r.lugar ? '\nLugar: ' + r.lugar : ''}`, autor:yo().id, createdAt:Date.now(), reactions:{}, comments:[] }); }
+    if (d.casaAviso){ const dest = s.users.filter(x => x.casa === d.casaAviso && x.estado === 'aprobado').map(x => x.id);
+      notificar(s, { para:dest, titulo:'Un recordatorio amable de la Administración', texto:`Te recordamos las normas de convivencia del barrio (${CAT_RECL.convivencia[0].toLowerCase()}). ¡Gracias por colaborar!`, icon:'users', color:'sky', link:'documentos' });
+      auditar(s, 'Recordatorio de convivencia enviado', d.casaAviso, r.id); }
+  });
+  cerrarHoja(); toast('Reclamo actualizado', 'check');
+};
+
+/* =========================================================
+   TABLERO DE RECLAMOS (pedido de Claudio, 11-10-2026; idea de uvdesk,
+   19.6k★, zammad, 6k★, y nullboard, 4.1k★, en GitHub: el código es propio)
+   La Administración ve los reclamos como tarjetas en cuatro columnas
+   (Reportado → Asignado → En curso → Resuelto). Arrastrando una tarjeta a
+   otra columna (con el mouse, o con la manija ⋮⋮ en el celular), o con el
+   botón "→ siguiente paso", se abre la hoja con el mensaje para el vecino
+   ya escrito: un toque y le llega el aviso.
+   Automático:
+     · cada tarjeta dice hace cuánto no se mueve (verde, amarillo, rojo);
+     · a los 5 días sin movimiento (RECL_TRABADO_DIAS) queda "trabado", sube arriba de su
+       columna y a la Administración le llega un aviso (regla
+       "reclamo-trabado" del motor, en js/admin.js); igual si se pasó la
+       fecha estimada;
+     · al pasar a "Resuelto", el vecino confirma con "Sí, gracias" o
+       "Sigue igual" (vuelve a "En curso" solo y avisa).
+   PRIVACIDAD: lo mismo de siempre. Los reclamos los ven solo el vecino que
+   lo hizo y la Administración.
+   ========================================================= */
+const RECL_MSJ = {
+  abierto: 'Volvimos a abrir tu reclamo para revisarlo de nuevo.',
+  asignado: 'Ya tomamos tu reclamo y tiene un responsable. Te avisamos cuando empiece el trabajo.',
+  en_curso: 'Ya estamos trabajando en tu reclamo.',
+  resuelto: 'Tu reclamo quedó resuelto. Si no es así, tocá "Sigue igual" en Mis reclamos y lo volvemos a abrir.',
+};
+const RECL_TRABADO_DIAS = 5;
+const reclUltimo = r => (aLista(r.historial).at(-1) || {}).at || r.createdAt;
+const reclDiasQuieto = r => Math.floor((Date.now() - reclUltimo(r)) / DIA);
+const reclTrabado = r => r.estado !== 'resuelto' && reclDiasQuieto(r) >= RECL_TRABADO_DIAS;
+const reclAtrasado = r => r.estado !== 'resuelto' && !!r.fechaEstimada && r.fechaEstimada < hoyISO();
+let reclVista = '';
+const vistaReclamos = () => `<div class="seg recl-vista" role="tablist">${[['tablero', 'clipboard', 'Tablero'], ['lista', 'list', 'Lista']].map(([k, ic, t]) =>
+  `<label><input type="radio" name="reclVista" value="${k}" ${(reclVista || 'tablero') === k ? 'checked' : ''} data-a="recl-vista" data-v="${k}"><span>${I(ic)}${t}</span></label>`).join('')}</div>`;
+A['recl-vista'] = el => { reclVista = el.dataset.v; pintar(); };
+function tarjetaTablero(r){
+  const c = CAT_RECL[r.categoria] || CAT_RECL.otro, quieto = reclDiasQuieto(r), i = PASOS_RECL.indexOf(r.estado), sig = PASOS_RECL[i + 1];
+  const nivel = r.estado === 'resuelto' ? 'ok' : quieto >= RECL_TRABADO_DIAS ? 'mal' : quieto >= 2 ? 'medio' : 'ok';
+  return `<article class="rk-card ${reclTrabado(r) ? 'trabado' : ''}" data-id="${r.id}" tabindex="0" aria-label="${esc(r.titulo)}">
+    <div class="rk-top"><span class="rk-cat ic-${(EST_RECL[r.estado] || EST_RECL.abierto)[1]}">${I(c[1])}</span>
+      <span class="rk-casa">${esc(r.anonimo ? 'Anónimo' : autorVisible(r.userId).casa || '')}</span>
+      <span class="rk-asa" aria-hidden="true" title="Arrastrar a otra columna">${I('grip')}</span></div>
+    <b class="rk-tit">${esc(r.titulo)}</b>
+    ${r.responsable || r.fechaEstimada ? `<span class="rk-meta">${r.responsable ? `${I('user')}${esc(r.responsable)}` : ''}${r.fechaEstimada ? `${I('calendar')}${esc(fechaCorta(r.fechaEstimada))}` : ''}</span>` : ''}
+    <span class="rk-demora d-${nivel}"><i></i>${r.estado === 'resuelto' ? (r.confirmado ? 'El vecino confirmó' : 'Resuelto ' + hace(reclUltimo(r))) : quieto ? `Sin movimiento hace ${plural(quieto, 'día')}` : 'Movido hoy'}</span>
+    <span class="rk-pills">${reclTrabado(r) ? `<em class="p-mal">${I('alert')}Trabado</em>` : ''}${reclAtrasado(r) ? `<em class="p-mal">${I('clock')}Atrasado</em>` : ''}${r.apoyos?.length ? `<em>${I('users')}+${r.apoyos.length}</em>` : ''}${r.publico ? `<em>${I('muro')}Pizarrón</em>` : ''}</span>
+    <div class="rk-acc">${sig ? `<button class="btn btn-xs btn-pri" data-a="gestionar-reclamo" data-id="${r.id}" data-estado="${sig}">${I('right')}${EST_RECL[sig][0]}</button>` : ''}
+      <button class="btn btn-xs btn-sec" data-a="recl-ver" data-id="${r.id}">Ver</button></div>
+  </article>`;
+}
+function tableroReclamos(){
+  const s = Store.s, hace30 = Date.now() - 30 * DIA;
+  const activos = s.reclamos.filter(r => r.estado !== 'resuelto'), res30 = s.reclamos.filter(r => r.estado === 'resuelto' && reclUltimo(r) >= hace30);
+  const prom = res30.length ? (res30.reduce((n, r) => n + (reclUltimo(r) - r.createdAt), 0) / res30.length / DIA) : null;
+  const kpi = (n, t, c, ic) => `<div class="rk-kpi" style="--c:var(--${c})"><span>${I(ic)}</span><b>${n}</b><small>${t}</small></div>`;
+  const orden = (a, b) => reclTrabado(b) - reclTrabado(a) || reclAtrasado(b) - reclAtrasado(a) || (b.apoyos?.length || 0) - (a.apoyos?.length || 0) || reclUltimo(a) - reclUltimo(b);
+  return `<div class="rk-kpis">
+      ${kpi(activos.length, 'Abiertos', 'warn', 'clipboard')}
+      ${kpi(activos.filter(reclTrabado).length, `Trabados (${RECL_TRABADO_DIAS}+ días quietos)`, 'danger', 'alert')}
+      ${kpi(activos.filter(reclAtrasado).length, 'Pasados de la fecha', 'accent', 'clock')}
+      ${kpi(prom === null ? '—' : prom.toFixed(1).replace('.', ',') + ' d', `Para resolver (${plural(res30.length, 'resuelto', 'resueltos')} en 30 días)`, 'ok', 'check')}
+    </div>
+    <p class="muted small rk-ayuda">${I('info')} Arrastrá una tarjeta a otra columna (en el celular, desde ${I('grip')}) o tocá el botón del paso siguiente: se abre el mensaje para el vecino ya escrito.</p>
+    <div class="rk-tablero" id="rkTablero">${PASOS_RECL.map(k => { const ls = (k === 'resuelto' ? res30 : activos.filter(r => (PASOS_RECL.includes(r.estado) ? r.estado : 'abierto') === k)).sort(orden);
+      return `<section class="rk-col c-${EST_RECL[k][1]}" data-estado="${k}"><header><i></i><b>${EST_RECL[k][0]}</b><span>${ls.length}</span></header>
+        <div class="rk-lista">${ls.length ? ls.map(tarjetaTablero).join('') : `<p class="rk-vacia">${k === 'resuelto' ? 'Nada resuelto en los últimos 30 días' : 'Sin reclamos'}</p>`}</div>
+        ${k === 'resuelto' ? `<button class="link rk-mas" data-a="recl-vista" data-v="lista">Ver todos en la lista</button>` : ''}</section>`; }).join('')}
+    </div>`;
+}
+A['recl-ver'] = el => { const r = Store.s.reclamos.find(x => x.id === el.dataset.id); if (r) hoja('Reclamo', `<div class="recl-hoja">${tarjetaReclamo(r)}</div>`); };
+A['recl-ok'] = el => { const u = yo();
+  Store.cambiar(s => { const r = s.reclamos.find(x => x.id === el.dataset.id); if (!r || r.userId !== u.id) return;
+    r.confirmado = Date.now(); r.historial.push({ at:Date.now(), por:u.id, estado:'resuelto', texto:'El vecino confirmó que quedó resuelto' }); });
+  toast('¡Gracias! Le avisamos a la Administración', 'check'); };
+A['recl-sigue'] = el => { const u = yo();
+  Store.cambiar(s => { const r = s.reclamos.find(x => x.id === el.dataset.id); if (!r || r.userId !== u.id) return;
+    r.estado = 'en_curso'; r.historial.push({ at:Date.now(), por:u.id, estado:'en_curso', texto:'El vecino avisó que sigue igual: se volvió a abrir' });
+    notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:`Reclamo reabierto: ${r.titulo}`, texto:`${u.casa} avisó que sigue igual`, icon:'clipboard', color:'danger', link:'reclamos' }); });
+  toast('Lo volvimos a abrir y le avisamos a la Administración', 'clipboard'); };
+
+/* Arrastrar tarjetas entre columnas: con el mouse desde cualquier parte de
+   la tarjeta; con el dedo, desde la manija (así se puede desplazar el
+   tablero con el dedo sin mover tarjetas). */
+let rkArrastre = null, rkSolto = 0;
+document.addEventListener('pointerdown', e => {
+  const card = e.target.closest && e.target.closest('.rk-card'); if (!card || e.button > 0) return;
+  if (e.target.closest('button, a')) return;
+  if (e.pointerType !== 'mouse' && !e.target.closest('.rk-asa')) return;
+  rkArrastre = { card, id:card.dataset.id, x0:e.clientX, y0:e.clientY, activo:false, fantasma:null, col:null };
+  if (e.pointerType !== 'mouse') e.preventDefault();
+});
+document.addEventListener('pointermove', e => {
+  const a = rkArrastre; if (!a) return;
+  if (!a.activo){ if (Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 6) return;
+    a.activo = true; const r = a.card.getBoundingClientRect();
+    a.dx = e.clientX - r.left; a.dy = e.clientY - r.top;
+    a.fantasma = a.card.cloneNode(true); a.fantasma.classList.add('rk-fantasma'); a.fantasma.style.width = r.width + 'px';
+    document.body.appendChild(a.fantasma); a.card.classList.add('rk-origen'); document.body.classList.add('rk-arrastrando'); }
+  a.fantasma.style.transform = `translate(${e.clientX - a.dx}px, ${e.clientY - a.dy}px) rotate(2deg)`;
+  a.fantasma.style.visibility = 'hidden';
+  const bajo = document.elementFromPoint(e.clientX, e.clientY); a.fantasma.style.visibility = '';
+  const col = bajo && bajo.closest('.rk-col');
+  document.querySelectorAll('.rk-col.sobre').forEach(c => { if (c !== col) c.classList.remove('sobre'); });
+  if (col) col.classList.add('sobre'); a.col = col;
+  /* Cerca del borde, el tablero se corre solo (en el celular las columnas no entran todas). */
+  const t = document.getElementById('rkTablero');
+  if (t){ const r = t.getBoundingClientRect(); if (e.clientX < r.left + 40) t.scrollLeft -= 14; else if (e.clientX > r.right - 40) t.scrollLeft += 14; }
+});
+const rkSoltar = () => {
+  const a = rkArrastre; rkArrastre = null; if (!a) return;
+  document.querySelectorAll('.rk-col.sobre').forEach(c => c.classList.remove('sobre'));
+  document.body.classList.remove('rk-arrastrando');
+  if (!a.activo) return;
+  rkSolto = Date.now(); a.fantasma.remove(); a.card.classList.remove('rk-origen');
+  const r = Store.s.reclamos.find(x => x.id === a.id), k = a.col && a.col.dataset.estado;
+  if (r && k && k !== r.estado) A['gestionar-reclamo']({ dataset:{ id:a.id, estado:k } });
+};
+document.addEventListener('pointerup', rkSoltar);
+document.addEventListener('pointercancel', rkSoltar);
+/* Después de arrastrar no se "toca" la tarjeta sin querer. */
+document.addEventListener('click', e => { if (Date.now() - rkSolto < 300 && e.target.closest && e.target.closest('.rk-card')){ e.stopPropagation(); e.preventDefault(); } }, true);
+
+/* ---------- VOTACIONES (un voto por casa, secreto) ---------- */
+/* =========================================================
+   VOTACIONES
+   -------------------------------------------------------
+   HASTA DÓNDE LLEGA EL VALOR LEGAL, DICHO SIN VUELTAS
+
+   Lo que obliga a todo el barrio es la decisión de la ASAMBLEA, con el
+   quórum y las mayorías que fija el reglamento de copropiedad, asentada
+   en el libro de actas (Código Civil y Comercial, arts. 2044 a 2072 para
+   propiedad horizontal y 2073 a 2086 para conjuntos inmobiliarios).
+   Una encuesta en una app, por sí sola, no reemplaza eso.
+
+   Lo que SÍ puede hacer esta app, y hace:
+
+   1. CONSULTA ESCRITA (art. 2060 CCyC). La ley permite obtener la
+      mayoría consultando por escrito a los propietarios ausentes. La
+      votación se emite con el texto exacto de la moción, con plazo, con
+      un voto por unidad funcional, y al cerrar la app arma el ACTA con
+      el detalle de cómo votó cada lote, lista para transcribir al libro
+      de actas y firmar. Eso es lo que le da fuerza.
+
+   2. UN VOTO POR LOTE, como manda el régimen: el voto es de la unidad
+      funcional, no de la persona. Si en una casa hay cinco cuentas,
+      el voto sigue siendo uno.
+
+   3. QUÓRUM Y MAYORÍA calculados según lo que diga el reglamento: por
+      cantidad de unidades o por coeficiente, con mayoría simple, absoluta
+      o de dos tercios. La app dice si se alcanzó o no, y no redondea a
+      favor de nadie.
+
+   4. REGISTRO QUE NO SE PUEDE TOCAR: cada voto queda en la auditoría con
+      lote, unidad funcional, quién lo emitió, fecha y hora. La auditoría
+      no se edita ni se borra desde la app.
+
+   Y las que se declaran PLEBISCITO / consulta no vinculante quedan
+   marcadas como tales, para que nadie las presente como lo que no son.
+   ========================================================= */
+const TIPOS_VOTACION = {
+  consulta:  { n:'Consulta escrita del art. 2060 CCyC', c:'accent',
+               d:'Tiene valor de decisión si se alcanza el quórum y la mayoría del reglamento. Al cerrar se emite el acta para el libro.' },
+  plebiscito:{ n:'Plebiscito · consulta no vinculante', c:'sky',
+               d:'Sirve para conocer la opinión del barrio. No obliga: para que obligue hace falta asamblea o consulta escrita.' },
+  asamblea:  { n:'Voto en asamblea', c:'brand',
+               d:'Registro del voto de una asamblea que se está celebrando. El acta de la asamblea manda.' },
+};
+const MAYORIAS = {
+  simple:   { n:'Mayoría simple de los que votan', f:(a, favor, total) => favor > (a - favor) },
+  absoluta: { n:'Mayoría absoluta del total de unidades', f:(a, favor, total) => favor > total / 2 },
+  dosTercios:{ n:'Dos tercios del total de unidades', f:(a, favor, total) => favor >= total * 2 / 3 },
+  unanimidad:{ n:'Unanimidad', f:(a, favor, total) => favor === total },
+};
+
+/* Cómo se cuenta: por unidad (un lote, un voto) o por coeficiente (el peso
+   de cada lote en las expensas). El reglamento dice cuál. */
+const pesoLote = (casa, porCoef) => {
+  if (!porCoef) return 1;
+  const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === casa) : null;
+  return L ? L.coef : 0;
+};
+function escrutinio(v){
+  const porCoef = v.conteo === 'coeficiente';
+  const total = porCoef ? 100 : (typeof LOTES !== 'undefined' ? LOTES.length : totalLotes());
+  const val = x => typeof x === 'object' && x ? x.i : x;
+  const entradas = Object.entries(v.votos || {}).filter(([, x]) => !(x && x.desacuerdo));
+  const desacuerdos = Object.values(v.votos || {}).filter(x => x && x.desacuerdo).length;
+  const cuenta = (v.opciones || []).map(() => 0);
+  let emitido = 0;
+  entradas.forEach(([casa, voto]) => {
+    const i = val(voto), p = pesoLote(casa, porCoef);
+    if (i >= 0 && i < cuenta.length){ cuenta[i] += p; emitido += p; }
+  });
+  const lotes = entradas.length;
+  const quorumPedido = +v.quorum || 0;                     /* % del total */
+  const quorumLogrado = total ? (emitido / total * 100) : 0;
+  const hayQuorum = quorumLogrado + 1e-9 >= quorumPedido;
+  const ganadora = cuenta.indexOf(Math.max(...cuenta, 0));
+  const favor = cuenta[ganadora] || 0;
+  const regla = MAYORIAS[v.mayoria] || MAYORIAS.simple;
+  const hayMayoria = emitido > 0 && regla.f(emitido, favor, total);
+  return { porCoef, total, cuenta, emitido, lotes, desacuerdos, quorumPedido, quorumLogrado, hayQuorum, ganadora, favor, regla, hayMayoria,
+    valida: hayQuorum && hayMayoria, cerrada: v.cierra <= Date.now() };
+}
+const fmtPeso = (n, porCoef) => porCoef ? n.toFixed(3) + ' %' : String(Math.round(n));
+
+/* =========================================================
+   ¿QUIÉN VOTA POR EL LOTE?
+   El voto es de la unidad funcional y lo emite su TITULAR (el propietario),
+   no quien vive ahí: así lo dice el régimen de propiedad horizontal y de
+   conjuntos inmobiliarios (CCyC arts. 2044 a 2086). Por eso:
+     · el INQUILINO o un familiar no vota, salvo que el propietario le dé una
+       CARTA PODER y la Administración la apruebe;
+     · si el lote tiene un REPRESENTANTE designado (varios cotitulares, una
+       sociedad, un sucesorio), vale solo su voto;
+     · si no lo tiene y los titulares votan DISTINTO, el voto del lote queda
+       "en desacuerdo" y NO SE COMPUTA hasta que coincidan: la app les avisa
+       a los dos. Nadie pisa el voto del otro.
+   En un plebiscito (consulta no vinculante) la Administración puede abrir
+   el voto a todos los residentes; sigue siendo un voto por lote.
+   Todo esto hay que confirmarlo con el reglamento de copropiedad del barrio.
+   ========================================================= */
+const RELACIONES = { propietario:'Propietario/a', cotitular:'Cotitular', inquilino:'Inquilino/a', familiar:'Familiar o conviviente' };
+const esTitular = u => !u.relacion || u.relacion === 'propietario' || u.relacion === 'cotitular';
+const poderVigente = u => !!(u.poderOk && (!u.poderHasta || u.poderHasta >= hoyISO()));
+const representanteDe = casa => Store.s.users.find(x => x.casa === casa && x.estado === 'aprobado' && x.representante);
+function puedeVotarEn(v, u){
+  if (!u || esStaff()) return { ok:false, motivo:'' };
+  if (!/^Lote\s/i.test(u.casa || '')) return { ok:false, motivo:'Tu cuenta no tiene un lote asignado, así que no puede emitir el voto de una unidad. Avisale a la Administración.' };
+  if (v.quienVota === 'residentes') return { ok:true };
+  if (!esTitular(u) && !poderVigente(u)) return { ok:false, motivo:`En esta votación vota el propietario de ${u.casa}. Si te autorizó, cargá la carta poder en Mi casa y, cuando la Administración la apruebe, vas a poder votar.` };
+  const rep = representanteDe(u.casa);
+  if (rep && rep.id !== u.id) return { ok:false, motivo:`Por ${u.casa} vota ${rep.nombre}, representante designado del lote.` };
+  return { ok:true };
+}
+/* El voto del lote a partir de lo que votó cada titular. */
+function votoDelLote(personas, casa){
+  const rep = representanteDe(casa), p = personas || {};
+  if (rep && p[rep.id] !== undefined) return { i:p[rep.id], desacuerdo:false };
+  const vals = [...new Set(Object.values(p))];
+  return vals.length === 1 ? { i:vals[0], desacuerdo:false } : { i:-1, desacuerdo:vals.length > 1 };
+}
+
+R.votaciones = {
+  titulo: 'Votaciones', icon: 'vote', color: 'accent', sub: 'Un voto por lote · queda asentado en la auditoría',
+  render(){
+    const u = yo(), s = Store.s;
+    const abiertas = s.votaciones.filter(v => v.cierra > Date.now()), cerradas = s.votaciones.filter(v => v.cierra <= Date.now());
+    const card = v => {
+      const abierta = v.cierra > Date.now();
+      const T = TIPOS_VOTACION[v.tipo] || TIPOS_VOTACION.plebiscito;
+      const e = escrutinio(v);
+      const val = x => typeof x === 'object' && x ? x.i : x;
+      const miVoto = v.votos[u.casa], mio = val(miVoto);
+      const quien = miVoto && typeof miVoto === 'object' && miVoto.por ? nombreDe(miVoto.por) : '';
+      const ver = !abierta || mio !== undefined || esAdmin();
+      const permiso = puedeVotarEn(v, u), puedeVotar = abierta && permiso.ok;
+      const miPersona = miVoto && miVoto.personas ? miVoto.personas[u.id] : undefined;
+      const enDesacuerdo = miVoto && miVoto.desacuerdo;
+      return `<div class="card"><div class="row" style="align-items:flex-start"><div class="grow"><b style="font-size:16px">${esc(v.titulo)}</b>
+        <div class="muted small">${abierta ? `Cierra el ${fechaLarga(isoDe(new Date(v.cierra)))}` : 'Cerrada'} · votaron ${plural(e.lotes, 'lote')} de ${e.total === 100 ? (typeof LOTES !== 'undefined' ? LOTES.length : '') : e.total}</div></div>
+        <span class="pill p-${T.c === 'accent' ? 'accent' : T.c === 'brand' ? 'brand' : ''}">${abierta ? 'Abierta' : 'Cerrada'}</span></div>
+        <div class="tiny muted" style="margin:6px 0 2px">${I('shield')} ${esc(T.n)}</div>
+        ${v.detalle ? `<p class="small" style="color:var(--ink-2);white-space:pre-wrap">${esc(v.detalle)}</p>` : ''}
+        <div class="muted tiny" style="margin-bottom:8px">Se cuenta por ${e.porCoef ? 'coeficiente de expensas' : 'unidad funcional (un lote, un voto)'} · ${esc(e.regla.n.toLowerCase())}${e.quorumPedido ? ` · quórum ${e.quorumPedido} %` : ''}</div>
+        <div class="progreso" style="margin:0 0 4px"><i style="width:${Math.min(100, e.quorumLogrado)}%;background:${e.hayQuorum ? 'var(--ok)' : 'var(--accent)'}"></i></div>
+        <div class="tiny muted" style="margin-bottom:10px">Participación: ${e.quorumLogrado.toFixed(1)} %${e.quorumPedido ? (e.hayQuorum ? ' · quórum alcanzado' : ` · faltan ${(e.quorumPedido - e.quorumLogrado).toFixed(1)} puntos para el quórum`) : ''}</div>
+        ${v.opciones.map((o, i) => { const pct = e.emitido ? (e.cuenta[i] / e.emitido * 100) : 0;
+          return puedeVotar ? `<button class="opcion ${mio === i ? 'elegida' : ''}" data-a="votar" data-id="${v.id}" data-v="${i}">${ver ? `<span class="barra" style="width:${pct}%"></span>` : ''}<span>${mio === i ? I('check') : ''}${esc(o)}</span>${ver ? `<span class="pct">${pct.toFixed(0)}%</span>` : ''}</button>`
+            : `<div class="opcion ${!abierta && i === e.ganadora && e.emitido ? 'elegida' : ''}"><span class="barra" style="width:${pct}%"></span><span>${esc(o)}</span><span class="pct">${fmtPeso(e.cuenta[i], e.porCoef)} · ${pct.toFixed(0)}%</span></div>`; }).join('')}
+        ${abierta && mio !== undefined ? `<p class="muted tiny" style="margin:4px 0 0">${quien && quien !== u.nombre ? `Votó ${esc(quien)} por ${esc(u.casa)}` : 'Tu lote ya votó'} · el voto es de la unidad funcional: cualquiera de la casa puede cambiarlo hasta el cierre, y siempre cuenta uno solo.</p>` : ''}
+        ${abierta && enDesacuerdo ? aviso('warn', 'alert', `En ${esc(u.casa)} hay votos distintos`, `${Object.entries(miVoto.personas || {}).map(([id, i]) => `${esc(nombreDe(id))}: ${esc(v.opciones[i] || '')}`).join(' · ')}. El voto del lote no se cuenta hasta que coincidan${miPersona !== undefined ? '' : ''}.`) : ''}
+        ${abierta && !puedeVotar && permiso.motivo ? `<p class="muted tiny">${esc(permiso.motivo)}</p>` : ''}
+        <p class="muted tiny" style="margin:2px 0 0">${v.quienVota === 'residentes' ? 'Votan los residentes del lote (propietarios o inquilinos), un voto por lote.' : 'Vota el titular del lote (o quien tenga su carta poder aprobada), un voto por lote.'}</p>
+        ${!abierta && e.desacuerdos ? `<p class="muted tiny">${plural(e.desacuerdos, 'lote no se computó', 'lotes no se computaron')} porque sus titulares votaron distinto.</p>` : ''}
+        ${!abierta ? `<div class="aviso a-${e.valida ? 'ok' : 'warn'}" style="margin-top:12px">${I(e.valida ? 'check' : 'alert')}<div class="txt">
+          <b>${v.tipo === 'plebiscito' ? (e.emitido ? `Ganó "${esc(v.opciones[e.ganadora])}"` : 'Nadie votó') + ' · consulta no vinculante'
+            : e.valida ? `Aprobado: "${esc(v.opciones[e.ganadora])}"` : e.emitido ? 'No se alcanzó la mayoría necesaria' : 'Nadie votó'}</b>
+          ${e.emitido ? `${fmtPeso(e.favor, e.porCoef)} de ${fmtPeso(e.emitido, e.porCoef)} emitidos${e.porCoef ? '' : ' votos'} · ${esc(e.regla.n.toLowerCase())}${e.quorumPedido ? ` · quórum ${e.hayQuorum ? 'alcanzado' : 'NO alcanzado'}` : ''}` : ''}</div></div>
+          ${esAdmin() ? `<div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-pri" data-a="acta-votacion" data-id="${v.id}">${I('file')}Emitir el acta</button></div>` : ''}` : ''}
+        </div>`;
+    };
+    return `${esAdmin() ? superficie({ a:'nueva-votacion', icon:'plus', t:'Nueva votación', s:'Consulta escrita, plebiscito o voto de asamblea', cls:'acento' }) : ''}
+      ${abiertas.length ? abiertas.map(card).join('') : vacio('vote', 'No hay votaciones abiertas.')}
+      ${cerradas.length ? sec('Cerradas') + cerradas.map(card).join('') : ''}
+      <div class="card plana small" style="color:var(--ink-2);line-height:1.6;margin-top:14px">
+        <b>Sobre el valor de estos votos.</b> El voto es de la unidad funcional: un lote, un voto, aunque en la casa haya varias cuentas.
+        Cada voto queda asentado en la auditoría con lote, UF, quién lo emitió y la hora, y esa auditoría no se edita ni se borra desde la app.
+        Las <b>consultas escritas</b> se apoyan en el art. 2060 del Código Civil y Comercial, que permite reunir la mayoría consultando por escrito:
+        al cerrarse, la app emite el <b>acta</b> con el detalle para transcribir al libro y firmar. Lo que obliga al barrio es esa acta y el
+        reglamento de copropiedad, no la pantalla.</div>`;
+  },
+};
+A['votar'] = el => {
+  const u = yo(), v0 = Store.s.votaciones.find(x => x.id === el.dataset.id); if (!v0) return;
+  const permiso = puedeVotarEn(v0, u);
+  if (!permiso.ok){ toast(permiso.motivo || 'No podés votar en esta votación', 'alert'); return; }
+  let antes, resultado;
+  Store.cambiar(s => {
+    const v = s.votaciones.find(x => x.id === el.dataset.id); if (!v || v.cierra <= Date.now()) return;
+    v.votos = v.votos && typeof v.votos === 'object' ? v.votos : {};
+    antes = v.votos[u.casa];
+    const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === u.casa) : null;
+    /* Cada titular deja SU voto; el del lote sale de todos juntos. Los votos
+       viejos (de antes de este cambio) se toman como el de quien los emitió. */
+    const personas = Object.assign({}, antes && antes.personas ? antes.personas : antes && antes.por ? { [antes.por]:antes.i } : {});
+    personas[u.id] = +el.dataset.v;
+    resultado = votoDelLote(personas, u.casa);
+    v.votos[u.casa] = { i:resultado.i, desacuerdo:resultado.desacuerdo, personas, por:u.id, at:Date.now(), uf:L?.uf || '', coef:L?.coef || 0 };
+    if (resultado.desacuerdo){
+      const otros = Object.keys(personas).filter(id => id !== u.id);
+      notificar(s, { para:otros, titulo:`En ${u.casa} votaron distinto`, texto:`"${v.titulo}": el voto del lote no se cuenta hasta que coincidan.`, icon:'vote', color:'warn', link:'votaciones', sonido:true });
+    }
+    /* Queda asentado: es lo que le da respaldo al resultado. */
+    auditar(s, antes !== undefined ? 'Cambió el voto de una unidad' : 'Emitió el voto de una unidad',
+      `${u.casa}${L ? ' (UF ' + L.uf + ')' : ''} · "${v.titulo}" · ${u.nombre} (${RELACIONES[u.relacion] || 'titular'}${poderVigente(u) ? ', con carta poder' : ''}) eligió: ${v.opciones[+el.dataset.v]}${resultado.desacuerdo ? ' · el lote queda en desacuerdo' : ''}`, u.id);
+  });
+  if (resultado?.desacuerdo) toast(`Tu voto quedó, pero en ${yo().casa} hay votos distintos: no se cuenta hasta que coincidan`, 'alert');
+  else toast(antes !== undefined ? `Cambiaste el voto de ${yo().casa}` : `Voto registrado por ${yo().casa}`, 'vote');
+};
+A['nueva-votacion'] = () => hoja('Nueva votación', `<form data-f="votacion">
+  <div class="field"><label>Tipo</label><select name="tipo" required>${Object.entries(TIPOS_VOTACION).map(([k, T]) => `<option value="${k}">${T.n}</option>`).join('')}</select>
+    <div class="ayuda">${Object.values(TIPOS_VOTACION).map(T => `<b>${esc(T.n.split('·')[0].trim())}:</b> ${esc(T.d)}`).join('<br>')}</div></div>
+  <div class="field"><label>Moción · el texto exacto que se vota</label><input name="titulo" required maxlength="140" placeholder="Ej: Aprobar la instalación de cámaras en el acceso de servicio"></div>
+  <div class="field"><label>Fundamentos y detalle</label><textarea name="detalle" maxlength="1200" style="min-height:120px" placeholder="Presupuestos, plazos, de dónde salen los fondos…"></textarea></div>
+  <div class="field"><label>Opciones (una por renglón)</label><textarea name="opciones" required>Sí\nNo\nMe abstengo</textarea>
+    <div class="ayuda">La primera opción es la que se considera "a favor" de la moción.</div></div>
+  <div class="grid2">
+    <div class="field"><label>Cómo se cuenta</label><select name="conteo"><option value="unidad">Un lote, un voto</option><option value="coeficiente">Por coeficiente de expensas</option></select>
+      <div class="ayuda">Lo define el reglamento de copropiedad.</div></div>
+    <div class="field"><label>Mayoría necesaria</label><select name="mayoria">${Object.entries(MAYORIAS).map(([k, M]) => `<option value="${k}">${M.n}</option>`).join('')}</select></div></div>
+  <div class="grid2">
+    <div class="field"><label>Quórum mínimo de participación (%)</label><input type="number" name="quorum" min="0" max="100" step="1" value="0"><div class="ayuda">0 = sin exigencia de quórum.</div></div>
+    <div class="field"><label>Cierra</label><input type="date" name="cierra" required min="${sumarDias(hoyISO(), 1)}" value="${sumarDias(hoyISO(), 15)}"></div></div>
+  <div class="field"><label>¿Quién vota por cada lote?</label><select name="quienVota"><option value="propietarios">El propietario (o quien tenga su carta poder aprobada)</option><option value="residentes">Cualquier residente del lote: propietario o inquilino (solo para plebiscitos)</option></select>
+    <div class="ayuda">Siempre es un voto por lote. Si votan distinto dos titulares del mismo lote sin representante designado, ese lote no se computa hasta que coincidan.</div></div>
+  <button class="btn btn-pri btn-block">${I('vote')}Abrir la votación</button>
+  <p class="muted tiny" style="margin:10px 0 0">Al abrirla se avisa a todo el barrio y queda asentada en la auditoría. Ni la moción ni las opciones se pueden cambiar después: si hay que corregir algo, se abre otra.</p></form>`, { ancho:'620px' });
+F['votacion'] = d => {
+  const ops = d.opciones.split('\n').map(x => x.trim()).filter(Boolean);
+  if (ops.length < 2){ toast('Hacen falta al menos dos opciones', 'vote'); return; }
+  const T = TIPOS_VOTACION[d.tipo] || TIPOS_VOTACION.plebiscito;
+  Store.cambiar(s => {
+    s.votaciones.unshift({ id:uid(), titulo:d.titulo.trim(), detalle:(d.detalle || '').trim(), opciones:ops,
+      tipo:d.tipo, conteo:d.conteo, mayoria:d.mayoria, quorum:+d.quorum || 0, quienVota: d.tipo === 'plebiscito' && d.quienVota === 'residentes' ? 'residentes' : 'propietarios',
+      cierra:fechaDe(d.cierra).getTime() + 23 * HORA, votos:{}, creadaPor:yo().id, createdAt:Date.now() });
+    notificar(s, { para:'todos', titulo:'Nueva votación del barrio', texto:d.titulo.trim(), icon:'vote', color:'accent', link:'votaciones', sonido:true });
+    auditar(s, 'Abrió una votación', `${T.n} · "${d.titulo.trim()}" · cierra ${d.cierra}`);
+  });
+  cerrarHoja(); toast('Votación abierta', 'vote');
+};
+
+/* El acta: lo que se transcribe al libro y se firma. Sin esto, el resultado
+   en pantalla es solo un número. */
+A['acta-votacion'] = el => {
+  const v = Store.s.votaciones.find(x => x.id === el.dataset.id); if (!v) return;
+  const e = escrutinio(v), c = Store.s.config, T = TIPOS_VOTACION[v.tipo] || TIPOS_VOTACION.plebiscito;
+  const filas = Object.entries(v.votos).sort((a, b) => a[0].localeCompare(b[0], 'es', { numeric:true })).map(([casa, voto]) => {
+    const i = typeof voto === 'object' ? voto.i : voto;
+    const L = typeof LOTES !== 'undefined' ? LOTES.find(l => 'Lote ' + l.lote === casa) : null;
+    return `<tr><td>${esc(casa)}</td><td>${esc(voto.uf || L?.uf || '')}</td><td class="n">${(voto.coef ?? L?.coef ?? 0).toFixed(4)}</td>
+      <td>${esc(propietarioDe(casa) || '')}</td><td>${voto.desacuerdo ? '<i>No computado: los titulares votaron distinto</i>' : esc(v.opciones[i] || '')}${voto.por && usuario(voto.por) && !esTitular(usuario(voto.por)) ? ' <i>(con carta poder)</i>' : ''}</td><td>${voto.at ? fechaHora(voto.at) : ''}</td></tr>`;
+  }).join('');
+  imprimir(`Acta · ${v.titulo}`, `
+    <h1>Acta de ${T.n.toLowerCase()}</h1>
+    <p><b>Barrio ${esc(c.nombre)}</b> · ${esc(c.domicilio)} · CUIT ${esc(c.cuit)}</p>
+    <p>En ${esc(c.ciudad)}, a los ${new Date().getDate()} días del mes de ${MESES[new Date().getMonth()]} de ${new Date().getFullYear()},
+    se deja constancia del resultado de la ${T.n.toLowerCase()} convocada por la Administración el ${fechaLarga(isoDe(new Date(v.createdAt)))},
+    con cierre el ${fechaLarga(isoDe(new Date(v.cierra)))}.</p>
+    <h2>Moción sometida a votación</h2>
+    <p style="font-size:15px"><b>${esc(v.titulo)}</b></p>
+    ${v.detalle ? `<p style="white-space:pre-wrap">${esc(v.detalle)}</p>` : ''}
+    <h2>Régimen aplicado</h2>
+    <table>
+      <tr><td>Cómputo</td><td>${e.porCoef ? 'Por coeficiente de expensas' : 'Por unidad funcional (un lote, un voto)'}</td></tr>
+      <tr><td>Mayoría exigida</td><td>${esc(e.regla.n)}</td></tr>
+      <tr><td>Quórum exigido</td><td>${e.quorumPedido ? e.quorumPedido + ' %' : 'Sin exigencia'}</td></tr>
+      <tr><td>Unidades del padrón</td><td>${typeof LOTES !== 'undefined' ? LOTES.length : ''}</td></tr>
+      <tr><td>Unidades que votaron</td><td>${e.lotes}</td></tr>
+      <tr><td>Participación</td><td>${e.quorumLogrado.toFixed(2)} %${e.quorumPedido ? (e.hayQuorum ? ' — quórum alcanzado' : ' — quórum NO alcanzado') : ''}</td></tr>
+    </table>
+    <h2>Escrutinio</h2>
+    <table><tr><th>Opción</th><th class="n">Votos</th><th class="n">%</th></tr>
+      ${v.opciones.map((o, i) => `<tr><td>${esc(o)}</td><td class="n">${fmtPeso(e.cuenta[i], e.porCoef)}</td><td class="n">${e.emitido ? (e.cuenta[i] / e.emitido * 100).toFixed(2) : '0.00'} %</td></tr>`).join('')}
+      <tr class="total"><td>Total emitido</td><td class="n">${fmtPeso(e.emitido, e.porCoef)}</td><td class="n">100 %</td></tr></table>
+    <h2>Resultado</h2>
+    <p style="font-size:15px"><b>${v.tipo === 'plebiscito'
+      ? `Consulta no vinculante. Opción más votada: "${esc(v.opciones[e.ganadora] || '—')}".`
+      : e.valida ? `APROBADA la opción "${esc(v.opciones[e.ganadora])}", por haberse alcanzado ${esc(e.regla.n.toLowerCase())}${e.quorumPedido ? ' y el quórum exigido' : ''}.`
+      : `NO APROBADA: no se alcanzó ${e.hayQuorum ? esc(e.regla.n.toLowerCase()) : 'el quórum exigido'}.`}</b></p>
+    ${v.tipo === 'consulta' ? `<p style="font-size:11.5px;color:#555">La presente se emite como consulta escrita en los términos del artículo 2060 del Código Civil y Comercial de la Nación, que admite obtener la mayoría mediante consulta escrita a los propietarios. Se deja constancia de que el voto fue emitido por unidad funcional y que el detalle individual obra a continuación. Corresponde su transcripción al libro de actas del consorcio.</p>` : ''}
+    ${v.tipo === 'plebiscito' ? `<p style="font-size:11.5px;color:#555">La presente consulta tiene carácter informativo y no vinculante. No sustituye a la asamblea ni a la consulta escrita del artículo 2060 del Código Civil y Comercial.</p>` : ''}
+    <h2>Detalle por unidad</h2>
+    <table><tr><th>Lote</th><th>UF</th><th class="n">Coef. %</th><th>Titular según padrón</th><th>Voto</th><th>Fecha y hora</th></tr>${filas || '<tr><td colspan="6">No se emitieron votos.</td></tr>'}</table>
+    <p style="font-size:11.5px;color:#555">Cada voto quedó asentado en el registro de auditoría de la aplicación, con lote, unidad funcional, cuenta que lo emitió y marca de fecha y hora. Ese registro no admite edición ni borrado desde la aplicación.</p>
+    <div class="firma"><div>Administración</div><div>Consejo de administración</div></div>`);
+};
+
+/* ---------- PRIVADO con la Administración ---------- */
+/* La cuenta de la garita (hay una sola). */
+const cuentaGarita = () => Store.s.users.find(x => x.rol === 'guardia' && x.estado === 'aprobado' && esCorreoGarita(x.email))
+  || Store.s.users.find(x => x.rol === 'guardia' && x.estado === 'aprobado');
+/* Garita ↔ Administración: una conversación interna que no ve ningún vecino.
+   Vive en la carpeta privada de la cuenta de la garita, con `con: 'interno'`. */
+function chatInterno(idP){
+  const u = yo(), s = Store.s;
+  if (!esStaff()) return vacio('lock', 'Solo para la garita y la Administración.');
+  const garitaId = esGuardia() ? u.id : (idP || cuentaGarita()?.id);
+  if (!garitaId) return vacio('shield', 'Todavía no hay una cuenta de la garita aprobada.');
+  const yoSoy = esGuardia() ? 'guardia' : 'admin';
+  const h = s.privados.find(x => x.userId === garitaId && x.con === 'interno');
+  const msgs = msgsVisibles(h, yoSoy);
+  /* Abrirla apaga también su aviso en la campanita. */
+  if (typeof marcarVistoLink === 'function') setTimeout(() => marcarVistoLink(esGuardia() ? 'privado:interno' : 'privado:interno|' + garitaId), 0);
+  if (h && msgs.some(m => m.from !== yoSoy && !m.leido)){ msgs.forEach(m => { if (m.from !== yoSoy) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
+  /* Las peticiones firmadas de los vecinos a la garita ya no tienen su teja
+     en la Administración (Claudio: "cumplen la misma función que los
+     mensajes con la garita"). Quedan a mano acá, arriba de la conversación,
+     con un nombre que dice qué son (26-09, tarde: "no sé bien qué es"). Las
+     recibe y las firma la garita; la Administración solo las mira. */
+  const pet = esAdmin() ? aLista(s.peticiones).filter(p => p && p.estado === 'pendiente').length : 0;
+  const barraPet = esAdmin() ? `<button class="chat-pet" data-a="abrir" data-v="peticiones">${I('edit')}<span><b>Pedidos por escrito de los vecinos a la garita</b><small>${pet ? `${plural(pet, 'pedido', 'pedidos')} que la garita todavía no recibió · ` : ''}No dejar pasar a alguien, aviso de viaje, llaves, paquetes… Los firma la garita; acá solo se miran.</small></span>${pet ? `<span class="n">${pet}</span>` : ''}${I('right')}</button>` : '';
+  return `<div class="chat-wrap">${barraPet}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${m.from === yoSoy ? 'mia' : ''}">
+
+      <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
+      : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
+    <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
+}
+/* LA CONSULTA DE EXPENSAS VA SOLO A LA ADMINISTRACIÓN (pedido de Claudio,
+   28-09): "Consultar a la Administración" desde Expensas abre la charla con
+   la Administración SIN los botones Administración / Guardia, para que nadie
+   le pregunte por su deuda a la garita por error. Llega con el parámetro
+   'admin|expensas'; lo de después de la barra no es una cuenta. */
+const privadoParam = p => { const [con, id] = String(p || '').split('|'); return id === 'expensas' ? [con, '', true] : [con, id, false]; };
+R.privado = {
+  titulo: p => { const [con, id, exp] = privadoParam(p); if (exp) return 'Consulta de expensas'; if (con === 'interno') return esGuardia() ? 'Administración' : 'Garita';
+    if (esHotel()) return 'Comunicación interna';
+    return esStaff() && id ? (usuario(id)?.nombre || 'Conversación') : con === 'guardia' ? 'Guardia' : 'Administración'; },
+  icon: 'lock', color: 'accent',
+  sub: p => { const [con, id, exp] = privadoParam(p);
+    if (exp) return 'Privado: solo lo ven vos y la Administración';
+    if (con === 'interno') return 'Entre la garita y la Administración · no lo ve ningún vecino';
+    if (esHotel()) return con === 'guardia' ? 'Con la garita · solo la ven el hotel y la garita' : con === 'admin' ? 'Con la Administración · solo la ven el hotel y la Administración' : 'Privada · elegí con quién hablar';
+    return esStaff() && id ? (usuario(id)?.casa || '') : con === 'guardia' ? 'Privado: solo lo ven vos y la guardia' : 'Privado: solo lo ven vos y la Administración'; },
+  render(p){
+    const u = yo(), s = Store.s;
+    const [conP, idP, deExpensas] = privadoParam(p);
+    /* Quien administra y vive en un lote recibe mensajes de la garita como
+       vecino: el aviso lo lleva a SU conversación (pasa a modo vecino). */
+    if (esAdmin() && conP === 'guardia' && !idP && tengoLote()){ Store.sesion.modo = 'vecino'; Store.guardarSesion(); setTimeout(() => { pintarTop(); toast('Pasaste a modo vecino: es tu conversación con la garita', 'home'); }, 0); }
+    if (conP === 'interno') return chatInterno(idP);
+    /* El hotel entra por "Comunicación interna" y elige con quién (v-hotel.js). */
+    if (esHotel() && conP !== 'guardia' && conP !== 'admin') return comunicacionHotel();
+    const con = conP === 'guardia' ? 'guardia' : 'admin';
+    /* La guardia ve solo sus conversaciones; la Administración, las suyas. */
+    const miCanal = esGuardia() ? 'guardia' : esAdmin() ? 'admin' : con;
+    if (esStaff() && !idP){
+      const hilos = s.privados.filter(h => (h.con || 'admin') === miCanal && msgsVisibles(h, miCanal).length).sort((a, b) => (msgsVisibles(b, miCanal).at(-1)?.createdAt || 0) - (msgsVisibles(a, miCanal).at(-1)?.createdAt || 0));
+      /* La conversación garita ↔ Administración ya no se repite acá (26-09,
+         tarde): tiene su lugar propio ("Mensajes con la garita" en el Día a
+         día de la Administración; "Administración" en las tejas de la
+         garita). Esta lista es solo de conversaciones con vecinos. */
+      /* UN SOLO BOTÓN (pedido de Claudio, 12-10-2026: "tienen dos botones que
+         son para lo mismo, depurá todo en un mismo botón"). "Avisar algo a un
+         lote en el pizarrón" hacía lo mismo que este: el aviso a un lote no
+         va al pizarrón, le llega a cada cuenta en privado. Quedó este, que
+         además deja elegir a quiénes del lote. Lo que es para todo el barrio
+         va por el pizarrón o un comunicado. */
+      return `${superficie({ a:'priv-lote', icon:'chat', color:'accent', t:'Escribir a un lote o a vecinos', s:'A todo el lote o a quienes elijas · le llega a cada uno en privado, con aviso al celular', cls:'acento' })}
+        ${hilos.length ? hilos.map(h => { const v = usuario(h.userId) || {}, vis = msgsVisibles(h, miCanal), ult = vis.at(-1), nl = vis.filter(m => m.from === 'vecino' && !m.leido).length;
+          return `<button class="superficie" data-a="abrir" data-v="privado" data-p="${miCanal}|${h.userId}">${v.fotoCasa ? fotoHTML(v.fotoCasa, 'casa-foto chica') : avatar(v)}<span class="txt"><b>${esc(v.nombre || '')} · ${esc(v.casa || '')}</b><small>${ult ? esc(ult.text.slice(0, 70)) + ' · ' + hace(ult.createdAt) : 'Sin mensajes'}</small></span>${nl ? `<span class="pill p-danger">${nl}</span>` : I('right')}</button>`; }).join('')
+          : vacio('lock', 'No hay conversaciones.')}`;
+    }
+    const quienId = esStaff() ? idP : u.id;
+    /* Abrir la conversación también apaga su aviso en la campanita (08-10-2026):
+       antes se marcaban leídos los mensajes, pero el aviso seguía contando. */
+    /* En la garita y la Administración pasaba lo mismo (08-10-2026, Claudio):
+       el aviso "Mensaje de Lote …" lleva el link 'privado:canal|cuenta'. */
+    const linksAviso = esStaff() ? ['privado:' + miCanal + '|' + quienId] : ['privado:' + miCanal, ...(miCanal === 'admin' ? ['privado'] : [])];
+    if (typeof marcarVistoLink === 'function') setTimeout(() => linksAviso.forEach(marcarVistoLink), 0);
+    let h = s.privados.find(x => x.userId === quienId && (x.con || 'admin') === miCanal);
+    const yoSoy = esStaff() ? miCanal : 'vecino';
+    const mio = m => esStaff() ? m.from !== 'vecino' : m.from === 'vecino';
+    if (h && h.msgs.some(m => !mio(m) && !m.leido)){ h.msgs.forEach(m => { if (!mio(m)) m.leido = true; }); Store.guardar(); setTimeout(pintarTop, 0); }
+    const msgs = msgsVisibles(h, yoSoy);
+    const chips = esStaff() ? '' : deExpensas ? `<p class="muted small" style="margin:0 0 10px">${I('wallet')} Consulta sobre ${esHotel() ? 'las expensas del hotel' : 'tus expensas'}: planes de pago, diferencias o dudas. La responde la Administración; la garita no la ve.</p>` : esHotel() ? chipsHotel(con) : `<div class="chips">
+      <button class="chip ${con === 'admin' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="admin">${I('sliders')}Administración</button>
+      <button class="chip ${con === 'guardia' ? 'on' : ''}" data-a="abrir" data-v="privado" data-p="guardia">${I('shield')}Guardia</button></div>`;
+    return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
+        <div class="b">${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
+        : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? (esHotel() ? 'Escribile a la garita. Solo la leen el hotel y la garita.' : 'Escribile a la guardia. Nadie más lo ve.') : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
+      <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'Mensaje a la Administración'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
+  },
+};
+F['privado'] = (d, form) => {
+  const u = yo(), para = form.dataset.u, { text, extra } = mensajeConAdj(d);
+  if (!text) return;
+  if (form.dataset.con === 'interno'){
+    if (!esStaff()) return;
+    const from = esGuardia() ? 'guardia' : 'admin';
+    let nuevo = null;
+    Salida.vigilar('privados', () => (Store.cambiar(s => {
+      let h = s.privados.find(x => x.userId === para && x.con === 'interno');
+      if (!h){ h = { id:uid(), userId:para, con:'interno', msgs:[] }; s.privados.push(h); }
+      const m = { id:uid(), from, text, createdAt:Date.now(), ...extra };
+      listaDe(h, 'msgs').push(m); nuevo = { h, m };
+      notificar(s, from === 'guardia'
+        ? { para:'rol:admin', titulo:'Mensaje de la garita', texto:text.slice(0, 90), icon:'shield', color:'brand', link:'privado:interno|' + para, sonido:true }
+        : { para, titulo:'Mensaje de la Administración', texto:text.slice(0, 90), icon:'sliders', color:'accent', link:'privado:interno', sonido:true });
+    }), nuevo));
+    const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
+    return;
+  }
+  const con = form.dataset.con === 'guardia' ? 'guardia' : 'admin';
+  const from = esStaff() ? con : 'vecino';
+  let nuevo = null;
+  Salida.vigilar('privados', () => (Store.cambiar(s => {
+    let h = s.privados.find(x => x.userId === para && (x.con || 'admin') === con);
+    if (!h){ h = { id:uid(), userId:para, con, msgs:[] }; s.privados.push(h); }
+    const m = { id:uid(), from, text, createdAt:Date.now(), ...extra };
+    listaDe(h, 'msgs').push(m); nuevo = { h, m };
+    notificar(s, from !== 'vecino'
+      ? { para, titulo: con === 'guardia' ? 'Mensaje de la guardia' : 'Mensaje de la Administración', texto:text.slice(0, 90), icon:'lock', color:'accent', link:'privado:' + con, sonido:true }
+      : { para: con === 'guardia' ? 'rol:guardia' : 'rol:admin', titulo:`Mensaje de ${u.casa}`, texto:text.slice(0, 90), icon:'lock', color:'accent', link:'privado:' + con + '|' + u.id });
+  }), nuevo));
+  const i = $('#privIn'); if (i){ i.value = ''; i.focus(); }
+};
+
+/* =========================================================
+   ESCRIBIR A UN LOTE O A VECINOS PUNTUALES (pedido de Claudio, 08-10-2026)
+   La garita y la Administración eligen el lote y, adentro, a quién: todo
+   el lote (lo reciben todas sus cuentas) o solo algunas (en el 42 viven
+   cuatro y se le escribe a dos: los otros dos no lo reciben). A cada uno le
+   llega en su conversación privada con la garita o la Administración.
+   ========================================================= */
+/* Quien administra y además vive en un lote (rol admin con casa "Lote …") también es del lote. */
+const esCuentaDeLote = u => !!u && u.estado === 'aprobado' && (u.rol === 'vecino' || u.rol === 'admin') && /^Lote\s/i.test(u.casa || '');
+const lotesConCuentas = () => [...new Set(Store.s.users.filter(esCuentaDeLote).map(u => u.casa))]
+  .sort((a, b) => a.localeCompare(b, 'es', { numeric:true }));
+const cuentasPrivLote = casa => cuentasDelLote(casa).filter(esCuentaDeLote);
+function filasPrivLote(casa){
+  const cs = cuentasPrivLote(casa);
+  if (!cs.length) return '<p class="muted small" style="margin:6px 0">Elegí un lote.</p>';
+  return `${cs.length > 1 ? `<label class="check" style="margin:4px 0 6px"><input type="checkbox" data-pl-todo checked><span><b>Todo el lote</b> (${cs.length} cuentas)</span></label>` : ''}
+    ${cs.map(x => `<label class="check" style="margin:2px 0 2px ${cs.length > 1 ? '22px' : '0'}"><input type="checkbox" name="u~${esc(x.id)}" checked><span>${esc(x.nombre)} <small class="muted">· ${esc(RELACIONES[x.relacion] || 'vecino/a')}${esPropDistancia(x) ? ', no vive en el lote' : ''}</small></span></label>`).join('')}`;
+}
+A['priv-lote'] = el => {
+  if (!esStaff()) return;
+  const pre = el?.dataset?.v || '';
+  hoja('Escribir a un lote', `<form data-f="priv-lote">
+    <div class="field"><label>Lote</label><select name="casa" id="plCasa" required><option value="">Elegí…</option>${lotesConCuentas().map(c => `<option ${c === pre ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="field"><label>¿A quién?</label><div id="plCuentas">${filasPrivLote(pre)}</div></div>
+    <div class="field"><label>Mensaje</label><textarea name="text" required maxlength="800" rows="4" placeholder="Escribí el mensaje…"></textarea></div>
+    <p class="muted tiny" style="margin:0 0 10px">${I('lock')} A cada uno le llega en su conversación privada con ${esGuardia() ? 'la garita' : 'la Administración'}, con aviso al celular. Los que no tildes no lo reciben.</p>
+    <button class="btn btn-pri btn-block">${I('send')}Enviar</button></form>`);
+};
+document.addEventListener('change', e => {
+  if (e.target.id === 'plCasa'){ const b = $('#plCuentas'); if (b) b.innerHTML = filasPrivLote(e.target.value); return; }
+  if (e.target.matches && e.target.matches('[data-pl-todo]')){ $$('#plCuentas input[name^="u~"]').forEach(c => { c.checked = e.target.checked; }); return; }
+  if (e.target.closest && e.target.closest('#plCuentas')){ const t = $('#plCuentas [data-pl-todo]'), cs = $$('#plCuentas input[name^="u~"]'); if (t) t.checked = cs.every(c => c.checked); }
+});
+F['priv-lote'] = d => {
+  if (!esStaff()) return;
+  const con = esGuardia() ? 'guardia' : 'admin', texto = String(d.text || '').trim();
+  const para = Object.keys(d).filter(k => k.startsWith('u~')).map(k => k.slice(2)).filter(id => { const x = usuario(id); return x && x.casa === d.casa && x.estado === 'aprobado'; });
+  if (!para.length){ toast('Tildá al menos una persona', 'alert'); return; }
+  if (!texto){ toast('Escribí el mensaje', 'alert'); return; }
+  const todo = para.length === cuentasPrivLote(d.casa).length;
+  Store.cambiar(s => para.forEach(id => {
+    let h = s.privados.find(x => x.userId === id && (x.con || 'admin') === con);
+    if (!h){ h = { id:uid(), userId:id, con, msgs:[] }; s.privados.push(h); }
+    h.msgs.push({ id:uid(), from:con, text:texto, createdAt:Date.now(), ...(todo && para.length > 1 ? { aLote:d.casa } : {}) });
+    notificar(s, { para:id, titulo: con === 'guardia' ? 'Mensaje de la guardia' : 'Mensaje de la Administración', texto:texto.slice(0, 90), icon:'lock', color:'accent', link:'privado:' + con, sonido:true });
+  }));
+  cerrarHoja(); toast(todo ? `Enviado a todo ${d.casa} (${plural(para.length, 'cuenta')})` : `Enviado a ${plural(para.length, 'persona')} de ${d.casa}`, 'send');
+};
+
+/* ---------- NORMAS Y REGLAMENTOS, con buscador ----------
+   Es EL lugar de las normas (pedido de Claudio, 26-09-2026): antes también
+   aparecían en Descargas y se duplicaban. Desde acá se leen, se buscan y se
+   descargan: cada norma sola o todas juntas en un PDF, y el original
+   oficial cuando lo hay. Si la Administración cargó en Descargas un
+   documento que es una norma (reglamento, estatuto, convivencia…), se
+   muestra acá y no allá (esNormaDescarga). */
+const esNormaDescarga = d => !!d && (d.tipo === 'doc' || !d.tipo) && /reglament|norma|estatut|convivencia|protocolo|ordenanza/i.test(`${d.titulo || ''} ${d.detalle || ''}`);
+const PIE_NORMAS = 'Copia informativa generada por la app del barrio. Ante cualquier diferencia vale el texto original aprobado u oficial.';
+R.documentos = {
+  titulo: 'Normas y reglamentos', icon: 'file', color: 'brand', sub: 'Manual y normas · reglamento, convivencia y protocolos',
+  render(q){
+    const docs = Store.s.documentos;
+    const qq = (q || '').trim().toLowerCase();
+    let resultados = '';
+    if (qq){
+      const pal = qq.split(/\s+/).filter(w => w.length > 2);
+      const hits = [];
+      docs.forEach(d => d.texto.split(/\n+/).forEach(par => { const pl = par.toLowerCase(); const n = pal.filter(w => pl.includes(w)).length; if (n) hits.push({ d, par, n }); }));
+      hits.sort((a, b) => b.n - a.n);
+      resultados = sec(`Respuestas para "${esc(q)}"`) + (hits.length ? hits.slice(0, 6).map(h => `<div class="card" style="padding:12px 14px"><div class="muted tiny">${esc(h.d.titulo)}</div><div class="small">${esc(h.par).replace(new RegExp(`(${pal.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi'), '<mark>$1</mark>')}</div></div>`).join('')
+        : vacio('search', 'No encontramos eso en las normas. Preguntale a la Administración.'));
+    }
+    const bajables = descargasVisibles().filter(d => esNormaDescarga(d) && (d.url || d.texto));
+    return `${typeof guiaSolapas === 'function' ? guiaSolapas('normas') : ''}<form data-f="buscar-norma" class="linea-form" style="margin-bottom:12px"><input name="q" id="qNorma" value="${esc(q || '')}" placeholder="Preguntá: ¿hasta qué hora puedo hacer obra?"><button class="btn btn-pri">${I('search')}</button></form>
+      ${resultados}${sec('Normas del barrio')}
+      ${docs.map(d => superficie({ a:'ver-doc', id:d.id, icon:'file', color: d.tipo === 'Convivencia' ? 'accent' : 'brand', t:esc(d.titulo), s:`${esc(d.tipo || 'Documento')} · actualizado ${hace(d.updatedAt || d.createdAt)}` })).join('') || vacio('file', 'Todavía no hay normas cargadas.')}
+      ${bajables.length ? sec('Para descargar') + bajables.map(d => `<button class="superficie" data-a="descargar" data-id="${esc(d.id)}"><span class="ic ic-${d.color || 'brand'}">${I(d.icon || 'file')}</span><span class="txt"><b>${esc(d.titulo)}</b>${d.detalle ? `<small>${esc(d.detalle)}</small>` : ''}</span>${I('download')}</button>`).join('') : ''}
+      <p class="muted tiny" style="margin-top:10px">${I('file')} Tocá una norma para leerla. Al final del texto está el botón para descargarla o imprimirla (y el original oficial, cuando lo hay).</p>
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido', icon:'edit', color:'accent', t:'Editar normas y documentos', s:'Desde Administración → Contenido' }) : ''}`;
+  },
+};
+F['buscar-norma'] = d => abrir('documentos', d.q || '');
+/* La descarga está SOLO adentro, al final del texto (pedido de Claudio,
+   26-09): primero se lee, después se baja. */
+A['ver-doc'] = el => { const d = Store.s.documentos.find(x => x.id === el.dataset.id); if (d) hoja(d.titulo, `<div style="white-space:pre-wrap;font-size:14.5px;line-height:1.6">${esc(d.texto)}</div>
+  <div class="doc-final"><span class="muted small">${I('check')} Fin del documento</span></div>
+  <div class="btns" style="margin-top:10px"><button class="btn btn-pri grow" data-a="doc-imprimir" data-id="${esc(d.id)}">${I('download')}Descargar o imprimir</button>
+  ${d.link ? `<a class="btn btn-sec grow" href="${esc(d.link)}" target="_blank" rel="noopener">${I('file')}Original oficial (PDF)</a>` : ''}</div>`, { ancho:'720px' }); };
+const normaParaImprimir = d => `<h2>${esc(d.titulo)}</h2><p style="color:#555;margin:-4px 0 10px">${esc(d.tipo || 'Documento')}${d.updatedAt || d.createdAt ? ' · actualizado el ' + fechaCorta(isoDe(new Date(d.updatedAt || d.createdAt))) : ''}${d.link ? ` · original: <a href="${esc(d.link)}">${esc(d.link)}</a>` : ''}</p>
+  <div style="white-space:pre-wrap;font-size:13px;line-height:1.55">${esc(d.texto || '')}</div>`;
+A['doc-imprimir'] = el => { const d = Store.s.documentos.find(x => x.id === el.dataset.id); if (d) imprimir(d.titulo, normaParaImprimir(d), { pie:PIE_NORMAS }); };
+A['docs-imprimir'] = () => { const ds = Store.s.documentos; if (!ds.length) return toast('No hay normas cargadas', 'file');
+  imprimir('Normas y reglamentos', `<p><b>Normas y reglamentos del barrio</b> · ${plural(ds.length, 'documento')} · ${fechaLarga(hoyISO())}</p>${ds.map(normaParaImprimir).join('<div style="page-break-after:always"></div>')}`, { pie:PIE_NORMAS }); };
+
+/* Las expensas viven en js/v-expensas.js: el módulo contable completo. */
+
+/* ---------- RESIDUOS ---------- */
+R.recoleccion = {
+  titulo: 'Residuos', icon: 'truck', color: 'ok', sub: 'Recolección y voluminosos',
+  render(){
+    const c = Store.s.config, hoy = new Date().getDay(), hoyIso = hoyISO();
+    /* Los retiros de voluminosos son una lista de fechas con su detalle:
+       la Administración anota todas las del año y la app avisa la víspera. */
+    const vols = volsProximos();
+    const viajes = typeof Camion !== 'undefined' ? Camion.lista().slice(0, 6) : [];
+    return `${typeof bandaCamion === 'function' ? bandaCamion(esGuardia()) : ''}
+      <div class="recoleccion">${[1,2,3,4,5,6,0].map(d => `<div class="${d === hoy ? 'hoy-r' : ''}"><b>${DIAS[d]}</b>${recoleccionDias()[d] ? I('truck') + esc(recoleccionDias()[d]) : '<span class="muted">—</span>'}</div>`).join('')}</div>
+      <p class="muted small">Pasa por la mañana, desde las ${c.recoleccionHora} h. Si ese día es feriado, puede cambiar: la app avisa.</p>
+      ${(() => { const man = diaInfo(sumarDias(hoyIso, 1));
+        return man.feriado ? aviso('warn', 'calendar', `Mañana es feriado: ${esc(man.feriado.nombre)}`, 'La recolección puede no pasar o pasar más tarde.') : ''; })()}
+      <p class="muted small">La recolección del barrio la hace <b>${esc(c.camionEmpresa || 'SEINCO S.A.')}</b>, la empresa contratada por el barrio.</p>
+      ${sec('El camión en la pantalla')}
+      ${superficie({ a:'camion-aviso', icon:'tacho', color: typeof Camion !== 'undefined' && Camion.encendido() ? 'ok' : 'accent', t: typeof Camion !== 'undefined' && Camion.encendido() ? 'Mostrar el camión: activado' : 'Mostrar el camión: apagado',
+        s:'Cuando la garita registra la entrada, cruza un camión por la pantalla hasta que sale, con su melodía' })}
+      ${superficie({ a:'camion-probar', icon:'volume', color:'sky', t:'Escuchar la melodía del camión', s:'La que suena cuando entra' })}
+      ${viajes.length ? `<div class="card lista">${viajes.map(v => `<div class="it"><div class="txt"><b>${fechaCorta(isoDe(new Date(v.entra)))} · ${hora(v.entra)} a ${v.sale ? hora(v.sale) : 'sigue adentro'}</b><span>${esc(v.patente)}${v.empresa ? ' · ' + esc(v.empresa) : ''}${v.sale ? ' · ' + Math.max(1, Math.round((v.sale - v.entra) / MIN)) + ' min en el barrio' : ''}</span></div></div>`).join('')}</div>` : ''}
+      ${sec('Voluminosos', esAdmin() ? `<button class="link" data-a="nuevo-voluminoso">Anotar un retiro</button>` : '')}
+      ${vols.length ? vols.map(v => `<div class="card"><div class="row">
+          <span class="ic ic-${v.fecha === hoyIso ? 'danger' : 'wood'}" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('truck')}</span>
+          <div class="grow"><b>${v.fecha === hoyIso ? 'Hoy' : v.fecha === sumarDias(hoyIso, 1) ? 'Mañana' : fechaLarga(v.fecha)}</b>
+            <div class="muted small">${esc(v.detalle || c.voluminososDetalle)}</div></div>
+          <span class="pill ${v.fecha === hoyIso ? 'p-danger' : ''}">${relDia(v.fecha)}</span>
+          ${esAdmin() ? `<button class="icon-btn" data-a="borrar-voluminoso" data-v="${v.fecha}" aria-label="Borrar">${I('trash')}</button>` : ''}</div></div>`).join('')
+        : Object.values(recoleccionDias()).some(esVoluminoso) ? `<div class="card"><b>Todos los ${[1,2,3,4,5,6,0].filter(d => esVoluminoso(recoleccionDias()[d])).map(d => DIAS_L[d].toLowerCase() + 's').join(' y ')}</b><p class="small" style="margin:6px 0 0;color:var(--ink-2)">${esc(c.voluminososDetalle)}</p>
+           ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="nuevo-voluminoso">${I('plus')}Anotar un retiro especial</button>` : ''}</div>`
+        : `<div class="card"><b>Sin retiros anotados</b><p class="small" style="margin:6px 0 0;color:var(--ink-2)">${esc(c.voluminososDetalle)}</p>
+           ${esAdmin() ? `<button class="btn btn-sm btn-sec" style="margin-top:10px" data-a="nuevo-voluminoso">${I('plus')}Anotar el próximo retiro</button>` : ''}</div>`}
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'accent', t:'Cambiar los días del camión', s:'Qué se retira cada día y a qué hora pasa' }) : ''}
+      ${sec('Para tener en cuenta')}<div class="card small" style="color:var(--ink-2);line-height:1.6">
+        • Canasto elevado y cerrado: los perros y los zorros rompen las bolsas.<br>• Con viento fuerte, sacá la bolsa a la mañana y no la noche anterior.<br>• La poda va al contenedor verde, atada.<br>• Pilas, aceite y electrónicos no van a la basura común.</div>
+      ${superficie({ a:'avistamiento', icon:'eye', color:'warn', t:'¿Viste zorros o perros en la basura?', s:'Avisá y la app alerta al barrio si se repite' })}`;
+  },
+};
+/* Compatibilidad: la versión vieja guardaba una sola fecha en config.voluminosos. */
+function volsProximos(){
+  const c = Store.s.config, hoy = hoyISO();
+  const lista = Array.isArray(c.volsLista) ? c.volsLista.slice() : [];
+  if (c.voluminosos && !lista.some(v => v.fecha === c.voluminosos)) lista.push({ fecha:c.voluminosos, detalle:c.voluminososDetalle });
+  return lista.filter(v => v.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+A['nuevo-voluminoso'] = () => hoja('Anotar un retiro de voluminosos', `<form data-f="voluminoso">
+  <div class="field"><label>Fecha del retiro</label><input type="date" name="fecha" required min="${hoyISO()}"></div>
+  <div class="field"><label>Qué se retira</label><textarea name="detalle" maxlength="220">${esc(Store.s.config.voluminososDetalle || '')}</textarea></div>
+  <label class="check"><input type="checkbox" name="avisar" checked><span>Avisar a todo el barrio ahora</span></label>
+  <button class="btn btn-pri btn-block" style="margin-top:12px">${I('truck')}Anotar</button>
+  <p class="muted tiny" style="margin:10px 0 0">La app vuelve a avisar sola la noche anterior.</p></form>`);
+F['voluminoso'] = d => {
+  Store.cambiar(s => {
+    const c = s.config;
+    c.volsLista = (Array.isArray(c.volsLista) ? c.volsLista : []).filter(v => v.fecha !== d.fecha);
+    c.volsLista.push({ fecha:d.fecha, detalle:(d.detalle || '').trim() });
+    c.volsLista.sort((a, b) => a.fecha.localeCompare(b.fecha));
+    c.voluminosos = volsProximos()[0]?.fecha || '';
+    if (d.avisar) notificar(s, { para:'todos', titulo:`Retiro de voluminosos el ${fechaLarga(d.fecha)}`, texto:(d.detalle || '').trim(), icon:'truck', color:'wood', link:'recoleccion', sonido:true });
+    auditar(s, 'Anotó un retiro de voluminosos', d.fecha);
+  });
+  cerrarHoja(); toast('Retiro anotado', 'truck');
+};
+A['borrar-voluminoso'] = async el => {
+  if (!await confirmar('Borrar el retiro', `¿Sacar el retiro del ${fechaLarga(el.dataset.v)}?`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => {
+    const c = s.config;
+    c.volsLista = (Array.isArray(c.volsLista) ? c.volsLista : []).filter(v => v.fecha !== el.dataset.v);
+    if (c.voluminosos === el.dataset.v) c.voluminosos = '';
+  });
+};
+
+/* =========================================================
+   EMERGENCIAS y AGENDA, en dos ventanas
+   Antes era una sola ("Emergencias y agenda") y el día que hace falta un
+   número de urgencia había que pasar entre heladerías y gimnasios. Ahora:
+     · EMERGENCIAS: los 4 números grandes, el DEA, los SOS de hoy, los
+       teléfonos del barrio, y las categorías de urgencia hasta farmacias;
+     · AGENDA: todo lo demás de Ushuaia (comidas, taxis, súper…) y los
+       vecinos que compartieron su profesión u oficio con el barrio.
+   ========================================================= */
+const CATS_EMERGENCIA = /emergenc|hospital|farmac/i;
+/* Los teléfonos de la garita y de la Administración están en Ajustes; si el
+   contacto de la lista no tiene número propio, se toma de ahí. */
+const telGarita = () => Store.s.config.garitaTel || (aLista(Store.s.contactos).find(k => /garita/i.test(k.nombre)) || {}).tel || '';
+const telAdmin = () => Store.s.config.adminTel || (aLista(Store.s.contactos).find(k => /administraci/i.test(k.nombre)) || {}).tel || '';
+const telContacto = k => k.tel || (/garita/i.test(k.nombre) ? Store.s.config.garitaTel : /administraci/i.test(k.nombre) ? Store.s.config.adminTel : '') || '';
+/* ¿Es un celular (tiene WhatsApp)? En Ushuaia los fijos empiezan con 4
+   después del 2901 (2901-42…, 43…, 44…); los celulares, con 15, 5 o 6.
+   En Buenos Aires (11), con 15 o 6. Ante la duda, no se ofrece WhatsApp:
+   mejor que falte un botón a que abra un chat con un teléfono fijo. */
+const esCelular = tel => {
+  let d = soloDigitos(tel).replace(/^0/, '').replace(/^549?/, '');
+  const m = d.match(/^(2901|2964|11)(\d+)$/); if (!m) return false;
+  return m[1] === '11' ? /^(15|6)/.test(m[2]) : /^(15|5|6)/.test(m[2]);
+};
+const waAR = tel => { let d = soloDigitos(tel).replace(/^0/, ''); if (!d.startsWith('54')) d = '549' + d.replace(/^(\d{2,4})15/, '$1'); return 'https://wa.me/' + d; };
+const renglonAgenda = a => `<div class="it" data-cat="${esc(a.categoria || '')}"><div class="txt"><b>${esc(a.nombre)}</b>${a.detalle ? `<span>${esc(a.detalle)}</span>` : ''}</div>
+  <div class="tel-acciones">${a.tel ? `<a class="tel-btn" href="${telLink(a.tel)}">${I('phone')}${esc(a.tel)}</a>` : '<span class="muted tiny">sin teléfono</span>'}
+  ${a.tel && (a.wa || esCelular(a.tel) || /whats\s?app/i.test(a.nombre + ' ' + (a.detalle || ''))) ? `<a class="tel-btn wa" href="${waAR(a.tel)}" target="_blank" rel="noopener" aria-label="WhatsApp a ${esc(a.nombre)}">${I('chat')}<span>WhatsApp</span></a>` : ''}</div></div>`;
+R.emergencias = {
+  titulo: 'Emergencias', icon: 'siren', color: 'danger', sub: 'Tocá un teléfono para llamar',
+  render(){
+    const s = Store.s;
+    const cats = [...new Set(s.agenda.map(a => a.categoria))].filter(c => CATS_EMERGENCIA.test(c));
+    const c = s.config, mio = typeof Dea !== 'undefined' ? Dea.mio() : null;
+    return `<div class="btns" style="margin-bottom:12px"><a class="btn btn-danger" href="tel:911">${I('phone')}911</a><a class="btn btn-danger-soft" href="tel:107">107 Ambulancia</a><a class="btn btn-danger-soft" href="tel:100">100 Bomberos</a><a class="btn btn-danger-soft" href="tel:101">101 Policía</a></div>
+      ${(() => { /* La garita no ve un botón para llamarse a sí misma (pedido de Claudio, 27-09). */
+        const g = esGuardia() ? '' : telGarita();
+        return g || telAdmin() ? `<div class="btns" style="margin-bottom:12px">
+        ${g ? `<a class="btn btn-pri grow" href="${telLink(g)}">${I('gate')}Garita · ${esc(g)}</a>` : ''}
+        ${telAdmin() ? `<a class="btn btn-sec grow" href="${telLink(telAdmin())}">${I('sliders')}Administración · ${esc(telAdmin())}</a>` : ''}</div>` : ''; })()}
+      <div class="card dea-card"><div class="dea-fila"><span class="dea-corazon" aria-hidden="true">${I('heart')}</span>
+        <div class="grow"><b>Desfibrilador (DEA) del barrio · operativo</b><div class="small" style="color:var(--ink-2);margin-top:2px">${esc(c.dea)}</div></div>
+        ${esGuardia() ? '' : `<button type="button" class="dea-pedir" id="deaBtn" aria-label="Solicitar el DEA: mantener apretado 2 segundos"><span>SOLICITARLO</span></button>`}</div>
+        ${mio ? `<div style="margin-top:12px">${aviso(mio.estado === 'en_camino' ? 'ok' : 'danger latido', 'heart', mio.estado === 'en_camino' ? 'El DEA va en camino' : 'Tu pedido del DEA está en la garita',
+            mio.estado === 'en_camino' ? `Salió ${hace(mio.enCaminoAt || mio.at)}.${(() => { const van = Object.entries(mio.responden || {}).filter(([, r]) => r && r.v === 'voy').map(([id]) => nombreDe(id).split(' ')[0]);
+              return van.length ? ` También va${van.length > 1 ? 'n' : ''} ${esc(van.join(', '))}, del equipo de salud.` : mio.respAvisados ? ` Avisamos a ${plural(mio.respAvisados, 'vecino', 'vecinos')} del equipo de salud.` : ''; })()}` : 'Esperando que salgan con el DEA. Llamá al 911.', `<button class="btn btn-xs btn-sec" data-a="dea-listo" data-id="${mio.id}">Ya no hace falta</button>`)}</div>`
+        : esGuardia() ? '' : `<p class="muted tiny" style="margin:10px 0 0">En una emergencia (alguien se desmayó y no respira), <b>mantené apretado SOLICITARLO 2 segundos</b> y confirmá: a la garita le salta la alarma con tu lote y tu apellido. Llamá también al 911.</p>`}</div>
+      ${c.deaHotel ? `<div class="card plana small" style="margin:-4px 0 12px">${I('heart')} <b>Otro DEA en el barrio:</b> ${esc(HOTEL_NOMBRE)} · ${esc(c.deaHotel.lugar || 'recepción')}${c.deaHotel.tel ? ` · <a href="${telLink(c.deaHotel.tel)}">${esc(c.deaHotel.tel)}</a>` : ''}. Ante una emergencia, la garita se lo pide al hotel.</div>` : ''}
+      ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
+      ${esStaff() ? '' : (() => { const n = typeof Respondedores !== 'undefined' ? Respondedores.lista().length : 0, u = yo();
+        return `<div class="card plana small" style="margin:-4px 0 12px">${I('heart')} <b>${n ? plural(n, 'vecino del equipo de salud o con RCP', 'vecinos del equipo de salud o con RCP') : 'Vecinos del equipo de salud o con RCP'}</b>: cuando la garita sale con el DEA, les llega un aviso para que se acerquen. ${u && u.respondedor ? 'Vos estás anotado/a.' : '¿Sos médico/a, enfermero/a o sabés RCP? <button class="link" data-a="abrir" data-v="perfil">Marcalo en Mi casa</button>.'}</div>`; })()}
+      ${sosDelDia()}
+      ${sec('Del barrio')}<div class="card lista">${s.contactos.filter(k => !(esGuardia() && /garita|guardia/i.test(k.nombre || ''))).map(k => renglonAgenda({ nombre:k.nombre, detalle:k.detalle, tel:telContacto(k), wa: k.wa !== false })).join('')}</div>
+      ${cats.map(c => `${sec(esc(c))}<div class="card lista">${s.agenda.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('')}`;
+  },
+};
+/* Los vecinos que eligieron compartir su profesión u oficio con el barrio
+   entran solos a la agenda, con su celular. No hay que cargar nada: se
+   toma de su ficha y desaparece si dejan de compartirlo. */
+function oficiosDelBarrio(){
+  const s = Store.s;
+  if (typeof enDirectorioProfesional !== 'function') return [];
+  return s.users.filter(enDirectorioProfesional).filter(x => x.tel && (x.mostrarTel || x.enDirectorio)).map(x => ({
+    categoria:'🏘️ Profesionales y oficios del barrio',
+    nombre:`${[publicaProfesion(x) ? x.profesion : '', publicaOficio(x) ? x.skills : ''].filter(Boolean).join(' · ')}`,
+    detalle:`${x.nombre} · ${x.casa}`, tel:x.tel, wa:true }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+R.agenda = {
+  titulo: 'Agenda de Ushuaia', icon: 'book', color: 'sky', sub: 'Comidas, taxis, compras y oficios del barrio',
+  render(q){
+    const s = Store.s, qq = normTxt(q || '');
+    const todo = [...oficiosDelBarrio(), ...s.agenda.filter(a => !CATS_EMERGENCIA.test(a.categoria))];
+    const cats = [...new Set(todo.map(a => a.categoria))];
+    const lista = qq ? todo.filter(a => normTxt(a.nombre + ' ' + a.detalle + ' ' + a.categoria).includes(qq)
+      || (qq.length > 3 && normTxt(a.nombre + ' ' + a.categoria).includes(qq.replace(/s$/, '')))) : null;
+    const catsHit = lista ? [...new Set(lista.map(a => a.categoria))] : [];
+    return `<form data-f="buscar-agenda" class="linea-form" id="buscaAgenda" style="margin-bottom:6px"><input name="q" id="qAgenda" value="${esc(q || '')}" placeholder="Buscar: taxi, empanadas, farmacia, electricista…"><button class="btn btn-pri">${I('search')}</button></form>
+      <div class="chips" style="margin-bottom:6px">${cats.map(c => `<button class="chip" data-a="agenda-ir" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+      ${lista ? `<div id="agendaResultados">${sec(`${plural(lista.length, 'resultado')} para "${esc(q)}"`, `<button class="link" data-a="abrir" data-v="agenda">Ver toda la agenda</button>`)}
+          ${catsHit.map(c => `<div class="muted tiny" style="margin:8px 4px 4px;font-weight:800">${esc(c)}</div><div class="card lista">${lista.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div>`).join('') || vacio('search', 'Sin resultados. Probá con otra palabra.')}</div>`
+        : cats.map(c => `<div class="agenda-cat" id="cat-${esc(normTxt(c).replace(/[^a-z0-9]+/g, '-'))}">${sec(esc(c))}<div class="card lista">${todo.filter(a => a.categoria === c).map(renglonAgenda).join('')}</div></div>`).join('')}
+      ${!oficiosDelBarrio().length ? `<p class="muted tiny">Los vecinos que compartan su profesión u oficio con el barrio (en Mi casa) aparecen acá solos, con su celular y WhatsApp.</p>` : ''}
+      ${superficie({ v:'emergencias', icon:'siren', color:'danger', t:'Emergencias', s:'911 · 107 · DEA · hospitales · farmacias' })}`;
+  },
+};
+/* Buscar lleva a los resultados, no arriba de todo. */
+F['buscar-agenda'] = d => { abrir('agenda', d.q || ''); setTimeout(() => $('#agendaResultados')?.scrollIntoView({ behavior:'smooth', block:'start' }), 80); };
+A['agenda-ir'] = el => {
+  const id = 'cat-' + normTxt(el.dataset.v).replace(/[^a-z0-9]+/g, '-');
+  if (!document.getElementById(id)) { abrir('agenda', ''); }
+  setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior:'smooth', block:'start' }), 80);
+};
+
+/* =========================================================
+   LOS SOS DEL DÍA
+   Debajo del DEA, una ventanita por cada SOS de las últimas 24 horas: qué
+   fue, a qué hora y si ya se resolvió. Al pasar el mouse (o tocarla en el
+   celular) se despliega con el vecino, el lote y cómo terminó. Pasadas las
+   24 h desaparecen solas de acá; el registro completo sigue en la bitácora
+   y la auditoría, que no se borran.
+   ========================================================= */
+function sosDelDia(){
+  const lista = aLista(Store.s.sos).filter(x => x && Date.now() - x.at < DIA).sort((a, b) => b.at - a.at);
+  const est = x => x.estado === 'resuelta' ? ['ok', 'Resuelta'] : x.estado === 'atendida' ? ['warn', 'Atendida, falta confirmar'] : x.estado === 'en_camino' ? ['warn', 'La guardia va en camino'] : ['danger', 'Activa'];
+  const tarjeta = x => {
+    const t = x.tipo === 'dea' ? TIPO_DEA : TIPOS_SOS[x.tipo] || TIPOS_SOS.otra, v = usuario(x.userId) || {}, [c, e] = x.tipo === 'dea' && x.estado === 'en_camino' ? ['ok', 'El DEA fue en camino'] : est(x);
+    const quien = x.estado === 'resuelta' && x.resuelve ? (x.resuelve === x.userId ? 'la dio por solucionada el vecino' : `la cerró ${esc(nombreDe(x.resuelve))}`) : '';
+    return `<details class="sos-dia s-${c}" tabindex="0">
+      <summary><span class="ic ic-${c === 'ok' ? 'ok' : 'danger'}">${I(t.icon)}</span><span class="sd-txt"><b>${esc(t.nombre)}</b><small>${hora(x.at)} h · ${esc(v.casa || '')}</small></span><span class="pill p-${c}">${e}</span></summary>
+      <div class="sd-mas">
+        <div><span class="muted">Pidió ayuda</span><b>${esc(v.nombre || 'Un vecino')}${v.casa ? ' · ' + esc(v.casa) : ''}</b></div>
+        <div><span class="muted">Cuándo</span><b>${cuandoFue(x.at)} · ${hace(x.at)}</b></div>
+        ${x.atiende ? `<div><span class="muted">Atendió</span><b>${esc(nombreDe(x.atiende))}</b></div>` : ''}
+        <div><span class="muted">Cómo terminó</span><b>${x.estado === 'resuelta' ? `Resuelta a las ${hora(x.resueltaAt || x.at)} h${quien ? ' · ' + quien : ''}` : e}</b></div>
+      </div></details>`;
+  };
+  return `${sec('SOS de hoy', `<span class="muted small">últimas 24 h · se limpia solo</span>`)}
+    ${lista.length ? `<div class="sos-dia-lista">${lista.map(tarjeta).join('')}</div>` : `<div class="card plana small" style="display:flex;gap:8px;align-items:center">${I('check')} No hubo ningún SOS en las últimas 24 horas.</div>`}`;
+}
+/* En la computadora se despliega con solo pasar el mouse. */
+document.addEventListener('mouseover', e => { const d = e.target.closest && e.target.closest('details.sos-dia'); if (d && matchMedia('(hover:hover)').matches) d.open = true; });
+document.addEventListener('mouseout', e => { const d = e.target.closest && e.target.closest('details.sos-dia');
+  if (d && matchMedia('(hover:hover)').matches && !d.contains(e.relatedTarget)) d.open = false; });
+
+/* ---------- USHUAIA: temporadas, feriados, eventos ---------- */
+function enTemporada(t, iso = hoyISO()){
+  const md = iso.slice(5);
+  return t.desde <= t.hasta ? md >= t.desde && md <= t.hasta : md >= t.desde || md <= t.hasta;
+}
+function diasHasta(md, iso = hoyISO()){
+  const y = +iso.slice(0, 4); let f = `${y}-${md}`; if (f < iso) f = `${y + 1}-${md}`;
+  return Math.round((fechaDe(f) - fechaDe(iso)) / DIA);
+}
+/* El próximo feriado de verdad (nacional, provincial o municipal): los
+   días religiosos y los no laborables no cuentan como feriado. */
+const proximoFeriado = () => proximoFeriadoReal();
+R.ushuaia = {
+  titulo: 'Ushuaia hoy', icon: 'pin', color: 'sky', sub: 'Temporadas, feriados y eventos de la ciudad',
+  render(){
+    const s = Store.s, hoy = hoyISO();
+    const temp = s.temporadas.map(t => { const on = enTemporada(t);
+      const d = on ? diasHasta(t.hasta) : diasHasta(t.desde);
+      return `<div class="card"><div class="row"><span class="ic ic-${on ? 'ok' : 'sky'}" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center">${I(t.icon || 'calendar')}</span>
+        <div class="grow"><b>${esc(t.nombre)}</b><div class="small ${on ? '' : 'muted'}">${on ? `En temporada · termina en ${plural(d, 'día')}` : `Empieza en ${plural(d, 'día')}`}</div></div>
+        <span class="pill ${on ? 'p-ok' : ''}">${on ? 'Ahora' : 'Fuera'}</span></div>
+        <div class="muted tiny" style="margin-top:8px">${esc(t.nota || '')}</div></div>`; }).join('');
+    const info = diaInfo(hoy);
+    const agenda = [...feriadosDe(+hoy.slice(0, 4)), ...feriadosDe(+hoy.slice(0, 4) + 1)].filter(f => f.fecha >= hoy);
+    const fer = agenda.filter(f => !f.laborable).slice(0, 8);
+    const noLab = agenda.filter(f => f.laborable && /no laborable/i.test(f.tipo)).slice(0, 6);
+    const relig = agenda.filter(f => f.ambito === 'católica' || f.ambito === 'judía').slice(0, 10);
+    const chipAmbito = f => `<span class="pill ${ {nacional:'p-brand', provincial:'p-accent', municipal:'p-wood', 'católica':'', 'judía':''}[f.ambito] || ''}">${esc(f.ambito)}</span>`;
+    const evs = s.eventosCiudad.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha));
+        const hoyCru = Cruceros.hoy();
+    return `${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}
+      ${hoyCru.length ? aviso('info', 'send', `Hoy recala${hoyCru.length > 1 ? 'n' : ''} ${hoyCru.map(c => esc(c.barco)).join(', ')}`, `${hoyCru.reduce((a, c) => a + (+c.pasajeros || 0), 0) || ''} pasajeros en el centro · más tránsito y más gente en los comercios`) : ''}
+      ${sec('Temporadas')}${temp}
+      ${sec('Cruceros')}${superficie({ v:'cruceros', icon:'send', color:'brand', t:'Arribos y partidas de cruceros', s: Cruceros.linea() + ' · cronograma oficial del puerto' })}
+      ${sec('Hoy')}
+      <div class="card ${info.laboral ? '' : 'plana'}" style="${info.laboral ? '' : 'background:var(--warn-soft)'}">
+        <div class="row"><span class="ic ic-${info.laboral ? 'ok' : 'warn'}" style="width:44px;height:44px;border-radius:14px;display:grid;place-items:center">${I(info.laboral ? 'check' : 'calendar')}</span>
+          <div class="grow"><b style="font-size:16px">${esc(info.resumen)}</b>
+            <div class="muted small">${fechaLarga(hoy)}${info.laboral ? ' · se trabaja y la Administración atiende' : info.feriado ? ' · no se trabaja; la recolección y los comercios pueden no funcionar' : ''}</div></div></div>
+        ${info.todos.filter(f => f.ambito === 'católica' || f.ambito === 'judía').map(f => `<div class="small" style="margin-top:8px;color:var(--ink-2)">${I(f.ambito === 'judía' ? 'star' : 'tree')} ${esc(f.nombre)} (${esc(f.ambito)})${f.noLaboralJudio ? ' · día no laborable para quienes profesan la religión judía' : ''}</div>`).join('')}
+      </div>
+      ${sec('Próximos feriados', esAdmin() ? `<button class="link" data-a="abrir" data-v="admin" data-p="contenido|feriados">Provinciales y puentes</button>` : '')}
+      <div class="card lista">${fer.length ? fer.map(f => `<div class="it"><div class="txt"><b>${esc(f.nombre)}</b>
+        <span>${fechaLarga(f.fecha)}${f.tipo === 'trasladable' ? ' · trasladado' : ''}${f.aConfirmar ? ' · a confirmar' : ''}</span></div>
+        ${chipAmbito(f)}<span class="pill ${f.fecha === hoy ? 'p-ok' : ''}">${relDia(f.fecha)}</span></div>`).join('') : vacio('calendar', 'No hay feriados próximos.')}</div>
+      ${noLab.length ? sec('Días no laborables') + `<div class="card lista">${noLab.map(f => `<div class="it"><div class="txt"><b>${esc(f.nombre)}</b><span>${fechaLarga(f.fecha)} · trabajar o no lo decide el empleador</span></div><span class="pill">${relDia(f.fecha)}</span></div>`).join('')}</div>` : ''}
+      ${sec('Calendario religioso', `<span class="muted small">católico y judío</span>`)}
+      <div class="card lista">${relig.map(f => `<div class="it"><span class="ic ic-${f.ambito === 'judía' ? 'accent' : 'brand'}" style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center">${I(f.ambito === 'judía' ? 'star' : 'tree')}</span>
+        <div class="txt"><b>${esc(f.nombre)}</b><span>${fechaLarga(f.fecha)}${f.noLaboralJudio ? ' · no laborable (Ley 24.571)' : ''}</span></div>
+        <span class="pill ${f.fecha === hoy ? 'p-ok' : ''}">${relDia(f.fecha)}</span></div>`).join('') || '<p class="muted small" style="margin:6px 0">Sin fiestas próximas.</p>'}</div>
+      <p class="muted tiny">Las fiestas judías empiezan al atardecer del día anterior. Los feriados nacionales, la Pascua y el calendario hebreo los calcula la app con las reglas de la Ley 27.399, el cómputo de la Pascua y la aritmética del calendario hebreo: no dependen de que alguien los cargue.</p>
+      ${sec('Eventos en la ciudad', esStaff() || true ? `<button class="link" data-a="nuevo-evento-ciudad">Sumar uno</button>` : '')}
+      ${evs.length ? evs.map(e => `<div class="card"><div class="row" style="align-items:flex-start"><div class="evento-box" style="margin:0;padding:0;background:none"><div class="fecha"><small>${MESES[fechaDe(e.fecha).getMonth()]}</small><b>${fechaDe(e.fecha).getDate()}</b></div></div>
+        <div class="grow"><b>${esc(e.titulo)}</b><div class="muted small">${esc(e.tipo || '')}${e.hora ? ' · ' + e.hora + ' h' : ''}${e.lugar ? ' · ' + esc(e.lugar) : ''}</div>${e.nota ? `<div class="small" style="margin-top:4px;color:var(--ink-2)">${esc(e.nota)}</div>` : ''}
+        ${e.link ? `<a class="small" href="${esc(e.link)}" target="_blank" rel="noopener">Más información</a>` : ''}</div></div></div>`).join('') : vacio('calendar', 'No hay eventos cargados.')}
+      ${sec('Fauna en el barrio')}${superficie({ a:'avistamiento', icon:'eye', color:'warn', t:'Avisar un avistamiento', s:`${plural(s.avistamientos.filter(a => Date.now() - a.at < 7 * DIA).length, 'aviso')} esta semana` })}
+      <p class="muted tiny">Lo provincial, lo municipal y los "días no laborables con fines turísticos" (los puentes) los fija cada año un decreto o una ordenanza: esos sí los confirma la Administración desde Contenido → Feriados, y hasta entonces aparecen marcados "a confirmar".</p>`;
+  },
+};
+A['nuevo-evento-ciudad'] = () => hoja('Sumar un evento de la ciudad', `<form data-f="evento-ciudad">
+  <div class="field"><label>Evento</label><input name="titulo" required maxlength="80" placeholder="Recital, partido, feria…"></div>
+  <div class="grid3"><div class="field"><label>Tipo</label><select name="tipo"><option>Deporte</option><option>Recital</option><option>Festival</option><option>Feria</option><option>Acto</option><option>Otro</option></select></div>
+    <div class="field"><label>Fecha</label><input type="date" name="fecha" required min="${hoyISO()}"></div><div class="field"><label>Hora</label><input type="time" name="hora"></div></div>
+  <div class="field"><label>Lugar</label><input name="lugar" maxlength="60"></div>
+  <div class="field"><label>Enlace con la fuente (opcional)</label><input name="link" type="url" placeholder="https://"></div>
+  <button class="btn btn-pri btn-block">${I('plus')}Sumar</button></form>`);
+F['evento-ciudad'] = d => { Store.cambiar(s => s.eventosCiudad.push({ id:uid(), titulo:d.titulo.trim(), tipo:d.tipo, fecha:d.fecha, hora:d.hora, lugar:d.lugar, link:d.link, nota:'', por:yo().id })); cerrarHoja(); toast('Evento sumado', 'calendar'); };
+
+/* ---------- VUELOS USH ----------
+   El aeropuerto de Ushuaia no es de Aeropuertos Argentina: su tablero lo
+   publica London Supply en flightstats.londonsupplygroup.com, y ese sí deja
+   que la app lo lea directo (manda access-control-allow-origin: *). De ahí
+   salen arribos y partidas del día, con estado, estima y puerta.
+   El Worker del barrio (Ajustes → Vuelos) ya no hace falta para el tablero:
+   queda solo para ver los aviones en vivo sobre el barrio. */
+/* =========================================================
+   CRUCEROS
+   Salen del cronograma oficial del Instituto Fueguino de Turismo
+   (findelmundo.tur.ar), armado con los datos de la Dirección Provincial
+   de Puertos. El navegador no puede leer esa página directo, así que la
+   lee el Apps Script del correo (?q=cruceros) y la devuelve lista; él
+   mismo la guarda 3 horas. Acá se guarda otras 3 horas en el equipo.
+   Si el Apps Script todavía no tiene esta parte, se usan las recaladas
+   que la Administración cargue a mano (Contenido → Recaladas).
+   Lo que NO hay: la posición del barco en el mar en tiempo real (eso es
+   AIS, y los servicios que lo dan son pagos). Lo que sí: a qué hora llega
+   y sale cada uno, y si en este momento está amarrado en el puerto.
+   ========================================================= */
+/* Datos generales de los barcos que más vienen (eslora aproximada, en
+   metros). Si un barco no está, la ficha se arma con lo que da el
+   cronograma: pasajeros, operador y tipo de viaje. */
+const FICHAS_BARCOS = {
+  'VENTUS AUSTRALIS':89, 'STELLA AUSTRALIS':89, 'OCEAN ALBATROS':104, 'SYLVIA EARLE':104, 'GREG MORTIMER':104, 'OCEAN EXPLORER':104,
+  'OCEAN VICTORY':104, 'DOUGLAS MAWSON':104, 'HONDIUS':108, 'ORTELIUS':91, 'PLANCIUS':89, 'SEA SPIRIT':91, 'OCEAN NOVA':73,
+  'FRIDTJOF NANSEN':140, 'ROALD AMUNDSEN':140, 'SEABOURN VENTURE':170, 'SEABOURN PURSUIT':170, 'VIKING POLARIS':205, 'VIKING OCTANTIS':205,
+  "L'AUSTRAL":142, 'LE BOREAL':142, 'LE LYRIAL':142, 'NAT. GEO. ENDURANCE':124, 'NAT. GEO. RESOLUTION':124, 'SCENIC ECLIPSE':168, 'SCENIC ECLIPSE II':168,
+  'WORLD NAVIGATOR':126, 'WORLD VOYAGER':126, 'WORLD TRAVELLER':126, 'SH VEGA':108, 'SH MINERVA':108, 'SH DIANA':125, 'ULTRAMARINE':128,
+  'MAGELLAN EXPLORER':90, 'HANSEATIC INSPIRATION':139, 'HANSEATIC SPIRIT':139, 'BARK EUROPA':56, 'VIKING JUPITER':228,
+  'CELEBRITY EQUINOX':317, 'MAJESTIC PRINCESS':330, 'OOSTERDAM':285, 'ZAANDAM':237, 'MSC MAGNIFICA':293, 'COSTA SERENA':290,
+  'QUEEN ANNE':322, 'CARNIVAL FIRENZE':272, 'SEVEN SEAS MARINER':216, 'SILVER NOVA':244, 'AZAMARA JOURNEY':181,
+};
+const Cruceros = {
+  KEY:'bhc.cruceros', d:null, cargando:null,
+  leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
+  /* Todo junto: lo oficial y lo que cargó la Administración, sin repetir. */
+  lista(){
+    if (!this.d) this.leer();
+    const of = (this.d?.barcos || []).map(b => ({ ...b, fecha:b.llega.slice(0, 10), oficial:true }));
+    const man = aLista(Store.s.cruceros).filter(c => c && c.fecha).map(c => ({ barco:c.barco, fecha:c.fecha,
+      llega:c.fecha + 'T' + (c.llega || '00:00'), sale:c.fecha + 'T' + (c.sale || c.llega || '23:59'), pasajeros:+c.pasajeros || 0,
+      operador:c.naviera || c.operador || '', tipo:c.tipo || '', nota:c.nota || '' }))
+      .filter(c => !of.some(o => o.fecha === c.fecha && normTxt(o.barco) === normTxt(c.barco)));
+    return [...of, ...man].sort((a, b) => a.llega.localeCompare(b.llega));
+  },
+  hoy(){ const h = hoyISO(); return this.lista().filter(c => c.fecha === h || (c.llega.slice(0, 10) <= h && c.sale.slice(0, 10) >= h)); },
+  enPuerto(){ const n = new Date(), ya = `${isoDe(n)}T${pad(n.getHours())}:${pad(n.getMinutes())}`; return this.lista().filter(c => c.llega <= ya && c.sale >= ya); },
+  linea(){
+    const hoy = this.hoy(), ahora = this.enPuerto();
+    if (ahora.length) return `${plural(ahora.length, 'barco en el puerto', 'barcos en el puerto')} ahora`;
+    if (hoy.length) return `${plural(hoy.length, 'recalada', 'recaladas')} hoy`;
+    const prox = this.lista().find(c => c.fecha > hoyISO());
+    return prox ? `Próximo: ${conMayusculasBarco(prox.barco)} ${relDia(prox.fecha)}` : 'Arribos y partidas';
+  },
+  pasajerosHoy(){ return this.hoy().reduce((a, c) => a + (c.pasajeros || 0), 0); },
+  url(){ const d = typeof Correo !== 'undefined' ? Correo.datos() : null; return d && d.url; },
+  async pedir(forzar = false){
+    if (!this.d) this.leer();
+    if (!forzar && this.d && Date.now() - this.d.t < 3 * HORA) return this.d;
+    if (this.cargando) return this.cargando;
+    const u = this.url(); if (!u) return null;
+    this.cargando = fetch(u + (u.includes('?') ? '&' : '?') + 'q=cruceros' + (forzar ? '&forzar=1' : ''))
+      .then(r => r.json()).then(j => {
+        if (!j || !Array.isArray(j.barcos)) throw new Error('El Apps Script todavía no tiene la parte de cruceros');
+        this.d = { t:Date.now(), barcos:j.barcos, actualizado:j.actualizado || '', fuente:j.fuente || '' };
+        try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
+        return this.d;
+      }).catch(e => { this.error = e.message; return null; }).finally(() => { this.cargando = null; });
+    return this.cargando;
+  },
+  /* Qué clase de barco es, dicho en simple. */
+  clase(c){
+    const p = c.pasajeros || 0, t = normTxt(c.tipo);
+    if (/velero|bark|yate/i.test(c.barco)) return 'Velero o yate: pocos pasajeros, navegación a vela y a motor.';
+    if (p > 1000) return 'Crucero grande: varios restaurantes, teatro, piscinas, gimnasio y spa. Recala por el día en viajes que unen el Atlántico y el Pacífico.';
+    if (/antart/.test(t)) return 'Barco de expedición polar: casco reforzado para el hielo, botes zodiac para desembarcar, charlas de naturalistas y, en muchos, kayak.';
+    if (/regional/.test(t)) return 'Crucero regional por el Canal Beagle, el Estrecho de Magallanes y el Cabo de Hornos, con desembarcos en la Patagonia chilena.';
+    return p > 400 ? 'Crucero mediano con salidas de expedición.' : 'Barco de expedición chico.';
+  },
+};
+const horaDe = iso => iso ? iso.slice(11, 16) : '';
+const diaDe = iso => iso ? (iso.slice(0, 10) === hoyISO() ? 'hoy' : relDia(iso.slice(0, 10))) : '';
+function fichaCrucero(c){
+  const n = new Date(), ya = `${isoDe(n)}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const estado = c.llega <= ya && c.sale >= ya ? ['ok', 'En el puerto ahora'] : c.sale < ya ? ['', 'Ya zarpó'] : ['sky', 'Por llegar'];
+  const eslora = FICHAS_BARCOS[normTxt(c.barco).toUpperCase().trim()] || FICHAS_BARCOS[c.barco.toUpperCase().trim()];
+  return `<div class="card crucero"><div class="row" style="align-items:flex-start">
+      <span class="ic ic-${estado[0] || 'brand'}" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('send')}</span>
+      <div class="grow"><b style="font-size:15.5px">${esc(conMayusculasBarco(c.barco))}</b>
+        <div class="muted small">${c.operador ? esc(c.operador) : ''}${c.tipo ? ' · ' + esc(c.tipo) : ''}</div></div>
+      <span class="pill ${estado[0] ? 'p-' + estado[0] : ''}">${estado[1]}</span></div>
+    <div class="crucero-datos">
+      <div><span>Llega</span><b>${horaDe(c.llega) || '—'} h</b><small>${diaDe(c.llega)}</small></div>
+      <div><span>Sale</span><b>${horaDe(c.sale) || '—'} h</b><small>${diaDe(c.sale)}</small></div>
+      <div><span>Pasajeros</span><b>${c.pasajeros ? c.pasajeros.toLocaleString('es-AR') : '—'}</b><small>capacidad</small></div>
+      <div><span>Eslora</span><b>${eslora ? '≈ ' + eslora + ' m' : '—'}</b><small>${eslora ? 'largo del barco' : 'sin dato'}</small></div>
+    </div>
+    <p class="small" style="margin:8px 0 0;color:var(--ink-2)">${esc(Cruceros.clase(c))}${c.nota ? ' ' + esc(c.nota) : ''}</p>
+    ${c.web ? `<a class="link small" href="${esc(c.web)}" target="_blank" rel="noopener">${I('right')} Sitio de ${esc(c.operador || 'la naviera')}</a>` : ''}</div>`;
+}
+const conMayusculasBarco = t => String(t || '').trim().toLowerCase().replace(/(^|[\s.'´-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()).replace(/\bSh\b/, 'SH').replace(/\bMsc\b/, 'MSC').replace(/\bIi\b/, 'II');
+R.cruceros = {
+  titulo: 'Cruceros', icon: 'send', color: 'brand', sub: 'Arribos y partidas del puerto de Ushuaia',
+  render(){
+    const todos = Cruceros.lista(), hoy = hoyISO();
+    const ahora = Cruceros.enPuerto(), deHoy = Cruceros.hoy();
+    const prox = todos.filter(c => c.fecha > hoy && c.fecha <= sumarDias(hoy, 21));
+    const porDia = {}; prox.forEach(c => (porDia[c.fecha] = porDia[c.fecha] || []).push(c));
+    const d = Cruceros.d;
+    return `<div class="admin-hero" style="background:var(--g-brand)">
+        <b style="font-size:18px">${ahora.length ? plural(ahora.length, 'barco amarrado ahora', 'barcos amarrados ahora') : deHoy.length ? plural(deHoy.length, 'recalada hoy', 'recaladas hoy') : 'Hoy no recala ningún crucero'}</b>
+        <div class="small" style="opacity:.85">${deHoy.length ? `Hasta ${Cruceros.pasajerosHoy().toLocaleString('es-AR')} pasajeros en la ciudad: más tránsito en el centro, el puerto y la Ruta 3.` : 'Día tranquilo en el puerto.'}</div></div>
+      ${deHoy.length ? sec('Hoy') + deHoy.map(fichaCrucero).join('') : ''}
+      ${sec('Próximas tres semanas', `<button class="link" data-a="cruceros-actualizar">Actualizar</button>`)}
+      ${Object.keys(porDia).length ? Object.entries(porDia).map(([f, cs]) => `<details class="crucero-dia"><summary><b>${fechaLarga(f)}</b><span class="muted small">${relDia(f)} · ${plural(cs.length, 'barco')} · ${cs.reduce((a, c) => a + (c.pasajeros || 0), 0).toLocaleString('es-AR')} pasajeros</span></summary>${cs.map(fichaCrucero).join('')}</details>`).join('')
+        : `<div class="card plana small">${Cruceros.url() ? (Cruceros.error ? esc(Cruceros.error) + '. Hay que actualizar el Apps Script con el código nuevo (apps-script/Codigo.gs) y hacer "Nueva versión".' : 'No hay recaladas anunciadas para las próximas tres semanas.') : 'Para que los cruceros lleguen solos hace falta el Apps Script del correo configurado (Administración → Ajustes → Correo).'}</div>`}
+      <p class="muted tiny" style="margin-top:12px">Fuente: cronograma oficial del Instituto Fueguino de Turismo con datos de la Dirección Provincial de Puertos${d?.actualizado ? `, actualizado al ${esc(d.actualizado)}` : ''}. Se revisa solo cada 3 horas. Las horas son las anunciadas: pueden cambiar por el clima. La eslora es aproximada.</p>
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido|cruceros', icon:'plus', color:'accent', t:'Cargar una recalada a mano', s:'Para un barco que no figure en el cronograma' }) : ''}`;
+  },
+  alPintar(){ if (!Cruceros.d || Date.now() - Cruceros.d.t > 3 * HORA) Cruceros.pedir().then(v => { if (v && PILA.at(-1)?.id === 'cruceros') refrescar(); }); },
+};
+A['cruceros-actualizar'] = () => Cruceros.pedir(true).then(v => { refrescar(); toast(v ? 'Cruceros actualizados' : 'No se pudo leer el cronograma' + (Cruceros.error ? ': ' + Cruceros.error : ''), v ? 'refresh' : 'alert'); });
+
+const Vuelos = {
+  KEY:'bhc.vuelos', TABLERO:'https://flightstats.londonsupplygroup.com/', d:null, estado:'', cargando:null,
+  leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
+  cuantosHoy(){ return this.d && Date.now() - this.d.t < 6 * HORA ? (this.d.arr.length + this.d.dep.length) || '' : ''; },
+  campo(o, ...ks){ for (const k of ks) if (o && o[k] != null && o[k] !== '') return o[k]; return ''; },
+  hhmm(x){ const m = String(x || '').match(/(\d{1,2}):(\d{2})/); return m ? `${pad(m[1])}:${m[2]}` : ''; },
+
+  /* Una fila del tablero de London Supply. Las columnas son siempre las
+     mismas: aerolínea, vuelo, procedencia o destino, horario, estima,
+     estado y puerta. */
+  fila(li, tipo){
+    const txt = c => (li.querySelector('.' + c)?.textContent || '').replace(/\s+/g, ' ').trim();
+    const lugar = txt('c3');
+    return { tipo, nro:txt('c2'), aerolinea:li.querySelector('.c1 img')?.getAttribute('alt') || '',
+      lugar:lugar.replace(/^\(([A-Z]{3})\)\s*/, '').trim() || lugar, iata:(lugar.match(/^\(([A-Z]{3})\)/) || [])[1] || '',
+      hora:this.hhmm(txt('c4')), real:this.hhmm(txt('c5')), estado:txt('c6'), puerta:txt('c7') };
+  },
+  /* La página viene en iso-8859-1: si se lee como UTF-8 los acentos salen rotos. */
+  async tablero(mov, tipo){
+    const r = await fetch(this.TABLERO + mov + '-USH', { cache:'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const doc = new DOMParser().parseFromString(new TextDecoder('iso-8859-1').decode(await r.arrayBuffer()), 'text/html');
+    const act = (doc.querySelector('.inf-act')?.textContent || '').match(/(\d{1,2}:\d{2})hs\s*$/);
+    return { filas:[...doc.querySelectorAll('li.dl')].map(li => this.fila(li, tipo)).filter(v => v.nro), act:act ? act[1] : '' };
+  },
+
+  /* Aviones en el aire sobre el barrio. Los servicios de ADS-B no se dejan
+     leer desde una página, así que esto sale solo si hay Worker propio. */
+  normalizarVivo(v){
+    return Array.isArray(v)
+      ? { callsign:(v[1] || '').trim(), alt:Math.round(v[7] || 0), vel:Math.round((v[9] || 0) * 3.6), suelo:v[8] }
+      : { callsign:v.callsign || v.flight || '', alt:v.alt || 0, vel:v.vel || 0, suelo:v.suelo };
+  },
+  async vivos(){
+    const px = Store.s.config.vuelosProxy;
+    if (!px) return null;
+    try {
+      const j = await fetch(px + (px.includes('?') ? '&' : '?') + 'apt=USH').then(r => r.json());
+      return (j.states || j.vivos || []).map(v => this.normalizarVivo(v));
+    } catch(e){ return null; }
+  },
+
+  /* Cada cuánto se vuelve a leer el tablero: cada 2 minutos si hay un vuelo
+     a menos de media hora (así la estima y el "Despegado" llegan a tiempo),
+     y cada 5 el resto del día. */
+  cadencia(){
+    const d = this.d; if (!d) return 2 * MIN;
+    const min = ahoraMin();
+    const cerca = [...(d.arr || []), ...(d.dep || [])].some(v => { const t = this.minutos(v.real || v.hora); return t !== null && Math.abs(t - min) <= 30; });
+    return cerca ? 2 * MIN : 5 * MIN;
+  },
+  recien: [],   /* partidas que acaban de pasar a "Despegado" en esta lectura */
+  async pedir(forzar = false){
+    if (!forzar && this.d && Date.now() - this.d.t < this.cadencia()) return this.d;
+    if (this.cargando) return this.cargando;
+    this.cargando = (async () => {
+      const [a, d, vivos] = await Promise.all([
+        this.tablero('arribos', 'A').catch(() => null),
+        this.tablero('partidas', 'D').catch(() => null),
+        this.vivos(),
+      ]);
+      if (!a && !d){ this.estado = navigator.onLine ? 'sin-fuente' : 'sin-conexion'; return this.d; }
+      this.estado = 'ok';
+      /* El momento en que el aeropuerto marca "Despegado" es lo más cercano a
+         tiempo real que hay: ese avión está pasando por arriba del barrio. */
+      const antes = new Set((this.d?.dep || []).filter(v => /despeg|depart/i.test(v.estado)).map(v => v.nro));
+      const hayAntes = !!(this.d && this.d.dep && this.d.dep.length && Date.now() - this.d.t < 15 * MIN);
+      this.recien = hayAntes ? (d?.filas || []).filter(v => /despeg|depart/i.test(v.estado) && !antes.has(v.nro)) : [];
+      this.d = { t:Date.now(), arr:a?.filas || [], dep:d?.filas || [], act:a?.act || d?.act || '', vivos:vivos || [] };
+      try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
+      return this.d;
+    })().finally(() => { this.cargando = null; });
+    return this.cargando;
+  },
+
+  /* ¿Hay un avión pasando por arriba del barrio ahora mismo?
+     El barrio está a 6 km de la cabecera, bajo la traza: los que llegan
+     pasan unos minutos antes de tocar tierra y los que salen, poco después
+     de despegar. Si hay Worker, lo que manda es el avión de verdad. */
+  minutos(h){ const m = String(h || '').match(/(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; },
+  /* Solo cruza un avión que puede estar pasando ahora: (1) la lectura del
+     tablero tiene que ser de los últimos 15 minutos (no una vieja guardada
+     en el equipo); (2) un "Despegado" cuenta solo si la hora del vuelo
+     (estimada o programada) está entre 2 horas antes y 20 minutos después
+     de ahora; (3) el cartel dice siempre la hora del vuelo. */
+  horaPosible(v, min, antes = 120, despues = 20){ const t = this.minutos(v.real || v.hora); return t !== null && min - t <= antes && t - min <= despues; },
+  sobrevuelos(){
+    const d = this.d; if (!d || Date.now() - (d.t || 0) > 15 * MIN) return [];
+    const ahora = new Date(), min = ahora.getHours() * 60 + ahora.getMinutes(), lista = [];
+    (d.vivos || []).filter(v => !v.suelo && v.alt && v.alt < 4500).forEach(v => lista.push({
+      clave:'vivo-' + (v.callsign || v.alt), titulo:v.callsign || 'Un avión sobre el barrio',
+      detalle:`${v.alt} m de altura · ${v.vel} km/h`, sentido:'A', vivo:true }));
+    const cerca = (t, desde, hasta) => t !== null && min - t >= desde && min - t <= hasta;
+    /* Llegadas: el avión cruza el barrio unos 2 a 5 minutos antes de tocar
+       tierra, según la hora ESTIMADA que publica el aeropuerto (se corrige
+       sola si viene demorado o adelantado). Si ya figura aterrizado, no. */
+    (d.arr || []).forEach(v => { if (/cancel|aterr|arrib|landed/i.test(v.estado)) return;
+      if (cerca(this.minutos(v.real || v.hora), -5, -1)) lista.push({ clave:'a-' + v.nro + (v.real || v.hora),
+        titulo:`${v.nro} está llegando`, detalle:`Viene de ${v.lugar} · aterriza ${v.real || v.hora}`, sentido:'A', vivo:false }); });
+    /* Salidas: en cuanto el aeropuerto lo marca "Despegado"; si no llegó a
+       marcarlo, por la hora estimada. */
+    this.recien.filter(v => this.horaPosible(v, min)).forEach(v => lista.push({ clave:'d-' + v.nro + (v.real || v.hora), titulo:`${v.nro} acaba de despegar`,
+      detalle:`Va a ${v.lugar} · salió ${v.real || v.hora}`, sentido:'D', vivo:false }));
+    (d.dep || []).forEach(v => { if (/cancel/i.test(v.estado)) return;
+      if (cerca(this.minutos(v.real || v.hora), 1, 5)) lista.push({ clave:'d-' + v.nro + (v.real || v.hora),
+        titulo:`${v.nro} acaba de despegar`, detalle:`Va a ${v.lugar} · salió ${v.real || v.hora}`, sentido:'D', vivo:false }); });
+    return lista;
+  },
+  /* El próximo vuelo que va a pasar por arriba del barrio, para mostrarlo. */
+  proximoPaso(){
+    const d = this.d; if (!d) return null;
+    const min = ahoraMin(), cand = [];
+    (d.arr || []).forEach(v => { if (/cancel|aterr|arrib|landed/i.test(v.estado)) return; const t = this.minutos(v.real || v.hora); if (t !== null && t - 3 >= min - 1) cand.push({ v, t:t - 3, tipo:'llega' }); });
+    (d.dep || []).forEach(v => { if (/cancel|despeg|depart/i.test(v.estado)) return; const t = this.minutos(v.real || v.hora); if (t !== null && t + 2 >= min - 1) cand.push({ v, t:t + 2, tipo:'sale' }); });
+    return cand.sort((a, b) => a.t - b.t)[0] || null;
+  },
+};
+Vuelos.leer();
+
+/* ---------- EL AVIÓN QUE CRUZA LA APP ----------
+   Cuando pasa un avión por arriba del barrio, cruza uno por la pantalla.
+   Es un aviso, no una ventana: no tapa nada ni se puede tocar. Cada vuelo
+   se muestra una sola vez y se puede apagar desde la ventana de Vuelos. */
+const Avion = {
+  KEY:'bhc.avion.vistos', PREF:'bhc.avion', timer:null, volando:false,
+  encendido(){ return localStorage.getItem(this.PREF) !== 'no'; },
+  prender(v){ try { localStorage.setItem(this.PREF, v ? 'si' : 'no'); } catch(e){} },
+  vistos(){ try { return JSON.parse(localStorage.getItem(this.KEY)) || {}; } catch(e){ return {}; } },
+  marcar(clave){ const v = this.vistos(); const lim = Date.now() - 6 * HORA;
+    Object.keys(v).forEach(k => { if (v[k] < lim) delete v[k]; });
+    v[clave] = Date.now(); try { localStorage.setItem(this.KEY, JSON.stringify(v)); } catch(e){} },
+
+  arrancar(){
+    if (this.timer) return;
+    this.timer = setInterval(() => this.mirar(), 45000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.mirar(); });
+    this.mirar();
+  },
+  mirar(){
+    if (document.hidden || this.volando || !this.encendido() || !yo()) return;
+    Vuelos.pedir().then(() => {
+      const v = Vuelos.sobrevuelos().find(x => !(x.clave in this.vistos()));
+      if (v){ this.marcar(v.clave); this.pasar(v); }
+    }).catch(() => {});
+  },
+
+  /* El avión cruza la pantalla en línea recta, con una estela corta detrás, y
+     lo hace tres veces. Nada más: es un guiño al pasar, no una animación que
+     pida atención. El color lo pone el tema —oscuro de día, claro de noche—
+     para que se vea sobre cualquier fondo. El único trozo que se puede tocar
+     es el cartel con los datos del vuelo. */
+  pasar(v){
+    if (this.volando) return;
+    this.volando = true;
+    const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const el = document.createElement('div');
+    el.className = 'sobrevuelo' + (v.sentido === 'D' ? ' vuelve' : '') + (quieto ? ' quieto' : '');
+    el.innerHTML = `<div class="avion">${I('send')}<span class="estela"></span></div>
+      <div class="avion-cartel"><b>${esc(v.titulo)}</b><span>${esc(v.detalle)}${v.vivo ? ' · en vivo' : ''}</span></div>`;
+    document.body.appendChild(el);
+    const fin = () => { if (!el.isConnected) return; el.remove(); this.volando = false; };
+    el.querySelector('.avion-cartel').addEventListener('click', () => { fin(); abrir('vuelos'); });
+    setTimeout(fin, quieto ? 5000 : 25000);   /* tres pasadas de 7,5 s y el cartel */
+  },
+};
+
+R.vuelos = {
+  titulo: 'Vuelos de Ushuaia', icon: 'send', color: 'accent', sub: 'Aeropuerto Malvinas Argentinas · a 6 km del barrio',
+  render(){
+    const d = Vuelos.d, hay = d && (d.arr.length || d.dep.length);
+    const fila = v => `<div class="it"><div class="mono" style="font-weight:800;width:52px">${esc(v.hora)}</div><div class="txt"><b>${esc(v.lugar)}</b><span>${esc(v.nro)}${v.aerolinea ? ' · ' + esc(v.aerolinea) : ''}${v.puerta ? ' · puerta ' + esc(v.puerta) : ''}</span></div>
+      <span class="pill ${/cancel/i.test(v.estado) ? 'p-danger' : /demor|delay/i.test(v.estado) ? 'p-warn' : /aterr|arrib|despeg|landed|departed/i.test(v.estado) ? 'p-ok' : ''}">${esc(v.estado || (v.real ? 'Est. ' + v.real : 'Programado'))}</span></div>`;
+    const porHora = {}; if (hay) [...d.arr, ...d.dep].forEach(v => { const h = v.hora.slice(0, 2); if (h) porHora[h] = (porHora[h] || 0) + 1; });
+    const horas = Object.keys(porHora).sort(), pico = Math.max(1, ...Object.values(porHora));
+    const estados = {
+      '': `<div class="vacio">${I('refresh')}Buscando los vuelos de hoy…</div>`,
+      'sin-fuente': aviso('info', 'info', 'No se pudo leer el tablero del aeropuerto',
+        'El tablero lo publica London Supply y a veces no responde. Probá de nuevo en un rato o mirá el sitio oficial acá abajo.'),
+      'sin-conexion': aviso('warn', 'cloud', 'Sin internet', 'Cuando vuelva la conexión, se actualiza solo.'),
+    };
+    return `${hay ? '' : (estados[Vuelos.estado] || estados[''])}
+      ${(() => { const pp = Vuelos.proximoPaso(); if (!pp) return '';
+        const hh = `${pad(Math.floor(pp.t / 60) % 24)}:${pad(pp.t % 60)}`, falta = pp.t - ahoraMin();
+        return `<div class="card vuelo-prox"><span class="ic ic-accent">${I('send')}</span><div class="grow"><small class="muted">Próximo paso sobre el barrio</small>
+          <b>${esc(pp.v.nro)} · ${pp.tipo === 'llega' ? 'llegando de' : 'saliendo a'} ${esc(pp.v.lugar)}</b>
+          <span class="small">cerca de las ${hh} h${falta > 0 ? ` · en ${falta >= 60 ? Math.floor(falta / 60) + ' h ' : ''}${falta % 60} min` : ' · ahora'}${pp.v.real && pp.v.real !== pp.v.hora ? ` · estimado ${esc(pp.v.real)} (programado ${esc(pp.v.hora)})` : ''}</span></div></div>`; })()}
+      ${hay ? `<div class="garita-kpis"><div class="kpi"><b>${d.arr.length}</b><span>Arribos</span></div><div class="kpi"><b>${d.dep.length}</b><span>Partidas</span></div><div class="kpi"><b>${d.arr.length + d.dep.length}</b><span>Hoy</span></div></div>
+        ${horas.length ? `<div class="card"><b style="font-size:14px">Movimientos por hora</b><div style="display:flex;align-items:flex-end;gap:4px;height:70px;margin-top:10px">${horas.map(h => `<div style="flex:1;text-align:center"><div style="height:${Math.round(porHora[h] / pico * 56) + 4}px;background:var(--g-accent);border-radius:4px 4px 0 0"></div><div class="tiny muted">${h}</div></div>`).join('')}</div>
+          <p class="muted tiny" style="margin:8px 0 0">El barrio está bajo la traza de aproximación: así se ve cuándo hay más movimiento.</p></div>` : ''}
+        ${sec('Arribos')}<div class="card lista">${d.arr.map(fila).join('') || vacio('send', 'Sin arribos')}</div>
+        ${sec('Partidas')}<div class="card lista">${d.dep.map(fila).join('') || vacio('send', 'Sin partidas')}</div>` : ''}
+      ${d?.vivos?.length ? sec('En el aire ahora, cerca del barrio') + `<div class="card lista">${d.vivos.map(v => `<div class="it"><span class="ic ic-sky" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I('send')}</span>
+        <div class="txt"><b>${esc(v.callsign || 'Sin identificar')}</b><span>${v.suelo ? 'En tierra' : `${v.alt} m de altura · ${v.vel} km/h`}</span></div></div>`).join('')}</div>` : ''}
+      ${sec('Cuando pasa un avión')}
+      ${superficie({ a:'avion-aviso', icon:'send', color:Avion.encendido() ? 'ok' : 'accent', t:Avion.encendido() ? 'Avisarme: está activado' : 'Avisarme: está apagado',
+        s:'Cruza un avión por la pantalla cuando uno sobrevuela el barrio' })}
+      ${sec('Ver en el sitio oficial')}
+      ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/arribos-USH', icon:'login', color:'accent', t:'Arribos a Ushuaia', s:'Tablero del aeropuerto · horarios y estado' })}
+      ${superficie({ a:'link', v:'https://flightstats.londonsupplygroup.com/partidas-USH', icon:'logout', color:'accent', t:'Partidas de Ushuaia', s:'Tablero del aeropuerto' })}
+      ${superficie({ a:'link', v:'https://www.flightradar24.com/-54.84,-68.30/11', icon:'eye', color:'sky', t:'Mapa de aviones en vivo', s:'Flightradar24 sobre el barrio' })}
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'brand', t:'Configurar el Worker de vuelos', s:'Opcional: para ver los aviones en vivo dentro de la app' }) : ''}
+      <button class="btn btn-sec btn-block" data-a="vuelos-actualizar">${I('refresh')}Actualizar</button>
+      ${d ? `<p class="muted tiny center">Última actualización: ${hora(d.t)}${d.act ? ` · el aeropuerto actualizó ${d.act}` : ''}</p>` : ''}`;
+  },
+  alPintar(){ if (!Vuelos.d || Date.now() - Vuelos.d.t > 5 * MIN) Vuelos.pedir().then(() => { if (PILA.at(-1)?.id === 'vuelos') refrescar(); }); },
+};
+/* Leer el tablero del aeropuerto tarda unos segundos: el botón lo dice al
+   instante ("Actualizando…") para que no parezca que no anda. */
+A['vuelos-actualizar'] = el => {
+  if (el && el.tagName === 'BUTTON'){ el.disabled = true; el.innerHTML = `${I('refresh')}Actualizando… (lee el tablero del aeropuerto)`; el.classList.add('cargando'); }
+  toast('Leyendo el tablero del aeropuerto…', 'refresh');
+  return Vuelos.pedir(true).then(() => toast('Vuelos actualizados', 'check')).catch(() => toast('No se pudo leer el tablero del aeropuerto', 'alert')).finally(() => refrescar());
+};
+
+A['avion-aviso'] = () => { Avion.prender(!Avion.encendido()); refrescar(); toast(Avion.encendido() ? 'Te avisamos cuando pase un avión' : 'Aviso de aviones apagado', 'send'); };
+A['link'] = el => window.open(el.dataset.v, '_blank', 'noopener');
+
+/* ---------- MI CASA ---------- */
+R.perfil = {
+  titulo: 'Mi casa', icon: 'home', color: 'ok', sub: 'Tus datos, familia, autos y mascotas',
+  render(){
+    const u = yo(), tema = Store.sesion.tema || 'auto';
+    if (esPropDistancia(u)) return perfilPropietario(u);
+    const notif = 'Notification' in window ? Notification.permission : 'no';
+    const L = loteDe(u);
+    return `<div class="card"><div class="perfil-cab">${avatar(u, 'lg')}<div class="grow"><b style="font-size:18px">${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
+      <div class="muted tiny">${{ vecino:'Vecino/a', admin:'Administración', guardia:'Guardia' }[u.rol]}${u.dni ? ' · DNI ' + esc(u.dni) : ''}${L ? ' · UF ' + L.uf + ' · coeficiente ' + L.coef.toFixed(3) + '%' : ''}</div></div></div></div>
+      <div class="card"><div class="row" style="align-items:flex-start;gap:14px">
+        ${u.fotoCasa ? fotoHTML(u.fotoCasa, 'casa-foto') : `<span class="casa-foto vacia">${I('home')}</span>`}
+        <div class="grow"><b style="font-size:14.5px">Foto del frente de tu casa</b>
+          <p class="muted small" style="margin:4px 0 10px">Sirve para que la guardia y los vecinos reconozcan tu domicilio de una mirada. La foto grande queda en este equipo; a la app solo sube una miniatura.</p>
+          <div class="foto-botones">${botonesFoto('fotoCasaIn')}</div>
+          <input type="hidden" id="fotoCasaIn">
+        </div></div></div>
+      ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Un QR personal para que la garita te reconozca sin mostrar el DNI. Sin datos sensibles.' })}
+      <form data-f="perfil" class="card">
+        ${tengoLote() ? `<div class="grid2"><div class="field"><label>Tu relación con ${esc(u.casa)}</label>${u.relacion
+            /* Una vez elegida la cambia solo la Administración (07-10-2026): de ella dependen el voto y quién maneja el lote alquilado. */
+            ? `<p style="margin:6px 0 0"><b>${esc(RELACIONES[u.relacion] || u.relacion)}</b></p><div class="ayuda">Si cambió, pedíselo a la <button type="button" class="link" data-a="abrir" data-v="privado" data-p="admin">Administración</button>.</div>`
+            : `<select name="relacion" id="pfRel"><option value="" selected>Elegí…</option>${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select><div class="ayuda">Se elige una sola vez; después la cambia la Administración.</div>`}
+          <div class="ayuda">En las votaciones vota el titular del lote. ${u.representante ? '<b>Sos el representante designado del lote.</b>' : ''}</div>
+          ${esDuenoDelLote(u) && !loteAlquilado(u.casa) ? `<button type="button" class="link" data-a="vivo-en-el-lote" data-v="no" style="margin-top:6px">No vivo en el lote (lo tengo vacío o alquilado)</button>` : ''}</div>
+          ${u.relacion === 'inquilino' || u.relacion === 'familiar' ? `<div class="field"><label>Carta poder para votar</label>${u.poderOk ? `<p class="small" style="margin:6px 0 0">${I('check')} Aprobada${u.poderHasta ? ' hasta el ' + fechaCorta(u.poderHasta) : ''}</p>` : u.poderFoto ? '<p class="small muted" style="margin:6px 0 0">Enviada, esperando que la Administración la apruebe.</p>' : `<button type="button" class="btn btn-sm btn-sec" data-a="subir-poder">${I('upload')}Cargar la carta poder</button>`}</div>` : ''}</div>` : ''}
+        <div class="field"><label>Teléfono / WhatsApp</label><input name="tel" id="pfTel" value="${esc(u.tel || '')}" inputmode="tel" maxlength="20"></div>
+        <div class="field"><label>Oficios o servicios que ofrecés</label><input name="skills" id="pfSkills" value="${esc(u.skills || '')}" maxlength="120" placeholder="Ej: electricista, clases de inglés"></div>
+        <label class="check"><input type="checkbox" name="mostrarTel" ${u.mostrarTel ? 'checked' : ''}><span>Publicar mi oficio en <b>Profesionales y oficios</b> (Ushuaia y servicios) con mi WhatsApp</span></label>
+        <label class="check"><input type="checkbox" name="respondedor" ${u.respondedor ? 'checked' : ''}><span><b>Sé primeros auxilios / RCP o soy del equipo de salud.</b> Avisame si un vecino pide ayuda médica con el SOS y cuando la garita sale con el DEA.</span></label>
+        <div class="field" style="margin:6px 0 0 30px"><label>¿Qué sos? (lo ve la garita cuando vas en camino)</label><select name="saludProf" id="pfSalud"><option value="">Elegí…</option>${Object.entries(typeof PROF_SALUD !== 'undefined' ? PROF_SALUD : {}).map(([k, n]) => `<option value="${k}" ${u.saludProf === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+        <hr class="sep"><div class="lbl">Directorio de vecinos</div>
+        <div class="grid2"><div class="field"><label>Profesión</label><input name="profesion" id="pfProf" value="${esc(u.profesion || '')}" maxlength="60" placeholder="Médica, abogado, docente…"></div>
+          <div class="field"><label>Dirección dentro del barrio</label><input name="direccion" id="pfDir" value="${esc(u.direccion || '')}" maxlength="60" placeholder="Calle 3 N° 42"></div></div>
+        <div class="field"><label>Ubicación exacta (para "Cómo llegar")</label><div class="linea-form"><input name="ubicacion" id="pfUbi" value="${esc(u.ubicacion || '')}" placeholder="-54.8195,-68.3790"><button type="button" class="btn btn-sec" data-a="mi-ubicacion" title="Usar mi ubicación actual">${I('pin')}</button></div><div class="ayuda">Tocá el pin estando en tu casa.</div></div>
+        <label class="check"><input type="checkbox" name="enDirectorio" ${u.enDirectorio ? 'checked' : ''}><span>Publicar mi profesión en <b>Profesionales y oficios</b> (Ushuaia y servicios) y mostrar mi teléfono y dirección en el buscador, para que me puedan contactar</span></label>
+        <div class="field" style="margin-top:10px"><label>Quiénes viven en la casa</label><input name="integrantes" id="pfInt" value="${esc(u.integrantes || '')}" maxlength="160"></div>
+        <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
+      ${sec('Vehículos', `<button class="link" data-a="nuevo-vehiculo">Sumar</button>`)}
+      <div class="card lista">${(u.vehiculos || []).length ? u.vehiculos.map((v, i) => `<div class="it">${I('car')}<div class="txt"><b class="mono">${esc(v.patente)}</b><span>${esc(v.modelo || '')}</span></div><button class="icon-btn" data-a="borrar-vehiculo" data-v="${i}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">La guardia reconoce tus patentes al instante.</p>'}</div>
+      ${sec('Mascotas', `<button class="link" data-a="nueva-mascota">Sumar</button>`)}
+      <div class="card lista">${(u.mascotas || []).length ? u.mascotas.map(m => `<div class="it">${m.foto ? fotoHTML(m.foto, 'mini-foto') : I('paw')}<div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.desc || '')}${m.foto ? '' : ' · sin foto'}</span></div><button class="icon-btn" data-a="editar-mascota" data-v="${m.id}" aria-label="Editar o sumar foto">${I(m.foto ? 'edit' : 'camera')}</button><button class="icon-btn" data-a="borrar-mascota" data-v="${m.id}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">Si se pierde, la avisás a todo el barrio con un toque.</p>'}</div>
+      ${Store.s.infracciones.some(i => i.casa === u.casa) ? superficie({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones de la Administración', s:'Infracciones y descargos de tu casa' }) : ''}
+      ${sec('Guardia')}
+      ${(() => { const au = typeof ausenciaDe === 'function' ? ausenciaDe(u) : null; return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t:'Me voy de viaje', s: au ? `Casa sola hasta el ${fechaCorta(au.hasta)} · la revisan cada día` : 'La revisan cada día y te avisan que está en orden' }); })()}
+      ${tengoLote() ? tarjetaInquilino(u) + familiaDelLote(u) : ''}
+      <p class="muted small" style="margin:14px 2px 0">${I('user')} La contraseña, el correo, el modo de pantalla, los avisos del celular, tus datos personales y cerrar sesión están en <button class="link" data-a="mi-cuenta">Tu cuenta</button> (tu inicial, arriba a la derecha).</p>`;
+  },
+};
+/* =========================================================
+   QUIÉNES ESTÁN EN TU LOTE (pedido de Claudio, 28-09-2026)
+   En "Mi casa" ya no se repite lo de "Tu cuenta" (contraseña, correo,
+   modo de pantalla, cerrar sesión): en su lugar, las cuentas anotadas en
+   el mismo lote. Así se ve a toda la familia y, si alguien se anotó en un
+   lote que no es el suyo (o alguien que no conocen pide entrar), se avisa
+   con un toque. Se muestra solo lo necesario: nombre, relación con el
+   lote y si tiene la app abierta ahora; ni DNI ni correo ni teléfono. El
+   aviso va a la carpeta privada de cada cuenta de la Administración (no
+   al pizarrón general) y, sin nombres, a la persona en cuestión.
+   ========================================================= */
+const cuentasDeMiLote = u => Store.s.users.filter(x => x && x.casa === u.casa && (x.estado === 'aprobado' || x.estado === 'pendiente') && x.rol !== 'hotel' && x.rol !== 'guardia')
+  .sort((a, b) => (b.id === u.id) - (a.id === u.id) || (a.estado === 'pendiente') - (b.estado === 'pendiente') || String(a.nombre).localeCompare(String(b.nombre)));
+const conAppAbierta = id => typeof Presencia !== 'undefined' && Presencia.d ? !!Presencia.d[id] : id === yo()?.id;
+/* =========================================================
+   QUIÉNES VIVEN EN EL LOTE, DIBUJADOS (pedido de Claudio, 12-10-2026: "un
+   dibujito de parejas, familias, amigos, lo que corresponda, y animado").
+   Sale de lo que cada cuenta dijo que es del lote:
+     · dos titulares (propietario/cotitular) → pareja, con un corazón;
+     · tres o más, o algún "familiar o conviviente" → familia, bajo un techo
+       con la chimenea humeando;
+     · inquilinos que comparten → compañeros de casa, con una charla;
+     · y las mascotas que cargaron en Mi casa (perro o gato) moviendo la cola.
+   Cada uno con su color y su nombre; el que mira saluda con la mano. Con
+   "reducir movimiento", quieto. No muestra nada que el lote no sepa ya.
+   ========================================================= */
+/* Lo que no cambia de una persona entre una pantalla y otra (sale de su nombre). */
+const hashTxt = t => { let h = 0; for (const c of String(t || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+const PIEL = ['#f5d3b3', '#eabf98', '#d9a47a', '#c08356', '#a06a44', '#7c4f31'];
+/* Sin gris: el color sale al azar del nombre y no sabemos la edad de nadie. */
+const PELO = ['#2b2118', '#4a3122', '#6b4426', '#a8723f', '#d9b26b', '#1a1a1f', '#3b2a20'];
+const PANTALON = ['#2f3e5c', '#3b3b45', '#5a4636', '#24324a', '#46505e'];
+function tipoDeLote(ps){
+  const rel = ps.map(x => x.relacion || '');
+  if (ps.length >= 3 || rel.includes('familiar')) return ['familia', 'Familia'];
+  if (ps.length === 2 && rel.every(r => !r || r === 'propietario' || r === 'cotitular')) return ['pareja', 'Pareja'];
+  if (ps.length >= 2) return ['amigos', 'Compañeros de casa'];
+  return ['solo', ''];
+}
+/* Una persona de frente, con proporciones de verdad (la cabeza es un
+   séptimo del cuerpo), pelo, cara, ropa y zapatos. Los pies en (0, 0).
+   brazoD / brazoI: 'baja' (al costado), 'mano' (le da la mano al de al
+   lado) o 'saluda' (el que mira la pantalla saluda).
+   Mujer u hombre lo elige CADA UNO en Tu cuenta (x.figura), no se adivina
+   por el nombre (pedido de Claudio, 12-10-2026: "Mónica es mujer y Claudio
+   hombre y salen al revés"). Mujer: siempre pelo largo (lacio o con rulos) y
+   casi siempre pollera. Hombre: pelo corto o rulos cortos, y a veces barba. Sin
+   elegir: una figura neutra (melena a la altura del mentón). */
+const FIGURAS = { mujer:'Mujer', hombre:'Hombre', neutra:'Otra forma' };
+const FALDA = ['#3f51b5', '#8e2c48', '#2e7d6b', '#6a4fb3', '#b5562f'];
+const figuraDe = x => x && (x.figura === 'mujer' || x.figura === 'hombre') ? x.figura : 'neutra';
+function svgPersona(x, { brazoD = 'baja', brazoI = 'baja', escala = 1, d = 0 } = {}){
+  const h = hashTxt(x.nombre), piel = PIEL[h % PIEL.length], pelos = PELO, pelo = pelos[(h >>> 3) % pelos.length], ropa = colorDe(x.nombre), pant = PANTALON[(h >>> 5) % PANTALON.length];
+  const fig = figuraDe(x);
+  const estilo = fig === 'mujer' ? ['largo', 'rulosL', 'largo'][(h >>> 7) % 3] : fig === 'hombre' ? ['corto', 'corto', 'rulos', 'corto'][(h >>> 7) % 4] : 'melena';
+  const falda = fig === 'mujer' && (h >>> 9) % 3 !== 0, colFalda = FALDA[(h >>> 11) % FALDA.length], barba = fig === 'hombre' && escala >= 1 && (h >>> 9) % 3 === 0;
+  const brazo = (lado, modo) => { const s = lado === 'd' ? 1 : -1, hx = s * 11, mano = modo === 'mano' ? `M${hx} -59 q${s * 7} 6 ${s * 15} 12` : modo === 'saluda' ? `M${hx} -59 q${s * 7} -6 ${s * 8} -18` : `M${hx} -59 q${s * 4} 8 ${s * 4} 20`;
+    const fin = modo === 'mano' ? [hx + s * 15, -47] : modo === 'saluda' ? [hx + s * 8, -77] : [hx + s * 4, -39];
+    return `<g class="dl-brazo ${modo}"><path d="${mano}" stroke="${ropa}" stroke-width="5.4" fill="none" stroke-linecap="round"/><circle cx="${fin[0]}" cy="${fin[1]}" r="2.7" fill="${piel}"/></g>`; };
+  const detras = estilo === 'largo' ? `<path d="M-11 -79 q0 -15 11 -15 q11 0 11 15 v15.6 q0 3.4 -3.6 3.4 q-2.8 0 -3.2 -3.4 v-11 h-8.4 v11 q-.4 3.4 -3.2 3.4 q-3.6 0 -3.6 -3.4z" fill="${pelo}"/>`
+    : estilo === 'rulosL' ? `<g fill="${pelo}"><circle cx="-10" cy="-78" r="3.8"/><circle cx="10" cy="-78" r="3.8"/><circle cx="-10.6" cy="-72" r="3.8"/><circle cx="10.6" cy="-72" r="3.8"/><circle cx="-10" cy="-66" r="3.6"/><circle cx="10" cy="-66" r="3.6"/><circle cx="-8.6" cy="-61" r="3.2"/><circle cx="8.6" cy="-61" r="3.2"/></g>`
+    : estilo === 'melena' ? `<path d="M-10.2 -79 q0 -14 10.2 -14 q10.2 0 10.2 14 v8 q-1.8 2.2 -3.8 0 v-5 h-12.8 v5 q-2 2.2 -3.8 0z" fill="${pelo}"/>` : '';
+  const arriba = estilo === 'rulos' || estilo === 'rulosL' ? `<g fill="${pelo}"><circle cx="-6.5" cy="-83" r="4"/><circle cx="-2" cy="-86.5" r="4.4"/><circle cx="3.2" cy="-86" r="4.3"/><circle cx="7" cy="-82" r="3.8"/><circle cx="-8.2" cy="-78.5" r="2.8"/><circle cx="8.6" cy="-78" r="2.6"/></g>`
+    : estilo === 'corto' ? `<path d="M-8.6 -78.5 q-.8 -11.4 8.6 -11.6 q9.4 .2 8.6 11.6 q-1.2 -4.2 -3 -5.4 q-6 1.4 -11.6 -.6 q-1.6 1.6 -2.6 6z" fill="${pelo}"/>`
+    : `<path d="M-8.6 -77.5 q-.6 -12 8.6 -12.3 q9.2 .3 8.6 12.3 q-1.8 -5.6 -7.4 -6.6 q-2.6 2.4 -9.8 6.6z" fill="${pelo}"/>`;
+  const piernas = falda
+    ? `<rect x="-6.6" y="-24" width="4.4" height="21" rx="2" fill="${piel}"/><rect x="2.2" y="-24" width="4.4" height="21" rx="2" fill="${piel}"/>`
+    : `<rect x="-8" y="-38" width="7.4" height="35" rx="3.2" fill="${pant}"/><rect x=".6" y="-38" width="7.4" height="35" rx="3.2" fill="${pant}"/>`;
+  const torso = fig === 'mujer' ? `M-11 -37 q1.2 -8 -.6 -16.6 q.4 -10 9 -11 h5.2 q8.6 1 9 11 q-1.8 8.6 -.6 16.6 q-11 3 -22 0z` : `M-12 -37 v-17 q0 -9.6 9.4 -10.6 h5.2 q9.4 1 9.4 10.6 v17 q-12 3 -24 0z`;
+  return `<g class="dl-p dl-${fig}" style="--d:${d}s" transform="scale(${escala})">
+    <ellipse cx="0" cy="0" rx="13" ry="2.4" fill="rgba(0,0,0,.14)"/>
+    <g class="dl-cuerpo">
+      ${piernas}
+      <path d="M-9.6 -4.5 h8.4 v3.4 h-9.2 q-1.8 0 -1.4 -1.8z M1.2 -4.5 h8.4 q2.2 1.6 1.2 3.4 h-9.6z" fill="#2a2a30"/>
+      ${falda ? `<path d="M-10.4 -40 h20.8 l4 17.4 q-14.4 3 -28.8 0z" fill="${colFalda}"/><path d="M-3 -39 l-2 16 M3 -39 l2 16" stroke="rgba(0,0,0,.1)" stroke-width="1"/>` : ''}
+      ${brazo('i', brazoI)}
+      <path d="${torso}" fill="${ropa}"/>
+      <path d="M3 -64.6 q9 1 9 10.6 v17 q-4 1 -9 1.2z" fill="rgba(0,0,0,.09)"/>
+      <path d="M-3.4 -64.8 l3.4 4.6 l3.4 -4.6z" fill="${piel}"/>
+      ${detras}
+      ${brazo('d', brazoD)}
+      <rect x="-2.6" y="-69" width="5.2" height="6" rx="2" fill="${piel}"/>
+      <ellipse cx="-8.3" cy="-76.5" rx="1.7" ry="2.4" fill="${piel}"/><ellipse cx="8.3" cy="-76.5" rx="1.7" ry="2.4" fill="${piel}"/>
+      <ellipse cx="0" cy="-77" rx="8.3" ry="9.6" fill="${piel}"/>
+      <path d="M2 -86 q6 2.6 6.2 9.6 q-2 -6 -6.2 -9.6z" fill="rgba(0,0,0,.06)"/>
+      ${barba ? `<path d="M-8.2 -77 q-.4 10.4 8.2 11 q8.6 -.6 8.2 -11 q-1.6 4.6 -8.2 5 q-6.6 -.4 -8.2 -5z" fill="${pelo}"/>` : ''}
+      ${arriba}
+      <path d="M-5.4 -80.2 q1.6 -1 3.2 0 M2.2 -80.2 q1.6 -1 3.2 0" stroke="${pelo}" stroke-width="${fig === 'hombre' ? 1.2 : .9}" fill="none" stroke-linecap="round"/>
+      <g class="dl-ojos"><ellipse cx="-3.2" cy="-77.4" rx="1" ry="1.35" fill="#24242c"/><ellipse cx="3.2" cy="-77.4" rx="1" ry="1.35" fill="#24242c"/>${fig === 'mujer' ? '<path d="M-4.6 -78.4 l-1.1 -.9 M4.6 -78.4 l1.1 -.9" stroke="#24242c" stroke-width=".6" stroke-linecap="round"/>' : ''}</g>
+      <path d="M.2 -76 q.9 2 -.7 2.5" stroke="rgba(0,0,0,.22)" stroke-width=".8" fill="none" stroke-linecap="round"/>
+      <circle cx="-5" cy="-73.6" r="1.5" fill="rgba(255,110,110,${fig === 'mujer' ? .34 : .22})"/><circle cx="5" cy="-73.6" r="1.5" fill="rgba(255,110,110,${fig === 'mujer' ? .34 : .22})"/>
+      <path d="M-2.8 -72 q2.8 2.2 5.6 0" stroke="${fig === 'mujer' ? '#c2455a' : barba ? '#5e2b22' : '#8a3b2e'}" stroke-width="${fig === 'mujer' ? 1.3 : 1}" fill="none" stroke-linecap="round"/></g></g>`;
+}
+/* Un perro de costado y un gato sentado, con la cola que se mueve. */
+const svgPerro = m => { const c = /negr/i.test(m.desc || '') ? '#2f2a28' : /blanc/i.test(m.desc || '') ? '#efe9e0' : '#b98250', o = '#7a4f2c';
+  return `<g class="dl-perro"><ellipse cx="0" cy="0" rx="15" ry="2.2" fill="rgba(0,0,0,.14)"/>
+    <path class="dl-cola" d="M11 -17 q7 -4 6 -12" stroke="${c}" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    <rect x="-10" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/><rect x="-5" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/><rect x="4" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/><rect x="8.6" y="-11" width="3.4" height="11" rx="1.6" fill="${c}"/>
+    <ellipse cx="1" cy="-15" rx="12.5" ry="6.4" fill="${c}"/>
+    <path d="M-9 -18 q-3 -6 -6.5 -9 l3 -2 q5 3 8 8z" fill="${c}"/>
+    <ellipse cx="-15" cy="-28" rx="5.6" ry="5" fill="${c}"/><ellipse cx="-20.4" cy="-26.4" rx="3.8" ry="2.6" fill="${c}"/>
+    <path class="dl-oreja" d="M-13.4 -32.6 q3.6 1 3 7.4 q-3.4 -1.6 -3 -7.4z" fill="${o}"/>
+    <circle cx="-23.6" cy="-27" r="1.3" fill="#1d1d22"/><circle cx="-16" cy="-29.4" r="1" fill="#1d1d22"/>
+    <path d="M-12 -23.6 q2 1.4 3.4 0" stroke="#d33a3a" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>`; };
+const svgGato = m => { const c = /negr/i.test(m.desc || '') ? '#2b2b30' : /naranj|atig/i.test(m.desc || '') ? '#d68a3c' : '#7d7f8c';
+  return `<g class="dl-gato"><ellipse cx="0" cy="0" rx="11" ry="2" fill="rgba(0,0,0,.14)"/>
+    <path class="dl-cola" d="M7 -3 q11 0 9 -12 q-1 -5 -4 -4" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M-8 0 q-2 -15 7 -19 q9 4 7 19z" fill="${c}"/>
+    <circle cx="0" cy="-23" r="6.6" fill="${c}"/><path d="M-6 -26 l-.6 -7 l4.6 3.6z M6 -26 l.6 -7 l-4.6 3.6z" fill="${c}"/>
+    <g class="dl-ojos"><ellipse cx="-2.4" cy="-23.6" rx="1.2" ry="1.5" fill="#cddc39"/><ellipse cx="2.4" cy="-23.6" rx="1.2" ry="1.5" fill="#cddc39"/></g>
+    <path d="M-.8 -21.2 h1.6 l-.8 1z" fill="#f5a3a3"/><path d="M-7 -21 h-4 M-7 -20 l-4 1.2 M7 -21 h4 M7 -20 l4 1.2" stroke="rgba(255,255,255,.55)" stroke-width=".5"/></g>`; };
+/* Perro con perro y gato con gato: se mira la especie que cargaron en Mi
+   casa. Otro animal (un loro, un conejo) no se dibuja: mejor nada que un
+   perro que no es. */
+const especieDibujo = m => { const e = normTxt(m && m.especie || ''); return /gat|cat|mich|felin|minin/.test(e) ? 'gato' : /perr|dog|can[ie]|cachorr|pich/.test(e) ? 'perro' : ''; };
+/* El dibujo del lote: solo quienes viven ahí (el propietario a distancia no
+   sale) y solo las mascotas cargadas en "Mi casa". Dos personas sin mascotas
+   = dos personas sin mascotas. Cada persona lleva su número (data-i): al
+   tocarla, o tocar su nombre en la tarjeta, salta y muestra su nombre. */
+function escenaLote(u){
+  if (!u || !/^Lote\s/i.test(u.casa || '')) return null;
+  const ps = [u, ...Store.s.users.filter(x => x && x.estado === 'aprobado' && x.casa === u.casa && x.id !== u.id && !esPropDistancia(x))].slice(0, 6);
+  if (ps.length < 2) return null;
+  const [tipo, etiqueta] = tipoDeLote(ps);
+  /* En familia, los "familiares o convivientes" van al medio, un poco más chicos. */
+  const orden = tipo === 'familia' ? [...ps.filter(x => x.relacion !== 'familiar').slice(0, 1), ...ps.filter(x => x.relacion === 'familiar'), ...ps.filter(x => x.relacion !== 'familiar').slice(1)] : ps;
+  const pets = [...new Map(ps.flatMap(x => aLista(x.mascotas)).filter(m => m && m.nombre && especieDibujo(m)).map(m => [m.nombre + '|' + (m.especie || ''), m])).values()].slice(0, 2);
+  const paso = tipo === 'pareja' ? 27 : 30, x0 = 22, H = 112, W = x0 * 2 + (orden.length - 1) * paso + pets.length * 34 + (pets.length ? 6 : 0);
+  const personas = orden.map((x, i) => {
+    const chico = tipo === 'familia' && x.relacion === 'familiar', yo = x.id === u.id, nom = x.nombre.split(' ')[0], an = nom.length * 4.9 + 10, alto = chico ? 72 : 96;
+    const brazoD = tipo === 'pareja' && i === 0 ? 'mano' : yo && !(tipo === 'pareja' && i === 0) ? 'saluda' : 'baja';
+    const brazoI = tipo === 'pareja' && i === 1 ? 'mano' : 'baja';
+    return `<g transform="translate(${x0 + i * paso} ${H - 6})" data-a="lote-saluda" data-i="${i}"><g class="dl-salto">${svgPersona(x, { brazoD, brazoI, escala: chico ? .78 : 1, d:(i * .4).toFixed(1) })}
+      <g class="dl-nom" transform="translate(0 ${-alto - 8})"><rect x="${-an / 2}" y="-8" width="${an}" height="12" rx="6" fill="${colorDe(x.nombre)}"/><text x="0" y="1.4" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${esc(nom)}</text></g></g></g>`; }).join('');
+  const xp = x0 + (orden.length - 1) * paso + 30;
+  const mascotas = pets.map((m, j) => `<g transform="translate(${xp + j * 34 + 8} ${H - 6})">${especieDibujo(m) === 'gato' ? svgGato(m) : svgPerro(m)}</g>`).join('');
+  const cx = x0 + (orden.length - 1) * paso / 2, ancho = (orden.length - 1) * paso;
+  const adorno = tipo === 'pareja' ? `<path class="dl-corazon" d="M${cx} 22 c-3.4 -4.6 -10.4 -1.2 -5.8 4.6 l5.8 5.2 l5.8 -5.2 c4.6 -5.8 -2.4 -9.2 -5.8 -4.6z" fill="#ff5a7a"/>`
+    : tipo === 'familia' ? `<path d="M${cx - ancho / 2 - 18} 34 L${cx} 6 L${cx + ancho / 2 + 18} 34" stroke="#b85f24" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/>
+        <rect x="${cx + ancho / 4 + 2}" y="8" width="6" height="12" rx="1" fill="#b85f24" opacity=".85"/><g class="dl-humo"><circle cx="${cx + ancho / 4 + 5}" cy="4" r="2.6" fill="#cfd6df"/><circle cx="${cx + ancho / 4 + 8}" cy="-1" r="3.2" fill="#dfe5ec"/></g>`
+    : `<g class="dl-charla"><rect x="${cx - 13}" y="8" width="26" height="13" rx="6.5" fill="#fff" stroke="#cfd6df" stroke-width=".8"/><circle class="c1" cx="${cx - 6}" cy="14.5" r="1.8" fill="#7445c0"/><circle class="c2" cx="${cx}" cy="14.5" r="1.8" fill="#7445c0"/><circle class="c3" cx="${cx + 6}" cy="14.5" r="1.8" fill="#7445c0"/></g>`;
+  const nombres = orden.map(x => x.nombre.split(' ')[0]), quien = `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}`;
+  const svg = `<svg class="dl-svg" viewBox="0 -14 ${W} ${H + 14}" role="img" aria-label="${esc(etiqueta)} en ${esc(u.casa)}: ${esc(quien)}${pets.length ? ', con ' + esc(pets.map(m => m.nombre).join(' y ')) : ''}">
+      <ellipse cx="${W / 2}" cy="${H - 5}" rx="${W / 2 - 4}" ry="5" fill="rgba(46,125,50,.12)"/>${adorno}${personas}${mascotas}</svg>`;
+  return { svg, tipo, etiqueta, orden, pets };
+}
+function dibujoLote(u){
+  const e = escenaLote(u); if (!e) return '';
+  return `<div class="dl-caja dl-${e.tipo}">${e.svg}
+    <div class="dl-txt"><b>${esc(e.etiqueta)}</b><small>${esc(u.casa)}</small><span>${e.orden.map((x, i) => `<i style="--c:${colorDe(x.nombre)}" data-a="lote-saluda" data-i="${i}">${esc(x.nombre.split(' ')[0])}${x.id === u.id ? ' (vos)' : ''}</i>`).join('')}${e.pets.map(m => `<i class="mas">${I('paw')}${esc(m.nombre)}</i>`).join('')}</span></div></div>`;
+}
+/* TU CUENTA → la tarjeta del lote (pedido de Claudio, 12-10-2026: "tiene un
+   diseño muy básico, hacele un diseño más innovador"). Una escena con el
+   cielo de la hora (sol o luna y estrellas), la casa y quienes viven; abajo,
+   cada persona con su rol y si tiene la app abierta (al tocarla, salta en
+   el dibujo), lo que comparten como lote y los botones. */
+function tarjetaLote(u){
+  const todos = Store.s.users.filter(x => x && x.estado === 'aprobado' && x.casa === u.casa), otros = todos.filter(x => x.id !== u.id);
+  if (!otros.length) return '';
+  const e = escenaLote(u), idx = id => e ? e.orden.findIndex(x => x.id === id) : -1;
+  const { sale, pone } = Clima.sol(), ahora = new Date().toTimeString().slice(0, 5), noche = ahora < sale || ahora >= pone;
+  const gente = [u, ...otros].map(x => { const i = idx(x.id), abierta = x.id !== u.id && conAppAbierta(x.id), lejos = esPropDistancia(x);
+    return `<button type="button" class="tl-p" style="--c:${colorDe(x.nombre)}" ${i >= 0 ? `data-a="lote-saluda" data-i="${i}"` : 'disabled'}>
+      <span class="tl-av">${avatar(x)}${abierta ? '<i class="tl-on" title="Tiene la app abierta"></i>' : ''}</span>
+      <span class="tl-pt"><b>${esc(x.nombre.split(' ')[0])}${x.id === u.id ? ' <em>vos</em>' : ''}</b><small>${esc(RELACIONES[x.relacion] || 'Del lote')}${lejos ? ' · no vive ahí' : abierta ? ' · app abierta' : ''}</small></span></button>`; }).join('');
+  const comp = [['vote', 'accent', 'Un voto', 'en las votaciones'], ['wallet', 'wood', 'Una expensa', 'un solo cupón'], ['users', 'sky', 'Las visitas', 'las ven todos'], ['shield', 'ok', 'La garita', 'les avisa a todos']]
+    .map(([ic, c, t, s2], k) => `<span class="tl-c c-${c}" style="--k:${k}">${I(ic)}<b>${t}</b><small>${s2}</small></span>`).join('');
+  const uno = otros.length === 1 ? otros[0] : null;
+  return `<section class="tl ${e ? 'tl-' + e.tipo : 'tl-solo'} ${noche ? 'tl-noche' : 'tl-dia'}" aria-label="Tu lote">
+    <div class="tl-escena">
+      <i class="tl-astro"></i>${noche ? '<i class="tl-estrella s1"></i><i class="tl-estrella s2"></i><i class="tl-estrella s3"></i>' : '<i class="tl-nube n1"></i><i class="tl-nube n2"></i>'}
+      <svg class="tl-casa" viewBox="0 0 120 80" aria-hidden="true"><path d="M8 40 L60 6 L112 40 V80 H8z"/><rect x="50" y="50" width="20" height="30" rx="2"/><rect x="20" y="46" width="18" height="14" rx="2"/><rect x="82" y="46" width="18" height="14" rx="2"/></svg>
+      ${e ? e.svg : ''}
+      <span class="tl-chapa">${I('home')}${esc(u.casa)}</span>
+      ${e ? `<span class="tl-tipo">${esc(e.etiqueta)}${e.pets.length ? ` · ${I('paw')}${esc(e.pets.map(m => m.nombre).join(' y '))}` : ''}</span>` : ''}
+    </div>
+    <div class="tl-cuerpo">
+      <div class="tl-tit"><b>Son ${todos.length} en la app</b><small>Cada uno con su cuenta, un solo lote. Tocá a alguien.</small></div>
+      <div class="tl-gente">${gente}</div>
+      ${e ? eligeFigura(u) : ''}
+      <div class="tl-comp">${comp}</div>
+      <div class="tl-acc"><button type="button" class="btn btn-sm btn-sec" data-a="abrir" data-v="perfil">${I('users')}Ver quiénes</button>
+        ${uno ? `<button type="button" class="btn btn-sm" data-a="abrir" data-v="dm" data-p="${esc(uno.id)}">${I('chat')}Escribirle a ${esc(uno.nombre.split(' ')[0])}</button>` : ''}</div>
+    </div></section>`;
+}
+/* Cada uno elige cómo aparece en el dibujo; se ve su propio muñequito en
+   cada opción. Se guarda en su cuenta (figura) y lo ven los de su lote. */
+const eligeFigura = u => `<div class="tl-fig${u.figura ? ' cerrado' : ''}">
+    ${u.figura ? `<button type="button" class="link tl-fig-abre" data-a="mi-figura-ver">${I('edit')}Cambiar cómo aparezco en el dibujo</button>` : `<b>${I('user')}¿Cómo querés aparecer en el dibujo?</b>`}
+    <div class="tl-fig-op">${Object.entries(FIGURAS).map(([k, t]) => `<button type="button" class="${u.figura === k ? 'on' : ''}" data-a="mi-figura" data-v="${k}" aria-pressed="${u.figura === k}"><svg viewBox="-17 -100 34 104" aria-hidden="true">${svgPersona({ ...u, figura:k })}</svg><span>${t}</span></button>`).join('')}</div></div>`;
+A['mi-figura'] = el => {
+  const u = yo(), v = el.dataset.v; if (!u || !FIGURAS[v]) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x) x.figura = v; });
+  const t = el.closest('.tl'); if (t) t.outerHTML = tarjetaLote(yo());
+  setTimeout(() => { const b = document.querySelector('.tl .tl-p[data-i]'); if (b) A['lote-saluda'](b); }, 120);
+  toast(v === 'neutra' ? 'Listo: en el dibujo aparecés con una figura neutra' : `Listo: en el dibujo aparecés como ${FIGURAS[v].toLowerCase()}`, 'check');
+};
+A['mi-figura-ver'] = el => el.closest('.tl-fig')?.classList.toggle('cerrado');
+A['lote-saluda'] = el => {
+  const caja = el.closest('.tl, .dl-caja'), i = el.dataset.i, g = caja?.querySelector(`.dl-svg g[data-i="${i}"]`); if (!g) return;
+  caja.querySelectorAll('.tl-p.on, .dl-txt i.on').forEach(b => b.classList.remove('on'));
+  caja.querySelectorAll(`.tl-p[data-i="${i}"], .dl-txt i[data-i="${i}"]`).forEach(b => b.classList.add('on'));
+  g.classList.remove('salta'); void caja.offsetWidth; g.classList.add('salta');
+  clearTimeout(g._t); g._t = setTimeout(() => { g.classList.remove('salta'); caja.querySelectorAll('.on').forEach(b => b.classList.remove('on')); }, 1800);
+};
+function familiaDelLote(u){
+  const ls = cuentasDeMiLote(u), otros = ls.filter(x => x.id !== u.id);
+  return `${sec(`Quiénes están en ${esc(u.casa)}`, `<span class="muted small">${plural(ls.length, 'cuenta')}</span>`)}
+    ${dibujoLote(u)}
+    <div class="card lista familia-lote">${ls.map(x => `<div class="it">${avatar(x)}<div class="txt"><b>${esc(x.nombre)}${x.id === u.id ? ' <span class="muted small">(vos)</span>' : ''}</b>
+        <span>${esc(RELACIONES[x.relacion] || 'Relación con el lote sin indicar')}${esPropDistancia(x) ? ' · no vive en el lote' : ''}${x.representante ? ' · representante del lote' : ''}</span></div>
+      ${x.estado === 'pendiente' ? '<span class="pill p-warn">Esperando aprobación</span>' : conAppAbierta(x.id) ? `<span class="pill p-ok">${I('check')}App abierta</span>` : ''}
+      ${x.id !== u.id ? `<button class="btn btn-xs btn-sec" data-a="lote-ajeno" data-id="${esc(x.id)}" title="Avisar que no es de ${esc(u.casa)}">No es de mi lote</button>` : ''}</div>`).join('')}</div>
+    <p class="muted tiny" style="margin:6px 2px 0">${otros.length ? `Todas estas cuentas son un solo lote: comparten los paquetes, las expensas, el plan ante un sismo y los cuidados de la casa, y votan como un lote.` : `Por ahora sos la única cuenta de ${esc(u.casa)}. Cuando alguien más de tu casa se inscriba, aparece acá.`}
+      Si ves a alguien que no vive en tu casa, tocá <b>No es de mi lote</b>: le avisamos a la Administración para que lo revise.</p>`;
+}
+/* =========================================================
+   EL PROPIETARIO A DISTANCIA Y SU INQUILINO (pedido de Claudio, 07-10-2026)
+   La regla está en core.js (esPropDistancia). Acá: su portada, su "Mi
+   lote", la tarjeta que ve el inquilino y el "No vivo en el lote".
+   ========================================================= */
+function portadaPropietario(){
+  const u = yo(), s = Store.s, hoy = hoyISO(), c = Clima.d?.c, inq = inquilinosDe(u.casa);
+  const hr = new Date().getHours(), saludo = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const saldo = typeof saldoLote === 'function' ? saldoLote(u.casa) : 0;
+  const votar = aLista(s.votaciones).filter(v => { const vv = v && (v.votos || {})[u.casa]; return v && v.cierra > Date.now() && !(vv && vv.personas && u.id in vv.personas) && puedeVotarEn(v, u).ok; }).length;
+  const coms = aLista(s.comunicados).filter(x => x && !x.archivado && (x.para === 'todos' || x.para === u.casa) && (!x.vence || x.vence >= hoy)).sort((a, b) => b.at - a.at).slice(0, 4);
+  const infr = aLista(s.infracciones).filter(i => i && i.casa === u.casa).length;
+  const nombres = inq.map(x => esc(x.nombre)).join(' y ');
+  const hero = `<div class="hero prop-hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
+    ${typeof guardiaHero === 'function' ? guardiaHero() : ''}
+    <div class="hero-centro">
+      <div class="saludo">${saludo},</div>
+      <h1>${esc(primerNombre(u.nombre))}</h1>
+      <div class="sub">${esc(u.casa)} · ${esc(RELACIONES[u.relacion] || 'Propietario/a')} a distancia</div>
+      ${c ? `<div class="clima-datos una"><span>${I('pin')}En el barrio ahora: ${Math.round(c.temperature_2m)} °C · ${Clima.cod(c.weather_code)[0]}</span></div>` : ''}
+    </div></div>`;
+  const quien = inq.length
+    ? aviso('info', 'key', `${esc(u.casa)} está alquilado`, `El día a día del lote (la garita, las visitas, los correos y el SOS) lo maneja ${nombres} (${inq.length > 1 ? 'inquilinos' : 'inquilino/a'}). Vos ves y hacés lo que te toca como dueño.`)
+    : aviso('info', 'key', 'No vivís en el lote', `Marcaste que no vivís en ${esc(u.casa)}: acá tenés lo que te toca como dueño. Si volvés a vivir ahí, cambialo en <b>Mi lote</b>.`);
+  return `${hero}<div class="inicio-lienzo">
+    ${typeof mantHero === 'function' ? mantHero() : ''}
+    <section class="bloque">${quien}</section>
+    ${coms.length ? `<section class="bloque">${sec('Comunicados de la Administración')}${coms.map(x => `<button class="superficie" data-a="ver-novedad" data-v="com" data-id="${esc(x.id)}"><span class="ic ic-danger">${I(x.tipo === 'reunion' ? 'calendar' : 'tack')}</span><span class="txt"><b>${esc(x.titulo)}</b><small>${x.fecha ? fechaLarga(x.fecha) + (x.hora ? ' · ' + esc(x.hora) + ' h' : '') + ' · ' : ''}${esc(String(x.texto || '').slice(0, 90))}</small></span>${I('right')}</button>`).join('')}</section>` : ''}
+    <section class="bloque">${sec('Lo tuyo como propietario/a')}<div class="mosaico">
+      ${teja({ v:'expensas', icon:'wallet', color:'wood', t:'Expensas del lote', s: saldo > 0.5 ? `Saldo ${plata(saldo)}` : 'Al día · cupones, pagos y recibos', destaca: saldo > 0.5 })}
+      ${teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votar ? `${plural(votar, 'abierta')} para votar` : 'Asambleas y decisiones del barrio', badge: votar })}
+      ${inq.length ? teja({ v:'dm', p:inq[0].id, icon:'chat', color:'ok', t:`Escribirle a ${esc(primerNombre(inq[0].nombre))}`, s:'Tu inquilino/a, en privado' }) : ''}
+      ${teja({ v:'privado', p:'admin', icon:'lock', color:'brand', t:'Mensajes con la Administración', s:'Consultas y avisos del lote' })}
+      ${teja({ v:'tablero', icon:'wallet', color:'sky', t:'Las cuentas del barrio', s:'En qué se gasta, mes a mes' })}
+      ${teja({ v:'documentos', icon:'file', color:'brand', t:'Normas y reglamentos', s:'El reglamento y la convivencia' })}
+      ${infr ? teja({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones del lote', s:'Infracciones y descargos', n:infr }) : ''}
+      ${teja({ v:'perfil', icon:'home', color:'ok', t:'Mi lote', s:'Quiénes están, tu teléfono y si vivís ahí' })}
+      ${teja({ v:'manual', icon:'book', color:'accent', t:'Manual de uso', s:'Cómo funciona tu parte' })}
+    </div></section>
+    <p class="muted tiny" style="margin:4px 2px 18px">${I('lock')} No ves el día a día del barrio ni te llegan sus avisos (la garita, el camión, los correos, el SOS): son de quien vive en el lote. Las expensas las ven las dos partes; vota el propietario, salvo que le dé la carta poder al inquilino.</p>
+  </div>`;
+}
+/* "Mi lote" del propietario a distancia: lo justo. */
+function perfilPropietario(u){
+  const inq = inquilinosDe(u.casa);
+  return `<div class="card"><div class="perfil-cab">${avatar(u, 'lg')}<div class="grow"><b style="font-size:18px">${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${esc(u.email)}</div>
+      <div class="muted tiny">${esc(RELACIONES[u.relacion] || '')} · no vive en el lote</div></div></div></div>
+    ${inq.length ? '' : `<div class="card"><b>¿Volviste a vivir en ${esc(u.casa)}?</b><p class="muted small" style="margin:4px 0 10px">Vuelve la app completa: la garita, las visitas, los avisos del barrio y el SOS.</p>
+      <button class="btn btn-sm btn-ok" data-a="vivo-en-el-lote" data-v="si">${I('home')}Vivo en el lote</button></div>`}
+    <form data-f="perfil-prop" class="card"><div class="field"><label>Teléfono / WhatsApp</label><input name="tel" value="${esc(u.tel || '')}" inputmode="tel" maxlength="20"></div>
+      <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
+    ${superficie({ a:'mi-credencial', icon:'qr', color:'brand', t:'Mi credencial del barrio', s:'Si venís al barrio, para que la garita te reconozca sin el DNI' })}
+    ${familiaDelLote(u)}
+    <p class="muted small" style="margin:14px 2px 0">${I('user')} La contraseña, el correo, tus datos personales y cerrar sesión están en <button class="link" data-a="mi-cuenta">Tu cuenta</button>.</p>`;
+}
+/* Lo que ve el inquilino en Mi casa: quién es el dueño y qué ve cada uno. */
+function tarjetaInquilino(u){
+  if (u.relacion !== 'inquilino') return '';
+  const duenos = cuentasDelLote(u.casa).filter(esDuenoDelLote);
+  return `<div class="card prop-inq"><div class="row" style="align-items:flex-start"><span class="ic ic-sky" style="width:40px;height:40px;border-radius:13px;display:grid;place-items:center;flex:none">${I('key')}</span>
+      <div class="grow"><b>${esc(u.casa)} está alquilado: el día a día es tuyo</b>
+      <p class="small" style="margin:4px 0 0;color:var(--ink-2)">Vos manejás la garita, las visitas, los correos, los paquetes y el SOS. ${duenos.length ? `${duenos.map(d => esc(d.nombre)).join(' y ')} (${duenos.length > 1 ? 'propietarios' : 'propietario/a'}) ve${duenos.length > 1 ? 'n' : ''} las expensas, las votaciones y los comunicados, y te puede escribir en privado; no ve tus visitas, tus paquetes ni tus mensajes.` : 'El propietario todavía no tiene cuenta en la app.'}</p>
+      ${duenos.length ? `<div class="btns" style="margin-top:8px">${duenos.map(d => `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="dm" data-p="${esc(d.id)}">${I('chat')}Escribirle a ${esc(primerNombre(d.nombre))}</button>`).join('')}</div>` : ''}</div></div></div>`;
+}
+/* La cuenta la creó la Administración: la primera vez, la persona acepta
+   los términos (Ley 25.326, art. 5) y puede elegir su propia contraseña. */
+let consentimientoPedido = false;
+function pedirConsentimiento(){
+  const u = yo(); if (!u || !u.altaPorAdmin || u.consentimiento || consentimientoPedido || hojaAbierta()) return;
+  consentimientoPedido = true;
+  hoja('Bienvenido/a a la app del barrio', `<form data-f="consentimiento">
+    <p class="small" style="margin:0 0 12px">La Administración te creó la cuenta de <b>${esc(u.casa)}</b>. Antes de empezar:</p>
+    <label class="check"><input type="checkbox" name="acepto" required><span>Acepto que la Administración use mis datos solo para la vida del barrio y el control de acceso (Ley 25.326). Puedo pedir verlos, corregirlos o borrarlos.</span></label>
+    <label class="check"><input type="checkbox" name="aceptoTerminos" required><span>Leí y acepto los <button type="button" class="link" data-a="ver-legal">Términos de uso</button>.</span></label>
+    ${typeof Nube !== 'undefined' && Nube.activa() ? `<div class="field" style="margin-top:10px"><label>Tu propia contraseña (opcional, mínimo 6)</label><input name="clave" type="password" minlength="6" autocomplete="new-password" placeholder="Si la dejás vacía, seguís con la provisoria"></div>` : ''}
+    <button class="btn btn-pri btn-block">${I('check')}Empezar</button></form>`);
+}
+F['consentimiento'] = async d => {
+  if (!d.acepto || !d.aceptoTerminos){ toast('Hace falta aceptar las dos casillas', 'alert'); return; }
+  if (d.clave){ if (String(d.clave).length < 6){ toast('La contraseña tiene que tener al menos 6 caracteres', 'lock'); return; }
+    try { await Nube.cambiarClave(d.clave); } catch(e){ toast('No se pudo cambiar la contraseña ahora: hacelo después en Tu cuenta', 'lock'); } }
+  Store.cambiar(s => { const x = s.users.find(z => z.id === yo().id); if (x) x.consentimiento = Date.now(); });
+  cerrarHoja(); toast('¡Listo! Ya podés usar la app', 'check');
+};
+F['perfil-prop'] = d => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x) x.tel = String(d.tel || '').trim(); }); toast('Guardado', 'check'); };
+/* "No vivo en el lote" / "Vivo en el lote": lo elige el propietario. */
+A['vivo-en-el-lote'] = async el => {
+  const u = yo(); if (!u || !esDuenoDelLote(u)) return;
+  const vive = el.dataset.v === 'si';
+  if (!vive && !await confirmar('No vivo en el lote', `La app te muestra solo lo de dueño: expensas, votaciones, comunicados, las cuentas del barrio y la Administración. Dejás de ver el día a día (la garita, las visitas, los correos, el SOS) y no te llegan sus avisos. Lo podés volver atrás cuando quieras desde Mi lote.`, { si:'No vivo en el lote' })) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); if (x) x.noVive = !vive; });
+  PILA.length = 0; refrescar(); pintarTop();
+  toast(vive ? 'Listo: volvés a tener la app completa' : 'Listo: ahora ves lo que te toca como propietario/a', 'home');
+};
+A['lote-ajeno'] = async el => {
+  const u = yo(), x = usuario(el.dataset.id); if (!u || !x || x.id === u.id || x.casa !== u.casa) return;
+  if (!await confirmar('No es de mi lote', `Le avisamos a la Administración que ${esc(x.nombre)} no vive en ${esc(u.casa)}, para que lo revise. A esa persona le llega un aviso, sin tu nombre, para que confirme su lote.`, { si:'Avisar' })) return;
+  const marca = 'bhc.loteAjeno.' + x.id + '.' + hoyISO();
+  try { if (localStorage.getItem(marca)){ toast('Ya lo avisaste hoy: la Administración lo está viendo', 'check'); return; } localStorage.setItem(marca, '1'); } catch(e){}
+  const admins = typeof cuentasAdministracion === 'function' ? cuentasAdministracion() : Store.s.users.filter(z => z.rol === 'admin' && z.estado === 'aprobado').map(z => z.id);
+  Store.cambiar(s => {
+    if (admins.length) notificar(s, { para:admins, titulo:`Revisar una cuenta de ${u.casa}`, texto:`${primerNombre(u.nombre)} avisa que ${x.nombre} no vive en ese lote${x.estado === 'pendiente' ? ' (está esperando aprobación)' : ''}. Revisalo en Administración → ${x.estado === 'pendiente' ? 'Inscripciones' : 'Vecinos'}.`, icon:'users', color:'warn', link:'admin', sonido:true });
+    notificar(s, { para:x.id, titulo:'¿Te anotaste en el lote correcto?', texto:`Desde ${u.casa} avisaron que no vivís ahí. Si te equivocaste de lote, escribile a la Administración para que lo corrija.`, icon:'users', color:'warn', link:'privado:admin' });
+  });
+  toast('Listo: la Administración lo va a revisar', 'send');
+};
+F['perfil'] = d => { const u = yo(); Store.cambiar(s => Object.assign(s.users.find(x => x.id === u.id), { ...('relacion' in d && !u.relacion && RELACIONES[d.relacion] ? { relacion:d.relacion } : {}), tel:d.tel.trim(), skills:d.skills.trim(), mostrarTel:!!d.mostrarTel, respondedor:!!d.respondedor, saludProf:d.respondedor && typeof PROF_SALUD !== 'undefined' && PROF_SALUD[d.saludProf] ? d.saludProf : '', integrantes:d.integrantes.trim(),
+  profesion:(d.profesion || '').trim(), direccion:(d.direccion || '').trim(), ubicacion:(d.ubicacion || '').trim(), enDirectorio:!!d.enDirectorio })); toast('Guardado', 'check'); };
+/* La carta poder: el propietario autoriza al inquilino (o a un familiar)
+   a votar por el lote. La Administración la revisa y la aprueba. */
+A['subir-poder'] = () => hoja('Carta poder para votar', `<form data-f="poder">
+  <p class="small" style="margin:0 0 10px">Una nota firmada por el propietario de ${esc(yo().casa)} que te autoriza a votar en su nombre (con su DNI y la firma). Sacale una foto.</p>
+  ${campoFoto('fotoPoder', 'Foto de la carta poder')}
+  <div class="field"><label>Vale hasta (opcional)</label><input type="date" name="hasta" min="${hoyISO()}"></div>
+  <button class="btn btn-pri btn-block">${I('send')}Enviar a la Administración</button></form>`);
+F['poder'] = d => {
+  const foto = fotoParaOtros(d.foto, 60); if (!foto){ toast('Falta la foto de la carta poder', 'camera'); return; }
+  Store.cambiar(s => { const x = s.users.find(z => z.id === yo().id); x.poderFoto = foto; x.poderHasta = d.hasta || ''; x.poderOk = false;
+    notificar(s, { para:'rol:admin', titulo:`Carta poder para votar · ${x.casa}`, texto:`${x.nombre} (${RELACIONES[x.relacion] || ''}) pide votar por el lote`, icon:'vote', color:'accent', link:'admin' }); });
+  cerrarHoja(); toast('Enviada: la Administración la revisa', 'send');
+};
+/* La foto del frente se guarda apenas se elige. */
+document.addEventListener('change', e => {
+  const i = e.target.closest('input[data-foto-in="fotoCasaIn"]');
+  if (!i) return;
+  const esperar = setInterval(() => {
+    const v = document.getElementById('fotoCasaIn');
+    if (v && v.value){ clearInterval(esperar); const f = leerFoto(v.value);
+      Store.cambiar(s => { const x = s.users.find(z => z.id === yo().id); if (x.fotoCasa?.fotoId) Fotos.borrar(x.fotoCasa.fotoId); x.fotoCasa = f; });
+      toast('Foto de tu casa guardada', 'home');
+      if (typeof Nube !== 'undefined' && Nube.activa()) setTimeout(() => Nube.fotoCasaAlDia(), 400); }
+  }, 300);
+  setTimeout(() => clearInterval(esperar), 15000);
+});
+A['mi-ubicacion'] = () => { if (!navigator.geolocation){ toast('Este equipo no da la ubicación', 'pin'); return; }
+  navigator.geolocation.getCurrentPosition(p => { const i = $('#pfUbi'); if (i) i.value = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`; toast('Ubicación tomada. Tocá Guardar.', 'pin'); }, () => toast('No se pudo tomar la ubicación', 'pin'), { enableHighAccuracy:true, timeout:10000 }); };
+A['nuevo-vehiculo'] = () => hoja('Sumar vehículo', `<form data-f="vehiculo"><div class="grid2"><div class="field"><label>Patente</label><input name="patente" required maxlength="10" style="text-transform:uppercase"></div><div class="field"><label>Modelo y color</label><input name="modelo" maxlength="40"></div></div><button class="btn btn-pri btn-block">Sumar</button></form>`);
+F['vehiculo'] = d => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); (x.vehiculos = x.vehiculos || []).push({ patente:d.patente.toUpperCase().trim(), modelo:d.modelo.trim() }); }); cerrarHoja(); };
+A['borrar-vehiculo'] = el => { const u = yo(); Store.cambiar(s => s.users.find(z => z.id === u.id).vehiculos.splice(+el.dataset.v, 1)); };
+A['nueva-mascota'] = () => hoja('Sumar mascota', `<form data-f="mascota"><div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="30"></div><div class="field"><label>Especie</label><input name="especie" maxlength="20" placeholder="Perro, gata…"></div></div>
+  <div class="field"><label>Cómo es</label><input name="desc" maxlength="120" placeholder="Color, tamaño, collar"></div>${campoFoto('fotoMasc')}<button class="btn btn-pri btn-block">Sumar</button></form>`);
+/* La foto de la mascota: la grande queda en este equipo; a la base va una
+   de 320 px (unos 20 KB) que los vecinos bajan solo si la tocan. */
+async function compartirFotoMascota(mid){
+  const u = yo(), m = (u.mascotas || []).find(x => x.id === mid);
+  if (!m || !m.foto || !m.foto.fotoId || typeof Nube === 'undefined' || !Nube.activa()) return;
+  if (await Nube.compartirFoto(m.foto.fotoId, 320))
+    Store.cambiar(s => { const x = s.users.find(z => z.id === u.id), mm = (x?.mascotas || []).find(z => z.id === mid); if (mm && mm.foto) mm.foto.nube = true; });
+}
+F['mascota'] = (d, form) => {
+  const u = yo(), mid = form?.dataset?.id || '', foto = leerFoto(d.foto);
+  const id = mid || uid();
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.mascotas = x.mascotas || [];
+    const ya = x.mascotas.find(m => m.id === id);
+    if (ya){ Object.assign(ya, { nombre:d.nombre.trim(), especie:d.especie.trim(), desc:d.desc.trim() }); if (foto){ if (ya.foto?.fotoId) Fotos.borrar(ya.foto.fotoId); ya.foto = foto; } }
+    else x.mascotas.push({ id, nombre:d.nombre.trim(), especie:d.especie.trim(), desc:d.desc.trim(), foto }); });
+  cerrarHoja();
+  if (foto) setTimeout(() => compartirFotoMascota(id), 300);
+};
+A['editar-mascota'] = el => {
+  const m = (yo().mascotas || []).find(x => x.id === el.dataset.v); if (!m) return;
+  hoja(`Editar a ${m.nombre}`, `<form data-f="mascota" data-id="${m.id}"><div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="30" value="${esc(m.nombre)}"></div><div class="field"><label>Especie</label><input name="especie" maxlength="20" value="${esc(m.especie || '')}"></div></div>
+    <div class="field"><label>Cómo es</label><input name="desc" maxlength="120" value="${esc(m.desc || '')}"></div>${campoFoto('fotoMasc', m.foto ? 'Cambiar la foto' : 'Sumar una foto')}
+    <button class="btn btn-pri btn-block">Guardar</button></form>`);
+};
+A['borrar-mascota'] = el => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.mascotas = x.mascotas.filter(m => m.id !== el.dataset.v); }); };
+A['pedir-notifs'] = async () => { try { const r = await Notification.requestPermission(); toast(r === 'granted' ? 'Avisos activados' : 'No se activaron', 'bell'); refrescar(); } catch(e){} };
+A['sonido'] = el => { setTimeout(() => { Store.sesion.sinSonido = !el.checked; Store.guardarSesion(); }, 0); return true; };
+/* =========================================================
+   MIS DATOS PERSONALES, EN UN INFORME QUE SE LEE (pedido de Claudio, 28-09-2026)
+   Antes "Descargar" bajaba un archivo técnico (JSON, "código") y además
+   incompleto: faltaban los mensajes, los pagos, los paquetes, los votos, lo
+   publicado, lo de la casa y el archivo histórico. La Ley 25.326 (art. 15)
+   pide que la información se dé "en forma clara, exenta de codificaciones"
+   y sobre la TOTALIDAD de lo que hay del titular. Ahora el botón principal
+   arma un informe legible, sección por sección, con quién ve cada cosa y
+   cuánto se guarda, listo para imprimir o guardar como PDF. La copia
+   técnica (JSON) queda aparte, para llevar los datos a otro sistema.
+   Se arma en el equipo del propio vecino con lo que ese equipo ya tiene
+   (y el archivo histórico, que se trae al abrir la hoja): no se manda a
+   ningún lado. Nunca incluye contraseñas, claves ni códigos que sirvan
+   para entrar (credencial, QR de retiro, token de la cuenta); de las
+   visitas, el DNI va tapado.
+   ========================================================= */
+const MisDatos = {
+  hist:null,
+  async traerHist(u){
+    this.hist = null;
+    if (typeof Historial === 'undefined' || !Historial.hayNube()){ this.hist = { pases:[], paquetes:[], local:true }; this.pintarEstado(); return; }
+    try { const [pases, paquetes] = await Promise.all([Historial.archivo('pases', u.id), Historial.archivo('paquetes', u.id)]); this.hist = { pases:pases || [], paquetes:paquetes || [] }; }
+    catch(e){ this.hist = { pases:[], paquetes:[], error:e.message || 'sin conexión' }; }
+    this.pintarEstado();
+  },
+  estado(){ const h = this.hist; return !h ? `${I('refresh')} Trayendo también tu archivo histórico (visitas y paquetes viejos)…`
+    : h.error ? `${I('alert')} No se pudo traer el archivo histórico (${esc(h.error)}): el informe sale con lo que hay en este equipo.`
+    : h.local ? `${I('info')} Modo de prueba: el informe sale con lo que hay en este equipo.`
+    : `${I('check')} Incluye tu archivo histórico: ${plural(h.pases.length, 'visita archivada', 'visitas archivadas')} y ${plural(h.paquetes.length, 'paquete archivado', 'paquetes archivados')}.`; },
+  pintarEstado(){ const el = $('#mdHist'); if (el) el.innerHTML = this.estado(); },
+  /* Lo técnico que nunca sale en una copia: sirve para entrar o para firmar. */
+  sinSecretos(u){ const c = JSON.parse(JSON.stringify(u || {})); ['clave', 'token', 'credencial', 'retiroPubs'].forEach(k => delete c[k]); if (c.fotoCasa) c.fotoCasa = '[foto cargada]'; if (c.poderFoto) c.poderFoto = '[foto cargada]';
+    aLista(c.mascotas).forEach(m => { if (m && m.foto) m.foto = '[foto cargada]'; }); return c; },
+};
+A['mis-datos'] = () => {
+  /* La garita y el hotel son cuentas institucionales: no guardan datos de
+     una persona como los de un vecino, así que no tienen este informe (28-09). */
+  if (esGuardia() || esHotel()){ toast('Es una cuenta institucional: no tiene datos personales de vecino', 'info'); return; }
+  const u = yo(), s = Store.s;
+  const tecnico = { emitido:new Date().toISOString(), usuario:MisDatos.sinSecretos(u), pases:s.pases.filter(p => p.hostId === u.id).map(p => ({ ...p, dni:p.dni ? '***' + String(p.dni).slice(-3) : '', tel:p.tel ? '***' + String(p.tel).replace(/\D/g, '').slice(-3) : '' })),
+    reclamos:s.reclamos.filter(r => r.userId === u.id).map(r => ({ ...r, foto:r.foto ? '[foto]' : null })),
+    peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
+    mensajes:s.privados.filter(h => h.userId === u.id), conversacionesConVecinos:aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)),
+    pagos:s.pagos.filter(x => x.lote === u.casa).map(x => ({ ...x, comprobante:x.comprobante ? '[comprobante]' : undefined })), recibos:s.recibos.filter(x => x.lote === u.casa),
+    paquetes:(typeof paquetesDelLote === 'function' ? paquetesDelLote(u) : []).map(p => ({ id:p.id, empresa:p.empresa, detalle:p.detalle, recibido:p.recibido, retirado:p.retirado, hostId:p.hostId })),
+    estoyBien: typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, ausencias:aLista(s.ausencias).filter(x => x && (x.userId === u.id || x.casa === u.casa)),
+    cosas:aLista(s.cosas).filter(x => x.userId === u.id), nieve:aLista(s.nieve).filter(x => x.userId === u.id), laCasa:aLista(s.casaTareas).filter(x => x.lote === u.casa) };
+  const blob = URL.createObjectURL(new Blob([JSON.stringify(tecnico, null, 2)], { type:'application/json' }));
+  hoja('Mis datos personales', `<p class="small" style="margin:0 0 12px;color:var(--ink-2)">Por la Ley 25.326 podés ver todo lo que la app guarda de vos, corregirlo y pedir que se borre. El informe se arma en tu equipo, sección por sección, con quién ve cada cosa y cuánto se guarda.</p>
+    <button class="btn btn-pri btn-block" data-a="mis-datos-pdf">${I('download')}Ver mi informe (imprimir o guardar en PDF)</button>
+    <p class="muted tiny" id="mdHist" style="margin:8px 2px 12px">${MisDatos.estado()}</p>
+    <div class="btns"><button class="btn btn-sec" data-a="abrir" data-v="perfil">${I('edit')}Corregir mis datos</button><button class="btn btn-danger-soft" data-a="pedir-baja">Pedir la baja</button></div>
+    <p class="muted tiny" style="margin:12px 2px 0">¿Querés llevar tus datos a otro sistema? <a href="${blob}" download="mis-datos-bahia-cauquen.json">Copia técnica (JSON)</a>: es un archivo para programas, no para leer.</p>`);
+  MisDatos.traerHist(u);
+};
+A['mis-datos-pdf'] = () => esGuardia() || esHotel() ? null : imprimir(`Mis datos personales · ${yo().nombre}`, informeMisDatos(), { pie:`Informe de acceso a los datos personales (arts. 14 y 15 de la Ley 25.326), armado por la app en tu equipo el ${fechaHora(Date.now())} con lo que hay en la base del barrio. Contiene datos personales: guardalo en un lugar seguro y no lo compartas. No es un certificado de la Administración.` });
+function informeMisDatos(){
+  const u = yo(), s = Store.s, c = s.config, L = loteDe(u), H = MisDatos.hist || { pases:[], paquetes:[] };
+  const fh = ts => ts ? fechaHora(ts) : '—', fc = iso => iso ? fechaCorta(iso) : '—', si = v => v ? 'Sí' : 'No', x = v => esc(v == null ? '' : String(v));
+  const tabla = (cols, filas) => filas.length ? `<table><thead><tr>${cols.map(k => `<th>${esc(k)}</th>`).join('')}</tr></thead><tbody>${filas.map(r => `<tr>${r.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p style="color:#666;margin:4px 0">No hay registros.</p>';
+  const kv = pares => `<table>${pares.filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => `<tr><th style="width:36%;text-transform:none;letter-spacing:0;font-size:12px">${esc(k)}</th><td>${v}</td></tr>`).join('')}</table>`;
+  const bloque = (t, quien, cuerpo) => `<h2>${esc(t)}</h2>${quien ? `<p style="font-size:11px;color:#555;margin:-2px 0 8px">${quien}</p>` : ''}${cuerpo}`;
+  const nom = id => id === u.id ? 'Vos' : esc(primerNombre(nombreDe(id)));
+  const cu = typeof Cuidado !== 'undefined' ? Cuidado.mio() : null;
+  const out = [];
+  out.push(`<p>Este informe junta <b>todo lo que la app del barrio guarda de ${x(u.nombre)}</b> (${x(u.casa)}), con quién puede verlo y cuánto se conserva. Lo que figura como "del lote" lo comparten todas las cuentas de ${x(u.casa)}.</p>`);
+  /* 1 · la cuenta */
+  out.push(bloque('1. Tu cuenta', 'Lo ven vos y la Administración. Los demás vecinos ven tu nombre y tu lote; tu teléfono, profesión y dirección, solo si elegiste compartirlos. Se guarda mientras tengas cuenta.', kv([
+    ['Nombre', x(u.nombre)], ['Lote', x(u.casa)], ['Unidad funcional y coeficiente', L ? `UF ${x(L.uf)} · ${L.coef.toLocaleString('es-AR', { minimumFractionDigits:3, maximumFractionDigits:3 })} %` : ''], ['Correo', x(u.email)], ['Teléfono', x(u.tel)], ['DNI', x(u.dni)],
+    ['Relación con el lote', x(RELACIONES[u.relacion] || 'Sin indicar')], ['Representante del lote para votar', u.representante ? 'Sí' : ''], ['Carta poder para votar', u.poderFoto ? (u.poderOk ? 'Aprobada' + (u.poderHasta ? ' hasta el ' + fc(u.poderHasta) : '') : 'Enviada, sin aprobar') : ''],
+    ['Rol y estado de la cuenta', `${x({ vecino:'Vecino/a', admin:'Administración', guardia:'Garita', hotel:'Hotel' }[u.rol] || u.rol)} · ${x(u.estado)}`], ['Alta', u.createdAt ? fh(u.createdAt) : ''], ['Aceptó los términos', u.consentimiento ? fh(u.consentimiento) : ''],
+    ['Profesión', x(u.profesion)], ['Oficios o servicios', x(u.skills)], ['Dirección en el barrio', x(u.direccion)], ['Ubicación para "Cómo llegar"', x(u.ubicacion)], ['Quiénes viven en la casa', x(u.integrantes)],
+    ['Publicar mi oficio con WhatsApp', si(u.mostrarTel)], ['Aparecer en el directorio', si(u.enDirectorio)], ['Equipo de salud / RCP', u.respondedor ? 'Sí' + (u.saludProf && typeof PROF_SALUD !== 'undefined' ? ' · ' + x(PROF_SALUD[u.saludProf]) : '') : 'No'],
+    ['Foto del frente de la casa', u.fotoCasa ? 'Cargada (la garita la usa para ubicar tu domicilio)' : 'No'], ['Credencial del barrio', u.credencial ? 'Generada (el código no se muestra acá por seguridad)' : 'No'],
+    ['Teléfonos habilitados para retirar paquetes', Object.values(u.retiroPubs || {}).filter(Boolean).map(e => `${x(e.equipo || 'Equipo')}${e.at ? ' · desde ' + fh(e.at) : ''}`).join('<br>') || 'Ninguno'],
+  ])));
+  out.push(bloque('Vehículos y mascotas', 'Los ve la garita (para reconocer tus patentes) y, las mascotas, los vecinos si las publicás como perdidas.',
+    tabla(['Patente', 'Modelo'], aLista(u.vehiculos).map(v => [x(v.patente), x(v.modelo)])) + tabla(['Mascota', 'Especie', 'Cómo es'], aLista(u.mascotas).map(m => [x(m.nombre), x(m.especie), x(m.desc)]))));
+  /* 2 · visitas */
+  const vivos = s.pases.filter(p => p.hostId === u.id), idsV = new Set(vivos.map(p => p.id));
+  const pases = [...vivos, ...aLista(H.pases).filter(p => p && !idsV.has(p.id))].sort((a, b) => String(b.fechaFin || b.fecha).localeCompare(String(a.fechaFin || a.fecha)));
+  const mov = p => { const l = p.log || {}, d = Object.keys(l).sort(); return d.length ? d.slice(-3).map(k => `${fc(k)}${l[k].in ? ' entró ' + hora(l[k].in) : ''}${l[k].out ? ', salió ' + hora(l[k].out) : ''}`).join('<br>') + (d.length > 3 ? `<br>(+${d.length - 3} días)` : '') : (p.cancelado ? 'Cancelado' : 'No vino'); };
+  out.push(bloque('2. Visitas que autorizaste', `Las ven vos, la garita y la Administración. Los datos de la visita (DNI, celular y patente) se borran a los ${typeof Historial !== 'undefined' ? Historial.diasVisitas() : 90} días; después queda solo en el archivo histórico (quién vino y cuándo). El DNI y el celular de las visitas van tapados en este informe.`,
+    tabla(['Fecha', 'Tipo', 'Quién', 'Patente', 'DNI', 'Movimientos'], pases.map(p => [p.dias?.length ? `${aLista(p.dias).map(d => DIAS[d]).join(' ')} hasta ${fc(p.fechaFin)}` : fc(p.fecha) + (p.desde ? ' ' + x(p.desde) + '–' + x(p.hasta) : ''),
+      x((TIPOS_PASE[p.tipo] || TIPOS_PASE.visita).n), x(p.nombre), x(p.patente), p.dni ? '***' + x(String(p.dni).slice(-3)) : '', mov(p) + (p.archivadoAt ? '<br><i>archivo histórico</i>' : '')]))
+    + tabla(['Llegó sin aviso', 'Motivo', 'Cuándo', 'Tu respuesta'], s.llegadas.filter(l => llegadaDeMiLote(l, u)).map(l => [x(l.nombre), x(l.motivo), fh(l.at), x({ consultando:'Sin responder', autorizado:'Que pase', rechazado:'No lo conozco' }[l.estado] || l.estado)]))));
+  /* 3 · paquetes */
+  const paqV = typeof paquetesDelLote === 'function' ? paquetesDelLote(u) : [], idsP = new Set(paqV.map(p => p.id));
+  const paqs = [...paqV, ...aLista(H.paquetes).filter(p => p && !idsP.has(p.id))].sort((a, b) => (b.recibido || 0) - (a.recibido || 0));
+  out.push(bloque('3. Paquetes del lote', 'Los ven las cuentas de tu lote, la garita y la Administración. Los retirados quedan 30 días en la app y después pasan al archivo histórico sin foto, firma ni DNI.',
+    tabla(['Empresa', 'A nombre de', 'Llegó', 'Retirado', 'Cómo'], paqs.map(p => [x(p.empresa) + (p.detalle ? ' · ' + x(p.detalle) : ''), nom(p.hostId), fh(p.recibido), p.retirado ? fh(p.retirado) : 'En la garita',
+      !p.entrega ? '' : p.entrega.metodo === 'qr' ? 'QR firmado' : p.entrega.tercero ? 'Lo retiró ' + x(p.entrega.recibe?.nombre || 'otra persona') : 'Firma y DNI']))));
+  /* 4 · expensas */
+  /* SOLO LOS PAGOS DEL LOTE, DEL AÑO EN CURSO (pedido de Claudio, 28-09):
+     antes entraba también todo pago que hubiera cargado esta cuenta, y quien
+     administra hizo la carga inicial de agosto de TODOS los lotes con su
+     usuario: le salían los de los 140 lotes. Ahora cuenta solo el lote, y
+     solo lo pagado de verdad (sin rechazados ni pagos de prueba). */
+  const anio = hoyISO().slice(0, 4), delAnio = f => String(f || '').slice(0, 4) === anio;
+  const cuentasLote = new Set(s.users.filter(z => z.casa === u.casa).map(z => z.id));
+  const pagos = s.pagos.filter(p => p.lote === u.casa && delAnio(p.fecha) && p.estado !== 'rechazado' && !(typeof esPrueba === 'function' && esPrueba(p))).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const estadoPago = p => p.estado === 'informado' && typeof esPagoMP === 'function' && esPagoMP(p) ? 'Acreditado (Mercado Pago)' : ({ confirmado:'Acreditado', informado:'Por acreditar', aprobado:'Acreditado' }[p.estado] || x(p.estado));
+  out.push(bloque(`4. Expensas del lote: pagos y recibos de ${anio}`, `Los pagos de ${x(u.casa)} de este año y sus recibos. Los ven las cuentas de tu lote y la Administración; se conservan 10 años (art. 328 del Código Civil y Comercial). Los de años anteriores están en Mis expensas. Los comprobantes que subiste se borran 30 días después de confirmados.`,
+    tabla(['Fecha', 'Importe', 'Medio', 'Estado', 'Informó'], pagos.map(p => [fc(p.fecha), typeof plata === 'function' ? plata(p.monto) : x(p.monto), x(p.medio), estadoPago(p), cuentasLote.has(p.userId) ? nom(p.userId) : 'La Administración']))
+    + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa && delAnio(r.fecha)).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))));
+  /* 5 · mensajes
+     SOLO LOS DE LA SEMANA (pedido de Claudio, 10-10-2026: "se hace muy
+     largo todo"). Los de los últimos 7 días van completos; de los más
+     viejos se dice cuántos hay y dónde verlos (en Mensajes de la app, hasta
+     90 días: después se borran solos). La Ley 25.326 pide informar la
+     totalidad de lo que hay: por eso se cuenta lo que no se transcribe. */
+  const semana = Date.now() - 7 * DIA, cuando = m => (m && (m.createdAt || m.at)) || 0;
+  const hilo = (titulo, todos, quien) => { const msgs = todos.filter(m => cuando(m) >= semana), resto = todos.length - msgs.length;
+    return `<div class="caja"><b>${titulo}</b>${msgs.length ? `<table style="margin-top:6px">${msgs.map(m => `<tr><td style="width:120px;white-space:nowrap">${fh(cuando(m))}</td><td style="width:90px">${quien(m)}</td><td>${x(m.text)}</td></tr>`).join('')}</table>` : '<br><span style="color:#666">Sin mensajes en los últimos 7 días.</span>'}
+      ${resto ? `<p style="font-size:11px;color:#666;margin:6px 0 0">Además hay ${plural(resto, 'mensaje anterior', 'mensajes anteriores')} (de hasta 90 días): los ves completos en Mensajes de la app.</p>` : ''}</div>`; };
+  const privs = s.privados.filter(h => h.userId === u.id);
+  out.push(bloque('5. Mensajes privados (de los últimos 7 días)', 'Con la Administración: solo vos y la Administración. Con la garita: solo vos y la garita. Con otro vecino: solo ustedes dos. Acá van los de los últimos 7 días; todos los demás los ves en Mensajes de la app. Los mensajes se borran solos de la base del barrio a los 90 días.',
+    privs.map(h => hilo(h.con === 'guardia' ? 'Con la garita' : 'Con la Administración', aLista(h.msgs), m => m.from === 'vecino' ? 'Vos' : h.con === 'guardia' ? 'Garita' : 'Administración')).join('')
+    + aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)).map(h => { const otro = h.a === u.id ? h.b : h.a; return hilo(`Con ${esc(primerNombre(nombreDe(otro)))} (${x(usuario(otro)?.casa || '')})`, aLista(h.msgs), m => m.de === u.id ? 'Vos' : esc(primerNombre(nombreDe(m.de)))); }).join('')
+    || '<p style="color:#666">No hay conversaciones.</p>'));
+  /* 6 · reclamos y peticiones */
+  out.push(bloque('6. Reclamos y peticiones a la garita', 'Los reclamos: vos y la Administración. Las peticiones: vos, la garita y la Administración; guardan las dos firmas y un sello digital (las firmas no se reproducen acá).',
+    tabla(['Reclamo', 'Categoría', 'Fecha', 'Estado'], s.reclamos.filter(r => r.userId === u.id).map(r => [x(r.titulo) + (r.detalle ? '<br><span style="color:#555">' + x(r.detalle) + '</span>' : ''), x(r.categoria), fh(r.createdAt), x(r.estado)]))
+    + tabla(['Petición', 'Pedido', 'Vigencia', 'Estado'], s.peticiones.filter(p => p.userId === u.id).map(p => [x((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n), x(p.texto), `${fc(p.desde)}${p.hasta ? ' al ' + fc(p.hasta) : ''}`, x((ESTADO_PET[p.estado] || [p.estado])[0])]))));
+  /* 7 · votaciones */
+  const votos = s.votaciones.map(v => { const vv = (v.votos || {})[u.casa]; const mio = vv && vv.personas ? vv.personas[u.id] : (vv && vv.por === u.id ? vv.i : undefined);
+    return mio === undefined || mio === null ? null : [x(v.titulo), x(aLista(v.opciones)[mio] ?? mio), vv.at ? fh(vv.at) : '—']; }).filter(Boolean);
+  out.push(bloque('7. Tus votos', 'Cada voto queda en el registro de auditoría con fecha y hora; el resultado se cuenta por lote.', tabla(['Votación', 'Tu opción', 'Cuándo'], votos)));
+  /* 8 · lo que publicaste */
+  const posts = s.posts.filter(p => p.autor === u.id), coms = s.posts.flatMap(p => aLista(p.comments).filter(k => k && k.autor === u.id).map(k => [x(p.title), x(k.text), fh(k.createdAt)]));
+  out.push(bloque('8. Lo que publicaste', 'Lo del pizarrón lo ven los vecinos aprobados, la garita y la Administración.',
+    tabla(['Pizarrón', 'Tipo', 'Fecha'], posts.map(p => [x(p.title), x(p.type), fh(p.createdAt)])) + tabla(['Comentaste en', 'Comentario', 'Fecha'], coms)
+    + tabla(['Obras', 'Empresa', 'Inicio', 'Estado'], s.obras.filter(o => o.userId === u.id).map(o => [x(o.tipo), x(o.empresa), fc(o.inicio), x(o.estado)]))
+    + tabla(['Viajes compartidos', 'Destino', 'Fecha'], s.viajes.filter(v => v.userId === u.id).map(v => [x(v.tipo), x(v.destino), fc(v.fecha) + ' ' + x(v.hora || '')]))
+    + tabla(['Cosas para prestar', 'Estado'], aLista(s.cosas).filter(k => k && k.userId === u.id).map(k => [x(k.nombre), x(k.estado)]))
+    + tabla(['Ángeles de la nieve', 'Nota'], aLista(s.nieve).filter(k => k && k.userId === u.id).map(k => [x(k.tipo === 'ayuda' ? 'Pedís ayuda' : 'Sos ángel'), x(k.nota)]))));
+  /* 9 · cuidados */
+  const fam = cu && typeof familiaresDe === 'function' ? familiaresDe(cu) : [];
+  out.push(bloque('9. "Estoy bien", salidas y casa sola', 'Los ven vos, la garita, la Administración y las personas del barrio que elegiste; tus familiares reciben el aviso por correo. Los avisos de cada día se borran a los 30 días; la casa sola, dos días después de volver.',
+    (cu ? kv([['Estoy bien', cu.activo ? `Activo · hasta las ${x(cu.hora || '')}` : 'No lo usás'], ['Tu teléfono para el aviso', x(cu.tel)], ['Último aviso', cu.ultimo ? fh(cu.ultimo) : ''], ['En pausa hasta', cu.pausaHasta ? fc(cu.pausaHasta) : ''],
+        ['Familiares (por correo)', fam.map(f => `${x(f.nombre)}${f.email ? ' · ' + x(f.email) : ''}${f.tel ? ' · ' + x(f.tel) : ''}`).join('<br>')], ['Personas del barrio elegidas', Object.entries(cu.contactos || {}).map(([id, k]) => `${esc(nombreDe(id))}${k && k.acepta ? ' (aceptó)' : ' (sin aceptar)'}`).join('<br>')],
+        ['Aceptaste la privacidad', cu.consentimiento ? fh(cu.consentimiento) : ''], ['Salida en curso', cu.salida && !cu.salida.volvio ? `${x(cu.salida.donde)} · vuelve ${fh(cu.salida.vuelta)}` : '']]) : '<p style="color:#666">No usás "Estoy bien" ni el aviso de salida.</p>')
+    + tabla(['Casa sola desde', 'Hasta', 'Revisiones de la guardia'], aLista(s.ausencias).filter(a => a && (a.userId === u.id || a.casa === u.casa)).map(a => [fc(a.desde), fc(a.hasta), Object.keys(a.revisiones || {}).length + ' días revisada']))));
+  /* 10 · la casa */
+  const plan = aLista(s.casaTareas).find(t => t && t.id === `ct-${String(u.casa).replace(/\D/g, '') || 'x'}-sismo-plan`) || {};
+  const nombreTarea = id => { const t = [...(typeof TAREAS_INVIERNO !== 'undefined' ? TAREAS_INVIERNO : []), ...(typeof TAREAS_VERANO !== 'undefined' ? TAREAS_VERANO : [])].find(z => z.id === id); if (t) return t.t;
+    const m = typeof MOCHILA !== 'undefined' && MOCHILA.find(z => 'moch-' + z.id === id); return m ? 'Mochila: ' + m.t : id === 'sismo-semana' ? 'Revisión semanal de la mochila' : id === 'sismo-plan' ? 'Plan familiar ante un sismo' : id; };
+  out.push(bloque('10. Tu casa (del lote)', 'Lo ven y lo cambian solo las cuentas de tu lote. Ni la garita ni la Administración.',
+    tabla(['Qué', 'Hecho', 'Anotó'], aLista(s.casaTareas).filter(t => t && t.lote === u.casa && t.tarea !== 'sismo-plan').map(t => [x(nombreTarea(t.tarea)), t.hecho ? fh(t.hecho) : '—', t.por ? nom(t.por) : '']))
+    + (plan.encuentro || plan.cortes ? kv([['Plan ante un sismo · punto de encuentro', x(plan.encuentro)], ['Contacto fuera de Tierra del Fuego', x(plan.contacto)], ['Llaves de corte', x(plan.cortes)], ['Lugares seguros', x(plan.seguros)], ['Quién se ocupa de qué', x(plan.roles)],
+        ['Sugerencias', aLista(plan.sugerencias).map(g => `${x(g.texto)} (${nom(g.de)}, ${fh(g.at)}${g.hecha ? ', hecha' : ''})`).join('<br>')]]) : '')));
+  /* 11 · notificaciones, SOS y avisos */
+  out.push(bloque('11. Notificaciones de la Administración, SOS y avisos', 'Las notificaciones (infracciones) y su descargo: las cuentas de tu lote y la Administración. Un SOS lo ven todos los vecinos en el momento (tipo, nombre, lote y ubicación), y queda en el registro de la guardia.',
+    tabla(['Notificación', 'Detalle', 'Fecha', 'Estado'], s.infracciones.filter(i => i.casa === u.casa).map(i => [x(i.tipo), x(i.detalle) + (i.descargo ? '<br><i>Descargo: ' + x(typeof i.descargo === 'string' ? i.descargo : i.descargo.texto || '') + '</i>' : ''), fh(i.at), x(i.estado)]))
+    + tabla(['SOS / DEA que pediste', 'Cuándo', 'Estado'], aLista(s.sos).filter(k => k && k.userId === u.id).map(k => [x(k.tipo), fh(k.at), x(k.estado)]))
+    + `<p style="font-size:12px;margin:6px 0 0">Avisos personales guardados para vos (campanita): <b>${aLista(s.notifs).filter(n => aLista(n.para).includes(u.id)).length}</b>.</p>`));
+  /* 12 · lo que no está */
+  out.push(bloque('12. Lo que la app NO guarda o no está en este informe', '', `<ul style="margin:0;padding-left:18px">
+    <li>Tu contraseña: no se guarda; el sistema de cuentas (Google Firebase) conserva solo una huella irreversible.</li>
+    <li>Las fotos grandes (la de tu casa, tus mascotas): quedan en tu equipo; a la base va una miniatura.</li>
+    <li>Los códigos que sirven para entrar o identificarte (credencial, QR de retiro, llave de tu teléfono): no se reproducen por seguridad.</li>
+    <li>El libro de guardia (bitácora) y el registro de auditoría: los llevan la garita y la Administración. Si querés lo que diga de vos, pedíselo a la Administración.</li></ul>`));
+  out.push(bloque('Tus derechos', '', `<p style="margin:0">Podés solicitarle a la Administración del Barrio ${x(c.nombre)} (${x(c.adminEmail || '')}${typeof cfgDatos === 'function' && cfgDatos().responsableArco ? ', responsable: ' + x(cfgDatos().responsableArco) : ''}) ver tus datos (te responde en 10 días corridos), que se corrijan o que se retiren (en 5 días hábiles), según los arts. 14 a 16 de la Ley 25.326. Muchos datos los corregís vos en Mi casa. La Agencia de Acceso a la Información Pública (AAIP) es el órgano de control y recibe denuncias.</p>`));
+  return out.join('');
+}
+/* El pedido de baja va a la carpeta privada de cada cuenta de la
+   Administración. Antes iba a "rol:admin", que se guarda en el pizarrón de
+   avisos del barrio: cualquier vecino podía ver quién había pedido la baja. */
+A['pedir-baja'] = async () => { const u = yo();
+  if (!await confirmar('Pedir la baja', 'Le llega a la Administración, que tiene 5 días hábiles para borrar tus datos (salvo lo que la ley obliga a conservar, como los pagos de expensas). Te avisa cuando esté hecho.', { si:'Pedir la baja', peligro:true })) return;
+  const admins = typeof cuentasAdministracion === 'function' ? cuentasAdministracion() : Store.s.users.filter(z => z.rol === 'admin' && z.estado === 'aprobado').map(z => z.id);
+  Store.cambiar(s => { if (admins.length) notificar(s, { para:admins, titulo:'Pedido de baja de datos', texto:`${u.nombre} · ${u.casa}`, icon:'trash', color:'danger', link:'admin:vecinos', sonido:true }); auditar(s, 'Pedido de baja de datos personales', u.casa, u.id); });
+  cerrarHoja(); toast('Pedido enviado a la Administración', 'send'); };
+
+/* =========================================================
+   DESCARGAS
+   Una ventana más de la app, con la misma lógica: superficies que se
+   tocan. Lo que hay adentro lo carga la Administración desde
+   Contenido → Descargas, así se puede sumar una app, un instructivo o
+   una planilla sin tocar el programa.
+   ========================================================= */
+/* Lo que viene de fábrica (Vitalia) se ve aunque la base todavía no lo
+   tenga: hasta que la Administración entra y se suma solo. */
+const descargasVisibles = () => {
+  const ds = aLista(Store.s.descargas).filter(Boolean);
+  return [...ds, ...DESCARGAS.filter(f => f.url && !ds.some(d => d.id === f.id))];
+};
+const TIPOS_DESCARGA = {
+  app:      { n:'Aplicación', icon:'smartphone', c:'accent' },
+  doc:      { n:'Documento', icon:'file', c:'brand' },
+  planilla: { n:'Planilla', icon:'clipboard', c:'wood' },
+  enlace:   { n:'Enlace', icon:'link', c:'sky' },
+};
+R.descargas = {
+  titulo: 'Descargas', icon: 'download', color: 'sky', sub: 'Apps, documentos y planillas del barrio',
+  render(){
+    const s = Store.s, ds = descargasVisibles().filter(d => (d.url || d.texto) && !esNormaDescarga(d));
+    const porTipo = {};
+    ds.forEach(d => { const t = TIPOS_DESCARGA[d.tipo] ? d.tipo : 'doc'; (porTipo[t] = porTipo[t] || []).push(d); });
+    const bloque = (t) => {
+      const T = TIPOS_DESCARGA[t];
+      return `${sec(T.n === 'Aplicación' ? 'Aplicaciones' : T.n + 's')}
+        ${porTipo[t].map(d => `<button class="superficie" data-a="descargar" data-id="${d.id}">
+          <span class="ic ic-${d.color || T.c}">${I(d.icon || T.icon)}</span>
+          <span class="txt"><b>${esc(d.titulo)}</b>${d.detalle ? `<small>${esc(d.detalle)}</small>` : ''}</span>${I(d.url && /^https?:/.test(d.url) ? 'right' : 'download')}</button>`).join('')}`;
+    };
+    return `${ds.length ? Object.keys(TIPOS_DESCARGA).filter(t => porTipo[t]).map(bloque).join('')
+      : vacio('download', 'Todavía no hay nada para descargar.')}
+      <p class="muted small" style="margin:10px 2px 6px">${I('file')} El reglamento y las normas del barrio se leen y se descargan en <button class="link" data-a="abrir" data-v="documentos">El barrio → Normas y reglamentos</button>.</p>
+      ${esAdmin() ? sec('Del barrio') : ''}
+      ${esAdmin() ? superficie({ a:'exportar-padron', icon:'users', color:'wood', t:'Padrón de propietarios (CSV)', s:'Para abrirlo en Excel' }) : ''}
+      ${esAdmin() ? superficie({ a:'exportar', icon:'download', color:'sky', t:'Copia de seguridad de los datos', s:'Todo el barrio en un archivo' }) : ''}
+      ${esAdmin() ? superficie({ a:'abrir', v:'admin', p:'contenido|descargas', icon:'plus', color:'accent', t:'Agregar algo a esta ventana', s:'Apps, instructivos, planillas o enlaces', cls:'acento' }) : ''}
+      <p class="muted tiny">Las aplicaciones se abren en el navegador y se instalan desde ahí: en el iPhone con Compartir → Agregar a la pantalla de inicio, y en Android con el menú → Instalar aplicación.</p>`;
+  },
+};
+/* =========================================================
+   ANTES DE ABRIR UNA APP DE SALUD
+   Vitalia (y cualquier descarga marcada con "deslinde") no se abre
+   directo: primero una ventana que deja claro que no es una app médica,
+   que el barrio no responde por la exactitud de sus cálculos y que no
+   reemplaza a un profesional. Hay que marcar "Entendí" para seguir.
+   ========================================================= */
+const DESLINDE_SALUD = `<b>Antes de abrirla, leé esto:</b>
+  <ul style="margin:8px 0 0;padding-left:18px;line-height:1.55">
+    <li><b>No es una aplicación médica</b> ni un dispositivo de salud. No diagnostica, no indica tratamientos y no reemplaza la consulta con un médico, nutricionista u otro profesional.</li>
+    <li>Sus cálculos, planes y sugerencias son orientativos. <b>Ni el barrio, ni la Administración, ni quien la desarrolló garantizan su exactitud</b> ni responden por decisiones tomadas en base a ella.</li>
+    <li>Si tenés una enfermedad, tomás medicación, estás embarazada o hay menores de por medio, consultá antes con tu profesional.</li>
+    <li>Se comparte como un espacio para los vecinos y para contribuir a la salud física. Es una aplicación aparte: lo que cargues ahí no pasa por la app del barrio.</li>
+  </ul>`;
+A['descargar'] = el => {
+  const d = descargasVisibles().find(x => x.id === el.dataset.id); if (!d) return;
+  if (d.deslinde && !el.dataset.ok){
+    hoja(d.titulo, `<div class="aviso a-warn" style="display:block">${DESLINDE_SALUD}</div>
+      <label class="check" style="margin:14px 0 0"><input type="checkbox" id="deslindeOk" onchange="document.getElementById('deslindeSeguir').disabled=!this.checked"><span>Entendí: no es una app médica y la uso bajo mi responsabilidad.</span></label>
+      <button class="btn btn-pri btn-block btn-grande" id="deslindeSeguir" style="margin-top:12px" disabled data-a="descargar" data-id="${esc(d.id)}" data-ok="1">${I('right')}Seguir</button>`);
+    return;
+  }
+  if (d.deslinde && el.dataset.ok && d.url){ cerrarHoja(); window.open(d.url, '_blank', 'noopener'); return; }
+  if (d.url && /^https?:/i.test(d.url)){
+    hoja(d.titulo, `${d.detalle ? `<p class="small" style="margin:0 0 14px;color:var(--ink-2)">${esc(d.detalle)}</p>` : ''}
+      ${d.texto ? `<div class="card plana small" style="white-space:pre-wrap">${esc(d.texto)}</div>` : ''}
+      <a class="btn btn-pri btn-block btn-grande" href="${esc(d.url)}" target="_blank" rel="noopener">${I(d.tipo === 'app' ? 'smartphone' : 'download')}${d.tipo === 'app' ? 'Abrir la aplicación' : 'Descargar'}</a>
+      <button class="btn btn-sec btn-block" style="margin-top:8px" data-a="copiar" data-v="${esc(d.url)}">${I('copy')}Copiar el enlace</button>
+      ${d.tipo === 'app' ? `<p class="muted tiny" style="margin-top:12px">Para tenerla como una app en el teléfono: abrila y después, en el iPhone, tocá Compartir → Agregar a la pantalla de inicio; en Android, el menú de tres puntos → Instalar aplicación.</p>` : ''}`);
+    return;
+  }
+  if (d.texto) imprimir(d.titulo, `<h1>${esc(d.titulo)}</h1><div style="white-space:pre-wrap">${esc(d.texto)}</div>`);
+};
+
+/* =========================================================
+   PROMOCIONES DEL HOTEL Y BENEFICIOS PARA VECINOS
+   -------------------------------------------------------
+   El Hotel Los Cauquenes está dentro del predio y suele tener propuestas
+   de la semana y descuentos para los vecinos. La app las muestra en una
+   tira debajo de la foto de la portada.
+
+   DE DÓNDE SALEN
+   Un navegador no puede leer la web del hotel directamente: el sitio no
+   autoriza que otra página lo lea (es la misma limitación que con los
+   aviones en vivo). Hay dos caminos, y los dos funcionan:
+     1. Las cargan a mano el hotel (desde su cuenta) o la Administración
+        (sala del hotel → Promociones, o Contenido → Promociones). Es lo
+        que anda hoy, sin depender de nadie (ver js/v-hotel.js).
+     2. Con un programita propio (un Worker de Cloudflare o un Apps
+        Script) que lea la página del hotel y devuelva la lista en JSON.
+        Se pega su dirección en Ajustes → Promociones y la app las
+        actualiza sola cada hora. El formato esperado está en CONECTAR.md.
+   ========================================================= */
+const Promos = {
+  KEY:'bhc.promos', d:null, cargando:null,
+  leer(){ try { this.d = JSON.parse(localStorage.getItem(this.KEY)); } catch(e){} },
+  /* Ejemplos que viajan en el código. Están para que la tira del hotel se vea
+     desde el primer día, aunque la base del barrio todavía no tenga nada
+     cargado: si no, la portada queda con un hueco y parece rota. En cuanto la
+     Administración carga una promoción de verdad (Contenido → Promociones) o
+     pega la dirección del lector en Ajustes, estos ejemplos desaparecen. */
+  MUESTRA: [
+    { id:'demo1', titulo:'Cena de los viernes en el restaurante', detalle:'Menú de tres pasos con productos fueguinos', descuento:'20 %', muestra:true },
+    { id:'demo2', titulo:'Spa · circuito de aguas', detalle:'De lunes a jueves, con reserva previa', descuento:'25 %', muestra:true },
+    { id:'demo3', titulo:'Noche para vecinos del barrio', detalle:'Alojamiento para familiares que vienen de visita', descuento:'15 %', muestra:true },
+    { id:'demo4', titulo:'Té de la tarde con vista al canal', detalle:'Todos los días de 16 a 18 h, sin reserva', descuento:'10 %', muestra:true },
+  ],
+  vigentes(){
+    const hoy = hoyISO();
+    const propias = aLista(Store.s.promos).filter(p => (!p.desde || p.desde <= hoy) && (!p.hasta || p.hasta >= hoy));
+    const web = aLista(this.d?.lista).filter(p => (!p.hasta || p.hasta >= hoy));
+    if (!propias.length && !web.length) return this.MUESTRA;
+    /* Si una promo está cargada a mano y también vino de la web, manda la
+       cargada a mano: la escribió alguien del barrio. */
+    const titulos = new Set(propias.map(p => (p.titulo || '').toLowerCase()));
+    return [...propias, ...web.filter(p => !titulos.has((p.titulo || '').toLowerCase()))];
+  },
+  async pedir(forzar = false){
+    const url = Store.s.config.promosUrl;
+    if (!url) return null;
+    if (!forzar && this.d && Date.now() - this.d.t < HORA) return this.d;
+    if (this.cargando) return this.cargando;
+    this.cargando = fetch(url).then(r => r.json()).then(j => {
+      const lista = (j.promociones || j.lista || (Array.isArray(j) ? j : [])).map(p => ({
+        id:'w' + (p.id || uid()), titulo:String(p.titulo || p.title || '').trim(),
+        detalle:String(p.detalle || p.descripcion || p.description || '').trim(),
+        descuento:String(p.descuento || p.discount || '').trim(),
+        desde:p.desde || '', hasta:p.hasta || '', url:p.url || p.link || '', web:true,
+      })).filter(p => p.titulo);
+      this.d = { t:Date.now(), lista };
+      try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
+      return this.d;
+    }).catch(() => this.d).finally(() => { this.cargando = null; });
+    return this.cargando;
+  },
+};
+Promos.leer();
+
+/* LA POSTAL DEL HOTEL (pedido de Claudio, 10-10-2026: opción B de las
+   propuestas). Antes era una cinta de promociones que pasaba sola. Ahora es
+   una tarjeta como una postal: el descuento bien grande a la izquierda, la
+   promoción a la derecha y, si hay varias, cambia sola cada 7 segundos
+   ("1 de 4", con sus puntitos). Se frena con el mouse encima y queda quieta
+   si el equipo pide menos movimiento. Tocarla abre la promoción. */
+let postalI = 0;
+function tiraPromos(){
+  const ps = Promos.vigentes();
+  if (!ps.length) return '';
+  /* Si lo que se está mostrando son los ejemplos que viajan en el código,
+     a quien administra se le dice dónde se cargan las de verdad. Al vecino
+     no se le cuenta: para él son propuestas del hotel y punto. */
+  const aviso = (ps[0] && ps[0].muestra && esAdmin())
+    ? `<div class="card plana small" style="margin:8px 0 0">${I('info')} Estas son promociones <b>de ejemplo</b>.
+        Las reales las cargan el hotel desde su cuenta o la Administración en <b>Día a día → Hotel Los Cauquenes → Promociones del hotel</b>.</div>`
+    : '';
+  const i = postalI % ps.length;
+  return `<div class="tira-promos hotel-postal" data-postal="${ps.length}">
+    <div class="tira-cab"><img class="tira-logo" src="img/logo-noche.png" alt="" width="26" height="26"><b>Hotel Los Cauquenes · esta semana</b>
+      ${ps[0] && ps[0].muestra ? `<span class="muted small">ejemplos</span>` : ps.length > 1 ? `<span class="muted small hp-cuenta">${i + 1} de ${ps.length}</span>` : ''}</div>
+    <div class="hp-slides">${ps.map((p, k) => `<button class="hp-slide ${k === i ? 'on' : ''}" data-a="ver-promo" data-id="${esc(p.id)}" ${k === i ? '' : 'tabindex="-1" aria-hidden="true"'}>
+      <span class="hp-desc">${p.descuento ? esc(p.descuento) : I('star')}</span>
+      <span class="txt"><small>Para los vecinos del barrio</small><b>${esc(p.titulo)}</b>${p.detalle ? `<span>${esc(p.detalle)}</span>` : ''}</span>${I('right')}</button>`).join('')}</div>
+    ${ps.length > 1 ? `<div class="hp-puntos" aria-hidden="true">${ps.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('')}</div>` : ''}
+    ${aviso}
+  </div>`;
+}
+/* Cambia de promoción sola, sin redibujar la portada. */
+setInterval(() => {
+  const el = document.querySelector('[data-postal]'); if (!el) return;
+  const n = +el.dataset.postal || 0; if (n < 2 || el.matches(':hover') || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  postalI = (postalI + 1) % n;
+  el.querySelectorAll('.hp-slide').forEach((b, k) => { const on = k === postalI; b.classList.toggle('on', on); if (on){ b.removeAttribute('tabindex'); b.removeAttribute('aria-hidden'); } else { b.setAttribute('tabindex', '-1'); b.setAttribute('aria-hidden', 'true'); } });
+  el.querySelectorAll('.hp-puntos i').forEach((p, k) => p.classList.toggle('on', k === postalI));
+  const c = el.querySelector('.hp-cuenta'); if (c) c.textContent = `${postalI + 1} de ${n}`;
+}, 7000);
+A['ver-promo'] = el => {
+  const p = Promos.vigentes().find(x => x.id === el.dataset.id); if (!p) return;
+  hoja(p.titulo, `
+    ${p.descuento ? `<div class="card plana center" style="background:var(--wood-soft);color:var(--wood)">
+      <div style="font-size:30px;font-weight:800;letter-spacing:-1px">${esc(p.descuento)}</div>
+      <div class="small">de descuento para vecinos del barrio</div></div>` : ''}
+    ${p.detalle ? `<p style="margin:0 0 14px;color:var(--ink-2)">${esc(p.detalle)}</p>` : ''}
+    ${p.desde || p.hasta ? `<div class="card plana small">${I('calendar')} ${p.desde ? 'Desde ' + fechaLarga(p.desde) : ''}${p.hasta ? (p.desde ? ' · hasta ' : 'Hasta ') + fechaLarga(p.hasta) : ''}</div>` : ''}
+    ${enlaceWeb(p.url) ? `<a class="btn btn-pri btn-block" href="${esc(enlaceWeb(p.url))}" target="_blank" rel="noopener">${I('link')}Ver en el Hotel Los Cauquenes</a>` : ''}
+    <p class="muted tiny" style="margin-top:12px">${p.muestra ? 'Promoción de MUESTRA, para ver cómo se ve la sección: no es una oferta real. La Administración las reemplaza desde Contenido → Promociones. ' : p.web ? 'Tomado del sitio del Hotel Los Cauquenes. ' : (p.autor || (p.hotel ? 'hotel' : 'admin')) === 'hotel' ? 'Publicada por el Hotel Los Cauquenes. ' : 'Cargada por la Administración del barrio. '}Confirmá las condiciones directamente con el Hotel Los Cauquenes antes de reservar.</p>`);
+};
+A['promos-actualizar'] = () => Promos.pedir(true).then(() => { refrescar(); toast('Promociones actualizadas', 'refresh'); });

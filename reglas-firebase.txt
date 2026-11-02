@@ -1,0 +1,923 @@
+REGLAS DE SEGURIDAD DE LA REALTIME DATABASE — BAHÍA CAUQUÉN
+===========================================================
+
+DÓNDE SE PEGAN
+  console.firebase.google.com → el proyecto → Realtime Database
+  → pestaña "Reglas" → reemplazar TODO por el bloque de abajo → Publicar
+
+QUÉ HACEN, EN CASTELLANO
+-----------------------------------------------------------
+1. TENER CUENTA NO ALCANZA. Cualquiera puede crearse una cuenta (la clave
+   del proyecto viaja en la página, es así por diseño). Por eso las reglas
+   no preguntan "¿estás logueado?" sino "¿figurás en /barrio/users con
+   estado aprobado?". Una cuenta sin aprobar no ve nada del barrio.
+
+2. NADIE SE APRUEBA SOLO. Un vecino puede crear su propio registro, pero
+   solo con estado "pendiente" y rol "vecino", y después no puede cambiarse
+   ni el estado, ni el rol, ni el lote, ni ser representante del lote para
+   votar, ni aprobarse su propia carta poder. Eso solo lo hace la
+   Administración.
+
+2 bis. LA GARITA ENTRA SOLA. La cuenta garitabarriobahiacauquen@gmail.com
+   (y solo esa, con su contraseña) puede habilitarse ella misma, pero
+   ÚNICAMENTE como garita: rol "guardia", lote "Garita". Nunca como
+   Administración. Si algún día cambia el correo de la garita, hay que
+   cambiarlo también en la regla de "users" (buscá garitabarriobahiacauquen).
+
+3. LA PRIMERA CUENTA ES LA EXCEPCIÓN. Mientras /barrio/publico/instalado no
+   existe, la primera cuenta que se crea queda como Administración y deja esa
+   marca puesta. Es la única ventana abierta del sistema y se cierra sola.
+   >>> CREALA APENAS PUBLIQUES LA APP. <<<
+   Esa marca es el ÚNICO dato público de toda la base: dice sí o no, y nada
+   más. Hace falta porque quien todavía no tiene cuenta no puede leer la lista
+   de vecinos, así que sin ella la app no sabría si ofrecer el alta de
+   Administración o un alta común.
+
+4. TRES ZONAS.
+   /barrio          lo que ven todos los vecinos aprobados (pizarrón,
+                    votaciones, la guía del barrio, documentos, obras…).
+                    El padrón de expensas (DNI, correo, deuda) está acá
+                    pero lo lee SOLO la Administración (ver 8 quater).
+                    Los datos del barrio (padrón, agenda, reglamento,
+                    proveedores, ajustes) solo los edita la
+                    Administración.
+   /privado/<uid>   lo de cada vecino: sus mensajes con la Administración y
+                    la guardia, sus mensajes con otros vecinos, sus reclamos,
+                    peticiones, pases, paquetes, llegadas y avisos.
+                    Lo lee ese vecino y el personal (la guardia necesita los
+                    pases; la Administración, reclamos y peticiones).
+   /staff           bitácora, avisos a la guardia, SOS, correos y auditoría.
+
+5. LOS MENSAJES ENTRE VECINOS no los puede leer ni la Administración: cada
+   uno guarda su copia en su propia carpeta y la regla de lectura es del
+   dueño. La Administración puede leer /privado para pases y reclamos, así
+   que si querés que ni ella vea los mensajes vecino a vecino, cambiá la
+   línea marcada con ⚠ (está explicado ahí mismo).
+
+6. LA AUDITORÍA NO SE BORRA NI SE EDITA: solo se agrega.
+
+6 bis. LA SUPERVISIÓN DE LA GUARDIA SOLO MIRA (07-10-2026). El rol
+   "supervisor" lee lo de la garita (bitácora, pases, peticiones, SOS,
+   rondas…) pero no escribe en ningún lado, salvo sus propias
+   conversaciones con la garita y la Administración y el visto de cada parte
+   de turno (staff/vistos). Ver abajo, "NUEVO 07-10".
+
+8. "ESTOY BIEN" (27-09-2026). Que alguien vive solo no es un dato para
+   todo el barrio: /cuidado lo leen solo la garita, la Administración, el
+   propio vecino y los familiares que viven en el barrio y eligió. Los demás
+   vecinos no. Un familiar solo puede aceptar, salir, o dar y resolver la
+   alarma del día. Los cuidados de la casa en invierno son del
+   lote (pv/casaTareas). Las cosas para prestar y los ángeles de la nieve
+   los ven todos los vecinos aprobados; cada uno escribe solo lo suyo.
+
+8 ter. INQUILINOS Y PROPIETARIOS (07-10-2026). La relación con el lote
+   (propietario, cotitular, inquilino, familiar) la elige cada uno UNA vez
+   (al inscribirse o en Mi casa); después solo la cambia la Administración,
+   porque decide el voto y quién maneja un lote alquilado. Lo del día a día
+   del lote (casa sola, plan ante un sismo, paquetes) se guarda solo en las
+   carpetas de quienes viven ahí: el propietario de un lote alquilado no lo
+   recibe.
+
+8 quater. LA GUÍA DEL BARRIO Y EL PADRÓN (08-10-2026).
+   /barrio/guia: quién vive en cada lote (propietarios, inquilinos, si es
+   baldío o cabaña). La leen los vecinos aprobados, la garita, la
+   Administración y la supervisión; el hotel NO (el hotel ve solo la
+   dirección de cada lote, que está en el programa, sin nombres).
+   /staff/telefonos: los teléfonos de cada lote. Los leen SOLO la garita, la
+   Administración y la supervisión. Los vecinos no.
+   /barrio/padron: el padrón de expensas (titular, DNI, correo, teléfono,
+   deuda). Antes lo leían todos los vecinos aprobados; ahora SOLO la
+   Administración. Las tres las escribe solo la Administración.
+
+8 quinquies. LAS EXPENSAS DE CADA LOTE (08-10-2026). /barrio/liquidaciones
+   (la cuota, el interés por mora, la deuda, las multas y si está en
+   gestión judicial cada lote) la lee SOLO la Administración. Los vecinos
+   leen /barrio/liqResumen (el mes: totales, rubros, vencimientos, sin
+   lotes) y /pv/cuotasLote/<su cuenta>: las cuotas de su propio lote, que
+   reparte la Administración. Los gastos del barrio (/barrio/gastos:
+   proveedor, factura, importe) los siguen viendo todos: es la
+   transparencia de las expensas.
+
+8 bis. LOS CORREOS (07-10-2026). /barrio/mensajeria dice solo qué correo
+   (Andreani, OCA…) está en el barrio y a qué hora entró y salió: lo anota la
+   garita (o la Administración) y lo leen los vecinos, la Administración y la
+   supervisión; el hotel no. A qué lotes va y la patente quedan en la
+   bitácora (/staff), que los vecinos no leen. Cada casa se entera de lo suyo
+   por su aviso personal (pv/notifs). Los equipos anotados para los avisos
+   pueden llevar la marca "cerrada" (se cerró la sesión): el Apps Script les
+   manda solo el aviso "un correo va a tu casa".
+
+8 ter. LA GUARDIA DE AHORA (13-10-2026). /barrio/guardiaAhora tiene un solo
+   registro: el turno abierto de la garita, su horario, los nombres de
+   quienes están de guardia (con su dibujo) y si hay policía de servicio
+   (sí o no, sin nombre). Lo escribe la garita y lo leen los vecinos, la
+   Administración y la supervisión; el hotel no. Los vecinos siguen sin leer
+   la bitácora. /staff/guardiaLooks guarda cómo eligió aparecer cada guardia:
+   lo escribe la garita y lo leen la garita, la Administración y la
+   supervisión.
+
+8 quater. EL PERSONAL DE MANTENIMIENTO (14-10-2026). /staff/mantenimiento
+   tiene a cada persona de mantenimiento del barrio: nombre, apellido, DNI,
+   la tarea, si está adentro y la tarea y el lugar del día (para el mapa
+   de la garita). Lo leen y lo escriben solo la garita y la
+   Administración. Sus entradas y salidas van a la bitácora sin el DNI. Los
+   vecinos ven solo cuántos están trabajando y desde qué hora, en
+   /barrio/guardiaAhora (campos "mant" y "mantDesde"), sin nombres ni DNI.
+
+8 octies. EL CHOFER DE LA VAN DEL HOTEL (27-10-2026). El hotel le manda a
+   cada chofer su enlace (/hotel/choferCodigos: 20 letras al azar, vale 120
+   días o hasta que el hotel lo da de baja). El teléfono entra como ANÓNIMO
+   y se anota en /choferSesion/<su id> con la clave.
+   - /hotel/vanPases: una ficha por pase vigente (huésped, empleado o van),
+     guardada bajo una huella SHA-256 del código, con nombre e inicial del
+     apellido y fechas o días. La escriben el hotel y la garita. El chofer
+     NO puede listar la carpeta: lee solo la ficha del QR que tiene adelante.
+   - /hotel/vanAbordo: quiénes van a bordo en cada viaje. La escribe el
+     chofer (solo los suyos, con su enlace vigente); la leen el hotel y la
+     garita; la garita la borra a los 7 días.
+   - /hotel/vanGarita: la respuesta de la garita ("OK" o "detener"), la hora
+     del paso y la ubicación de la garita (para el aviso de llegada). La
+     escribe la garita; el chofer lee la de su viaje.
+   - El GPS del chofer: solo viaja la distancia a la garita, nunca la
+     ubicación.
+
+8 quinquies. MANTENIMIENTO EN VIVO (15-10-2026). Al marcar la entrada de
+   alguien de mantenimiento, la garita crea un enlace secreto
+   (/staff/mantCodigos: 20 letras al azar, solo esa persona, vence a las 16 h
+   o con la salida) y se lo manda por WhatsApp. El enlace abre el "brazo de
+   mantenimiento" sin cuenta: el teléfono entra a la base como ANÓNIMO
+   (hay que tener habilitado "Anónimo" en Firebase → Authentication →
+   Método de acceso) y se anota en /mantSesion/<su id> con la clave.
+   - /barrio/mantVivo: quién trabaja (nombre e inicial del apellido) y los
+     puntos que marca en el mapa. Lo leen todas las cuentas aprobadas y el
+     teléfono de mantenimiento con su enlace vigente. Ese teléfono escribe
+     solo sus puntos; la garita y la Administración, todo.
+   - /mantChat/<persona>/<conversación>: los mensajes. Cada vecino (o el
+     hotel) lee solo su conversación; la garita y la Administración, todas;
+     el teléfono de mantenimiento, las suyas. Se borran con la salida.
+   - /staff/mantJornadas: la bitácora de mantenimiento (12 meses), solo
+     garita y Administración. Los DNI, celulares y correos siguen solo en
+     /staff/mantenimiento.
+
+8 sexies. LA RONDA DEL POLICÍA EN EL PLANO (15-10-2026). Los puntos de
+   control (/staff/puntos) suman su lugar en el plano y una foto chica. El
+   teléfono del policía baja una vez su guía (puntos, lugar y fotos) de
+   /ronda/guia/<clave larga al azar>, que va solo en el enlace de su
+   tarjeta: no se puede listar, la escriben la garita y la Administración,
+   y se borra con su salida. Los vecinos ven el recorrido y las rondas de la
+   noche dentro de /barrio/guardiaAhora (campo "ronda"), sin el nombre del
+   policía; desde el 17-10-2026 la ronda en curso va en vivo (la
+   Administración puede ponerle 5, 10 o 15 minutos de demora). La foto
+   GRANDE de cada punto (17-10-2026) vive aparte, en
+   /ronda/fotos/<clave larga al azar>: no se puede listar, la escribe y la
+   borra solo la Administración, y la baja solo quien la pide.
+
+8 octies. EL INFORME SEMANAL DE LA POLICÍA (22-10-2026). El sábado, al
+   registrarse la salida del policía del viernes, la app manda a la
+   supervisión de la policía el informe de la semana y guarda la copia en
+   /staff/informesPolicia (el PDF, sin fotos) y /staff/informesPoliciaIdx
+   (una línea por sábado con los números y si salió). La leen y la
+   escriben solo la garita y la Administración, y la app no la baja al
+   abrir: se trae solo cuando alguien toca "Informes enviados". Lleva del
+   policía nombre, cargo y matrícula; de lo demás de la garita, solo
+   cantidades (sin vecinos ni visitas).
+
+8 septies. LA FICHA DE POLICÍAS (22-10-2026). /staff/policiasFicha tiene a
+   cada policía que viene al barrio: nombre y apellido, cargo, matrícula,
+   celular, correo y si "ya no viene". La leen y la escriben solo la garita
+   y la Administración (la supervisión no). Sirve para completar su
+   próximo ingreso; sus noches siguen en la bitácora.
+
+7. LA CONTABILIDAD ES DE LA ADMINISTRACIÓN. Los gastos y las liquidaciones los
+   ven todos los vecinos (esa fue la decisión: transparencia), pero solo los
+   escribe una cuenta con rol admin. Los pagos y los recibos de cada lote
+   viven en la carpeta privada de ese lote. Lo impositivo, solo la
+   Administración.
+
+-----------------------------------------------------------
+PEGAR DESDE ACÁ
+-----------------------------------------------------------
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "barrio": {
+      "publico": {
+        ".read": true,
+        "instalado": { ".write": "!data.exists() || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+        /* A dónde se piden los correos (la URL del Apps Script y su frase).
+           Tiene que poder leerlo quien TODAVÍA no está aprobado: si no, el
+           mail de "recibimos tu inscripción" y el aviso a la Administración
+           no salen nunca. La frase no es un secreto fuerte (ver Codigo.gs):
+           las defensas son el tope diario y el registro de envíos. */
+        "correo": { ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" }
+      },
+
+      "users": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        "$uid": {
+          ".read": "auth.uid === $uid",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (auth.uid === $uid && auth.token.email != null && auth.token.email.toLowerCase() === 'garitabarriobahiacauquen@gmail.com' && newData.child('rol').val() === 'guardia' && newData.child('estado').val() === 'aprobado' && newData.child('casa').val() === 'Garita') || (auth.uid === $uid && (!data.exists() ? (!root.child('barrio/publico/instalado').exists() || (newData.child('estado').val() === 'pendiente' && newData.child('rol').val() === 'vecino')) : (newData.child('estado').val() === data.child('estado').val() && newData.child('rol').val() === data.child('rol').val() && newData.child('casa').val() === data.child('casa').val() && newData.child('representante').val() === data.child('representante').val() && newData.child('poderOk').val() === data.child('poderOk').val() && (!data.child('relacion').exists() || data.child('relacion').val() === '' || newData.child('relacion').val() === data.child('relacion').val()))))",
+          "recomiendan": {
+            ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')"
+          }
+        }
+      },
+
+      /* Quién tiene la app abierta ahora (el contador del encabezado). Cada
+         uno escribe solo lo suyo; lo leen los vecinos aprobados. */
+      "presencia": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        "$uid": { ".write": "auth.uid === $uid" }
+      },
+
+      /* Las fotos se leen UNA POR UNA, sabiendo su id (que solo está en el
+         registro donde se publicó): nadie puede bajar la lista entera. */
+      "fotosCasa": {
+        "$id": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && (!newData.exists() || (newData.isString() && newData.val().length < 150000))" }
+      },
+      /* La copia "para bajar" de una foto (1280 px), que vence a los pocos
+         días y la Administración borra. Se lee también de a una. */
+      "fotosDescarga": {
+        "$id": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && (!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 700000))" }
+      },
+      "fotosIdx": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" }
+      },
+
+      /* Fotos y archivos de los mensajes privados (11-10-2026, js/adjuntos.js).
+         Se leen de a uno, sabiendo el id (que está solo en el mensaje); nadie
+         puede listarlos. Los usan todas las cuentas aprobadas (también el
+         hotel y la supervisión, que tienen sus conversaciones). Hasta 5 MB.
+         Se borran una hora después de bajarlos, o a los 3 días. */
+      "adjuntos": {
+        "$id": { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'", ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 7200000 && newData.child('vence').isNumber()))" }
+      },
+      "adjuntosIdx": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".write": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'" }
+      },
+
+      /* Los equipos anotados para recibir avisos push. NADIE los lee desde la
+         app: solo el Apps Script, con la cuenta de servicio. Cada uno escribe
+         los suyos. */
+      "pushTokens": {
+        "$uid": { ".write": "auth.uid === $uid && ((root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'))" }
+      },
+
+      /* El camión de la basura: lo registra la garita, lo ven todos. */
+      "camion":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+
+      /* La guardia de ahora (13-10-2026): el turno abierto de la garita, su
+         horario y los nombres de quienes están de guardia (con el dibujo que
+         eligió cada uno), y si hay policía de servicio (sin su nombre). Lo
+         escribe la garita; lo leen los vecinos, la Administración y la
+         supervisión (el hotel no). */
+      "guardiaAhora":  { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+
+      /* Mantenimiento en vivo (15-10-2026): quién de mantenimiento está
+         trabajando (nombre e inicial del apellido) y los puntos que marca en
+         el mapa. Lo leen todas las cuentas aprobadas (vecinos, garita,
+         Administración, supervisión y hotel) y el teléfono de mantenimiento
+         con su enlace vigente. La garita y la Administración escriben todo;
+         el teléfono de mantenimiento, solo SUS puntos y mientras su enlace
+         siga vigente (con la salida se borra y deja de poder). */
+      "mantVivo": { ".read": "auth != null && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' || (root.child('mantSesion').child(auth.uid).child('tok').isString() && root.child('staff/mantCodigos').child(root.child('mantSesion').child(auth.uid).child('tok').val()).child('vence').val() > now))", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": {
+          ".write": "auth != null && (root.child('mantSesion').child(auth.uid).child('tok').isString() && root.child('staff/mantCodigos').child(root.child('mantSesion').child(auth.uid).child('tok').val()).child('vence').val() > now) && ((newData.exists() && newData.child('tipo').val() === 'pt' && newData.child('uid').val() === auth.uid && newData.child('mid').val() === root.child('mantSesion').child(auth.uid).child('mid').val() && (!data.exists() || data.child('uid').val() === auth.uid)) || (!newData.exists() && data.child('uid').val() === auth.uid))",
+          ".validate": "newData.child('id').val() === $id && (newData.child('tipo').val() === 'p' || (newData.child('tipo').val() === 'pt' && newData.child('x').isNumber() && newData.child('y').isNumber() && newData.child('tarea').isString() && newData.child('tarea').val().length <= 20 && (!newData.child('nota').exists() || (newData.child('nota').isString() && newData.child('nota').val().length <= 300)) && (!newData.child('lugar').exists() || (newData.child('lugar').isString() && newData.child('lugar').val().length <= 60)) && (!newData.child('txt').exists() || (newData.child('txt').isString() && newData.child('txt').val().length <= 40))))"
+        }
+      },
+
+      /* Los correos que están en el barrio (07-10-2026): solo la empresa y las
+         horas. Los anota la garita; los ven los vecinos, la Administración y la
+         supervisión (el hotel no). Los lotes y la patente van a la bitácora. */
+      "mensajeria":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+
+      /* Avisos urgentes por zona: los manda la garita o la Administración;
+         cada vecino escribe SOLO su respuesta. */
+      "alertas": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { "respuestas": { "$uid": { ".write": "auth.uid === $uid && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" } } }
+      },
+
+      "config":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 08-10-2026: el padrón de expensas (DNI, correo, deuda), solo la
+         Administración. La guía (quién vive dónde, sin teléfonos), los
+         vecinos aprobados, la garita y la supervisión; el hotel no. */
+      "padron":        { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "guia":          { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 29-09-2026: el chat vecinal (msgs) y las reservas (reservas, bloqueos,
+         amenities) se sacaron de la app. Nadie las lee ni las escribe; solo la
+         Administración, para borrar lo que quedó (Protección de datos). */
+      "amenities":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "agenda":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "temporadas":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "feriados":      { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "contactos":     { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "documentos":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "proveedores":   { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "bloqueos":    { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "votaciones": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { "votos": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" } }
+      },
+
+      "gastos":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 08-10-2026: la liquidación completa (cuota, interés, deuda, multas y
+         gestión judicial de cada lote) la lee solo la Administración. Los
+         demás leen el resumen del mes (liqResumen) y las cuotas de su lote
+         (pv/cuotasLote). */
+      "liquidaciones": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 10-10-2026: los MOROSOS, por lote y SIN NOMBRES (deuda por mes, total,
+         gestión judicial y la proyección a 12 meses). Los lee quien es
+         vecino del barrio y la Administración; NO la garita, la supervisión
+         ni el hotel. Los escribe solo la Administración (la app los arma
+         sola con la última liquidación). */
+      "morosos":       { ".read": "root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'vecino' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "liqResumen":    { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+
+      "posts":         { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
+      "msgs":        { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "reservas":    { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "compras":       { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
+      "viajes":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
+      /* Obras: las registra cada vecino y la Administración; la garita las ve pero no las edita. */
+      "obras":         { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'guardia'" },
+      "cruceros":      { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" },
+      "eventosCiudad": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" },
+      "avistamientos": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
+      "notifsTodos":   { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')",
+                         "$id": { ".write": "!data.exists() && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" } },
+
+      /* Las promociones del hotel (barrio/promos, más arriba) las cargan,
+         cambian y borran el hotel o la Administración (27-09); las ven todos
+         los vecinos aprobados. Lo que escribe el hotel tiene que venir marcado
+         hotel:true y con un título de hasta 60 letras. Sin la regla de promos,
+         Firebase NIEGA la rama entera y la tira de ofertas de la portada no
+         aparece nunca (falla muda). */
+      "descargas":     { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "promos":        { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')",
+                         "$id": { ".validate": "root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' || (newData.child('hotel').val() === true && newData.child('titulo').isString() && newData.child('titulo').val().length > 0 && newData.child('titulo').val().length <= 60)" } },
+
+      /* Los comunicados importantes: los escribe la Administración, los ve
+         todo el barrio, y cada lote deja su respuesta y su acuse de recibo. */
+      "comunicados": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": {
+          "vistos":     { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
+          "respuestas": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" }
+        }
+      },
+      /* COSAS PARA PRESTAR (27-09-2026): las ven los vecinos aprobados; cada
+         cosa la crea, cambia y borra solo su dueño (o la Administración). */
+      "cosas": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+                 "$id": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.child('userId').val() === auth.uid && (!newData.exists() || newData.child('userId').val() === auth.uid)) || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')" } },
+      /* ÁNGELES DE LA NIEVE (27-09-2026): un registro por vecino (n-<uid>),
+         lo ven los vecinos aprobados. Lo escribe su dueño. Un vecino anotado
+         como ángel puede además adoptar o soltar una casa (solo el campo
+         "angel", y solo con su propio uid) y marcar el pedido del día. */
+      "nieve": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+                 "$id": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && ((!data.exists() && newData.child('userId').val() === auth.uid) || (data.child('userId').val() === auth.uid && (!newData.exists() || newData.child('userId').val() === auth.uid)) || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')",
+                          "angel":  { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && root.child('barrio/nieve').child('n-' + auth.uid).child('tipo').val() === 'angel' && (!data.exists() || data.val() === auth.uid) && (!newData.exists() || newData.val() === auth.uid)" },
+                          "pedido": { "$k": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && root.child('barrio/nieve').child('n-' + auth.uid).child('tipo').val() === 'angel'" } } } },
+      "motorLog":      { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+                         "$marca": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')", ".validate": "newData.isNumber()" } }
+    },
+
+    /* LA CARPETA PRIVADA, POR COLECCIÓN (desde el 25-09-2026).
+       pv/<carpeta>/<vecino>/<id>. Cada vecino lee SOLO lo suyo. Cada carpeta
+       entera la lee solo el rol que la necesita:
+         Administración: privados (sus mensajes con vecinos), reclamos,
+                         infracciones, pagos, recibos.
+         Garita:         privadosGuardia (sus mensajes con vecinos).
+         Las dos:        privadosInterno (garita ↔ Administración), peticiones,
+                         pases, solicitudesPase, llegadas, paquetes.
+         Nadie más:      dms (mensajes entre vecinos) y notifs (avisos personales).
+       Escribir: el dueño; quien puede leer esa carpeta; cualquier vecino
+       aprobado en dms y notifs (para mandarle un mensaje o un aviso a otro);
+       los titulares del mismo lote en pagos, recibos e infracciones (y
+       llegadas, desde el 10-10-2026: "llegó sin aviso" le llega a todo el
+       lote y contesta cualquiera); y
+       cualquiera, solo para CREAR, en solicitudesPase (el pedido de pase de
+       una visita sin cuenta). La Administración puede CREAR (no leer ni
+       cambiar) en privadosGuardia: lo necesita la mudanza desde la carpeta
+       vieja. */
+    /* "ESTOY BIEN" Y AVISO DE SALIDA (27-09-2026). Decisión de Claudio: el
+       aviso lo reciben SOLO la garita, la Administración y los familiares
+       del vecino; el resto del barrio no. cuidado/ entero lo leen la garita
+       y la Administración; cuidado/<vecino>, además, él y los familiares que
+       viven en el barrio y eligió (contactos/<uid>). Lo escribe solo él; un
+       familiar puede aceptar (contactos/<su uid>/acepta) o salir; la
+       garita, la Administración y los familiares pueden dar o resolver la
+       alarma del día (aviso/<clave>). El reloj del Apps Script entra con la
+       cuenta de servicio.
+       cuidadoDe/<familiar>/<vecino>: a quién cuida cada familiar. Lo lee
+       solo él; lo escribe el vecino que lo eligió o el propio familiar. */
+    "cuidado": {
+      ".read": "auth != null && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')",
+      "$persona": {
+        ".read": "auth != null && (auth.uid === $persona || data.child('contactos').child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid === $persona && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')",
+        "contactos": { "$c": { ".write": "auth != null && auth.uid === $c && !newData.exists()",
+                                "acepta": { ".write": "auth != null && auth.uid === $c && newData.isNumber() && root.child('cuidado').child($persona).child('contactos').child($c).exists()" } } },
+        "aviso": { "$k": { ".write": "auth != null && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && (root.child('cuidado').child($persona).child('contactos').child(auth.uid).exists() || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin')" } }
+      }
+    },
+    "cuidadoDe": {
+      "$c": {
+        ".read": "auth != null && auth.uid === $c",
+        "$persona": { ".write": "auth != null && ((auth.uid === $persona && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')) || auth.uid === $c)" }
+      }
+    },
+
+    "pv": {
+      /* LAS CUOTAS DE CADA LOTE (08-10-2026): la Administración las escribe
+         en la carpeta de cada cuenta del lote; cada cuenta lee solo la suya.
+         Nadie más las escribe (ni el propio vecino). Nombre fijo: va antes
+         que $carpeta y el comodín no lo toma. */
+      "cuotasLote": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$uid": { ".read": "auth.uid === $uid" }
+      },
+      /* PAQUETES POR LOTE (26-09-2026, tarde): un paquete va a la carpeta de
+         TODAS las cuentas del lote (en el 148, Mónica y Claudio). Por eso un
+         vecino puede escribir el paquete también en la carpeta de otra cuenta
+         de SU MISMO lote (como ya pasaba con pagos, recibos e infracciones):
+         si no, al confirmar un paquete Firebase rechazaba el guardado entero.
+         COMPROBANTES DE PAGO (26-09-2026). El vecino que pagó por fuera de
+         la app sube acá el comprobante (PDF o imagen achicada). Lo leen solo
+         él y la Administración, y NO baja con el resto: se trae al tocar
+         "Ver comprobante". Este nombre fijo va antes que $carpeta: en
+         Firebase, un hijo con nombre propio no lo toma el comodín. */
+      "comprobantes": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$uid": {
+          ".read": "auth.uid === $uid",
+          ".write": "(auth.uid === $uid && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+          "$id": {
+            ".validate": "!newData.exists() || (newData.hasChildren(['d', 'tipo', 'at']) && newData.child('d').isString() && newData.child('d').val().length < 2200000 && newData.child('tipo').isString())"
+          }
+        }
+      },
+      "$carpeta": {
+        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupGarita' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupAdmin' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'llegadas' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'))",
+        "$uid": {
+          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'privadosSupGarita' || $carpeta === 'privadosSupAdmin' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas')",
+          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'privadosSupGarita' || $carpeta === 'privadosSupAdmin' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas') && ((auth.uid === $uid && (root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor' || $carpeta === 'privadosSupGarita' || $carpeta === 'privadosSupAdmin' || $carpeta === 'notifs')) || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupGarita' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupAdmin' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')) || ($carpeta === 'notifs' && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')) || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones' || $carpeta === 'paquetes' || $carpeta === 'casaTareas' || $carpeta === 'ausencias' || $carpeta === 'llegadas' || $carpeta === 'pases') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
+          "$id": {
+            ".write": "!data.exists() && ($carpeta === 'solicitudesPase' || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'))"
+          }
+        }
+      }
+    },
+
+    /* EL ARCHIVO HISTÓRICO (desde el 25-09-2026, ver js/historial.js).
+       Lo viejo de la carpeta privada (visitas de más de 90 días, mensajes
+       de más de 120) se muda acá una vez por día, para que la app no baje
+       todo cada vez que se abre. Mismas reglas que pv: cada vecino lee solo
+       lo suyo, cada rol la carpeta que le toca. A las visitas se les saca
+       el DNI y la patente antes de archivarlas. */
+    "hist": {
+      "$carpeta": {
+        ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupGarita' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupAdmin' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'llegadas' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'))",
+        "$uid": {
+          ".read": "auth.uid === $uid && (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'privadosSupGarita' || $carpeta === 'privadosSupAdmin' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas')",
+          ".write": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') || ($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') || $carpeta === 'privadosGuardia' || $carpeta === 'privadosSupGarita' || $carpeta === 'privadosSupAdmin' || $carpeta === 'dms' || $carpeta === 'notifs' || $carpeta === 'casaTareas') && ((auth.uid === $uid && (root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor' || $carpeta === 'privadosSupGarita' || $carpeta === 'privadosSupAdmin' || $carpeta === 'notifs')) || (($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupGarita' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupAdmin' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'dms' || $carpeta === 'notifs') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')) || ($carpeta === 'notifs' && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')) || (($carpeta === 'pagos' || $carpeta === 'recibos' || $carpeta === 'infracciones' || $carpeta === 'paquetes' || $carpeta === 'casaTareas' || $carpeta === 'ausencias' || $carpeta === 'llegadas' || $carpeta === 'pases') && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val()))",
+          "$id": {
+            ".write": "!data.exists() && ($carpeta === 'solicitudesPase' || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'))"
+          }
+        }
+      }
+    },
+
+    /* La carpeta VIEJA (privado/<vecino>/…). La app de la Administración la
+       muda sola a pv/ la primera vez que se abre con la versión nueva, y
+       después la borra. Mientras tanto la lee y la escribe solo la
+       Administración. Cuando esté vacía se puede sacar este bloque. */
+    "privado": {
+      ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+      ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'"
+    },
+
+    "staff": {
+      /* Índice de comprobantes confirmados o rechazados: cuándo se borran de
+         la base (30 días después). Solo la Administración. */
+      /* SUPERVISIÓN DE LA GUARDIA (07-10-2026, 2.ª tanda).
+         alertasSup: las alertas automáticas (garita sin conexión, SOS sin
+         respuesta, policía sin ronda). Las crea el equipo que las detecta
+         (o el reloj del Apps Script, con su cuenta de servicio); nadie las
+         cambia; la Administración puede borrarlas. Las leen la
+         Administración, la garita y la supervisión.
+         vistos: el visto de la supervisión a cada parte de turno. Lo crea
+         SOLO una cuenta de supervisión, a su nombre, una vez por turno, y no
+         se puede cambiar (es constancia). Lo leen los mismos tres. */
+      "alertasSup": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".indexOn": ["at"],
+        "$id": { ".write": "!data.exists() && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')", ".validate": "newData.hasChildren(['id', 'tipo', 'at']) && newData.child('id').val() === $id && newData.child('tipo').isString() && newData.child('at').isNumber()" } },
+      "vistos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".write": "!data.exists() && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') && newData.child('por').val() === auth.uid", ".validate": "newData.hasChildren(['id', 'por', 'at', 'estado']) && newData.child('id').val() === $id && (newData.child('estado').val() === 'ok' || newData.child('estado').val() === 'obs') && (!newData.child('obs').exists() || (newData.child('obs').isString() && newData.child('obs').val().length <= 600))" } },
+      "compIdx": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* Puntos de control de la ronda, con su clave: los leen la garita y la
+         Administración; los edita la Administración. */
+
+      "puntos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* Códigos de ronda: uno por policía y por noche (6 números, vence a
+         las 14 h). Los crea la garita al registrar el ingreso; los leen
+         solo la garita y la Administración. */
+      "rondaCodigos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      /* Pasos de ronda: los manda el teléfono del policía al escanear un QR,
+         SIN cuenta. Se aceptan solo nuevos, con la hora del servidor, con la
+         clave del punto (impresa en el QR) Y con un código de ronda vigente
+         (el que la garita le dio al policía): un vecino que escanea un QR no
+         puede registrar nada. Leen garita y Administración. */
+      "pasos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": {
+          ".write": "!data.exists()",
+          ".validate": "newData.hasChildren(['id', 'punto', 'k', 'c', 'nombre', 'at']) && newData.child('c').isString() && newData.child('c').val().length === 6 && root.child('staff/rondaCodigos').child(newData.child('c').val()).child('vence').val() > now && newData.child('id').val() === $id && newData.child('at').val() === now && newData.child('nombre').isString() && newData.child('nombre').val().length >= 2 && newData.child('nombre').val().length <= 60 && newData.child('punto').isString() && root.child('staff/puntos').child(newData.child('punto').val()).child('k').val() === newData.child('k').val() && root.child('staff/puntos').child(newData.child('punto').val()).child('activo').val() !== false"
+        }
+      },
+      "sos": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')"
+      },
+      "bitacora": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$id": { ".write": "!data.exists() && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" }, ".indexOn": ["at"] },
+      "avisos":   { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
+      "correos":  { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" },
+      /* Ingresos frecuentes (proveedores del hotel, personal doméstico…):
+         los carga la Administración y los leen la garita y (12-10-2026) la
+         supervisión, solo para mirar. */
+      "frecuentes": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'))", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* Los teléfonos de cada lote (08-10-2026): la garita, la Administración
+         y la supervisión. Los vecinos no. Los carga la Administración. */
+      /* Cómo eligió aparecer cada guardia en el dibujo (13-10-2026): nombre y
+         rasgos (hombre o mujer, altura, contextura, pelo, piel). Lo escribe la
+         garita; lo leen la garita, la Administración y la supervisión. */
+      "guardiaLooks": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      /* El personal de mantenimiento del barrio (14-10-2026): nombre, apellido,
+         DNI, la tarea, si está adentro y la tarea y el lugar del día. Lo leen y lo escriben SOLO la garita
+         y la Administración (la supervisión no; los vecinos ven solo cuántos
+         están trabajando, en barrio/guardiaAhora, sin nombres ni DNI). */
+      "mantenimiento": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { ".validate": "newData.child('id').val() === $id && newData.child('nombre').isString() && newData.child('nombre').val().length >= 1 && newData.child('nombre').val().length <= 40 && newData.child('apellido').isString() && newData.child('apellido').val().length >= 1 && newData.child('apellido').val().length <= 40 && newData.child('dni').isString() && newData.child('dni').val().matches(/^[0-9]{7,8}$/)" } },
+      /* La ficha de policías (22-10-2026): nombre, cargo, matrícula, celular,
+         correo y "ya no viene". Solo la garita y la Administración. */
+      "policiasFicha": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { ".validate": "newData.child('id').val() === $id && newData.child('nombre').isString() && newData.child('nombre').val().length >= 3 && newData.child('nombre').val().length <= 60" } },
+      /* El informe semanal de la policía (22-10-2026): la copia de lo que se
+         mandó a la supervisión (el PDF) y una línea por sábado con los
+         números. Ningún equipo lo baja al abrir: se trae a pedido. Solo la
+         garita y la Administración. */
+      "informesPolicia": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { ".validate": "$id.matches(/^ip-[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.child('html').isString() && newData.child('html').val().length <= 400000" } },
+      "informesPoliciaIdx": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+        "$id": { ".validate": "$id.matches(/^ip-[0-9]{4}-[0-9]{2}-[0-9]{2}$/) && newData.child('id').val() === $id" } },
+      /* La copia comprimida de cada correo ya enviado (01-11-2026, js/v-informes.js).
+         Ningún equipo la baja al abrir: se trae a pedido, de a una. La lee solo
+         la Administración; la escribe quien mandó el correo (una sola vez). */
+      "correosCopia": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || (!data.exists() && (root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor'))", ".validate": "!newData.exists() || (newData.child('z').isString() && newData.child('z').val().length <= 400000 && newData.child('at').isNumber() && (!newData.child('p').exists() || (newData.child('p').isString() && newData.child('p').val().length <= 400000)))" } },
+      /* Los enlaces del brazo de mantenimiento (15-10-2026): uno por persona
+         y por turno, 20 letras al azar, vence a las 16 h y se borra con la
+         salida. Y la bitácora de mantenimiento: cada jornada (qué hizo,
+         dónde, horarios, quiénes trabajaron y cuántos mensajes, sin los
+         textos), 12 meses. Solo la garita y la Administración. */
+      "mantCodigos": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+      "mantJornadas": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')" },
+      "telefonos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* El libro contable: solo la Administración. */
+      "asientos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "impuestos": { ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "auditoria": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        ".indexOn": ["at"],
+        "$id": { ".write": "!data.exists() && ((root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'))" }
+      }
+    },
+
+    /* EL HOTEL LOS CAUQUENES (26-09-2026). Una cuenta institucional con rol
+       "hotel". Cada parte la lee solo quien la necesita: los huéspedes, el
+       hotel y la garita (la Administración ve solo la cantidad, que el hotel
+       deja en hotelInfo); las promociones propuestas, el hotel y la
+       Administración; el resto, los tres. Los pasos de las vans y los
+       proveedores los registra solo la garita. */
+    /* EL TELÉFONO DE MANTENIMIENTO (15-10-2026). Entra a la base como
+       "anónimo" (sin cuenta) y se anota acá con la clave de su enlace: vale
+       solo si la clave está vigente y es de esa persona. Cada uno lee y
+       escribe solo lo suyo. */
+    /* EL TELÉFONO DEL CHOFER DE LA VAN (27-10-2026). Entra como "anónimo" y se anota con la clave de su enlace (vigente). */
+    "choferSesion": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['tok', 'at']) && newData.child('tok').isString() && root.child('hotel/choferCodigos').child(newData.child('tok').val()).child('vence').val() > now && newData.child('at').val() === now"
+      }
+    },
+    "mantSesion": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['tok', 'mid', 'at']) && newData.child('tok').isString() && newData.child('mid').isString() && root.child('staff/mantCodigos').child(newData.child('tok').val()).child('vence').val() > now && root.child('staff/mantCodigos').child(newData.child('tok').val()).child('mid').val() === newData.child('mid').val() && newData.child('at').val() === now"
+      }
+    },
+    /* LOS MENSAJES CON MANTENIMIENTO (15-10-2026): mantChat/<persona>/<conversación>/<mensaje>.
+       La conversación de un vecino (o del hotel) lleva su id: la lee solo
+       él. La de la garita es "garita" y la de la Administración "admin".
+       La garita y la Administración leen todas; el teléfono de
+       mantenimiento, las suyas, con el enlace vigente. Solo se escribe
+       mientras la persona está trabajando. La garita las borra al marcar
+       la salida. */
+    "mantChat": {
+      ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')",
+      "$mid": {
+        ".read": "auth != null && ((root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ((root.child('mantSesion').child(auth.uid).child('tok').isString() && root.child('staff/mantCodigos').child(root.child('mantSesion').child(auth.uid).child('tok').val()).child('vence').val() > now) && root.child('mantSesion').child(auth.uid).child('mid').val() === $mid))",
+        "$hilo": {
+          ".read": "auth != null && auth.uid === $hilo && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'",
+          "$msg": {
+            ".write": "!data.exists() && auth != null && newData.child('de').val() === auth.uid && root.child('barrio/mantVivo').child('p' + $mid).exists() && ((root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor' && $hilo === auth.uid && newData.child('yo').val() === 'otro') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' && $hilo === 'garita' && newData.child('yo').val() === 'otro') || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' && $hilo === 'admin' && newData.child('yo').val() === 'otro') || ((root.child('mantSesion').child(auth.uid).child('tok').isString() && root.child('staff/mantCodigos').child(root.child('mantSesion').child(auth.uid).child('tok').val()).child('vence').val() > now) && root.child('mantSesion').child(auth.uid).child('mid').val() === $mid && newData.child('yo').val() === 'mant'))",
+            ".validate": "newData.hasChildren(['id', 'de', 'yo', 'nombre', 'texto', 'at']) && newData.child('id').val() === $msg && newData.child('at').val() === now && newData.child('texto').isString() && newData.child('texto').val().length >= 1 && newData.child('texto').val().length <= 500 && newData.child('nombre').isString() && newData.child('nombre').val().length <= 60"
+          }
+        }
+      }
+    },
+
+    "hotel": {
+      "hotelInfo":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" },
+      "hotelVans":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "hotelMovs":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      "hotelViajes":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      "hotelEventos":   { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "hotelHuespedes": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      "hotelProv":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      "hotelPromos":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 28-09: la copia de las cuotas de las 6 UF del hotel (solo sus UF). La escribe la Administración; la leen el hotel y la Administración. */
+      "hotelLiqs":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'" },
+      /* 15-10: los empleados del hotel con su credencial y su DNI. Los escribe solo el hotel; los leen el hotel y la garita. */
+      "hotelEmpleados": { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')" },
+      /* 20-10: la agenda inteligente (ag-<día>) y la bitácora diaria (bd-<día>) del hotel. La leen y la escriben el hotel y la garita (la garita cierra el día y marca "Recibido"). */
+      "hotelDiario":    { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'" },
+      /* 27-10: EL CHOFER DE LA VAN. Los enlaces de los choferes: los escribe y los lista solo el hotel; cada enlace lo lee quien tiene su clave de 20 letras. */
+      "choferCodigos":  { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado')",
+        "$tok": { ".read": "auth != null", ".validate": "newData.hasChildren(['id', 'empId', 'nombre', 'vence']) && newData.child('id').val() === $tok && newData.child('vence').isNumber()" } },
+      /* Las fichas de los pases, bajo la huella del código: las escriben el hotel y la garita; el chofer con su enlace vigente lee SOLO la ficha cuya huella conoce (la carpeta no se lista). */
+      "vanPases":       { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$h": { ".read": "(auth != null && root.child('choferSesion').child(auth.uid).child('tok').isString() && root.child('hotel/choferCodigos').child(root.child('choferSesion').child(auth.uid).child('tok').val()).child('vence').val() > now)" } },
+      /* Quiénes van a bordo: cada viaje lo escribe el chofer que lo empezó (con su enlace vigente); lo leen el hotel y la garita; la garita los borra a los 7 días. */
+      "vanAbordo":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$id": { ".write": "(auth != null && root.child('choferSesion').child(auth.uid).child('tok').isString() && root.child('hotel/choferCodigos').child(root.child('choferSesion').child(auth.uid).child('tok').val()).child('vence').val() > now) && newData.exists() && newData.child('uid').val() === auth.uid && newData.child('tok').val() === root.child('choferSesion').child(auth.uid).child('tok').val() && (!data.exists() || data.child('uid').val() === auth.uid)",
+          ".validate": "!newData.exists() || (newData.hasChildren(['id', 'uid', 'vid', 'sentido', 'estado', 'at']) && newData.child('id').val() === $id)" } },
+      /* La respuesta de la garita (OK / detener, la hora del paso) y la ubicación de la garita ("geo"): la escribe la garita; el chofer lee la de su viaje. */
+      "vanGarita":      { ".read": "(root.child('barrio/users').child(auth.uid).child('rol').val() === 'hotel' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado') || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'", ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+        "$id": { ".read": "(auth != null && root.child('choferSesion').child(auth.uid).child('tok').isString() && root.child('hotel/choferCodigos').child(root.child('choferSesion').child(auth.uid).child('tok').val()).child('vence').val() > now)" } }
+    },
+
+    /* 15-10: LA GUÍA DE LA RONDA para el teléfono del policía (sin cuenta):
+       los puntos en orden, su lugar en el plano y una foto chica de cada uno.
+       Vive en ronda/guia/<clave de 20 letras al azar> que va solo en el
+       enlace de su tarjeta. Nadie puede listar las guías (la carpeta no se
+       lee entera); cada una la lee solo quien tiene el enlace. La escriben y
+       la borran la garita y la Administración (se borra con su salida). */
+    "ronda": {
+      "guia": {
+        "$t": {
+          ".read": "$t.length >= 16",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia'",
+          ".validate": "!newData.exists() || ($t.length >= 16 && newData.hasChildren(['vence', 'pts']) && newData.child('vence').isNumber())"
+        }
+      },
+      /* 17-10: LA FOTO GRANDE de cada punto (la chica va con el punto y con
+         la guía). Vive en ronda/fotos/<clave de 20 letras al azar>, no baja
+         con nada: la trae solo quien toca "Bajar la foto en grande" (la
+         clave está en el punto y en la guía del policía). Nadie puede listar
+         la carpeta. La escribe y la borra solo la Administración; hasta
+         unos 600 KB por foto. */
+      "fotos": {
+        "$k": {
+          ".read": "$k.length >= 16",
+          ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+          ".validate": "!newData.exists() || ($k.length >= 16 && newData.hasChildren(['d', 'at']) && newData.child('d').isString() && newData.child('d').val().beginsWith('data:image/') && newData.child('d').val().length <= 800000 && newData.child('at').val() === now)"
+        }
+      }
+    }
+  }
+}
+-----------------------------------------------------------
+HASTA ACÁ
+
+✔ NUEVO 22-10-2026, tarde (hay que volver a publicar): EL INFORME SEMANAL DE LA POLICÍA.
+- staff/informesPolicia y staff/informesPoliciaIdx: la copia del informe
+  que sale los sábados a la supervisión de la policía (ver el punto 8
+  octies). Solo la garita y la Administración.
+- Sin publicar estas reglas, el correo sale igual, pero la copia no se
+  guarda y "Informes enviados" queda vacío.
+-----------------------------------------------------------
+
+✔ NUEVO 22-10-2026 (hay que volver a publicar): LA FICHA DE POLICÍAS.
+- staff/policiasFicha: nombre, cargo, matrícula, celular, correo y "ya no
+  viene" de cada policía (ver el punto 8 septies). La leen y la escriben
+  solo la garita y la Administración.
+- Sin publicar estas reglas, la ficha no se guarda en la base (anular un
+  ingreso anda igual: usa la bitácora, que ya estaba).
+-----------------------------------------------------------
+
+✔ NUEVO 20-10-2026 (hay que volver a publicar): LA AGENDA Y LA BITÁCORA DEL HOTEL.
+- hotel/hotelDiario: la agenda inteligente que arma la app a las 22 h
+  (ag-<día>) y la bitácora del día que cierra la garita a las 23:59
+  (bd-<día>). La leen y la escriben SOLO el hotel y la garita. La
+  Administración, la supervisión y los vecinos no la ven. No lleva DNI,
+  nombres de huéspedes ni patentes de clientes en la bitácora.
+- Sin publicar estas reglas, la agenda no se guarda y la bitácora no se
+  cierra (el resto del hotel anda igual).
+-----------------------------------------------------------
+
+✔ 18-10-2026 (NO hay que volver a publicar): la guía de la ronda se guarda
+  además en ronda/guia/<resumen del código de 6 números> (25 letras), para
+  el policía que puso el código a mano sin abrir el enlace. Entra en la
+  misma regla de ronda/guia que ya está publicada.
+
+✔ NUEVO 27-10-2026 (hay que volver a publicar): EL CHOFER DE LA VAN.
+  Bloques nuevos: hotel/choferCodigos, hotel/vanPases, hotel/vanAbordo,
+  hotel/vanGarita y choferSesion (ver el punto 8 octies). Usa el acceso
+  "Anónimo" que ya está habilitado para mantenimiento. Sin publicarlo, el
+  enlace del chofer dice "Este enlace ya no vale" y la garita no ve quién
+  va a bordo (todo lo demás anda igual).
+
+✔ NUEVO 17-10-2026 (hay que volver a publicar): LAS FOTOS GRANDES DE LOS
+  PUNTOS DE LA RONDA. Bloque nuevo: ronda/fotos (dentro de "ronda", al
+  lado de "guia"). Sin publicarlo, la foto chica anda igual, pero "Bajar la
+  foto en grande" no funciona en los otros equipos.
+
+✔ NUEVO 15-10-2026, más tarde (hay que volver a publicar): LA RONDA EN EL
+  PLANO. Bloque nuevo: ronda/guia (ver el punto 8 sexies). Sin publicarlo,
+  todo anda igual, pero el teléfono del policía no recibe las fotos ni el
+  recorrido.
+
+✔ NUEVO 15-10-2026 (hay que volver a publicar Y habilitar el acceso anónimo):
+  MANTENIMIENTO EN VIVO. Bloques nuevos: barrio/mantVivo, staff/mantCodigos,
+  staff/mantJornadas, mantSesion y mantChat (ver el punto 8 quinquies).
+  Además: Firebase → Compilación → Authentication → Método de acceso →
+  Agregar proveedor → Anónimo → Habilitar → Guardar. Sin eso, el enlace de
+  los chicos de mantenimiento dice "Sin conexión".
+
+✔ NUEVO 12-10-2026 (hay que volver a publicar): LAS VISITAS SON DEL LOTE.
+- Cada visita autorizada (pv/pases) se guarda en la carpeta de todos los que
+  viven en el lote, no solo en la de quien la autorizó: Claudio y Mónica ven
+  las mismas visitas del Lote 148 en "Mis visitas".
+- Cambio: en pv/ (y en el archivo hist/), una cuenta aprobada (no hotel, no
+  supervisión) puede escribir en "pases" de otra cuenta DE SU MISMO LOTE,
+  como ya pasaba con pagos, paquetes, llegadas y ausencias. Nadie de otro
+  lote puede leerlas ni escribirlas.
+- Si la app nueva se sube antes que estas reglas, no se rompe nada: la
+  Administración reparte las copias al abrir la app; solo los cambios que
+  haga un vecino sobre una visita de otro del lote esperan a las reglas.
+-----------------------------------------------------------
+
+✔ NUEVO 07-10-2026, 2.ª tanda (hay que volver a publicar): ALERTAS Y VISTOS.
+- staff/alertasSup: alertas automáticas a la supervisión (la garita sin
+  conexión, un SOS o el DEA sin respuesta, el policía sin ronda). Las crea
+  el equipo que las detecta (vecino, garita o Administración, solo crear) o
+  el reloj del Apps Script; nadie las cambia; la Administración las borra.
+- staff/vistos: el visto de la supervisión a cada parte de turno. Lo crea
+  solo una cuenta de supervisión, a su nombre, una vez, y queda fijo.
+- Las dos las leen la Administración, la garita y la supervisión. Los
+  vecinos, los pendientes y el hotel no.
+- Es la única escritura nueva de la supervisión (además de sus mensajes).
+-----------------------------------------------------------
+
+✔ NUEVO 15-10-2026 (hay que volver a publicar): LOS EMPLEADOS DEL HOTEL.
+- hotel/hotelEmpleados: los empleados que carga el hotel (nombre, DNI, puesto,
+  patente, días y horario, y el código de su credencial). Los escribe SOLO el
+  hotel; los leen el hotel y la garita. La Administración, la supervisión y
+  los vecinos NO los leen (tienen el DNI).
+- Sus entradas y salidas van a hotel/hotelMovs (ya existía: la escribe la
+  garita) con solo el id del empleado y la hora.
+- Sin publicar estas reglas, el hotel no puede guardar empleados y la garita
+  no los ve.
+-----------------------------------------------------------
+
+✔ NUEVO 07-10-2026 (hay que volver a publicar): LA SUPERVISIÓN DE LA GUARDIA.
+- Rol nuevo "supervisor": una cuenta personal que habilita la Administración
+  (Gestión → Garita y seguridad → Supervisión de la guardia). SOLO MIRA.
+- Lee lo que la garita usa para trabajar: barrio/ (como cualquier aprobado),
+  staff/sos, staff/bitacora, staff/avisos, staff/puntos y staff/pasos, las
+  carpetas enteras pv/ (y hist/) de peticiones, pases, llegadas y ausencias,
+  y del hotel: hotelInfo, hotelVans, hotelMovs, hotelViajes, hotelEventos y
+  hotelProv. NO lee: hotelHuespedes, cuidado ("Estoy bien"), privadosGuardia,
+  privadosInterno, privados, reclamos, pagos, recibos, infracciones,
+  solicitudesPase, paquetes, staff/correos, staff/auditoria, staff/frecuentes,
+  staff/rondaCodigos, staff/asientos ni staff/impuestos.
+- NO ESCRIBE en ningún lado, salvo: su propia ficha (sin poder cambiarse el
+  rol, el estado ni el lote), sus equipos para los avisos (pushTokens), su
+  presencia, sus conversaciones y los avisos que le deja a la garita o a la
+  Administración al escribirles (pv/notifs). En pv/ ni siquiera escribe en
+  sus propias carpetas de pagos, reclamos, pases, etc. (no las usa). Por eso, en TODAS las escrituras
+  que antes decían "aprobado y no hotel" ahora dice "aprobado, no hotel y no
+  supervisor" (33 lugares): para vecinos, garita, Administración y hotel no
+  cambia nada.
+- Carpetas nuevas de sus conversaciones: pv/privadosSupGarita/<supervisor>
+  (la lee y la escribe él y la garita) y pv/privadosSupAdmin/<supervisor>
+  (él y la Administración). Ningún vecino las ve.
+- Sin publicar estas reglas, el supervisor puede entrar pero no ve nada de la
+  garita (la base se lo niega en silencio).
+-----------------------------------------------------------
+
+✔ NUEVO 29-09-2026 (hay que volver a publicar): SIN CHAT VECINAL NI RESERVAS.
+- barrio/msgs (chat vecinal), barrio/reservas, barrio/bloqueos y
+  barrio/amenities (espacios comunes): se sacaron de la app. Ahora las lee y
+  las escribe SOLO la Administración, para borrar lo que quedó guardado
+  (Gestión → Protección de datos → "Borrar lo que quedó del chat y las
+  reservas"). Vecinos, garita, pendientes y el hotel ya no pueden leer ni
+  escribir ahí: aunque alguien tenga abierta una versión vieja de la app,
+  no puede escribir en el chat ni reservar. Se quitó el índice de msgs.
+-----------------------------------------------------------
+
+✔ NUEVO 28-09-2026 (hay que volver a publicar): LAS EXPENSAS DEL HOTEL.
+- hotel/hotelLiqs: la copia de las cuotas de las 6 UF del hotel (UF 000 a 005),
+  que arma sola la app de la Administración. La leen el hotel y la
+  Administración; la escribe solo la Administración. El hotel sigue sin leer la
+  liquidación del barrio (los montos de los vecinos).
+- pv/comprobantes/<cuenta>: el hotel también puede subir SU comprobante de pago
+  (antes solo vecinos aprobados). Cada uno escribe solo en su propia carpeta.
+- Los pagos y recibos de las UF del hotel van a pv/pagos y pv/recibos de la
+  cuenta del hotel, que ya podía leer y escribir su propia carpeta: sin cambio.
+-----------------------------------------------------------
+
+✔ NUEVO 27-09-2026 (hay que volver a publicar): "Estoy bien" y aviso de
+salida (cuidado, cuidadoDe), cosas para prestar (barrio/cosas), ángeles de
+la nieve (barrio/nieve), la casa en invierno y la mochila para sismos
+(pv/casaTareas) y la casa sola revisada cada día (pv/ausencias: "Me voy de
+viaje" deja de estar en la ficha que leen todos los vecinos; la leen solo el
+lote, la garita y la Administración). Sin publicar, esas funciones no guardan
+nada en el barrio de verdad (en Firebase lo
+que no está nombrado se niega en silencio). Comparación vieja/nueva: 3.310
+casos, sin ningún cambio en lo que ya existía; casos nuevos probados (el aviso
+de "Estoy bien" lo leen solo la garita, la Administración y los familiares
+elegidos; otro vecino no, y no puede anotarse solo como familiar).
+-----------------------------------------------------------
+
+✔ EL HOTEL LOS CAUQUENES Y EL CHAT SIN LA GARITA (26-09-2026, noche)
+- Toda la zona barrio/ pasó de "aprobado" a "aprobado Y NO hotel". Para
+  vecinos, garita y Administración da exactamente lo mismo que antes (se
+  comprobó ruta por ruta con el evaluador de reglas).
+- El hotel (rol "hotel") lee solo lo público de la ciudad: configuración,
+  agenda, temporadas, feriados, contactos, normas, cruceros, eventos de la
+  ciudad, promociones y el camión. NO lee el padrón, las fichas de los
+  vecinos, el chat, el pizarrón, las visitas, la bitácora ni los SOS.
+- Nuevo bloque hotel/ (vans, pasos por la garita, traslados, eventos,
+  huéspedes, proveedores, promociones propuestas y la ficha del hotel).
+- barrio/msgs (chat vecinal): ya no lo lee ni escribe la garita.
+- pv/paquetes: un vecino puede escribir el paquete en la carpeta de otra
+  cuenta de su mismo lote (los paquetes van a todo el lote).
+
+
+✔ ARCHIVO HISTÓRICO Y OBRAS (25-09-2026, tarde)
+- hist/…: lo viejo de la carpeta privada (visitas de más de 90 días, sin
+  DNI ni patente; mensajes privados de más de 120 días; desde el 28-09,
+  paquetes retirados hace más de 30 días, sin foto, firma ni DNI) se muda
+  acá una vez por día. Mismas reglas que pv (hist/paquetes ya estaba
+  cubierto: no hizo falta una regla nueva). Si estas reglas NO se publican, la app no
+  borra nada: la mudanza falla y todo queda donde estaba.
+- Índices (".indexOn") en staff/bitacora, staff/auditoria y barrio/msgs:
+  así cada equipo baja solo lo reciente (60/90/60 días) y lo anterior se
+  trae con un botón. Sin los índices anda igual, pero Firebase manda todo y
+  filtra en el teléfono.
+- barrio/obras: la garita ya no puede escribirlas (las ve, no las edita).
+
+✔ LAS MARCAS DEL MOTOR, DE A UNA (25-09-2026, mediodía)
+barrio/motorLog ya no se puede escribir entero: solo cada marca por separado
+(barrio/motorLog/<marca>, un número). Una copia vieja de la app que mande la
+lista entera queda rechazada en vez de borrar las marcas de los demás (eso
+hacía que los avisos automáticos se repitieran en la campanita de la garita).
+Si estas reglas no se publican, la app nueva igual anda: escribe de a una.
+
+✔ LA CARPETA PRIVADA QUEDÓ CERRADA (25-09-2026)
+Antes era privado/<vecino>/… y la garita y la Administración podían leerla
+entera (en Firebase un permiso dado arriba no se puede quitar abajo). Ahora
+es pv/<carpeta>/<vecino>/…: cada rol lee solo las carpetas que necesita, y
+los mensajes entre vecinos (dms) no los puede leer nadie más que los dos que
+conversan. La Administración muda sola lo viejo la primera vez que abre la
+app con esta versión.
+
+ORDEN PARA PUBLICAR ESTA VERSIÓN
+  1. Publicar estas reglas (Realtime Database → Reglas → pegar → Publicar).
+  2. Subir la app a GitHub.
+  3. Abrir la app con la cuenta de la Administración (Claudio): hace la
+     mudanza sola en unos segundos. Recién ahí los vecinos ven sus cosas
+     viejas en la carpeta nueva.
+
+CÓMO PROBAR QUE ESTÁN BIEN (consola del navegador, F12, con la app abierta)
+  Con la cuenta de un VECINO:
+     firebase.database().ref('pv/pases').get().then(s => console.log('VE', s.val())).catch(e => console.log('BLOQUEADO', e.message))
+     → tiene que decir BLOQUEADO (solo puede leer pv/pases/<su uid>).
+  Con la cuenta de la GARITA:
+     firebase.database().ref('pv/reclamos').get().then(s => console.log('VE', s.val())).catch(e => console.log('BLOQUEADO', e.message))
+     → BLOQUEADO.
+  Con CUALQUIER cuenta, incluida la Administración:
+     firebase.database().ref('pv/dms').get().then(s => console.log('VE', s.val())).catch(e => console.log('BLOQUEADO', e.message))
+     → BLOQUEADO. Si alguna muestra datos, las reglas no se publicaron.

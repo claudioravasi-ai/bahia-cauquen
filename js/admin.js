@@ -1,0 +1,1399 @@
+/* =========================================================
+   Administración: inscripciones, vecinos, contenido del barrio
+   (todo lo que no viene de internet), ajustes, motor de
+   automatizaciones, correos, auditoría y datos.
+   ========================================================= */
+
+/* ---------- MOTOR DE AUTOMATIZACIONES ----------
+   Reglas que corren solas cada minuto mientras la app está abierta
+   en algún equipo. Cada una deja una marca en motorLog para no
+   repetirse. Con la base del barrio la marca se RECLAMA antes de actuar
+   (ver marca() y Motor.reclamar): la gana un solo equipo y ese es el
+   único que da el aviso, aunque haya cien apps abiertas a la vez. */
+/* Las cuentas que deben expensas: cualquier cuenta aprobada con lote cuyo
+   saldo, descontado lo "por acreditar", sigue siendo positivo. */
+function deudoresExpensas(s){
+  const ids = s.users.filter(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || '')).filter(u => { const c = cuentaLote(u.casa); return c.saldo - c.informado > 0.5; }).map(u => u.id);
+  /* El hotel (28-09): un solo aviso si alguna de sus UF debe. */
+  const h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
+  if (h && typeof lotesDelHotel === 'function' && lotesDelHotel().some(l => { const c = cuentaLote(l); return c.saldo - c.informado > 0.5; }) && !ids.includes(h.id)) ids.push(h.id);
+  return ids;
+}
+const REGLAS = [
+  { id:'clima-viento', n:'Viento fuerte → aviso en el pizarrón', d:'Con ráfagas de 60 km/h o más publica un aviso para asegurar objetos sueltos.',
+    run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'wind'); if (!a) return 0;
+      return marca(s, 'viento-' + hoy, () => { publicarSistema(s, 'aviso', a.t, a.x); notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'wind', color:'warn', link:'pizarron', sonido:true, vence:finDelDia(hoy) }); }); } },
+  { id:'clima-nieve', n:'Nieve prevista → no dejar autos en la calle', d:'Si se anuncia nieve, a partir de las 18 h avisa a todos.',
+    run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'snow'); if (!a || new Date().getHours() < 18) return 0;
+      return marca(s, 'nieve-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'snow', color:'sky', link:'ushuaia', vence:finDelDia(hoy) })); } },
+  { id:'clima-hielo', n:'Helada → cuidado en las subidas', d:'Con mínima bajo cero, avisa a la guardia a las 6 h para echar arena o sal.',
+    run(s, hoy){ const a = Clima.alertas().find(x => x.icon === 'thermo'); if (!a || new Date().getHours() < 6) return 0;
+      return marca(s, 'hielo-' + hoy, () => notificar(s, { para:'staff', titulo:'Helada: revisar subidas', texto:'Echar arena o sal en las subidas y el acceso.', icon:'thermo', color:'warn', vence:finDelDia(hoy) })); } },
+  /* Sale SOLO la víspera de un día con camión (lunes, miércoles y viernes
+     en el barrio) y dice "Mañana pasa el camión de residuos" (pedido de
+     Claudio, 25-09-2026); si al otro día no hay camión, no sale nada. Se va
+     sola a medianoche (a la mañana la pizarra ya dice "Hoy pasa…"), o antes
+     si la garita registra la entrada del camión. */
+  { id:'recoleccion', n:'Recolección → recordatorio la noche anterior', d:'A las 20 h, la víspera de cada día con camión, avisa "Mañana pasa el camión de residuos" (y si son los voluminosos).',
+    run(s, hoy){ if (new Date().getHours() < 20) return 0; const man = sumarDias(hoy, 1), t = recoleccionDias()[fechaDe(man).getDay()];
+      const vol = volsProximos().find(v => v.fecha === man);
+      if (!t && !vol) return 0;
+      const a = anuncioCamion('Mañana', vol ? 'Voluminosos' : t, vol && vol.detalle);
+      return marca(s, 'reco-' + hoy, () => notificar(s, { para:'todos', titulo:a.t, texto:a.x, icon:'truck', color:'ok', link:'recoleccion', vence:finDelDia(hoy) })); } },
+  { id:'reclamo-72h', n:'Reclamo sin respuesta 72 h → recordar a la Administración', d:'Evita que un reclamo quede olvidado.',
+    run(s){ let n = 0; s.reclamos.filter(r => r.estado === 'abierto' && Date.now() - (r.historial.at(-1)?.at || r.createdAt) > 72 * HORA)
+      .forEach(r => n += marca(s, 'r72-' + r.id, () => notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:'Reclamo sin respuesta hace 3 días', texto:r.titulo, icon:'clipboard', color:'danger', link:'reclamos' }))); return n; } },
+  /* Tablero de reclamos (11-10-2026): un reclamo sin movimiento 5 días, o
+     pasado de su fecha estimada, le avisa a la Administración una vez por
+     cada vez que se traba (si se mueve y se vuelve a trabar, avisa de nuevo). */
+  { id:'reclamo-trabado', n:'Reclamo trabado 5 días o pasado de fecha → avisar a la Administración', d:'En el tablero queda arriba de su columna con la marca "Trabado" o "Atrasado".',
+    run(s){ let n = 0; s.reclamos.filter(r => r && r.estado !== 'resuelto').forEach(r => {
+      if (typeof reclTrabado === 'function' && reclTrabado(r))
+        n += marca(s, 'rtrab-' + r.id + '-' + reclUltimo(r), () => notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:`Reclamo trabado hace ${reclDiasQuieto(r)} días`, texto:`${r.titulo} · ${EST_RECL[r.estado]?.[0] || ''}`, icon:'clipboard', color:'danger', link:'reclamos' }));
+      if (typeof reclAtrasado === 'function' && reclAtrasado(r))
+        n += marca(s, 'ratr-' + r.id + '-' + r.fechaEstimada, () => notificar(s, { para:'rol:admin', ref:'reclamos:' + r.id, titulo:'Reclamo pasado de la fecha estimada', texto:`${r.titulo} · era para el ${fechaCorta(r.fechaEstimada)}. ¿Le avisás al vecino la fecha nueva?`, icon:'clock', color:'warn', link:'reclamos' }));
+    }); return n; } },
+  { id:'votacion-cierre', n:'Votación cerrada → publicar el resultado', d:'Al cerrar, publica el resultado en el pizarrón y avisa a todos.',
+    run(s){ let n = 0; s.votaciones.filter(v => v.cierra <= Date.now()).forEach(v => n += marca(s, 'vot-' + v.id, () => {
+      const votos = Object.values(v.votos), cuenta = v.opciones.map((_, i) => votos.filter(x => x === i).length), max = Math.max(...cuenta, 0);
+      const txt = v.opciones.map((o, i) => `${o}: ${cuenta[i]}`).join(' · ');
+      publicarSistema(s, 'aviso', `Resultado: ${v.titulo}`, `${votos.length ? `Ganó "${v.opciones[cuenta.indexOf(max)]}". ` : 'No votó ninguna casa. '}${txt}. Votaron ${votos.length} casas.`);
+      notificar(s, { para:'todos', titulo:'Cerró una votación', texto:v.titulo, icon:'vote', color:'accent', link:'votaciones' }); })); return n; } },
+  { id:'compra-cierre', n:'Compra conjunta cerrada → avisar a los anotados', d:'Cuenta el total y avisa si se llegó a la meta.',
+    run(s){ let n = 0; s.compras.filter(c => c.cierra <= Date.now()).forEach(c => n += marca(s, 'cmp-' + c.id, () => {
+      const tot = c.anotados.reduce((a, x) => a + (+x.cant || 0), 0);
+      notificar(s, { para:[c.creadaPor, ...c.anotados.map(x => x.userId)], titulo:`Cerró: ${c.titulo}`, texto:`${tot} de ${c.meta} ${c.unidad}${tot >= c.meta ? ' · ¡se llegó a la meta!' : ''}`, icon:'cart', color:'brand', link:'compras' }); })); return n; } },
+  /* 'paquete-24h' (un solo aviso, a una persona y sin push) se reemplazó el 26-09-2026 por
+     'paquetes-24h' en js/v-servicio.js: push a todo el lote, repetido hasta que lo ven. */
+  { id:'viaje-regreso', n:'Fin de un viaje → avisar a la guardia', d:'El día que vuelve el vecino, la guardia lo sabe.',
+    /* 27-09: las casas solas viven en la carpeta privada (pv/ausencias, js/v-casa.js)
+       y el aviso va a cada cuenta de la garita en privado, no al canal general. */
+    run(s, hoy){ if (typeof casasSolas !== 'function' || !(esGuardia() || esAdmin())) return 0; let n = 0;
+      casasSolas(hoy).filter(a => a.hasta === hoy).forEach(a => n += marca(s, 'vj-' + String(a.casa).replace(/\D/g, '') + '-' + hoy, () => notificar(s, { para:cuentasGarita(), titulo:`Hoy vuelve ${a.casa}`, texto:'Termina el aviso de casa sola.', icon:'home', color:'ok', link:'garita' })));
+      const viejas = aLista(s.ausencias).filter(a => a && a.hasta < sumarDias(hoy, -2)).map(a => a.id);
+      if (viejas.length){ s.ausencias = s.ausencias.filter(a => !viejas.includes(a.id)); n += viejas.length; }
+      return n; } },
+  /* ---- el calendario de las expensas, que corre solo todos los meses ----
+     Arreglado el 26-09-2026: estas reglas miraban la liquidación del mes
+     EN CURSO, cuyos vencimientos son del mes que viene, y por eso nunca
+     encontraban el día justo. Ahora miran la última liquidación emitida
+     (la que se está cobrando). Y "quién debe" es cualquier cuenta con lote
+     (también quien administra y vive en el barrio), sin contar a quien ya
+     pagó o avisó que pagó por fuera (eso queda "por acreditar"). */
+  { id:'expensas-cerrar', n:'Expensas → recordarle a la Administración que cierre el mes',
+    d:'Cinco días antes del primer vencimiento, si el mes anterior todavía no se emitió.',
+    run(s, hoy){
+      const per = periodoAnterior(periodoHoy()), vto = vtoDe(per, 1), faltan = Math.round((fechaDe(vto) - fechaDe(hoy)) / DIA);
+      if (faltan !== 5 || liquidacionDe(per)?.estado === 'emitida') return 0;
+      return marca(s, 'expcerrar-' + per, () => notificar(s, { para:'rol:admin', titulo:`Falta cerrar ${nombrePeriodo(per)}`,
+        texto:`El primer vencimiento es el ${fechaCorta(vto)} y todavía no se emitieron los cupones.`, icon:'zap', color:'warn', link:'contabilidad:cierre', sonido:true })); } },
+
+  { id:'expensas-aviso', n:'Expensas → aviso tres días antes del primer vencimiento',
+    d:'A cada lote que todavía no pagó ni avisó que pagó.',
+    run(s, hoy){
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l) return 0;
+      const vto = vtoDe(l.periodo, 1); if (hoy !== sumarDias(vto, -3)) return 0;
+      const d = deudoresExpensas(s); if (!d.length) return 0;
+      return marca(s, 'expaviso-' + l.periodo, () => notificar(s, { para:d, titulo:`Las expensas vencen el ${fechaCorta(vto)}`,
+        texto:'Faltan 3 días. Podés ver tu cupón y pagar desde la app.', icon:'wallet', color:'wood', link:'expensas' })); } },
+
+  { id:'expensas-vence-hoy', n:'Expensas → aviso el día del primer vencimiento',
+    d:'Solo a los lotes que todavía no pagaron ni avisaron.',
+    run(s, hoy){
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || vtoDe(l.periodo, 1) !== hoy) return 0;
+      const d = deudoresExpensas(s); if (!d.length) return 0;
+      return marca(s, 'expvto1-' + l.periodo, () => notificar(s, { para:d, titulo:'Hoy vencen las expensas',
+        texto:`Después de hoy se suma el recargo del ${cfgExp().recargo2} % (2º vencimiento el ${fechaCorta(vtoDe(l.periodo, 2))}).`, icon:'wallet', color:'warn', link:'expensas', sonido:true })); } },
+
+  { id:'expensas-ultimo-dia', n:'Expensas → aviso el día del segundo vencimiento',
+    d:'El último día para pagar sin el ajuste: aviso con sonido a quien todavía debe.',
+    run(s, hoy){
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || vtoDe(l.periodo, 2) !== hoy) return 0;
+      const d = deudoresExpensas(s); if (!d.length) return 0;
+      return marca(s, 'expvto2-' + l.periodo, () => notificar(s, { para:d, titulo:'Hoy es el último día para pagar las expensas',
+        texto:`Mañana lo impago pasa a la expensa que viene con el ajuste (${textoMora()}).`, icon:'alert', color:'danger', link:'expensas', sonido:true, urgente:true })); } },
+
+  { id:'expensas-impaga', n:'Expensas → correo al día siguiente del segundo vencimiento',
+    d:'Solo a los lotes que no pagaron NI avisaron que pagaron: les recuerda que venció y que, pagado fuera de término, la expensa siguiente suma el ajuste por inflación. Queda en la auditoría.',
+    run(s, hoy){
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l) return 0;
+      const per = l.periodo;
+      if (sumarDias(vtoDe(per, 2), 1) !== hoy) return 0;
+      return marca(s, 'expimpaga-' + per, () => {
+        const conDeuda = (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => { const c = cuentaLote('Lote ' + L.lote); return c.saldo - c.informado > 0.5; });
+        /* Las UF del hotel no reciben seis avisos: le llega UNO al hotel con el total (28-09). */
+        const hotelUF = conDeuda.filter(L => L.grupo === 'hotel'), h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
+        if (hotelUF.length && h){ const tot = hotelUF.reduce((a, L) => { const c = cuentaLote('Lote ' + L.lote); return a + c.saldo - c.informado; }, 0);
+          notificar(s, { para:[h.id], titulo:'Venció el 2º vencimiento de las expensas del hotel', texto:`${plata(tot)} impagos entre ${plural(hotelUF.length, 'UF')}. Pagado fuera de término, la expensa que viene suma el ajuste (${textoMora()}).`, icon:'alert', color:'danger', link:'expensas', sonido:true });
+          if (h.email) Correo.enviar({ para:h.email, asunto:`Expensas vencidas · ${HOTEL_NOMBRE} · ${nombrePeriodo(per)}`, tipo:'reclamo-expensas',
+            html:Correo.plantilla('Concluyó el segundo vencimiento de las expensas del hotel', `<p>El <b>${fechaCorta(vtoDe(per, 2))}</b> concluyó el segundo vencimiento de las expensas de <b>${nombrePeriodo(per)}</b> y a hoy no registramos el pago de ${plural(hotelUF.length, 'UF', 'UF')} del ${esc(HOTEL_NOMBRE)} (${hotelUF.map(L => 'UF ' + L.uf).join(', ')}).</p>
+              <p style="font-size:26px;font-weight:800;color:#b91c1c;margin:14px 0">${plata(tot)}</p><p>Pagado fuera de término, la próxima expensa suma el ajuste (${esc(textoMora())}). Si ya pagaron, avísenlo desde la app con el comprobante.</p>`, { texto:'Ver las expensas del hotel', url:urlApp('expensas') }) }); }
+        conDeuda.filter(L => L.grupo !== 'hotel').forEach(L => {
+          const casa = 'Lote ' + L.lote, c = cuentaLote(casa), saldo = c.saldo - c.informado;
+          const us = s.users.filter(u => u.casa === casa && u.estado === 'aprobado');
+          if (us.length) notificar(s, { para:us.map(u => u.id), titulo:`Venció el 2º vencimiento de las expensas`,
+            texto:`${plata(saldo)} impagos. Pagado fuera de término, la expensa que viene suma el ajuste (${textoMora()}). Si ya pagaste, avisalo con el comprobante.`, icon:'alert', color:'danger', link:'expensas', sonido:true });
+          const p = s.padron.find(x => x.lote === L.lote);
+          const mails = [...new Set([p?.email, ...us.map(u => u.email)].filter(Boolean))];
+          mails.forEach(mail => Correo.enviar({ para:mail, asunto:`Expensas vencidas · ${casa} · ${nombrePeriodo(per)}`, tipo:'reclamo-expensas',
+            html:Correo.plantilla('Concluyó el segundo vencimiento de tus expensas',
+              `<p>Te recordamos que el <b>${fechaCorta(vtoDe(per, 2))}</b> concluyó el segundo vencimiento de las expensas de <b>${nombrePeriodo(per)}</b> de <b>${esc(casa)}</b>, y a hoy no registramos el pago ni el aviso de pago.</p>
+               <p style="font-size:26px;font-weight:800;color:#b91c1c;margin:14px 0">${plata(saldo)}</p>
+               <p>Si hacés el pago fuera de término, en la próxima expensa se te va a cobrar un excedente correspondiente al <b>ajuste inflacionario</b> (${esc(textoMora())}), que la app calcula sola al cerrar el mes.</p>
+               <p>Podés pagar desde la app con tarjeta, Mercado Pago o cualquier billetera. Si ya pagaste por fuera de la app, avisalo desde tu cupón con el botón <b>"Ya pagué por fuera de la app"</b> adjuntando el comprobante, y dejamos de enviarte recordatorios.</p>`,
+              { texto:'Pagar o avisar que pagué', url:urlApp('expensas') }) }));
+        });
+        if (conDeuda.length) auditar(s, 'Correo automático por expensas vencidas', `${nombrePeriodo(per)} · ${conDeuda.length} lotes`);
+      }); } },
+  { id:'temporadas', n:'Temporadas → avisar cuando empiezan o están por terminar', d:'Pesca, cubiertas con clavos, ski, cruceros: aviso al empezar y 7 días antes de terminar.',
+    run(s, hoy){ let n = 0; s.temporadas.forEach(t => {
+      if (hoy.slice(5) === t.desde) n += marca(s, `tmp-i-${t.id}-${hoy}`, () => notificar(s, { para:'todos', titulo:`Empieza: ${t.nombre}`, texto:t.nota, icon:t.icon || 'calendar', color:'sky', link:'ushuaia' }));
+      if (enTemporada(t) && diasHasta(t.hasta) === 7) n += marca(s, `tmp-f-${t.id}-${hoy}`, () => notificar(s, { para:'todos', titulo:`Faltan 7 días: ${t.nombre}`, texto:t.nota, icon:t.icon || 'calendar', color:'warn', link:'ushuaia' })); });
+      return n; } },
+  { id:'feriado', n:'Feriado mañana → aviso y recolección', d:'El día anterior avisa del feriado (la recolección puede cambiar).',
+    run(s, hoy){ const man = sumarDias(hoy, 1), info = diaInfo(man);
+      const f = info.feriado || info.noLaborable; if (!f || new Date().getHours() < 12) return 0;
+      return marca(s, 'fer-' + f.fecha, () => notificar(s, { para:'todos', vence:finDelDia(hoy),
+        titulo: info.feriado ? `Mañana es feriado ${f.ambito}: ${f.nombre}` : `Mañana es día no laborable: ${f.nombre}`,
+        texto:'La recolección, la Administración y los comercios pueden cambiar sus horarios.', icon:'calendar', color:'sky', link:'ushuaia' })); } },
+  { id:'zorros', n:'Dos avistamientos en el día → alerta de fauna', d:'Si dos vecinos avisan lo mismo en 24 h, se avisa a todos.',
+    run(s, hoy){ let n = 0; Object.keys(ESPECIES).forEach(e => { const v = s.avistamientos.filter(a => a.especie === e && Date.now() - a.at < DIA);
+      if (v.length >= 2) n += marca(s, `fau-${e}-${hoy}`, () => { publicarSistema(s, 'aviso', `${ESPECIES[e].n} en el barrio`, `Hubo ${v.length} avisos hoy (${[...new Set(v.map(x => x.lugar))].join(', ')}). Guardá la basura en canastos cerrados y no les des de comer.`);
+        notificar(s, { para:'todos', titulo:`${ESPECIES[e].n} en el barrio`, texto:`${v.length} avisos hoy`, icon:'paw', color:'warn', link:'pizarron' }); }); }); return n; } },
+  { id:'sos-respondedores', n:'SOS médica → avisar a vecinos con RCP', d:'Los vecinos que marcaron "sé primeros auxilios" reciben la alerta médica.', run(){ return 0; } },
+  /* Una vez por día, los avisos generales repetidos quedan en uno (con los
+     "visto" de todos) y se borran los que ya no sirven. Así se limpió lo que
+     dejaron las versiones anteriores, cuando cada equipo repetía los avisos. */
+  { id:'avisos-limpieza', n:'Avisos repetidos o vencidos → se juntan y se borran', d:'Una vez por día: los avisos iguales quedan en uno solo y se borran los vencidos (el tiempo de otro día, el camión que ya pasó) y los de más de 60 días.',
+    run(s, hoy){ return marca(s, 'limpia-avisos-' + hoy, () => limpiarAvisos(s)); } },
+  /* 10-10-2026 (pedido de Claudio): lo del pizarrón ya no queda para siempre (ver DURA_POST en js/v-comunidad.js). */
+  { id:'pizarron-vence', n:'Pizarrón → cada publicación se borra sola a su tiempo', d:'Alertas 2 días, guardia al terminar el día (a las 0 h; la garita puede elegir hasta 3 días), avisos 7 (de la Administración 15), vendo o regalo 15, mascotas perdidas, ofrezco y busco 30, eventos al día siguiente; lo fijado queda. A quien la publicó le llega el aviso.',
+    run(s){ let n = 0; if (typeof postVencido !== 'function') return 0;
+      aLista(s.posts).filter(p => p && p.id && postVencido(p)).forEach(p => { n += marca(s, 'pzv-' + p.id, () => borrarPostVencido(s, p.id)); }); return n; } },
+  /* 20-10-2026 (pedido de Claudio): que no queden obras viejas "en curso".
+     Al dueño le llega un aviso si su obra no cambió en 30 días (otra vez a
+     los 30 días del último cambio) y otro, una sola vez, si pasó la fecha de
+     fin estimado. Los dos lo llevan a la obra, donde la tarjeta le pregunta
+     y la termina con un toque (ver OBRA_QUIETA en js/v-vecinos.js). */
+  { id:'obras-recordar', n:'Obra quieta o con el fin pasado → preguntarle al dueño', d:'Si una obra no cambió en 30 días, a su dueño le llega "¿Tu obra sigue en…?"; si pasó el fin estimado, "¿Terminaste la obra?". Desde ahí la avanza o la termina con un toque.',
+    run(s, hoy){ let n = 0; if (typeof obraQuieta !== 'function') return 0;
+      aLista(s.obras).filter(o => o && o.id && o.estado === 'activa' && o.userId).forEach(o => {
+        if (obraQuieta(o)) n += marca(s, `obq-${o.id}-${o.ultima || o.createdAt}`, () => notificar(s, { para:o.userId, titulo:`¿Tu obra sigue en ${ETAPAS[o.etapa] || 'la misma etapa'}?`,
+          texto:`${dondeObra(o)} · hace ${OBRA_QUIETA} días que no cambia. Si avanzó, tocá "Paso siguiente"; si ya terminó, "Terminar la obra".`, icon:'wrench', color:'wood', link:'obras' }));
+        if (obraFinPasado(o, hoy)) n += marca(s, `obf-${o.id}-${o.finEstimado}`, () => notificar(s, { para:o.userId, titulo:'¿Terminaste la obra?',
+          texto:`${dondeObra(o)} · el fin estimado era el ${fechaCorta(o.finEstimado)}. Si terminó, la cerrás con un toque; si sigue, cambiá la fecha en "Editar".`, icon:'wrench', color:'wood', link:'obras' })); });
+      return n; } },
+  { id:'privacidad', n:`Datos de visitas → borrar a los N días`, d:'Borra DNI, celular y patente de pases y llegadas viejas (Ley 25.326, principio de finalidad).',
+    run(s){ const lim = Date.now() - (s.config.datosDias || 90) * DIA; let n = 0;
+      s.pases.forEach(p => { if (p.createdAt < lim && (p.dni || p.patente || p.tel) && !(p.dias && (p.fechaFin || '') >= hoyISO())){ p.dni = ''; p.patente = ''; p.tel = ''; n++; } });
+      s.llegadas.forEach(l => { if (l.at < lim && (l.patente || l.nombre !== '—')){ l.patente = ''; l.nombre = '—'; n++; } });
+      s.solicitudesPase.forEach(r => { if (r.at < lim && (r.dni || r.tel)){ r.dni = ''; r.patente = ''; r.tel = ''; n++; } });
+      return n; } },
+];
+const motorActivo = id => Store.s?.config?.motor?.[id] !== false;
+/* =========================================================
+   LA MARCA DE CADA AVISO AUTOMÁTICO
+   Sin base (modo prueba) se anota y se actúa en el momento. Con la base del
+   barrio, el motor corre en TODOS los equipos abiertos: antes cada uno
+   anotaba la marca en su copia y mandaba la lista entera, y dos equipos que
+   actuaban a la vez se pisaban las marcas; además, cada equipo que abría la
+   app corría el motor antes de que bajaran las marcas de la base. Resultado:
+   "Helada: revisar subidas" y "Mañana pasa el camión" repetidos en la
+   campanita (lo vio Claudio en la garita el 25-09-2026). Ahora la marca se
+   pide con una transacción de Firebase (Nube.reclamarMarca): solo el equipo
+   que la gana da el aviso.
+   ========================================================= */
+function marca(s, clave, fn){
+  if (s.motorLog[clave] || Motor.pedidas.has(clave)) return 0;
+  if (Motor.enNube()){ Motor.pedidas.set(clave, { fn, regla:Motor.regla }); return 1; }
+  s.motorLog[clave] = Date.now(); Motor.conMarca(clave, fn); return 1;
+}
+function publicarSistema(s, type, title, body){
+  const id = Automatico.clave ? idAutomatico() : uid();
+  if (aLista(s.posts).some(p => p && p.id === id)) return;
+  s.posts.unshift({ id, type, title, body, autor:'sistema', createdAt:Date.now(), reactions:{}, comments:[] });
+}
+/* Los avisos generales iguales quedan en uno (el último, con los "visto" de
+   todos) y se borran los vencidos y los de más de 60 días. Solo los
+   generales: los personales de cada vecino no se tocan desde otro equipo. */
+function limpiarAvisos(s){
+  const general = n => aLista(n.para).some(p => p === 'todos' || p === 'staff' || String(p).startsWith('rol:'));
+  const ahora = Date.now(), lim = ahora - 60 * DIA, quedan = new Map(), fuera = new Set();
+  aLista(s.notifs).filter(n => n && general(n)).sort((a, b) => (b.at || 0) - (a.at || 0)).forEach(n => {
+    if ((n.at || 0) < lim || (avisoVencido(n, ahora) && ahora - (n.at || 0) > HORA)){ fuera.add(n.id); return; }
+    const k = claveAviso(n), y = quedan.get(k);
+    if (!y){ quedan.set(k, n); return; }
+    if (ahora - (n.at || 0) < 10 * MIN) return;
+    const l = listaDe(y, 'leidas'); aLista(n.leidas).forEach(id => { if (!l.includes(id)) l.push(id); });
+    fuera.add(n.id);
+  });
+  if (fuera.size) s.notifs = aLista(s.notifs).filter(n => !n || !fuera.has(n.id));
+}
+const Motor = {
+  corriendo:false, regla:null,
+  pedidas:new Map(),
+  enNube(){ return typeof Nube !== 'undefined' && Nube.activa() && !!Nube.db; },
+  /* Lo que hace una regla, con su marca a la vista: los avisos y las
+     publicaciones que salen de acá llevan un id fijo (idAutomatico). */
+  conMarca(clave, fn){ Automatico.clave = clave; Automatico.n = 0; try { fn(); } finally { Automatico.clave = null; } },
+  correr(){
+    if (this.corriendo || !Store.s || !yo()) return;
+    /* El hotel no corre el motor del barrio: no ve los datos de los vecinos
+       (tiene el suyo, HotelMotor en js/v-hotel.js). */
+    if (esHotel() || esSupervisor()) return;
+    /* Con la base: hasta que no bajaron las marcas, la configuración y los
+       datos del barrio, el motor no corre. Antes corría al abrir la app, con
+       las marcas vacías, y repetía todos los avisos del día en cada equipo
+       que se abría (ver Nube.listoParaMotor). */
+    if (this.enNube() && !Nube.listoParaMotor()) return;
+    this.corriendo = true;
+    try {
+      const hoy = hoyISO(); let total = 0;
+      const s = Store.s;
+      for (const r of REGLAS){ if (!motorActivo(r.id)) continue; this.regla = r.id;
+        try { const n = r.run(s, hoy) || 0; if (n){ total += n; if (!this.enNube()) this.contar(r.id, n); } } catch(e){ console.warn('Regla', r.id, e); } }
+      this.regla = null;
+      /* limpia marcas de más de 60 días */
+      const lim = Date.now() - 60 * DIA; for (const k in s.motorLog) if (s.motorLog[k] < lim) delete s.motorLog[k];
+      if (total){ Store.guardar(); Store.avisar(false); }
+    } finally { this.corriendo = false; this.regla = null; }
+    if (this.pedidas.size) this.reclamar();
+  },
+  contar(id, n = 1){ const s = Store.s; s.motorCuenta = s.motorCuenta || {}; s.motorCuenta[id] = (s.motorCuenta[id] || 0) + n; },
+  /* Cada marca pedida se reclama en la base; el equipo que la gana actúa. */
+  reclamar(){
+    [...this.pedidas].forEach(([clave, p]) => {
+      if (p.enCurso) return; p.enCurso = true;
+      Nube.reclamarMarca(clave)
+        .then(mia => { this.pedidas.delete(clave); if (mia) Store.cambiar(() => { this.conMarca(clave, p.fn); if (p.regla) this.contar(p.regla); }); })
+        .catch(e => { this.pedidas.delete(clave); console.warn('Marca del motor', clave, e && e.message); });
+    });
+  },
+};
+
+/* ---------- editor genérico de listas ----------
+   Todo lo que es propio del barrio se edita con la misma pieza:
+   un esquema de campos y una colección del estado. */
+const LISTAS = {
+  contactos:  { t:'Contactos del barrio', icon:'phone', campos:[['nombre','Nombre'],['detalle','Detalle'],['tel','Teléfono','tel']], titulo:x => x.nombre, sub:x => `${x.detalle || ''} · ${x.tel || 'sin teléfono'}` },
+  temporadas: { t:'Temporadas de Ushuaia', icon:'sun', campos:[['nombre','Nombre'],['desde','Empieza (MM-DD)'],['hasta','Termina (MM-DD)'],['nota','Nota','area']], titulo:x => x.nombre, sub:x => `${x.desde} a ${x.hasta}` },
+  /* Solo lo provincial, lo municipal y los puentes: los nacionales y los
+     religiosos los calcula la app sola y no se cargan a mano. */
+  feriados:   { t:'Feriados provinciales, municipales y puentes', icon:'calendar',
+                campos:[['fecha','Fecha','date'],['nombre','Nombre'],['ambito','Ámbito (provincial, municipal, nacional)'],
+                        ['tipo','Tipo (inamovible, trasladable, no laborable, puente turístico)'],['nota','Nota o fuente','area']],
+                titulo:x => x.nombre, sub:x => `${fechaLarga(x.fecha)} · ${x.ambito || 'nacional'}${x.aConfirmar ? ' · a confirmar' : ''}`,
+                orden:(a, b) => a.fecha.localeCompare(b.fecha),
+                salida:(d, x) => ({ ...x, ...d, laborable:/no laborable|puente/i.test(d.tipo || ''), aConfirmar:false }) },
+  eventosCiudad:{ t:'Eventos de la ciudad', icon:'calendar', campos:[['titulo','Evento'],['tipo','Tipo'],['fecha','Fecha','date'],['hora','Hora','time'],['lugar','Lugar'],['link','Enlace','url'],['nota','Nota','area']], titulo:x => x.titulo, sub:x => `${fechaCorta(x.fecha)} · ${x.lugar || ''}`, orden:(a, b) => a.fecha.localeCompare(b.fecha) },
+  cruceros:   { t:'Recaladas de cruceros', icon:'send', campos:[['fecha','Fecha','date'],['barco','Barco'],['llega','Llega','time'],['sale','Sale','time'],['pasajeros','Pasajeros','number'],['muelle','Muelle']],
+                titulo:x => x.barco, sub:x => `${fechaCorta(x.fecha)}${x.llega ? ' · ' + x.llega : ''}${x.pasajeros ? ' · ' + x.pasajeros + ' pasajeros' : ''}`, orden:(a, b) => a.fecha.localeCompare(b.fecha) },
+  documentos: { t:'Documentos y normas', icon:'file', campos:[['titulo','Título'],['tipo','Tipo (Reglamento, Convivencia, Acta…)'],['texto','Texto','area-grande'],['link','Enlace al PDF (opcional)','url']], titulo:x => x.titulo, sub:x => x.tipo || '' },
+  descargas:  { t:'Descargas', icon:'download', campos:[['titulo','Título'],['detalle','Descripción'],
+                ['tipo','Tipo (app, doc, planilla, enlace)'],['url','Dirección (https://…)','url'],['texto','Texto, si es un documento propio','area']],
+                titulo:x => x.titulo, sub:x => `${(TIPOS_DESCARGA[x.tipo] || {}).n || 'Documento'}${x.url ? ' · ' + x.url : ' · sin dirección'}` },
+  promos:     { t:'Promociones del Hotel Los Cauquenes y beneficios', icon:'star', campos:[['titulo','Título'],['detalle','Detalle'],
+                ['descuento','Descuento para vecinos (ej: 20 %)'],['desde','Desde','date'],['hasta','Hasta','date'],['url','Enlace','url']],
+                titulo:x => x.titulo, sub:x => `${x.descuento ? x.descuento + ' · ' : ''}${x.desde ? fechaCorta(x.desde) : ''}${x.hasta ? ' a ' + fechaCorta(x.hasta) : ''}`,
+                orden:(a, b) => String(a.desde || '').localeCompare(String(b.desde || '')) },
+  agenda:     { t:'Agenda de Ushuaia', icon:'phone', campos:[['categoria','Categoría'],['nombre','Nombre'],['detalle','Dirección o detalle'],['tel','Teléfono','tel']], titulo:x => x.nombre, sub:x => `${x.categoria} · ${x.tel || 'sin teléfono'}` },
+};
+function editorLista(clave, q = ''){
+  const L = LISTAS[clave], items = Store.s[clave].slice();
+  if (L.orden) items.sort(L.orden);
+  const qq = q.toLowerCase();
+  const vis = qq ? items.filter(x => JSON.stringify(x).toLowerCase().includes(qq)) : items;
+  return `<div class="row" style="margin:6px 0 10px"><b class="grow">${L.t} <span class="muted small">(${items.length})</span></b><button class="btn btn-sm btn-pri" data-a="lista-editar" data-v="${clave}" data-id="">${I('plus')}Agregar</button></div>
+    ${items.length > 12 ? `<input placeholder="Filtrar…" data-filtro-lista="${clave}" value="${esc(q)}" style="margin-bottom:10px">` : ''}
+    <div class="card lista">${vis.map(x => `<div class="it"><div class="txt"><b>${esc(L.titulo(x))}</b><span>${esc(L.sub(x))}</span></div>
+      <button class="icon-btn" data-a="lista-editar" data-v="${clave}" data-id="${x.id}" aria-label="Editar">${I('edit')}</button>
+      <button class="icon-btn" data-a="lista-borrar" data-v="${clave}" data-id="${x.id}" aria-label="Borrar">${I('trash')}</button></div>`).join('') || '<p class="muted small">Vacío.</p>'}</div>`;
+}
+let filtroLista = {};
+document.addEventListener('input', e => { const k = e.target.dataset?.filtroLista; if (k){ filtroLista[k] = e.target.value; const pos = e.target.selectionStart; refrescar(); const n = $(`[data-filtro-lista="${k}"]`); if (n){ n.focus(); n.setSelectionRange(pos, pos); } } });
+A['lista-editar'] = el => {
+  const L = LISTAS[el.dataset.v], x0 = Store.s[el.dataset.v].find(z => z.id === el.dataset.id) || {};
+  const x = L.entrada ? L.entrada(x0) : x0;
+  hoja(el.dataset.id ? 'Editar' : 'Agregar', `<form data-f="lista-guardar" data-v="${el.dataset.v}" data-id="${el.dataset.id}">
+    ${L.campos.map(([k, lab, tipo]) => `<div class="field"><label>${lab}</label>${tipo && tipo.startsWith('area') ? `<textarea name="${k}" ${tipo === 'area-grande' ? 'style="min-height:260px"' : ''}>${esc(x[k] ?? '')}</textarea>` : `<input name="${k}" type="${tipo || 'text'}" value="${esc(x[k] ?? '')}">`}</div>`).join('')}
+    <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`, { ancho: el.dataset.v === 'documentos' ? '760px' : '' });
+};
+F['lista-guardar'] = (d, form) => {
+  const clave = form.dataset.v, id = form.dataset.id, L = LISTAS[clave];
+  Store.cambiar(s => {
+    const arr = s[clave], i = arr.findIndex(z => z.id === id), prev = i >= 0 ? arr[i] : { id: clave.slice(0, 3) + uid(), createdAt:Date.now() };
+    const nuevo = L.salida ? L.salida(d, prev) : { ...prev, ...d };
+    nuevo.updatedAt = Date.now();
+    if (i >= 0) arr[i] = nuevo; else arr.push(nuevo);
+    auditar(s, `${i >= 0 ? 'Editó' : 'Agregó'} en ${L.t}`, L.titulo(nuevo));
+  });
+  cerrarHoja(); toast('Guardado', 'check');
+};
+A['lista-borrar'] = async el => {
+  const L = LISTAS[el.dataset.v], x = Store.s[el.dataset.v].find(z => z.id === el.dataset.id); if (!x) return;
+  if (!await confirmar('Borrar', `¿Borrar "${esc(L.titulo(x))}"?`, { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { s[el.dataset.v] = s[el.dataset.v].filter(z => z.id !== el.dataset.id); auditar(s, `Borró en ${L.t}`, L.titulo(x)); });
+};
+
+/* ---------- ventana de Administración ---------- */
+const PESTANAS_ADMIN = [['resumen','Resumen'],['solicitudes','Inscripciones'],['vecinos','Vecinos'],['contenido','Contenido'],['ajustes','Ajustes'],['motor','Automatizaciones'],['correos','Correos'],['auditoria','Auditoría'],['datos','Datos']];
+R.admin = {
+  titulo: 'Administración', icon: 'sliders', color: 'accent', ancha: true, sub: 'Todo lo del barrio se maneja desde acá',
+  render(p){
+    if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
+    const [tab, sub] = String(p || 'resumen').split('|');
+    const s = Store.s;
+    const pend = s.users.filter(u => u.estado === 'pendiente').length;
+    const correosPend = s.correos.filter(c => c.estado !== 'enviado').length;
+    const tabs = `<div class="tabs-in">${PESTANAS_ADMIN.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="abrir" data-v="admin" data-p="${k}">${t}${k === 'solicitudes' && pend ? `<span class="dot-badge">${pend}</span>` : ''}${k === 'correos' && correosPend ? `<span class="dot-badge">${correosPend}</span>` : ''}</button>`).join('')}</div>`;
+    return tabs + (ADMIN_TABS[tab] || ADMIN_TABS.resumen)(sub);
+  },
+};
+const ADMIN_TABS = {
+  resumen(){
+    const s = Store.s, hoy = hoyISO();
+    const ingresos7 = Array.from({ length:7 }, (_, i) => { const d = sumarDias(hoy, i - 6); return { d, n:s.pases.filter(p => p.log?.[d]?.in).length }; });
+    const max = Math.max(1, ...ingresos7.map(x => x.n));
+    const kpi = (n, t) => `<div class="kpi"><b>${n}</b><span>${t}</span></div>`;
+    return `<div class="admin-hero"><b style="font-size:18px">Barrio ${esc(s.config.nombre)}</b><div class="small" style="opacity:.8">${fechaLarga(hoy)}</div>
+      <div class="garita-kpis">${kpi(`${casasRegistradas()}/${s.config.casas}`, 'Casas en la app')}${kpi(s.users.filter(u => u.estado === 'pendiente').length, 'Inscripciones')}${kpi(s.reclamos.filter(r => r.estado !== 'resuelto').length, 'Reclamos')}</div>
+      <div class="garita-kpis" style="margin-top:8px">${kpi(pasesDelDia().length, 'Visitas hoy')}${hayPaquetes() ? kpi(s.paquetes.filter(p => !p.retirado).length, 'Paquetes en garita') : ''}${kpi(s.peticiones.filter(p => p.estado === 'pendiente').length, 'Peticiones')}</div></div>
+      <div class="card"><b style="font-size:14px">Ingresos por día (últimos 7)</b>
+        <div style="display:flex;align-items:flex-end;gap:6px;height:110px;margin-top:12px">${ingresos7.map(x => `<div style="flex:1;text-align:center"><div class="tiny muted">${x.n}</div><div style="height:${x.n / max * 80}px;min-height:3px;background:var(--brand);border-radius:6px 6px 0 0"></div><div class="tiny muted">${DIAS[fechaDe(x.d).getDay()]}</div></div>`).join('')}</div></div>
+      <p class="muted small" style="margin:10px 2px 0">${I('info')} Reclamos, peticiones, garita, comunicados, contabilidad y expensas están en <b>Gestión del barrio</b>; acá, los datos y la configuración.</p>`;
+  },
+  solicitudes(){
+    const s = Store.s, pend = s.users.filter(u => u.estado === 'pendiente'), rech = s.users.filter(u => u.estado === 'rechazado');
+    const card = u => `<div class="card">${esCorreoGarita(u.email) ? `<div class="pill p-brand" style="margin-bottom:8px">${I('shield')}Cuenta de la GARITA · al aprobarla ve solo lo de la garita</div>` : u.casa === 'Supervisión' && u.estado === 'pendiente' ? `<div class="pill p-brand" style="margin-bottom:8px">${I('eye')}Pide SUPERVISIÓN de la guardia · al aprobarla solo mira la garita</div>` : ''}<div class="row">${avatar(u)}<div class="grow"><b>${esc(u.nombre)}</b><div class="muted small">${esc(u.casa)} · ${hace(u.createdAt)}</div></div><span class="pill ${u.estado === 'pendiente' ? 'p-warn' : 'p-danger'}">${u.estado}</span></div>
+      ${u.relacion ? `<div class="pill ${u.relacion === 'inquilino' ? 'p-warn' : ''}" style="margin-top:8px">${esc(RELACIONES[u.relacion] || u.relacion)}${u.relacion === 'inquilino' ? ' · al aprobarlo, el lote queda alquilado' : ''}</div>` : ''}
+      <div class="small" style="margin:10px 0;color:var(--ink-2)">DNI ${esc(u.dni || '—')} · ${esc(u.email)} · ${esc(u.tel || 'sin teléfono')}${u.consentimiento ? ' · aceptó el uso de datos' : ''}</div>
+      ${(() => { const misma = s.users.filter(x => x.id !== u.id && x.casa === u.casa && x.estado === 'aprobado'); return misma.length ? `<div class="small" style="margin-bottom:10px">${I('info')} En ${esc(u.casa)} ya están: ${misma.map(x => esc(x.nombre)).join(', ')}</div>` : ''; })()}
+      <div class="btns">${u.estado === 'pendiente' ? `<button class="btn btn-sm btn-ok" data-a="aprobar" data-id="${u.id}">${I('check')}Aprobar y mandar clave</button><button class="btn btn-sm btn-danger-soft" data-a="rechazar" data-id="${u.id}">Rechazar</button>`
+        : `<button class="btn btn-sm btn-sec" data-a="reactivar" data-id="${u.id}">Volver a pendiente</button>`}</div></div>`;
+    return `${pend.length ? pend.map(card).join('') : vacio('user', 'No hay inscripciones pendientes.')}${rech.length ? sec('Rechazadas') + rech.map(card).join('') : ''}`;
+  },
+  vecinos(q){
+    const s = Store.s, qq = (q || '').toLowerCase();
+    const ls = s.users.filter(u => u.estado === 'aprobado' && (!qq || (u.nombre + u.casa + u.email + (u.dni || '')).toLowerCase().includes(qq))).sort((a, b) => a.casa.localeCompare(b.casa, 'es', { numeric:true }));
+    return `<form data-f="buscar-vecino-admin" class="linea-form" style="margin-bottom:12px"><input name="q" id="qVecAdm" value="${esc(q || '')}" placeholder="Nombre, casa, email o DNI"><button class="btn btn-pri">${I('search')}</button></form>
+      ${superficie({ a:'alta-vecino', icon:'user', color:'ok', t:'Dar de alta a un vecino o inquilino', s:'La Administración crea la cuenta y le manda el acceso (para quien no sabe inscribirse)', cls:'acento' })}
+      ${superficie({ a:'alta-staff', icon:'plus', color:'accent', t:'Dar de alta guardia o administrador', s:'Cuentas del personal' })}
+      ${superficie({ a:'pasar-admin', icon:'key', color:'wood', t:'Pasar la Administración a otro vecino', s:'Por ejemplo, a Paula cuando la app esté andando' })}
+      ${Store.s.padron.length ? `<div class="card plana small"><b>${LOTES.length} lotes</b> · ${lotesVecinos().length} de vecinos y ${LOTES.length - lotesVecinos().length} del hotel y las cabañas · ${casasRegistradas()} con cuenta en la app</div>` : ''}
+      <div class="card lista">${ls.map(u => `<div class="it">${avatar(u, 'sm')}<div class="txt"><b>${esc(u.nombre)}</b><span>${esc(u.casa)}${u.relacion ? ' · ' + esc(RELACIONES[u.relacion] || u.relacion) : ''}${esPropDistancia(u) ? ' (no vive en el lote)' : ''} · ${esc(u.email)}${u.dni ? ' · DNI ' + esc(u.dni) : ''}</span></div>
+        <span class="pill ${u.rol === 'admin' ? 'p-accent' : u.rol === 'guardia' ? 'p-brand' : ''}">${u.rol}</span><button class="icon-btn" data-a="gestionar-vecino" data-id="${u.id}" aria-label="Gestionar">${I('more')}</button></div>`).join('')}</div>`;
+  },
+  contenido(sub){
+    const k = LISTAS[sub] ? sub : 'contactos';
+    return `<div class="chips">${Object.entries(LISTAS).map(([c, L]) => `<button class="chip ${c === k ? 'on' : ''}" data-a="abrir" data-v="admin" data-p="contenido|${c}">${I(L.icon)}${L.t}</button>`).join('')}</div>${editorLista(k, filtroLista[k] || '')}`;
+  },
+  ajustes(){
+    const c = Store.s.config;
+    const campo = (k, lab, tipo = 'text', ayuda = '') => `<div class="field"><label>${lab}</label><input name="${k}" type="${tipo}" value="${esc(c[k] ?? '')}">${ayuda ? `<div class="ayuda">${ayuda}</div>` : ''}</div>`;
+    return `<form data-f="ajustes">
+      <div class="card"><h3>El barrio</h3>${campo('nombre', 'Nombre')}${campo('ciudad', 'Ciudad')}<div class="grid2">${campo('casas', 'Cantidad de casas', 'number')}${campo('datosDias', 'Borrar datos de visitas a los (días)', 'number')}</div>
+        ${campo('mapa', 'Enlace de Google Maps del acceso', 'url', 'Es el "cómo llegar" que reciben las visitas.')}${campo('dea', 'Dónde está el desfibrilador (DEA)')}</div>
+      <div class="card"><h3>Contacto</h3><div class="grid2">${campo('garitaTel', 'Teléfono de la garita', 'tel')}${campo('adminTel', 'Teléfono de la Administración', 'tel')}</div>${campo('adminEmail', 'Email de la Administración (recibe avisos de inscripciones)', 'email')}</div>
+      <div class="card"><h3>Residuos</h3><div class="grid3">${[1,2,3,4,5,6,0].map(d => `<div class="field"><label>${DIAS[d]}</label><input name="rec${d}" value="${esc(recoleccionDias()[d] || '')}" placeholder="—"></div>`).join('')}</div>
+        <div class="grid2">${campo('recoleccionHora', 'Hora del camión', 'time')}${campo('voluminososDetalle', 'Qué se retira en los voluminosos')}</div>
+        <div class="ayuda" style="margin:-4px 0 10px">Hoy: martes y jueves a la mañana, todos los residuos; sábados, voluminosos. La víspera de cada día con camión la app avisa "Mañana pasa el camión de residuos" (y "… voluminosos" si ese día dice voluminosos). Los días sin camión se dejan vacíos (o "No pasa"): esa noche no sale ningún aviso.</div>
+        <div class="card plana small" style="margin:0">${I('info')} Las fechas de retiros especiales de voluminosos se anotan en <b>Residuos</b>, una por una: ahí se pueden cargar todas las del año.
+          <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-xs btn-sec" data-a="abrir" data-v="recoleccion">${I('truck')}Ir a Residuos</button></div></div></div>
+      <div class="card"><h3>Convivencia</h3><div class="grid2">${campo('silencio', 'Horario de silencio')}${campo('obraHorario', 'Horario de obras')}</div></div>
+      <div class="card plana small">${I('info')} Los vencimientos, el recargo, el interés, el CBU y lo impositivo se configuran en <b>Contabilidad → Parámetros</b>, junto a las expensas.
+        <div class="btns" style="margin-top:10px"><button type="button" class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="parametros">${I('right')}Ir a Parámetros</button></div></div>
+      <div class="card"><h3>Correo</h3><p class="muted small" style="margin-top:0">Para que la app mande los mails de inscripción y claves. Instrucciones en <span class="mono">apps-script/Codigo.gs</span>.</p>
+        ${campo('correoUrl', 'URL del Apps Script (termina en /exec)', 'url')}<div class="field"><label>Frase compartida</label>
+          <input name="correoClave" type="text" class="frase-oculta" value="${esc(c.correoClave ?? '')}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore>
+          <label class="check" style="margin:6px 0 0"><input type="checkbox" data-a="frase-ver"><span>Mostrar la frase</span></label>
+          <div class="ayuda">Tiene que ser idéntica a la de <span class="mono">var CLAVE_COMPARTIDA</span> del Apps Script. Antes este campo era de tipo contraseña y el navegador lo rellenaba solo con la clave guardada de la cuenta: al tocar Guardar, esa clave pisaba la frase.</div></div>
+        <div class="card plana small" style="margin:0 0 10px">${I('info')} Los correos salen de la cuenta de Google con la que se <b>creó el proyecto</b> de Apps Script (si lo hiciste con ${esc(Store.s.config.garitaEmail || 'la casilla de la garita')}, salen de ahí). El correo de la Administración de arriba es el que <b>recibe</b> los avisos.</div>
+        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-correo">${I('send')}Probar el envío</button></div>
+        <div id="probarCorreo"></div>
+        <label class="check" style="margin:12px 0 0"><input type="checkbox" name="parteTurnoCorreo" ${c.parteTurnoCorreo === true ? 'checked' : ''}><span>Al cerrarse cada turno de la garita, mandar el parte (guardias, novedades, policía, rondas y bitácora) al correo de la Administración</span></label></div>
+      <div class="card"><h3>Cortes de luz, agua y gas</h3>
+        <p class="muted small" style="margin-top:0">Todos los días a las 6 y a las 23, el Apps Script lee los cortes de agua de la DPOSS y los comunicados de la DPE (luz) y de Camuzzi (gas) que publican NotiTDF, Radio Fueguina y Tiempo Fueguino. Si un corte nombra al barrio (o a una de las zonas de abajo) o es para toda la ciudad, sale solo en la pizarra y el pizarrón con su lamparita, gotita o llamita titilando, y se borra cuando termina el corte (o a las 24 horas). Lo demás no se publica. Facebook no se puede leer desde un programa.</p>
+        <div class="field"><label>Zonas que cuentan (separadas por coma)</label><input name="serviciosZonas" value="${esc(!c.serviciosZonas || c.serviciosZonas.trim() === 'Bahía Cauquén, Los Cauquenes' ? 'Cauquén, Los Cauquenes, Alimentador 11' : c.serviciosZonas)}" maxlength="300">
+          <div class="ayuda">La DPE nombra al barrio como "Urbanización Cauquén" o "Alto del Cauquén", y siempre bajo el <b>Alimentador 11</b> (con Terraza I y II, Ushuaia Chico y Costa Susana): por eso van "Cauquén" y "Alimentador 11". Cada zona cuenta como palabra entera ("Alimentador 11" no es el 110). No pongas palabras sueltas como "Bahía": aparece en muchos barrios.</div></div>
+        <label class="check" style="margin:0 0 10px"><input type="checkbox" name="serviciosActivo" ${c.serviciosActivo !== false ? 'checked' : ''}><span>Buscar y publicar los cortes solos</span></label>
+        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="servicios-buscar">${I('search')}Buscar ahora</button></div><div id="serviciosRes"></div></div>
+      <div class="card"><h3>Promociones del Hotel Los Cauquenes (opcional)</h3>
+        <p class="muted small" style="margin-top:0">Las promociones se cargan a mano en <b>Contenido → Promociones</b> y eso ya funciona. Esto es solo si querés que se lean solas del sitio del Hotel Los Cauquenes: hace falta un programita propio que las devuelva en JSON (está explicado en CONECTAR.md), porque el navegador no puede leer otra web directamente.</p>
+        ${campo('promosUrl', 'Dirección del lector de promociones', 'url')}</div>
+      <div class="card"><h3>Avisos al celular con la pantalla apagada</h3>
+        <p class="muted small" style="margin-top:0">Para que el camión, el SOS, los avisos urgentes y los mensajes lleguen aunque el celular esté bloqueado. Son dos pasos de una sola vez, explicados en <span class="mono">AVISOS.md</span>: la clave pública va acá y la cuenta de servicio, en el Apps Script.</p>
+        <div class="field"><label>Clave pública de avisos (Firebase → Cloud Messaging → Certificados push web)</label>
+          <input name="pushVapid" type="text" value="${esc(c.pushVapid ?? '')}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore placeholder="BK… (un texto de 87 caracteres)">
+          <div class="ayuda">${c.pushVapid ? `${I('check')} Guardada en la base del barrio (termina en <span class="mono">…${esc(String(c.pushVapid).slice(-6))}</span>). Ya no se borra sola: antes la pisaba otro equipo de la Administración al abrirse con una copia vieja de los ajustes.` : 'Es la clave <b>pública</b> (empieza con B). La privada no va nunca en la app.'}</div></div>
+        <div class="btns"><button type="button" class="btn btn-sm btn-sec" data-a="probar-push">${I('send')}Ver si el Apps Script está listo</button></div><div id="probarPush"></div>
+        <div class="field" style="margin-top:14px"><label>Mandar un aviso de prueba a…</label>
+          <div class="validador"><select id="pushGrupo"><option value="yo">Solo a mis equipos</option><option value="rol:guardia">La garita</option><option value="rol:admin">La Administración</option><option value="rol:vecino">Todos los vecinos</option><option value="todos">Todo el barrio</option>
+            ${LOTES.map(l => `<option value="lote:Lote ${l.lote}">Lote ${l.lote}</option>`).join('')}</select>
+          <button type="button" class="btn btn-sec" data-a="push-grupo">${I('send')}Mandar</button></div>
+          <div class="ayuda">Sirve para comprobar que los avisos llegan con el teléfono bloqueado. Dice a cuántos equipos llegó; un equipo cuenta solo si activó los avisos.</div></div>
+        <div id="pushGrupoRes"></div></div>
+      <div class="card"><h3>Aviones en vivo (opcional)</h3>${campo('vuelosProxy', 'URL del Worker que reenvía ADS-B', 'url', 'Ver CONECTAR.md. Arribos y partidas se leen solos del tablero del aeropuerto: esto es solo para ver los aviones que están en el aire.')}</div>
+      <button class="btn btn-pri btn-block">${I('check')}Guardar ajustes</button></form>
+      ${superficie({ a:'diagnostico', icon:'info', color:'sky', t:'Datos técnicos de esta sesión', s:'Versión, conexión con la base y modo: por si algo no anda y hay que revisarlo' })}`;
+  },
+  motor(){
+    const s = Store.s;
+    return `<p class="muted small" style="margin-top:0">Reglas que la app aplica sola. Hoy corren mientras la app está abierta en algún equipo del barrio; con servidor corren siempre.</p>
+      ${typeof reglasPropiasHTML === 'function' ? reglasPropiasHTML() : ''}
+      ${REGLAS.filter(r => hayPaquetes() || !/^paq/.test(r.id)).map(r => `<div class="card" style="padding:13px 14px"><div class="row"><span class="ic ic-${motorActivo(r.id) ? 'accent' : 'brand'}" style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;opacity:${motorActivo(r.id) ? 1 : .4}">${I('zap')}</span>
+        <div class="grow"><b style="font-size:14px">${esc(r.n.replace('N días', (s.config.datosDias || 90) + ' días'))}</b>${r.d ? `<div class="muted small">${esc(r.d)}</div>` : ''}<div class="tiny muted">${s.motorCuenta?.[r.id] ? `Actuó ${plural(s.motorCuenta[r.id], 'vez', 'veces')}` : 'Todavía no actuó'}</div></div>
+        <label class="check" style="margin:0"><input type="checkbox" data-a="regla" data-v="${r.id}" ${motorActivo(r.id) ? 'checked' : ''}></label></div></div>`).join('')}
+      <button class="btn btn-sec btn-block" data-a="motor-ahora">${I('zap')}Correr ahora</button>`;
+  },
+  correos(){
+    const cs = Store.s.correos;
+    const hoy = hoyISO();
+    const salidosHoy = cs.filter(c => c.estado === 'enviado' && isoDe(new Date(c.at)) === hoy).length;
+    return `${Correo.configurado() ? aviso('ok', 'mail', 'El envío automático está configurado', `Salieron ${plural(salidosHoy, 'correo')} hoy.`) : aviso('warn', 'mail', 'El envío automático no está configurado', 'Los correos quedan acá para mandarlos a mano. Configuralo en Ajustes → Correo, siguiendo CORREO.md.')}
+      ${superficie({ v:'correos-enviados', icon:'file', color:'sky', t:'Correos enviados', s:'El listado con fecha y hora, y cada uno en PDF' })}
+      ${superficie({ a:'circular', icon:'send', color:'accent', t:'Escribirles a los vecinos', s:'Una circular del barrio, a todos o a quien elijas', cls:'acento' })}
+      ${Correo.configurado() && cs.some(c => c.estado !== 'enviado') ? superficie({ a:'correos-reintentar', icon:'refresh', color:'warn', t:'Mandar ahora los que no salieron', s:`${plural(cs.filter(c => c.estado !== 'enviado').length, 'correo pendiente', 'correos pendientes')} · también se reintentan solos al abrir la app` }) : ''}
+      ${superficie({ a:'abrir', v:'admin', p:'ajustes', icon:'sliders', color:'brand', t:'Probar el envío', s:'Ajustes → Correo → Probar el envío: dice exactamente qué falla' })}
+      ${sec('Historial')}
+      ${cs.length ? cs.slice(0, 60).map(c => `<div class="card" style="padding:12px 14px"><div class="row"><span class="ic ic-${c.estado === 'enviado' ? 'ok' : c.estado === 'error' ? 'danger' : 'warn'}" style="width:36px;height:36px;border-radius:11px;display:grid;place-items:center">${I('mail')}</span>
+        <div class="grow"><b style="font-size:14px">${esc(c.asunto)}</b><div class="muted small">${esc(c.para)} · ${hace(c.at)} · ${c.estado}</div>${c.error ? `<div class="small" style="color:var(--danger);margin-top:2px">${esc(c.error)}</div>` : ''}</div>
+        ${c.estado !== 'enviado' ? `<button class="btn btn-xs btn-sec" data-a="correo-manual" data-id="${c.id}">${I('send')}Mandar</button>` : ''}</div></div>`).join('') : vacio('mail', 'No hay correos.')}`;
+  },
+  auditoria(){
+    const a = aLista(Store.s.auditoria).filter(Boolean).sort((x, y) => y.at - x.at).slice(0, 200);
+    return `<p class="muted small" style="margin-top:0">Registro de las acciones sensibles: altas, bajas, peticiones firmadas, cambios de contenido y recordatorios. No se puede editar desde la app.</p>
+      <div class="card lista">${a.length ? a.map(x => `<div class="it"><div class="txt"><b>${esc(x.accion)}</b><span>${esc(x.detalle || '')} · ${esc(autorVisible(x.por).nombre)} · ${fechaHora(x.at)}</span></div></div>`).join('') : '<p class="muted small">Vacío.</p>'}</div>
+      <p class="muted tiny">Acá se ven los últimos ${Historial.VENTANA.auditoria[1]} días. La auditoría completa sigue en la base (no se borra) y se trae solo cuando la pedís.</p>
+      <div class="btns"><button class="btn btn-sec grow" data-a="hist-auditoria">${I('clock')}Ver toda la auditoría</button><button class="btn btn-sec grow" data-a="exportar-auditoria">${I('download')}Descargar lo reciente (CSV)</button></div>`;
+  },
+  datos(){
+    const nube = typeof Nube !== 'undefined' && Nube.activa();
+    return `<div class="card"><h3>Copia de seguridad</h3>
+      ${nube ? `<p class="small" style="color:var(--ink-2);margin-top:0">Los datos del barrio viven en la <b>base del barrio en Firebase</b> (servidores de Google), no en esta computadora: si se rompe o se pierde un celular, no se pierde nada.</p>
+        <p class="small" style="color:var(--ink-2)">Esta copia es un <b>respaldo extra</b>: baja en un archivo todo lo que la Administración ve en este momento (vecinos, padrón, expensas, pagos, reclamos, bitácora, auditoría…). Sirve por si alguna vez se borra algo por error o se quiere guardar el estado de un cierre de mes. Conviene bajarla <b>una vez por mes</b>, después de emitir las expensas, y guardarla en un lugar seguro: tiene datos personales (Ley 25.326).</p>`
+        : `<p class="muted small">La app está funcionando sin servidor (modo de prueba): los datos viven solo en este equipo. Descargá una copia seguido.</p>`}
+      <div class="btns"><button class="btn btn-pri" data-a="exportar">${I('download')}Descargar copia</button>
+        ${nube ? '' : `<label class="btn btn-sec">${I('upload')}Restaurar copia<input type="file" accept="application/json" id="importar" hidden></label>`}</div>
+      ${nube ? `<p class="muted tiny" style="margin:10px 0 0">"Restaurar" no aparece a propósito: con la base del barrio en uso, volcar un archivo viejo pisaría lo que cargaron los vecinos después. Si alguna vez hace falta recuperar algo, se hace a mano desde la copia.</p>` : ''}</div>
+      ${nube ? '' : `<div class="card"><h3>Volver a la demo</h3><p class="muted small">Borra todo y carga otra vez los datos de muestra. Solo existe en el modo de prueba.</p><button class="btn btn-danger-soft" data-a="reiniciar">${I('refresh')}Reiniciar datos</button></div>`}`;
+  },
+};
+A['regla'] = el => { setTimeout(() => { Store.cambiar(s => { s.config.motor = s.config.motor || {}; s.config.motor[el.dataset.v] = el.checked; }); }, 0); return true; };
+A['motor-ahora'] = () => { Motor.correr(); toast('Motor ejecutado', 'zap'); refrescar(); };
+F['buscar-vecino-admin'] = d => abrir('admin', 'vecinos|' + (d.q || ''));
+F['ajustes'] = d => {
+  const vapid = String(d.pushVapid || '').replace(/\s+/g, '');
+  if (vapid && !/^B[A-Za-z0-9_-]{80,95}$/.test(vapid)){
+    toast(vapid.length < 60 ? 'Esa parece la clave PRIVADA de avisos. Acá va la pública: la larga, que empieza con B.' : 'La clave de avisos no tiene el formato esperado: tiene que empezar con B y tener unos 87 caracteres.', 'alert');
+    return;
+  }
+  Store.cambiar(s => {
+    const c = s.config;
+    ['nombre','ciudad','mapa','dea','garitaTel','adminTel','adminEmail','recoleccionHora','voluminososDetalle','silencio','obraHorario','correoUrl','correoClave','vuelosProxy','promosUrl','serviciosZonas'].forEach(k => { if (k in d) c[k] = String(d[k]).trim(); });
+    c.serviciosActivo = !!d.serviciosActivo;
+    /* La clave de avisos se pega desde la consola de Firebase y a veces viene
+       con espacios o saltos de línea en el medio. Vacía no borra la que ya
+       está: se reemplaza pegando otra. */
+    const vapid = String(d.pushVapid || '').replace(/\s+/g, '');
+    if (vapid) c.pushVapid = vapid;
+    c.parteTurnoCorreo = !!d.parteTurnoCorreo;
+    ['casas','datosDias'].forEach(k => { if (d[k] !== '' && d[k] !== undefined) c[k] = +d[k]; });
+    c.recoleccion = {}; [0,1,2,3,4,5,6].forEach(i => { const v = String(d['rec' + i] || '').trim(); if (v) c.recoleccion[i] = v; });
+    auditar(s, 'Cambió los ajustes del barrio', '');
+  });
+  toast('Ajustes guardados', 'check');
+  if (typeof Nube !== 'undefined' && Nube.activa()) Nube.publicarCorreo();
+};
+A['probar-push'] = async () => {
+  const caja = $('#probarPush'), d = Correo.datos();
+  if (!d){ caja.innerHTML = `<div style="margin-top:10px">${aviso('warn', 'alert', 'Primero configurá el correo', 'Los avisos usan el mismo Apps Script.')}</div>`; return; }
+  caja.innerHTML = `<div class="card plana small" style="margin:10px 0 0">${I('refresh')} Preguntando…</div>`;
+  try {
+    const j = await fetch(d.url).then(r => r.json());
+    const ok = j.push && j.version >= 3;
+    caja.innerHTML = `<div style="margin-top:10px">${aviso(ok ? 'ok' : 'warn', ok ? 'check' : 'alert', ok ? 'El Apps Script puede mandar avisos' : 'Al Apps Script le falta un paso',
+      ok ? (Store.s.config.pushVapid ? 'Ahora cada vecino activa los avisos en su equipo (Tu cuenta → Avisos en este equipo).' : 'Falta pegar acá la clave pública y Guardar.') + (j.version < 4 ? ' Conviene pegar el Codigo.gs nuevo (versión 4) y hacer "Nueva versión": manda los avisos con prioridad alta, para que Android no los demore con la pantalla apagada.' : '') : j.version >= 3 ? 'Falta la propiedad FCM_CUENTA (ver AVISOS.md).' : 'Tiene la versión vieja del código: pegá el Codigo.gs nuevo y hacé "Nueva versión".')}</div>`;
+  } catch(e){ caja.innerHTML = `<div style="margin-top:10px">${aviso('danger', 'alert', 'No se pudo consultar', esc(Correo.motivo(e)))}</div>`; }
+};
+/* "Buscar ahora" los cortes de luz, agua y gas (11-10-2026): hace lo mismo
+   que el Apps Script a las 6 y a las 23 y muestra qué encontró y qué dejó
+   afuera (y por qué). Lo que sirve al barrio queda publicado. */
+const resultadoServicios = j => {
+  const pub = aLista(j.publicados), des = aLista(j.descartados);
+  return `${aviso(pub.length ? 'warn' : 'ok', pub.length ? 'bolt' : 'check', pub.length ? `${plural(pub.length, 'corte que toca al barrio', 'cortes que tocan al barrio')}` : 'Ningún corte anunciado para el barrio',
+      `Leyó ${plural(j.leidos || 0, 'nota')} de la DPOSS y los diarios. Zonas: ${esc(aLista(j.zonas).join(', '))}.`)}
+    ${pub.length ? `<div class="lista" style="margin-top:8px">${pub.map(x => `<div class="small" style="padding:6px 0">${I('check')} <b>${esc(x.titulo)}</b> · ${esc(x.fuente)}${x.nuevo ? ' · <b>publicado ahora</b>' : ' · ya estaba publicado'}</div>`).join('')}</div>` : ''}
+    ${des.length ? `<details style="margin-top:8px"><summary class="small">Lo que leyó y no publicó (${des.length})</summary>${des.map(x => `<div class="tiny muted" style="padding:4px 0">${esc(x.fuente)} · ${esc(x.titulo)} → ${esc(x.motivo)}</div>`).join('')}</details>` : ''}
+    ${aLista(j.fallas).length ? `<p class="tiny muted">No se pudo leer: ${esc(aLista(j.fallas).join(' · '))}</p>` : ''}`;
+};
+A['servicios-buscar'] = async () => {
+  const caja = $('#serviciosRes'), d = Correo.datos();
+  if (!caja) return;
+  if (!d){ caja.innerHTML = `<div style="margin-top:10px">${aviso('warn', 'alert', 'Primero configurá el Apps Script', 'La búsqueda la hace el mismo Apps Script del correo.')}</div>`; return; }
+  caja.innerHTML = `<div class="card plana small" style="margin:10px 0 0">${I('refresh')} Leyendo la DPOSS y los diarios… (tarda unos segundos)</div>`;
+  try {
+    const r = await fetch(d.url, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify({ accion:'servicios', clave:d.clave }) });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error(j && /desconocida/.test(j.error || '') ? 'El Apps Script tiene una versión vieja: pegá el Codigo.gs nuevo (versión 12) y hacé "Nueva versión".' : (j && j.error) || 'El Apps Script contestó que no');
+    caja.innerHTML = `<div style="margin-top:10px">${resultadoServicios(j)}</div>`;
+  } catch(e){ caja.innerHTML = `<div style="margin-top:10px">${aviso('danger', 'alert', 'No se pudo buscar', esc(Correo.motivo(e)))}</div>`; }
+};
+A['frase-ver'] = el => { const i = el.closest('form')?.correoClave; if (i) i.classList.toggle('frase-oculta', !el.checked); };
+A['correos-reintentar'] = async () => {
+  Store.s.correos.forEach(c => { if (c.estado !== 'enviado') c.intentos = 0; });
+  const n = await Correo.reintentar();
+  refrescar();
+  if (!Correo.enCola) return toast('No había correos pendientes de la última semana para reintentar', 'check');
+  if (n === Correo.enCola) return toast(`Salieron los ${plural(n, 'correo')}`, 'mail');
+  hoja('Reintento de correos', `${aviso(n ? 'warn' : 'danger', 'mail', n ? `Salieron ${n} de ${Correo.enCola}` : 'No salió ninguno', esc(Correo.ultimoError || 'Sin detalle'))}
+    <p class="muted small">El motivo de cada uno queda escrito en rojo en el historial, debajo de cada correo. Si dice "no autorizado", la frase de Ajustes y la del Apps Script no coinciden; si dice "tope", ya se mandaron los del día.</p>
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`);
+};
+/* Prueba el correo con lo que está escrito en el formulario, aunque todavía
+   no se haya guardado: así se sabe si anda antes de tocar Guardar. */
+A['probar-correo'] = async el => {
+  const f = el.closest('form'), caja = $('#probarCorreo');
+  const url = f?.correoUrl?.value.trim(), clave = f?.correoClave?.value.trim();
+  const c = Store.s.config, antes = [c.correoUrl, c.correoClave];
+  if (url) c.correoUrl = url; if (clave) c.correoClave = clave;
+  const para = (f?.adminEmail?.value || '').trim() || c.adminEmail || yo().email;
+  if (caja) caja.innerHTML = `<div class="card plana small" style="margin:10px 0 0">${I('refresh')} Probando…</div>`;
+  el.disabled = true;
+  const r = await Correo.probar(para);
+  el.disabled = false;
+  [c.correoUrl, c.correoClave] = antes;
+  if (caja) caja.innerHTML = `<div style="margin-top:10px">${aviso(r.ok ? 'ok' : 'danger', r.ok ? 'check' : 'alert', r.ok ? 'El correo funciona' : 'El correo no está saliendo', esc(r.txt))}</div>`;
+};
+A['aprobar'] = async el => {
+  const u = Store.s.users.find(x => x.id === el.dataset.id); if (!u) return;
+  const nube = typeof Nube !== 'undefined' && Nube.activa();
+  const clave = nube ? '' : generarClave(u.rol === 'guardia' ? 'GAR' : u.rol === 'admin' ? 'ADM' : 'VEC');
+  const garita = esCorreoGarita(u.email);
+  /* 07-10: quien eligió "Supervisión de la guardia" al inscribirse se habilita como supervisión (js/v-supervisor.js). */
+  if (!garita && u.casa === 'Supervisión' && typeof A['sup-hacer'] === 'function') return A['sup-hacer'](el);
+  if (garita && !await confirmar('Aprobar la cuenta de la garita', `Esta cuenta (${esc(u.email)}) va a ver todo lo de la garita: ingresos, peticiones y datos de contacto de los vecinos. Aprobala solo si la inscribiste vos o la guardia te lo confirmó.`, { si:'Aprobar como garita' })) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.estado = 'aprobado'; x.clave = clave; x.aprobadoAt = Date.now();
+    if (garita){ x.rol = 'guardia'; x.casa = 'Garita'; x.nombre = 'Garita'; }
+    auditar(s, garita ? 'Aprobó la cuenta de la garita' : 'Aprobó una inscripción', `${x.nombre} · ${x.casa}`, x.id);
+    if (!garita) avisoLoteAlquilado(s, x, true); });
+  const salio = await Correo.enviar({ para:u.email, asunto:'Tu acceso al barrio está aprobado', tipo:'clave',
+    html:Correo.plantilla('¡Bienvenido/a al barrio!', `<p>Hola ${esc(u.nombre.split(' ')[0])}: la Administración aprobó tu inscripción para <b>${esc(u.casa)}</b>.</p>` +
+      (nube ? `<p>Ya podés entrar con tu email y la contraseña que elegiste al inscribirte.</p>`
+        : `<p>Entrás con tu email y esta clave:</p><p style="font-family:monospace;font-size:26px;font-weight:800;letter-spacing:3px;background:#dcefec;color:#0d6b66;padding:12px 16px;border-radius:10px;display:inline-block">${clave}</p><p style="font-size:13px">Es personal: no la compartas.</p>`),
+      { texto:'Entrar a la app', url:urlApp() }) });
+  const msg = nube ? `Hola ${u.nombre.split(' ')[0]}, ya tenés acceso a la app del barrio ${Store.s.config.nombre}. Entrá con tu email y tu contraseña: ${urlApp()}`
+    : `Hola ${u.nombre.split(' ')[0]}, ya tenés acceso a la app del barrio ${Store.s.config.nombre}. Entrá con tu email y la clave ${clave}: ${urlApp()}`;
+  hoja('Inscripción aprobada', `${aviso(salio ? 'ok' : 'warn', salio ? 'mail' : 'info', salio ? 'Le avisamos por correo' : 'El correo quedó en la bandeja de salida', salio ? u.email : 'Avisale por WhatsApp:')}
+    ${clave ? `<div class="codigo-grande">${clave}</div>` : ''}
+    <div class="btns">${u.tel ? `<a class="btn btn-wa" href="${waLink(u.tel, msg)}" target="_blank" rel="noopener">${I('phone')}WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar mensaje</button></div>`);
+};
+/* LOTE ALQUILADO (07-10-2026): cuando entra o se va un inquilino, los dueños del lote se enteran. */
+function avisoLoteAlquilado(s, x, entra){
+  if (!x || x.relacion !== 'inquilino' || !/^Lote\s/i.test(x.casa || '')) return;
+  const otros = s.users.filter(o => o.id !== x.id && o.casa === x.casa && o.estado === 'aprobado' && o.relacion === 'inquilino');
+  const duenos = s.users.filter(o => o.casa === x.casa && o.estado === 'aprobado' && (o.relacion === 'propietario' || o.relacion === 'cotitular')).map(o => o.id);
+  if (!duenos.length || (!entra && otros.length)) return;
+  notificar(s, entra
+    ? { para:duenos, titulo:`${x.casa} figura alquilado`, texto:`${x.nombre} se inscribió como inquilino/a y la Administración lo aprobó. El día a día del lote (garita, visitas, correos y SOS) pasa a ser suyo. Vos seguís viendo las expensas, las votaciones y los comunicados, y le podés escribir en privado.`, icon:'key', color:'sky', link:'inicio', sonido:true }
+    : { para:duenos, titulo:`${x.casa} ya no figura alquilado`, texto:`Se dio de baja la cuenta de ${x.nombre}, inquilino/a. Volvés a tener la app completa del lote.`, icon:'home', color:'ok', link:'inicio', sonido:true });
+}
+A['rechazar'] = async el => {
+  if (!await confirmar('Rechazar inscripción', 'La persona no va a poder entrar a la app.', { si:'Rechazar', peligro:true })) return;
+  const u = Store.s.users.find(x => x.id === el.dataset.id);
+  Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); x.estado = 'rechazado'; auditar(s, 'Rechazó una inscripción', `${x.nombre} · ${x.casa}`, x.id); });
+  if (u) Correo.enviar({ para:u.email, asunto:'Tu inscripción al barrio', tipo:'rechazo', html:Correo.plantilla('Sobre tu inscripción', `<p>Hola ${esc(u.nombre.split(' ')[0])}: no pudimos aprobar tu inscripción. Comunicate con la Administración del barrio para revisarla.</p>`) });
+};
+A['reactivar'] = el => Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); x.estado = 'pendiente'; });
+A['gestionar-vecino'] = el => {
+  const u = Store.s.users.find(x => x.id === el.dataset.id); if (!u) return;
+  hoja(u.nombre, `<form data-f="gestionar-vecino" data-id="${u.id}">
+    <div class="grid2"><div class="field"><label>Casa</label><input name="casa" value="${esc(u.casa)}"></div><div class="field"><label>Rol</label><select name="rol">${['vecino','guardia','admin'].map(r => `<option ${u.rol === r ? 'selected' : ''}>${r}</option>`).join('')}</select></div></div>
+    <div class="field"><label>Email</label><input name="email" type="email" value="${esc(u.email)}"></div>
+    ${/^Lote\s/i.test(u.casa || '') ? `<div class="grid2"><div class="field"><label>Relación con el lote</label><select name="relacion">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${u.relacion === k ? 'selected' : ''}>${t}</option>`).join('')}<option value="" ${!u.relacion ? 'selected' : ''}>Sin indicar</option></select></div>
+      <div class="field"><label>Votaciones</label><label class="check" style="margin:6px 0 0"><input type="checkbox" name="representante" ${u.representante ? 'checked' : ''}><span>Representante designado del ${esc(u.casa)} (solo vale su voto)</span></label></div></div>
+      ${u.poderFoto ? `<div class="card plana small"><b>Carta poder</b>${u.poderHasta ? ' · hasta ' + fechaCorta(u.poderHasta) : ''}${fotoHTML(u.poderFoto, 'post-foto')}
+        <label class="check" style="margin-top:8px"><input type="checkbox" name="poderOk" ${u.poderOk ? 'checked' : ''}><span>Aprobada: puede votar por el lote</span></label></div>` : ''}
+      <label class="check"><input type="checkbox" name="noVive" ${u.noVive ? 'checked' : ''}><span><b>No vive en el lote</b> (propietario a distancia: ve expensas, votaciones y comunicados; no el día a día)</span></label>` : ''}
+    <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
+    <div class="btns" style="margin-top:10px"><button class="btn btn-sec" data-a="nueva-clave" data-id="${u.id}">${I('key')}Nueva clave</button><button class="btn btn-danger-soft" data-a="baja-vecino" data-id="${u.id}">${I('trash')}Dar de baja</button></div>`);
+};
+F['gestionar-vecino'] = (d, form) => { Store.cambiar(s => { const x = s.users.find(z => z.id === form.dataset.id); Object.assign(x, { casa:d.casa.trim(), rol:d.rol, email:d.email.trim().toLowerCase() });
+  if ('relacion' in d){ const antes = x.relacion; x.relacion = d.relacion; x.noVive = !!d.noVive && (d.relacion === 'propietario' || d.relacion === 'cotitular'); if (antes !== 'inquilino' && d.relacion === 'inquilino') avisoLoteAlquilado(s, x, true); x.representante = !!d.representante; if (x.poderFoto) x.poderOk = !!d.poderOk;
+    /* Un solo representante por lote. */
+    if (x.representante) s.users.forEach(o => { if (o.id !== x.id && o.casa === x.casa && o.representante) o.representante = false; }); } auditar(s, 'Editó un vecino', `${x.nombre} · ${x.casa} · ${x.rol}`, x.id); }); cerrarHoja(); toast('Guardado', 'check'); };
+A['nueva-clave'] = el => { const c = generarClave(); Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); x.clave = c; auditar(s, 'Generó una clave nueva', x.nombre, x.id); }); hoja('Clave nueva', `<div class="codigo-grande">${c}</div><button class="btn btn-sec btn-block" data-a="copiar" data-v="${c}">${I('copy')}Copiar</button>`); };
+A['baja-vecino'] = async el => {
+  if (!await confirmar('Dar de baja', 'Se borran sus datos personales, sus mensajes privados y sus pases. Lo que publicó en el pizarrón queda sin nombre.', { si:'Dar de baja', peligro:true })) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === el.dataset.id); auditar(s, 'Dio de baja a un vecino', `${x.nombre} · ${x.casa}`, x.id); avisoLoteAlquilado(s, { ...x, estado:'baja' }, false);
+    /* Si estuvo de guardia o de policía (una prueba), no sale más en el informe semanal de la policía (js/informe-policia.js). */
+    if (typeof ipMarcaFuera === 'function' && ipNombreUsado(x.nombre)) ipMarcaFuera(s, x.nombre, 'se dio de baja la cuenta');
+    s.privados = s.privados.filter(h => h.userId !== x.id); s.pases = s.pases.filter(p => p.hostId !== x.id); s.users = s.users.filter(z => z.id !== x.id); });
+  cerrarHoja(); toast('Vecino dado de baja', 'trash');
+};
+/* Traspaso de la Administración. Se puede quedar más de un administrador; lo
+   que no se puede es dejar el barrio sin ninguno. */
+A['pasar-admin'] = () => {
+  const yoId = yo().id;
+  const gente = Store.s.users.filter(u => u.estado === 'aprobado' && u.id !== yoId).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  if (!gente.length){ toast('Todavía no hay otra cuenta aprobada en el barrio', 'users'); return; }
+  hoja('Pasar la Administración', `<form data-f="pasar-admin">
+    <p class="muted small" style="margin:0 0 12px">La persona que elijas pasa a tener el panel completo: inscripciones, datos del barrio, reclamos, expensas y auditoría.</p>
+    <div class="field"><label>¿A quién?</label><select name="id" required>${gente.map(u => `<option value="${u.id}">${esc(u.nombre)} · ${esc(u.casa)}${u.rol !== 'vecino' ? ' (' + u.rol + ')' : ''}</option>`).join('')}</select></div>
+    <label class="check"><input type="checkbox" name="dejar"><span>Además, dejo de ser Administración y paso a ser vecino/a de mi lote</span></label>
+    <button class="btn btn-pri btn-block" style="margin-top:12px">${I('key')}Pasar la Administración</button>
+    <p class="muted tiny" style="margin:10px 0 0">Queda asentado en la auditoría, con fecha y hora.</p></form>`);
+};
+F['pasar-admin'] = async d => {
+  const yoId = yo().id, nuevo = usuario(d.id);
+  if (!nuevo) return;
+  if (!await confirmar('Pasar la Administración', `${esc(nuevo.nombre)} va a poder administrar todo el barrio${d.dejar ? ', y vos pasás a ser vecino/a' : ''}.`, { si:'Sí, pasarla' })) return;
+  Store.cambiar(s => {
+    const n = s.users.find(x => x.id === d.id);
+    n.rol = 'admin'; n.estado = 'aprobado';
+    if (d.dejar){
+      const quedan = s.users.filter(x => x.rol === 'admin' && x.id !== yoId).length;
+      if (quedan >= 1) s.users.find(x => x.id === yoId).rol = 'vecino';
+    }
+    notificar(s, { para:d.id, titulo:'Ahora sos Administración del barrio', texto:'Ya tenés el panel completo en la app.', icon:'shield', color:'accent', link:'admin', sonido:true });
+    auditar(s, 'Pasó la Administración', `${nuevo.nombre} (${nuevo.casa})${d.dejar ? ' · quien la pasó quedó como vecino' : ''}`, d.id);
+  });
+  cerrarHoja();
+  toast(`${nuevo.nombre.split(' ')[0]} ya es Administración`, 'shield');
+  if (d.dejar) pintar();
+};
+/* =========================================================
+   ALTA HECHA POR LA ADMINISTRACIÓN (pedido de Claudio, 08-10-2026)
+   Muchos dueños son mayores y no van a inscribirse ni "autorizar" a nadie.
+   La Administración, que conoce a cada uno, crea la cuenta: nombre, DNI,
+   lote, qué es del lote, correo y teléfono. Queda aprobada al instante, con
+   una contraseña provisoria que se le manda por WhatsApp o correo. Si es un
+   inquilino, el lote queda alquilado solo (y el dueño se entera). La
+   primera vez que entra, acepta los términos y puede elegir su contraseña.
+   ========================================================= */
+const claveProvisoria = () => { const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; const r = new Uint32Array(6); crypto.getRandomValues(r);
+  return 'Cauquen-' + abc[r[0] % abc.length] + abc[r[1] % abc.length] + [2, 3, 4, 5].map(i => r[i] % 10).join(''); };
+A['alta-vecino'] = () => {
+  if (!esAdmin()) return;
+  hoja('Dar de alta a un vecino', `<form data-f="alta-vecino">
+    <div class="field"><label>Nombre y apellido</label><input name="nombre" required maxlength="60"></div>
+    <div class="grid2"><div class="field"><label>DNI</label><input name="dni" required inputmode="numeric" maxlength="11"></div>
+      <div class="field"><label>Lote</label><select name="casa" required><option value="">Elegí…</option>${LOTES.map(l => `<option value="Lote ${l.lote}">${esc(nombreLote(l))}${propietarioDe('Lote ' + l.lote) ? ' · ' + esc(propietarioDe('Lote ' + l.lote)) : ''}</option>`).join('')}</select></div></div>
+    <div class="field"><label>¿Qué es del lote?</label><select name="relacion">${Object.entries(RELACIONES).map(([k, t]) => `<option value="${k}" ${k === 'inquilino' ? 'selected' : ''}>${t}</option>`).join('')}</select>
+      <div class="ayuda">Inquilino/a: el día a día del lote pasa a ser suyo y el propietario ve solo lo de dueño.</div></div>
+    <label class="check"><input type="checkbox" name="noVive"><span>Es propietario y <b>no vive en el lote</b></span></label>
+    <div class="grid2"><div class="field"><label>Correo (para entrar)</label><input name="email" type="email" required maxlength="80"></div>
+      <div class="field"><label>Celular / WhatsApp</label><input name="tel" inputmode="tel" maxlength="20" placeholder="549 2901 …"></div></div>
+    <button class="btn btn-pri btn-block">${I('check')}Crear la cuenta</button></form>`);
+};
+F['alta-vecino'] = async d => {
+  if (!esAdmin()) return;
+  const email = String(d.email || '').trim().toLowerCase(), dni = soloDigitos(d.dni), nombre = String(d.nombre || '').trim();
+  if (dni.length < 7 || dni.length > 9){ toast('Revisá el DNI', 'alert'); return; }
+  if (!/^Lote\s/.test(d.casa || '') || !RELACIONES[d.relacion]){ toast('Elegí el lote y qué es del lote', 'alert'); return; }
+  if (Store.s.users.some(u => (u.email || '').toLowerCase() === email)){ toast('Ese correo ya tiene una cuenta en la app', 'alert'); return; }
+  const clave = claveProvisoria(), nube = typeof Nube !== 'undefined' && Nube.activa();
+  let id = 'u' + uid();
+  if (nube){ try { id = await Nube.crearCuentaAjena(email, clave); }
+    catch(e){ toast({ 'auth/email-already-in-use':'Ese correo ya tiene cuenta. Si es de esta persona, buscala en Vecinos.', 'auth/invalid-email':'El correo no es válido' }[e.code] || e.message, 'alert'); return; } }
+  let x;
+  Store.cambiar(s => {
+    x = { id, nombre, casa:d.casa, dni, email, tel:String(d.tel || '').trim(), rol:'vecino', estado:'aprobado', relacion:d.relacion, noVive:!!d.noVive && (d.relacion === 'propietario' || d.relacion === 'cotitular'),
+      altaPorAdmin:Date.now(), aprobadoAt:Date.now(), clave: nube ? '' : clave, createdAt:Date.now(), vehiculos:[], mascotas:[] };
+    s.users.push(x);
+    auditar(s, 'Dio de alta a un vecino', `${nombre} · ${d.casa} · ${RELACIONES[d.relacion]}`, id);
+    avisoLoteAlquilado(s, x, true);
+  });
+  const msg = `Hola ${nombre.split(' ')[0]}: la Administración te creó la cuenta de la app del barrio ${Store.s.config.nombre} (${d.casa}).\n\nEntrá en ${urlApp()}\nCorreo: ${email}\nContraseña provisoria: ${clave}\n\nLa primera vez te pide aceptar los términos y podés elegir tu propia contraseña.`;
+  Correo.enviar({ para:email, asunto:'Tu acceso a la app del barrio', tipo:'clave',
+    html:Correo.plantilla('Tu acceso a la app del barrio', `<p>Hola ${esc(nombre.split(' ')[0])}: la Administración te creó la cuenta para <b>${esc(d.casa)}</b>.</p><p>Correo: <b>${esc(email)}</b><br>Contraseña provisoria: <b style="font-family:monospace;font-size:20px">${esc(clave)}</b></p><p>La primera vez te pide aceptar los términos y podés elegir tu propia contraseña.</p>`, { texto:'Entrar a la app', url:urlApp() }) });
+  hoja('Cuenta creada', `${aviso('ok', 'check', `${esc(nombre)} ya puede entrar`, `${esc(d.casa)} · ${esc(RELACIONES[d.relacion])}${x.relacion === 'inquilino' ? ' · el lote quedó alquilado' : ''}`)}
+    <p class="small" style="margin:0 0 6px">Correo: <b>${esc(email)}</b></p><div class="codigo-grande">${esc(clave)}</div>
+    <p class="muted small">Contraseña provisoria. También le mandamos un correo con estos datos.</p>
+    <div class="btns">${x.tel ? `<a class="btn btn-wa" href="${waLink(x.tel, msg)}" target="_blank" rel="noopener">${I('phone')}Mandárselo por WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar el mensaje</button></div>`);
+};
+A['alta-staff'] = () => hoja('Alta de personal', `<form data-f="alta-staff"><div class="field"><label>Nombre</label><input name="nombre" required></div>
+  <div class="grid2"><div class="field"><label>Rol</label><select name="rol"><option value="guardia">Guardia</option><option value="admin">Administración</option></select></div><div class="field"><label>DNI</label><input name="dni" inputmode="numeric"></div></div>
+  <div class="field"><label>Email</label><input name="email" type="email" required></div><button class="btn btn-pri btn-block">Crear y generar clave</button></form>`);
+F['alta-staff'] = d => {
+  const clave = generarClave(d.rol === 'guardia' ? 'GAR' : 'ADM');
+  Store.cambiar(s => { s.users.push({ id:'u' + uid(), nombre:d.nombre.trim(), casa: d.rol === 'guardia' ? 'Garita' : 'Administración', dni:soloDigitos(d.dni), email:d.email.trim().toLowerCase(), rol:d.rol, estado:'aprobado', clave, createdAt:Date.now() });
+    auditar(s, 'Dio de alta personal', `${d.nombre} · ${d.rol}`); });
+  hoja('Cuenta creada', `<p class="small">Entra con <b>${esc(d.email)}</b> y esta clave:</p><div class="codigo-grande">${clave}</div><button class="btn btn-sec btn-block" data-a="copiar" data-v="${clave}">${I('copy')}Copiar</button>`);
+};
+A['correo-manual'] = el => {
+  const c = Store.s.correos.find(x => x.id === el.dataset.id); if (!c) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = c.html;
+  const texto = tmp.innerText.replace(/\n{3,}/g, '\n\n').trim();
+  window.open(`mailto:${encodeURIComponent(c.para)}?subject=${encodeURIComponent(c.asunto)}&body=${encodeURIComponent(texto)}`);
+  Store.cambiar(s => { const x = s.correos.find(z => z.id === c.id); x.estado = 'enviado'; x.manual = true; });
+};
+A['exportar'] = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(Store.s)], { type:'application/json' })); a.download = `bahia-cauquen-${hoyISO()}.json`; a.click(); };
+A['exportar-auditoria'] = () => {
+  const csv = 'fecha,accion,detalle,por\n' + Store.s.auditoria.map(x => [new Date(x.at).toISOString(), x.accion, x.detalle, autorVisible(x.por).nombre].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' })); a.download = `auditoria-${hoyISO()}.csv`; a.click();
+};
+document.addEventListener('change', async e => {
+  if (e.target.id === 'importarPadron' && e.target.files[0]){
+    const f = e.target.files[0];
+    try {
+      const { us, periodo } = leerPadron(await f.text(), f.name);
+      if (!us.length) throw new Error('No encontré ninguna unidad');
+      /* Lo que ya estaba cargado no se pierde: si la planilla nueva no trae
+         correo o teléfono de un lote, se conserva el que había. */
+      const antes = {}; Store.s.padron.forEach(x => antes[x.lote] = x);
+      const fusion = us.map(x => {
+        const v = antes[x.lote] || {};
+        return { ...v, ...Object.fromEntries(Object.entries(x).filter(([k, val]) => val !== '' && val !== 0 || v[k] === undefined)) };
+      });
+      const sinNombre = fusion.filter(x => !x.propietario).length;
+      Store.cambiar(s => {
+        s.padron = fusion;
+        s.padronPeriodo = periodo || s.padronPeriodo || '';
+        auditar(s, 'Importó el padrón de propietarios', `${fusion.length} unidades${periodo ? ' · ' + periodo : ''}`);
+      });
+      toast(`Padrón cargado: ${plural(fusion.length, 'unidad', 'unidades')}${sinNombre ? ` (${sinNombre} sin propietario)` : ''}`, 'check');
+      abrir('padron');
+    } catch(err){ toast('No pude leer ese archivo: ' + err.message, 'alert'); }
+    e.target.value = ''; return;
+  }
+  if (e.target.id !== 'importar' || !e.target.files[0]) return;
+  try { const j = JSON.parse(await e.target.files[0].text()); if (j.v !== 3 || !Array.isArray(j.users)) throw 0;
+    if (!await confirmar('Restaurar copia', 'Se reemplazan todos los datos de este equipo por los de la copia.', { si:'Restaurar', peligro:true })) return;
+    Store.s = j; migrar(Store.s); Store.guardar(); Store.avisar(false); toast('Copia restaurada', 'upload');
+  } catch(err){ toast('Ese archivo no es una copia válida', 'alert'); }
+});
+A['reiniciar'] = async () => {
+  if (!await confirmar('Reiniciar datos', 'Se borra todo lo de este equipo y vuelve la demo.', { si:'Reiniciar', peligro:true })) return;
+  const quien = Store.sesion.userId;
+  Store.s = seed(); migrar(Store.s); Store.guardar();
+  if (!Store.s.users.find(u => u.id === quien)) Store.sesion.userId = null;
+  Store.guardarSesion(); PILA.length = 0; $('#app').innerHTML = ''; pintar();
+};
+
+/* =========================================================
+   PADRÓN DE PROPIETARIOS
+   -------------------------------------------------------
+   El padrón llega de la liquidación de expensas: puede venir como JSON
+   (el que arma la app) o como CSV, que es lo que sale de guardar el Excel
+   de la administración con "Guardar como → CSV". Una vez cargado, se puede
+   buscar por apellido, nombre, lote, UF, calle, DNI, correo o teléfono, y
+   cada ficha muestra la cuenta de expensas de ese lote y si el propietario
+   ya tiene cuenta en la app.
+   ========================================================= */
+
+/* Nombres de columna que se aceptan, en el orden en que se prueban. */
+const COLS_PADRON = {
+  uf:          ['uf','unidad','unidad funcional','u.f.','ufunc'],
+  lote:        ['lote','lotes','nro lote','numero de lote','n° lote'],
+  propietario: ['propietario','titular','apellido y nombre','apellido y nombres','nombre y apellido','nombre','razon social','razón social'],
+  dni:         ['dni','documento','cuit','cuil','dni/cuit'],
+  direccion:   ['direccion','dirección','domicilio','calle','domicilio real','calle y numero','calle y número'],
+  email:       ['email','e-mail','correo','mail','correo electronico','correo electrónico'],
+  tel:         ['tel','telefono','teléfono','celular','cel','whatsapp','movil','móvil'],
+  coef:        ['coef','coeficiente','porcentaje','%','prorrateo'],
+  deuda:       ['deuda','saldo','saldo anterior','deuda anterior'],
+  expensas:    ['expensas','expensa','importe','total','total cupon','total cupón','monto'],
+};
+const sinAcentos = t => String(t ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+const numeroAR = v => {
+  const t = String(v ?? '').replace(/[^\d,.\-]/g, '');
+  if (!t) return 0;
+  /* 1.234.567,89 (argentino) contra 1,234,567.89 (inglés): manda el último separador. */
+  const coma = t.lastIndexOf(','), punto = t.lastIndexOf('.');
+  const limpio = coma > punto ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+  return parseFloat(limpio) || 0;
+};
+
+/* Una línea de CSV, respetando las comillas y los ; o , como separador. */
+function filasCSV(texto){
+  const sep = (texto.split('\n')[0].match(/;/g) || []).length > (texto.split('\n')[0].match(/,/g) || []).length ? ';' : ',';
+  const filas = []; let campo = '', fila = [], enComillas = false;
+  for (let i = 0; i < texto.length; i++){
+    const c = texto[i];
+    if (enComillas){
+      if (c === '"' && texto[i + 1] === '"'){ campo += '"'; i++; }
+      else if (c === '"') enComillas = false;
+      else campo += c;
+    } else if (c === '"') enComillas = true;
+    else if (c === sep){ fila.push(campo); campo = ''; }
+    else if (c === '\n'){ fila.push(campo); filas.push(fila); fila = []; campo = ''; }
+    else if (c !== '\r') campo += c;
+  }
+  if (campo || fila.length){ fila.push(campo); filas.push(fila); }
+  return filas.filter(f => f.some(x => String(x).trim()));
+}
+
+/* De un archivo (JSON o CSV) a la lista de unidades del padrón. */
+function leerPadron(texto, nombreArchivo = ''){
+  let periodo = '';
+  if (/^\s*[\{\[]/.test(texto)){
+    const j = JSON.parse(texto);
+    const lista = j.unidades || j.padron || (Array.isArray(j) ? j : null);
+    if (!Array.isArray(lista)) throw new Error('El JSON no trae una lista de unidades');
+    return { us: lista.map(normalizarUnidad), periodo: j.periodo || '' };
+  }
+  const filas = filasCSV(texto);
+  if (filas.length < 2) throw new Error('El CSV no tiene filas');
+  /* La fila de encabezados puede no ser la primera: se busca la que tenga "lote". */
+  let iCab = filas.findIndex(f => f.some(c => COLS_PADRON.lote.includes(sinAcentos(c))));
+  if (iCab < 0) iCab = 0;
+  const cab = filas[iCab].map(sinAcentos);
+  const indice = {};
+  for (const clave in COLS_PADRON){
+    const i = cab.findIndex(c => COLS_PADRON[clave].includes(c));
+    if (i >= 0) indice[clave] = i;
+  }
+  if (indice.lote === undefined) throw new Error('No encontré la columna "Lote"');
+  const m = nombreArchivo.match(/(20\d\d)[-_ ]?(0[1-9]|1[0-2])/);
+  if (m) periodo = m[1] + '-' + m[2];
+  const us = filas.slice(iCab + 1).map(f => {
+    const g = k => indice[k] === undefined ? '' : String(f[indice[k]] ?? '').trim();
+    return normalizarUnidad({ uf:g('uf'), lote:g('lote'), propietario:g('propietario'), dni:g('dni'),
+      direccion:g('direccion'), email:g('email'), tel:g('tel'),
+      coef:numeroAR(g('coef')), deuda:numeroAR(g('deuda')), expensas:numeroAR(g('expensas')) });
+  }).filter(x => x.lote);
+  return { us, periodo };
+}
+function normalizarUnidad(x){
+  const lote = String(x.lote ?? '').trim().replace(/^lote\s*/i, '');
+  const L = typeof LOTES !== 'undefined' ? LOTES.find(l => l.lote.toUpperCase() === lote.toUpperCase()) : null;
+  return {
+    id: 'lote-' + lote,
+    uf: String(x.uf || L?.uf || lote).trim(),
+    lote,
+    propietario: String(x.propietario || '').trim(),
+    dni: soloDigitos(x.dni || ''),
+    direccion: String(x.direccion || x.calle || '').trim(),
+    email: String(x.email || '').trim().toLowerCase(),
+    tel: String(x.tel || '').trim(),
+    coef: +x.coef || L?.coef || 0,
+    deuda: +x.deuda || 0,
+    expensasAgosto: +x.expensas || +x.expensasAgosto || 0,
+  };
+}
+
+/* Todo lo que se puede escribir en el buscador para encontrar una unidad. */
+const textoPadron = p => sinAcentos([p.propietario, 'lote ' + p.lote, p.lote, 'uf ' + p.uf, p.uf, p.direccion, p.dni, p.email, p.tel].join(' '));
+function buscarPadron(q){
+  const ps = Store.s.padron.slice().sort((a, b) => String(a.lote).localeCompare(String(b.lote), 'es', { numeric:true }));
+  const palabras = sinAcentos(q).split(/\s+/).filter(Boolean);
+  if (!palabras.length) return ps;
+  return ps.filter(p => { const t = textoPadron(p); return palabras.every(w => t.includes(w)); });
+}
+const cuentaDeApp = p => Store.s.users.find(u => u.estado === 'aprobado' && (u.casa === 'Lote ' + p.lote || (p.email && (u.email || '').toLowerCase() === p.email)));
+
+R.padron = {
+  titulo: 'Padrón de propietarios', icon: 'users', color: 'brand', ancha: true,
+  sub: 'Buscá por apellido, nombre, lote, UF, calle, DNI, correo o teléfono',
+  render(q){
+    if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
+    const s = Store.s;
+    if (!s.padron.length) return `${aviso('warn', 'upload', 'Todavía no cargaste el padrón',
+      'Sin padrón, la app conoce los 152 lotes y sus coeficientes pero no sabe de quién es cada uno. Se carga una sola vez y se actualiza cuando cambia un propietario.')}
+      ${cajaImportarPadron()}
+      ${superficie({ a:'padron-modelo', icon:'download', color:'sky', t:'Bajar el modelo de planilla', s:'Un CSV con las columnas que espera la app, ya con los 152 lotes' })}
+      ${sec('Guía del barrio')}${cajaImportarGuia()}${botonCorregirGuia()}`;
+    const ls = buscarPadron(q || '');
+    const conCuenta = s.padron.filter(cuentaDeApp).length;
+    const conMail = s.padron.filter(p => p.email).length;
+    return `<form data-f="buscar-padron" class="linea-form" style="margin-bottom:12px">
+        <input name="q" id="qPadron" value="${esc(q || '')}" placeholder="Ej: Pérez, Lote 42, Los Ñires, 27123456, @gmail"><button class="btn btn-pri">${I('search')}</button></form>
+      <div class="garita-kpis"><div class="kpi"><b>${s.padron.length}</b><span>Unidades</span></div>
+        <div class="kpi"><b>${conCuenta}</b><span>Con cuenta en la app</span></div>
+        <div class="kpi"><b>${conMail}</b><span>Con correo cargado</span></div></div>
+      ${s.padronPeriodo ? `<div class="card plana small">${I('info')} Cargado de la liquidación de <b>${esc(nombrePeriodo(s.padronPeriodo))}</b>.</div>` : ''}
+      <div class="muted small" style="margin:0 2px 8px">${plural(ls.length, 'unidad', 'unidades')}${q ? ' que coinciden' : ''}</div>
+      ${ls.slice(0, 200).map(p => { const u = cuentaDeApp(p), saldo = saldoLote('Lote ' + p.lote);
+        return `<button class="superficie" data-a="ficha-lote" data-v="${esc(p.lote)}">
+          <span class="ic ic-${saldo > .5 ? 'danger' : u ? 'ok' : 'brand'}">${I(u ? 'user' : 'home')}</span>
+          <span class="txt"><b>${esc(p.propietario || 'Sin propietario cargado')}</b>
+            <small>Lote ${esc(p.lote)} · UF ${esc(p.uf)}${p.direccion ? ' · ' + esc(p.direccion) : ''}${u ? ' · tiene cuenta' : ''}${saldo > .5 ? ' · debe ' + plata(saldo) : ''}</small></span>${I('right')}</button>`;
+      }).join('') || vacio('search', 'Nadie coincide con esa búsqueda.')}
+      ${ls.length > 200 ? `<p class="muted small center">Se muestran las primeras 200. Afiná la búsqueda.</p>` : ''}
+      ${sec('Mantenimiento')}
+      ${cajaImportarPadron()}
+      ${superficie({ a:'exportar-padron', icon:'download', color:'sky', t:'Descargar el padrón (CSV)', s:'Para editarlo en Excel y volver a subirlo' })}
+      ${sec('Guía del barrio')}
+      <p class="muted small" style="margin:0 2px 8px">Quién vive en cada lote (propietario o inquilino) y sus teléfonos. La garita la usa en "Buscar un vecino". El padrón de arriba es el de expensas: lo ve solo la Administración.</p>
+      ${cajaImportarGuia()}
+      ${botonCorregirGuia()}
+      ${aLista(Store.s.guia).length ? superficie({ a:'exportar-guia', icon:'download', color:'sky', t:'Descargar la guía (CSV)', s:'Para corregirla en Excel y volver a subirla · tiene teléfonos' }) : ''}`;
+  },
+};
+/* En modo Administración no hay otra puerta al buscador de Vecinos, que es
+   donde está "Editar" de cada lote (09-10-2026: cambio de dueños del Lote 51). */
+const botonCorregirGuia = () => aLista(Store.s.guia).length ? superficie({ a:'abrir', v:'vecinos', icon:'edit', color:'brand', t:'Corregir un lote de la guía', s:'Buscalo por número, apellido o calle y tocá "Editar": quién vive y sus teléfonos' }) : '';
+const cajaImportarPadron = () => `<label class="superficie acento"><span class="ic">${I('upload')}</span>
+  <span class="txt"><b>${Store.s.padron.length ? 'Actualizar el padrón' : 'Cargar el padrón'}</b>
+  <small>Archivo CSV (Excel → Guardar como CSV) o JSON. Los nombres quedan solo en la base del barrio.</small></span>
+  <input type="file" accept=".csv,.json,text/csv,application/json" id="importarPadron" hidden></label>`;
+F['buscar-padron'] = d => abrir('padron', d.q || '');
+
+A['ficha-lote'] = el => {
+  const lote = el.dataset.v, p = Store.s.padron.find(x => x.lote === lote) || { lote };
+  const u = cuentaDeApp(p), cuenta = cuentaLote('Lote ' + lote), L = typeof LOTES !== 'undefined' ? LOTES.find(l => l.lote === lote) : null;
+  const dato = (t, v, accion = '') => v ? `<div class="it"><div class="txt"><b>${t}</b><span>${esc(v)}</span></div>${accion}</div>` : '';
+  hoja(`Lote ${esc(lote)}`, `
+    <div class="card" style="margin-bottom:10px"><b style="font-size:17px">${esc(p.propietario || 'Sin propietario cargado')}</b>
+      <div class="muted small">UF ${esc(p.uf || '—')}${L ? ` · coeficiente ${L.coef.toFixed(4)} %` : ''}${L?.grupo && L.grupo !== 'vecino' ? ` · ${L.grupo}` : ''}</div></div>
+    <div class="card lista">
+      ${dato('Dirección', p.direccion)}
+      ${dato('DNI / CUIT', p.dni)}
+      ${dato('Correo', p.email, p.email ? `<button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(p.email)}">${I('copy')}</button>` : '')}
+      ${dato('Teléfono', p.tel, p.tel ? `<a class="btn btn-xs btn-wa" href="${waLink(p.tel)}" target="_blank" rel="noopener">${I('phone')}</a>` : '')}
+      <div class="it"><div class="txt"><b>Cuenta en la app</b><span>${u ? esc(u.nombre) + ' · ' + esc(u.email) : 'Todavía no tiene'}</span></div></div>
+      <div class="it"><div class="txt"><b>Saldo de expensas</b><span>${cuenta.movs.length ? plural(cuenta.movs.length, 'movimiento') : 'sin movimientos'}</span></div>
+        <b class="num" style="color:${cuenta.saldo > .5 ? 'var(--danger)' : 'var(--ok)'}">${plata(Math.max(0, cuenta.saldo))}</b></div>
+    </div>
+    <div class="btns">
+      <button class="btn btn-sm btn-sec" data-a="ver-cuenta" data-v="Lote ${esc(lote)}">${I('eye')}Ver la cuenta</button>
+      ${cuenta.saldo > .5 ? `<button class="btn btn-sm btn-sec" data-a="certificado-deuda" data-v="Lote ${esc(lote)}">${I('file')}Certificado</button>` : ''}
+      ${u ? `<button class="btn btn-sm btn-pri" data-a="gestionar-vecino" data-id="${u.id}">${I('user')}Su cuenta</button>`
+          : p.email ? `<button class="btn btn-sm btn-pri" data-a="invitar-propietario" data-v="${esc(lote)}">${I('mail')}Invitarlo a la app</button>` : ''}
+      <button class="btn btn-sm btn-sec" data-a="editar-lote" data-v="${esc(lote)}">${I('edit')}Editar</button>
+    </div>`);
+};
+A['editar-lote'] = el => {
+  const p = Store.s.padron.find(x => x.lote === el.dataset.v) || { lote:el.dataset.v };
+  hoja(`Editar Lote ${esc(p.lote)}`, `<form data-f="editar-lote" data-v="${esc(p.lote)}">
+    <div class="field"><label>Propietario</label><input name="propietario" value="${esc(p.propietario || '')}" maxlength="80"></div>
+    <div class="grid2"><div class="field"><label>UF</label><input name="uf" value="${esc(p.uf || '')}"></div>
+      <div class="field"><label>DNI / CUIT</label><input name="dni" inputmode="numeric" value="${esc(p.dni || '')}"></div></div>
+    <div class="field"><label>Dirección dentro del barrio</label><input name="direccion" value="${esc(p.direccion || '')}" placeholder="Ej: Los Ñires 3333, calle 3"></div>
+    <div class="grid2"><div class="field"><label>Correo</label><input name="email" type="email" value="${esc(p.email || '')}"></div>
+      <div class="field"><label>Teléfono</label><input name="tel" inputmode="tel" value="${esc(p.tel || '')}"></div></div>
+    <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`);
+};
+F['editar-lote'] = (d, form) => {
+  const lote = form.dataset.v;
+  Store.cambiar(s => {
+    const i = s.padron.findIndex(x => x.lote === lote);
+    const base = i >= 0 ? s.padron[i] : normalizarUnidad({ lote });
+    const nuevo = { ...base, ...d, dni:soloDigitos(d.dni), email:(d.email || '').trim().toLowerCase() };
+    if (i >= 0) s.padron[i] = nuevo; else s.padron.push(nuevo);
+    auditar(s, 'Editó el padrón', `Lote ${lote} · ${d.propietario || ''}`);
+  });
+  cerrarHoja(); toast('Guardado', 'check');
+};
+A['invitar-propietario'] = async el => {
+  const p = Store.s.padron.find(x => x.lote === el.dataset.v);
+  if (!p || !p.email){ toast('Ese lote no tiene correo cargado', 'alert'); return; }
+  const salio = await Correo.enviar({ para:p.email, asunto:`Te invitamos a la app del barrio ${Store.s.config.nombre}`, tipo:'invitacion',
+    html:Correo.plantilla('La app del barrio', `<p>Hola${p.propietario ? ' ' + esc(p.propietario.split(',')[0].split(' ')[0]) : ''}: ya está andando la app del barrio <b>${esc(Store.s.config.nombre)}</b>.</p>
+      <p>Con ella autorizás visitas con QR, les escribís en privado a tus vecinos, ves tus expensas y recibís los avisos de la guardia. Tu lote es el <b>${esc(p.lote)}</b>.</p>
+      <p>Para entrar, inscribite con este enlace y la Administración te habilita.</p>`, { texto:'Inscribirme', url:urlApp() }) });
+  cerrarHoja();
+  toast(salio ? 'Invitación enviada' : 'Quedó en la bandeja de salida de Correos', salio ? 'mail' : 'clock');
+};
+A['exportar-padron'] = () => {
+  const cab = ['uf','lote','propietario','dni','direccion','email','tel','coef','deuda'];
+  const csv = cab.join(';') + '\n' + Store.s.padron.map(p => cab.map(k => `"${String(p[k] ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }));
+  a.download = `padron-${Store.s.config.nombre.toLowerCase().replace(/\s+/g, '-')}-${hoyISO()}.csv`; a.click();
+};
+A['padron-modelo'] = () => {
+  const cab = ['uf','lote','propietario','dni','direccion','email','tel','coef','deuda'];
+  const filas = LOTES.map(L => [L.uf, L.lote, '', '', '', '', '', L.coef, 0]);
+  const csv = cab.join(';') + '\n' + filas.map(f => f.map(v => `"${v}"`).join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }));
+  a.download = 'modelo-padron-bahia-cauquen.csv'; a.click();
+  toast('Completá la columna "propietario" y volvé a subirlo', 'download');
+};
+
+/* =========================================================
+   LA GUÍA DEL BARRIO: CARGARLA, BAJARLA Y CORREGIRLA (08-10-2026)
+   Es la planilla que salió del LISTADO GENERAL (datos-privados/guia-…csv):
+   lote; estado (casa, baldío, hotel, cabaña); propietarios; alquila;
+   inquilinos; cabaña; teléfonos ("Sr.: 15489595 | Sra.: 15610304"); nota.
+   Se puede abrir en Excel, corregir y volver a subir: la nueva reemplaza a
+   la anterior. Los nombres van a /barrio/guia (los ven los vecinos) y los
+   teléfonos y la nota a /staff/telefonos (solo garita, Administración y
+   supervisión).
+   ========================================================= */
+const COLS_GUIA = { lote:['lote'], estado:['estado'], propietarios:['propietarios', 'propietario'], alquila:['alquila', 'alquilado'],
+  inquilinos:['inquilinos', 'inquilino'], cabana:['cabana', 'cabana nº', 'cabana n'], telefonos:['telefonos', 'telefono', 'tel'], nota:['nota', 'notas'] };
+const partirNombres = t => String(t || '').split(/\s+\/\s+/).map(x => x.trim()).filter(Boolean);
+const partirTels = t => String(t || '').split(/\s*[|\n]\s*/).map(x => x.trim()).filter(Boolean).map(x => {
+  const m = x.match(/^(.*?):\s*([\d\s\-+()]+)$/);
+  return m ? { de:m[1].trim(), n:soloDigitos(m[2]) } : { de:'', n:soloDigitos(x) }; }).filter(t => t.n);
+const estadoGuia = t => { const e = sinAcentos(t); return /baldi|valdi/.test(e) ? 'baldio' : /caban/.test(e) ? 'cabana' : /hotel/.test(e) ? 'hotel' : 'casa'; };
+const telsTexto = ts => aLista(ts).map(t => (t.de ? t.de + ': ' : '') + t.n).join(' | ');
+function leerGuia(texto){
+  const filas = filasCSV(String(texto).replace(/^﻿/, ''));
+  const iCab = filas.findIndex(f => f.some(c => sinAcentos(c) === 'lote'));
+  if (iCab < 0) throw new Error('No encontré la columna "lote"');
+  const cab = filas[iCab].map(sinAcentos), ix = {};
+  for (const k in COLS_GUIA){ const i = cab.findIndex(c => COLS_GUIA[k].includes(c)); if (i >= 0) ix[k] = i; }
+  if (ix.propietarios === undefined) throw new Error('No encontré la columna "propietarios"');
+  const malos = [], out = [];
+  filas.slice(iCab + 1).forEach(f => {
+    const g = k => ix[k] === undefined ? '' : String(f[ix[k]] ?? '').trim();
+    const lote = g('lote').replace(/^lote\s*/i, '').toUpperCase();
+    if (!lote) return;
+    if (!LOTES.some(L => L.lote.toUpperCase() === lote)){ malos.push(lote); return; }
+    const L = LOTES.find(x => x.lote.toUpperCase() === lote);
+    const inq = partirNombres(g('inquilinos'));
+    out.push({ guia:{ id:'lote-' + L.lote, lote:L.lote, estado:estadoGuia(g('estado')), propietarios:partirNombres(g('propietarios')),
+      alquila: /^s/i.test(g('alquila')) || inq.length > 0, inquilinos:inq, cabana:g('cabana') },
+      /* Teléfonos y nota van a /staff: no los leen los vecinos. */
+      tels:{ id:'lote-' + L.lote, lote:L.lote, tels:partirTels(g('telefonos')), nota:g('nota') } });
+  });
+  if (!out.length) throw new Error('No encontré ningún lote');
+  return { out, malos };
+}
+const cajaImportarGuia = () => `<label class="superficie ${aLista(Store.s.guia).length ? '' : 'acento'}"><span class="ic ic-sky">${I('pin')}</span>
+  <span class="txt"><b>${aLista(Store.s.guia).length ? 'Actualizar la guía del barrio' : 'Cargar la guía del barrio'}</b>
+  <small>Quién vive en cada lote y sus teléfonos (el CSV hecho con el LISTADO GENERAL). Los teléfonos los ven solo la garita, la Administración y la supervisión.</small></span>
+  <input type="file" accept=".csv,text/csv" id="importarGuia" hidden></label>`;
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'importarGuia' || !e.target.files[0]) return;
+  const f = e.target.files[0];
+  try {
+    if (!esAdmin()) throw new Error('solo la Administración carga la guía');
+    const { out, malos } = leerGuia(await f.text());
+    const nTels = out.reduce((n, x) => n + x.tels.tels.length, 0);
+    if (aLista(Store.s.guia).length && !await confirmar('Reemplazar la guía', `La guía nueva trae ${plural(out.length, 'lote')} y ${plural(nTels, 'teléfono')}. Reemplaza a la que está cargada.`, { si:'Reemplazar' })) { e.target.value = ''; return; }
+    if (typeof Nube !== 'undefined' && Nube.enviado){ delete Nube.enviado['barrio/guia']; delete Nube.enviado['staff/telefonos']; }
+    Store.cambiar(s => {
+      s.guia = out.map(x => ({ ...x.guia, at:Date.now() }));
+      s.telefonos = out.filter(x => x.tels.tels.length || x.tels.nota).map(x => ({ ...x.tels, at:Date.now() }));
+      auditar(s, 'Cargó la guía del barrio', `${out.length} lotes · ${nTels} teléfonos`);
+    });
+    resultadoGuia(out.length, nTels, malos);
+  } catch(err){ hoja('No se cargó la guía', `${aviso('danger', 'alert', 'No pude leer el archivo', esc(err.message) + '. Revisá que sea el CSV de la guía (guia-del-barrio-….csv) y probá de nuevo.')}
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`); }
+  e.target.value = '';
+});
+/* "NO SÉ SI SE CARGÓ" (Claudio, 09-10-2026): antes salía un cartelito de
+   3 segundos y la app saltaba a Vecinos, y no se veía. Ahora queda una
+   ventana abierta que dice cuántos lotes y teléfonos leyó y espera la
+   respuesta de la base del barrio: "Guardada" o qué falló y qué hacer. */
+function resultadoGuia(nLotes, nTels, malos){
+  const datos = `<div class="garita-kpis"><div class="kpi"><b>${nLotes}</b><span>${nLotes === 1 ? 'Lote' : 'Lotes'}</span></div><div class="kpi"><b>${nTels}</b><span>${nTels === 1 ? 'Teléfono' : 'Teléfonos'}</span></div></div>
+    ${malos.length ? aviso('warn', 'alert', 'Algunos lotes no existen y no se cargaron', esc(malos.join(', '))) : ''}`;
+  const pie = `<div class="btns" style="margin-top:14px"><button class="btn btn-sec" data-a="cerrar-hoja">Cerrar</button>
+    <button class="btn btn-pri grow" data-a="guia-ver-vecinos">${I('search')}Ver la guía</button></div>`;
+  const mostrar = estado => { if (!hojaAbierta() || $('#hojaTitulo').textContent !== 'Guía del barrio') return;
+    $('#hojaCuerpo').innerHTML = estado + datos + pie; };
+  const nube = typeof Nube !== 'undefined' && Nube.activa();
+  hoja('Guía del barrio', '');
+  if (!nube){ mostrar(aviso('ok', 'check', 'Guía cargada en este equipo', 'Estás probando sin la base del barrio: los demás no la ven.')); return; }
+  mostrar(`<div class="card plana" style="margin-bottom:12px;display:flex;align-items:center;gap:12px"><div class="cargando" style="margin:0"><span></span><span></span><span></span></div>Guardando en la base del barrio…</div>`);
+  const env = Nube.enviado || {}, esperar = ['barrio/guia', 'staff/telefonos'].map(g => env[g]).filter(Boolean);
+  const tope = new Promise(r => setTimeout(() => r({ ok:false, msg:'tiempo' }), 20000));
+  Promise.race([Promise.all(esperar).then(rs => rs.find(r => !r.ok) || { ok:true }), tope]).then(r => {
+    if (r.ok) mostrar(aviso('ok', 'check', 'Listo: la guía quedó guardada', 'La garita, la Administración y la supervisión ya la ven en "Buscar un vecino". Los teléfonos no los ven los vecinos.'));
+    else if (r.msg === 'tiempo') mostrar(aviso('warn', 'clock', 'Todavía no hay respuesta de la base', 'Puede ser la conexión. La guía queda en este equipo y se manda sola cuando vuelva internet. Mirá en un rato en "Buscar un vecino".'));
+    else mostrar(aviso('danger', 'alert', 'La base del barrio no la aceptó', /permission/i.test(r.msg) ? 'Faltan publicar las reglas nuevas de Firebase (reglas-firebase.txt). Publicalas y volvé a cargar el archivo.' : esc(r.msg)));
+  });
+}
+A['guia-ver-vecinos'] = () => { cerrarHoja(); abrir('vecinos'); };
+A['exportar-guia'] = () => {
+  if (!esAdmin()) return;
+  const cab = ['lote', 'estado', 'propietarios', 'alquila', 'inquilinos', 'cabana', 'telefonos', 'nota'];
+  const est = { casa:'casa', baldio:'baldío', hotel:'hotel', cabana:'cabaña' };
+  const filas = LOTES.map(L => { const g = guiaDe(L.lote) || {};
+    return [L.lote, est[g.estado] || '', aLista(g.propietarios).join(' / '), g.alquila ? 'sí' : '', aLista(g.inquilinos).join(' / '), g.cabana || '', telsTexto(telsDe(L.lote)), notaDe(L.lote)]; });
+  const csv = cab.join(';') + '\n' + filas.map(f => f.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' }));
+  a.download = `guia-del-barrio-${hoyISO()}.csv`; a.click();
+  toast('Bajó la guía. Tiene teléfonos: guardala en la carpeta de datos privados', 'download');
+};
+A['editar-guia'] = el => {
+  if (!esAdmin()) return;
+  const lote = el.dataset.v, g = guiaDe(lote) || { lote, estado:'casa' }, L = LOTES.find(x => x.lote === lote);
+  hoja(`Lote ${esc(lote)}${L?.dir ? ' · ' + esc(L.dir) : ''}`, `<form data-f="editar-guia" data-v="${esc(lote)}">
+    <div class="grid2"><div class="field"><label>Qué hay</label><select name="estado">${[['casa', 'Casa'], ['baldio', 'Baldío'], ['cabana', 'Cabaña del hotel'], ['hotel', 'Hotel']].map(([v, t]) => `<option value="${v}" ${g.estado === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Nº de cabaña</label><input name="cabana" value="${esc(g.cabana || '')}" maxlength="10"></div></div>
+    <div class="field"><label>Propietarios</label><input name="propietarios" value="${esc(aLista(g.propietarios).join(' / '))}" maxlength="200" placeholder="Nombre Apellido / Nombre Apellido"></div>
+    <div class="field"><label>Inquilinos (si está alquilado)</label><input name="inquilinos" value="${esc(aLista(g.inquilinos).join(' / '))}" maxlength="200" placeholder="Vacío si viven los dueños"></div>
+    <div class="field"><label>Teléfonos (uno por renglón)</label><textarea name="telefonos" rows="3" placeholder="Sr.: 15489595&#10;Casa: 446719">${esc(telsDe(lote).map(t => (t.de ? t.de + ': ' : '') + t.n).join('\n'))}</textarea>
+      <div class="ayuda">Los ven solo la garita, la Administración y la supervisión.</div></div>
+    <div class="field"><label>Nota (solo garita, Administración y supervisión)</label><input name="nota" value="${esc(notaDe(lote))}" maxlength="200"></div>
+    <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>`);
+};
+F['editar-guia'] = (d, form) => {
+  if (!esAdmin()) return;
+  const lote = form.dataset.v, inq = partirNombres(d.inquilinos), tels = partirTels(d.telefonos);
+  Store.cambiar(s => {
+    const g = { id:'lote-' + lote, lote, estado:d.estado || 'casa', propietarios:partirNombres(d.propietarios), alquila:inq.length > 0, inquilinos:inq,
+      cabana:(d.cabana || '').trim(), at:Date.now() };
+    const i = s.guia.findIndex(x => x && x.lote === lote); if (i >= 0) s.guia[i] = g; else s.guia.push(g);
+    const j = s.telefonos.findIndex(x => x && x.lote === lote);
+    const nota = (d.nota || '').trim();
+    if (tels.length || nota){ const t = { id:'lote-' + lote, lote, tels, nota, at:Date.now() }; if (j >= 0) s.telefonos[j] = t; else s.telefonos.push(t); }
+    else if (j >= 0) s.telefonos.splice(j, 1);
+    auditar(s, 'Editó la guía del barrio', `Lote ${lote}`);
+  });
+  cerrarHoja(); toast('Guardado', 'check');
+};
+
+
+/* =========================================================
+   CIRCULARES: la Administración le escribe a los vecinos
+   -------------------------------------------------------
+   El correo del barrio sale desde acá, con el membrete de la app y el pie
+   de la Ley 25.326. Se elige a quién y la app arma la lista sola.
+
+   Ojo con el tope de Gmail: una casilla común manda unos 100 por día. Por
+   eso la pantalla dice de antemano a cuántos va a salir, y si son muchos
+   los manda de a poco para que Google no los frene.
+   ========================================================= */
+const DESTINOS_CIRCULAR = {
+  vecinos:   { n:'Todos los vecinos con cuenta', d:'Los que ya entraron a la app',
+               lista: () => Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino' && u.email).map(u => ({ email:u.email, nombre:u.nombre, casa:u.casa })) },
+  padron:    { n:'Todos los propietarios del padrón', d:'Tengan cuenta o no',
+               lista: () => Store.s.padron.filter(p => p.email).map(p => ({ email:p.email, nombre:p.propietario, casa:'Lote ' + p.lote })) },
+  sinCuenta: { n:'Los que todavía no tienen cuenta', d:'Para invitarlos a usar la app',
+               lista: () => Store.s.padron.filter(p => p.email && !cuentaDeApp(p)).map(p => ({ email:p.email, nombre:p.propietario, casa:'Lote ' + p.lote })) },
+  morosos:   { n:'Los lotes con deuda', d:'Para el reclamo de expensas',
+               lista: () => (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => saldoLote('Lote ' + L.lote) > 0.5)
+                 .map(L => { const p = Store.s.padron.find(x => x.lote === L.lote) || {};
+                   const u = Store.s.users.find(z => z.casa === 'Lote ' + L.lote && z.estado === 'aprobado' && z.email);
+                   return { email:p.email || u?.email || '', nombre:p.propietario || u?.nombre || '', casa:'Lote ' + L.lote, saldo:saldoLote('Lote ' + L.lote) }; })
+                 .filter(x => x.email) },
+  staff:     { n:'Guardia y Administración', d:'El personal del barrio',
+               lista: () => Store.s.users.filter(u => u.estado === 'aprobado' && u.rol !== 'vecino' && u.email).map(u => ({ email:u.email, nombre:u.nombre, casa:u.casa })) },
+  uno:       { n:'Un lote en particular', d:'Elegís cuál', lista: () => [] },
+};
+A['circular'] = () => {
+  const cuentas = Object.fromEntries(Object.entries(DESTINOS_CIRCULAR).map(([k, D]) => [k, D.lista().length]));
+  hoja('Escribirles a los vecinos', `<form data-f="circular">
+    <div class="field"><label>¿A quiénes?</label>
+      <select name="destino" id="circDestino">${Object.entries(DESTINOS_CIRCULAR).map(([k, D]) =>
+        `<option value="${k}">${D.n}${k !== 'uno' ? ` (${cuentas[k]})` : ''}</option>`).join('')}</select>
+      <div class="ayuda">Solo entran los que tienen correo cargado. Los que no, se pueden completar en el Padrón.</div></div>
+    <div class="field" id="circLoteCampo"><label>Si elegiste un lote, ¿cuál?</label>
+      <input name="lote" id="circLote" list="lotesCirc" placeholder="Ej: 148 o Lote 148" autocomplete="off"><datalist id="lotesCirc">${(typeof LOTES === 'undefined' ? [] : LOTES).map(L => `<option>Lote ${L.lote}</option>`).join('')}</datalist>
+      <div id="circCorreos"></div></div>
+    <div class="field"><label>Asunto</label><input name="asunto" required maxlength="120" placeholder="Ej: Corte de agua programado"></div>
+    <div class="field"><label>Mensaje</label><textarea name="cuerpo" required style="min-height:200px" placeholder="Escribilo como se lo dirías a un vecino. Cada renglón en blanco separa un párrafo."></textarea>
+      <div class="ayuda">Se manda con el membrete del barrio y el pie de la Ley 25.326. Si escribís <b>{nombre}</b> o <b>{lote}</b>, la app los reemplaza en cada correo.</div></div>
+    <label class="check"><input type="checkbox" name="pizarron" checked><span>Publicarlo también en el pizarrón de la app</span></label>
+    <label class="check"><input type="checkbox" name="aviso" checked><span>Avisarles dentro de la app (suena y aparece en Avisos)</span></label>
+    <button class="btn btn-pri btn-block btn-grande" style="margin-top:14px">${I('send')}Continuar</button>
+    ${Correo.configurado() ? '' : `<p class="muted tiny" style="margin:10px 0 0">${I('info')} El envío automático no está configurado: los correos van a quedar en la bandeja de salida para mandarlos a mano. El aviso dentro de la app sale igual.</p>`}</form>`,
+    { ancho:'620px' });
+};
+/* =========================================================
+   UN LOTE PUEDE TENER VARIOS CORREOS
+   El del propietario en el padrón y los de cada persona con cuenta en la
+   app (por ejemplo, los dos de una pareja). Al elegir "Un lote en
+   particular" aparecen todos, marcados, y se destilda el que no va.
+   ========================================================= */
+const loteNormal = v => { const m = String(v || '').match(/(\d+[A-Za-z]?)/); return m ? 'Lote ' + m[1] : ''; };
+function correosDelLote(lote){
+  const p = Store.s.padron.find(x => 'Lote ' + x.lote === lote) || {};
+  const out = [];
+  const poner = (email, nombre, de) => { const e = String(email || '').trim().toLowerCase(); if (e && !out.some(x => x.email === e)) out.push({ email:e, nombre:nombre || '', de, casa:lote }); };
+  aLista(p.titulares).forEach(t => poner(t && t.email, t && t.nombre, 'padrón'));
+  poner(p.email, p.propietario, 'padrón');
+  Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').forEach(u => poner(u.email, u.nombre, 'cuenta en la app'));
+  return out;
+}
+document.addEventListener('input', e => {
+  if (!e.target.closest || !e.target.closest('form[data-f="circular"]')) return;
+  if (e.target.id === 'circLote' || e.target.id === 'circDestino'){
+    const caja = $('#circCorreos'), lote = loteNormal($('#circLote')?.value);
+    if (!caja) return;
+    if ($('#circDestino')?.value !== 'uno' || !lote){ caja.innerHTML = ''; return; }
+    const cs = correosDelLote(lote);
+    caja.innerHTML = cs.length ? `<div class="card plana small" style="margin:8px 0 0"><b>¿A cuál de los correos de ${esc(lote)}?</b>
+      ${cs.map(c => `<label class="check" style="margin:6px 0 0"><input type="checkbox" name="mail" value="${esc(c.email)}" checked><span>${esc(c.email)}<small class="muted" style="display:block">${esc(c.nombre || '')}${c.nombre ? ' · ' : ''}${esc(c.de)}</small></span></label>`).join('')}</div>`
+      : `<div class="card plana small" style="margin:8px 0 0">${I('info')} ${esc(lote)} no tiene ningún correo cargado. Completalo en el Padrón.</div>`;
+  }
+});
+document.addEventListener('change', e => { if (e.target.id === 'circDestino') e.target.dispatchEvent(new Event('input', { bubbles:true })); });
+F['circular'] = async d => {
+  const D = DESTINOS_CIRCULAR[d.destino];
+  let gente = D.lista();
+  if (d.destino === 'uno'){
+    const lote = loteNormal(d.lote);
+    if (!lote){ toast('Escribí el lote, por ejemplo "148" o "Lote 148"', 'alert'); return; }
+    const elegidos = [].concat(d.mail || []).map(x => String(x).toLowerCase());
+    const todos = correosDelLote(lote);
+    if (todos.length && !elegidos.length){ toast('Marcá al menos un correo del lote', 'alert'); return; }
+    gente = todos.filter(c => elegidos.includes(c.email));
+  }
+  /* Un mismo correo puede estar en el padrón y en una cuenta: se manda una vez. */
+  const vistos = new Set();
+  gente = gente.filter(x => { const e = (x.email || '').toLowerCase(); if (!e || vistos.has(e)) return false; vistos.add(e); return true; });
+  if (!gente.length){ toast('No hay nadie con correo cargado en ese grupo', 'alert'); return; }
+
+  const cuerpo = String(d.cuerpo || '').trim();
+  const previa = gente[0];
+  const armar = x => cuerpo.replace(/\{nombre\}/g, (x.nombre || '').split(/[ ,]/)[0] || 'vecino/a').replace(/\{lote\}/g, x.casa || '');
+  const html = x => Correo.plantilla(d.asunto, armar(x).split(/\n\s*\n/).map(pp => `<p>${esc(pp).replace(/\n/g, '<br>')}</p>`).join(''),
+    { texto:'Abrir la app del barrio', url:urlApp() });
+
+  const ok = await confirmar('Revisá antes de mandar', `
+    <b>${esc(d.asunto)}</b><br>
+    Va a salir a <b>${plural(gente.length, 'persona')}</b> (${esc(D.n.toLowerCase())}).<br><br>
+    <span style="display:block;max-height:180px;overflow:auto;background:var(--surface-2);border-radius:12px;padding:12px;font-size:13px;white-space:pre-wrap">${esc(armar(previa))}</span>
+    <span class="tiny" style="display:block;margin-top:8px;opacity:.8">Así lo va a ver ${esc(previa.nombre || previa.email)}.</span>
+    ${gente.length > 80 ? '<br><b style="color:var(--warn)">Son más de 80: Gmail puede frenar los últimos. Conviene mandarlos en dos días o subir el tope en el Apps Script.</b>' : ''}`,
+    { si:`Mandar a ${gente.length}` });
+  if (!ok) return;
+  cerrarHoja();
+
+  if (d.pizarron || d.aviso){
+    Store.cambiar(s => {
+      if (d.pizarron) publicarSistema(s, 'aviso', d.asunto, cuerpo.replace(/\{nombre\}/g, 'vecino/a').replace(/\{lote\}/g, 'tu lote'));
+      if (d.aviso) notificar(s, { para:'todos', titulo:d.asunto, texto:cuerpo.slice(0, 140), icon:'mail', color:'sky', link:'pizarron', sonido:true });
+      auditar(s, 'Mandó una circular', `${d.asunto} · ${gente.length} destinatarios`);
+    });
+  }
+
+  /* De a diez, con una pausa: así Gmail no lo toma por un envío masivo. */
+  const resultado = [];
+  toast(`Mandando a ${gente.length}…`, 'send');
+  for (let i = 0; i < gente.length; i += 10){
+    const tanda = gente.slice(i, i + 10);
+    const r = await Promise.all(tanda.map(x => Correo.enviarDetalle({ para:x.email, asunto:d.asunto, tipo:'circular', html:html(x) })));
+    r.forEach((y, j) => resultado.push({ ...tanda[j], ...y }));
+    if (i + 10 < gente.length) await new Promise(res => setTimeout(res, 800));
+  }
+  const salieron = resultado.filter(x => x.ok).length;
+  refrescar();
+  /* Lo que pasó con cada correo, a la vista: antes decía "no salió
+     ninguno" sin decir por qué, aunque a veces sí había llegado. */
+  hoja('Resultado del envío', `${aviso(salieron === resultado.length ? 'ok' : salieron ? 'warn' : 'danger', 'mail',
+      salieron === resultado.length ? `Salieron los ${plural(salieron, 'correo')}` : `Salieron ${salieron} de ${resultado.length}`, esc(d.asunto))}
+    <div class="card lista">${resultado.map(x => `<div class="it"><span class="ic ic-${x.ok ? 'ok' : 'danger'}" style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:none">${I(x.ok ? 'check' : 'x')}</span>
+      <div class="txt"><b>${esc(x.email)}</b><span>${esc(x.nombre || '')}${x.casa ? ' · ' + esc(x.casa) : ''}</span>${x.ok ? '' : `<span style="color:var(--danger)">${esc(x.error || 'No salió')}</span>`}</div></div>`).join('')}</div>
+    <p class="muted tiny">"Salió" quiere decir que Google lo aceptó y lo mandó. Si no aparece en la bandeja de entrada, mirar en Spam o Correo no deseado.</p>
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Listo</button>`);
+};
+
+/* =========================================================
+   COMUNICADOS — el lado de la Administración
+   Crear, y sobre todo VER quién respondió. Cada comunicado lleva su propio
+   conteo: abre, cierra y cuenta lo suyo, sin mezclarse con los demás.
+   ========================================================= */
+R.comunicados = {
+  titulo: 'Comunicados importantes', icon: 'tack', color: 'danger', ancha: true,
+  sub: 'Salen como ventana, suenan y piden acuse de recibo',
+  render(){
+    if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
+    const s = Store.s, hoy = hoyISO();
+    const cs = (s.comunicados || []).slice().sort((a, b) => b.at - a.at);
+    const vivos = cs.filter(c => !c.archivado && (!c.vence || c.vence >= hoy));
+    const viejos = cs.filter(c => c.archivado || (c.vence && c.vence < hoy));
+    const card = c => {
+      const alcance = c.para === 'todos'
+        ? Store.s.users.filter(u => u.estado === 'aprobado' && u.rol === 'vecino').length
+        : Store.s.users.filter(u => u.estado === 'aprobado' && u.casa === c.para).length;
+      const vistos = (c.vistos || []).length;
+      const resp = Object.entries(c.respuestas || {});
+      const van = resp.filter(([, r]) => r.va), noVan = resp.filter(([, r]) => !r.va);
+      const lotesTotal = c.para === 'todos' ? (typeof LOTES !== 'undefined' ? LOTES.length : totalLotes()) : 1;
+      return `<div class="card">
+        <div class="row" style="align-items:flex-start">
+          <span class="ic ic-${c.tipo === 'reunion' ? 'accent' : 'danger'}" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I(c.tipo === 'reunion' ? 'calendar' : 'tack')}</span>
+          <div class="grow"><b style="font-size:16px">${esc(c.titulo)}</b>
+            <div class="muted small">${c.para === 'todos' ? 'Todo el barrio' : esc(c.para)} · ${hace(c.at)}${c.vence ? ' · vence ' + fechaCorta(c.vence) : ''}</div></div>
+          <span class="pill ${c.tipo === 'reunion' ? 'p-accent' : 'p-danger'}">${c.tipo === 'reunion' ? 'Invitación' : 'Aviso'}</span></div>
+        <p class="small" style="color:var(--ink-2);white-space:pre-wrap;margin:10px 0 0">${esc(c.texto)}</p>
+        ${c.tipo === 'reunion' && c.fecha ? `<div class="card plana small" style="margin:10px 0 0">${I('calendar')} ${fechaLarga(c.fecha)}${c.hora ? ' · ' + esc(c.hora) + ' h' : ''}${c.lugar ? ' · ' + esc(c.lugar) : ''}</div>` : ''}
+        ${c.tipo === 'reunion' ? `
+          <div class="garita-kpis" style="margin-top:12px">
+            <div class="kpi"><b style="color:var(--ok)">${van.length}</b><span>Lotes que van</span></div>
+            <div class="kpi"><b style="color:var(--danger)">${noVan.length}</b><span>No pueden</span></div>
+            <div class="kpi"><b>${Math.max(0, lotesTotal - resp.length)}</b><span>Sin responder</span></div></div>
+          ${resp.length ? `<div class="chips">${van.map(([lote]) => `<span class="chip" style="background:var(--ok-soft);color:var(--ok);border-color:transparent">${I('check')}${esc(lote)}</span>`).join('')}
+            ${noVan.map(([lote]) => `<span class="chip" style="background:var(--danger-soft);color:var(--danger);border-color:transparent">${esc(lote)}</span>`).join('')}</div>` : ''}`
+        : `<div class="muted small" style="margin-top:10px">${I('eye')} Lo acusaron ${vistos} de ${alcance} cuentas</div>`}
+        <div class="btns" style="margin-top:10px">
+          ${c.tipo === 'reunion' ? `<button class="btn btn-sm btn-sec" data-a="comunicado-lista" data-id="${c.id}">${I('users')}Ver lote por lote</button>` : ''}
+          <button class="btn btn-sm btn-pri" data-a="comunicado-editar" data-id="${c.id}">${I('edit')}Editar</button>
+          <button class="btn btn-sm btn-sec" data-a="comunicado-repetir" data-id="${c.id}">${I('refresh')}Volver a mostrarlo</button>
+          <button class="btn btn-sm btn-danger-soft" data-a="comunicado-cerrar" data-id="${c.id}">${c.archivado ? 'Cerrado' : 'Cerrar'}</button></div>
+        ${c.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editado ${hace(c.editado.at)}</div>` : ''}</div>`;
+    };
+    return `${superficie({ a:'nuevo-comunicado', icon:'plus', color:'danger', t:'Nuevo comunicado importante', s:'Sale como ventana, suena y pide acuse', cls:'acento' })}
+      ${aviso('info', 'info', 'Usalo poco', 'Un comunicado importante interrumpe lo que el vecino esté haciendo. Si se usa para todo, deja de significar algo. Lo común va al pizarrón.')}
+      ${vivos.length ? sec('Activos') + vivos.map(card).join('') : vacio('tack', 'No hay comunicados activos.')}
+      ${viejos.length ? sec('Cerrados') + viejos.slice(0, 10).map(card).join('') : ''}`;
+  },
+};
+/* EDITAR UN COMUNICADO (pedido de Claudio, 12-10-2026: "aparte de cerrarlo
+   o volver a mostrarlo, un tercer botón: editarlo"). Es el mismo formulario,
+   con lo que ya tenía. Las respuestas de "voy / no puedo" se conservan. Si
+   el cambio es importante, se tilda "Que les vuelva a aparecer a todos" y
+   sale otra vez como ventana (con el aviso "Corregido"); si es una coma, se
+   guarda sin molestar a nadie. Queda en la auditoría. */
+A['nuevo-comunicado'] = el => {
+  const c = el && el.dataset && el.dataset.id ? aLista(Store.s.comunicados).find(x => x && x.id === el.dataset.id) : null;
+  const lotes = (typeof LOTES !== 'undefined' ? LOTES : []).map(l => 'Lote ' + l.lote), v = c || {};
+  hoja(c ? 'Editar el comunicado' : 'Nuevo comunicado importante', `<form data-f="comunicado" data-id="${esc(v.id || '')}">
+    <div class="field"><label>¿A quién?</label>
+      <select name="para" required><option value="todos">A todo el barrio</option>${lotes.map(l => `<option value="${esc(l)}" ${v.para === l ? 'selected' : ''}>Solo a ${esc(l)}</option>`).join('')}</select>
+      <div class="ayuda">Si elegís un lote, lo ven todas las cuentas de ese lote y nadie más.</div></div>
+    <div class="field"><label>¿Qué tipo?</label>
+      <select name="tipo" required><option value="aviso">Aviso · solo acusar recibo</option><option value="reunion" ${v.tipo === 'reunion' ? 'selected' : ''}>Invitación · con "voy / no puedo"</option></select></div>
+    <div class="field"><label>Título</label><input name="titulo" required maxlength="110" value="${esc(v.titulo || '')}" placeholder="Ej: Reunión extraordinaria del barrio"></div>
+    <div class="field"><label>Mensaje</label><textarea name="texto" required maxlength="900" style="min-height:130px" placeholder="Ej: El lunes próximo hay reunión extraordinaria. Tema: pavimento y asfalto.">${esc(v.texto || '')}</textarea></div>
+    <div class="grid3">
+      <div class="field"><label>Fecha (si es reunión)</label><input type="date" name="fecha" value="${esc(v.fecha || '')}"></div>
+      <div class="field"><label>Hora</label><input type="time" name="hora" value="${esc(v.hora || '')}"></div>
+      <div class="field"><label>Deja de mostrarse</label><input type="date" name="vence" min="${hoyISO()}" value="${esc(c ? v.vence || '' : sumarDias(hoyISO(), 30))}"></div></div>
+    <div class="field"><label>Lugar</label><input name="lugar" maxlength="80" value="${esc(v.lugar || '')}" placeholder="Ej: Garita del barrio"></div>
+    ${c ? `<label class="check"><input type="checkbox" name="repetir" checked><span><b>Que les vuelva a aparecer a todos</b>, con el aviso "Corregido" (destildalo si es un cambio chico)</span></label>` : ''}
+    <label class="check"><input type="checkbox" name="mail"><span>Mandarlo también por correo</span></label>
+    <button class="btn btn-pri btn-block btn-grande" style="margin-top:14px">${I(c ? 'check' : 'send')}${c ? 'Guardar los cambios' : 'Publicar el comunicado'}</button>
+    <p class="muted tiny" style="margin:10px 0 0">${c ? 'Las respuestas de "voy / no puedo" que ya llegaron se conservan. El cambio queda asentado en la auditoría.' : 'Aparece como ventana en la app de cada vecino, suena una vez y no se va hasta que lo acusan. Queda asentado en la auditoría.'}</p></form>`, { ancho:'620px' });
+};
+A['comunicado-editar'] = el => A['nuevo-comunicado'](el);
+F['comunicado'] = async (d, form) => {
+  const editar = form && form.dataset && form.dataset.id ? aLista(Store.s.comunicados).find(x => x && x.id === form.dataset.id) : null;
+  const id = editar ? editar.id : uid(), esReunion = d.tipo === 'reunion';
+  if (editar){
+    Store.cambiar(s => {
+      const c = s.comunicados.find(x => x.id === id); if (!c) return;
+      Object.assign(c, { titulo:d.titulo.trim(), texto:d.texto.trim(), para:d.para, tipo:d.tipo, fecha:d.fecha || '', hora:d.hora || '', lugar:(d.lugar || '').trim(), vence:d.vence || '', editado:{ at:Date.now(), por:yo().id } });
+      if (d.repetir){ c.vistos = []; c.at = Date.now(); c.archivado = false;
+        notificar(s, { para: d.para === 'todos' ? 'todos' : s.users.filter(u => u.casa === d.para && u.estado === 'aprobado').map(u => u.id),
+          titulo:'Corregido: ' + d.titulo.trim(), texto:d.texto.trim().slice(0, 120), icon: esReunion ? 'calendar' : 'tack', color:'danger', link:'pizarron', urgente:true }); }
+      auditar(s, 'Editó un comunicado importante', `${d.para} · ${d.titulo.trim()}${d.repetir ? ' · volvió a aparecer' : ''}`);
+    });
+    cerrarHoja(); toast(d.repetir ? 'Comunicado corregido: vuelve a aparecer en todas las pantallas' : 'Comunicado guardado', 'check');
+  } else Store.cambiar(s => {
+    s.comunicados.unshift({ id, titulo:d.titulo.trim(), texto:d.texto.trim(), para:d.para, tipo:d.tipo,
+      fecha:d.fecha || '', hora:d.hora || '', lugar:(d.lugar || '').trim(), vence:d.vence || '',
+      creadoPor:yo().id, at:Date.now(), respuestas:{}, vistos:[] });
+    notificar(s, { para: d.para === 'todos' ? 'todos' : s.users.filter(u => u.casa === d.para && u.estado === 'aprobado').map(u => u.id),
+      titulo: (esReunion ? 'Invitación: ' : 'Comunicado: ') + d.titulo.trim(), texto:d.texto.trim().slice(0, 120),
+      icon: esReunion ? 'calendar' : 'tack', color:'danger', link:'pizarron', urgente:true });
+    auditar(s, 'Publicó un comunicado importante', `${d.para} · ${d.titulo.trim()}`);
+  });
+  if (!editar){ cerrarHoja(); toast('Comunicado publicado', 'tack'); }
+  if (d.mail){
+    const gente = d.para === 'todos'
+      ? Store.s.users.filter(u => u.estado === 'aprobado' && u.email)
+      : Store.s.users.filter(u => u.casa === d.para && u.estado === 'aprobado' && u.email);
+    for (const u of gente){
+      await Correo.enviar({ para:u.email, asunto:d.titulo.trim(), tipo:'comunicado',
+        html:Correo.plantilla(d.titulo.trim(),
+          `<p>${esc(d.texto.trim()).replace(/\n/g, '<br>')}</p>` +
+          (esReunion && d.fecha ? `<p><b>${fechaLarga(d.fecha)}${d.hora ? ' · ' + esc(d.hora) + ' h' : ''}</b>${d.lugar ? '<br>' + esc(d.lugar) : ''}</p>` : ''),
+          { texto: esReunion ? 'Confirmar si voy' : 'Abrir la app', url:urlApp() }) });
+    }
+  }
+};
+A['comunicado-repetir'] = el => {
+  Store.cambiar(s => { const c = s.comunicados.find(x => x.id === el.dataset.id); if (c){ c.vistos = []; c.at = Date.now(); c.archivado = false; } });
+  toast('Va a volver a aparecer en todas las pantallas', 'refresh');
+};
+A['comunicado-cerrar'] = async el => {
+  if (!await confirmar('Cerrar el comunicado', 'Deja de mostrarse. El conteo de respuestas se conserva.', { si:'Cerrar' })) return;
+  Store.cambiar(s => { const c = s.comunicados.find(x => x.id === el.dataset.id); if (c) c.archivado = true; });
+};
+A['comunicado-lista'] = el => {
+  const c = Store.s.comunicados.find(x => x.id === el.dataset.id); if (!c) return;
+  const lotes = (typeof LOTES !== 'undefined' ? LOTES : []).map(l => 'Lote ' + l.lote);
+  const fila = lote => { const r = (c.respuestas || {})[lote];
+    return `<div class="it"><div class="txt"><b>${esc(lote)}</b><span>${esc(propietarioDe(lote) || '')}</span></div>
+      <span class="pill ${r ? (r.va ? 'p-ok' : 'p-danger') : ''}">${r ? (r.va ? 'Va' : 'No puede') : 'Sin responder'}</span></div>`; };
+  hoja(c.titulo, `<div class="card lista">${(c.para === 'todos' ? lotes : [c.para]).map(fila).join('')}</div>
+    <button class="btn btn-sec btn-block" data-a="copiar" data-v="${esc(Object.entries(c.respuestas || {}).map(([l, r]) => `${l}: ${r.va ? 'va' : 'no'}`).join('\n'))}">${I('copy')}Copiar la lista</button>`);
+};

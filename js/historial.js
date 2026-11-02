@@ -1,0 +1,396 @@
+/* =========================================================
+   EL HISTORIAL, A PEDIDO (pedido de Claudio, 25-09-2026)
+   -------------------------------------------------------
+   Con 152 lotes, si cada equipo baja al abrir la app TODO lo que pasó
+   desde el primer día (cada visita, cada línea del libro de guardia, cada
+   mensaje), la app se hace más lenta cada mes. Por eso:
+
+   1. Al abrir, cada equipo baja solo lo RECIENTE:
+        · visitas, llegadas y pedidos de pase: los últimos N días (los de
+          Ajustes → "Borrar datos de visitas", 90 por defecto) y el
+          personal fijo vigente;
+        · libro de guardia (bitácora): 60 días;
+        · auditoría: 90 días;
+        · conversaciones privadas: los mensajes de los últimos 90 días.
+          Desde el 10-10-2026 (pedido de Claudio) los de más de 3 meses SE
+          BORRAN de la base, no van al archivo: así no ocupan lugar.
+   2. Lo más viejo NO se borra: pasa al ARCHIVO HISTÓRICO de la base
+      (hist/<carpeta>/<dueño>/<id>, con las mismas reglas de lectura que la
+      carpeta privada: cada vecino ve solo lo suyo; la garita y la
+      Administración, lo que les toca por su función). La bitácora y la
+      auditoría no se mudan: quedan donde están y solo se baja
+      la ventana reciente.
+   3. Quien quiere ver todo, lo pide con un botón ("Ver mi historial
+      completo", "Historial de visitas", "Ver el libro completo",
+      "Ver mensajes anteriores"). Se baja UNA vez, en ese momento, y no
+      entra al resto de la app.
+
+   Al archivar, a las visitas se les sacan el DNI y la patente: el archivo
+   guarda quién vino, a qué lote, cuándo entró y cuándo salió, pero nunca
+   el documento (Ley 25.326, art. 4 inc. 7).
+
+   La mudanza la hace, una vez por día, un equipo con permiso:
+   la Administración (visitas y sus conversaciones), la garita (sus
+   conversaciones) y cada vecino (sus mensajes con otros vecinos). Si la
+   base rechaza la copia al archivo (reglas sin publicar), NO se borra
+   nada del lugar de siempre.
+   ========================================================= */
+const Historial = {
+  /* Lo que baja al abrir, en días. */
+  VENTANA: { bitacora:['at', 60], auditoria:['at', 90] },
+  HILO_DIAS: 120, HILO_MIN: 30,
+  /* Los mensajes privados viven 90 días y después se borran (10-10-2026). */
+  MSG_DIAS: 90,
+  diasVisitas: () => Math.max(30, +(Store.s.config.datosDias || 90)),
+
+  /* Consulta con ventana para las colecciones planas (la usa Nube). */
+  consulta(ref, col){
+    const v = this.VENTANA[col];
+    return v ? ref.orderByChild(v[0]).startAt(Date.now() - v[1] * DIA) : ref;
+  },
+  hayNube: () => typeof Nube !== 'undefined' && !!Nube.db && !!Nube.arrancada,
+
+  /* ---------- la mudanza diaria ---------- */
+  async archivar(){
+    if (!this.hayNube()) return;
+    const u = yo(); if (!u || u.estado !== 'aprobado') return;
+    const hoy = hoyISO(), clave = 'bhc.archivo.' + u.id;
+    try { if (localStorage.getItem(clave) === hoy) return; } catch(e){}
+    let n = 0;
+    try {
+      if (u.rol === 'admin' && await Nube.reclamarMarca('archivo-' + hoy)) n += await this.archivarVisitas();
+      /* Los mensajes de más de 90 días se borran (10-10-2026). Cada uno poda
+         las conversaciones que le toca escribir: la Administración las suyas
+         (con vecinos, con la garita y con la supervisión), la garita las
+         suyas, y cada vecino sus mensajes con otros vecinos. */
+      if (u.rol === 'admin') n += this.podarHilos('privados', h => ['admin', 'interno', 'supAdmin'].includes(h.con || 'admin'));
+      if (u.rol === 'guardia') n += this.podarHilos('privados', h => h.con === 'guardia' || h.con === 'supGarita');
+      n += this.podarHilos('dms', h => h.a === u.id || h.b === u.id);
+      try { localStorage.setItem(clave, hoy); } catch(e){}
+      if (n) console.info(`Archivo histórico: ${n} registros pasaron al archivo`);
+    } catch(e){ console.warn('Archivo histórico: no se completó (¿faltan publicar las reglas?)', e.message); }
+  },
+  sinDatos(x){ const c = JSON.parse(JSON.stringify(x)); ['dni', 'patente', 'tel'].forEach(k => { if (k in c) c[k] = ''; }); c.archivadoAt = Date.now(); return c; },
+  /* Un paquete archivado guarda qué llegó, para quién, cuándo y quién lo
+     retiró, con el sello de la entrega; sin la foto, sin la firma dibujada,
+     sin la firma del QR y sin los dígitos del DNI. */
+  PAQUETES_DIAS: 30,
+  paqueteSinDatos(p){
+    const c = { id:p.id, empresa:p.empresa || '', detalle:p.detalle || '', hostId:p.hostId || '', lote:p.lote || '', recibido:p.recibido || 0, retirado:p.retirado || 0, confirmado:p.confirmado || p.retirado || 0, archivadoAt:Date.now() };
+    const e = p.entrega;
+    if (e && typeof e === 'object') c.entrega = { metodo:e.metodo || '', at:e.at || 0, sello:e.sello || '', tercero:!!e.tercero, recibe:{ nombre:(e.recibe && e.recibe.nombre) || '' }, entrega:{ nombre:(e.entrega && e.entrega.nombre) || '' } };
+    return c;
+  },
+  async subir(cambios){
+    const rutas = Object.keys(cambios);
+    for (let i = 0; i < rutas.length; i += 300){ const t = {}; rutas.slice(i, i + 300).forEach(r => { t[r] = cambios[r]; }); await Nube.db.ref().update(t); }
+  },
+  async archivarVisitas(){
+    const s = Store.s, lim = sumarDias(hoyISO(), -this.diasVisitas()), limMs = Date.now() - this.diasVisitas() * DIA;
+    const viejo = {
+      pases: aLista(s.pases).filter(p => p && p.id && (p.fechaFin || p.fecha || '9999') < lim && (p.createdAt || 0) < limMs),
+      llegadas: aLista(s.llegadas).filter(l => l && l.id && (l.at || Date.now()) < limMs),
+      solicitudesPase: aLista(s.solicitudesPase).filter(r => r && r.id && (r.at || r.createdAt || Date.now()) < limMs && r.estado !== 'pendiente'),
+      /* Los paquetes ya retirados "duermen" 30 días en la app y después
+         pasan al archivo (pedido de Claudio, 28-09-2026). */
+      paquetes: aLista(s.paquetes).filter(p => p && p.id && p.retirado && p.retirado < Date.now() - this.PAQUETES_DIAS * DIA),
+    };
+    let n = 0;
+    for (const col in viejo){
+      const lista = viejo[col]; if (!lista.length) continue;
+      const cambios = {};
+      lista.forEach(x => Nube.duenos(col, x).filter(Boolean).forEach(d => { cambios[`hist/${col}/${d}/${x.id}`] = col === 'paquetes' ? this.paqueteSinDatos(x) : this.sinDatos(x); }));
+      if (!Object.keys(cambios).length) continue;
+      await this.subir(cambios);                     /* si falla, sale por el catch y no se borra nada */
+      const ids = new Set(lista.map(x => x.id));
+      Store.cambiar(st => { st[col] = aLista(st[col]).filter(x => !ids.has(x.id)); });
+      n += lista.length;
+    }
+    return n;
+  },
+  /* Borra de cada conversación los mensajes de más de 90 días. No hay copia
+     en el archivo: el vecino lo sabe (Preguntas frecuentes, Mis datos). */
+  podarHilos(col, mio){
+    const lim = Date.now() - this.MSG_DIAS * DIA, cuando = m => (m && (m.createdAt || m.at)) || 0;
+    const viejos = aLista(Store.s[col]).filter(h => h && h.id && mio(h) && aLista(h.msgs).some(m => cuando(m) && cuando(m) < lim));
+    if (!viejos.length) return 0;
+    let n = 0; const ids = new Set(viejos.map(h => h.id));
+    Store.cambiar(st => aLista(st[col]).filter(h => h && ids.has(h.id)).forEach(h => { const antes = aLista(h.msgs).length;
+      h.msgs = aLista(h.msgs).filter(m => !cuando(m) || cuando(m) >= lim); n += antes - h.msgs.length; }));
+    return n;
+  },
+  /* (Hasta el 10-10-2026: una conversación larga dejaba en la base solo lo reciente;
+     lo viejo iba al archivo en un paquete con clave fija. Queda por si hay
+     que volver a usarlo; la app ya no lo llama.) */
+  async archivarHilos(col, mio){
+    const lim = Date.now() - this.HILO_DIAS * DIA, cuando = m => m.createdAt || m.at || 0;
+    const hilos = aLista(Store.s[col]).filter(h => h && h.id && mio(h) && aLista(h.msgs).length > this.HILO_MIN);
+    let n = 0;
+    for (const h of hilos){
+      const msgs = aLista(h.msgs), corte = msgs.length - this.HILO_MIN;
+      const viejos = msgs.slice(0, corte).filter(m => cuando(m) < lim);
+      if (!viejos.length) continue;
+      const hasta = Math.max(...viejos.map(cuando)), paquete = { hilo:h.id, desde:Math.min(...viejos.map(cuando)), hasta, msgs:viejos, archivadoAt:Date.now() };
+      const cambios = {};
+      Nube.duenos(col, h).filter(Boolean).forEach(d => { cambios[`hist/${Nube.carpetaDe(col, h)}/${d}/${h.id}-${hasta}`] = paquete; });
+      if (!Object.keys(cambios).length) continue;
+      await this.subir(cambios);
+      const ids = new Set(viejos.map(m => m.id || cuando(m)));
+      Store.cambiar(st => { const x = aLista(st[col]).find(z => z.id === h.id); if (!x) return;
+        x.msgs = aLista(x.msgs).filter(m => !ids.has(m.id || cuando(m))); x.archivados = (x.archivados || 0) + viejos.length; });
+      n += viejos.length;
+    }
+    return n;
+  },
+
+  /* ---------- traer a pedido ---------- */
+  async traer(ruta){
+    if (!this.hayNube()) return null;
+    return (await Nube.db.ref(ruta).get()).val() || {};
+  },
+  /* hist/<carpeta>/<uid>/<id> → lista (de un vecino o de todos). */
+  async archivo(carpeta, uid){
+    const v = await this.traer(uid ? `hist/${carpeta}/${uid}` : `hist/${carpeta}`);
+    if (!v) return [];
+    const out = [], meter = nodo => Object.values(nodo || {}).forEach(x => { if (x && typeof x === 'object') out.push(x); });
+    if (uid) meter(v); else Object.values(v).forEach(meter);
+    return out;
+  },
+  cargando(titulo){ hoja(titulo, `<div class="card plana small" style="display:flex;gap:10px;align-items:center">${I('refresh')} Trayendo el historial de la base del barrio…</div>`); },
+  fallo(e){ hoja('No se pudo traer el historial', aviso('danger', 'alert', 'La base no lo entregó', esc(e && e.message || 'Revisá la conexión.'))); },
+};
+
+/* Una fila de visita para las listas de historial. */
+function filaHistVisita(p, conCasa){
+  const t = TIPOS_PASE[p.tipo] || TIPOS_PASE.visita, host = usuario(p.hostId) || {};
+  const log = p.log || {}, dias = Object.keys(log).sort();
+  const mov = dias.length ? dias.map(d => `${fechaCorta(d)}${log[d].in ? ' entró ' + hora(log[d].in) : ''}${log[d].out ? ' · salió ' + hora(log[d].out) : ''}`).slice(-3).join(' / ') + (dias.length > 3 ? ` (+${dias.length - 3} días)` : '') : (p.cancelado ? 'Cancelado' : 'No vino');
+  return `<div class="it"><span class="ic ic-${t.c}" style="width:32px;height:32px;border-radius:10px;display:grid;place-items:center">${I(t.icon)}</span>
+    <div class="txt"><b>${esc(p.nombre || '—')}${conCasa ? ` → ${esc(host.casa || p.casa || '')}` : ''}</b><span>${esc(t.n)} · ${p.dias?.length ? 'fijo hasta ' + fechaCorta(p.fechaFin) : fechaCorta(p.fecha)} · ${esc(mov)}${p.autoriza ? ' · autorizó ' + esc(p.autoriza) : ''}${p.archivadoAt ? ' · archivo' : ''}</span></div></div>`;
+}
+const csvDe = (filas, nombre) => { const csv = filas.map(f => f.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type:'text/csv' })); a.download = nombre; a.click(); };
+const filasCSVVisitas = ls => [['fecha','lote','visita','tipo','autorizó','movimientos'], ...ls.map(p => [p.fecha || '', (usuario(p.hostId) || {}).casa || '', p.nombre || '', (TIPOS_PASE[p.tipo] || {}).n || '', p.autoriza || nombreDe(p.hostId) || '',
+  Object.keys(p.log || {}).sort().map(d => `${d} ${p.log[d].in ? 'in ' + hora(p.log[d].in) : ''} ${p.log[d].out ? 'out ' + hora(p.log[d].out) : ''}`.trim()).join(' | ')])];
+
+/* ---------- Mis visitas: todo, lo reciente y lo del archivo ---------- */
+let histVisitas = [];
+/* Mis paquetes: los retirados hace más de 30 días, a pedido (los del
+   archivo y los que todavía no se mudaron). */
+A['hist-paquetes'] = async () => {
+  const u = yo(); Historial.cargando('Paquetes anteriores');
+  try {
+    const arch = await Historial.archivo('paquetes', u.id) || [];
+    const lim = Date.now() - Historial.PAQUETES_DIAS * DIA;
+    const vivos = paquetesDelLote(u).filter(p => p.retirado && p.retirado < lim), ids = new Set(vivos.map(p => p.id));
+    const todos = [...vivos, ...arch.filter(p => p && p.id && !ids.has(p.id))].sort((a, b) => (b.retirado || 0) - (a.retirado || 0));
+    const quien = p => !p.entrega ? '' : p.entrega.metodo === 'qr' ? ' · con QR firmado' : p.entrega.tercero ? ` · lo retiró ${esc(p.entrega.recibe?.nombre || 'otra persona')}` : ' · con firma y DNI';
+    let mes = '';
+    hoja('Paquetes anteriores', todos.length ? `<p class="muted small" style="margin:0 0 10px">${plural(todos.length, 'paquete retirado', 'paquetes retirados')} de ${esc(u.casa)} de hace más de ${Historial.PAQUETES_DIAS} días. Se trajeron de la base solo ahora.</p>
+      <div class="card lista">${todos.map(p => { const m = isoDe(new Date(p.retirado || p.recibido)).slice(0, 7), cab = m !== mes ? (mes = m, `<div class="lbl" style="margin:10px 0 4px">${esc(typeof nombrePeriodo === 'function' ? nombrePeriodo(m) : m)}</div>`) : '';
+        return `${cab}<div class="it"><span class="ic ic-wood" style="width:30px;height:30px;border-radius:10px;display:grid;place-items:center">${I('box')}</span><div class="txt"><b>${esc(p.empresa || 'Paquete')}${p.detalle ? ' · ' + esc(p.detalle) : ''}</b>
+          <span>Llegó ${fechaCorta(isoDe(new Date(p.recibido)))} · retirado ${fechaCorta(isoDe(new Date(p.retirado)))}${p.hostId && p.hostId !== u.id ? ' · era para ' + esc(primerNombre(nombreDe(p.hostId))) : ''}${quien(p)}</span></div>
+          ${p.entrega && p.entrega.sello ? `<span class="pill p-ok" title="Sello ${esc(p.entrega.sello)}">${I('lock')}sellado</span>` : ''}</div>`; }).join('')}</div>`
+      : vacio('box', `No hay paquetes de hace más de ${Historial.PAQUETES_DIAS} días.`));
+  } catch(e){ Historial.fallo(e); }
+};
+A['hist-mis-visitas'] = async () => {
+  const u = yo(); Historial.cargando('Mi historial de visitas');
+  try {
+    const arch = await Historial.archivo('pases', u.id) || [];
+    const vivos = aLista(Store.s.pases).filter(p => p.hostId === u.id);
+    const ids = new Set(vivos.map(p => p.id));
+    histVisitas = [...vivos, ...arch.filter(p => !ids.has(p.id))].sort((a, b) => (b.fechaFin || b.fecha || '').localeCompare(a.fechaFin || a.fecha || ''));
+    pintarHistVisitas('Mi historial de visitas', false);
+  } catch(e){ Historial.fallo(e); }
+};
+/* La garita y la Administración: todas las visitas del barrio. */
+A['hist-visitas-todo'] = async () => {
+  /* 12-10-2026: también la supervisión (ve las visitas igual que la garita; antes el botón no hacía nada). */
+  if (!esStaff() && !esSupervisor()) return;
+  Historial.cargando('Historial de visitas');
+  try {
+    const arch = await Historial.archivo('pases') || [];
+    const vivos = aLista(Store.s.pases), ids = new Set(vivos.map(p => p.id));
+    histVisitas = [...vivos, ...arch.filter(p => !ids.has(p.id))].sort((a, b) => (b.fechaFin || b.fecha || '').localeCompare(a.fechaFin || a.fecha || ''));
+    pintarHistVisitas('Historial de visitas', true);
+  } catch(e){ Historial.fallo(e); }
+};
+/* EL HISTORIAL DE VISITAS, REDISEÑADO (pedido de Claudio, 13-10-2026):
+   arriba los números (visitas, este mes, lotes o días, adentro ahora), los
+   tipos como fichas de color que filtran, y cada visita como una tarjeta
+   con su color, el lote, quién autorizó y una barrita de cuánto se quedó.
+   Agrupadas por mes. El buscador y la planilla siguen igual. */
+let histVisArgs = { titulo:'', conCasa:false, q:'', tipo:'' };
+const durTxt = ms => { const m = Math.max(1, Math.round(ms / MIN)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + m % 60 + ' min' : ''); };
+function tarjetaHistVisita(p, conCasa, i){
+  const t = TIPOS_PASE[p.tipo] || TIPOS_PASE.visita, host = usuario(p.hostId) || {}, log = p.log || {}, dias = Object.keys(log).sort();
+  const ult = dias.length ? log[dias.at(-1)] : null, hoy = hoyISO();
+  const adentro = ult && ult.in && !ult.out && dias.at(-1) === hoy;
+  const porVenir = !dias.length && (p.fechaFin || p.fecha || '') >= hoy;
+  const estado = p.cancelado ? ['Cancelado', 'gris'] : adentro ? ['Adentro ahora', 'ok'] : porVenir ? [p.dias?.length ? 'Vigente' : 'Por venir', 'sky'] : !dias.length ? ['No vino', 'gris'] : ult.out ? ['Salió', 'sky'] : ['Entró', 'ok'];
+  const dur = ult && ult.in && ult.out ? ult.out - ult.in : adentro ? Date.now() - ult.in : 0, ancho = Math.min(100, Math.max(6, dur / (8 * HORA) * 100));
+  const cuando = p.dias?.length ? `fijo hasta ${fechaCorta(p.fechaFin)}` : fechaCorta(p.fecha || '');
+  return `<div class="hv-it c-${t.c}" style="--i:${Math.min(i, 14)}">
+    <span class="hv-av">${esc(inicial(p.nombre || '?'))}<i>${I(t.icon)}</i></span>
+    <div class="hv-txt"><div class="hv-l1"><b>${esc(p.nombre || '—')}</b>${conCasa && (host.casa || p.casa) ? `<span class="hv-lote">${I('home')}${esc(host.casa || p.casa)}</span>` : ''}</div>
+      <div class="hv-l2"><span class="hv-tipo">${esc(t.n)}</span><span>${I('calendar')}${esc(cuando)}</span>${p.autoriza || p.hostId ? `<span>${I('user')}autorizó ${esc(p.autoriza || primerNombre(nombreDe(p.hostId)))}</span>` : ''}${p.archivadoAt ? `<span>${I('lock')}archivo</span>` : ''}</div>
+      ${ult && ult.in ? `<div class="hv-estadia"><time>${hora(ult.in)}</time><span class="hv-barra ${adentro ? 'viva' : ''}"><i style="width:${ancho.toFixed(0)}%"></i></span><time>${ult.out ? hora(ult.out) : adentro ? 'ahora' : '—'}</time><small>${dur ? durTxt(dur) : ''}${dias.length > 1 ? ` · vino ${dias.length} días` : ''}</small></div>` : ''}</div>
+    <span class="hv-estado e-${estado[1]}">${estado[0]}</span></div>`;
+}
+function pintarHistVisitas(titulo, conCasa, q = '', tipo = histVisArgs.titulo === titulo ? histVisArgs.tipo : ''){
+  histVisArgs = { titulo, conCasa, q, tipo };
+  const qq = normTxt(q), mes = hoyISO().slice(0, 7);
+  const porTexto = qq ? histVisitas.filter(p => normTxt(`${p.nombre} ${(usuario(p.hostId) || {}).casa || ''} ${p.autoriza || ''} ${p.fecha}`).includes(qq)) : histVisitas;
+  /* Se ordena y se agrupa por el último día que vino (o el día anunciado). */
+  const clave = p => Object.keys(p.log || {}).sort().at(-1) || p.fecha || '';
+  const ls = (tipo ? porTexto.filter(p => (p.tipo || 'visita') === tipo) : porTexto).slice().sort((a, b) => clave(b).localeCompare(clave(a)));
+  const tipos = [...new Set(porTexto.map(p => p.tipo || 'visita'))].filter(k => TIPOS_PASE[k]);
+  const delMes = porTexto.filter(p => String(p.fecha || '').startsWith(mes)).length;
+  const lotes = new Set(porTexto.map(p => (usuario(p.hostId) || {}).casa || p.casa).filter(Boolean)).size;
+  const adentro = porTexto.filter(p => { const l = p.log || {}, d = l[hoyISO()]; return d && d.in && !d.out; }).length;
+  const vinieron = porTexto.filter(p => Object.keys(p.log || {}).length).length;
+  let m0 = '';
+  const filas = ls.slice(0, 400).map((p, i) => { const m = clave(p).slice(0, 7), cab = m !== m0 ? (m0 = m, `<div class="hv-mes"><b>${esc(m && typeof nombrePeriodo === 'function' ? nombrePeriodo(m) : m || 'Sin fecha')}</b><span>${plural(ls.filter(x => clave(x).slice(0, 7) === m).length, 'visita')}</span></div>`) : '';
+    return cab + tarjetaHistVisita(p, conCasa, i); }).join('');
+  hoja(titulo, `<div class="hv-stats">
+      <span class="c-brand"><b>${porTexto.length}</b><small>${qq ? 'encontradas' : 'visitas'}</small></span>
+      <span class="c-accent"><b>${delMes}</b><small>este mes</small></span>
+      <span class="c-sky"><b>${conCasa ? lotes : vinieron}</b><small>${conCasa ? 'lotes' : 'vinieron'}</small></span>
+      <span class="c-ok ${adentro ? 'vivo' : ''}"><b>${adentro}</b><small>adentro ahora</small></span></div>
+    <form class="hv-buscar" data-f="hist-visitas-buscar" data-t="${esc(titulo)}" data-c="${conCasa ? 1 : ''}">${I('search')}
+      <input name="q" value="${esc(q)}" type="search" placeholder="${conCasa ? 'Nombre, lote o mes (2026-09)…' : 'Nombre o mes (2026-09)…'}" aria-label="Buscar visitas"><button class="btn btn-sm btn-pri">Buscar</button></form>
+    ${tipos.length > 1 ? `<div class="hv-tipos">${[['', 'Todas', 'list', 'brand'], ...tipos.map(k => [k, TIPOS_PASE[k].n, TIPOS_PASE[k].icon, TIPOS_PASE[k].c])].map(([k, n, ic, c]) => `<button type="button" class="hv-t c-${c} ${tipo === k ? 'on' : ''}" data-a="hv-tipo" data-v="${k}">${I(ic)}${esc(n)}<b>${k ? porTexto.filter(p => (p.tipo || 'visita') === k).length : porTexto.length}</b></button>`).join('')}</div>` : ''}
+    <div class="hv-lista">${filas || `<div class="bt-vacio">${I('users')}<b>No hay visitas${qq || tipo ? ' con ese filtro' : ''}</b><small>${qq || tipo ? 'Probá con otra palabra o tocá "Todas".' : 'Cuando vengan, aparecen acá.'}</small></div>`}</div>
+    ${ls.length > 400 ? `<p class="muted tiny">Se muestran las 400 más recientes. Buscá por nombre, lote o mes para ver otras, o bajá la planilla.</p>` : ''}
+    <p class="muted tiny" style="margin:10px 2px">${I('lock')} Las de más de ${Historial.diasVisitas()} días vienen del archivo histórico, sin DNI, celular ni patente.</p>
+    <button class="btn btn-sec btn-block" data-a="hist-visitas-csv">${I('download')}Descargar la planilla (CSV)</button>`, { ancho:'640px' });
+}
+A['hv-tipo'] = el => pintarHistVisitas(histVisArgs.titulo, histVisArgs.conCasa, histVisArgs.q, el.dataset.v || '');
+F['hist-visitas-buscar'] = (d, form) => pintarHistVisitas(form.dataset.t, !!form.dataset.c, d.q || '', histVisArgs.tipo);
+A['hist-visitas-csv'] = () => csvDe(filasCSVVisitas(histVisitas), `visitas-${hoyISO()}.csv`);
+
+/* ---------- El libro de guardia completo ---------- */
+let histBitacora = [];
+A['hist-bitacora'] = async () => {
+  if (!esStaff()) return;
+  Historial.cargando('Libro de guardia completo');
+  try {
+    const v = Historial.hayNube() ? await Historial.traer('staff/bitacora') : null;
+    histBitacora = (v ? Object.values(v) : aLista(Store.s.bitacora)).filter(b => b && b.at).sort((a, b) => b.at - a.at);
+    pintarHistBitacora('');
+  } catch(e){ Historial.fallo(e); }
+};
+function pintarHistBitacora(q){
+  const qq = normTxt(q), ls = qq ? histBitacora.filter(b => normTxt(`${b.texto} ${isoDe(new Date(b.at))} ${autorVisible(b.autor).nombre}`).includes(qq)) : histBitacora;
+  hoja('Libro de guardia completo', `<form class="linea-form" data-f="hist-bitacora-buscar" style="margin-bottom:10px"><input name="q" value="${esc(q)}" placeholder="Palabra, nombre, lote o fecha (2026-09-14)"><button class="btn btn-pri">${I('search')}</button></form>
+    <p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'registro')}${qq ? ' encontrados' : ' desde el primer día'}.</p>
+    <div class="card lista">${ls.slice(0, 400).map(b => { const t = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad;
+      return `<div class="it"><span class="ic ic-${t[2]}" style="width:30px;height:30px;border-radius:10px;display:grid;place-items:center">${I(t[1])}</span><div class="txt"><b>${esc(b.texto)}</b><span>${fechaHora(b.at)} · ${esc(autorVisible(b.autor).nombre)}</span></div></div>`; }).join('') || '<p class="muted small">Sin registros.</p>'}</div>
+    ${ls.length > 400 ? `<p class="muted tiny">Se muestran los 400 más recientes. Buscá por fecha o palabra, o bajá la planilla.</p>` : ''}
+    <button class="btn btn-sec btn-block" data-a="hist-bitacora-csv">${I('download')}Descargar la planilla (CSV)</button>`);
+}
+F['hist-bitacora-buscar'] = d => pintarHistBitacora(d.q || '');
+A['hist-bitacora-csv'] = () => csvDe([['fecha','tipo','texto','autor'], ...histBitacora.map(b => [new Date(b.at).toISOString(), b.tipo, b.texto, autorVisible(b.autor).nombre])], `libro-de-guardia-${hoyISO()}.csv`);
+
+/* ---------- El libro de guardia de otro día (10-10-2026) ----------
+   La bitácora muestra solo hoy. Un día anterior (o varios, hasta 31) se
+   pide a la base con una consulta por fecha: baja solo eso, no el libro
+   entero. Lo usan la garita, la Administración y la supervisión. */
+A['bit-otro-dia'] = () => {
+  if (!veGarita()) return;
+  const ayer = sumarDias(hoyISO(), -1);
+  hoja('Ver otro día del libro', `<form data-f="bit-dias">
+    <div class="grid2"><div class="field"><label>Desde</label><input type="date" name="desde" value="${ayer}" max="${hoyISO()}" required></div>
+      <div class="field"><label>Hasta (opcional)</label><input type="date" name="hasta" max="${hoyISO()}"></div></div>
+    <div class="field"><label>Buscar una palabra (opcional)</label><input name="q" maxlength="40" placeholder="Nombre, lote, patente, camión…"></div>
+    <button class="btn btn-pri btn-block">${I('search')}Traer de la base</button>
+    <p class="muted tiny" style="margin:10px 0 0">Se trae solo lo de esas fechas (hasta 31 días juntos) y no queda guardado en el equipo.</p></form>`, { ancho:'460px' });
+};
+let bitDias = { ls:[], titulo:'' };
+F['bit-dias'] = async d => {
+  if (!veGarita()) return;
+  let desde = d.desde, hasta = d.hasta && d.hasta >= d.desde ? d.hasta : d.desde;
+  if (sumarDias(desde, 31) < hasta) hasta = sumarDias(desde, 30);
+  const ini = new Date(desde + 'T00:00').getTime(), fin = new Date(sumarDias(hasta, 1) + 'T00:00').getTime() - 1;
+  const titulo = desde === hasta ? `Libro de guardia · ${fechaLarga(desde)}` : `Libro de guardia · ${fechaCorta(desde)} al ${fechaCorta(hasta)}`;
+  Historial.cargando(titulo);
+  try {
+    let v = null;
+    if (Historial.hayNube()) v = (await Nube.db.ref('staff/bitacora').orderByChild('at').startAt(ini).endAt(fin).get()).val() || {};
+    const qq = normTxt(d.q || '');
+    const ls = (v ? Object.values(v) : aLista(Store.s.bitacora)).filter(b => b && b.at >= ini && b.at <= fin)
+      .filter(b => !qq || normTxt(`${b.texto} ${autorVisible(b.autor).nombre}`).includes(qq)).sort((a, b) => b.at - a.at);
+    bitDias = { ls, titulo };
+    let dia = '';
+    hoja(titulo, `<p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'registro')}${qq ? ` con "${esc(d.q)}"` : ''}. ${v ? 'Traído de la base recién.' : 'Modo de prueba: lo que hay en este equipo.'}</p>
+      <div class="card lista">${ls.slice(0, 500).map(b => { const t = TIPOS_BIT[b.tipo] || TIPOS_BIT.novedad, dd = isoDe(new Date(b.at));
+        const cab = dd !== dia ? (dia = dd, `<div class="lbl" style="margin:10px 0 4px">${esc(fechaLarga(dd))}</div>`) : '';
+        return `${cab}<div class="it"><span class="ic ic-${t[2]}" style="width:30px;height:30px;border-radius:10px;display:grid;place-items:center">${I(t[1])}</span><div class="txt"><b>${esc(b.texto)}</b><span>${hora(b.at)} · ${esc(autorVisible(b.autor).nombre)}</span></div></div>`; }).join('') || '<p class="muted small">No hay registros en esas fechas.</p>'}</div>
+      ${ls.length > 500 ? '<p class="muted tiny">Se muestran los 500 más recientes: achicá las fechas o bajá la planilla.</p>' : ''}
+      <div class="btns" style="margin-top:12px"><button class="btn btn-sec" data-a="bit-otro-dia">${I('calendar')}Otras fechas</button>${ls.length ? `<button class="btn btn-sec grow" data-a="bit-dias-csv">${I('download')}Planilla (CSV)</button>` : ''}</div>`);
+  } catch(e){ Historial.fallo(e); }
+};
+A['bit-dias-csv'] = () => csvDe([['fecha','tipo','texto','autor'], ...bitDias.ls.map(b => [new Date(b.at).toISOString(), b.tipo, b.texto, autorVisible(b.autor).nombre])], `libro-de-guardia-${hoyISO()}.csv`);
+
+/* ---------- La auditoría completa (solo la Administración) ---------- */
+A['hist-auditoria'] = async () => {
+  if (yo()?.rol !== 'admin') return;
+  Historial.cargando('Auditoría completa');
+  try {
+    const v = Historial.hayNube() ? await Historial.traer('staff/auditoria') : null;
+    const ls = (v ? Object.values(v) : aLista(Store.s.auditoria)).filter(x => x && x.at).sort((a, b) => b.at - a.at);
+    hoja('Auditoría completa', `<p class="muted small" style="margin:0 0 10px">${plural(ls.length, 'registro')} desde el primer día. No se pueden editar ni borrar.</p>
+      <div class="card lista">${ls.slice(0, 500).map(x => `<div class="it"><div class="txt"><b>${esc(x.accion)}</b><span>${esc(x.detalle || '')} · ${esc(autorVisible(x.por).nombre)} · ${fechaHora(x.at)}</span></div></div>`).join('') || '<p class="muted small">Vacío.</p>'}</div>
+      ${ls.length > 500 ? `<p class="muted tiny">Se muestran los 500 más recientes; la planilla trae todos.</p>` : ''}
+      <button class="btn btn-sec btn-block" data-a="hist-auditoria-csv">${I('download')}Descargar toda la auditoría (CSV)</button>`);
+    Historial.auditoria = ls;
+  } catch(e){ Historial.fallo(e); }
+};
+A['hist-auditoria-csv'] = () => csvDe([['fecha','accion','detalle','por'], ...aLista(Historial.auditoria).map(x => [new Date(x.at).toISOString(), x.accion, x.detalle, autorVisible(x.por).nombre])], `auditoria-completa-${hoyISO()}.csv`);
+
+/* ---------- Conversaciones privadas: lo archivado de un hilo ---------- */
+A['hist-hilo'] = async el => {
+  const [col, id] = String(el.dataset.v || '').split('|');
+  const h = aLista(Store.s[col]).find(x => x.id === id); if (!h) return;
+  const carpeta = Nube.carpetaDe ? Nube.carpetaDe(col, h) : col;
+  const dueno = col === 'dms' ? yo().id : h.userId;
+  Historial.cargando('Mensajes anteriores');
+  try {
+    const paquetes = (await Historial.archivo(carpeta, dueno) || []).filter(p => p.hilo === id);
+    const msgs = paquetes.flatMap(p => aLista(p.msgs)).sort((a, b) => (a.createdAt || a.at) - (b.createdAt || b.at));
+    const mio = m => col === 'dms' ? m.de === yo().id : (esStaff() ? m.from !== 'vecino' : m.from === 'vecino');
+    hoja('Mensajes anteriores', msgs.length ? `<div class="chat">${msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}"><div class="b">${cuerpoMsg(m)}<time>${fechaHora(m.createdAt || m.at)}</time></div></div>`).join('')}</div>`
+      : vacio('chat', 'No hay mensajes archivados de esta conversación.'));
+  } catch(e){ Historial.fallo(e); }
+};
+/* =========================================================
+   BORRAR LA CONVERSACIÓN, SOLO PARA MÍ (pedido de Claudio, 10-10-2026)
+   Cualquier chat (garita, Administración, hotel, vecinos, supervisión) se
+   puede borrar para empezar de cero. Se borra SOLO para quien lo borra: la
+   conversación guarda desde cuándo la ve cada lado (vaciado[lado] = hora)
+   y a ese lado se le muestran solo los mensajes posteriores. El otro lado
+   la sigue viendo entera hasta que la borre él. Lados: 'vecino' (el
+   vecino o el hotel), 'admin', 'guardia', 'supervisor', o el id de cada
+   vecino en los mensajes entre vecinos.
+   ========================================================= */
+const vaciadoDe = (h, lado) => (h && h.vaciado && +h.vaciado[lado]) || 0;
+const msgsVisibles = (h, lado) => { const t = vaciadoDe(h, lado), l = aLista(h && h.msgs); return t ? l.filter(m => m && (m.createdAt || m.at || 0) > t) : l; };
+/* El cesto rojo va en el título de la ventana del chat (pedido de Claudio,
+   10-10-2026: "arriba de la conversación no se ve"): la conversación lo
+   deja en accionCabecera y pintar()/refrescar() lo ponen en #cabAccion. */
+let accionCabecera = '';
+const botonVaciar = (col, h, lado) => h && msgsVisibles(h, lado).length ? `<button type="button" class="cab-vaciar" data-a="hilo-vaciar" data-v="${col}|${esc(h.id)}|${esc(lado)}" title="Borrar esta conversación" aria-label="Borrar esta conversación">${I('trash')}</button>` : '';
+/* Arriba de la conversación queda solo el archivo histórico (si no la borré). */
+const barraHilo = (col, h, lado) => { accionCabecera = botonVaciar(col, h, lado); const hist = vaciadoDe(h, lado) ? '' : botonHistHilo(col, h);
+  return hist ? `<div class="chat-barra">${hist}</div>` : ''; };
+A['hilo-vaciar'] = async el => {
+  const [col, id, lado] = String(el.dataset.v || '').split('|');
+  if (!await confirmar('Borrar la conversación', 'Se borra solo para vos: empezás de cero. La otra persona la sigue viendo hasta que la borre ella.', { si:'Borrar', peligro:true })) return;
+  Store.cambiar(s => { const h = aLista(s[col]).find(x => x && x.id === id); if (!h) return;
+    h.vaciado = Object.assign({}, h.vaciado || {}, { [lado]: Date.now() });
+    /* Lo que quedaba sin leer se da por leído: si no, seguiría contando. */
+    aLista(h.msgs).forEach(m => { if (m && (col === 'dms' ? m.de !== lado : m.from !== lado)) m.leido = true; }); });
+  toast('Conversación borrada para vos', 'trash');
+};
+const botonHistHilo = (col, h) => h && h.archivados ? `<button class="btn btn-sm btn-sec" style="align-self:center;margin:4px auto 10px" data-a="hist-hilo" data-v="${col}|${h.id}">${I('clock')}Ver ${plural(h.archivados, 'mensaje anterior', 'mensajes anteriores')}</button>` : '';
