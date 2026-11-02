@@ -69,7 +69,9 @@ const Nube = {
               /* 27-09: "Me voy de viaje" (casa sola), antes en la ficha pública */
               'ausencias',
               /* 08-10: las cuotas de expensas de UN lote, para las cuentas de ese lote (ExpLote) */
-              'cuotasLote'],
+              'cuotasLote',
+              /* 02-11: el débito automático de cada lote (js/v-debito.js): sin datos del banco */
+              'debitos'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos',
             /* 07-10: alertas a la supervisión y vistos de los partes (js/v-supervisor.js) */
             'alertasSup','vistos',
@@ -171,6 +173,7 @@ const Nube = {
     ausencias:       { objetos:['revisiones'] },
     casaTareas:      { listas:['sugerencias','cambioQue'] },
     pagos:           { listas:['reparto'] },
+    debitos:         { listas:['historial'], objetos:['rebotes'] },
     hotelLiqs:       { listas:['cuotas'] },
   },
   comoLaGuardamos(col, x){
@@ -239,7 +242,7 @@ const Nube = {
          todas las cuentas aprobadas de ese lote, más quien lo informó; y si
          el lote no tiene ninguna cuenta (un propietario sin la app), a una
          carpeta del lote ("lote-148") que lee la Administración. */
-      case 'pagos': case 'recibos': {
+      case 'pagos': case 'recibos': case 'debitos': {
         const lote = x.lote || x.casa;
         const us = Store.s.users.filter(u => u.casa === lote && u.estado === 'aprobado').map(u => u.id);
         if (x.userId && usuario(x.userId)?.casa === lote && !us.includes(x.userId)) us.push(x.userId);
@@ -626,6 +629,7 @@ const Nube = {
     casaTareas:      { col:'casaTareas',      leen:[] },
     ausencias:       { col:'ausencias',       leen:['admin', 'guardia', 'supervisor'] },
     cuotasLote:      { col:'cuotasLote',      leen:['admin'] },
+    debitos:         { col:'debitos',         leen:['admin'] },
   },
   carpetaDe(col, x){
     if (col !== 'privados') return col;
@@ -653,7 +657,7 @@ const Nube = {
     /* Los paquetes también: uno que llegó antes de que el otro vecino del
        lote tuviera cuenta pasa a su carpeta cuando se inscribe. */
     /* Las visitas también (12-10-2026): las de antes pasan a las carpetas de los demás del lote. */
-    ['pagos', 'recibos', 'paquetes', 'pases'].forEach(f => {
+    ['pagos', 'recibos', 'paquetes', 'pases', 'debitos'].forEach(f => {
       const donde = this.pvDonde[f] || {};
       aLista(Store.s[f]).forEach(x => {
         if (!x || !x.id) return;
@@ -689,7 +693,7 @@ const Nube = {
         if (this.arrancada) this.llegoAlgo();
       }, err => { this.listos.add('pv/' + f); console.warn('No se pudo leer', 'pv/' + f, err.message);
         /* Las cuotas de cada lote son nuevas (08-10-2026): si las reglas se publican con la app abierta, se reintenta. */
-        if (f === 'cuotasLote'){ this.reintentos = this.reintentos || {}; const uid = this.uid, n = this.reintentos['pv/' + f] = (this.reintentos['pv/' + f] || 0) + 1;
+        if (f === 'cuotasLote' || f === 'debitos'){ this.reintentos = this.reintentos || {}; const uid = this.uid, n = this.reintentos['pv/' + f] = (this.reintentos['pv/' + f] || 0) + 1;
           if (n <= 30) setTimeout(() => { if (this.uid === uid && this.arrancada) this.escucharUnaPv(f, def, rol); }, 60000); }
       });
       this.esperados.add('pv/' + f);

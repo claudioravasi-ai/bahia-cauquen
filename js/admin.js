@@ -13,7 +13,8 @@
 /* Las cuentas que deben expensas: cualquier cuenta aprobada con lote cuyo
    saldo, descontado lo "por acreditar", sigue siendo positivo. */
 function deudoresExpensas(s){
-  const ids = s.users.filter(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || '')).filter(u => { const c = cuentaLote(u.casa); return c.saldo - c.informado > 0.5; }).map(u => u.id);
+  /* Con débito automático activo (02-11) no se le recuerda: se debita solo (salvo que haya rebotado). */
+  const ids = s.users.filter(u => u.estado === 'aprobado' && /^Lote\s/.test(u.casa || '') && !(typeof enDebito === 'function' && enDebito(u.casa))).filter(u => { const c = cuentaLote(u.casa); return c.saldo - c.informado > 0.5; }).map(u => u.id);
   /* El hotel (28-09): un solo aviso si alguna de sus UF debe. */
   const h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
   if (h && typeof lotesDelHotel === 'function' && lotesDelHotel().some(l => { const c = cuentaLote(l); return c.saldo - c.informado > 0.5; }) && !ids.includes(h.id)) ids.push(h.id);
@@ -120,7 +121,7 @@ const REGLAS = [
       const per = l.periodo;
       if (sumarDias(vtoDe(per, 2), 1) !== hoy) return 0;
       return marca(s, 'expimpaga-' + per, () => {
-        const conDeuda = (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => { const c = cuentaLote('Lote ' + L.lote); return c.saldo - c.informado > 0.5; });
+        const conDeuda = (typeof LOTES === 'undefined' ? [] : LOTES).filter(L => { if (typeof enDebito === 'function' && enDebito('Lote ' + L.lote, per)) return false; const c = cuentaLote('Lote ' + L.lote); return c.saldo - c.informado > 0.5; });
         /* Las UF del hotel no reciben seis avisos: le llega UNO al hotel con el total (28-09). */
         const hotelUF = conDeuda.filter(L => L.grupo === 'hotel'), h = typeof cuentaHotel === 'function' ? cuentaHotel() : null;
         if (hotelUF.length && h){ const tot = hotelUF.reduce((a, L) => { const c = cuentaLote('Lote ' + L.lote); return a + c.saldo - c.informado; }, 0);
@@ -336,6 +337,23 @@ A['lista-borrar'] = async el => {
 };
 
 /* ---------- ventana de Administración ---------- */
+/* LOS LOTES QUE TIENEN LA APP (pedido de Claudio, 02-11-2026): "en
+   Inscripciones, los lotes que actualmente tienen la app bajada, solo los
+   lotes, independiente de los vecinos por lote (los vecinos ya se ven en
+   Vecinos)". Un lote tiene la app si al menos una cuenta aprobada es de
+   ese lote (vecino, o la Administración con lote). Solo números de lote. */
+function lotesConApp(){
+  if (typeof LOTES === 'undefined') return '';
+  const con = new Set(Store.s.users.filter(u => u.estado === 'aprobado' && /^Lote\s/i.test(u.casa || '') && !['hotel', 'guardia', 'supervisor'].includes(u.rol)).map(u => u.casa));
+  const todos = LOTES.filter(L => L.grupo !== 'hotel').map(L => 'Lote ' + L.lote), si = todos.filter(l => con.has(l)), no = todos.filter(l => !con.has(l));
+  const hotel = typeof cuentaHotel === 'function' && cuentaHotel();
+  const fichas = ls => `<div class="lotes-app">${ls.map(l => `<span class="pill">${esc(l.replace(/^Lote\s*/i, ''))}</span>`).join('')}</div>`;
+  return `${sec(`Lotes con la app · ${si.length} de ${todos.length}`)}
+    <div class="card"><div class="barra-prog" style="margin:0 0 10px"><i style="width:${Math.round(si.length / (todos.length || 1) * 100)}%"></i></div>
+      <p class="muted small" style="margin:0 0 10px">Un lote cuenta si al menos una cuenta aprobada es de ese lote. Sin nombres: las personas se ven en Vecinos.${hotel ? ' El hotel (UF 000 a 005) usa su propia cuenta.' : ''}</p>
+      <details data-k="lotes-app-si" open><summary><b>Con la app (${si.length})</b></summary>${si.length ? fichas(si) : '<p class="muted small">Todavía ninguno.</p>'}</details>
+      <details data-k="lotes-app-no" style="margin-top:8px"><summary><b>Sin la app (${no.length})</b> <span class="muted small">· para invitarlos</span></summary>${no.length ? fichas(no) : '<p class="muted small">Todos los lotes tienen la app.</p>'}</details></div>`;
+}
 const PESTANAS_ADMIN = [['resumen','Resumen'],['solicitudes','Inscripciones'],['vecinos','Vecinos'],['contenido','Contenido'],['ajustes','Ajustes'],['motor','Automatizaciones'],['correos','Correos'],['auditoria','Auditoría'],['datos','Datos']];
 R.admin = {
   titulo: 'Administración', icon: 'sliders', color: 'accent', ancha: true, sub: 'Todo lo del barrio se maneja desde acá',
@@ -370,7 +388,7 @@ const ADMIN_TABS = {
       ${(() => { const misma = s.users.filter(x => x.id !== u.id && x.casa === u.casa && x.estado === 'aprobado'); return misma.length ? `<div class="small" style="margin-bottom:10px">${I('info')} En ${esc(u.casa)} ya están: ${misma.map(x => esc(x.nombre)).join(', ')}</div>` : ''; })()}
       <div class="btns">${u.estado === 'pendiente' ? `<button class="btn btn-sm btn-ok" data-a="aprobar" data-id="${u.id}">${I('check')}Aprobar y mandar clave</button><button class="btn btn-sm btn-danger-soft" data-a="rechazar" data-id="${u.id}">Rechazar</button>`
         : `<button class="btn btn-sm btn-sec" data-a="reactivar" data-id="${u.id}">Volver a pendiente</button>`}</div></div>`;
-    return `${pend.length ? pend.map(card).join('') : vacio('user', 'No hay inscripciones pendientes.')}${rech.length ? sec('Rechazadas') + rech.map(card).join('') : ''}`;
+    return `${pend.length ? pend.map(card).join('') : vacio('user', 'No hay inscripciones pendientes.')}${rech.length ? sec('Rechazadas') + rech.map(card).join('') : ''}${lotesConApp()}`;
   },
   vecinos(q){
     const s = Store.s, qq = (q || '').toLowerCase();

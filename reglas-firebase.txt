@@ -466,6 +466,24 @@ PEGAR DESDE ACÁ
           }
         }
       },
+      /* DÉBITO AUTOMÁTICO (02-11-2026, js/v-debito.js): uno por lote, en la
+         carpeta de cada cuenta del lote. Sin datos del banco (ni CBU). Lo
+         leen las cuentas del lote y la Administración. El vecino aprobado
+         solo puede dejarlo "pendiente" (avisa que está adherido o pide el
+         alta) o "baja" (vuelve al pago manual), y solo para SU lote; pasarlo
+         a "activo" (confirmado) o "rechazado" lo hace solo la Administración.
+         Nombre fijo: va antes que $carpeta y el comodín no lo toma. */
+      "debitos": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$uid": {
+          ".read": "auth.uid === $uid",
+          "$id": {
+            ".write": "newData.exists() && root.child('barrio/users').child(auth.uid).child('rol').val() === 'vecino' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val() && newData.child('lote').val() === root.child('barrio/users').child(auth.uid).child('casa').val() && (newData.child('estado').val() === 'pendiente' || newData.child('estado').val() === 'baja')",
+            ".validate": "!newData.exists() || (newData.hasChildren(['id', 'lote', 'estado']) && newData.child('id').val() === $id && newData.child('lote').isString() && (newData.child('estado').val() === 'pendiente' || newData.child('estado').val() === 'activo' || newData.child('estado').val() === 'baja' || newData.child('estado').val() === 'rechazado'))"
+          }
+        }
+      },
       "$carpeta": {
         ".read": "(($carpeta === 'privados' || $carpeta === 'reclamos' || $carpeta === 'infracciones' || $carpeta === 'pagos' || $carpeta === 'recibos') && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || ($carpeta === 'privadosGuardia' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupGarita' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia') || ($carpeta === 'privadosSupAdmin' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin') || (($carpeta === 'privadosInterno' || $carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'solicitudesPase' || $carpeta === 'llegadas' || $carpeta === 'paquetes' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia')) || (($carpeta === 'peticiones' || $carpeta === 'pases' || $carpeta === 'llegadas' || $carpeta === 'ausencias') && (root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado'))",
         "$uid": {
@@ -709,6 +727,13 @@ PEGAR DESDE ACÁ
 }
 -----------------------------------------------------------
 HASTA ACÁ
+
+✔ NUEVO 02-11-2026 (hay que volver a publicar): EL DÉBITO AUTOMÁTICO.
+- pv/debitos/<cuenta>/deb-<lote>: si el lote paga las expensas por débito
+  automático (pendiente, activo, baja o rechazado), sin datos del banco. Lo
+  leen las cuentas del lote y la Administración. El vecino solo lo pone en
+  "pendiente" o "baja" para su propio lote; "activo" lo pone solo la
+  Administración. Sin publicar esto, el botón del vecino no se guarda.
 
 ✔ NUEVO 22-10-2026, tarde (hay que volver a publicar): EL INFORME SEMANAL DE LA POLICÍA.
 - staff/informesPolicia y staff/informesPoliciaIdx: la copia del informe

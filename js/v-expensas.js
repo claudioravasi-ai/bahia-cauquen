@@ -155,7 +155,7 @@ function cuentaLote(lote){
     const acred = pagoAcreditado(p), grupo = repartoDe(p).length > 1;
     movs.push({ fecha:p.fecha ? fechaDe(p.fecha).getTime() : p.at,
       detalle: (p.estado === 'confirmado' ? `Pago recibido (${p.medio})` : acred ? 'Pago con Mercado Pago · aprobado, recibo en camino' : `Pago informado, por acreditar (${p.medio})`) + (grupo ? ` · parte del pago de ${plata(p.monto)} por ${repartoDe(p).length} UF` : ''),
-      haber:parteDelLote(p, lote), tipo:'pago', pendiente:!acred, id:p.id });
+      haber:parteDelLote(p, lote), tipo:'pago', pendiente:!acred, id:p.id, ...(p.debito ? { debito:true } : {}) });
   });
   movs.sort((a, b) => a.fecha - b.fecha);
   recargosDelLote(lote, movs).forEach(m => movs.push(m));
@@ -187,7 +187,8 @@ function recargosDelLote(lote, movs){
     const fin1 = fechaDe(vtoDe(l.periodo, 1)).getTime() + DIA - 1, hasta = ems[k + 1] ? ems[k + 1].emitidaAt : Infinity;
     const deuda = Math.round(movs.filter(m => m.fecha <= fin1).reduce((a, m) => a + (m.debe || 0) - (m.pendiente ? 0 : (m.haber || 0)), 0) * 100) / 100;
     if (deuda <= .5) return;
-    const tarde = movs.filter(m => m.tipo === 'pago' && !m.pendiente && m.fecha > fin1 && m.fecha < hasta);
+    /* El débito automático no lleva recargo: el banco lo debita el día del 1º vto, aunque se confirme después. */
+    const tarde = movs.filter(m => m.tipo === 'pago' && !m.pendiente && !m.debito && m.fecha > fin1 && m.fecha < hasta);
     const pagado = tarde.reduce((a, m) => a + (m.haber || 0), 0); if (!(pagado > 0)) return;
     const entero = Math.round((conCentavosDelLote(deuda * (1 + r / 100), lote).total - deuda) * 100) / 100;
     const monto = pagado >= deuda + entero - .005 ? entero : Math.min(entero, Math.round(pagado * r / (100 + r) * 100) / 100);
@@ -282,6 +283,9 @@ function avisoExpensas(){
   if (esAdmin() && typeof modoActivo === 'function' && modoActivo() === 'admin') return null;
   const e = estadoVencimiento(u.casa); if (!e) return null;
   const hoy = hoyISO(), mes = nombrePeriodo(e.periodo);
+  /* Débito automático (02-11): un solo renglón tranquilo hasta el 1º vto; después, nada (salvo que rebote). */
+  if (typeof enDebito === 'function' && enDebito(u.casa, e.periodo)) return e.fase === 'antes' || e.fase === 'vto1'
+    ? { k:`exp-${e.periodo}-debito`, nivel:'verde', icon:'refresh', tag:'Tus expensas · privado', at:new Date(hoy + 'T00:01').getTime(), titulo:`Expensas de ${mes}: se debitan el ${fechaCorta(e.v1)}`, texto:`${plata(e.total1)} por débito automático. No hace falta que hagas nada.`, a:'abrir', v:'expensas' } : null;
   const [nivel, titulo] = {
     antes:   [e.d1 <= 3 ? 'amarillo' : 'verde', `Expensas de ${mes}: ${e.d1 === 1 ? 'mañana es' : `faltan ${e.d1} días para`} el 1º vencimiento`],
     vto1:    ['amarillo', `Hoy es el 1º vencimiento de las expensas de ${mes}`],
@@ -406,7 +410,8 @@ function cuponHTML(lote, periodo){
       <tr class="total"><td>Total 1º vencimiento · ${fechaCorta(vtoDe(periodo, 1))}</td><td class="n">${plata(total1)}</td></tr>
       <tr class="total"><td>Total 2º vencimiento · ${fechaCorta(vtoDe(periodo, 2))} (+${cf.recargo2} %)</td><td class="n">${plata(total2)}</td></tr>
     </table>
-    <div class="caja"><b>Formas de pago</b><br>Transferencia · Alias <b>${esc(Store.s.config.alias || '')}</b> · CBU ${esc(Store.s.config.cbu || '')}<br>
+    ${typeof enDebito === 'function' && enDebito(lote, periodo) ? `<div class="caja"><b>Débito automático</b><br>El ${fechaCorta(vtoDe(periodo, 1))} se debita de la cuenta del propietario el total del 1º vencimiento. No hace falta pagarlo ni informarlo: el recibo sale cuando la Administración lo confirma con el banco.</div>` : ''}
+    <div class="caja"><b>${typeof enDebito === 'function' && enDebito(lote, periodo) ? 'Si el débito no pasa' : 'Formas de pago'}</b><br>Transferencia · Alias <b>${esc(Store.s.config.alias || '')}</b> · CBU ${esc(Store.s.config.cbu || '')}<br>
       Titular: Barrio ${esc(Store.s.config.nombre)} · CUIT ${esc(Store.s.config.cuit || '')}<br>
       Una vez pagado, informalo desde la app (Expensas → Informar pago) y te llega el recibo.</div>`;
 }
@@ -527,11 +532,11 @@ function carpetaVecino(lote, { ajena = false } = {}){
   const alDia = cuenta.saldo <= 0.5;
   /* Pagó por fuera y lo informó: la deuda queda cubierta "por acreditar". */
   const cubierto = !alDia && cuenta.saldo - cuenta.informado <= 0.5;
-  const e = estadoVencimiento(lote);
+  const e = estadoVencimiento(lote), deb = !alDia && !cubierto && !ajena && typeof enDebito === 'function' && enDebito(lote);
   const cuenta1 = e && !alDia && !cubierto ? `<span class="tp-reloj f-${e.fase}">
       <span><small>1º vto · ${fechaCorta(e.v1)}</small><b>${plata(e.total1)}</b>${e.d1 > 0 ? `<em>faltan ${plural(e.d1, 'día', 'días')}</em>` : e.d1 === 0 ? '<em>hoy</em>' : '<em>vencido</em>'}</span>
       <span><small>2º vto · ${fechaCorta(e.v2)}</small><b>${plata(e.total2)}</b>${e.d2 > 0 ? `<em>faltan ${plural(e.d2, 'día', 'días')}</em>` : e.d2 === 0 ? '<em>¡hoy es el último día!</em>' : '<em>vencido</em>'}</span></span>` : '';
-  return `
+  return `${deb ? Debito.tarjeta(lote, cuenta.saldo) : `
     <button class="tarjeta-pago ${alDia ? 'al-dia' : cubierto ? 'por-acreditar' : pagar.vencido ? 'vencida' : e && e.fase === 'ultimo' ? 'ultimo-dia' : ''}" ${alDia || ajena || cubierto ? 'disabled' : 'data-a="pagar-expensas"'}>
       <span class="tp-arriba">
         <span class="tp-rotulo">${alDia ? 'Tu cuenta está al día' : cubierto ? (pagoSimple() ? 'Pagada · la Administración la confirma con el banco' : 'Pago informado · por acreditar') : pagar.vencido ? 'Tenés un saldo vencido' : 'Tu expensa de este mes'}</span>
@@ -543,9 +548,10 @@ function carpetaVecino(lote, { ajena = false } = {}){
       ${cuenta.informado ? `<span class="tp-detalle">${I('clock')} ${plata(cuenta.informado)} ${pagoSimple() ? 'pagados: la Administración los confirma con el banco y te llega el recibo' : 'por acreditar: la Administración está corroborando tu comprobante'}${cubierto ? '' : ` · te quedarían ${plata(cuenta.saldo - cuenta.informado)}`}</span>` : ''}
       ${!alDia && !ajena && !cubierto ? `<span class="tp-pie">${I('right')}Tocá para pagar: tarjeta, Mercado Pago, billeteras, QR o transferencia</span>` : ''}
     </button>
-    ${!alDia && !ajena && !cubierto ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagué por fuera de la app · adjuntar comprobante</button>` : ''}
+    ${!alDia && !ajena && !cubierto ? `<button class="btn btn-sec btn-block btn-envuelve" style="margin:-4px 0 12px" data-a="informar-pago">${I('upload')}Ya pagué por fuera de la app · adjuntar comprobante</button>` : ''}`}
     ${puedeAdministrar() && !ajena && MercadoPago.activo() && montoDePrueba(lote) ? botonPruebaMP(montoDePrueba(lote)) : ''}
 
+    ${typeof Debito !== 'undefined' ? Debito.seccion(lote, { ajena }) : ''}
     ${L ? fichaUF(L, lote) : ''}
     ${sec('Tus cupones')}
     ${emitidas.length ? emitidas.slice(0, 12).map(l => { const cu = cuotaDe(l, lote); if (!cu) return '';
@@ -938,14 +944,14 @@ R.contabilidad = {
   },
 };
 
-const TABS_COBRO = [['plan','Automáticas'],['resumen','Resumen'],['cupones','Cupones'],['cobranzas','Pagos'],['morosos','Morosos'],['recibos','Recibos']];
+const TABS_COBRO = [['plan','Automáticas'],['resumen','Resumen'],['cupones','Cupones'],['cobranzas','Pagos'],['debito','Débito automático'],['morosos','Morosos'],['recibos','Recibos']];
 R.cobranzas = {
   titulo: 'Expensas', icon: 'wallet', color: 'wood', ancha: true, sub: 'Automáticas, cupones, pagos, morosos y recibos',
   render(p){
     if (!esAdmin()) return vacio('lock', 'Solo para la Administración.');
     const [tab, sub] = String(p || 'plan').split('|');
     const pend = Store.s.pagos.filter(porAcreditar).length;
-    return `<div class="tabs-in">${TABS_COBRO.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="abrir" data-v="cobranzas" data-p="${k}">${t}${k === 'cobranzas' && pend ? `<span class="dot-badge">${pend}</span>` : ''}</button>`).join('')}</div>
+    return `<div class="tabs-in">${TABS_COBRO.map(([k, t]) => `<button class="${k === tab ? 'on' : ''}" data-a="abrir" data-v="cobranzas" data-p="${k}">${t}${k === 'cobranzas' && pend ? `<span class="dot-badge">${pend}</span>` : ''}${k === 'debito' && aLista(Store.s.debitos).some(d => d && d.estado === 'pendiente') ? `<span class="dot-badge">${aLista(Store.s.debitos).filter(d => d && d.estado === 'pendiente').length}</span>` : ''}</button>`).join('')}</div>
       ${(COBRO[tab] || COBRO.resumen)(sub)}`;
   },
 };
@@ -1045,6 +1051,7 @@ const CONTA = {
         `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="contabilidad" data-p="cierre|${despues}">Ir a ${nombrePeriodo(despues)}</button>`) : ''}
       ${falta ? aviso('warn', 'alert', `Primero va ${nombrePeriodo(falta)}`, `Las expensas se emiten en orden y cuando el mes terminó: ${nombrePeriodo(falta)} todavía no está emitido.${calc.gastos ? ` Si los ${plural(calc.gastos, 'gasto')} de ${nombrePeriodo(periodo)} eran de ${nombrePeriodo(falta)}, pasalos con un toque.` : ''}`,
         `${calc.gastos ? `<button class="btn btn-xs btn-sec" data-a="gastos-a-periodo" data-v="${periodo}" data-p="${falta}">Pasar los ${calc.gastos} gastos a ${nombrePeriodo(falta)}</button>` : ''}${irFalta}`) : ''}
+      ${typeof Debito !== 'undefined' ? Debito.avisoCierre(periodo) : ''}
       <div class="card"><b style="font-size:16px">Cerrar ${nombrePeriodo(periodo)}</b>
         <p class="small" style="color:var(--ink-2);margin:6px 0 0">Se reparten los gastos del mes entre los ${LOTES.length} lotes según su coeficiente, se suma el Fondo de Infraestructura de ${plata(c.fondoFijo)} por lote, los gastos particulares, las multas firmes y los intereses del saldo impago.</p>
         <div class="lista" style="margin-top:10px">
@@ -1614,13 +1621,14 @@ async function mandarCupones(periodo, { silencioso = false, detalle = false, sol
              ${cu.interes ? `<tr><td style="padding:4px 0;color:#555">Intereses por saldo impago</td><td style="text-align:right">${plata(cu.interes)}</td></tr>` : ''}
              ${cu.redondeo ? `<tr><td style="padding:4px 0;color:#555">Redondeo (los centavos identifican al ${esc(x.casa)})</td><td style="text-align:right">${plata(cu.redondeo)}</td></tr>` : ''}
            </table>
+           ${!x.hotel && typeof enDebito === 'function' && enDebito(x.casa, periodo) ? `<p style="margin-top:16px;background:#eef7f1;border-radius:10px;padding:10px 12px"><b>Débito automático:</b> el ${fechaCorta(vtoDe(periodo, 1))} se debitan de tu cuenta <b>${plata(total1)}</b>. No hace falta que pagues ni que lo avises: cuando la Administración lo confirme con el banco te llega el recibo.</p>` : `
            <p style="margin-top:16px">Primer vencimiento: <b>${fechaCorta(vtoDe(periodo, 1))}</b><br>
              Segundo vencimiento: ${fechaCorta(vtoDe(periodo, 2))} — ${plata(total2)} con el recargo del ${c.recargo2} %.</p>
            <p>Podés pagar por transferencia:<br>
              Alias <b>${esc(Store.s.config.alias || '—')}</b><br>
              CBU <span style="font-family:monospace">${esc(Store.s.config.cbu || '—')}</span><br>
              ${esc(Store.s.config.cuenta || '')}</p>
-           <p>Después de pagar, informá el pago desde la app y te llega el recibo.</p>
+           <p>Después de pagar, informá el pago desde la app y te llega el recibo.</p>`}
            ${x.hotel ? `<p style="background:#f4f7f7;border-radius:10px;padding:10px 12px">Este es uno de los ${lotesDelHotel().length} cupones del ${esc(HOTEL_NOMBRE)}. Desde la app del hotel (Expensas) se pueden pagar las ${lotesDelHotel().length} UF juntas en un solo pago: la app lo reparte y emite un recibo por cada UF.</p>` : ''}`,
           { texto: x.hotel ? 'Ver las expensas del hotel' : 'Ver mi cupón en la app', url:urlApp('expensas') }, { color:'#b85f24', bajada:x.casa, datos:[[plata(total1), 'A pagar'], [fechaCorta(vtoDe(periodo, 1)), '1.er vencimiento'], [fechaCorta(vtoDe(periodo, 2)), '2.º vencimiento']] }) });
       resultados.push({ ...x, ok:envio.ok, error:envio.error });
@@ -1703,7 +1711,7 @@ REGLAS.push(
    en una función que usa también la acreditación automática de Mercado
    Pago.)
    ========================================================= */
-function confirmarPago(id, { auto = false } = {}){
+function confirmarPago(id, { auto = false, titulo = '', texto = '' } = {}){
   let numero = '';
   Store.cambiar(s => {
     const pago = s.pagos.find(x => x.id === id); if (!pago || pago.estado === 'confirmado') return;
@@ -1720,7 +1728,7 @@ function confirmarPago(id, { auto = false } = {}){
       return n; });
     if (nums.length > 1) s.config.exp = Object.assign({}, s.config.exp, { reciboNro: (c.reciboNro || 0) + nums.length });
     pago.recibo = nums.join(', ');
-    notificar(s, { para:cuentasDelCobro(pago.lote), titulo:'Recibimos tu pago', texto: nums.length > 1 ? `${plata(pago.monto)} · ${nums.length} recibos, uno por UF (${nums[0]} a ${nums.at(-1)})` : `${plata(pago.monto)} · recibo ${numero}`, icon:'check', color:'ok', link:'expensas', sonido:true });
+    notificar(s, { para:cuentasDelCobro(pago.lote), titulo:titulo || 'Recibimos tu pago', texto: texto ? `${texto} · ${plata(pago.monto)} · recibo ${numero}` : nums.length > 1 ? `${plata(pago.monto)} · ${nums.length} recibos, uno por UF (${nums[0]} a ${nums.at(-1)})` : `${plata(pago.monto)} · recibo ${numero}`, icon:'check', color:'ok', link:'expensas', sonido:true });
     auditar(s, auto ? 'Acreditó solo un pago de Mercado Pago' : 'Confirmó un pago', `${partes.length ? HOTEL_NOMBRE + ' (' + partes.length + ' UF)' : pago.lote} · ${plata(pago.monto)} · recibo${nums.length > 1 ? 's ' + nums[0] + ' a ' + nums.at(-1) : ' ' + numero}${pago.mpId ? ' · MP ' + pago.mpId : ''}`);
   });
   if (numero) Comprobantes.vencer(Store.s.pagos.find(x => x.id === id));

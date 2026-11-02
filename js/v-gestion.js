@@ -1978,7 +1978,7 @@ A['mis-datos'] = () => {
     reclamos:s.reclamos.filter(r => r.userId === u.id).map(r => ({ ...r, foto:r.foto ? '[foto]' : null })),
     peticiones:s.peticiones.filter(p => p.userId === u.id).map(p => ({ ...p, firmaVecino:'[firma]', firmaGuardia:p.firmaGuardia ? '[firma]' : '' })),
     mensajes:s.privados.filter(h => h.userId === u.id), conversacionesConVecinos:aLista(s.dms).filter(h => h && (h.a === u.id || h.b === u.id)),
-    pagos:s.pagos.filter(x => x.lote === u.casa).map(x => ({ ...x, comprobante:x.comprobante ? '[comprobante]' : undefined })), recibos:s.recibos.filter(x => x.lote === u.casa),
+    pagos:s.pagos.filter(x => x.lote === u.casa).map(x => ({ ...x, comprobante:x.comprobante ? '[comprobante]' : undefined })), recibos:s.recibos.filter(x => x.lote === u.casa), debito:aLista(s.debitos).find(x => x && x.lote === u.casa) || null,
     paquetes:(typeof paquetesDelLote === 'function' ? paquetesDelLote(u) : []).map(p => ({ id:p.id, empresa:p.empresa, detalle:p.detalle, recibido:p.recibido, retirado:p.retirado, hostId:p.hostId })),
     estoyBien: typeof Cuidado !== 'undefined' ? Cuidado.mio() : null, ausencias:aLista(s.ausencias).filter(x => x && (x.userId === u.id || x.casa === u.casa)),
     cosas:aLista(s.cosas).filter(x => x.userId === u.id), nieve:aLista(s.nieve).filter(x => x.userId === u.id), laCasa:aLista(s.casaTareas).filter(x => x.lote === u.casa) };
@@ -2039,7 +2039,8 @@ function informeMisDatos(){
   const estadoPago = p => p.estado === 'informado' && typeof esPagoMP === 'function' && esPagoMP(p) ? 'Acreditado (Mercado Pago)' : ({ confirmado:'Acreditado', informado:'Por acreditar', aprobado:'Acreditado' }[p.estado] || x(p.estado));
   out.push(bloque(`4. Expensas del lote: pagos y recibos de ${anio}`, `Los pagos de ${x(u.casa)} de este año y sus recibos. Los ven las cuentas de tu lote y la Administración; se conservan 10 años (art. 328 del Código Civil y Comercial). Los de años anteriores están en Mis expensas. Los comprobantes que subiste se borran 30 días después de confirmados.`,
     tabla(['Fecha', 'Importe', 'Medio', 'Estado', 'Informó'], pagos.map(p => [fc(p.fecha), typeof plata === 'function' ? plata(p.monto) : x(p.monto), x(p.medio), estadoPago(p), cuentasLote.has(p.userId) ? nom(p.userId) : 'La Administración']))
-    + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa && delAnio(r.fecha)).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))));
+    + tabla(['Recibo', 'Fecha', 'Importe', 'Medio'], s.recibos.filter(r => r.lote === u.casa && delAnio(r.fecha)).map(r => [x(r.numero), fc(r.fecha), typeof plata === 'function' ? plata(r.monto) : x(r.monto), x(r.medio)]))
+    + (() => { const d = aLista(s.debitos).find(z => z && z.lote === u.casa); return `<p style="margin:8px 0 0"><b>Débito automático:</b> ${d ? x((typeof ESTADOS_DEB !== 'undefined' && ESTADOS_DEB[d.estado]) || d.estado) + (d.confirmadoAt && d.estado === 'activo' ? ' desde el ' + fh(d.confirmadoAt) : '') : 'no adherido'}. Solo se guarda si el lote está adherido: la app no guarda datos de tu cuenta del banco.</p>`; })()));
   /* 5 · mensajes
      SOLO LOS DE LA SEMANA (pedido de Claudio, 10-10-2026: "se hace muy
      largo todo"). Los de los últimos 7 días van completos; de los más

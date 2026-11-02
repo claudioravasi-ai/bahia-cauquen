@@ -257,6 +257,8 @@ function migrar(s){
     hotelInfo:[], hotelVans:[], hotelMovs:[], hotelViajes:[], hotelEventos:[], hotelHuespedes:[], hotelProv:[], hotelPromos:[], hotelLiqs:[], hotelEmpleados:[], hotelDiario:[],
     /* 08-10: el resumen de cada liquidación y las cuotas de cada lote (ExpLote, js/v-expensas.js) */
     liqResumen:[], cuotasLote:[], morosos:[],
+    /* 02-11: el débito automático de cada lote (js/v-debito.js) */
+    debitos:[],
     cosas:[], nieve:[], casaTareas:[], ausencias:[],
     /* 07-10: supervisión de la guardia (js/v-supervisor.js) */
     alertasSup:[], vistos:[],

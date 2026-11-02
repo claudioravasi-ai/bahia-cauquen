@@ -6890,3 +6890,13 @@ body.vc-modo{background:#07141a}
 .ce-est svg{width:12px;height:12px}
 .ce-est.ok{color:var(--ok)}.ce-est.mal{color:var(--danger)}.ce-est.esp{color:var(--warn)}
 @media (max-width:560px){.ce-fila{grid-template-columns:30px minmax(0,1fr) auto;row-gap:4px}.ce-fila time{grid-column:2;grid-row:2;display:flex;gap:6px}.ce-ic{grid-row:1/3}.ce-est{display:none}.ce-fila .btn{grid-column:3;grid-row:1/3}}
+
+/* Lotes con la app (Administración → Inscripciones, 02-11-2026) */
+.barra-prog{height:8px;border-radius:99px;background:var(--line,rgba(0,0,0,.08));overflow:hidden}
+.barra-prog i{display:block;height:100%;border-radius:99px;background:var(--brand)}
+.lotes-app{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.lotes-app .pill{min-width:38px;justify-content:center;font-variant-numeric:tabular-nums}
+/* Débito automático (Mis expensas, 02-11-2026) */
+.deb-tarjeta{cursor:default}
+.deb-card .row{align-items:flex-start;gap:12px}
+.deb-card .row .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
