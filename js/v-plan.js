@@ -33,8 +33,22 @@ const MESES_LARGO = ['','enero','febrero','marzo','abril','mayo','junio','julio'
    1,8 %), publicado el 10-09-2026. El de septiembre sale a mediados de
    octubre: cuando salga, se actualiza acá (o la Administración pone su
    número en Plan → Cómo se calcula → "IPC para la proyección"). */
-const IPC_INDEC = { periodo:'2026-08', pct:1.7, publicado:'2026-09-10', fuente:'INDEC' };
-const ipcProyeccion = () => { const p = Store.s?.config?.plan || {}; return +p.ipcProyeccion > 0 ? { pct:+p.ipcProyeccion, periodo:p.ipcPeriodo || '', fuente:'Administración' } : IPC_INDEC; };
+const IPC_INDEC = { periodo:'2026-09', pct:1.9, publicado:'2026-10-13', fuente:'INDEC' };
+/* El IPC más nuevo que tiene la app: el cargado a mano para la proyección,
+   el que cargó la Administración en "Inflación mensual", el que trajo la
+   serie oficial o, si nada de eso, el último anotado acá arriba. */
+const ipcProyeccion = () => { const p = Store.s?.config?.plan || {}, m = p.inflacionManual, i = p.ipc;
+  if (+p.ipcProyeccion > 0) return { pct:+p.ipcProyeccion, periodo:p.ipcPeriodo || '', fuente:'Administración' };
+  const cands = [m && { pct:+m.pct, periodo:m.mes, fuente:'Administración' }, i && { pct:+i.pct, periodo:i.mes, fuente:'INDEC' }, IPC_INDEC].filter(x => x && x.periodo && +x.pct > 0);
+  return cands.sort((a, b) => b.periodo.localeCompare(a.periodo))[0]; };
+/* EL IPC QUE YA TENDRÍA QUE ESTAR (02-11-2026): el INDEC publica el de cada
+   mes a mediados del siguiente (el de septiembre de 2026 salió el 13-10),
+   pero la serie de datos.gob.ar que trae la app a veces tarda semanas más.
+   Si el que hay es más viejo que el esperable, la Administración lo ve y
+   lo carga a mano en "Inflación mensual" (y ese valor ya no se pisa). */
+const ipcEsperado = (hoy = hoyISO()) => { let p = hoy.slice(0, 7); p = periodoAnterior(p); if (+hoy.slice(8) < 15) p = periodoAnterior(p); return p; };
+const ipcAtrasado = () => { const p = cfgPlan(), tiene = [p.inflacionManual?.mes, p.ipc?.mes].filter(Boolean).sort().at(-1) || '';
+  return tiene < ipcEsperado() ? { tiene, pct:p.inflacion, falta:ipcEsperado() } : null; };
 const MESES_CORTO = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const periodoSiguiente = p => { const [a, m] = p.split('-').map(Number); return m === 12 ? `${a + 1}-01` : `${a}-${pad(m + 1)}`; };
 const mesesEntre = (a, b) => { const [y1, m1] = a.split('-').map(Number), [y2, m2] = b.split('-').map(Number); return (y2 - y1) * 12 + (m2 - m1); };
@@ -377,9 +391,11 @@ const PLAN_VISTAS = {
   },
   ajustes(){
     const p = cfgPlan(), tpl = plantillaPlan();
+    const atr = ipcAtrasado();
     return `<form data-f="plan-ajustes">
+      ${atr ? aviso('warn', 'alert', `Falta el IPC de ${nombrePeriodo(atr.falta)}`, `La serie oficial que consulta la app todavía da ${atr.tiene ? 'el de ' + nombrePeriodo(atr.tiene) : 'un mes viejo'} (${String(atr.pct).replace('.', ',')} %). El INDEC publica cada mes a mediados del siguiente: cuando salga, cargalo abajo en <b>Inflación mensual</b> y tocá Guardar.`) : ''}
       <div class="card"><h3>Supuestos</h3><div class="grid3">
-        <div class="field"><label>Inflación mensual (%)</label><input name="inflacion" type="number" step="0.1" value="${p.inflacion}"><div class="ayuda">Actualiza los gastos fijos mes a mes.</div></div>
+        <div class="field"><label>Inflación mensual (%)</label><input name="inflacion" type="number" step="0.01" value="${p.inflacion}"><div class="ayuda">${p.inflacionManual ? `Cargada a mano para el IPC de ${nombrePeriodo(p.inflacionManual.mes)}.` : p.ipc ? `IPC de ${nombrePeriodo(p.ipc.mes)} (INDEC).` : ''} Actualiza los gastos fijos mes a mes${p.metodoDeuda !== 'interes' ? ' y lo adeudado' : ''}.</div></div>
         <div class="field"><label>Cobro en término (%)</label><input name="tasaCobro" type="number" step="0.1" value="${p.tasaCobro}"><div class="ayuda">En agosto: ${(p.tasaCobroBase || 94.7).toLocaleString('es-AR')} %.</div></div>
         <div class="field"><label>Recupero de deuda por mes ($)</label><input name="recupero" type="number" step="1000" value="${Math.round(p.recupero || 0)}"><div class="ayuda">En agosto se cobraron ${plata(p.banco?.cobrosAdeudadas || 0)} de deudas.</div></div></div></div>
       <div class="card"><h3>Actualización de lo adeudado</h3>
@@ -413,7 +429,11 @@ F['plan-buscar-lote'] = d => abrir('cobranzas', 'plan|lotes~' + (d.q || ''));
 F['plan-ajustes'] = d => {
   Store.cambiar(s => {
     const p = Object.assign({}, cfgPlan());
+    const infAntes = +p.inflacion;
     ['inflacion','tasaCobro','recupero','interesPuro'].forEach(k => { if (d[k] !== '' && d[k] != null) p[k] = +d[k]; });
+    /* Inflación cambiada a mano: vale para el mes que ya tendría que estar
+       publicado, y la serie oficial no la pisa hasta traer ese mes. */
+    if (+p.inflacion !== infAntes) p.inflacionManual = { pct:+p.inflacion, mes:ipcEsperado(), at:Date.now(), por:yo()?.id || '' };
     p.diaCierre = Math.min(28, Math.max(1, +d.diaCierre || 1));
     p.metodoDeuda = d.metodoDeuda || 'interes';
     p.invierno = String(d.invierno || '').split(/[,\s]+/).map(Number).filter(m => m >= 1 && m <= 12);
@@ -653,8 +673,9 @@ REGLAS.push({ id:'plan-mensual', n:'Cierre automático de cada mes (expensas)', 
     return marca(s, 'plan-cierre-' + prev, () => {
       const n = p.autoBorrador ? completarConEstimados(s, prev) : 0;
       const x = mesPlan(prev);
+      const atr = ipcAtrasado();
       notificar(s, { para:'rol:admin', titulo:`${nombrePeriodo(prev)} está lista para ${p.autoEmitir ? 'emitirse' : 'revisar y emitir'}`,
-        texto:`${plata(x.total)} en gastos${n ? ` (${plural(n, 'estimado')})` : ''} · cuota promedio ${plata(x.cuotas / LOTES.length)}`, icon:'zap', color:'wood', link:'contabilidad:cierre|' + prev, sonido:true });
+        texto:`${plata(x.total)} en gastos${n ? ` (${plural(n, 'estimado')})` : ''} · cuota promedio ${plata(x.cuotas / LOTES.length)}${atr ? ` · Ojo: falta el IPC de ${nombrePeriodo(atr.falta)} (se usa ${String(atr.pct).replace('.', ',')} %); cargalo en Automáticas → Cómo se calcula antes de emitir` : ''}`, icon:'zap', color:'wood', link:'contabilidad:cierre|' + prev, sonido:true });
       if (p.autoEmitir) setTimeout(() => emitirLiquidacion(prev, { auto:true }), 1500);
     });
   } });
@@ -785,9 +806,12 @@ const IPC = {
       const pct = Math.round((v / prev - 1) * 10000) / 100;
       if (!(pct > -5 && pct < 50)) throw new Error('Valor fuera de rango: ' + pct);
       Store.cambiar(s => {
-        const p = Object.assign({}, cfgPlan());
-        p.ipc = { mes: String(mes).slice(0, 7), pct, at: Date.now(), fuente:'INDEC · datos.gob.ar' };
-        if (p.inflacionAuto !== false) p.inflacion = pct;
+        const p = Object.assign({}, cfgPlan()), m7 = String(mes).slice(0, 7);
+        p.ipc = { mes: m7, pct, at: Date.now(), fuente:'INDEC · datos.gob.ar' };
+        /* Lo que cargó la Administración a mano manda hasta que la serie
+           traiga un mes igual o más nuevo que el de ese valor. */
+        const man = p.inflacionManual;
+        if (!(man && man.mes > m7)){ if (p.inflacionAuto !== false) p.inflacion = pct; delete p.inflacionManual; }
         s.config.plan = p;
       });
       if (avisar) toast(`IPC de ${nombrePeriodo(String(mes).slice(0, 7))}: ${pct.toLocaleString('es-AR')} % mensual`, 'check');

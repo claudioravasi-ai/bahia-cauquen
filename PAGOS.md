@@ -23,6 +23,13 @@
    la app manda un **correo** que avisa que venció el plazo. Si pagan fuera de término, la expensa
    siguiente suma el **ajuste por inflación**. La app lo calcula sola al cerrar el mes siguiente,
    con el IPC del INDEC, que trae cada tres días (Contabilidad → Parámetros → Pago fuera de término).
+   Si la serie oficial está atrasada (el INDEC publica a mediados de cada mes), Automáticas → Cómo se
+   calcula avisa "Falta el IPC de …" y se carga a mano en "Inflación mensual"; ese valor no se pisa
+   hasta que la serie traiga un mes igual o más nuevo.
+   **El recargo del 2º vencimiento** (desde la liquidación de octubre de 2026): lo pagado después del
+   1º vencimiento y antes de la liquidación siguiente lleva su recargo como un renglón propio en la
+   cuenta del lote (pagado entero, el recargo del cupón; en parte, la parte proporcional). Así quien
+   paga el 2º vencimiento queda en cero y no le queda el recargo a favor.
 5. **Todo se cruza con Contabilidad:** cada pago confirmado es un asiento de ingreso en el Libro
    contable, cada factura es un egreso, y la Carpeta del contador los junta por mes.
 

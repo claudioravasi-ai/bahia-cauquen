@@ -32,6 +32,20 @@ const TIPOS_COMP = ['Factura A','Factura B','Factura C','Recibo','Nota de débit
 
 const cfgExp = () => Object.assign({ vto1:10, vto2:21, recargo2:1.5, interesMensual:3, fondoFijo:5000, mpLink:'', reciboNro:0, contador:'', condicion:'Exento', iibb:'', empleados:false }, Store.s.config.exp || {});
 const periodoHoy = () => hoyISO().slice(0, 7);
+/* EL MES QUE TOCA LIQUIDAR (02-11-2026). El 2-11 se emitió "Noviembre"
+   en lugar de "Octubre": Cierre de mes, Gastos del mes y el Resumen abrían
+   en el mes en curso. Las expensas de un mes se emiten cuando ese mes
+   terminó: mientras el mes anterior no esté emitido, lo que toca es ese. */
+const periodoALiquidar = () => { const hoyP = periodoHoy(), ant = periodoAnterior(hoyP), base = typeof cfgPlan === 'function' ? cfgPlan().base : '';
+  if (!liquidacionesEmitidas().length || (base && ant <= base) || liquidacionDe(ant)?.estado === 'emitida') return hoyP;
+  return ant; };
+/* El mes de antes que falta emitir (si falta), para no saltear ninguno. */
+const faltaAntes = periodo => { const ant = periodoAnterior(periodo), base = typeof cfgPlan === 'function' ? cfgPlan().base : '', ems = liquidacionesEmitidas();
+  if (!ems.length || (base && ant <= base) || ems[0].periodo > ant) return '';
+  return liquidacionDe(ant)?.estado === 'emitida' ? '' : ant; };
+/* Un mes POSTERIOR ya emitido (se emitió antes de tiempo): hay que
+   reabrirlo antes de emitir este, o cada lote quedaría con dos expensas. */
+const emitidoDespues = periodo => liquidacionesEmitidas().find(l => l.periodo > periodo)?.periodo || '';
 const periodoAnterior = p => { const [a, m] = p.split('-').map(Number); return m === 1 ? `${a - 1}-12` : `${a}-${pad(m - 1)}`; };
 const nombrePeriodo = p => { const [a, m] = p.split('-').map(Number); return `${['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][m]} ${a}`; };
 const plata = n => '$ ' + (Math.round((+n || 0) * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 });
@@ -144,10 +158,42 @@ function cuentaLote(lote){
       haber:parteDelLote(p, lote), tipo:'pago', pendiente:!acred, id:p.id });
   });
   movs.sort((a, b) => a.fecha - b.fecha);
+  recargosDelLote(lote, movs).forEach(m => movs.push(m));
+  movs.sort((a, b) => a.fecha - b.fecha);
   let saldo = 0;
   movs.forEach(m => { saldo += (m.debe || 0) - (m.pendiente ? 0 : (m.haber || 0)); m.saldo = saldo; });
   const informado = Store.s.pagos.filter(p => pagoDelLote(p, lote) && porAcreditar(p)).reduce((a, p) => a + parteDelLote(p, lote), 0);
   return { movs, saldo, informado, porAcreditar:informado };
+}
+/* =========================================================
+   EL RECARGO DEL 2º VENCIMIENTO QUEDA COBRADO (02-11-2026)
+   Después del 1º vencimiento la app pide el importe con el recargo
+   (aPagar, el cupón, "Para vos"), pero nunca lo cargaba en la cuenta: el
+   vecino que pagaba el 2º vencimiento quedaba con el recargo A FAVOR y se
+   le descontaba en la expensa siguiente. Ahora, por cada liquidación que
+   arma la app (desde la de octubre de 2026; las de Octavo Piso traen su
+   propio ajuste en la liquidación siguiente), lo que se paga después del
+   1º vencimiento y antes de la liquidación siguiente lleva su parte de
+   recargo: pagado entero, el recargo del cupón (al centavo del lote);
+   pagado en parte, la parte proporcional. Quien no paga no lleva recargo:
+   la liquidación siguiente le cobra el ajuste por mora sobre el saldo.
+   ========================================================= */
+const RECARGO_DESDE = '2026-10';
+function recargosDelLote(lote, movs){
+  const r = +cfgExp().recargo2 || 0; if (!(r > 0)) return [];
+  const ems = liquidacionesEmitidas(), out = [];
+  ems.forEach((l, k) => {
+    if (l.importada || l.real || l.periodo < RECARGO_DESDE || !cuotaDe(l, lote)) return;
+    const fin1 = fechaDe(vtoDe(l.periodo, 1)).getTime() + DIA - 1, hasta = ems[k + 1] ? ems[k + 1].emitidaAt : Infinity;
+    const deuda = Math.round(movs.filter(m => m.fecha <= fin1).reduce((a, m) => a + (m.debe || 0) - (m.pendiente ? 0 : (m.haber || 0)), 0) * 100) / 100;
+    if (deuda <= .5) return;
+    const tarde = movs.filter(m => m.tipo === 'pago' && !m.pendiente && m.fecha > fin1 && m.fecha < hasta);
+    const pagado = tarde.reduce((a, m) => a + (m.haber || 0), 0); if (!(pagado > 0)) return;
+    const entero = Math.round((conCentavosDelLote(deuda * (1 + r / 100), lote).total - deuda) * 100) / 100;
+    const monto = pagado >= deuda + entero - .005 ? entero : Math.min(entero, Math.round(pagado * r / (100 + r) * 100) / 100);
+    if (monto > 0) out.push({ fecha:tarde[0].fecha - 1, periodo:l.periodo, detalle:`Recargo del 2º vencimiento (${String(r).replace('.', ',')} %) · ${nombrePeriodo(l.periodo)}, pagada después del ${fechaCorta(vtoDe(l.periodo, 1))}`, debe:monto, tipo:'recargo' });
+  });
+  return out;
 }
 const saldoLote = lote => cuentaLote(lote).saldo;
 /* LA CUENTA SE MUESTRA CUANDO LLEGÓ ENTERA (pedido de Claudio, 23-10-2026:
@@ -252,7 +298,8 @@ function avisoExpensas(){
 function tasaMoraPct(){ return typeof tasaDeuda === 'function' ? Math.round(tasaDeuda() * 10000) / 100 : cfgExp().interesMensual; }
 function textoMora(){
   const p = typeof cfgPlan === 'function' ? cfgPlan() : {}, t = tasaMoraPct().toLocaleString('es-AR', { maximumFractionDigits:2 });
-  if (p.metodoDeuda === 'ipc') return `ajuste por inflación, IPC del INDEC${p.ipc?.mes ? ' de ' + nombrePeriodo(p.ipc.mes) : ''}: ${t} % mensual`;
+  const mesIpc = p.inflacionManual?.mes || p.ipc?.mes;
+  if (p.metodoDeuda === 'ipc') return `ajuste por inflación, IPC del INDEC${mesIpc ? ' de ' + nombrePeriodo(mesIpc) : ''}: ${t} % mensual`;
   if (p.metodoDeuda === 'ipc+interes') return `inflación (IPC del INDEC) más interés: ${t} % mensual`;
   return `interés por mora del ${t} % mensual`;
 }
@@ -904,7 +951,7 @@ R.cobranzas = {
 };
 const CONTA = {
   resumen(){
-    const per = periodoHoy(), calc = calcularLiquidacion(per), ant = liquidacionDe(periodoAnterior(per));
+    const per = periodoALiquidar(), calc = calcularLiquidacion(per), ant = liquidacionDe(periodoAnterior(per));
     const emitida = liquidacionDe(per)?.estado === 'emitida';
     return `<div class="admin-hero" style="background:var(--g-brand)">
         <b style="font-size:18px">${nombrePeriodo(per)}</b>
@@ -934,7 +981,7 @@ const CONTA = {
   },
 
   gastos(per){
-    const periodo = /^\d{4}-\d{2}$/.test(per || '') ? per : periodoHoy();
+    const periodo = /^\d{4}-\d{2}$/.test(per || '') ? per : periodoALiquidar();
     const gs = gastosDe(periodo).sort((a, b) => (a.rubro - b.rubro) || a.proveedor.localeCompare(b.proveedor));
     const total = gs.reduce((a, g) => a + (+g.total || 0), 0);
     const emitida = liquidacionDe(periodo)?.estado === 'emitida';
@@ -983,15 +1030,22 @@ const CONTA = {
   },
 
   cierre(per){
-    const periodo = /^\d{4}-\d{2}$/.test(per || '') ? per : periodoHoy();
+    const periodo = /^\d{4}-\d{2}$/.test(per || '') ? per : periodoALiquidar();
     const l = liquidacionDe(periodo), calc = calcularLiquidacion(periodo);
-    const c = cfgExp();
-    if (l && l.estado === 'emitida') return `${aviso('ok', 'check', `${nombrePeriodo(periodo)} ya está liquidado`, `Emitida ${hace(l.emitidaAt)} por ${esc(nombreDe(l.por))} · ${plural(l.cuotas.length, 'cupón', 'cupones')}`)}
+    const c = cfgExp(), falta = faltaAntes(periodo);
+    const irFalta = falta ? `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="contabilidad" data-p="cierre|${falta}">Ir a ${nombrePeriodo(falta)}</button>` : '';
+    if (l && l.estado === 'emitida') return `${falta ? aviso('danger', 'alert', `Se emitió ${nombrePeriodo(periodo)} sin haber emitido ${nombrePeriodo(falta)}`,
+        `Los cupones de ${nombrePeriodo(periodo)} vencen en ${MESES_LARGO[+vtoDe(periodo, 1).slice(5, 7)]} y no llevan el ajuste de los deudores. Para corregirlo: 1) tocá "Reabrir el período" acá abajo; 2) pasá sus gastos a ${nombrePeriodo(falta)} con el botón que aparece; 3) emití ${nombrePeriodo(falta)}. Los pagos ya hechos no se tocan.`) : ''}
+      ${aviso('ok', 'check', `${nombrePeriodo(periodo)} ya está liquidado`, `Emitida ${hace(l.emitidaAt)} por ${esc(nombreDe(l.por))} · ${plural(l.cuotas.length, 'cupón', 'cupones')}`)}
       ${superficie({ a:'ver-liquidacion', v:periodo, icon:'file', color:'wood', t:'Ver la liquidación', s:'Formato completo, para imprimir o guardar en PDF' })}
       ${superficie({ a:'mandar-cupones', v:periodo, icon:'mail', color:'sky', t:'Reenviar los cupones por correo', s:'A cada propietario con correo cargado' })}
       ${superficie({ a:'reabrir-liquidacion', v:periodo, icon:'refresh', color:'danger', t:'Reabrir el período', s:'Si hay que corregir un gasto', cls:'peligro' })}`;
-    const vencido = m => `${fechaCorta(vtoDe(periodo, m))}`;
-    return `<div class="card"><b style="font-size:16px">Cerrar ${nombrePeriodo(periodo)}</b>
+    const vencido = m => `${fechaCorta(vtoDe(periodo, m))}`, despues = emitidoDespues(periodo);
+    return `${despues ? aviso('danger', 'alert', `${nombrePeriodo(despues)} ya está emitido`, `Se emitió ${nombrePeriodo(despues)} antes que ${nombrePeriodo(periodo)}. Para no cobrar dos expensas: 1) reabrí ${nombrePeriodo(despues)}; 2) pasá sus gastos a ${nombrePeriodo(periodo)}; 3) emití ${nombrePeriodo(periodo)} acá.`,
+        `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="contabilidad" data-p="cierre|${despues}">Ir a ${nombrePeriodo(despues)}</button>`) : ''}
+      ${falta ? aviso('warn', 'alert', `Primero va ${nombrePeriodo(falta)}`, `Las expensas se emiten en orden y cuando el mes terminó: ${nombrePeriodo(falta)} todavía no está emitido.${calc.gastos ? ` Si los ${plural(calc.gastos, 'gasto')} de ${nombrePeriodo(periodo)} eran de ${nombrePeriodo(falta)}, pasalos con un toque.` : ''}`,
+        `${calc.gastos ? `<button class="btn btn-xs btn-sec" data-a="gastos-a-periodo" data-v="${periodo}" data-p="${falta}">Pasar los ${calc.gastos} gastos a ${nombrePeriodo(falta)}</button>` : ''}${irFalta}`) : ''}
+      <div class="card"><b style="font-size:16px">Cerrar ${nombrePeriodo(periodo)}</b>
         <p class="small" style="color:var(--ink-2);margin:6px 0 0">Se reparten los gastos del mes entre los ${LOTES.length} lotes según su coeficiente, se suma el Fondo de Infraestructura de ${plata(c.fondoFijo)} por lote, los gastos particulares, las multas firmes y los intereses del saldo impago.</p>
         <div class="lista" style="margin-top:10px">
           ${Object.entries(COLUMNAS).map(([k, t]) => `<div class="it"><div class="txt"><b>${t}</b></div><b class="num">${plata(calc.porColumna[k] || 0)}</b></div>`).join('')}
@@ -1333,7 +1387,12 @@ A['previsualizar'] = el => {
     <b class="num">${plata(c.total)}</b></div>`).join('')}</div>`, { ancho:'700px' });
 };
 A['emitir-liquidacion'] = async el => {
-  const periodo = el.dataset.v, calc = calcularLiquidacion(periodo);
+  const periodo = el.dataset.v, calc = calcularLiquidacion(periodo), falta = faltaAntes(periodo), despues = emitidoDespues(periodo);
+  if (despues) return hoja(`Primero reabrí ${nombrePeriodo(despues)}`, `${aviso('danger', 'alert', `${nombrePeriodo(despues)} ya está emitido`, `Si emitís ${nombrePeriodo(periodo)} así, cada lote queda con dos expensas. Reabrí ${nombrePeriodo(despues)}, pasá sus gastos a ${nombrePeriodo(periodo)} y volvé acá.`)}
+    <button class="btn btn-pri btn-block" data-a="abrir" data-v="contabilidad" data-p="cierre|${despues}">Ir a ${nombrePeriodo(despues)}</button>`);
+  if (falta) return hoja(`Primero va ${nombrePeriodo(falta)}`, `${aviso('warn', 'alert', `${nombrePeriodo(falta)} todavía no está emitido`, `Las expensas se emiten en orden: primero ${nombrePeriodo(falta)} (vence el ${fechaCorta(vtoDe(falta, 1))}) y recién después ${nombrePeriodo(periodo)}.`)}
+    <button class="btn btn-pri btn-block" data-a="abrir" data-v="contabilidad" data-p="cierre|${falta}">Ir a ${nombrePeriodo(falta)}</button>`);
+  if (periodo >= periodoHoy() && !await confirmar(`${nombrePeriodo(periodo)} todavía no terminó`, `Las expensas de ${nombrePeriodo(periodo)} se emiten cuando termina el mes, con los vencimientos el ${fechaCorta(vtoDe(periodo, 1))} y el ${fechaCorta(vtoDe(periodo, 2))}. ¿Seguro que querés emitirlas ahora?`, { si:'Emitir igual', peligro:true })) return;
   const est = gastosDe(periodo).filter(g => g.estimado).length;
   if (!await confirmar('Emitir la liquidación', `Se van a generar ${calc.cuotas.length} cupones por ${plata(calc.totalCuotas)} y cada vecino va a recibir el suyo.${est ? ` <b>Ojo: ${plural(est, 'gasto es estimado', 'gastos son estimados')}</b> (todavía no se cargó la factura real).` : ''}`, { si:'Emitir' })) return;
   emitirLiquidacion(periodo);
@@ -1361,6 +1420,34 @@ A['reabrir-liquidacion'] = async el => {
   Store.cambiar(s => { const l = s.liquidaciones.find(x => x.periodo === el.dataset.v); if (l) l.estado = 'borrador';
     auditar(s, 'Reabrió un período', el.dataset.v); });
   HotelExp.publicar(); ExpLote.publicar(); Morosos.publicar();
+};
+/* PASAR LOS GASTOS DE UN MES AL ANTERIOR (02-11-2026): para corregir un
+   mes emitido antes de tiempo. La factura real gana; si los dos meses
+   tienen el mismo gasto estimado, queda el del mes de destino (que trae
+   la actualización justa). Las cuotas se corren al número de ese mes. */
+A['gastos-a-periodo'] = async el => {
+  const de = el.dataset.v, a = el.dataset.p, gs = gastosDe(de);
+  if (liquidacionDe(de)?.estado === 'emitida') return toast(`Primero reabrí ${nombrePeriodo(de)}`, 'alert');
+  if (!gs.length) return toast(`${nombrePeriodo(de)} no tiene gastos`, 'check');
+  if (!await confirmar(`Pasar gastos a ${nombrePeriodo(a)}`, `Los ${plural(gs.length, 'gasto')} de ${nombrePeriodo(de)} (${plata(gs.reduce((x, g) => x + (+g.total || 0), 0))}) pasan a ${nombrePeriodo(a)}. Si ${nombrePeriodo(a)} ya tiene el mismo gasto como estimado, la factura real lo reemplaza y entre dos estimados queda el de ${nombrePeriodo(a)}.`, { si:'Pasarlos' })) return;
+  let movidos = 0, dobles = 0;
+  Store.cambiar(s => {
+    const k = g => typeof claveGasto === 'function' ? claveGasto(g) : g.id, mismo = (x, g) => k(x) === k(g) || (g.origen && (x.origen === g.origen || k(x) === g.origen)) || (x.origen && x.origen === k(g));
+    const tpl = typeof plantillaPlan === 'function' ? plantillaPlan() : null, esperados = tpl && a > tpl.periodo ? gastosEsperados(a, tpl) : [];
+    s.gastos.filter(g => g.periodo === de && !g.anulado).forEach(g => {
+      const otro = s.gastos.find(x => x.periodo === a && !x.anulado && x !== g && mismo(x, g));
+      if (otro && g.estimado && otro.estimado){ g.anulado = true; g.anuladoPor = 'quedó el estimado de ' + a; dobles++; return; }
+      if (otro && otro.estimado){ otro.anulado = true; otro.anuladoPor = 'lo reemplazó la factura real'; }
+      if (+g.cuotaN > 1) g.cuotaN = +g.cuotaN - mesesEntre(a, de);
+      /* Un estimado pasa con el importe que corresponde a ese mes (no con la inflación de un mes más). */
+      const e = g.estimado && esperados.find(x => k(x) === (g.origen || k(g))); if (e) g.total = e.monto;
+      g.periodo = a; if (String(g.fecha || '').slice(0, 7) === de && g.estimado) g.fecha = a + '-28'; movidos++;
+    });
+    const i = s.liquidaciones.findIndex(l => l.periodo === de && l.estado !== 'emitida'); if (i >= 0) s.liquidaciones.splice(i, 1);
+    auditar(s, 'Pasó gastos de un mes al anterior', `${nombrePeriodo(de)} → ${nombrePeriodo(a)} · ${movidos} pasados${dobles ? ` · ${dobles} estimados repetidos sacados` : ''}`);
+  });
+  toast(`Listo: ${plural(movidos, 'gasto pasado', 'gastos pasados')} a ${nombrePeriodo(a)}`, 'check');
+  abrir('contabilidad', 'cierre|' + a);
 };
 A['ver-liquidacion'] = el => imprimir(`Liquidación ${nombrePeriodo(el.dataset.v)}`, liquidacionHTML(el.dataset.v));
 /* REENVIAR CUPONES: a todos, a un lote (eligiendo a cuál de sus correos)
@@ -1913,9 +2000,9 @@ const HotelExp = {
     const lotes = new Set(lotesDelHotel()); if (!lotes.size) return [];
     return aLista(Store.s.liquidaciones).filter(l => l && l.estado === 'emitida' && aLista(l.cuotas).some(c => lotes.has(c.lote)))
       .sort((a, b) => a.periodo.localeCompare(b.periodo)).slice(-24)
-      .map(l => ({ id:'hl-' + l.periodo, periodo:l.periodo, estado:'emitida', emitidaAt:l.emitidaAt || 0, cuotas:aLista(l.cuotas).filter(c => lotes.has(c.lote)).map(c => JSON.parse(JSON.stringify(c))) }));
+      .map(l => ({ id:'hl-' + l.periodo, periodo:l.periodo, estado:'emitida', emitidaAt:l.emitidaAt || 0, ...(l.importada ? { importada:true } : {}), ...(l.real ? { real:true } : {}), cuotas:aLista(l.cuotas).filter(c => lotes.has(c.lote)).map(c => JSON.parse(JSON.stringify(c))) }));
   },
-  huella: arr => JSON.stringify(aLista(arr).map(l => [l.id, l.emitidaAt, aLista(l.cuotas).map(c => [c.lote, +c.total || 0, +c.interes || 0, +c.saldoInicial || 0, +c.expensas || 0, +c.fondo || 0, +c.redondeo || 0])]).sort()),
+  huella: arr => JSON.stringify(aLista(arr).map(l => [l.id, l.emitidaAt, !!l.importada, !!l.real, aLista(l.cuotas).map(c => [c.lote, +c.total || 0, +c.interes || 0, +c.saldoInicial || 0, +c.expensas || 0, +c.fondo || 0, +c.redondeo || 0])]).sort()),
   publicar(){
     if (yo()?.rol !== 'admin' || typeof cuentaHotel !== 'function' || !cuentaHotel()) return 0;
     if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listoParaMotor && Nube.listoParaMotor())) return 0;
