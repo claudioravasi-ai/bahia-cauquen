@@ -195,7 +195,7 @@ function cardPost(p){
       <span class="grow"></span>
       ${p.type === 'perdido' && p.autor === u.id && !p.resuelto ? `<button class="accion" data-a="post-resuelto" data-id="${p.id}">${I('check')}¡Apareció!</button>` : ''}
       ${esAdmin() ? `<button class="accion" data-a="fijar" data-id="${p.id}" title="${p.fijado ? 'Desfijar' : 'Fijar arriba'}">${I('tack')}</button>` : ''}
-      ${puedoBorrar ? `<button class="accion" data-a="borrar-post" data-id="${p.id}" title="Borrar">${I('trash')}</button>` : ''}
+      ${puedoBorrar ? `<button class="accion" data-a="borrar-post" data-id="${p.id}">${I('trash')}Borrar</button>` : ''}
     </div>
     ${puedoBorrar && p.autor !== 'sistema' ? (() => { const v = venceDelPost(p), falta = v ? v - Date.now() : 0;
       return `<div class="post-vence">${I('clock')}<span>${esc(textoVencePost(p))}${p.autor === u.id ? '. Para sacarlo antes, tocá el tachito.' : ''}</span>${p.autor === u.id && RENOVABLES.includes(p.type) && v && falta < 3 * DIA ? `<button class="link" data-a="post-renovar" data-id="${p.id}">Renovar ${plural(diasDelPost(p), 'día')} más</button>` : ''}</div>`; })() : ''}
@@ -330,7 +330,7 @@ R.servicios = {
           ${rec.length ? `<span class="pill p-warn">${I('star')}${rec.length}</span>` : ''}</div>
           ${publicaProfesion(x) ? `<div class="prof-que"><span class="pill p-brand">${I('user')}Profesión</span><b>${esc(x.profesion)}</b></div>` : ''}
           ${publicaOficio(x) ? `<div class="prof-que"><span class="pill p-wood">${I('wrench')}Oficio</span><b>${esc(x.skills)}</b></div>` : ''}
-          <div class="btns" style="margin-top:12px">${x.id !== u.id ? `${tel ? `<a class="btn btn-sm btn-wa" href="${waLink(x.tel, 'Hola ' + x.nombre.split(' ')[0] + ', te escribo por la app del barrio.')}" target="_blank" rel="noopener">${I('phone')}WhatsApp</a>
+          <div class="btns" style="margin-top:12px">${x.id !== u.id ? `${tel ? `<a class="btn btn-sm btn-wa" href="${waLink(x.tel, 'Hola ' + x.nombre.split(' ')[0] + ', te escribo por la app del barrio.')}" target="_blank" rel="noopener">${I('send')}WhatsApp</a>
               <a class="btn btn-sm btn-sec" href="${telLink(x.tel)}">${I('phone')}Llamar</a>` : ''}
             <button class="btn btn-sm btn-sec" data-a="abrir" data-v="dm" data-p="${x.id}">${I('chat')}Mensaje</button>
             <button class="btn btn-sm ${mia ? 'btn-accent' : 'btn-sec'}" data-a="recomendar" data-id="${x.id}">${I('star')}${mia ? 'Lo recomiendo' : 'Recomendar'}</button>` : `<span class="muted small">Así te ven los vecinos</span><button class="btn btn-xs btn-sec" data-a="abrir" data-v="perfil">${I('edit')}Cambiar</button>`}</div></div>`; }).join('')}</div>`

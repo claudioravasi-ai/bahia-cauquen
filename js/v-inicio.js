@@ -240,9 +240,15 @@ function tarjetaPase(p, { garita = false } = {}){
         : `${p.app && (est === 'esperado' || est === 'noingreso' || est === 'adentro') ? `<button class="btn btn-sm ${p.patente ? 'btn-sec' : 'btn-pri'}" data-a="pase-app-patente" data-id="${p.id}">${I('car')}${p.patente ? 'Cambiar la patente' : 'Agregar la patente'}</button>`
            : est === 'esperado' || est === 'noingreso' || est === 'futuro' || est === 'adentro' ? `<button class="btn btn-sm btn-sec" data-a="ver-pase" data-id="${p.id}">${I('qr')}Ver pase</button>
            ${est === 'adentro' ? '' : `<button class="btn btn-sm btn-wa" data-a="compartir-pase" data-id="${p.id}">${I('share')}Enviar</button>`}` : ''}
-           ${/* Con la visita ya adentro, mandar el pase o editarlo no tiene sentido (Claudio, 10-10-2026): quedan "Ver pase" y borrar. */ est === 'adentro' ? '' : `<button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>`}
-           ${est === 'esperado' || est === 'noingreso' || est === 'futuro' ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase">${I('x')}</button>` : ''}
-           <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button>`}
+           ${/* Con la visita ya adentro, mandar el pase o editarlo no tiene sentido (Claudio, 10-10-2026): quedan "Ver pase" y borrar. */ est === 'adentro' || (!garita && est === 'noingreso' && p.hostId === yo()?.id) /* la franja "Todavía no llegó" ya tiene "Cambiar el horario" */ ? '' : `<button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}Editar</button>`}
+           ${/* UN SOLO BOTÓN ROJO, CON NOMBRE (Claudio, 03-11-2026: "¿qué diferencia tienen el cesto y la X?").
+                Antes las dos sacaban de la lista un pase que todavía servía: eran lo mismo. Ahora, mientras el
+                pase sirve: "Cancelar" (el código deja de andar y sale de la lista; queda en el historial).
+                Vencido, no vino, adentro o ya salió: "Borrar" (sale de la lista). */
+             (!garita && est === 'noingreso' && p.hostId === yo()?.id) ? '' /* y "Ya no viene", que cancela y lo anota en el libro de guardia */
+             : est === 'esperado' || est === 'noingreso' || est === 'futuro'
+             ? `<button class="btn btn-sm btn-danger-soft" data-a="cancelar-pase" data-id="${p.id}" title="Cancelar el pase: el código deja de servir">${I('x')}Cancelar</button>`
+             : `<button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}Borrar</button>`}`}
       ${/* El celular que la visita dejó en el enlace: la garita y el vecino que la espera la pueden llamar (si se demora, si no la encuentran). */
         p.tel && ['esperado', 'noingreso', 'vencido', 'nollego', 'futuro', 'adentro'].includes(est) && (garita ? esGuardia() || esAdmin() : p.hostId === yo()?.id) ? `<a class="btn btn-sm btn-sec" href="${telLink(p.tel)}">${I('phone')}Llamar</a>` : ''}
     </div>${garita && p.borrado ? `<div class="muted tiny" style="margin-top:6px">${I('trash')} ${p.borrado.admin ? 'La Administración la borró' : 'El vecino la sacó de su lista'} ${hace(p.borrado.at)} · queda en el historial</div>` : ''}${p.editado ? `<div class="muted tiny" style="margin-top:6px">${I('edit')} Editada ${hace(p.editado.at)}</div>` : ''}</div>`;
@@ -297,7 +303,7 @@ function tarjetaFijo(p){
       <button class="btn btn-sm btn-sec" data-a="compartir-pase" data-id="${p.id}" title="Enviar el pase">${I('share')}<span>Enviar</span></button>
       ${p.tel ? `<a class="btn btn-sm btn-sec" href="${telLink(p.tel)}" title="Llamar">${I('phone')}<span>Llamar</span></a>` : ''}
       <button class="btn btn-sm btn-sec" data-a="editar-pase" data-id="${p.id}" title="Editar">${I('edit')}<span>Editar</span></button>
-      <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista">${I('trash')}</button></div>
+      <button class="btn btn-sm btn-danger-soft" data-a="borrar-pase" data-id="${p.id}" title="Borrar de mi lista: el código deja de servir">${I('trash')}<span>Borrar</span></button></div>
   </div>`;
 }
 
@@ -1416,7 +1422,7 @@ function pintarQRPublico(contenido){
   pintarQR($('#qrPub'), c);
 }
 A['cancelar-pase'] = async el => {
-  if (!await confirmar('Cancelar el pase', 'El código deja de servir en la garita.', { si:'Cancelar pase', peligro:true })) return;
+  if (!await confirmar('Cancelar el pase', 'El código deja de servir en la garita y la visita sale de tu lista. Queda en tu historial y en el de la garita.', { si:'Cancelar pase', peligro:true })) return;
   Store.cambiar(s => { const p = s.pases.find(x => x.id === el.dataset.id); if (p) p.cancelado = Date.now(); });
   toast('Pase cancelado', 'x');
 };
@@ -1488,17 +1494,19 @@ A['borrar-pase'] = async el => {
   const est = estadoPase(p), ajena = p.hostId !== yo().id && esAdmin(), vale = est === 'esperado' || est === 'noingreso' || est === 'futuro' || (p.dias?.length && !p.cancelado);
   const deOtro = !ajena && p.hostId !== yo().id;
   const texto = ajena ? `${esc(p.nombre)} · ${esc(usuario(p.hostId)?.casa || '')}. Sale de la lista del vecino y de las visitas del barrio.${vale ? ' El código deja de servir en la garita.' : ''} Lo que ya pasó queda en el historial de la garita y en la auditoría. Al vecino le llega el aviso.`
-    : `Sale de la lista de ${deOtro ? 'todo el lote (la autorizó ' + esc((p.autoriza || nombreDe(p.hostId)).split(' ')[0]) + ', le llega el aviso)' : 'tu lote'}.${est === 'esperado' || est === 'futuro' ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`;
+    : `Sale de la lista de ${deOtro ? 'todo el lote (la autorizó ' + esc((p.autoriza || nombreDe(p.hostId)).split(' ')[0]) + ', le llega el aviso)' : 'tu lote'}.${vale ? ' El código deja de servir en la garita.' : ''} Queda en el historial de la garita y en la auditoría del barrio.`;
   if (!await confirmar('Borrar la visita', texto, { si:'Borrar', peligro:true })) return;
   Store.cambiar(s => {
     const x = s.pases.find(z => z.id === p.id); if (!x) return;
-    if (ajena ? vale : est === 'esperado' || est === 'futuro') x.cancelado = Date.now();
+    /* (03-11-2026) Si todavía sirve, se anula siempre: antes un pase en "No ingresó" o un pase fijo
+       salía de la lista del vecino y el código seguía andando en la garita. */
+    if (vale) x.cancelado = Date.now();
     x.borrado = { at:Date.now(), por:yo().id, ...(ajena ? { admin:true } : {}) };
     if (ajena){
       auditar(s, 'La Administración borró una visita', `${usuario(x.hostId)?.casa || ''} · ${resumenPase(x)}`, x.id);
       notificar(s, { para:x.hostId, titulo:`La Administración borró la visita de ${x.nombre}`, texto: vale ? 'El código ya no sirve en la garita.' : 'Ya no está en tu lista.', icon:'trash', color:'warn', link:'visitas' });
     } else { auditar(s, 'Borró una visita de su lista', `${yo().casa} · ${resumenPase(x)}`, x.id);
-      if (deOtro) notificar(s, { para:x.hostId, titulo:`${yo().nombre.split(' ')[0]} borró la visita de ${x.nombre}`, texto: est === 'esperado' || est === 'futuro' ? 'El código ya no sirve en la garita.' : 'Ya no está en la lista del lote.', icon:'trash', color:'warn', link:'visitas' }); }
+      if (deOtro) notificar(s, { para:x.hostId, titulo:`${yo().nombre.split(' ')[0]} borró la visita de ${x.nombre}`, texto: vale ? 'El código ya no sirve en la garita.' : 'Ya no está en la lista del lote.', icon:'trash', color:'warn', link:'visitas' }); }
   });
   toast(ajena ? 'Visita borrada' : 'Visita borrada de tu lista', 'trash');
 };

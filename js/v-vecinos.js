@@ -158,7 +158,7 @@ function fichaVecino(f, u, staff){
     if (staff) return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="privado" data-p="${esGuardia() ? 'guardia' : 'admin'}|${x.id}">${I('chat')}Escribirle${quien}</button>`;
     if (esSupervisor()) return '';
     return `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="dm" data-p="${x.id}">${I('chat')}Mensaje${quien}</button>
-      ${x.enDirectorio && x.tel ? `<a class="btn btn-xs btn-wa" href="${waLink(x.tel)}" target="_blank" rel="noopener">${I('phone')}</a>` : ''}`;
+      ${x.enDirectorio && x.tel ? `<a class="btn btn-xs btn-wa" href="${waLink(x.tel)}" target="_blank" rel="noopener">${I('send')}</a>` : ''}`;
   }).join('');
   const prof = f.cuentas.map(x => x.enDirectorio && x.profesion ? x.profesion : '').filter(Boolean);
   const tels = veTelefonos() ? telsDe(f.lote) : [];
@@ -175,7 +175,7 @@ function fichaVecino(f, u, staff){
       ${prof.length ? `<small>${I('user')} ${esc(prof.join(' · '))}</small>` : ''}
       ${tels.length ? `<div class="ficha-tels">${tels.map(t => { const i = telInfo(t.n);
         return `<span class="ficha-tel ${i.dudoso ? 'dudoso' : ''}"><span>${t.de ? `<small>${esc(t.de)}</small>` : ''}${esc(i.ver)}${i.fijo ? ' <small>fijo</small>' : ''}${i.dudoso ? ' <small>a revisar</small>' : ''}</span>
-          ${i.tel ? `<a class="btn btn-xs btn-sec" href="${telLink(i.tel)}" aria-label="Llamar">${I('phone')}</a>` : ''}${i.wa ? `<a class="btn btn-xs btn-wa" href="${waLink(i.wa)}" target="_blank" rel="noopener" aria-label="WhatsApp">${I('chat')}</a>` : ''}</span>`; }).join('')}</div>` : ''}
+          ${i.tel ? `<a class="btn btn-xs btn-sec" href="${telLink(i.tel)}" aria-label="Llamar">${I('phone')}</a>` : ''}${i.wa ? `<a class="btn btn-xs btn-wa" href="${waLink(i.wa)}" target="_blank" rel="noopener" aria-label="WhatsApp">${I('send')}</a>` : ''}</span>`; }).join('')}</div>` : ''}
       ${veTelefonos() && notaDe(f.lote) ? `<small class="ficha-nota">${I('info')} ${esc(notaDe(f.lote))}</small>` : ''}
       ${esMio ? `<small>Es tu lote</small>` : !f.cuentas.length && f.estado !== 'baldio' && f.estado !== 'hotel' ? `<small class="muted">Todavía no usa la app</small>` : ''}
       ${botones || esAdmin() ? `<div class="btns">${botones}${esAdmin() ? `<button class="btn btn-xs btn-sec" data-a="editar-guia" data-v="${esc(f.lote)}">${I('edit')}Editar</button>` : ''}</div>` : ''}
@@ -428,7 +428,7 @@ R.obras = {
             <button class="btn btn-sm btn-sec" data-a="obra-editar" data-id="${o.id}">${I('edit')}Editar</button>
             ${o.userId === u.id && !o.porAdmin && o.estado !== 'finalizada' ? `<button class="btn btn-sm btn-sec" data-a="nuevo-pase" data-v="proveedor">${I('qr')}Pase para el personal</button>` : ''}
             <button class="btn btn-sm btn-danger-soft" data-a="obra-borrar" data-id="${o.id}">${I('trash')}Eliminar</button>
-            ${esAdmin() && o.estado === 'activa' ? `<button class="btn btn-sm btn-danger-soft" data-a="obra-pausa" data-id="${o.id}">Pausar</button>` : ''}
+            ${esAdmin() && o.estado === 'activa' ? `<button class="btn btn-sm btn-sec" data-a="obra-pausa" data-id="${o.id}">Pausar</button>` : ''}
             ${esAdmin() && o.estado === 'pausada' ? `<button class="btn btn-sm btn-ok" data-a="obra-reanudar" data-id="${o.id}">Reanudar</button>` : ''}</div>` : ''}</article>`; }).join('')}</div>` : vacio('wrench', filtro === 'pesada' ? 'Ninguna obra en curso con maquinaria pesada.' : 'No hay obras en esta lista.')}
       <p class="muted tiny" style="margin-top:12px">${I('info')} Cada obra en curso aparece todos los días en la Pizarra del día, desde que empieza hasta que termina. Los días con movimiento (mixer, camión, grúa) su dueño manda el "Aviso del día" y sale en amarillo. ${esGuardia() ? 'La garita las ve pero no las edita.' : 'La garita las ve pero no las puede editar; la Administración sí.'} El personal de obra ingresa con ART vigente (Ley 24.557). La guardia lo verifica en Proveedores.</p>`;
   },

@@ -603,7 +603,7 @@ A['aprobar'] = async el => {
     : `Hola ${u.nombre.split(' ')[0]}, ya tenés acceso a la app del barrio ${Store.s.config.nombre}. Entrá con tu email y la clave ${clave}: ${urlApp()}`;
   hoja('Inscripción aprobada', `${aviso(salio ? 'ok' : 'warn', salio ? 'mail' : 'info', salio ? 'Le avisamos por correo' : 'El correo quedó en la bandeja de salida', salio ? u.email : 'Avisale por WhatsApp:')}
     ${clave ? `<div class="codigo-grande">${clave}</div>` : ''}
-    <div class="btns">${u.tel ? `<a class="btn btn-wa" href="${waLink(u.tel, msg)}" target="_blank" rel="noopener">${I('phone')}WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar mensaje</button></div>`);
+    <div class="btns">${u.tel ? `<a class="btn btn-wa" href="${waLink(u.tel, msg)}" target="_blank" rel="noopener">${I('send')}WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar mensaje</button></div>`);
 };
 /* LOTE ALQUILADO (07-10-2026): cuando entra o se va un inquilino, los dueños del lote se enteran. */
 function avisoLoteAlquilado(s, x, entra){
@@ -727,7 +727,7 @@ F['alta-vecino'] = async d => {
   hoja('Cuenta creada', `${aviso('ok', 'check', `${esc(nombre)} ya puede entrar`, `${esc(d.casa)} · ${esc(RELACIONES[d.relacion])}${x.relacion === 'inquilino' ? ' · el lote quedó alquilado' : ''}`)}
     <p class="small" style="margin:0 0 6px">Correo: <b>${esc(email)}</b></p><div class="codigo-grande">${esc(clave)}</div>
     <p class="muted small">Contraseña provisoria. También le mandamos un correo con estos datos.</p>
-    <div class="btns">${x.tel ? `<a class="btn btn-wa" href="${waLink(x.tel, msg)}" target="_blank" rel="noopener">${I('phone')}Mandárselo por WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar el mensaje</button></div>`);
+    <div class="btns">${x.tel ? `<a class="btn btn-wa" href="${waLink(x.tel, msg)}" target="_blank" rel="noopener">${I('send')}Mandárselo por WhatsApp</a>` : ''}<button class="btn btn-sec" data-a="copiar" data-v="${esc(msg)}">${I('copy')}Copiar el mensaje</button></div>`);
 };
 A['alta-staff'] = () => hoja('Alta de personal', `<form data-f="alta-staff"><div class="field"><label>Nombre</label><input name="nombre" required></div>
   <div class="grid2"><div class="field"><label>Rol</label><select name="rol"><option value="guardia">Guardia</option><option value="admin">Administración</option></select></div><div class="field"><label>DNI</label><input name="dni" inputmode="numeric"></div></div>
@@ -958,7 +958,7 @@ A['ficha-lote'] = el => {
       ${dato('Dirección', p.direccion)}
       ${dato('DNI / CUIT', p.dni)}
       ${dato('Correo', p.email, p.email ? `<button class="btn btn-xs btn-sec" data-a="copiar" data-v="${esc(p.email)}">${I('copy')}</button>` : '')}
-      ${dato('Teléfono', p.tel, p.tel ? `<a class="btn btn-xs btn-wa" href="${waLink(p.tel)}" target="_blank" rel="noopener">${I('phone')}</a>` : '')}
+      ${dato('Teléfono', p.tel, p.tel ? `<a class="btn btn-xs btn-wa" href="${waLink(p.tel)}" target="_blank" rel="noopener">${I('send')}</a>` : '')}
       <div class="it"><div class="txt"><b>Cuenta en la app</b><span>${u ? esc(u.nombre) + ' · ' + esc(u.email) : 'Todavía no tiene'}</span></div></div>
       <div class="it"><div class="txt"><b>Saldo de expensas</b><span>${cuenta.movs.length ? plural(cuenta.movs.length, 'movimiento') : 'sin movimientos'}</span></div>
         <b class="num" style="color:${cuenta.saldo > .5 ? 'var(--danger)' : 'var(--ok)'}">${plata(Math.max(0, cuenta.saldo))}</b></div>

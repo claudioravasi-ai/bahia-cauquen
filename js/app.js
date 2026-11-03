@@ -587,7 +587,7 @@ function pintar(){
       <button class="volver-btn" data-a="cerrar-ventana" aria-label="Volver a ${esc(titulo(R[PILA[PILA.length - 2].id] || {}, PILA[PILA.length - 2].param) || 'atrás')}">${I('left')}</button>
       <span class="ic ic-${def.color || 'brand'}">${I(def.icon || 'grid')}</span>
       <div class="tit"><h2>${esc(titulo(def, activa.param))}</h2>${def.sub ? `<div class="sub">${esc(typeof def.sub === 'function' ? def.sub(activa.param) : def.sub)}</div>` : ''}</div>
-      <span class="cab-accion" id="cabAccion"></span><button class="cerrar" data-a="volver" data-i="0" aria-label="Cerrar e ir al inicio">${I('x')}</button></header>` : '';
+      <span class="cab-accion" id="cabAccion"></span>${/* (03-11-2026) Con una sola pantalla abierta la ✕ hacía lo mismo que la flecha: solo aparece si hay pantallas en el medio. */ PILA.length > 2 ? `<button class="cerrar" data-a="volver" data-i="0" aria-label="Cerrar todo e ir al inicio" title="Cerrar todo e ir al inicio">${I('x')}</button>` : ''}</header>` : '';
   let html;
   if (typeof accionCabecera !== 'undefined') accionCabecera = '';
   try { html = def.render(activa.param); }
@@ -2176,7 +2176,7 @@ document.addEventListener('change', e => { const f = e.target.matches && e.targe
 document.addEventListener('reset', e => { if (e.target.matches && e.target.matches('form')) setTimeout(() => conformidadAlDia(e.target), 0); });
 let conformidadPendiente = false;
 const conformidadRevisar = () => { if (conformidadPendiente) return; conformidadPendiente = true;
-  requestAnimationFrame(() => { conformidadPendiente = false; document.querySelectorAll('form').forEach(f => { if (f.querySelector('input[type="checkbox"][required]')) conformidadAlDia(f); }); }); };
+  setTimeout(() => { conformidadPendiente = false; document.querySelectorAll('form').forEach(f => { if (f.querySelector('input[type="checkbox"][required]')) conformidadAlDia(f); }); }, 20); };
 new MutationObserver(conformidadRevisar).observe(document.documentElement, { childList:true, subtree:true });
 /* Las páginas que se abren por enlace (el pase de la visita) se arman antes de esta línea. */
 conformidadRevisar(); window.addEventListener('load', conformidadRevisar);
