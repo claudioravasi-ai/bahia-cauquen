@@ -5,14 +5,14 @@
    ========================================================= */
 :root{
   --bg:#f2f4f3; --surface:#ffffff; --surface-2:#f6f8f7; --surface-3:#eaefed;
-  --ink:#0f1f1e; --ink-2:#3d4f4d; --muted:#6c7d7a; --line:#e2e8e6; --line-2:#d3dcd9;
+  --ink:#0f1f1e; --ink-2:#3d4f4d; --muted:#5b6b68; --line:#e2e8e6; --line-2:#d3dcd9;
   --brand:#0d6b66; --brand-2:#14968c; --brand-soft:#dcefec; --brand-ink:#ffffff;
   --accent:#7445c0; --accent-soft:#eee6fa;
-  --wood:#b85f24; --wood-soft:#fbe9dc;
-  --danger:#d33a3a; --danger-soft:#fde5e5;
-  --ok:#1b8f5a; --ok-soft:#dcf3e7;
-  --warn:#b7790a; --warn-soft:#fcf0d2;
-  --sky:#2b6fb3; --sky-soft:#e1edf9;
+  --wood:#a3511c; --wood-soft:#fbe9dc;
+  --danger:#c22f2f; --danger-soft:#fde5e5;
+  --ok:#14784b; --ok-soft:#dcf3e7;
+  --warn:#946000; --warn-soft:#fcf0d2;
+  --sky:#2563a3; --sky-soft:#e1edf9;
   --sh-1:0 1px 2px rgba(15,31,30,.05),0 1px 1px rgba(15,31,30,.03);
   --sh-2:0 2px 6px rgba(15,31,30,.06),0 10px 28px rgba(15,31,30,.07);
   --sh-3:0 18px 50px rgba(15,31,30,.18);
@@ -250,7 +250,7 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
 .btn-danger{background:var(--danger);color:#fff}
 .btn-danger-soft{background:var(--danger-soft);color:var(--danger)}
 .btn-accent{background:var(--accent);color:#fff}
-.btn-wa{background:#1fa855;color:#fff}
+.btn-wa{background:#137f3f;color:#fff}
 .btn-block{width:100%}
 .btn-sm{padding:8px 12px;font-size:13px;border-radius:11px;min-height:38px}
 .btn-xs{padding:6px 10px;font-size:12px;border-radius:9px;gap:5px;min-height:34px}
@@ -469,7 +469,7 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .accion{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:700;padding:7px 10px;border-radius:10px;text-decoration:none}
 .accion:hover{background:var(--surface-3);color:var(--ink)}
 .accion svg.i{width:17px;height:17px}
-.accion.wa{color:#1a9a4d}
+.accion.wa{color:#137f3f}
 .comentarios{margin-top:10px;display:flex;flex-direction:column;gap:10px}
 .cmt{display:flex;gap:8px}
 .cmt .burb{background:var(--surface-3);border-radius:4px 14px 14px 14px;padding:8px 12px;font-size:13.5px;min-width:0}
@@ -624,7 +624,10 @@ button.opcion:hover{border-color:var(--brand)}
    portal no scrollea por su cuenta, en una pantalla baja el formulario de
    inscripción queda cortado y el botón de enviar es inalcanzable. Pasaba
    justamente eso. */
-.portal{position:relative;min-height:100dvh;max-height:100dvh;overflow-y:auto;overflow-x:hidden;
+/* 02-11-2026: ocupa el alto de #app (que ya mide --alto) en vez de 100dvh:
+   en el iPhone 100dvh puede ser más alto que la pantalla real y lo de abajo
+   quedaba cortado por el cuerpo fijo. */
+.portal{position:relative;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   display:flex;isolation:isolate;color:#fff;
   padding:calc(26px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom))}
@@ -671,7 +674,13 @@ button.opcion:hover{border-color:var(--brand)}
 @media (min-width:900px){ .portal-contenido{max-width:520px} }
 
 /* Las pantallas de invitado (pase, inscripción) comparten la misma foto */
-.bienvenida{position:relative;min-height:100dvh;display:flex;flex-direction:column;isolation:isolate;color:#fff;
+/* Y SCROLLEAN como el portal (pedido de Claudio, 02-11-2026: "a la visita no
+   le aparece el botón verde de Generar mi pase en el celular"). Tenían
+   min-height:100dvh y sin desplazamiento propio: con el cuerpo de la página
+   fijo, todo lo que no entraba en la pantalla (el botón, la casilla de los
+   datos) quedaba cortado abajo y no había forma de llegar. */
+.bienvenida{position:relative;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;isolation:isolate;color:#fff;
   padding:calc(26px + env(safe-area-inset-top)) 18px calc(22px + env(safe-area-inset-bottom))}
 .bienvenida > *{width:100%;max-width:470px;margin-inline:auto}
 .bienvenida::after{content:"";position:fixed;inset:0;z-index:-1;
@@ -1461,6 +1470,11 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 .dmv-sin{margin:12px 2px 0;font-size:13px}
 .dmv-sin summary{cursor:pointer;color:var(--muted)}
 .dmv-barra{position:sticky;bottom:0;margin-top:12px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh-2, 0 -4px 18px rgba(0,0,0,.08));display:flex;flex-direction:column;gap:8px;z-index:2}
+/* CELULAR ACOSTADO O CHICO (02-11-2026): con 375 px de alto, la barra de
+   escribir pegada abajo ocupaba 201 de los 219 px que quedan bajo el
+   encabezado y la lista de vecinos no se veía (en un iPhone SE, la mitad).
+   En pantallas bajas va en su lugar, sin pegarse. */
+@media (max-height:600px){ .dmv-barra{position:static} }
 .dmv-elegidos{font-size:13px;color:var(--ink-2);overflow-wrap:anywhere}
 .dmv-barra textarea{width:100%;resize:vertical}
 
@@ -1580,7 +1594,7 @@ button.notif > svg.i:last-child{width:17px;height:17px;color:var(--muted);flex:n
 
 /* ---- Agenda: teléfono + WhatsApp ---- */
 .tel-acciones{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
-.tel-btn.wa{background:color-mix(in srgb,#25d366 16%,var(--surface));color:#128c4a;border-color:color-mix(in srgb,#25d366 40%,transparent)}
+.tel-btn.wa{background:color-mix(in srgb,#25d366 16%,var(--surface));color:#0e6e3a;border-color:color-mix(in srgb,#25d366 40%,transparent)}
 :root[data-theme="dark"] .tel-btn.wa{color:#5fe39a}
 @media (max-width:420px){ .tel-btn.wa span{display:none} }
 .agenda-cat{scroll-margin-top:12px} #agendaResultados{scroll-margin-top:12px}
@@ -1893,7 +1907,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .dea-corazon svg.i{width:32px;height:32px;color:#e11d2e;fill:#e11d2e;animation:deaLate 1s ease-in-out infinite}
 @keyframes deaLate{0%,100%{transform:scale(1)}15%{transform:scale(1.22)}30%{transform:scale(1)}45%{transform:scale(1.14)}60%{transform:scale(1)}}
 .dea-pedir{--dea-carga:0%;position:relative;overflow:hidden;border:0;border-radius:999px;padding:12px 18px;min-height:46px;font:inherit;font-weight:800;letter-spacing:.5px;
-  color:#fff;background:#16a34a;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  color:#fff;background:#15803d;cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
   animation:deaTitila 1.1s ease-in-out infinite alternate}
 .dea-pedir::before{content:'';position:absolute;inset:0;width:var(--dea-carga);background:#0b5d27;transition:width .05s linear}
 .dea-pedir span{position:relative}
@@ -2295,7 +2309,10 @@ details.man-cap[open] .man-n{background:var(--accent);color:#fff}
 @media (min-width:1000px){
   .garita-grid{grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto 1fr;grid-template-areas:"titulo lado" "main lado";column-gap:18px}
   .garita-grid.sin-titulo{grid-template-rows:1fr;grid-template-areas:"main lado"}
-  .garita-lado{align-self:start;position:sticky;top:8px;margin-bottom:0;max-height:calc(100vh - 16px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:0 4px 8px 0}
+  /* El alto máximo descuenta el encabezado y la cabecera de la ventana (~200 px):
+     con "toda la pantalla" la columna era más alta que lo visible y en una tablet
+     acostada (1024×768) "Otro día" y "Abrir el libro completo" no se alcanzaban (02-11-2026). */
+  .garita-lado{align-self:start;position:sticky;top:8px;margin-bottom:0;max-height:calc(100vh - 200px);max-height:calc(var(--alto,100dvh) - 200px - env(safe-area-inset-top));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:0 4px 8px 0}
 }
 .tareas-dia{padding:12px 14px}
 .tareas-dia summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
@@ -3076,6 +3093,9 @@ button.srv-fila{cursor:pointer}
 .hr-punto{position:absolute;top:50%;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;display:grid;place-items:center;padding:0;cursor:pointer;
   border:2.5px solid var(--surface);background:var(--sky);color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .15s}
 .hr-punto svg{width:14px;height:14px}
+/* Los escalonados (--r = renglón 1 o 2) suben 30 px por renglón con una rayita hasta su hora. */
+.hr-punto[style*="--r"]{margin-top:calc(-14px - var(--r) * 30px)}
+.hr-punto[style*="--r"]::after{content:"";position:absolute;left:50%;top:100%;width:2px;margin-left:-1px;height:calc(var(--r) * 30px - 12px);background:var(--line-2);pointer-events:none}
 .hr-punto:hover,.hr-punto:focus-visible{transform:scale(1.18);z-index:2}
 .hr-punto.e-en_curso{background:var(--warn);animation:hrLatido 1.6s ease-in-out infinite}
 .hr-punto.e-hecho{background:var(--ok)}
@@ -4855,7 +4875,7 @@ body.rk-arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .pn-t-pie{display:flex;gap:8px;align-items:flex-start;padding:10px 16px 14px;font-size:12px;opacity:.88;border-top:1px solid rgba(255,255,255,.12)}
 .pn-t-pie svg.i{width:16px;height:16px;flex:none}
 @media (max-width:420px){ .pn-t-cuerpo{grid-template-columns:minmax(0,1fr) 112px} .pn-t-nom{font-size:18px} }
-.btn-wa{background:#1fa855;color:#fff;border-color:#1fa855}
+.btn-wa{background:#137f3f;color:#fff;border-color:#137f3f}
 /* la banda de la garita */
 .pn-banda{border:1px solid color-mix(in srgb,#3b3f8f 30%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,#3b3f8f 8%,var(--surface)),var(--surface) 60%)}
 .pn-banda-cab{display:flex;align-items:center;gap:10px}
@@ -5247,7 +5267,7 @@ button.turno-banda>svg.i:last-child{width:18px;height:18px;color:var(--muted)}
 .lg{display:flex;flex-direction:column;gap:7px}
 .lg-fila{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:8px}
 .lg-lbl{display:flex;flex-direction:column;line-height:1.1}
-.lg-lbl b{font-size:12.5px;color:var(--c,var(--ink))}
+.lg-lbl b{font-size:12.5px;color:color-mix(in srgb,var(--c,var(--ink)) 55%,var(--ink))}
 .lg-lbl small{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .lg-pista{position:relative;height:26px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line)}
 .lg-plan{position:absolute;top:3px;bottom:3px;border-radius:7px;border:1.5px dashed color-mix(in srgb,var(--c) 70%,transparent);background:color-mix(in srgb,var(--c) 9%,transparent)}
@@ -5260,7 +5280,7 @@ button.turno-banda>svg.i:last-child{width:18px;height:18px;color:var(--muted)}
 .lg-reglas .lg-pista{height:16px;background:none;border:0}
 .lg-horas i{position:absolute;top:0;transform:translateX(-50%);font-style:normal;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
 .lg-horas i:first-child{transform:none} .lg-horas i:last-of-type{transform:translateX(-100%)}
-.lg-ahora-et{position:absolute;top:-2px;transform:translateX(-50%);padding:0 5px;border-radius:6px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;z-index:3}
+.lg-ahora-et{position:absolute;top:-2px;transform:translateX(-50%);padding:0 5px;border-radius:6px;background:#dc2626;color:#fff;font-size:10px;font-weight:800;z-index:3}
 .lg-ref{display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end;font-size:11px;color:var(--muted);margin-top:2px}
 .lg-ref span{display:inline-flex;align-items:center;gap:5px}
 .lg-ref i{width:16px;height:9px;border-radius:3px;display:inline-block}
@@ -5978,7 +5998,7 @@ li.prox .rm-gn{background:#ff9a3d}
 .ag-prog i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#ffd36b,#7be0a6);transition:width .5s cubic-bezier(.2,.9,.3,1)}
 .ag-prog b{font-size:12px;white-space:nowrap}
 .ag-cats{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
-.ag-cat{border:0;border-radius:99px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:800;white-space:nowrap;cursor:pointer;background:color-mix(in srgb,var(--c) 14%,var(--surface));color:var(--c);transition:transform .15s,background .2s}
+.ag-cat{border:0;border-radius:99px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:800;white-space:nowrap;cursor:pointer;background:color-mix(in srgb,var(--c) 14%,var(--surface));color:color-mix(in srgb,var(--c) 82%,var(--ink));transition:transform .15s,background .2s}
 .ag-cat b{opacity:.75}.ag-cat.on{background:var(--c);color:#fff}.ag-cat:active{transform:scale(.93)}
 .ag-lista{list-style:none;margin:0;padding:0}
 .ag-it{position:relative;display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 11px;margin-bottom:8px;border-radius:16px;
@@ -6900,3 +6920,31 @@ body.vc-modo{background:#07141a}
 .deb-tarjeta{cursor:default}
 .deb-card .row{align-items:flex-start;gap:12px}
 .deb-card .row .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
+
+/* ---- Para el dedo y para leer (SKILL DISEÑO, 02-11-2026) ----
+   Medido en 866 pantallas × 7 perfiles, de día y de noche:
+   - Los enlaces de texto («Ver todo», «Sumar», «Actualizar», «Manual de uso interactivo»)
+     medían 14 a 20 px de alto, fácil de errarles con el dedo. Ganan relleno arriba y abajo
+     y el margen negativo devuelve el mismo espacio: se tocan mejor y nada se mueve.
+   - La paleta de día (arriba) quedó un punto más oscura en gris, rojo, verde, ámbar, madera y
+     celeste: la letra de esos colores ahora se lee al sol (4,5 a 1 contra el fondo).
+   - De noche, la letra blanca sobre los colores claros (etiquetas AUTO, filtros de la agenda,
+     descuentos de las promos) pasa a oscura.
+   - Botón del DEA, nombres de los turnos y la etiqueta roja de la hora: un tono más oscuro. */
+#app button.link:not(.btn){padding-top:4px;padding-bottom:4px;margin-top:-4px;margin-bottom:-4px}
+#app .hu-lista>.link{margin-top:2px}
+.manual-link{padding:5px 0;top:calc(100% - 2px)}
+@media (max-width:520px){ .manual-link{top:calc(100% + 2px)} }
+.pie-app button{padding:5px 8px}
+#app summary{min-height:24px}
+.hr-pista>i small{color:var(--ink-2)}
+:root[data-theme="dark"] :is(.ag-auto,.ag-cat.on){color:#0a1315}
+:root[data-theme="dark"] .accion.wa{color:#5fe39a}
+:root[data-theme="dark"] :is(.bt-tipos input:checked+span,.bt-tipos input:checked+span b,.bt-cat.on b,.bt-cat.on small){color:#0a1315}
+:root[data-theme="dark"] :is(.hp-desc,.promo-desc){background:#a3511c}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) :is(.ag-auto,.ag-cat.on){color:#0a1315}
+  :root:not([data-theme="light"]) .accion.wa{color:#5fe39a}
+  :root:not([data-theme="light"]) :is(.bt-tipos input:checked+span,.bt-tipos input:checked+span b,.bt-cat.on b,.bt-cat.on small){color:#0a1315}
+  :root:not([data-theme="light"]) :is(.hp-desc,.promo-desc){background:#a3511c}
+}

@@ -303,11 +303,11 @@ function datosAdmin(periodo){
 }
 
 /* ---------- el informe: en tablas, para que salga igual en la app, el correo y el PDF ---------- */
-const INF_COL = { urgente:['#c9302c', '#fdecea', 'Urgente', 'Enfrentar ya'], reclamable:['#b7790a', '#fdf4dc', 'Reclamable', 'A quién y qué reclamarle'], solucionable:['#1b8f5a', '#e6f6ee', 'Solucionable', 'Lo resuelve la Administración'] };
+const INF_COL = { urgente:['#c9302c', '#fdecea', 'Urgente', 'Enfrentar ya'], reclamable:['#946000', '#fdf4dc', 'Reclamable', 'A quién y qué reclamarle'], solucionable:['#14784b', '#e6f6ee', 'Solucionable', 'Lo resuelve la Administración'] };
 function informeAdminHTML(d, { correo = false } = {}){
   const AZ = '#0b3c47', VE = '#0d6b66', GR = '#5f6f6c', BO = '#e2e8e6', c = Store.s.config;
-  const OK = '#1b8f5a', AM = '#e0a100', RO = '#c9302c', VA = '#e4eaE8';
-  const ir = (v, p, txt) => correo ? `<a href="${esc(urlApp(p ? v + '/' + p : v))}" style="color:${VE};font-weight:700">${txt}</a>` : `<a href="#" data-a="abrir" data-v="${esc(v)}" data-p="${esc(p || '')}" style="color:${VE};font-weight:700">${txt}</a>`;
+  const OK = '#14784b', AM = '#e0a100', RO = '#c9302c', VA = '#e4eaE8';
+  const ir = (v, p, txt) => correo ? `<a href="${esc(urlApp(p ? v + '/' + p : v))}" style="color:${VE};font-weight:700">${txt}</a>` : `<a href="#" data-a="abrir" data-v="${esc(v)}" data-p="${esc(p || '')}" style="color:${VE};font-weight:700;display:inline-block;padding:5px 2px;margin:-5px -2px">${txt}</a>`;
   const sello = (real, txt) => d.sim ? `<span style="font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:99px;margin-left:8px;vertical-align:2px;background:${real ? '#e6f6ee' : '#f0e9fb'};color:${real ? OK : '#6a3fb5'}">${txt || (real ? 'Dato real' : 'Simulado')}</span>` : '';
   const h2 = (n, t, real) => `<h2 style="font-size:17px;color:${AZ};margin:30px 0 10px;padding:0 0 7px;border-bottom:3px solid ${VE}"><span style="color:${VE};font-weight:800">${n}</span>&nbsp; ${t}${sello(real)}</h2>`;
   const kpi = (n, t, sub = '', col = AZ) => `<td style="width:25%;padding:4px;vertical-align:top"><div style="border:1px solid ${BO};border-radius:12px;padding:12px 6px;text-align:center;background:#fff"><div style="font-size:23px;font-weight:800;color:${col};line-height:1.1">${n}</div><div style="font-size:10px;color:${GR};text-transform:uppercase;letter-spacing:.03em;margin-top:5px;line-height:1.25">${t}</div>${sub ? `<div style="font-size:10.5px;color:${GR};margin-top:2px">${sub}</div>` : ''}</div></td>`;

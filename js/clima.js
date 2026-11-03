@@ -2,6 +2,9 @@
    Clima de Ushuaia en vivo (Open-Meteo, gratis y sin clave)
    y la luz del día, que decide si la portada va de día o de noche.
    ========================================================= */
+/* (02-11-2026) Tope de 12 s para los servicios de afuera: con señal mala un pedido
+   puede quedar colgado y la app no volvía a intentar hasta cerrarla y abrirla. */
+const conTope = () => (window.AbortSignal && AbortSignal.timeout ? { signal:AbortSignal.timeout(12000) } : {});
 const Clima = {
   LAT: -54.81, LON: -68.33, KEY: 'bhc.clima',
   d: null, cargando: null,
@@ -17,7 +20,7 @@ const Clima = {
       `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,snowfall,precipitation,is_day` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,snowfall_sum,wind_gusts_10m_max,precipitation_probability_max` +
       `&timezone=America%2FArgentina%2FUshuaia&forecast_days=4&wind_speed_unit=kmh`;
-    this.cargando = fetch(url).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+    this.cargando = fetch(url, conTope()).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
       this.d = { t: Date.now(), c: j.current, dd: j.daily };
       try { localStorage.setItem(this.KEY, JSON.stringify(this.d)); } catch(e){}
       return this.d;
@@ -101,7 +104,7 @@ const Agua = {
     const url = `https://marine-api.open-meteo.com/v1/marine?latitude=${this.LAT}&longitude=${this.LON}` +
       `&current=sea_surface_temperature,wave_height&hourly=sea_surface_temperature&past_days=1&forecast_days=1` +
       `&cell_selection=sea&timezone=America%2FArgentina%2FUshuaia`;
-    this.cargando = fetch(url).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
+    this.cargando = fetch(url, conTope()).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => {
       const c = j.current || {}, temp = c.sea_surface_temperature;
       if (temp == null) return this.d;
       /* La de hace 24 horas, para decir si sube o baja. */

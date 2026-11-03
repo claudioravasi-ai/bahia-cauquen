@@ -493,10 +493,16 @@ function vanViva(v, { acciones = false } = {}){
 function rielDia(vs, dia){
   const desde = 6 * 60, hasta = 24 * 60, pos = m => Math.max(0, Math.min(100, (m - desde) / (hasta - desde) * 100));
   const ahora = dia === hoyISO() ? `<span class="hr-ahora" style="left:${pos(ahoraMin())}%"><small>ahora</small></span>` : '';
-  const puntos = vs.filter(x => minDe(x.sale) != null).map(x => { const e = ESTADO_VIAJE[x.estado] || ESTADO_VIAJE.programado;
-    return `<button type="button" class="hr-punto e-${esc(x.estado)}" style="left:${pos(minDe(x.sale))}%" data-a="hviaje-ver" data-id="${esc(x.id)}" title="${esc(x.sale)} · ${esc(textoViaje(x))} · ${e[0]}" aria-label="${esc(x.sale)} ${esc(textoViaje(x))}">${I((DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro)[1])}</button>`; }).join('');
+  /* ESCALONADOS (02-11-2026): en el celular una hora del riel mide ~17 px y
+     cada punto 28: dos traslados a 40 minutos se tapaban y el de abajo no se
+     podía tocar. El que cae a menos de 130 min del anterior de su renglón
+     sube a otro renglón (hasta 3), con una rayita hasta su hora. */
+  const fin = [], conHora = vs.filter(x => minDe(x.sale) != null).sort((a, b) => minDe(a.sale) - minDe(b.sale));
+  const fila = m => { let r = fin.findIndex(u => m - u >= 130); if (r < 0) r = fin.length < 3 ? fin.length : fin.indexOf(Math.min(...fin)); fin[r] = m; return r; };
+  const puntos = conHora.map(x => { const e = ESTADO_VIAJE[x.estado] || ESTADO_VIAJE.programado, r = fila(minDe(x.sale));
+    return `<button type="button" class="hr-punto e-${esc(x.estado)}" style="left:${pos(minDe(x.sale))}%${r ? `;--r:${r}` : ''}" data-a="hviaje-ver" data-id="${esc(x.id)}" title="${esc(x.sale)} · ${esc(textoViaje(x))} · ${e[0]}" aria-label="${esc(x.sale)} ${esc(textoViaje(x))}">${I((DESTINOS_HOTEL[x.destino] || DESTINOS_HOTEL.otro)[1])}</button>`; }).join('');
   const marcas = [6, 9, 12, 15, 18, 21, 24].map(h => `<i style="left:${pos(h * 60)}%"><small>${h}</small></i>`).join('');
-  return `<div class="hr-riel" role="group" aria-label="Los traslados del día en una línea de 6 a 24 horas"><div class="hr-pista">${marcas}${ahora}${puntos}</div></div>`;
+  return `<div class="hr-riel" role="group" aria-label="Los traslados del día en una línea de 6 a 24 horas"${fin.length > 1 ? ` style="padding-top:${20 + (fin.length - 1) * 30}px"` : ''}><div class="hr-pista">${marcas}${ahora}${puntos}</div></div>`;
 }
 /* La línea de tiempo: cada traslado se toca y se abre. */
 function lineaTraslados(vs, { dia = hoyISO(), acciones = false, max = 99 } = {}){

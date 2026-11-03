@@ -36,7 +36,7 @@ const Sismos = {
     if (this.cargando) return this.cargando;
     const desde = new Date(Date.now() - 15 * DIA).toISOString().slice(0, 10);
     const q = new URLSearchParams({ format:'geojson', starttime:desde, minmagnitude:'3.5', orderby:'time', limit:'300', ...this.CAJA });
-    this.cargando = fetch('https://earthquake.usgs.gov/fdsnws/event/1/query?' + q)
+    this.cargando = fetch('https://earthquake.usgs.gov/fdsnws/event/1/query?' + q, conTope())
       .then(r => r.ok ? r.json() : Promise.reject(new Error('USGS ' + r.status)))
       .then(j => {
         const lista = (j.features || []).map(f => this.deUSGS(f)).filter(x => x && x.mag != null);
