@@ -6948,3 +6948,7 @@ body.vc-modo{background:#07141a}
   :root:not([data-theme="light"]) :is(.bt-tipos input:checked+span,.bt-tipos input:checked+span b,.bt-cat.on b,.bt-cat.on small){color:#0a1315}
   :root:not([data-theme="light"]) :is(.hp-desc,.promo-desc){background:#a3511c}
 }
+
+/* Conformidad primero (03-11-2026): debajo del botón apagado, por qué no se puede seguir. */
+.conformidad-aviso{margin:6px 0 0;font-size:12.5px;font-weight:700;text-align:center;color:var(--ink-2)}
+:is(.bienvenida,.portal) .conformidad-aviso{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}

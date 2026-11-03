@@ -2159,6 +2159,27 @@ document.addEventListener('submit', e => {
   try { const r = f(d, form, e); if (r && r.catch) r.catch(err => avisarFalla(err, form.dataset.f)); }
   catch(err){ avisarFalla(err, form.dataset.f); }
 });
+/* CONFORMIDAD PRIMERO (pedido de Claudio, 03-11-2026: "si no se cliquea el
+   consentimiento, el botón Generar mi pase sigue activo"). En cualquier formulario
+   con casillas obligatorias (consentimiento, términos, ART de obras…) el botón de
+   enviar queda apagado hasta marcarlas todas, con una línea que dice por qué.
+   Antes lo frenaba solo el aviso del navegador, que en el celular casi no se ve. */
+const CONFORMIDAD_AVISO = 'Para seguir, marcá la casilla de conformidad de arriba.';
+function conformidadAlDia(form){
+  const cs = [...form.querySelectorAll('input[type="checkbox"][required]')]; if (!cs.length) return;
+  const b = form.querySelector('button:not([type="button"])'); if (!b) return;
+  const ok = cs.every(c => c.checked), aviso = form.querySelector('.conformidad-aviso');
+  if (!ok){ if (!b.disabled){ b.disabled = true; b.dataset.faltaOk = '1'; } if (!aviso) b.insertAdjacentHTML('afterend', `<p class="conformidad-aviso" role="status">${CONFORMIDAD_AVISO}</p>`); }
+  else { if (b.dataset.faltaOk){ b.disabled = false; delete b.dataset.faltaOk; } if (aviso) aviso.remove(); }
+}
+document.addEventListener('change', e => { const f = e.target.matches && e.target.matches('input[type="checkbox"][required]') && e.target.closest('form'); if (f) conformidadAlDia(f); });
+document.addEventListener('reset', e => { if (e.target.matches && e.target.matches('form')) setTimeout(() => conformidadAlDia(e.target), 0); });
+let conformidadPendiente = false;
+const conformidadRevisar = () => { if (conformidadPendiente) return; conformidadPendiente = true;
+  requestAnimationFrame(() => { conformidadPendiente = false; document.querySelectorAll('form').forEach(f => { if (f.querySelector('input[type="checkbox"][required]')) conformidadAlDia(f); }); }); };
+new MutationObserver(conformidadRevisar).observe(document.documentElement, { childList:true, subtree:true });
+/* Las páginas que se abren por enlace (el pase de la visita) se arman antes de esta línea. */
+conformidadRevisar(); window.addEventListener('load', conformidadRevisar);
 /* Las entradas de archivo con data-foto-in guardan la foto en el
    equipo y dejan { fotoId, mini } en un campo oculto. */
 document.addEventListener('change', async e => {

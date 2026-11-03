@@ -197,7 +197,7 @@ const MANUAL_CAPS = [
     ['h', 'Que la visita complete sus datos'],
     ['pasos', [
       'En <b>Tu casa → Mis visitas</b> tocá <b>"Pasale un enlace a tu visita"</b> y mandalo por WhatsApp.',
-      'Tu visita lo abre en su celular (no necesita la app ni una cuenta), ve que viene a verte a vos y a tu lote, y completa su nombre, DNI, celular, patente (si viene en auto), día y horario. <b>Nombre, DNI y celular son obligatorios</b>: sin eso no le sale el pase.',
+      'Tu visita lo abre en su celular (no necesita la app ni una cuenta), ve que viene a verte a vos y a tu lote, y completa su nombre, DNI, celular, patente (si viene en auto), día y horario. <b>Nombre, DNI y celular son obligatorios</b>: sin eso no le sale el pase. Al final marca la casilla de conformidad (sus datos se usan solo para entrar al barrio y se borran solos): <b>hasta que no la marca, el botón "Generar mi pase" queda apagado</b> y debajo le dice qué le falta. Lo mismo pasa en la inscripción, en el registro de una obra y en "Estoy bien".',
       'Toca <b>"Generar mi pase"</b> y <b>en el momento le aparece su QR</b> con el código, igual que el que mandás vos. Con <b>"Guardarlo en mi WhatsApp"</b> se manda la tarjeta del pase a su propio chat y le queda guardada. Si vuelve a abrir el enlace, la ve otra vez.',
       'A vos te llega el aviso <b>"… completó sus datos: ya tiene su QR"</b> y la visita aparece en Mis visitas, con el botón <b>"Llamar"</b> a su celular (la garita también lo tiene, por si se demora o no la encuentra). Si no la esperabas, cancelala ahí y el código deja de servir.',
     ]],
