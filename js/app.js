@@ -2239,6 +2239,8 @@ Store.alCambiar(remoto => {
    Ahora entra directo: el puntito del encabezado dice si ya está conectada, y
    lo que llega de la base se va sumando solo.
    ========================================================= */
+let rutaPolicia = '';
+window.addEventListener('hashchange', () => { if (/^#\/(punto|ronda)\//.test(location.hash)) rutaPublica(); });
 function rutaPublica(){
   const h = location.hash;
   if (h.startsWith('#/pedir/')){ if (!$('#pedidoPublico form')) pintarPedirPase(h.slice(8)); return true; }
@@ -2246,8 +2248,11 @@ function rutaPublica(){
   /* El recordatorio para el calendario de la visita (12-10-2026). */
   if (h.startsWith('#/cal/')){ if (!$('#calPublico')) pintarCalendarioPublico(h.slice(6)); return true; }
   if (h.startsWith('#/inscripcion/')){ pintarInscripcion(decodeURIComponent(h.slice(14))); return true; }
-  if (h.startsWith('#/punto/')){ if (!$('#puntoPublico')) pintarPunto(h.slice(8)); return true; }
-  if (h.startsWith('#/ronda/')){ if (!$('#puntoPublico')) pintarRondaHabilitar(h.slice(8)); return true; }
+  /* (03-11-2026) Se vuelve a dibujar solo si cambió el QR: si el teléfono
+     abre el QR del próximo punto en la MISMA pestaña, antes seguía la
+     pantalla del punto anterior y no aparecía "Registrar paso". */
+  if (h.startsWith('#/punto/')){ if (!$('#puntoPublico') || rutaPolicia !== h){ rutaPolicia = h; pintarPunto(h.slice(8)); } return true; }
+  if (h.startsWith('#/ronda/')){ if (!$('#puntoPublico') || rutaPolicia !== h){ rutaPolicia = h; pintarRondaHabilitar(h.slice(8)); } return true; }
   /* El brazo de los chicos de mantenimiento (15-10-2026, js/mant-vivo.js). */
   if (h.startsWith('#/mant/')){ pintarMantBrazo(h.slice(7)); return true; }
   /* El chofer de la van del hotel (27-10-2026, js/van-chofer.js). */

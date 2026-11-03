@@ -2343,13 +2343,20 @@ function pintarPunto(codigo, yaBusco){
       ${gp && gp.f ? `<img class="rm-pp-foto" src="${gp.f}" alt="Foto del lugar de este punto">` : ''}
       <form id="puntoForm"><p style="margin:0 0 12px;opacity:.9">Punto de control de la ronda. Registrá tu paso: queda anotado con la hora exacta en la garita.</p>
         ${r ? `<p style="margin:0 0 12px"><b>${esc(r.nombre || 'Policía de ronda')}</b> · código ••${esc(r.c.slice(-2))} <button type="button" class="enlace" id="puntoOtro" style="color:inherit;text-decoration:underline">no soy yo</button></p>`
-          : `<div class="field"><label>Código de ronda (6 números)</label><input name="c" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Te lo da la garita al empezar"></div>`}
-        <button class="btn btn-pri btn-block btn-grande">${I('check')}Registrar paso</button>
+          : `<div class="field"><label>Código de ronda (6 números)</label><input name="c" required inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="Te lo da la garita al empezar"></div>`}
+        <button class="btn btn-pri btn-block btn-grande" ${r ? '' : 'disabled'}>${I('check')}Registrar paso</button>
+        ${r ? '' : `<p class="tiny" id="puntoFalta" style="margin:8px 0 0">${I('info')} Escribí los 6 números del código para poder registrar.</p>`}
         <p class="tiny" style="opacity:.75;margin:10px 0 0">Solo cuenta con el código que la garita le da al policía de turno. Tu nombre y la hora del paso los ven solo la garita y la Administración del barrio (Ley 25.326).</p></form>
-      <div id="puntoRes"></div>${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}`}</div></section>`;
+      <div id="puntoRes"></div><div id="rondaCola">${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}</div>`}</div></section>`;
   if (typeof rondaColaVaciar === 'function') setTimeout(rondaColaVaciar, 300);
   $('#puntoOtro')?.addEventListener('click', () => { Ronda.olvidar(); pintarPunto(codigo); });
   const f = $('#puntoForm'); if (!f) return;
+  /* 03-11: sin el código guardado, el botón queda apagado hasta tener los 6
+     números (antes lo frenaba solo el globito del navegador, que en el
+     celular casi no se ve). Acepta "123 456" y lo deja en números. */
+  if (f.c) f.c.addEventListener('input', () => { const v = soloDigitos(f.c.value).slice(0, 6), b = f.querySelector('button:not([type="button"])');
+    if (f.c.value !== v) f.c.value = v;
+    b.disabled = v.length !== 6; const x = $('#puntoFalta'); if (x) x.hidden = v.length === 6; });
   f.addEventListener('submit', async e => {
     e.preventDefault();
     const c = r ? r.c : soloDigitos(f.c.value);
@@ -2367,13 +2374,17 @@ function pintarPunto(codigo, yaBusco){
       if (!r) Ronda.guardar(c, '');
       if (!g && !guardado){ g = await bajarGuia(c); gps = aLista(g && g.pts); gp = gps.find(x => x.id === id); }
       /* 17-10: el teléfono anota el punto y muestra solo el próximo, con su foto. */
-      const hoy = RondaLocal.anotar(id, g);
+      const antes = RondaLocal.leer(), hoy = RondaLocal.anotar(id, g);
+      /* 03-11: el mismo QR dos veces en la ronda cuenta una sola vez (se le avisa). */
+      const repetido = antes.some(x => x.id === id) && hoy.length === antes.length && hoy[0].at === antes[0].at;
       f.hidden = true;
       const fotoAca = $('#puntoPublico .rm-pp-foto'); if (fotoAca) fotoAca.hidden = true;
       const hechos = g ? rondaHechosLocales(g) : [], px = g ? rondaProximo(g, hechos) : null;
       res.innerHTML = `${guardado ? aviso('warn', 'clock', `Guardado en tu teléfono · ${hora(paso.t)} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Acá no hay señal: el paso queda con esta hora y se manda solo cuando vuelva. Seguí la ronda tranquilo.`)
-        : aviso('ok', 'check', `Leído · ${hora(Date.now())} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Llevás ${plural(hechos.length || hoy.length, 'punto', 'puntos')} en esta ronda.${gps.length ? '' : ' Seguí al próximo.'}`)}
+        : aviso('ok', 'check', `Leído · ${hora(Date.now())} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. ${repetido ? 'Este punto ya lo habías leído en esta ronda: cuenta una sola vez. ' : ''}Llevás ${plural(hechos.length || hoy.length, 'punto', 'puntos')} en esta ronda.${gps.length ? '' : ' Seguí al próximo.'}`)}
         ${g ? rondaProximoHTML(g, hechos) : ''}${g ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:10px" id="verMiRecorrido">${I('map')}Ver todo mi recorrido</button>` : ''}`;
+      /* 03-11: el cartel de pasos guardados sin señal se pone al día con este paso. */
+      const cola = $('#rondaCola'); if (cola) cola.innerHTML = rondaColaAviso();
       rondaVibrar();
       if (px && px.p) setTimeout(() => $('#puntoRes .rm-prox')?.scrollIntoView({ block:'start', behavior:'smooth' }), 120);
       $('#verMiRecorrido')?.addEventListener('click', () => { history.replaceState(null, '', '#/ronda/guia'); pintarGuiaPolicia(g, Ronda.leer()); });

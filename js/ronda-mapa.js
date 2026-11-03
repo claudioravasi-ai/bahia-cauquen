@@ -616,14 +616,18 @@ function rondaGuiaHTML(g, { hechos = [] } = {}){
 const RondaLocal = {
   KEY:'bhc.ronda.pasos',
   leer(){ try { return JSON.parse(localStorage.getItem(this.KEY) || '[]').filter(x => x && Date.now() - x.at < 90 * MIN); } catch(e){ return []; } },
-  /* Anota el punto leído. Si ese punto ya estaba en la ronda (o la ronda ya
-     estaba completa), empieza una ronda nueva en este teléfono. */
+  /* Anota el punto leído. Si la ronda ya estaba completa, o empezó hace más
+     de una hora, empieza una ronda nueva en este teléfono (igual que la
+     garita, procesarPasos en js/v-inicio.js). (03-11-2026) Volver a leer un
+     punto de la ronda en curso ya no la reinicia: antes, si el policía
+     escaneaba dos veces el mismo QR, su teléfono volvía a "1 de 10" y le
+     decía que le faltaban los puntos anteriores, que la garita sí tenía. */
   anotar(id, g){
     let hoy = this.leer();
     const ids = aLista(g && g.pts).map(p => p.id).filter(Boolean);
     const completa = ids.length && ids.every(i => hoy.some(x => x.id === i));
-    if (completa || hoy.some(x => x.id === id)) hoy = [];
-    hoy.push({ id, at:Date.now() });
+    if (completa || (hoy.length && Date.now() - hoy[0].at > HORA)) hoy = [];
+    if (!hoy.some(x => x.id === id)) hoy.push({ id, at:Date.now() });
     try { localStorage.setItem(this.KEY, JSON.stringify(hoy)); } catch(e){}
     return hoy;
   },
@@ -694,7 +698,8 @@ function rondaColaAviso(){
 async function rondaColaVaciar(){
   if (!RondaCola.leer().length) return;
   const r = await RondaCola.mandar();
-  document.querySelectorAll('#puntoPublico .rm-cola').forEach(el => { el.outerHTML = rondaColaAviso(); });
+  const caja = document.getElementById('rondaCola');
+  if (caja) caja.innerHTML = rondaColaAviso(); else document.querySelectorAll('#puntoPublico .rm-cola').forEach(el => { el.outerHTML = rondaColaAviso(); });
   if (r.ok) toast(r.ok === 1 ? 'Volvió la señal: se mandó el paso que estaba guardado' : `Volvió la señal: se mandaron los ${r.ok} pasos guardados`, 'check');
   if (r.no) toast(`${plural(r.no, 'paso guardado no se aceptó', 'pasos guardados no se aceptaron')} (el código venció). Avisá a la garita.`, 'alert');
 }

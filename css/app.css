@@ -5743,6 +5743,8 @@ li.hecho .rm-gn{background:#15a862}
 .rm-pp-in small{display:block;font-size:12px;opacity:.85}
 /* El próximo punto en el teléfono del policía, con la foto grande (17-10-2026) */
 /* 18-10: los pasos guardados sin señal (pantalla del policía). */
+/* 03-11: en la pantalla del policía (de noche, al aire libre) la letra chica no baja de 12,5 px. */
+#puntoPublico .tiny{font-size:12.5px;line-height:1.45}
 .rm-cola{display:flex;gap:10px;align-items:flex-start;margin:12px 0 0;padding:10px 12px;border-radius:14px;background:rgba(255,183,77,.18);border:1.5px dashed #ffb74d}
 .rm-cola svg{flex:none;width:20px;height:20px;margin-top:2px}
 .rm-cola span{display:block;font-size:13px;line-height:1.35}.rm-cola b{display:block;font-size:14px}
