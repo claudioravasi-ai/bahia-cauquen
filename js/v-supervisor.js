@@ -398,6 +398,7 @@ R.supervisor = {
       ${alertasAct.map(a => aviso('warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, esc(a.zona || ''), `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`)).join('')}
       ${centroDeControl({ s, hoy, u, g, t, lista, adentro, esperados, petPend, solas, sos, deas, ps, bit, ult, hoyBit })}
       ${partesParaElVisto()}
+      ${typeof graciasResumen === 'function' ? graciasResumen() : ''}
       ${(() => { const as = aLista(s.alertasSup).filter(a => a && Date.now() - a.at < 7 * DIA).sort((a, b) => b.at - a.at).slice(0, 8); return as.length ? sec('Alertas de los últimos 7 días') + `<div class="card lista">${as.map(a => { const tt = (typeof TIPOS_ALERTA_SUP !== 'undefined' && TIPOS_ALERTA_SUP[a.tipo]) || ['Alerta', 'alert', 'warn'];
           return `<div class="it"><span class="ic ic-${tt[2]}" style="width:34px;height:34px;border-radius:11px;display:grid;place-items:center">${I(tt[1])}</span><div class="txt"><b>${esc(a.titulo || tt[0])}</b><span style="white-space:normal">${esc(a.texto || '')} · ${relDia(isoDe(new Date(a.at))).toLowerCase()} ${hora(a.at)} h${a.hasta ? ' · volvió ' + hora(a.hasta) + ' h' : ''}</span></div></div>`; }).join('')}</div>` : ''; })()}
       ${mirarSupervision({ lista, adentro, esperados, petPend })}

@@ -137,6 +137,17 @@ function seed(){
     puntos: typeof puntosSugeridos === 'function' ? puntosSugeridos() : [],
     pasos: [],
     rondaCodigos: [],
+    /* 03-11: El Consejo informa (js/v-consejo.js) y los agradecimientos (js/gracias.js), de muestra */
+    consejo: [
+      { id:'cj-luces', tipo:'obra', titulo:'Recambio de luminarias en Los Salesianos', txt:'Se cambian las luminarias de la calle por LED: baja el consumo y mejora la luz para la ronda nocturna.',
+        fecha:D(-25), acta:'112', monto:4500000, etapa:'encurso', avance:50, por:'u_admin', at:n - 25*DIA,
+        novedades:[ { at:n - 10*DIA, txt:'Llegaron las luminarias y empezó la colocación.', avance:20, por:'u_admin' }, { at:n - 2*DIA, txt:'Ya se cambiaron 12 de las 24.', avance:50, por:'u_admin' } ] },
+      { id:'cj-obras-inv', tipo:'decision', titulo:'Horario de obras en invierno', txt:'De mayo a agosto, las obras terminan a las 17 h por la poca luz. Rige desde el próximo invierno.',
+        fecha:D(-12), acta:'111', por:'u_admin', at:n - 12*DIA, novedades:[] },
+    ],
+    gracias: [
+      { id:'gr-1', userId:'u_diego', lote:'Lote 18', de:'Diego P. · Lote 18', para:{ t:'garita' }, txt:'Gracias por ayudarme anoche con el portón.', at:n - 5*HORA },
+    ],
     peticiones: [],
     auditoria: [ { id:uid(), at:n - 30*DIA, por:'u_admin', accion:'Aprobó una inscripción', detalle:'Lucía Fernández · Lote 42', ref:'u_lucia' } ],
     obras: [

@@ -1541,9 +1541,9 @@ R.perfil = {
         <div class="field" style="margin-top:10px"><label>Quiénes viven en la casa</label><input name="integrantes" id="pfInt" value="${esc(u.integrantes || '')}" maxlength="160"></div>
         <button class="btn btn-pri btn-block">${I('check')}Guardar</button></form>
       ${sec('Vehículos', `<button class="link" data-a="nuevo-vehiculo">Sumar</button>`)}
-      <div class="card lista">${(u.vehiculos || []).length ? u.vehiculos.map((v, i) => `<div class="it">${I('car')}<div class="txt"><b class="mono">${esc(v.patente)}</b><span>${esc(v.modelo || '')}</span></div><button class="icon-btn" data-a="borrar-vehiculo" data-v="${i}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">La guardia reconoce tus patentes al instante.</p>'}</div>
+      <div class="card lista">${(u.vehiculos || []).length ? u.vehiculos.map((v, i) => `<div class="it">${I('car')}<div class="txt"><b class="mono">${esc(v.patente)}</b><span>${esc(v.modelo || '')}</span></div><button class="btn btn-xs btn-danger-soft" data-a="borrar-vehiculo" data-v="${i}">${I('trash')}Quitar</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">La guardia reconoce tus patentes al instante.</p>'}</div>
       ${sec('Mascotas', `<button class="link" data-a="nueva-mascota">Sumar</button>`)}
-      <div class="card lista">${(u.mascotas || []).length ? u.mascotas.map(m => `<div class="it">${m.foto ? fotoHTML(m.foto, 'mini-foto') : I('paw')}<div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.desc || '')}${m.foto ? '' : ' · sin foto'}</span></div><button class="icon-btn" data-a="editar-mascota" data-v="${m.id}" aria-label="Editar o sumar foto">${I(m.foto ? 'edit' : 'camera')}</button><button class="icon-btn" data-a="borrar-mascota" data-v="${m.id}" aria-label="Quitar">${I('trash')}</button></div>`).join('') : '<p class="muted small" style="margin:4px 0">Si se pierde, la avisás a todo el barrio con un toque.</p>'}</div>
+      <div class="card lista">${(u.mascotas || []).length ? u.mascotas.map(m => `<div class="it it-acc">${m.foto ? fotoHTML(m.foto, 'mini-foto') : I('paw')}<div class="txt"><b>${esc(m.nombre)}</b><span>${esc(m.especie || '')} · ${esc(m.desc || '')}${m.foto ? '' : ' · sin foto'}</span></div><div class="it-botones"><button class="btn btn-xs btn-sec" data-a="editar-mascota" data-v="${m.id}">${I(m.foto ? 'edit' : 'camera')}${m.foto ? 'Editar' : 'Sumar foto'}</button><button class="btn btn-xs btn-danger-soft" data-a="borrar-mascota" data-v="${m.id}">${I('trash')}Quitar</button></div></div>`).join('') : '<p class="muted small" style="margin:4px 0">Si se pierde, la avisás a todo el barrio con un toque.</p>'}</div>
       ${Store.s.infracciones.some(i => i.casa === u.casa) ? superficie({ v:'infracciones', icon:'alert', color:'danger', t:'Notificaciones de la Administración', s:'Infracciones y descargos de tu casa' }) : ''}
       ${sec('Guardia')}
       ${(() => { const au = typeof ausenciaDe === 'function' ? ausenciaDe(u) : null; return superficie({ a:'modo-viaje', icon:'lock', color:'wood', t:'Me voy de viaje', s: au ? `Casa sola hasta el ${fechaCorta(au.hasta)} · la revisan cada día` : 'La revisan cada día y te avisan que está en orden' }); })()}
@@ -1798,6 +1798,7 @@ function portadaPropietario(){
     <section class="bloque">${sec('Lo tuyo como propietario/a')}<div class="mosaico">
       ${teja({ v:'expensas', icon:'wallet', color:'wood', t:'Expensas del lote', s: saldo > 0.5 ? `Saldo ${plata(saldo)}` : 'Al día · cupones, pagos y recibos', destaca: saldo > 0.5 })}
       ${teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votar ? `${plural(votar, 'abierta')} para votar` : 'Asambleas y decisiones del barrio', badge: votar })}
+      ${teja({ v:'consejo', icon:'vote', color:'accent', t:'El Consejo informa', s:'Decisiones, obras y compras del barrio', badge: typeof Consejo !== 'undefined' ? Consejo.nuevas() : 0 })}
       ${inq.length ? teja({ v:'dm', p:inq[0].id, icon:'chat', color:'ok', t:`Escribirle a ${esc(primerNombre(inq[0].nombre))}`, s:'Tu inquilino/a, en privado' }) : ''}
       ${teja({ v:'privado', p:'admin', icon:'lock', color:'brand', t:'Mensajes con la Administración', s:'Consultas y avisos del lote' })}
       ${teja({ v:'tablero', icon:'wallet', color:'sky', t:'Las cuentas del barrio', s:'En qué se gasta, mes a mes' })}
@@ -1905,7 +1906,10 @@ A['mi-ubicacion'] = () => { if (!navigator.geolocation){ toast('Este equipo no d
   navigator.geolocation.getCurrentPosition(p => { const i = $('#pfUbi'); if (i) i.value = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`; toast('Ubicación tomada. Tocá Guardar.', 'pin'); }, () => toast('No se pudo tomar la ubicación', 'pin'), { enableHighAccuracy:true, timeout:10000 }); };
 A['nuevo-vehiculo'] = () => hoja('Sumar vehículo', `<form data-f="vehiculo"><div class="grid2"><div class="field"><label>Patente</label><input name="patente" required maxlength="10" style="text-transform:uppercase"></div><div class="field"><label>Modelo y color</label><input name="modelo" maxlength="40"></div></div><button class="btn btn-pri btn-block">Sumar</button></form>`);
 F['vehiculo'] = d => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); (x.vehiculos = x.vehiculos || []).push({ patente:d.patente.toUpperCase().trim(), modelo:d.modelo.trim() }); }); cerrarHoja(); };
-A['borrar-vehiculo'] = el => { const u = yo(); Store.cambiar(s => s.users.find(z => z.id === u.id).vehiculos.splice(+el.dataset.v, 1)); };
+/* 03-11-2026 (SKILL FUNCIÓN): quitar un auto o una mascota borraba con un solo toque del cesto, sin palabra ni pregunta. */
+A['borrar-vehiculo'] = async el => { const u = yo(), v = (u.vehiculos || [])[+el.dataset.v]; if (!v) return;
+  if (!await confirmar('Quitar el vehículo', `Se saca ${esc(v.patente)} de tu ficha: la garita deja de reconocerlo por la patente.`, { si:'Quitar', peligro:true })) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.vehiculos = (x.vehiculos || []).filter((z, i) => !(i === +el.dataset.v && z.patente === v.patente)); }); };
 A['nueva-mascota'] = () => hoja('Sumar mascota', `<form data-f="mascota"><div class="grid2"><div class="field"><label>Nombre</label><input name="nombre" required maxlength="30"></div><div class="field"><label>Especie</label><input name="especie" maxlength="20" placeholder="Perro, gata…"></div></div>
   <div class="field"><label>Cómo es</label><input name="desc" maxlength="120" placeholder="Color, tamaño, collar"></div>${campoFoto('fotoMasc')}<button class="btn btn-pri btn-block">Sumar</button></form>`);
 /* La foto de la mascota: la grande queda en este equipo; a la base va una
@@ -1932,7 +1936,9 @@ A['editar-mascota'] = el => {
     <div class="field"><label>Cómo es</label><input name="desc" maxlength="120" value="${esc(m.desc || '')}"></div>${campoFoto('fotoMasc', m.foto ? 'Cambiar la foto' : 'Sumar una foto')}
     <button class="btn btn-pri btn-block">Guardar</button></form>`);
 };
-A['borrar-mascota'] = el => { const u = yo(); Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.mascotas = x.mascotas.filter(m => m.id !== el.dataset.v); }); };
+A['borrar-mascota'] = async el => { const u = yo(), m = (u.mascotas || []).find(z => z.id === el.dataset.v); if (!m) return;
+  if (!await confirmar('Quitar la mascota', `Se saca a ${esc(m.nombre)} de tu ficha.`, { si:'Quitar', peligro:true })) return;
+  Store.cambiar(s => { const x = s.users.find(z => z.id === u.id); x.mascotas = x.mascotas.filter(z => z.id !== el.dataset.v); }); };
 A['pedir-notifs'] = async () => { try { const r = await Notification.requestPermission(); toast(r === 'granted' ? 'Avisos activados' : 'No se activaron', 'bell'); refrescar(); } catch(e){} };
 A['sonido'] = el => { setTimeout(() => { Store.sesion.sinSonido = !el.checked; Store.guardarSesion(); }, 0); return true; };
 /* =========================================================

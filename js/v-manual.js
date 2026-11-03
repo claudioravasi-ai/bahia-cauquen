@@ -358,8 +358,8 @@ const MANUAL_CAPS = [
       'Si sos propietario y no vivís en el lote: <b>"No vivo en el lote"</b> (capítulo "Lote alquilado").',
       'Tu teléfono o WhatsApp, tu profesión u oficio (y si querés mostrarlos al barrio).',
       'Quiénes viven en la casa, la dirección y la ubicación exacta (sirve para "Cómo llegar" en una emergencia). Quiénes viven en la casa lo ve también la garita en la ficha de tu lote del mapa del barrio, para saber a quién va una visita.',
-      '<b>Tus autos</b> con la patente: la garita los reconoce.',
-      '<b>Tus mascotas</b>, con foto.',
+      '<b>Tus autos</b> con la patente: la garita los reconoce. Para sacar uno, <b>Quitar</b> (te pregunta antes).',
+      '<b>Tus mascotas</b>, con foto (<b>Editar</b> o <b>Sumar foto</b>). Para sacar una, <b>Quitar</b> (te pregunta antes).',
       '<b>La foto del frente de tu casa</b>: la usa la garita para ubicar tu domicilio. Tocá <b>"Sacar foto"</b> para usar la cámara o <b>"Elegir de la galería"</b> para subir una que ya tengas (JPG, PNG, HEIC del iPhone u otro formato de imagen). Lo mismo en todos los lugares donde se adjunta una foto.',
       '<b>Me voy de viaje</b>: tu casa entra en la lista de "casas solas" de la garita. La garita o el policía de la ronda nocturna la revisa <b>una vez por día</b> y te llega el aviso <b>"Tu casa está en orden"</b> (o la novedad, si hay una). Lo ven solo la garita, la Administración y las cuentas de tu lote. Si usás "Estoy bien", queda en pausa hasta que volvés. "Ya volví" termina el aviso.',
       '<b>Sé primeros auxilios / RCP o soy del equipo de salud</b>, y qué sos: te avisamos cuando un vecino pide ayuda médica o la garita sale con el DEA.',
@@ -494,6 +494,8 @@ const MANUAL_CAPS = [
       '<b>Pizarrón</b>: los avisos de la guardia, la Administración y los vecinos. Podés publicar algo (una novedad, un evento, algo perdido o encontrado). Cada publicación <b>se borra sola</b> a su tiempo (ver "Cuánto dura lo que se publica", abajo).',
       '<b>Vecinos</b>: buscá a alguien por nombre, apellido, lote o calle ("Pérez", "42", "Los Salesianos 3500") y escribile en privado. Salen los 152 lotes con su <b>dirección</b> y quién vive (propietario o inquilino). Aunque escribas mal el apellido ("Peres"), lo encuentra.',
       '<b>Votaciones</b>: votá desde la app. Vota el titular del lote (un voto por lote); si son varios titulares y votan distinto, el voto del lote no se cuenta.',
+      '<b>El Consejo informa</b>: las decisiones del Consejo (con la fecha y el acta) y las obras y compras del barrio, con el presupuesto, la etapa y el avance. Si tenés una duda, tocá <b>"Preguntar sobre esto"</b>: le llega solo a la Administración, con el tema ya escrito.',
+      '<b>Agradecer a quien trabaja</b>: un agradecimiento corto a la guardia, a la policía nocturna o a mantenimiento (capítulo "Agradecer a quien trabaja").',
       '<b>Obras</b>: registrá tu obra ("Registrar mi obra") y marcá <b>con qué se trabaja</b>: solo obreros, herramientas eléctricas, camiones o mixer, o maquinaria pesada (retroexcavadora, grúa). La obra toma el nivel de movimiento de lo más pesado (bajo, medio, alto o muy alto) y lo ven todos; el filtro <b>"Con máquinas pesadas"</b> las junta. Los días con mixer, camión o máquina, mandá el <b>"Aviso del día"</b> y marcá qué entra: todos se enteran en la pizarra. Cuando termina una etapa, tocá <b>"Paso siguiente"</b> (un solo toque, el botón dice a qué etapa pasa); en la última dice <b>"Terminar la obra"</b>: la obra sale sola de "En curso", de la pizarra y del mapa, y queda en "Terminadas". Para contar algo con foto está <b>"Novedad"</b>. Si la obra no se hace o la cargaste por error, tocá <b>"Eliminar"</b> en cualquier momento: la borra para todos (lo pueden hacer vos y la Administración; la garita no). Para que no queden obras viejas "en curso": si tu obra no cambia en <b>30 días</b> te llega <b>"¿Tu obra sigue en…?"</b>, y si pasó la <b>fecha de fin estimado</b>, <b>"¿Terminaste la obra?"</b>. En la tarjeta de la obra aparece la misma pregunta: <b>"Sí, terminó"</b> la cierra con un toque; <b>"Sigue igual"</b> vuelve a contar 30 días, y si pasó el fin, <b>"Sigue: cambiar fecha"</b> abre Editar. También salen las <b>obras de afuera que afectan al barrio</b> (la ruta o el acceso, agua, luz o gas): las carga la Administración con el lugar, dicen "Fuera del barrio · Ruta 3…", tienen su filtro <b>"Fuera del barrio"</b> y su aviso del día llega como cualquier otro. No salen en el mapa.',
       '<b>Viajes compartidos</b>: ofrecé o buscá lugar para ir al centro, la escuela o el aeropuerto.',
       '<b>Profesionales y oficios</b>: los vecinos que ofrecen su profesión u oficio, con su WhatsApp.',
@@ -519,6 +521,16 @@ const MANUAL_CAPS = [
     ['p', 'Al publicar, la app te dice el día en que se borra. En tu publicación lo ves siempre ("Se borra solo el…"), y si querés sacarla antes, tocá el <b>tachito</b>. Cuando se borra sola, te llega el aviso. Lo que dura 30 días lo podés <b>renovar</b> desde la misma publicación los últimos 3 días. La Pizarra del día de la portada muestra lo general solo 24 horas.'],
     ['ojo', 'info', 'No hay chat vecinal', 'Lo que es para todo el barrio va al <b>pizarrón</b>. Lo que es para una persona, por <b>mensaje privado</b> (Vecinos → Mensaje, o Tu casa → Mensajes → "Buscar un vecino y escribirle", que deja elegir hasta diez y le llega a cada uno por separado).'],
   ], ir:[['abrir', 'comunidad', 'Ir a El barrio'], ['abrir', 'documentos', 'Normas y reglamentos']] },
+  { id:'gracias', icon:'heart', color:'danger', para:'vecinos', t:'Agradecer a quien trabaja', s:'La guardia, la policía nocturna y mantenimiento', b:[
+    ['p', 'Un gesto chico que a quien trabaja le cambia el día. Le llega con tu nombre de pila, la inicial de tu apellido y tu lote.'],
+    ['pasos', [
+      'Entrá por <b>El barrio → Agradecer a quien trabaja</b>, por las caritas de <b>"De guardia"</b> de la portada (botón <b>Agradecer</b>) o por el corazón de la tarjeta de alguien de mantenimiento en vivo.',
+      'Elegí a quién: cada guardia que está ahora en la garita, <b>toda la guardia</b> (para alguien que ya se fue), <b>la policía nocturna</b> (sin su nombre) o quien esté trabajando de mantenimiento.',
+      'Tocá una frase hecha ("Gracias por la ayuda"…) o escribila con tus palabras (hasta 280 letras). El botón se prende recién cuando hay algo para mandar.',
+      'Tocá <b>Mandar el agradecimiento</b>.',
+    ]],
+    ['ojo', 'info', 'Quién lo ve', 'La persona (en la garita, o en su teléfono si es de mantenimiento), la garita, la supervisión y la Administración. Ningún otro vecino. Uno por día a cada persona. Se guarda un año. En la misma ventana ves los que mandaste.'],
+  ], ir:[['abrir', 'gracias', 'Agradecer a quien trabaja']] },
 
   { id:'ciudad', icon:'pin', color:'sky', para:'vecinos', t:'Ushuaia y servicios', s:'Lo de afuera que igual te toca', b:[
     ['lista', [
@@ -570,6 +582,7 @@ const MANUAL_CAPS = [
       'Las gotas de trabajo también se ven en el <b>mapa del barrio</b> de la garita.',
       'Al tocar <b>"Salida"</b>, el enlace se apaga, sus puntos se sacan del mapa, la jornada queda en la <b>Bitácora de mantenimiento</b> (aparte del libro de guardia) y sale el parte por correo si tiene el <b>correo</b> cargado.',
       'En la <b>Bitácora de mantenimiento</b> están todas las jornadas por día, con <b>"Ver el parte"</b> (para imprimir o guardar en PDF) y <b>"Reenviar"</b>. Se guardan 12 meses.']],
+    ['p', 'Para agradecerle a alguien de mantenimiento, tocá el <b>corazón</b> (o "Gracias") en su tarjeta: le llega a su teléfono y queda en los agradecimientos del mes (capítulo "Agradecer a quien trabaja").'],
   ]},
   { id:'datos', icon:'lock', color:'brand', para:'vecinos', t:'Tus datos y tu privacidad', s:'Quién ve qué', b:[
     ['lista', [
@@ -577,6 +590,7 @@ const MANUAL_CAPS = [
       'Los <b>teléfonos de cada lote</b> que tiene la Administración los ven solo la garita, la Administración y la supervisión, para ubicarte o avisarte. Ningún vecino ni el hotel. El hotel ve solo la dirección de cada lote, sin nombres.',
       'El <b>padrón de expensas</b> (titular, DNI, correo y deuda de cada lote) lo ve <b>solo la Administración</b>. Tus expensas las ves vos y las cuentas de tu lote.',
       'Tu <b>cuota, los intereses y las multas</b> viajan solo a los teléfonos de las cuentas de tu lote; los demás vecinos no los reciben. La liquidación completa del barrio la ve solo la Administración. La única excepción son los <b>morosos del barrio</b>: si tu lote tiene deuda vencida, los demás vecinos ven el número de lote, lo que debe por mes, si está en gestión judicial y la proyección, <b>sin tu nombre</b> (como el estado de cuentas de una liquidación de expensas); no lo ven la garita, la supervisión ni el hotel, y la Administración lo puede apagar. Los <b>gastos del barrio</b> (proveedores, facturas e importes) los ven todos: es la transparencia de las expensas.',
+      'Si <b>agradecés</b> a alguien que trabaja en el barrio, lo ven esa persona, la garita, la supervisión y la Administración, con tu nombre de pila, la inicial del apellido y tu lote; ningún otro vecino. Se borra a los 12 meses.',
       'Si cargás el <b>celular de tu visita</b> (optativo), lo ven vos, la garita y la Administración. El recordatorio de una hora antes lo mandás <b>vos</b> desde tu WhatsApp: la app no le escribe a nadie.',
       'En la portada todos ven <b>quiénes están de guardia ahora en la garita</b> (su nombre, su horario y su dibujo) y si hay policía nocturna de servicio, sin su nombre. El libro de guardia sigue siendo solo de la garita, la Administración y la supervisión.',
       '<b>Las visitas son del lote</b>: las que autorizás las ven también las otras cuentas de tu mismo lote (con quién la autorizó, cuándo entró y salió), como ves vos las de ellos. Ningún otro vecino las ve.',
@@ -824,6 +838,8 @@ const MANUAL_CAPS = [
     ['p', 'Si la Administración habilita a un <b>supervisor de la guardia</b>, esa persona ve en su teléfono, en tiempo real, lo mismo que la garita: los ingresos, la bitácora, el turno, el policía y las rondas, las peticiones, los SOS y los pedidos del DEA. <b>No puede tocar nada</b>: no registra, no firma y no escribe en el libro. Cuando te escribe, te suena y aparece la teja <b>Supervisión</b> con el número de mensajes; contestale desde ahí. Esa conversación la ven solo la garita y la supervisión: ningún vecino.'],
     ['p', 'La supervisión mira la <b>bitácora del día</b> (de 00 a 24 h); para otros días toca "Ver otro día" y se trae de la base.'],
     ['p', 'La supervisión además da el <b>visto</b> a cada parte de turno (si deja observaciones, te llega un aviso y se ven en Turnos) y recibe alertas: si la app de la garita se desconecta un rato largo, si un SOS o el DEA quedan sin "Voy en camino" o si el policía pasa mucho tiempo sin ronda (este último aviso también te llega a vos, para recordárselo).'],
+    ['h', 'Los agradecimientos de los vecinos'],
+    ['p', 'Cuando un vecino le agradece a un guardia, a toda la guardia, a la policía nocturna o a alguien de mantenimiento, a la garita le llega el aviso (sin sonido) y en la portada aparece la tarjeta <b>"Agradecimientos de los vecinos"</b> con los de las últimas 24 horas. <b>Ver todos</b> muestra el mes entero, con quién recibió más. Si es para alguien de mantenimiento, además le llega a su teléfono como mensaje.'],
   ], ir:[['abrir', 'garita', 'Ir a la Garita'], ['abrir', 'bitacora', 'Bitácora']] },
 
   /* ---------- Para la supervisión de la guardia (07-10-2026) ---------- */
@@ -868,6 +884,8 @@ const MANUAL_CAPS = [
     ['h', 'Lo que no ves'],
     ['p', 'Los mensajes privados de los vecinos con la garita o con la Administración, "Estoy bien", los huéspedes del hotel, las expensas y los pagos. Lo que ves es reservado: estás obligado/a a guardar secreto (art. 10 de la Ley 25.326).'],
     ['p', 'Los avisos al celular: te llegan los SOS, los pedidos del DEA y los mensajes que te escriben. Los avisos generales del barrio (el camión, la pizarra) no.'],
+    ['h', 'Agradecimientos de los vecinos'],
+    ['p', 'En tu portada, <b>"Agradecimientos de los vecinos"</b> muestra cuántos llegaron este mes. Adentro ves cada uno, con quién recibió más (sirve para reconocer a los mejores) y podés mirar los meses anteriores. Solo para mirar: no se pueden borrar ni cambiar.'],
   ], ir:[['abrir', 'garita', 'Garita en vivo'], ['abrir', 'privado', 'Mensajes']] },
 
   /* ---------- Para el hotel ---------- */
@@ -1094,6 +1112,18 @@ const MANUAL_CAPS = [
     ['p', '<b>"Ya la pagué"</b>: mientras Mercado Pago no esté activado, los vecinos pueden marcar su expensa como pagada con un toque, sin comprobante. Te llega el aviso y el pago aparece en <b>Pagos</b> para confirmarlo con el resumen del banco (los centavos dicen el lote). Recién al confirmarlo se emite el recibo.'],
     ['p', '<b>El hotel (6 UF)</b>: sus cupones salen solos al emitir el mes, uno por UF, a su correo y a su ventana "Expensas del hotel". Paga el total de sus 6 UF en un solo pago: en "Por acreditar" aparece como <b>"Hotel Los Cauquenes · 6 UF"</b>, con cómo se reparte; al confirmarlo salen <b>6 recibos</b>, uno por UF. Los pagos con Mercado Pago del hotel se reparten y se pasan a recibo solos, como los de los vecinos. Para eso la app le deja al hotel una copia con solo sus cuotas: no ve las de nadie más.'],
     ['p', '<b>Probar Mercado Pago</b>: en tu vista de vecino, en Expensas, la tarjeta celeste <b>"Probar Mercado Pago"</b>, con el logo y la etiqueta PRUEBA (solo la ve quien administra), cobra el importe de tu último cupón aunque estés al día. Se paga con una tarjeta de prueba (titular APRO) y queda en <b>Pagos de PRUEBA</b>: no cambia tu saldo ni saca recibo, y se borra con un toque en Expensas → Pagos.'],
+    ['h', 'El Consejo informa'],
+    ['p', 'En <b>Comunicación → El Consejo informa</b> publicás, en nombre del Consejo, lo que ven los vecinos en <b>El barrio → El Consejo informa</b> (también el propietario a distancia; no el hotel ni la supervisión).'],
+    ['pasos', [
+      '<b>Publicar una decisión</b>: título, qué se decidió, la fecha de la reunión y, si hay, el número de acta.',
+      '<b>Cargar una obra o compra</b>: qué es, el presupuesto aprobado, la etapa (aprobada, en curso o terminada) y el avance en %.',
+      'Cuando hay novedad de una obra, tocá <b>Contar un avance</b>: escribís qué hay de nuevo y el nuevo %. Queda la historia, que los vecinos despliegan en la tarjeta. Al pasarla a <b>Terminada</b> queda al 100 % y baja a "Terminadas".',
+      'La casilla <b>Avisarles a los vecinos</b> manda el aviso a la campanita y al celular. Para corregir una coma, destildala.',
+      '<b>Editar</b> y <b>Borrar</b> están en cada tarjeta. Todo queda en la auditoría.',
+    ]],
+    ['p', 'Cada vecino tiene en cada tarjeta <b>"Preguntar sobre esto"</b>: te llega como mensaje privado, con el tema ya escrito. Las preguntas no quedan a la vista de los demás.'],
+    ['h', 'Agradecimientos de los vecinos'],
+    ['p', 'En <b>Garita → Agradecimientos de los vecinos</b> ves lo que los vecinos le agradecen a la guardia, a la policía nocturna y a mantenimiento, mes a mes y con quién recibió más. Si alguno no corresponde, lo podés <b>Borrar</b> (queda en la auditoría). Se borran solos a los 12 meses.'],
   ], ir:[['abrir', 'gestion', 'Gestión del barrio']] },
 ];
 

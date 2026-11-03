@@ -62,7 +62,9 @@ const Nube = {
              /* 13-10: quiénes están de guardia ahora (turno, nombres y su dibujo; js/guardia.js) */
              'guardiaAhora',
              /* 15-10: mantenimiento en vivo: quién trabaja y sus puntos en el mapa (js/mant-vivo.js) */
-             'mantVivo'],
+             'mantVivo',
+             /* 03-11: El Consejo informa: decisiones, obras y compras (js/v-consejo.js). Lo escribe la Administración */
+             'consejo'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
@@ -71,7 +73,9 @@ const Nube = {
               /* 08-10: las cuotas de expensas de UN lote, para las cuentas de ese lote (ExpLote) */
               'cuotasLote',
               /* 02-11: el débito automático de cada lote (js/v-debito.js): sin datos del banco */
-              'debitos'],
+              'debitos',
+              /* 03-11: los agradecimientos a quien trabaja (js/gracias.js): garita, supervisión y Administración */
+              'gracias'],
     staff: ['bitacora','avisos','sos','correos','auditoria','impuestos','frecuentes','asientos','puntos','pasos','rondaCodigos',
             /* 07-10: alertas a la supervisión y vistos de los partes (js/v-supervisor.js) */
             'alertasSup','vistos',
@@ -174,6 +178,7 @@ const Nube = {
     casaTareas:      { listas:['sugerencias','cambioQue'] },
     pagos:           { listas:['reparto'] },
     debitos:         { listas:['historial'], objetos:['rebotes'] },
+    consejo:         { listas:['novedades'] },
     hotelLiqs:       { listas:['cuotas'] },
   },
   comoLaGuardamos(col, x){
@@ -189,7 +194,7 @@ const Nube = {
     switch (col){
       case 'privados': return [x.userId];
       case 'dms': return [x.a, x.b];
-      case 'reclamos': case 'peticiones': return [x.userId];
+      case 'reclamos': case 'peticiones': case 'gracias': return [x.userId];
       /* LAS VISITAS SON DEL LOTE (pedido de Claudio, 12-10-2026: "Estela, que
          es frecuente del lote 148, le debe aparecer a Claudio y a Mónica"). El
          pase va a la carpeta de todos los que viven en el lote (no al
@@ -630,6 +635,7 @@ const Nube = {
     ausencias:       { col:'ausencias',       leen:['admin', 'guardia', 'supervisor'] },
     cuotasLote:      { col:'cuotasLote',      leen:['admin'] },
     debitos:         { col:'debitos',         leen:['admin'] },
+    gracias:         { col:'gracias',         leen:['admin', 'guardia', 'supervisor'] },
   },
   carpetaDe(col, x){
     if (col !== 'privados') return col;
@@ -693,7 +699,7 @@ const Nube = {
         if (this.arrancada) this.llegoAlgo();
       }, err => { this.listos.add('pv/' + f); console.warn('No se pudo leer', 'pv/' + f, err.message);
         /* Las cuotas de cada lote son nuevas (08-10-2026): si las reglas se publican con la app abierta, se reintenta. */
-        if (f === 'cuotasLote' || f === 'debitos'){ this.reintentos = this.reintentos || {}; const uid = this.uid, n = this.reintentos['pv/' + f] = (this.reintentos['pv/' + f] || 0) + 1;
+        if (f === 'cuotasLote' || f === 'debitos' || f === 'gracias'){ this.reintentos = this.reintentos || {}; const uid = this.uid, n = this.reintentos['pv/' + f] = (this.reintentos['pv/' + f] || 0) + 1;
           if (n <= 30) setTimeout(() => { if (this.uid === uid && this.arrancada) this.escucharUnaPv(f, def, rol); }, 60000); }
       });
       this.esperados.add('pv/' + f);

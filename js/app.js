@@ -55,7 +55,9 @@ const VENTANAS_GARITA = new Set(['garita', 'bitacora', 'turnos', 'peticiones', '
   /* 14-10: el personal de mantenimiento del barrio (js/mantenimiento.js) */
   'mantenimiento',
   /* 15-10: la bitácora de mantenimiento, aparte de la de la garita (js/mant-vivo.js) */
-  'mant-bitacora']);
+  'mant-bitacora',
+  /* 03-11: lo que los vecinos le agradecen a quien trabaja (js/gracias.js) */
+  'gracias']);
 /* El hotel ve solo lo suyo y lo público de la ciudad (ver js/v-hotel.js).
    Emergencias (la de los vecinos) no: tiene el pedido del DEA y los SOS del
    día; el hotel tiene la suya. */
@@ -74,12 +76,16 @@ const VENTANAS_SUPERVISOR = new Set(['supervisor', 'garita', 'bitacora', 'turnos
   /* 12-10: los ingresos frecuentes, solo para mirar (sin el código ni el QR) */
   'frecuentes',
   /* 13-10: el mapa del barrio en pantalla completa */
-  'mapa']);
+  'mapa',
+  /* 03-11: los agradecimientos de los vecinos a la guardia (js/gracias.js) */
+  'gracias']);
 /* EL PROPIETARIO A DISTANCIA (07-10-2026): su lote está alquilado (o no vive
    en el barrio). Ve lo que le toca como dueño; el día a día es del inquilino
    (ver esPropDistancia en core.js). */
 const VENTANAS_PROPIETARIO = new Set(['inicio', 'expensas', 'votaciones', 'tablero', 'documentos', 'privado', 'dm', 'infracciones', 'perfil',
-  'manual', 'ayuda', 'legal', 'aporte', 'descargas']);
+  'manual', 'ayuda', 'legal', 'aporte', 'descargas',
+  /* 03-11: las decisiones, obras y compras del Consejo (js/v-consejo.js) */
+  'consejo']);
 VENTANAS_HOTEL.add('aporte');
 /* 08-10-2026: el hotel ve las direcciones del barrio (lote y calle, sin nombres). */
 VENTANAS_HOTEL.add('vecinos');
@@ -2334,6 +2340,8 @@ const PIEZAS = [
   ['js/v-informes.js', () => typeof cabinaGarita],
   ['js/portal-vivo.js', () => typeof portalVivo],
   ['js/van-chofer.js', () => typeof VanChofer],
+  ['js/gracias.js',    () => typeof Gracias],
+  ['js/v-consejo.js',  () => typeof Consejo],
 ];
 function piezasQueFaltan(){
   const falta = [];

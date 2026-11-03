@@ -357,6 +357,17 @@ const L = [
     { t:'Elegí', x:'<b>Tocá una opción</b> para votar. Se vota por lote y queda el acta.', s:'#cuerpo [data-a="votar"]', h:'tocar' },
     { t:'Tu voto', x:'Ves cómo va la votación y cuándo cierra.', s:'#cuerpo' },
   ] },
+  { id:'consejo', g:'vecino', q:'u_lucia', ir:'consejo', t:'El Consejo informa', d:'Decisiones, obras y compras del barrio.', p:[
+    { t:'Obras y compras', x:'Cada obra o compra del barrio con su <b>presupuesto</b>, la etapa y la barra de <b>avance</b>.', s:'#cuerpo .cj-card' },
+    { t:'Los avances', x:'<b>Tocá "avances"</b> para ver la historia: qué se hizo y cuándo.', s:'#cuerpo .cj-nov summary', h:'tocar' },
+    { t:'Preguntar', x:'<b>Tocá "Preguntar sobre esto"</b>: se abre tu conversación con la Administración con el tema ya escrito. Nadie más la ve.', s:'#cuerpo [data-a="consejo-preguntar"]', h:'tocar' },
+  ] },
+  { id:'gracias', g:'vecino', ven:['garita', 'supervision'], q:'u_lucia', ir:'gracias', t:'Agradecer a quien trabaja', d:'A la guardia, la policía nocturna o mantenimiento.', p:[
+    { t:'Agradecer', x:'<b>Tocá "Agradecerle a alguien"</b>. También se entra por las caritas de "De guardia" de la portada.', s:'#cuerpo [data-a="gracias-nueva"]', h:'tocar' },
+    { t:'A quién', x:'Aparecen los que están trabajando ahora. <b>Tocá uno</b> (o "Toda la guardia" para alguien que ya se fue).', s:'#hoja .gr-op[data-a]', h:'tocar' },
+    { t:'Qué decirle', x:'<b>Tocá una frase</b> o escribila con tus palabras. El botón se prende recién cuando hay algo para mandar.', s:'#hoja .gr-frases label', h:'tocar' },
+    { t:'Mandar', x:'Con <b>"Mandar el agradecimiento"</b> le llega con tu nombre y tu lote. Lo ven esa persona, la garita, la supervisión y la Administración. Uno por día a cada persona.', s:'#hoja [data-gr-boton]' },
+  ] },
   { id:'camion', g:'vecino', ven:['garita'], q:'u_lucia', ir:'recoleccion', t:'El camión de residuos', d:'Qué días pasa y el aviso cuando entra.', p:[
     { t:'Los días', x:'Qué días pasa y qué se saca cada día. Cuando la garita registra que entró, te suena el aviso para que saques las bolsas.', s:'#cuerpo' },
   ] },
@@ -466,6 +477,14 @@ const L = [
   { id:'comunicado', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'comunicados', t:'Mandar un comunicado', d:'A todo el barrio o a algunos lotes.', p:[
     { t:'Nuevo', x:'<b>Tocá "Nuevo comunicado"</b>.', s:'#cuerpo [data-a="nuevo-comunicado"]', h:'tocar' },
     { t:'A quién y qué', x:'Elegís a quién le llega, escribís y adjuntás si hace falta. Les suena el aviso y queda en la pizarra.', s:'#hoja' },
+  ] },
+  { id:'consejo-a', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'consejo', t:'El Consejo informa', d:'Publicar decisiones, obras y compras.', p:[
+    { t:'Publicar', x:'<b>Tocá "Publicar una decisión"</b> (o "Cargar una obra o compra").', s:'#cuerpo [data-a="consejo-nuevo"][data-v="decision"]', h:'tocar' },
+    { t:'Qué se decidió', x:'Título, texto, fecha de la reunión y número de acta. Con "Avisarles a los vecinos" les llega a la campanita y al celular.', s:'#hoja' },
+  ] },
+  { id:'gracias-a', g:'admin', q:'u_admin', m:'admin', ir:'gracias', t:'Agradecimientos de los vecinos', d:'Lo que le agradecen al personal, mes a mes.', p:[
+    { t:'El mes', x:'Cuántos llegaron, a cuántas personas y de cuántos lotes.', s:'#cuerpo .garita-kpis' },
+    { t:'Cada uno', x:'Quién recibió más y lo que escribió cada vecino. Si alguno no corresponde, <b>Borrar</b> (queda en la auditoría).', s:'#cuerpo .gr-card' },
   ] },
   { id:'reclamos-a', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'reclamos', t:'Reclamos en tablero', d:'Nuevo, en curso y resuelto.', p:[
     { t:'Tablero', x:'<b>Tocá "Tablero"</b> para verlos por estado.', s:'#cuerpo [data-a="recl-vista"][data-v="tablero"]', h:'tocar' },

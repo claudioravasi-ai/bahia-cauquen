@@ -70,6 +70,8 @@ La persona también puede forzarlo desde **Tu cuenta → Actualizar la app**.
 | `js/v-vecinos.js` | Directorio, mensajes entre vecinos, obras, viajes, infracciones, proveedores. |
 | `js/v-expensas.js` | Expensas del vecino, contabilidad y cobranzas. |
 | `js/admin.js` | Administración, padrón, circulares y el motor de automatizaciones. |
+| `js/gracias.js` | Los agradecimientos de los vecinos a la guardia, la policía nocturna y mantenimiento. |
+| `js/v-consejo.js` | El Consejo informa: decisiones, obras y compras que publica la Administración. |
 | `js/nube.js` | Sincronización con Firebase (las tres zonas de privacidad). |
 | `js/firebase-config.js` | Las claves del proyecto de Firebase. Vacío = modo local. |
 | `reglas-firebase.txt` | Las reglas de seguridad de la base. Sin esto, no hay privacidad. |

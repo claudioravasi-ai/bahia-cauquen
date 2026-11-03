@@ -6954,3 +6954,68 @@ body.vc-modo{background:#07141a}
 /* Conformidad primero (03-11-2026): debajo del botón apagado, por qué no se puede seguir. */
 .conformidad-aviso{margin:6px 0 0;font-size:12.5px;font-weight:700;text-align:center;color:var(--ink-2)}
 :is(.bienvenida,.portal) .conformidad-aviso{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+
+/* =========================================================
+   GRACIAS A QUIEN TRABAJA (03-11-2026, js/gracias.js)
+   ========================================================= */
+.gr-cara{width:44px;height:44px;flex:none;border-radius:50%;background:var(--c);border:2px solid var(--surface);overflow:hidden;display:block;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.gr-cara .ga-cara{width:100%;height:100%;display:block;transform:translateY(4px) scale(1.15)}
+.gr-ic{width:44px;height:44px;flex:none;border-radius:14px;display:grid;place-items:center}
+.gr-elegir{display:flex;flex-direction:column;gap:8px}
+.gr-op{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:10px 12px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-align:left;font:inherit;cursor:pointer}
+.gr-op:active{transform:scale(.99)}
+.gr-op b{display:block;font-size:15px} .gr-op small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.gr-op > svg.i{flex:none;color:var(--muted)}
+.gr-cab{display:flex;align-items:center;gap:12px;min-width:0}
+.gr-cab .grow{min-width:0} .gr-cab b{display:block;overflow-wrap:anywhere} .gr-cab small{display:block;color:var(--muted);font-size:12.5px}
+.gr-form .gr-cab{margin-bottom:14px}
+.gr-frases{display:flex;flex-wrap:wrap;gap:8px}
+.gr-frases label{position:relative;cursor:pointer}
+.gr-frases input{position:absolute;opacity:0;pointer-events:none}
+.gr-frases span{display:inline-flex;align-items:center;min-height:44px;padding:8px 14px;border-radius:999px;border:1px solid var(--line-2);background:var(--surface);font-size:14px;font-weight:700;color:var(--ink-2)}
+.gr-frases input:checked + span{background:var(--danger-soft);border-color:var(--danger);color:var(--danger)}
+.gr-frases input:focus-visible + span{outline:2px solid var(--brand);outline-offset:2px}
+.gr-form [data-gr-boton]:disabled{opacity:.55;filter:grayscale(.4);cursor:not-allowed}
+.gr-card{padding:14px}
+.gr-txt{margin:10px 0 0;font-size:15px;line-height:1.5;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.gr-rk{align-items:center;gap:10px}
+.gr-rk .num{font-size:20px;font-weight:800}
+.gr-banda{margin:12px 0;padding:14px;border-radius:20px;background:linear-gradient(135deg,var(--danger-soft),var(--surface) 70%);border:1px solid var(--line)}
+.gr-banda-cab{display:flex;align-items:center;gap:12px}
+.gr-banda-cab b{display:block} .gr-banda-cab small{display:block;color:var(--muted);font-size:12.5px}
+.gr-corazon{width:40px;height:40px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--danger);color:#fff;animation:grLatido 1.6s ease-in-out infinite}
+@keyframes grLatido{0%,100%{transform:scale(1)}15%{transform:scale(1.12)}30%{transform:scale(1)}45%{transform:scale(1.08)}}
+.gr-linea{display:flex;align-items:flex-start;gap:10px;margin-top:10px;font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+.gr-linea .gr-cara,.gr-linea .gr-ic{width:34px;height:34px}
+.gr-linea small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+@media (prefers-reduced-motion:reduce){.gr-corazon{animation:none}}
+
+/* =========================================================
+   EL CONSEJO INFORMA (03-11-2026, js/v-consejo.js)
+   ========================================================= */
+.cj-acciones{display:grid;gap:8px;margin-bottom:6px}
+@media (min-width:720px){.cj-acciones{grid-template-columns:1fr 1fr}}
+.cj-card{padding:14px}
+.cj-cab{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.cj-cab .grow{min-width:0} .cj-cab b{display:block;font-size:16px;overflow-wrap:anywhere} .cj-cab small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.cj-ic{width:42px;height:42px;flex:none;border-radius:13px;display:grid;place-items:center}
+.cj-avance{display:flex;align-items:center;gap:10px;margin-top:12px}
+.cj-avance .progreso{flex:1;height:10px;border-radius:5px}
+.cj-avance .progreso i{background:linear-gradient(90deg,var(--wood),var(--warn));border-radius:5px;transition:width .6s ease}
+.cj-avance b{font-size:14px;min-width:46px;text-align:right}
+.cj-txt{margin:10px 0 0;font-size:14.5px;line-height:1.55;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:anywhere}
+.cj-monto{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13.5px;color:var(--ink-2);flex-wrap:wrap}
+.cj-nov{margin-top:10px}
+.cj-linea{list-style:none;margin:8px 0 0;padding:0 0 0 14px;border-left:3px solid var(--line-2)}
+.cj-linea li{position:relative;padding:4px 0 8px 6px;font-size:14px;line-height:1.45}
+.cj-linea li::before{content:'';position:absolute;left:-21px;top:9px;width:11px;height:11px;border-radius:50%;background:var(--wood);border:2px solid var(--surface)}
+.cj-linea small{display:block;color:var(--muted);font-size:12px;font-weight:700}
+.gr-op.hecho{opacity:.6;cursor:default;background:var(--surface-2)}
+.gr-op.hecho > svg.i{color:var(--ok)}
+/* En el celular, con "Gracias" y "Mensaje" los botones bajan a un renglón propio: el nombre no se aprieta y cada botón conserva su palabra. */
+@media (max-width:480px){.mv-per-cab:has(.gr-mv){flex-wrap:wrap}.mv-per-cab:has(.gr-mv) .grow{flex:1 1 calc(100% - 60px);min-width:0}.mv-per-cab:has(.gr-mv) .mv-msj{flex:1 1 0;justify-content:center}}
+.cj-form [data-cj-boton]:disabled{opacity:.55;filter:grayscale(.4);cursor:not-allowed}
+/* Mi casa (03-11-2026): la mascota con "Editar" y "Quitar" con palabra; si no entran al lado del nombre, bajan a su renglón. */
+.it.it-acc{flex-wrap:wrap}
+.it.it-acc .txt{flex:1 1 150px;min-width:0}
+.it-botones{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}

@@ -472,6 +472,8 @@ const SECCIONES = {
         teja({ v:'manual', icon:'book', color:'accent', t:'Manual y normas', s:'Cómo usar la app · reglamento, convivencia y protocolos' }),
         teja({ v:'vecinos', icon:'users', color:'sky', t:'Vecinos', s:'Buscá por nombre, oficio o dirección' }),
         teja({ v:'votaciones', icon:'vote', color:'accent', t:'Votaciones', s: votAbiertas ? `${plural(votAbiertas, 'abierta')}` : 'Sin votaciones abiertas', n: votAbiertas || '' }),
+        teja({ v:'consejo', icon:'vote', color:'accent', t:'El Consejo informa', s:'Decisiones, obras y compras del barrio', badge: typeof Consejo !== 'undefined' ? Consejo.nuevas() : 0 }),
+        teja({ v:'gracias', icon:'heart', color:'danger', t:'Agradecer a quien trabaja', s:'Guardia, policía nocturna y mantenimiento' }),
         teja({ v:'obras', icon:'wrench', color:'wood', t:'Obras', s:(() => { const h = s.obras.filter(o => o.avisoHoy?.fecha === hoy).length; return h ? `${plural(h, 'aviso')} para hoy` : `${plural(s.obras.filter(o => o.estado === 'activa').length, 'en curso', 'en curso')}`; })(), n: s.obras.filter(o => o.estado === 'activa').length || '' }),
         teja({ v:'viajes', icon:'car', color:'sky', t:'Viajes compartidos', s:'Centro, escuela, aeropuerto', n: s.viajes.filter(v => v.fecha >= hoy).length || '' }),
         teja({ v:'servicios', icon:'star', color:'wood', t:'Profesionales y oficios', s:'Vecinos que se pueden contactar' }),
@@ -573,6 +575,7 @@ function diaADia(u, s){
         { v:'privado', p:'interno', icon:'shield', t:'Mensajes con la garita', s:'Chat con la garita y los pedidos firmados de los vecinos', badge: msgGarita + petPend },
         { v:'frecuentes', icon:'qr', t:'Ingresos frecuentes', s:'QR fijo de proveedores y el personal fijo de los vecinos', n: frec || '' },
         { v:'supervisores', icon:'eye', t:'Supervisión de la guardia', s: typeof haySupervision === 'function' && haySupervision() ? 'Quién mira la garita en vivo y sus mensajes' : 'Habilitar a quien controla el servicio (solo mira)', badge: typeof sinLeerDeSupervision === 'function' ? sinLeerDeSupervision('supAdmin') : 0 },
+        { v:'gracias', icon:'heart', t:'Agradecimientos de los vecinos', s:'Lo que le agradecen a la guardia, la policía y mantenimiento', n: typeof Gracias !== 'undefined' ? Gracias.delMes(hoyISO().slice(0, 7)).length || '' : '' },
       ] },
     { k:'vecinos', t:'Vecinos', icon:'users', color:'accent',
       linea: `${plural(conCuenta, 'vecino con cuenta', 'vecinos con cuenta')} · ${s.padron.length ? plural(s.padron.length, 'unidad', 'unidades') + ' en el padrón' : 'padrón sin cargar'}`,
@@ -590,6 +593,7 @@ function diaADia(u, s){
         { v:'informe-admin', icon:'file', t:'Informe mensual del barrio', s:'El mes entero, ordenado por importancia' },
         { v:'correos-enviados', icon:'mail', t:'Correos enviados', s:'Todo lo que mandó la app, con fecha, hora y PDF' },
         { v:'comunicados', icon:'tack', t:'Comunicados importantes', s:'Ventana, sonido y acuse de recibo', n: comAct || '' },
+        { v:'consejo', icon:'vote', t:'El Consejo informa', s:'Decisiones, obras y compras que ven los vecinos', n: typeof Consejo !== 'undefined' ? Consejo.obras().filter(x => x.etapa !== 'terminada').length || '' : '' },
         { a:'nuevo-post', v:'aviso', icon:'muro', t:'Publicar en el pizarrón', s:'Para lo que no es urgente' },
         { v:'manual', icon:'book', t:'Manual de uso', s:'El que leen los vecinos, con los capítulos de garita y Administración' },
         { v:'alertas', icon:'siren', t:'Avisos urgentes por zona', s:'Corte de luz, nieve, portón… con respuesta', n: alertasAct || '' },
@@ -3400,6 +3404,7 @@ R.garita = {
       ${typeof bandaHotel === 'function' ? bandaHotel(opera) : ''}
       ${typeof bandaDeaEnCurso === 'function' ? bandaDeaEnCurso() : ''}
       ${typeof bandaCuidadoGarita === 'function' ? bandaCuidadoGarita() : ''}
+      ${typeof bandaGracias === 'function' ? bandaGracias() : ''}
       ${alertas().filter(alertaActiva).map(a => { const ay = destinatariosAlerta(a).filter(v => a.respuestas?.[v.id]?.r === 'ayuda').length;
         return aviso(ay ? 'danger latido' : 'warn', 'siren', `Aviso urgente activo: ${esc(a.titulo)}`, `${esc(a.zona)} · ${ay ? plural(ay, 'casa pide', 'casas piden') + ' ayuda' : 'nadie pidió ayuda'}`, `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="alertas">Ver respuestas</button>`); }).join('')}
       ${Clima.alertas().map(a => aviso(a.nivel, a.icon, a.t, a.x)).join('')}

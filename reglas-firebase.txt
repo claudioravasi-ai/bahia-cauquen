@@ -374,6 +374,14 @@ PEGAR DESDE ACÁ
           "respuestas": { ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')" }
         }
       },
+      /* EL CONSEJO INFORMA (03-11-2026, js/v-consejo.js): decisiones, obras y
+         compras del barrio. Lo escribe solo la Administración; lo leen los
+         vecinos aprobados (no el hotel ni la supervisión). */
+      "consejo": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor')",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$id": { ".validate": "!newData.exists() || (newData.child('id').val() === $id && newData.child('titulo').isString() && newData.child('titulo').val().length > 0 && newData.child('titulo').val().length <= 110 && (newData.child('tipo').val() === 'decision' || newData.child('tipo').val() === 'obra'))" }
+      },
       /* COSAS PARA PRESTAR (27-09-2026): las ven los vecinos aprobados; cada
          cosa la crea, cambia y borra solo su dueño (o la Administración). */
       "cosas": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
@@ -481,6 +489,22 @@ PEGAR DESDE ACÁ
           "$id": {
             ".write": "newData.exists() && root.child('barrio/users').child(auth.uid).child('rol').val() === 'vecino' && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child($uid).child('casa').val() === root.child('barrio/users').child(auth.uid).child('casa').val() && newData.child('lote').val() === root.child('barrio/users').child(auth.uid).child('casa').val() && (newData.child('estado').val() === 'pendiente' || newData.child('estado').val() === 'baja')",
             ".validate": "!newData.exists() || (newData.hasChildren(['id', 'lote', 'estado']) && newData.child('id').val() === $id && newData.child('lote').isString() && (newData.child('estado').val() === 'pendiente' || newData.child('estado').val() === 'activo' || newData.child('estado').val() === 'baja' || newData.child('estado').val() === 'rechazado'))"
+          }
+        }
+      },
+      /* GRACIAS A QUIEN TRABAJA (03-11-2026, js/gracias.js). El vecino escribe
+         SOLO en su carpeta y solo agrega (no cambia lo mandado). La carpeta
+         entera la leen la garita, la supervisión y la Administración; la
+         Administración borra lo de más de 12 meses o lo que no corresponde.
+         Nombre fijo: va antes que $carpeta y el comodín no lo toma. */
+      "gracias": {
+        ".read": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'guardia' || root.child('barrio/users').child(auth.uid).child('rol').val() === 'supervisor'",
+        ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+        "$uid": {
+          ".read": "auth.uid === $uid",
+          "$id": {
+            ".write": "auth.uid === $uid && !data.exists() && newData.exists() && root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() === 'vecino'",
+            ".validate": "!newData.exists() || (newData.hasChildren(['id', 'userId', 'para', 'txt', 'at']) && newData.child('id').val() === $id && newData.child('userId').val() === $uid && newData.child('txt').isString() && newData.child('txt').val().length > 0 && newData.child('txt').val().length <= 300 && (newData.child('para/t').val() === 'guardia' || newData.child('para/t').val() === 'garita' || newData.child('para/t').val() === 'policia' || newData.child('para/t').val() === 'mant'))"
           }
         }
       },
@@ -734,6 +758,16 @@ HASTA ACÁ
   leen las cuentas del lote y la Administración. El vecino solo lo pone en
   "pendiente" o "baja" para su propio lote; "activo" lo pone solo la
   Administración. Sin publicar esto, el botón del vecino no se guarda.
+
+✔ NUEVO 03-11-2026 (hay que volver a publicar): GRACIAS Y EL CONSEJO INFORMA.
+- pv/gracias/<cuenta>/<id>: los agradecimientos de los vecinos a la guardia,
+  la policía nocturna y mantenimiento. El vecino solo agrega en su carpeta;
+  la leen entera la garita, la supervisión y la Administración (que además
+  borra). Sin publicar esto, el botón "Mandar el agradecimiento" no se guarda.
+- barrio/consejo/<id>: decisiones, obras y compras del Consejo. Las escribe
+  solo la Administración; las leen los vecinos aprobados (no el hotel ni la
+  supervisión). Sin publicar esto, no se puede publicar nada ahí.
+-----------------------------------------------------------
 
 ✔ NUEVO 22-10-2026, tarde (hay que volver a publicar): EL INFORME SEMANAL DE LA POLICÍA.
 - staff/informesPolicia y staff/informesPoliciaIdx: la copia del informe
