@@ -1046,6 +1046,7 @@ R.inicio = {
     const hero = `<div class="hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
       ${deaHero()}
       ${typeof guardiaHero === 'function' ? guardiaHero() : ''}
+      ${typeof graciasBoton === 'function' ? graciasBoton() : ''}
       <div class="hero-centro">
         <div class="saludo">${saludo},</div>
         <h1>${esc(u.rol === 'vecino' ? u.nombre.split(' ')[0] : u.nombre)}</h1>

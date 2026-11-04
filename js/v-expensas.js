@@ -1264,25 +1264,47 @@ F['parametros-exp'] = d => {
 
 /* ---------- EXPENSAS Y COBRANZAS ---------- */
 const COBRO = {
+  /* EL RESUMEN MUESTRA EL MES QUE SE ESTÁ COBRANDO (pedido de Claudio, 04-11-2026:
+     "acá dice Noviembre 2026 y debe estar el resumen de octubre"). Antes miraba
+     el mes del calendario: decía "Noviembre · el mes no está cerrado", contaba
+     los 152 lotes como "con deuda" (todos tienen el cupón de octubre sin vencer)
+     y pedía cerrar el mes. Ahora: la última liquidación emitida (octubre, que se
+     cobra en noviembre), sus vencimientos, lo que falta cobrar, la deuda
+     VENCIDA (morosos) aparte del cupón del mes, y el paso que sigue. */
   resumen(){
-    const per = periodoHoy();
-    const deuda = LOTES.reduce((a, L) => a + Math.max(0, saldoLote('Lote ' + L.lote)), 0);
-    const cobrado = Store.s.pagos.filter(p => p.estado === 'confirmado' && p.fecha >= per + '-01').reduce((a, p) => a + p.monto, 0);
-    const morosos = LOTES.filter(L => saldoLote('Lote ' + L.lote) > 0.5).length;
-    const emitida = liquidacionDe(per)?.estado === 'emitida';
-    const pend = Store.s.pagos.filter(porAcreditar).length;
-    return `<div class="admin-hero" style="background:var(--g-wood)">
-        <b style="font-size:18px">${nombrePeriodo(per)}</b>
-        <div class="small" style="opacity:.85">${emitida ? 'Cupones emitidos' : 'El mes todavía no está cerrado'}</div>
-        <div class="garita-kpis"><div class="kpi"><b>${plataCorta(cobrado)}</b><span>Cobrado</span></div>
-          <div class="kpi"><b>${plataCorta(deuda)}</b><span>Deuda total</span></div>
-          <div class="kpi"><b>${plataCorta(Store.s.pagos.filter(porAcreditar).reduce((a, p) => a + (+p.monto || 0), 0))}</b><span>Por acreditar</span></div>
-          <div class="kpi"><b>${morosos}</b><span>Lotes con deuda</span></div></div></div>
+    const l = liquidacionesEmitidas().slice(-1)[0], pend = Store.s.pagos.filter(porAcreditar).length;
+    const porAcred = Store.s.pagos.filter(porAcreditar).reduce((a, p) => a + (+p.monto || 0), 0);
+    if (!l) return `${aviso('info', 'file', 'Para cobrar, primero hay que cerrar el mes', 'El cierre reparte los gastos entre los lotes y emite los cupones.',
+        `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="cierre">Ir al cierre</button>`)}`;
+    const per = l.periodo, octavo = deOctavo(l), mesCobro = MESES_LARGO[+periodoSiguiente(per).slice(5)], hoy = hoyISO();
+    const v1 = vtoDe(per, 1), v2 = vtoDe(per, 2), dias = d => Math.round((fechaDe(d) - fechaDe(hoy)) / DIA);
+    const saldos = LOTES.map(L => { const c = cuentaLote('Lote ' + L.lote); return { s:c.saldo, inf:c.informado }; });
+    const aCobrar = saldos.reduce((a, x) => a + Math.max(0, x.s), 0), alDia = saldos.filter(x => x.s <= 0.5).length;
+    const mor = typeof Morosos !== 'undefined' ? Morosos.armar() : [], vencida = mor.reduce((a, x) => a + x.total, 0);
+    const desde = isoDe(new Date(l.emitidaAt || Date.now()));
+    const cobrado = Store.s.pagos.filter(p => p.estado === 'confirmado' && !/^ci-/.test(p.id || '') && String(p.fecha || '') >= desde).reduce((a, p) => a + (+p.monto || 0), 0);
+    const cuponMes = +l.totalCuotas || aLista(l.cuotas).reduce((a, c) => a + (+c.total || 0), 0);
+    const reloj = dias(v1) > 0 ? `faltan ${plural(dias(v1), 'día', 'días')} para el 1º vencimiento` : dias(v1) === 0 ? 'hoy es el 1º vencimiento' : dias(v2) > 0 ? `faltan ${plural(dias(v2), 'día', 'días')} para el 2º vencimiento` : dias(v2) === 0 ? 'hoy es el 2º vencimiento' : 'ya pasaron los dos vencimientos';
+    const sig = periodoSiguiente(per), sigTermina = sig < periodoHoy();
+    const conDeuda = saldos.filter(x => x.s > 0.5).length - mor.length;
+    return `<div class="rs-hero">
+        <div class="rs-cab"><div><small>Se está cobrando</small><b>${nombrePeriodo(per)}</b></div><span class="rs-chip">${I('calendar')}se paga en ${mesCobro}</span></div>
+        <div class="rs-vtos"><span><small>1º vencimiento</small><b>${fechaCorta(v1)}</b></span><span><small>2º vencimiento</small><b>${fechaCorta(v2)}</b></span><span class="rs-reloj">${I('clock')}${reloj}</span></div>
+        <div class="rs-kpis"><div><b>${plataCorta(aCobrar)}</b><span>A cobrar</span><small>cupón de ${MESES_LARGO[+per.slice(5)]} + deudas</small></div>
+          <div><b>${plataCorta(vencida)}</b><span>Deuda vencida</span><small>${plural(mor.length, 'lote', 'lotes')}${mor.length ? ' (morosos)' : ''}</small></div>
+          <div><b>${plataCorta(cobrado)}</b><span>Cobrado por la app</span><small>desde el ${fechaCorta(desde)}</small></div>
+          <div><b>${plataCorta(porAcred)}</b><span>Por acreditar</span><small>${plural(pend, 'pago informado', 'pagos informados')}</small></div></div>
+        <div class="rs-barra" role="img" aria-label="${alDia} lotes al día, ${conDeuda} con el cupón por pagar y ${mor.length} con deuda vencida">
+          <i class="ok" style="flex:${alDia || 0.0001}"></i><i class="mes" style="flex:${conDeuda || 0.0001}"></i><i class="mor" style="flex:${mor.length || 0.0001}"></i></div>
+        <div class="rs-ley"><span><i class="ok"></i>${alDia} al día</span><span><i class="mes"></i>${conDeuda} con el cupón por pagar</span><span><i class="mor"></i>${mor.length} con deuda vencida</span></div>
+      </div>
+      ${octavo ? aviso('info', 'info', `${nombrePeriodo(per)} es la liquidación real de Octavo Piso`, `Los vecinos le pagan a Octavo Piso: la app ve esos pagos recién cuando traigas la liquidación de ${MESES_LARGO[+sig.slice(5)]}${sigTermina ? '' : ` (a principios de ${MESES_LARGO[+periodoSiguiente(sig).slice(5)]})`}. Hasta entonces cada lote figura con su cupón de ${MESES_LARGO[+per.slice(5)]} por pagar. Cupones del mes, sin deudas: ${plata(cuponMes)}. No se mandan avisos ni correos de expensas.`) : ''}
       ${pend ? aviso('warn', 'clock', `${plural(pend, 'pago por fuera de la app', 'pagos por fuera de la app')} por acreditar`, 'Corroboralos con el comprobante y confirmalos: se emite el recibo solo.',
-
         `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="cobranzas" data-p="cobranzas">Ver los pagos</button>`) : ''}
-      ${!emitida ? aviso('info', 'file', 'Para cobrar, primero hay que cerrar el mes', 'El cierre reparte los gastos entre los lotes y emite los cupones.',
-        `<button class="btn btn-xs btn-sec" data-a="abrir" data-v="contabilidad" data-p="cierre">Ir al cierre</button>`) : ''}
+      <div class="rs-sig">${I('right')}<p><b>Lo que sigue: ${nombrePeriodo(sig)}</b>${sigTermina
+          ? (octavo ? ` · ya terminó: traé el PDF de Octavo Piso.` : ` · ya terminó: cerralo y emití los cupones.`)
+          : ` · cuando termine el mes${octavo ? ', con el PDF de Octavo Piso' : ', desde Contabilidad → Cierre de mes'}.`}</p>
+        ${sigTermina ? `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="${octavo ? 'cobranzas' : 'contabilidad'}" data-p="${octavo ? 'plan|anio' : 'cierre'}">${octavo ? 'Traer el PDF' : 'Ir al cierre'}</button>` : ''}</div>
       <p class="muted small" style="margin:10px 2px 0">${I('info')} Cupones, pagos, morosos y recibos están en las pestañas de arriba.</p>`;
   },
 

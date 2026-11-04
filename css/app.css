@@ -7176,3 +7176,45 @@ body.vc-modo{background:#07141a}
 .mc{grid-template-columns:minmax(0,1fr)} .mc > *{min-width:0} .mc-k{min-width:0} .mc-kpis > .mc-k{flex:1 1 180px;min-width:0} .mc-cab > div{min-width:0}
 .mc-flujo{white-space:normal;flex-wrap:wrap;max-width:100%} .mc-frase p{min-width:0}
 @media (max-width:520px){ .mc-g{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto} .mc-g-n{font-size:12px;white-space:normal;overflow-wrap:anywhere} }
+
+/* RESUMEN DE EXPENSAS (04-11-2026): el mes que se está cobrando. */
+.rs-hero{display:grid;gap:12px;padding:16px;border-radius:22px;color:#fff;background:linear-gradient(135deg,#7a3416,#b85f24 55%,#d9823b);margin-bottom:12px}
+.rs-cab{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:8px} .rs-cab > div{display:grid;gap:2px;min-width:0}
+.rs-cab small{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;opacity:.85} .rs-cab b{font-size:clamp(22px,6vw,28px);line-height:1.1}
+.rs-chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:800;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.18)} .rs-chip svg{width:14px;height:14px}
+.rs-vtos{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.rs-vtos > span{display:grid;gap:1px;padding:8px 12px;border-radius:14px;background:rgba(255,255,255,.14)} .rs-vtos small{font-size:10.5px;opacity:.85;text-transform:uppercase;letter-spacing:.04em} .rs-vtos b{font-size:15px}
+.rs-vtos .rs-reloj{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;background:rgba(0,0,0,.14)} .rs-reloj svg{width:16px;height:16px}
+.rs-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.rs-kpis > div{display:grid;gap:2px;padding:12px;border-radius:16px;background:rgba(255,255,255,.95);color:var(--ink,#122);min-width:0}
+.rs-kpis b{font-size:clamp(18px,5vw,22px);font-variant-numeric:tabular-nums;white-space:nowrap} .rs-kpis span{font-size:11.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#7a3416} .rs-kpis small{font-size:11.5px;color:#5b6b6a}
+.rs-barra{display:flex;gap:2px;height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.2)}
+.rs-barra i{display:block;min-width:0} .rs-barra .ok,.rs-ley .ok{background:#7be0b0} .rs-barra .mes,.rs-ley .mes{background:#ffe1a8} .rs-barra .mor,.rs-ley .mor{background:#ff8a80}
+.rs-ley{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;font-weight:600} .rs-ley i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.rs-sig{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.rs-sig > svg{width:18px;height:18px;color:var(--wood,#b85f24);flex:none} .rs-sig p{margin:0;flex:1;min-width:200px;font-size:13.5px}
+:root[data-theme="dark"] .rs-kpis > div{background:rgba(20,30,30,.85);color:#eef} :root[data-theme="dark"] .rs-kpis span{color:#ffb98a} :root[data-theme="dark"] .rs-kpis small{color:#b9c6c5}
+@media (max-width:520px){ .rs-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .rs-kpis > div{padding:10px} .rs-kpis b{font-size:17px} .rs-kpis span{font-size:10.5px} .rs-vtos > span:not(.rs-reloj){flex:1 1 40%} .rs-vtos .rs-reloj{flex:1 1 100%} }
+
+/* =========================================================
+   EL BOTÓN "GRACIAS" EN LA FOTO (04-11-2026): debajo de "De guardia".
+   ========================================================= */
+.gr-boton{position:absolute;top:64px;left:14px;z-index:2;display:flex;align-items:center;gap:8px;max-width:calc(100% - 28px)}
+.gr-b{display:inline-flex;align-items:center;gap:8px;padding:5px 14px 5px 5px;border-radius:999px;border:1px solid rgba(255,255,255,.35);background:rgba(8,24,30,.42);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#fff;font:inherit;cursor:pointer;min-height:44px;box-shadow:0 4px 16px -6px rgba(0,0,0,.45)}
+.gr-b:active{transform:scale(.96)} .gr-b b{font-size:13.5px;letter-spacing:.01em;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.gr-b-cor{position:relative;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#ff6b95,#e0245e);box-shadow:0 0 0 0 rgba(255,107,149,.6);animation:grHalo 2.2s ease-out infinite}
+.gr-b-cor svg{width:18px;height:18px;color:#fff;fill:currentColor;animation:grLate 1.6s ease-in-out infinite}
+@keyframes grLate{0%,100%{transform:scale(1)}12%{transform:scale(1.18)}24%{transform:scale(.96)}36%{transform:scale(1.12)}}
+@keyframes grHalo{0%{box-shadow:0 0 0 0 rgba(255,107,149,.65)}70%{box-shadow:0 0 0 12px rgba(255,107,149,0)}100%{box-shadow:0 0 0 0 rgba(255,107,149,0)}}
+.gr-globo{position:relative;padding:8px 12px;border:0;border-radius:14px;background:#fff;color:#7a1430;font:inherit;font-size:13px;font-weight:800;cursor:pointer;
+  box-shadow:0 8px 22px -8px rgba(0,0,0,.5);white-space:normal;text-align:left;max-width:210px;animation:grGlobo 8.5s ease both}
+.gr-globo::before{content:'';position:absolute;left:-6px;top:50%;width:12px;height:12px;background:#fff;transform:translateY(-50%) rotate(45deg);border-radius:2px}
+@keyframes grGlobo{0%,10%{opacity:0;transform:translateX(-6px) scale(.9)}16%{opacity:1;transform:none}88%{opacity:1;transform:none}100%{opacity:0;transform:translateX(-4px);visibility:hidden}}
+@media (max-width:380px){ .gr-globo{max-width:160px;font-size:12px} }
+@media (prefers-reduced-motion:reduce){ .gr-b-cor,.gr-b-cor svg{animation:none} .gr-globo{animation:none} }
+.gr-fiesta{position:fixed;inset:0;pointer-events:none;z-index:2147483000;overflow:hidden}
+.gr-fiesta i{position:absolute;left:var(--x);bottom:-40px;font-style:normal;font-size:calc(28px * var(--s));animation:grSube 2.2s cubic-bezier(.2,.7,.3,1) var(--d) both}
+@keyframes grSube{0%{transform:translateY(0) rotate(0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translateY(-105vh) rotate(var(--r)) scale(1);opacity:0}}
+@media (prefers-reduced-motion:reduce){ .gr-latido,.gr-h-corazon,.gr-h-p{animation:none} }
+.hero:has(.gr-boton){padding-top:118px}

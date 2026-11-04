@@ -448,7 +448,7 @@ A['guardia-ver'] = () => {
     ${typeof rondaSeccionGuardia === 'function' ? rondaSeccionGuardia(g) : ''}
     <div class="btns" style="margin-top:12px">${c.garitaTel ? `<a class="btn btn-pri grow" href="${telLink(c.garitaTel)}">${I('phone')}Llamar a la garita</a>` : ''}
       ${!veGarita() && !esHotel() ? `<button class="btn btn-sec grow" data-a="abrir" data-v="privado" data-p="guardia">${I('chat')}Escribirle a la garita</button>
-        <button class="btn btn-sec grow" data-a="gracias-nueva">${I('heart')}Agradecer</button>` : ''}</div>
+        ${typeof Gracias !== 'undefined' && Gracias.hoyYa() ? `<button class="btn btn-sec grow" disabled>${I('heart')}Hoy ya agradeciste</button>` : `<button class="btn btn-sec grow" data-a="gracias-nueva">${I('heart')}Agradecer</button>`}` : ''}</div>
     <p class="muted tiny" style="margin:10px 2px 0">${I('lock')} Se ve solo el nombre de quienes están de guardia ahora, su horario, tal como lo anotó la garita, y cómo eligió aparecer cada uno. Cambia solo cuando entra o sale cada guardia.</p>`);
   setTimeout(() => { const hc = document.getElementById('hojaCuerpo'); if (hc) hc.scrollTop = 0;
     const b = document.querySelector('#hoja .ga-caja g[data-i="0"]'); if (b) A['guardia-saluda'](b); }, 350);
