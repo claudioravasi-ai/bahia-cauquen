@@ -1,13 +1,18 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261103-202746';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=20261103-202746',
-  './js/firebase-config.js?v=20261103-202746', './js/icons.js?v=20261103-202746', './js/agenda.js?v=20261103-202746', './js/padron.js?v=20261103-202746', './js/core.js?v=20261103-202746', './js/seed.js?v=20261103-202746', './js/clima.js?v=20261103-202746', './js/calendario.js?v=20261103-202746',
-  './js/v-inicio.js?v=20261103-202746', './js/v-comunidad.js?v=20261103-202746', './js/v-gestion.js?v=20261103-202746', './js/admin.js?v=20261103-202746', './js/v-vecinos.js?v=20261103-202746', './js/v-expensas.js?v=20261103-202746', './js/v-plan.js?v=20261103-202746', './js/v-debito.js?v=20261103-202746', './js/v-contable.js?v=20261103-202746', './js/v-servicio.js?v=20261103-202746', './js/v-legal.js?v=20261103-202746', './js/v-hotel.js?v=20261103-202746', './js/hotel-diario.js?v=20261103-202746', './js/v-cuidados.js?v=20261103-202746', './js/v-casa.js?v=20261103-202746', './js/mapa.js?v=20261103-202746', './js/ronda-mapa.js?v=20261103-202746', './js/recorrido.js?v=20261103-202746', './js/reglas.js?v=20261103-202746', './js/asistente.js?v=20261103-202746', './js/v-manual.js?v=20261103-202746', './js/push.js?v=20261103-202746', './js/sismos.js?v=20261103-202746', './js/nube.js?v=20261103-202746', './js/adjuntos.js?v=20261103-202746', './js/historial.js?v=20261103-202746', './js/v-supervisor.js?v=20261103-202746', './js/guardia.js?v=20261103-202746', './js/mantenimiento.js?v=20261103-202746', './js/mant-vivo.js?v=20261103-202746', './js/relevos.js?v=20261103-202746', './js/turnos-vivo.js?v=20261103-202746', './js/informe-policia.js?v=20261103-202746', './js/v-informes.js?v=20261103-202746', './js/portal-vivo.js?v=20261103-202746', './js/van-chofer.js?v=20261103-202746', './js/gracias.js?v=20261103-202746', './js/v-consejo.js?v=20261103-202746', './js/app.js?v=20261103-202746',
+const CACHE = 'bhc-20261104-113559';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=80ba91ab77',
+  './js/firebase-config.js?v=436e2fd7f5', './js/icons.js?v=9438a0dade', './js/agenda.js?v=52eb2c7f4b', './js/padron.js?v=609a9fe311', './js/core.js?v=abb2b028e2', './js/seed.js?v=bb1e7aba3d', './js/clima.js?v=03cd3e043e', './js/calendario.js?v=4c8c2f6ebc',
+  './js/v-inicio.js?v=f2a7afdc08', './js/v-comunidad.js?v=8e791e0d20', './js/v-gestion.js?v=4efe8cfcc3', './js/admin.js?v=c6e5a9c57d', './js/v-vecinos.js?v=e8125016a0', './js/v-expensas.js?v=e64e28f7a4', './js/v-plan.js?v=dedf9e3e70', './js/octavo-pdf.js?v=7f41f21b22', './js/v-debito.js?v=c844498343', './js/v-contable.js?v=76ed8cac61', './js/v-servicio.js?v=b1be088a3f', './js/v-legal.js?v=e37490f864', './js/v-hotel.js?v=14ff69ded5', './js/hotel-diario.js?v=13888a9201', './js/v-cuidados.js?v=4f9ff758ab', './js/v-casa.js?v=1560341cd7', './js/mapa.js?v=f2e8f7dd38', './js/ronda-mapa.js?v=0e537f5971', './js/recorrido.js?v=d04de41dfa', './js/reglas.js?v=90fa01b34e', './js/asistente.js?v=016c84b986', './js/v-manual.js?v=a8f17f7bd5', './js/push.js?v=cfbdc889f0', './js/sismos.js?v=50a67626c7', './js/nube.js?v=7e7d8b1278', './js/adjuntos.js?v=f452ad2e36', './js/historial.js?v=e91e6e6e66', './js/v-supervisor.js?v=c8355b2cff', './js/guardia.js?v=6e54f5f414', './js/mantenimiento.js?v=1b45f15aed', './js/mant-vivo.js?v=dac37ca957', './js/relevos.js?v=d4f91679a1', './js/turnos-vivo.js?v=2db5ea6214', './js/informe-policia.js?v=be3a71f643', './js/v-informes.js?v=86cdcc4ba7', './js/portal-vivo.js?v=c1844aff30', './js/van-chofer.js?v=93bcde1a86', './js/gracias.js?v=e29469d6fb', './js/v-consejo.js?v=ee2bf4e3fd', './js/app.js?v=e03bb6893b',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
-self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting())); });
+/* 04-11-2026: cada archivo del programa lleva en ?v= una huella de SU contenido
+   (version.py). Al llegar una versión nueva, lo que no cambió se copia de lo ya
+   guardado y solo se baja de internet lo que cambió: antes se volvía a bajar
+   todo (3,4 MB) con cada versión, y con señal floja la app tardaba en abrir. */
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => Promise.all(ARCHIVOS.map(u =>
+  (/[?&]v=/.test(u) ? caches.match(u) : Promise.resolve(null)).then(r => r ? c.put(u, r) : c.add(new Request(u, { cache:'reload' })))))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 /* LA APP ABRE AUNQUE LA SEÑAL SEA MALA (pedido de Claudio, 11-10-2026: "a veces
    en iPhone y Android tarda en abrirse, es como si se trabara"). Antes cada
@@ -32,7 +37,28 @@ self.addEventListener('fetch', e => {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => { if (x && (x.ok || x.type === 'opaque')){ const c = x.clone(); caches.open(CACHE).then(k => k.put(e.request, c)).catch(() => {}); } return x; })));
     return;
   }
+  /* 04-11-2026: la letra de Google (Manrope) queda guardada: se usa la guardada al
+     instante y, si hay internet, se renueva por detrás. Antes cada apertura esperaba
+     a Google antes de mostrar la primera pantalla. */
+  /* El lector de PDF (pdf.js, con su versión en la dirección: no cambia nunca) también queda guardado. */
+  if (url.hostname === 'cdnjs.cloudflare.com' && url.pathname.includes('/pdf.js/')){
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => { if (x && (x.ok || x.type === 'opaque')){ const c = x.clone(); caches.open(CACHE).then(k => k.put(e.request, c)).catch(() => {}); } return x; })));
+    return;
+  }
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com'){
+    e.respondWith(caches.match(e.request).then(r => { const red = fetch(e.request).then(x => { if (x && (x.ok || x.type === 'opaque')){ const c = x.clone(); caches.open(CACHE).then(k => k.put(e.request, c)).catch(() => {}); } return x; });
+      return r || red; }));
+    return;
+  }
   if (url.origin !== self.location.origin) return;   /* clima, vuelos, QR: siempre en vivo */
+  /* 04-11-2026: las fotos y los dibujos del barrio (portada, logo, íconos) se muestran
+     al instante desde lo guardado y se renuevan por detrás. Antes se pedían a internet
+     primero y, con señal floja, la portada o el logo quedaban sin cargar. */
+  if (/\.(jpe?g|png|svg|webp|gif|ico)$/i.test(url.pathname)){
+    e.respondWith(caches.match(e.request, { ignoreSearch:true }).then(r => { const red = fetch(e.request, { cache:'no-cache' }).then(x => guardar(e.request, x));
+      if (r){ red.catch(() => {}); return r; } return red; }));
+    return;
+  }
   if (url.searchParams.has('v') && /\.(js|css)$/.test(url.pathname)){
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(x => guardar(e.request, x))));
     return;

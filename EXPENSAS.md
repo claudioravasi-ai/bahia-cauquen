@@ -218,6 +218,28 @@ Al final dice si los 152 lotes coinciden al centavo con el PDF. Septiembre 2026:
 $ 52.119.136,17 + $ 390.885 de obleas, cupones por $ 97.279.177,58, cobros de agosto por
 $ 53.352.387,55. **Mes contra mes** (pestaña de Automáticas) compara cada mes con el anterior.
 
+**Octubre 2026 (traída el 04-11-2026, `liquidacion-octubre-2026.json`).** 24 gastos por
+$ 54.907.608,09 + $ 35.995 de obleas (lote 121) = $ 54.943.603,09; seguros sin movimientos; cupones
+por $ 100.860.989,58 (= patrimonio neto); cobros de septiembre $ 53.500.324,19 en 144 lotes;
+vencimientos 10 y **20** de noviembre (la liquidación guarda los suyos: `vto1`/`vto2` mandan sobre
+Parámetros); interés 4,63 % mensual sobre la deuda; 10 lotes con deuda (el 12 en abogados). Desde
+este mes cada cupón guarda su renglón del PDF (`pdf`: saldo anterior, pagos, deuda, interés,
+disponible, %, total), las marcas (1)/(2), `interesCancelado` y el motivo del ajuste
+(`ajusteTxt`); la liquidación guarda `pdf` (banco, patrimonio, totales, juicios, formas de pago, tasa).
+Lote 122: Octavo Piso canceló los intereses de octubre ($ 28.346,12) y los de septiembre: su saldo
+anterior baja $ 26.510,00 respecto del total de septiembre (va como ajuste con su motivo).
+**Desde el 04-11-2026 la app lee sola el PDF de Octavo Piso** (`js/octavo-pdf.js`, con pdf.js de
+Mozilla bajado de cdnjs y guardado por el service worker): período, vencimientos, gastos por rubro
+(cada uno se reconoce con el del mes anterior por CUIT, cuota y palabras: mantiene proveedor, detalle
+y recurrencia), particulares, banco, patrimonio, juicios, formas de pago, el renglón de cada lote (por
+posición: los nombres no se leen ni se guardan) y multas/ajustes. Antes de traerla muestra "Revisar
+antes de traer": controles del PDF (graves = no deja traer), hallazgos y la comparación lote por lote
+con lo que la app habría calculado (saldo, prorrateo con el coeficiente del padrón, fondo, interés con
+`tasaMoraPct()`). Probado con octubre: da igual que el .json armado a mano (0 diferencias).
+Observaciones del PDF: el resumen del banco suma $ 17.751.664,03 y dice $ 17.751.664,02 (1 centavo);
+lo prorrateado a los lotes ($ 54.907.597,69) es $ 10,40 menos que los gastos; el gas dice
+"Septiembre/2027" (es 2026).
+
 **"Ya la pagué" (mientras Mercado Pago no esté activo).** El vecino marca su expensa como pagada
 con un toque, sin comprobante obligatorio: queda *Pagada* para él (sin recordatorios) y "por
 acreditar" para la Administración, que la confirma con el resumen del banco (los centavos dicen el

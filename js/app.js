@@ -2311,6 +2311,7 @@ const PIEZAS = [
   ['js/v-vecinos.js',  () => typeof normTxt],
   ['js/v-expensas.js', () => typeof RUBROS],
   ['js/v-plan.js',     () => typeof anioPlan],
+  ['js/octavo-pdf.js', () => typeof RevisarReal],
   ['js/v-debito.js',   () => typeof enDebito],
   ['js/v-contable.js', () => typeof Libro],
   ['js/v-servicio.js', () => typeof Servicio],

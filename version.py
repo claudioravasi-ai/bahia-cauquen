@@ -21,16 +21,23 @@ import re, sys, datetime, pathlib
 raiz = pathlib.Path(__file__).parent
 v = sys.argv[1] if len(sys.argv) > 1 else datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
 
+# 04-11-2026: cada .js y el .css llevan en ?v= la huella de SU contenido (no la
+# fecha): así, al publicar, los teléfonos bajan solo los archivos que cambiaron
+# (el service worker copia los demás de lo que ya tenía). La versión (fecha)
+# sigue en window.VERSION y en el nombre del caché.
+import hashlib
+def huella(rel):
+    return hashlib.md5((raiz / rel).read_bytes()).hexdigest()[:10]
 html = (raiz / 'index.html').read_text(encoding='utf-8')
-html = re.sub(r'(src="js/[a-z\-]+\.js)(\?v=[^"]*)?"', lambda m: f'{m.group(1)}?v={v}"', html)
-html = re.sub(r'(href="css/app\.css)(\?v=[^"]*)?"', lambda m: f'{m.group(1)}?v={v}"', html)
+html = re.sub(r'(src="(js/[a-z\-]+\.js))(\?v=[^"]*)?"', lambda m: f'{m.group(1)}?v={huella(m.group(2))}"', html)
+html = re.sub(r'(href="css/app\.css)(\?v=[^"]*)?"', lambda m: f'{m.group(1)}?v={huella("css/app.css")}"', html)
 html = re.sub(r'window\.VERSION="[^"]*"', f'window.VERSION="{v}"', html)
 (raiz / 'index.html').write_text(html, encoding='utf-8')
 
 sw = (raiz / 'sw.js').read_text(encoding='utf-8')
 sw = re.sub(r"const CACHE = '[^']*';", f"const CACHE = 'bhc-{v}';", sw)
-sw = re.sub(r"'\./js/([a-z\-]+)\.js(\?v=[^']*)?'", lambda m: f"'./js/{m.group(1)}.js?v={v}'", sw)
-sw = re.sub(r"'\./css/app\.css(\?v=[^']*)?'", f"'./css/app.css?v={v}'", sw)
+sw = re.sub(r"'\./js/([a-z\-]+)\.js(\?v=[^']*)?'", lambda m: f"'./js/{m.group(1)}.js?v={huella('js/' + m.group(1) + '.js')}'", sw)
+sw = re.sub(r"'\./css/app\.css(\?v=[^']*)?'", f"'./css/app.css?v={huella('css/app.css')}'", sw)
 (raiz / 'sw.js').write_text(sw, encoding='utf-8')
 
 print(f'Versión sellada: {v}')

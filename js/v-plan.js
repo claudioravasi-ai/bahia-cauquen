@@ -402,7 +402,7 @@ const PLAN_VISTAS = {
         <div class="seg" style="flex-wrap:wrap">${[['interes','Interés por mora (Parámetros)'],['ipc','Inflación'],['ipc+interes','Inflación + interés puro']].map(([k, t]) => `<label><input type="radio" name="metodoDeuda" value="${k}" ${p.metodoDeuda === k ? 'checked' : ''}><span>${t}</span></label>`).join('')}</div>
         <div class="grid2" style="margin-top:10px"><div class="field"><label>Interés puro mensual (%)</label><input name="interesPuro" type="number" step="0.1" value="${p.interesPuro}"></div>
           <div class="field"><label>Interés por mora hoy (Parámetros)</label><input disabled value="${cfgExp().interesMensual} %"></div></div>
-        ${p.tasaOctavo ? `<div class="card plana small" style="margin:0">${I('info')} Octavo Piso aplicó en agosto <b>${p.tasaOctavo.toLocaleString('es-AR')} % mensual</b> a los lotes con un mes de atraso.
+        ${p.tasaOctavo ? `<div class="card plana small" style="margin:0">${I('info')} Octavo Piso aplicó en ${p.tasaOctavoPeriodo ? MESES_LARGO[+p.tasaOctavoPeriodo.slice(5)] : 'agosto'} <b>${p.tasaOctavo.toLocaleString('es-AR')} % mensual</b> ${p.tasaOctavoPeriodo ? 'sobre la deuda de cada lote' : 'a los lotes con un mes de atraso'}.
           <div class="btns" style="margin-top:8px"><button type="button" class="btn btn-xs btn-sec" data-a="plan-usar-tasa">Usar ${p.tasaOctavo.toLocaleString('es-AR')} % como interés por mora</button></div></div>` : ''}</div>
       <div class="card"><h3>Cierre automático de cada mes</h3>
         <div class="grid2"><div class="field"><label>Día de cierre</label><input name="diaCierre" type="number" min="1" max="28" value="${p.diaCierre}"><div class="ayuda">Ese día se arma la liquidación del mes anterior.</div></div>
@@ -572,39 +572,67 @@ function aplicarLiquidacionReal(s, b){
   if (iL >= 0) s.liquidaciones.splice(iL, 1);
   const cuotas = b.lotes.map(l => {
     const lote = 'Lote ' + l.lote, L = LOTES.find(x => x.lote === String(l.lote)) || { uf:l.uf, coef:0 };
-    const total = Math.round(((+l.expensas || 0) + (+l.fondo || 0) + (+l.particulares || 0) + (+l.redondeo || 0)) * 100) / 100;
+    const total = Math.round(((+l.expensas || 0) + (+l.mejoras || 0) + (+l.multas || 0) + (+l.fondo || 0) + (+l.particulares || 0) + (+l.redondeo || 0)) * 100) / 100;
     const ajuste = Math.round(((+l.total || 0) - total - (+l.interes || 0) - saldoLote(lote)) * 100) / 100;
-    if (Math.abs(ajuste) >= 0.01) res.ajustes.push({ lote, ajuste });
-    return { lote, uf:L.uf, coef:L.coef, expensas:+l.expensas || 0, mejoras:0, particulares:+l.particulares || 0, multas:0, fondo:+l.fondo || 0, redondeo:+l.redondeo || 0,
-      interes:+l.interes || 0, ajuste: Math.abs(ajuste) >= 0.01 ? ajuste : 0, total, judicial:!!l.judicial };
+    if (Math.abs(ajuste) >= 0.01) res.ajustes.push({ lote, ajuste, motivo:String((aLista(l.ajustes).find(x => x && Math.abs(+x.monto - ajuste) < 0.01) || {}).tipo || '') });
+    /* 04-11-2026 (liquidación de octubre): cada renglón del "Estado de cuentas
+       y prorrateo" del PDF queda guardado tal cual (saldo anterior, pagos,
+       deuda, interés, disponible, porcentaje y total), más las marcas (1) y
+       (2), los intereses cancelados y el motivo de cada ajuste. */
+    const extra = {}, det = aLista(l.ajustes).filter(a => a && +a.monto);
+    if (l.deuda != null) extra.pdf = { saldoAnterior:+l.saldoAnterior || 0, pagos:+l.pagos || 0, deuda:+l.deuda || 0, interes:+l.interesColumna || 0, disponible:+l.disponible || 0, coef:+l.coefPdf || 0, total:+l.total || 0 };
+    if (l.enAbogados) extra.enAbogados = true;
+    if (+l.marca) extra.marca = +l.marca;
+    if (+l.interesCancelado) extra.interesCancelado = +l.interesCancelado;
+    const a1 = det.find(a => Math.abs(+a.monto - ajuste) < 0.01);
+    if (a1 && Math.abs(ajuste) >= 0.01) Object.assign(extra, { ajusteTxt:String(a1.tipo || ''), ajusteDesc:String(a1.descripcion || '') });
+    return { lote, uf:L.uf, coef:L.coef, expensas:+l.expensas || 0, mejoras:+l.mejoras || 0, particulares:+l.particulares || 0, multas:+l.multas || 0, fondo:+l.fondo || 0, redondeo:+l.redondeo || 0,
+      interes:+l.interes || 0, ajuste: Math.abs(ajuste) >= 0.01 ? ajuste : 0, total, judicial:!!l.judicial, ...extra };
   });
   const porRubro = {}; [...b.gastos, ...aLista(b.particulares).map(g => ({ ...g, rubro:12 }))].forEach(g => { porRubro[g.rubro] = (porRubro[g.rubro] || 0) + (+g.total || 0); });
   const totalGastos = Math.round(((+b.totalGastos || 0) + (+b.totalParticulares || 0)) * 100) / 100;
+  /* Lo del mes que trae el PDF (04-11-2026): los vencimientos que puso Octavo
+     Piso (octubre: 10 y 20 de noviembre, no el 21 de siempre), el banco, el
+     estado patrimonial, los totales del estado de cuentas, juicios, formas de
+     pago y la tasa de interés. Va al resumen del mes (sin lotes). */
+  const pdf = b.banco ? { banco:b.banco, patrimonio:b.patrimonio || {}, totales:b.totalesLotes || {}, prorrateo:b.prorrateo || {}, juicios:b.juicios || '', formasPago:b.formasPago || {},
+    tasaInteres:+b.tasaInteres || 0, seguros:b.seguros || '', marcas:b.marcas || {}, porRubroPct:b.porRubroPct || {} } : null;
+  const conCol = b.prorrateo != null;   /* desde octubre: la columna Expensas sin los particulares, como el PDF */
   s.liquidaciones.push({ id:'liq-' + b.periodo, periodo:b.periodo, estado:'emitida', importada:true, real:true, fuente:b.fuente || '', emitidaAt:new Date(+b.periodo.slice(0, 4), +b.periodo.slice(5), 1, 9).getTime(),
-    por:'importado', porColumna:{ expensas:totalGastos, mejoras:0, multas:0, fondo:0 }, porRubro, totalGastos, totalCuotas:cuotas.reduce((a, c) => a + c.total, 0), cuotas });
+    por:'importado', porColumna: conCol ? { expensas:+b.totalGastos || 0, mejoras:0, multas:0, fondo:0, particulares:+b.totalParticulares || 0 } : { expensas:totalGastos, mejoras:0, multas:0, fondo:0 },
+    porRubro, totalGastos, totalCuotas:cuotas.reduce((a, c) => a + c.total, 0), cuotas,
+    ...(b.vto1 ? { vto1:b.vto1 } : {}), ...(b.vto2 ? { vto2:b.vto2 } : {}), ...(pdf ? { pdf } : {}) });
   /* 4. El banco y la deuda reales del mes. */
   const bb = b.banco || {}, reales = Object.assign({}, cfgPlan().reales || {});
   reales[b.periodo] = { saldoCierre:+bb.saldoCierre || 0, deuda:+(b.patrimonio || {}).deudasEInteresesACobrar || 0, egresos:+bb.egresos || totalGastos,
     percibido:(+bb.cobrosTermino || 0) + (+bb.cobrosAdeudadas || 0) + (+bb.cobrosIntereses || 0) + (+bb.cobrosACuenta || 0), at:ahora };
-  s.config.plan = Object.assign({}, cfgPlan(), { reales });
+  s.config.plan = Object.assign({}, cfgPlan(), { reales }, +b.tasaInteres > 0 ? { tasaOctavo:+b.tasaInteres, tasaOctavoPeriodo:b.periodo } : {});
   /* 5. La prueba: el saldo de cada lote tiene que dar el total del PDF. */
   res.malos = b.lotes.filter(l => Math.abs(saldoLote('Lote ' + l.lote) - (+l.total || 0)) > 0.01).map(l => `Lote ${l.lote}: app ${plata(saldoLote('Lote ' + l.lote))} · PDF ${plata(+l.total || 0)}`);
   res.lotes = b.lotes.length; res.totalCupones = b.lotes.reduce((a, l) => a + (+l.total || 0), 0);
   return res;
 }
-document.addEventListener('change', async e => {
+/* 04-11-2026: el archivo (PDF de Octavo Piso o .json) pasa primero por "Revisar
+   antes de traer" (js/octavo-pdf.js): se lee, se controla y se compara lote por
+   lote con lo que la app habría calculado. El botón "Traer" llama a esto. */
+document.addEventListener('change', e => {
   if (e.target.id !== 'importarReal' || !e.target.files[0]) return;
   const f = e.target.files[0]; e.target.value = '';
+  RevisarReal.abrir(f);
+});
+/* Lo que tiene que estar antes de traer un mes real (si no, frena con el motivo). */
+function validarReal(b){
+  if (!esAdmin()) throw new Error('solo la Administración trae liquidaciones');
+  if (!liquidacionDe(b.anterior) || liquidacionDe(b.anterior).estado !== 'emitida') throw new Error(`Antes tiene que estar ${nombrePeriodo(b.anterior)} (traela primero)`);
+  /* Un mes POSTERIOR emitido desde la app (como el "Noviembre" del 02-11):
+     cada lote quedaría con dos expensas y nada coincidiría con el PDF. */
+  const posterior = liquidacionesEmitidas().find(l => l.periodo > b.periodo && !l.real);
+  if (posterior) throw new Error(`${nombrePeriodo(posterior.periodo)} está emitido desde la app. Primero reabrilo (Contabilidad → Cierre de mes → ${nombrePeriodo(posterior.periodo)} → Reabrir el período) y después traé ${nombrePeriodo(b.periodo)}.`);
+}
+function traerLiquidacionReal(b){
   try {
-    if (!esAdmin()) throw new Error('solo la Administración trae liquidaciones');
-    const b = JSON.parse(await f.text());
-    if (b.tipo !== 'liquidacion-real' || !b.periodo || !b.anterior || !Array.isArray(b.gastos) || !Array.isArray(b.lotes)) throw new Error('No es el archivo de una liquidación real (liquidacion-<mes>.json)');
-    if (!liquidacionDe(b.anterior) || liquidacionDe(b.anterior).estado !== 'emitida') throw new Error(`Antes tiene que estar ${nombrePeriodo(b.anterior)} (traela primero)`);
-    const ya = liquidacionDe(b.periodo), pisa = ya && ya.estado === 'emitida' && !ya.real;
-    const tot = b.lotes.reduce((a, l) => a + (+l.total || 0), 0), cobros = b.lotes.reduce((a, l) => a + (+l.pagos || 0), 0);
-    if (!await confirmar(`Traer ${nombrePeriodo(b.periodo)} real`, `${b.fuente || 'Liquidación'}: ${plural(b.gastos.length, 'gasto')} por ${plata(b.totalGastos)}${b.totalParticulares ? ` y ${plata(b.totalParticulares)} de gastos particulares` : ''}, ${plural(b.lotes.length, 'cupón', 'cupones')} por ${plata(tot)} y los cobros del mes (${plata(cobros)}).
-      ${pisa ? `<br><br><b>Ojo:</b> ${nombrePeriodo(b.periodo)} ya está emitida desde la app; la real la reemplaza.` : ''}${ya && ya.real ? '<br><br>Ya estaba traída: se vuelve a cargar igual (no se duplica nada).' : ''}
-      <br><br>A cada vecino le aparece su cupón por pagar y le llega un aviso. No se mandan correos (los cupones ya los mandó ${esc(String(b.fuente || '').replace(/^.*\((.*)\).*$/, '$1') || 'Octavo Piso')}).`, { si:'Traer', peligro:pisa })) return;
+    validarReal(b);
+    const tot = b.lotes.reduce((a, l) => a + (+l.total || 0), 0);
     let res;
     Store.cambiar(s => {
       res = aplicarLiquidacionReal(s, b);
@@ -617,15 +645,15 @@ document.addEventListener('change', async e => {
       <div class="garita-kpis"><div class="kpi"><b>${res.pagos}</b><span>Cobros de ${MESES_LARGO[+b.anterior.slice(5)]}</span></div><div class="kpi"><b>${plataCorta(res.cobrado)}</b><span>Cobrado</span></div>
         <div class="kpi"><b>${b.gastos.length + aLista(b.particulares).length}</b><span>Gastos</span></div></div>
       ${res.confirmados ? `<div class="card plana small">${I('check')} ${plural(res.confirmados, 'pago informado en la app quedó confirmado', 'pagos informados en la app quedaron confirmados')}: ya estaban en la liquidación.</div>` : ''}
-      ${res.ajustes.length ? aviso('warn', 'info', `${plural(res.ajustes.length, 'lote lleva', 'lotes llevan')} un ajuste para igualar el PDF`, res.ajustes.slice(0, 12).map(a => `${esc(a.lote)}: ${plata(a.ajuste)}`).join('<br>') + '<br>Lo ven en su cuenta como "Ajuste".') : ''}
+      ${res.ajustes.length ? aviso('warn', 'info', `${plural(res.ajustes.length, 'lote lleva', 'lotes llevan')} un ajuste para igualar el PDF`, res.ajustes.slice(0, 12).map(a => `${esc(a.lote)}: ${plata(a.ajuste)}${a.motivo ? ' · ' + esc(a.motivo) : ''}`).join('<br>') + '<br>Lo ven en su cuenta con ese motivo (o como "Ajuste").') : ''}
       ${res.revisar.length ? aviso('warn', 'alert', 'Para revisar', res.revisar.slice(0, 12).map(esc).join('<br>')) : ''}
       <div class="btns" style="margin-top:14px"><button class="btn btn-sec" data-a="cerrar-hoja">Cerrar</button>
         <button class="btn btn-pri grow" data-a="plan-comparar-ir" data-v="${esc(b.periodo)}">${I('eye')}Comparar con ${MESES_LARGO[+b.anterior.slice(5)]}</button></div>`, { ancho:'560px' });
-  } catch(err){ hoja('No se trajo la liquidación', `${aviso('danger', 'alert', 'No pude traer ese archivo', esc(err.message))}<button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`); }
-});
+  } catch(err){ hoja('No se trajo la liquidación', `${aviso('danger', 'alert', 'No pude traerla', esc(err.message))}<button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`); }
+}
 const cajaImportarReal = () => `<label class="superficie acento"><span class="ic">${I('upload')}</span><span class="txt"><b>Traer la liquidación real de un mes</b>
-    <small>El archivo <span class="mono">datos-privados/liquidacion-&lt;mes&gt;.json</span> armado con el PDF de Octavo Piso. Registra los cobros del mes, los gastos y el cupón de cada lote.</small></span>
-    <input type="file" accept=".json,application/json" id="importarReal" hidden></label>`;
+    <small>Elegí el <b>PDF de Octavo Piso</b> tal como llega (o el archivo .json). Antes de traerlo, la app lo controla y te muestra, lote por lote, en qué difiere de lo que ella habría calculado.</small></span>
+    <input type="file" accept=".pdf,application/pdf,.json,application/json" id="importarReal" hidden></label>`;
 A['plan-comparar-ir'] = el => { cerrarHoja(); abrir('cobranzas', 'plan|comparar~' + el.dataset.v); };
 A['plan-comparar-pdf'] = el => { const C = comparacionMeses(el.dataset.v); if (!C) return;
   const MA = MESES_LARGO[+C.a.slice(5)], MB = MESES_LARGO[+C.b.slice(5)];
@@ -693,7 +721,7 @@ function proximasDelLote(lote){
   const vals = fut.map(x => ({ t:nombrePeriodo(x.periodo), v:cuotaLoteEn(x, L) }));
   return `${sec('Tus próximas expensas (estimadas)')}
     <div class="card">${barrasH(vals.map(v => ({ t:v.t, v:v.v, c:CHART_COL.proyectada, etiqueta:plata(v.v) })))}
-      <p class="muted tiny" style="margin:8px 0 0">Estimado con los gastos de ${nombrePeriodo(A2.tpl?.periodo || A2.cfg.base)} y una inflación de ${A2.cfg.inflacion} % mensual. El cupón real puede variar según las facturas de cada mes.</p>
+      <p class="muted tiny" style="margin:8px 0 0">Estimado con los gastos de ${nombrePeriodo(A2.tpl?.periodo || A2.cfg.base)} y una inflación de ${String(A2.cfg.inflacion).replace('.', ',')} % mensual. El cupón real puede variar según las facturas de cada mes.</p>
       <div class="btns" style="margin-top:8px"><button class="btn btn-xs btn-sec" data-a="abrir" data-v="tablero">${I('eye')}En qué se gasta la plata del barrio</button></div></div>`;
 }
 R.tablero = {
@@ -703,15 +731,20 @@ R.tablero = {
     if (!p.base) return vacio('wallet', 'Todavía no hay datos cargados. Cuando la Administración empiece a liquidar con la app, acá se ve todo.');
     const A2 = anioPlan(), emit = liquidacionesEmitidas().slice(-1)[0], m = mesPlan(emit?.periodo || p.base);
     const rubros = Object.entries(m.porRubro).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-    const ultima = emit, conDeuda = ultima ? LOTES.filter(L => { const lote = 'Lote ' + L.lote, cu = cuotaDe(ultima, lote); return saldoLote(lote) > (cu?.total || 0) + 1; }).length : 0;
+    /* 04-11-2026: el vecino no tiene las cuentas de los otros lotes (solo la
+       suya), así que contarlas acá daba siempre 0 %. Sale de la lista de
+       morosos (deuda vencida, por lote y sin nombres) que arma la
+       Administración; si ella la ocultó, no se muestra el porcentaje. */
+    const verMor = typeof Morosos !== 'undefined' && (esAdmin() || Morosos.visibles());
+    const conDeuda = !verMor ? 0 : esAdmin() ? Morosos.armar().length : aLista(Morosos.lista()).length;
     const comparar = A2.meses.filter(x => x.estado === 'emitida').map(x => { const prev = A2.meses.find(y => y.periodo === periodoAnterior(x.periodo)); return prev && prev.total ? { x, prev } : null; }).filter(Boolean);
     return `<div class="garita-kpis"><div class="kpi"><b>${plataCorta(m.total)}</b><span>Gastos de ${MESES_LARGO[+m.periodo.slice(5)]}</span></div>
         <div class="kpi"><b>${plataCorta(m.total / LOTES.length)}</b><span>Promedio por lote</span></div>
-        <div class="kpi"><b>${Math.round(conDeuda / LOTES.length * 100)} %</b><span>Lotes con deuda vencida</span></div></div>
+        <div class="kpi"><b>${verMor ? Math.round(conDeuda / LOTES.length * 100) + ' %' : '—'}</b><span>Lotes con deuda vencida${verMor && conDeuda ? ` (${conDeuda})` : ''}</span></div></div>
       ${sec('El año, mes a mes')}<div class="card grafico-card">${graficoAnual(A2)}${leyendaAnual()}</div>
       ${sec(`En qué se gastó en ${MESES_LARGO[+m.periodo.slice(5)]}`)}
-      <div class="card">${barrasH(rubros.map(([r, v]) => ({ t:RUBROS[r] || 'Otros', v, etiqueta:`${plataCorta(v)} · ${(v / (m.total || 1) * 100).toFixed(1)} %` })))}</div>
-      ${comparar.length ? sec('Previsto contra real') + `<div class="card lista">${comparar.map(({ x, prev }) => `<div class="it"><div class="txt"><b>${nombrePeriodo(x.periodo)}</b><span>Mes anterior ${plata(prev.total)}</span></div><b class="num">${plata(x.total)} <small class="${x.total > prev.total ? 'rojo' : ''}">${x.total > prev.total ? '+' : ''}${((x.total / prev.total - 1) * 100).toFixed(1)} %</small></b></div>`).join('')}</div>` : ''}
+      <div class="card">${barrasH(rubros.map(([r, v]) => ({ t:RUBROS[r] || 'Otros', v, etiqueta:`${plataCorta(v)} · ${(v / (m.total || 1) * 100).toFixed(1).replace('.', ',')} %` })))}</div>
+      ${comparar.length ? sec('Previsto contra real') + `<div class="card lista">${comparar.map(({ x, prev }) => `<div class="it"><div class="txt"><b>${nombrePeriodo(x.periodo)}</b><span>Mes anterior ${plata(prev.total)}</span></div><b class="num">${plata(x.total)} <small class="${x.total > prev.total ? 'rojo' : ''}">${x.total > prev.total ? '+' : ''}${((x.total / prev.total - 1) * 100).toFixed(1).replace('.', ',')} %</small></b></div>`).join('')}</div>` : ''}
       ${sec('Morosidad del barrio')}
       <div class="card grafico-card">${graficoLineas(A2.meses, [{ k:'deuda', n:'Deuda total de vecinos (estimada)', c:CHART_COL.deuda }])}
         <p class="muted tiny" style="margin:6px 0 0">Suma de lo que deben todos los lotes, con intereses. No se muestra quién debe: eso lo ve solo la Administración.</p></div>

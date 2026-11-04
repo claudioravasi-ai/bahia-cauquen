@@ -54,7 +54,15 @@ const plataCorta = n => { n = +n || 0; const a = Math.abs(n);
   if (a >= 1e6) return '$ ' + (n / 1e6).toLocaleString('es-AR', { maximumFractionDigits:1 }) + ' M';
   if (a >= 1e4) return '$ ' + Math.round(n / 1e3).toLocaleString('es-AR') + ' mil';
   return plata(n); };
-const vtoDe = (periodo, cual = 1) => { const [a, m] = periodo.split('-').map(Number); const c = cfgExp();
+/* 04-11-2026: si la liquidación del mes trae sus propios vencimientos (la
+   real de octubre: 10 y 20 de noviembre), mandan esos; si no, los de
+   Parámetros. Se buscan en lo que el equipo tenga (completa, resumen o la
+   copia del hotel) sin llamar a liqsFuente, que para el hotel arma todo. */
+const vtoPropio = (periodo, cual) => { const k = cual === 1 ? 'vto1' : 'vto2';
+  for (const arr of [Store.s?.liquidaciones, Store.s?.liqResumen, Store.s?.hotelLiqs]){ const l = aLista(arr).find(x => x && x.periodo === periodo && x[k]); if (l && /^\d{4}-\d{2}-\d{2}$/.test(l[k])) return l[k]; }
+  return ''; };
+const vtoDe = (periodo, cual = 1) => { const propio = vtoPropio(periodo, cual); if (propio) return propio;
+  const [a, m] = periodo.split('-').map(Number); const c = cfgExp();
   const d = new Date(a, m, cual === 1 ? c.vto1 : c.vto2); return isoDe(d); };   /* vence al mes siguiente */
 
 /* =========================================================
@@ -145,11 +153,16 @@ function cuentaLote(lote){
       ? { fecha:l.emitidaAt - 1, periodo:l.periodo, detalle:`Saldo anterior a ${nombrePeriodo(l.periodo)}${c.judicial ? ' (en gestión judicial)' : ''}`, debe:c.saldoInicial, tipo:'saldo' }
       : { fecha:l.emitidaAt - 1, periodo:l.periodo, detalle:`Saldo a favor anterior a ${nombrePeriodo(l.periodo)}`, haber:-c.saldoInicial, tipo:'saldo' });
     movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:`Expensas ${nombrePeriodo(l.periodo)}`, debe:c.total, tipo:'cuota' });
-    if (c.interes) movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:'Intereses por saldo impago', debe:c.interes, tipo:'interes' });
+    if (c.interes) movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:`Intereses por saldo impago${c.enAbogados ? ' (deuda en manos de los abogados)' : ''}`, debe:c.interes, tipo:'interes' });
+    /* Intereses que la liquidación calculó y canceló entera (lote 122, octubre 2026): se ven los dos renglones. */
+    /* "par": se anulan entre sí; Morosos no los usa (si no, la cancelación bajaría la deuda vieja). */
+    if (c.interesCancelado) movs.push({ fecha:l.emitidaAt, periodo:l.periodo, detalle:'Intereses por saldo impago', debe:c.interesCancelado, tipo:'interes', par:true },
+      { fecha:l.emitidaAt, periodo:l.periodo, detalle:`Cancelación total de intereses (${l.fuente || 'la liquidación'})`, haber:c.interesCancelado, tipo:'ajuste', par:true });
     /* Una liquidación real de Octavo Piso (js/v-plan.js, importarReal) trae a
        veces una diferencia chica con lo que la app tenía: se muestra aparte. */
-    if (c.ajuste) movs.push(c.ajuste > 0 ? { fecha:l.emitidaAt, periodo:l.periodo, detalle:`Ajuste para igualar ${l.fuente || 'la liquidación'}`, debe:c.ajuste, tipo:'ajuste' }
-      : { fecha:l.emitidaAt, periodo:l.periodo, detalle:`Ajuste a favor para igualar ${l.fuente || 'la liquidación'}`, haber:-c.ajuste, tipo:'ajuste' });
+    const motivo = c.ajusteTxt ? `${c.ajusteTxt} (${l.fuente || 'la liquidación'})` : '';
+    if (c.ajuste) movs.push(c.ajuste > 0 ? { fecha:l.emitidaAt, periodo:l.periodo, detalle:motivo || `Ajuste para igualar ${l.fuente || 'la liquidación'}`, debe:c.ajuste, tipo:'ajuste' }
+      : { fecha:l.emitidaAt, periodo:l.periodo, detalle:motivo || `Ajuste a favor para igualar ${l.fuente || 'la liquidación'}`, haber:-c.ajuste, tipo:'ajuste' });
   });
   Store.s.pagos.filter(p => pagoDelLote(p, lote) && p.estado !== 'rechazado' && !esPrueba(p)).forEach(p => {
     const acred = pagoAcreditado(p), grupo = repartoDe(p).length > 1;
@@ -392,15 +405,18 @@ function cuponHTML(lote, periodo){
   const hasta = new Date(l.emitidaAt).getTime();
   const previos = cuenta.movs.filter(m => m.fecha < hasta);
   const saldoAnterior = previos.length ? previos[previos.length - 1].saldo : 0;
-  const total1 = saldoAnterior + c.total + (c.interes || 0);
+  /* El ajuste de la liquidación (si hay) también es parte de lo que se paga. */
+  const total1 = Math.round((saldoAnterior + c.total + (c.interes || 0) + (c.ajuste || 0)) * 100) / 100;
   /* El 2º vencimiento también termina en los centavos del lote. */
   const total2 = conCentavosDelLote(total1 * (1 + cf.recargo2 / 100), lote).total;
   const fila = (t, v) => `<tr><td>${t}</td><td class="n">${plata(v)}</td></tr>`;
   return `<h2>Cupón de pago · ${nombrePeriodo(periodo)}</h2>
-    <div class="caja"><b>${esc(prop || 'Propietario')}</b><br>${esc(lote)} · UF ${esc(c.uf)} · coeficiente ${c.coef.toFixed(4)} %</div>
+    <div class="caja"><b>${esc(prop || 'Propietario')}</b><br>${esc(lote)} · UF ${esc(c.uf)} · coeficiente ${(+c.coef || 0).toLocaleString('es-AR', { minimumFractionDigits:4, maximumFractionDigits:4 })} %</div>
     <table>
       ${fila('Saldo anterior', saldoAnterior)}
-      ${c.interes ? fila('Intereses por saldo impago', c.interes) : ''}
+      ${c.interes ? fila(`Intereses por saldo impago${c.enAbogados ? ' (en manos de los abogados)' : ''}`, c.interes) : ''}
+      ${c.interesCancelado ? fila('Intereses por saldo impago', c.interesCancelado) + fila('Cancelación total de intereses', -c.interesCancelado) : ''}
+      ${c.ajuste ? fila(esc(c.ajusteTxt || (c.ajuste > 0 ? 'Ajuste de la liquidación' : 'Ajuste a favor de la liquidación')), c.ajuste) : ''}
       ${fila('Expensas: gastos, servicios y mantenimiento', c.expensas)}
       ${c.mejoras ? fila('Mejoras', c.mejoras) : ''}
       ${c.multas ? fila('Multas, obleas y otros', c.multas) : ''}
@@ -408,19 +424,98 @@ function cuponHTML(lote, periodo){
       ${fila('Fondo de Infraestructura', c.fondo)}
       ${c.redondeo ? fila(`Redondeo (los centavos identifican al ${esc(lote)})`, c.redondeo) : ''}
       <tr class="total"><td>Total 1º vencimiento · ${fechaCorta(vtoDe(periodo, 1))}</td><td class="n">${plata(total1)}</td></tr>
-      <tr class="total"><td>Total 2º vencimiento · ${fechaCorta(vtoDe(periodo, 2))} (+${cf.recargo2} %)</td><td class="n">${plata(total2)}</td></tr>
+      <tr class="total"><td>Total 2º vencimiento · ${fechaCorta(vtoDe(periodo, 2))} (+${String(cf.recargo2).replace('.', ',')} %)</td><td class="n">${plata(total2)}</td></tr>
     </table>
+    ${c.pdf ? estadoCuentaPdfHTML(c, l) : ''}
     ${typeof enDebito === 'function' && enDebito(lote, periodo) ? `<div class="caja"><b>Débito automático</b><br>El ${fechaCorta(vtoDe(periodo, 1))} se debita de la cuenta del propietario el total del 1º vencimiento. No hace falta pagarlo ni informarlo: el recibo sale cuando la Administración lo confirma con el banco.</div>` : ''}
     <div class="caja"><b>${typeof enDebito === 'function' && enDebito(lote, periodo) ? 'Si el débito no pasa' : 'Formas de pago'}</b><br>Transferencia · Alias <b>${esc(Store.s.config.alias || '')}</b> · CBU ${esc(Store.s.config.cbu || '')}<br>
       Titular: Barrio ${esc(Store.s.config.nombre)} · CUIT ${esc(Store.s.config.cuit || '')}<br>
       Una vez pagado, informalo desde la app (Expensas → Informar pago) y te llega el recibo.</div>`;
 }
 
+/* =========================================================
+   LA LIQUIDACIÓN REAL, TAL CUAL EL PDF (pedido de Claudio, 04-11-2026:
+   "que nada se te pase por alto y quede igual en cada centavo")
+   Para las liquidaciones de Octavo Piso traídas desde octubre de 2026:
+     · en el cupón de cada lote, su renglón del "Estado de cuentas y
+       prorrateo" (saldo anterior, pagos, deuda, interés, disponible,
+       porcentaje y total), la marca (1)/(2) y el motivo de cada ajuste;
+     · en "Ver la liquidación" (Administración), el estado financiero
+       (banco), el estado patrimonial, juicios, el estado de cuentas de
+       los 152 lotes con todas sus columnas, multas/reservas/ajustes, las
+       notas y las formas de pago;
+     · en Morosos, la deuda y los intereses que dice la liquidación.
+   ========================================================= */
+const segunLiq = (cu, l) => cu && cu.pdf && l && (+cu.pdf.deuda > 0 || +cu.pdf.interes > 0)
+  ? { liq:{ periodo:l.periodo, deuda:+cu.pdf.deuda || 0, interes:+cu.pdf.interes || 0, ...(cu.enAbogados ? { abogados:true } : {}) } } : {};
+const pctAR = n => (+n || 0).toLocaleString('es-AR', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' %';
+function estadoCuentaPdfHTML(c, l){
+  const p = c.pdf, m = (l && l.pdf && l.pdf.marcas) || {}, fila = (t, v) => `<tr><td>${t}</td><td class="n">${v}</td></tr>`;
+  return `<h2>Tu renglón en la liquidación de ${esc(String(l.fuente || 'Octavo Piso').replace(/^Liquidación de /, ''))}</h2><table>
+      ${fila('Saldo anterior', plata(p.saldoAnterior))}
+      ${fila('Pagos recibidos', plata(p.pagos))}
+      ${fila('Deuda', plata(p.deuda))}
+      ${fila('Interés', c.enAbogados ? `En abogados · ${plata(p.interes)}` : plata(p.interes))}
+      ${fila('Disponible (saldo a favor)', plata(p.disponible))}
+      ${fila('Porcentaje del lote en el prorrateo', pctAR(p.coef))}
+      <tr class="total"><td>Total</td><td class="n">${plata(p.total)}</td></tr></table>
+    ${c.marca && m[c.marca] ? `<div class="caja">(${c.marca}) ${esc(m[c.marca])}.</div>` : ''}
+    ${c.ajusteDesc ? `<div class="caja"><b>${esc(c.ajusteTxt)}</b><br>${esc(c.ajusteDesc)}.</div>` : ''}
+    ${c.interesCancelado ? `<div class="caja"><b>Cancelación total de intereses</b><br>Los ${plata(c.interesCancelado)} de interés de este mes se cancelaron enteros.</div>` : ''}`;
+}
+function liquidacionRealHTML(l){
+  const P = l.pdf, b = P.banco || {}, pa = P.patrimonio || {}, T = P.totales || {}, cs = aLista(l.cuotas).filter(c => c && c.pdf), m = P.marcas || {};
+  const fila = (t, v, neg) => `<tr><td>${t}</td><td class="n">${plata(neg ? -v : v)}</td></tr>`;
+  const suma = k => Math.round(cs.reduce((a, c) => a + (+c.pdf[k] || 0), 0) * 100) / 100, sumaC = k => Math.round(cs.reduce((a, c) => a + (+c[k] || 0), 0) * 100) / 100;
+  const cuentaBanco = Math.round(((+b.saldoInicial || 0) + (+b.cobrosTermino || 0) + (+b.cobrosAdeudadas || 0) + (+b.cobrosIntereses || 0) + (+b.cobrosACuenta || 0) - (+b.egresosGastos || 0) - (+b.egresosParticulares || 0)) * 100) / 100;
+  const control = [['saldoAnterior', suma('saldoAnterior')], ['pagos', suma('pagos')], ['deuda', suma('deuda')], ['interesColumna', suma('interes')], ['disponible', suma('disponible')], ['expensas', sumaC('expensas')], ['fondo', sumaC('fondo')], ['particulares', sumaC('particulares')], ['redondeo', sumaC('redondeo')], ['total', suma('total')]]
+    .filter(([k, v]) => T[k] != null && Math.abs(v - T[k]) > 0.005);
+  const ajustes = cs.filter(c => c.ajusteTxt || c.interesCancelado);
+  const adm = typeof esAdmin === 'function' && esAdmin(), nro = n => plata(n).replace(/^\$\s/, '');
+  return `<h2>Estado financiero · resumen de movimientos del banco</h2><table>
+      ${fila('<b>Saldo inicial</b>', b.saldoInicial)}
+      ${fila('Ingresos por cobros de expensas en término', b.cobrosTermino)}
+      ${fila('Ingresos por cobros de expensas adeudadas', b.cobrosAdeudadas)}
+      ${fila('Ingresos por cobros de intereses', b.cobrosIntereses)}
+      ${fila('Ingresos por cobros de pagos a cuenta', b.cobrosACuenta)}
+      ${fila('Egresos por gastos del mes', b.egresosGastos, true)}
+      ${fila('Egresos por gastos particulares', b.egresosParticulares, true)}
+      <tr class="total"><td>Saldo al cierre</td><td class="n">${plata(b.saldoCierre)}</td></tr></table>
+    ${Math.abs(cuentaBanco - (+b.saldoCierre || 0)) >= 0.005 ? `<div class="caja">Ojo: sumando los renglones da ${plata(cuentaBanco)}; el PDF dice ${plata(b.saldoCierre)} (diferencia de ${plata(cuentaBanco - b.saldoCierre)}). Se deja lo del PDF.</div>` : ''}
+    <h2>Estado patrimonial</h2><table>
+      ${fila('Expensas a cobrar por gastos', pa.expensasACobrar)}
+      ${fila('Deudas e intereses a cobrar', pa.deudasEInteresesACobrar)}
+      ${fila('Redondeos a cobrar', pa.redondeos)}
+      ${fila('Disponibles', pa.disponibles)}
+      ${fila('Cobranzas pendientes de imputación', pa.pendienteImputacion)}
+      <tr class="total"><td>Patrimonio neto al cierre</td><td class="n">${plata(pa.patrimonioNeto)}</td></tr></table>
+    <h2>Datos de juicios</h2><p>${esc(P.juicios || 'Sin datos')}</p>
+    ${P.tasaInteres ? `<p class="muted">Interés aplicado a la deuda: <b>${pctAR(P.tasaInteres)} mensual</b>.</p>` : ''}
+    ${P.prorrateo && P.prorrateo.nota ? `<p class="muted">${esc(P.prorrateo.nota)}</p>` : ''}
+    <h2>Estado de cuentas y prorrateo de gastos</h2>
+    <style>.hoja:has(.ec){max-width:1180px}.ec{font-size:9px}.ec th,.ec td{padding:3px 3px;white-space:nowrap}.ec th{font-size:7.5px;letter-spacing:0;white-space:normal;vertical-align:bottom}.ec td.p{white-space:normal;min-width:110px}.ec tr.total td{font-size:9px}.ec-env{overflow-x:auto}
+      @page apaisada{size:A4 landscape;margin:10mm}@media print{.ec-env{page:apaisada;overflow:visible}.hoja:has(.ec){max-width:none}}</style>
+    <div class="ec-env"><table class="ec"><tr><th>UF</th><th>Lote</th>${adm ? '<th>Propietario</th>' : ''}<th class="n">Saldo anterior</th><th class="n">Pagos recibidos</th><th class="n">Deuda</th><th class="n">Interés</th><th class="n">Disponible</th>
+        <th class="n">%</th><th class="n">Expensas</th><th class="n">Mejoras</th><th class="n">Multas, obleas</th><th class="n">Fondo Infr.</th><th class="n">Otros gastos</th><th class="n">Redon.</th><th class="n">Total</th></tr>
+      ${cs.map(c => `<tr><td>${esc(c.uf)}</td><td>${esc(String(c.lote).replace(/^Lote\s*/i, ''))}${c.marca ? `<sup>(${c.marca})</sup>` : ''}</td>${adm ? `<td class="p">${esc(propietarioDe(c.lote) || (esLoteHotel(c.lote) ? HOTEL_NOMBRE : ''))}</td>` : ''}
+        <td class="n">${nro(c.pdf.saldoAnterior)}</td><td class="n">${nro(c.pdf.pagos)}</td><td class="n">${nro(c.pdf.deuda)}</td><td class="n">${c.enAbogados ? 'En abogados' : plata(c.pdf.interes)}</td><td class="n">${nro(c.pdf.disponible)}</td>
+        <td class="n">${(+c.pdf.coef || 0).toLocaleString('es-AR', { minimumFractionDigits:2 })}</td><td class="n">${nro(c.expensas)}</td><td class="n">${nro(c.mejoras)}</td><td class="n">${nro(c.multas)}</td><td class="n">${nro(c.fondo)}</td><td class="n">${nro(c.particulares)}</td><td class="n">${nro(c.redondeo)}</td><td class="n"><b>${nro(c.pdf.total)}</b></td></tr>`).join('')}
+      <tr class="total"><td colspan="${adm ? 3 : 2}">Totales</td><td class="n">${nro(T.saldoAnterior)}</td><td class="n">${nro(T.pagos)}</td><td class="n">${nro(T.deuda)}</td><td class="n">${nro(T.interesColumna)}</td><td class="n">${nro(T.disponible)}</td>
+        <td class="n">100,00</td><td class="n">${nro(T.expensas)}</td><td class="n">${nro(T.mejoras)}</td><td class="n">${nro(T.multas)}</td><td class="n">${nro(T.fondo)}</td><td class="n">${nro(T.particulares)}</td><td class="n">${nro(T.redondeo)}</td><td class="n">${nro(T.total)}</td></tr></table></div>
+    ${control.length ? `<div class="caja">Ojo: no cierran con los totales del PDF: ${control.map(([k, v]) => `${esc(k)} ${plata(v)} contra ${plata(T[k])}`).join(' · ')}.</div>` : `<p class="muted">Control: la suma de los ${cs.length} lotes da, columna por columna, los totales del PDF.</p>`}
+    ${Object.keys(m).length ? `<p class="muted">${Object.entries(m).map(([k, t]) => `(${esc(k)}) ${esc(t)}.`).join('<br>')}</p>` : ''}
+    <h2>Multas, reservas y ajustes</h2>${ajustes.length ? `<table><tr><th>UF</th><th>Lote</th><th>Tipo</th><th>Descripción</th><th class="n">Monto</th></tr>
+      ${ajustes.map(c => `${c.interesCancelado ? `<tr><td>${esc(c.uf)}</td><td>${esc(c.lote)}</td><td>Cancelación total de intereses</td><td>Cancelación TOTAL de intereses</td><td class="n">${plata(-c.interesCancelado)}</td></tr>` : ''}
+        ${c.ajusteTxt ? `<tr><td>${esc(c.uf)}</td><td>${esc(c.lote)}</td><td>${esc(c.ajusteTxt)}</td><td>${esc(c.ajusteDesc || '')}</td><td class="n">${plata(c.ajuste)}</td></tr>` : ''}`).join('')}</table>` : '<p>Sin multas ni ajustes.</p>'}
+    ${P.formasPago && P.formasPago.cbu ? `<h2>Formas de pago</h2><p>CBU / CVU para transferencias: <b>${esc(P.formasPago.cbu)}</b><br>${esc(P.formasPago.cuenta || '')}<br>CUIT: ${esc(P.formasPago.cuit || '')} · Alias: <b>${esc(P.formasPago.alias || '')}</b></p>` : ''}`;
+}
 function liquidacionHTML(periodo){
   const l = liquidacionDe(periodo);
   const gs = gastosDe(periodo);
   const porRubro = {};
   gs.forEach(g => { (porRubro[g.rubro] = porRubro[g.rubro] || []).push(g); });
+  /* Seguros "sin movimientos" (octubre 2026) va en su lugar, como en el PDF. */
+  if (l.pdf && l.pdf.seguros && !porRubro[10]) porRubro[10] = [];
   const total = l.totalGastos || Object.values(l.porColumna).reduce((a, b) => a + b, 0);
   return `<h2>Liquidación de expensas · ${nombrePeriodo(periodo)}</h2>
     <div class="caja">Primer vencimiento: <b>${fechaCorta(vtoDe(periodo, 1))}</b> · Segundo vencimiento: <b>${fechaCorta(vtoDe(periodo, 2))}</b> (+${cfgExp().recargo2} %)</div>
@@ -428,22 +523,23 @@ function liquidacionHTML(periodo){
       const sub = porRubro[r].reduce((a, g) => a + (+g.total || 0), 0);
       return `<h2>${r} · ${esc(RUBROS[r] || 'Otros')}</h2><table>
         <tr><th>Proveedor y comprobante</th><th class="n">Importe</th></tr>
-        ${porRubro[r].map(g => `<tr><td>${esc(g.proveedor)}${g.cuit ? ' · CUIT ' + esc(g.cuit) : ''}<br>
-          <span style="color:#666">${esc(g.tipoComp || '')} ${esc(g.nroComp || '')}${g.cuotaN ? ` · pago ${g.cuotaN} de ${g.cuotaDe}` : ''}${g.detalle ? ' · ' + esc(g.detalle) : ''}</span></td>
+        ${porRubro[r].length ? '' : `<tr><td>${esc(l.pdf?.seguros || 'Sin movimientos')}</td><td class="n">${plata(0)}</td></tr>`}${porRubro[r].map(g => `<tr><td>${esc(g.proveedor)}${g.cuit ? ' · CUIT ' + esc(g.cuit) : ''}<br>
+          <span style="color:#666">${esc(g.tipoComp || '')} ${esc(g.nroComp || '')}${g.cuotaN ? ` · pago ${g.cuotaN} de ${g.cuotaDe}` : ''}${g.detalle ? ' · ' + esc(g.detalle) : ''}${g.lote ? ' · ' + esc(g.lote) : ''}${g.nota ? ' · ' + esc(g.nota) : ''}</span></td>
           <td class="n">${plata(g.total)}</td></tr>`).join('')}
-        <tr class="total"><td>Total rubro ${r} · ${(sub / total * 100).toFixed(2)} %</td><td class="n">${plata(sub)}</td></tr></table>`;
+        <tr class="total"><td>Total rubro ${r} · ${pctAR(sub / total * 100)}</td><td class="n">${plata(sub)}</td></tr></table>`;
     }).join('')}
     <h2>Totales del período</h2><table>
       ${Object.entries(COLUMNAS).map(([k, t]) => `<tr><td>${t}</td><td class="n">${plata(l.porColumna[k] || 0)}</td></tr>`).join('')}
+      ${l.porColumna.particulares ? `<tr><td>Gastos particulares</td><td class="n">${plata(l.porColumna.particulares)}</td></tr>` : ''}
       <tr class="total"><td>Total de gastos</td><td class="n">${plata(total)}</td></tr>
-      <tr class="total"><td>Total prorrateado a los ${l.cuotas.length} lotes (incluye Fondo de Infraestructura)</td><td class="n">${plata(l.totalCuotas)}</td></tr>
+      <tr class="total"><td>Total prorrateado a los ${l.cuotas.length} lotes (incluye Fondo de Infraestructura${l.porColumna.particulares ? ', gastos particulares y redondeos' : ''})</td><td class="n">${plata(l.totalCuotas)}</td></tr>
     </table>
-    <h2>Prorrateo por unidad</h2><table>
+    ${l.pdf && aLista(l.cuotas).some(c => c && c.pdf) ? liquidacionRealHTML(l) : `<h2>Prorrateo por unidad</h2><table>
       <tr><th>UF</th><th>Lote</th><th class="n">Coef. %</th><th class="n">Expensas</th><th class="n">Fondo</th><th class="n">Otros</th><th class="n">Total</th></tr>
       ${l.cuotas.map(c => `<tr><td>${esc(c.uf)}</td><td>${esc(c.lote)}</td><td class="n">${c.coef.toFixed(4)}</td>
         <td class="n">${plata(c.expensas)}</td><td class="n">${plata(c.fondo)}</td>
         <td class="n">${plata((c.mejoras || 0) + (c.multas || 0) + (c.particulares || 0))}</td><td class="n">${plata(c.total)}</td></tr>`).join('')}
-      <tr class="total"><td colspan="6">Total</td><td class="n">${plata(l.totalCuotas)}</td></tr></table>
+      <tr class="total"><td colspan="6">Total</td><td class="n">${plata(l.totalCuotas)}</td></tr></table>`}
     <div class="firma"><div>Administración</div><div>Consejo de administración</div></div>`;
 }
 
@@ -1042,7 +1138,7 @@ const CONTA = {
     const irFalta = falta ? `<button class="btn btn-xs btn-pri" data-a="abrir" data-v="contabilidad" data-p="cierre|${falta}">Ir a ${nombrePeriodo(falta)}</button>` : '';
     if (l && l.estado === 'emitida') return `${falta ? aviso('danger', 'alert', `Se emitió ${nombrePeriodo(periodo)} sin haber emitido ${nombrePeriodo(falta)}`,
         `Los cupones de ${nombrePeriodo(periodo)} vencen en ${MESES_LARGO[+vtoDe(periodo, 1).slice(5, 7)]} y no llevan el ajuste de los deudores. Para corregirlo: 1) tocá "Reabrir el período" acá abajo; 2) pasá sus gastos a ${nombrePeriodo(falta)} con el botón que aparece; 3) emití ${nombrePeriodo(falta)}. Los pagos ya hechos no se tocan.`) : ''}
-      ${aviso('ok', 'check', `${nombrePeriodo(periodo)} ya está liquidado`, `Emitida ${hace(l.emitidaAt)} por ${esc(nombreDe(l.por))} · ${plural(l.cuotas.length, 'cupón', 'cupones')}`)}
+      ${aviso('ok', 'check', `${nombrePeriodo(periodo)} ya está liquidado`, `${l.importada ? `Real, de ${esc((String(l.fuente || '').match(/\(([^)]+)\)/) || [, 'Octavo Piso'])[1])}` : `Emitida ${hace(l.emitidaAt)} por ${esc(nombreDe(l.por))}`} · ${plural(l.cuotas.length, 'cupón', 'cupones')}${l.vto1 ? ` · vence el ${fechaCorta(vtoDe(periodo, 1))} y el ${fechaCorta(vtoDe(periodo, 2))}` : ''}`)}
       ${superficie({ a:'ver-liquidacion', v:periodo, icon:'file', color:'wood', t:'Ver la liquidación', s:'Formato completo, para imprimir o guardar en PDF' })}
       ${superficie({ a:'mandar-cupones', v:periodo, icon:'mail', color:'sky', t:'Reenviar los cupones por correo', s:'A cada propietario con correo cargado' })}
       ${superficie({ a:'reabrir-liquidacion', v:periodo, icon:'refresh', color:'danger', t:'Reabrir el período', s:'Si hay que corregir un gasto', cls:'peligro' })}`;
@@ -1250,7 +1346,7 @@ const COBRO = {
     /* Mismo diseño que ven los vecinos (12-10-2026), con el nombre del propietario y los botones. Siempre, aunque la lista no se muestre a los vecinos. */
     const ult = liquidacionesEmitidas().slice(-1)[0], ipc = typeof ipcProyeccion === 'function' ? ipcProyeccion() : { pct:0 }, i = (+ipc.pct || 0) / 100;
     const ls = LOTES.map(L => { const lote = 'Lote ' + L.lote, d = Morosos.deudaPorMes(lote); if (d.total <= 1) return null; const cu = ult ? cuotaDe(ult, lote) : null;
-      return { lote, meses:d.meses, total:d.total, judicial: !!(cu && cu.judicial), interes: cu ? Math.round((+cu.interes || 0) * 100) / 100 : 0, proyeccion:[3, 6, 12].map(n => ({ n, m:Math.round(d.total * Math.pow(1 + i, n)) })) }; })
+      return { lote, meses:d.meses, total:d.total, judicial: !!(cu && cu.judicial), interes: cu ? Math.round((+cu.interes || 0) * 100) / 100 : 0, ...segunLiq(cu, ult), proyeccion:[3, 6, 12].map(n => ({ n, m:Math.round(d.total * Math.pow(1 + i, n)) })) }; })
       .filter(Boolean).sort(ordenMorosos);
     const alDia = LOTES.filter(L => saldoLote('Lote ' + L.lote) > 0.5 && !ls.some(x => x.lote === 'Lote ' + L.lote)).length;
     if (ls.length && typeof animarNumeros === 'function') setTimeout(() => animarNumeros(), 60);
@@ -2008,9 +2104,9 @@ const HotelExp = {
     const lotes = new Set(lotesDelHotel()); if (!lotes.size) return [];
     return aLista(Store.s.liquidaciones).filter(l => l && l.estado === 'emitida' && aLista(l.cuotas).some(c => lotes.has(c.lote)))
       .sort((a, b) => a.periodo.localeCompare(b.periodo)).slice(-24)
-      .map(l => ({ id:'hl-' + l.periodo, periodo:l.periodo, estado:'emitida', emitidaAt:l.emitidaAt || 0, ...(l.importada ? { importada:true } : {}), ...(l.real ? { real:true } : {}), cuotas:aLista(l.cuotas).filter(c => lotes.has(c.lote)).map(c => JSON.parse(JSON.stringify(c))) }));
+      .map(l => ({ id:'hl-' + l.periodo, periodo:l.periodo, estado:'emitida', emitidaAt:l.emitidaAt || 0, ...(l.importada ? { importada:true } : {}), ...(l.real ? { real:true } : {}), ...(l.vto1 ? { vto1:l.vto1 } : {}), ...(l.vto2 ? { vto2:l.vto2 } : {}), cuotas:aLista(l.cuotas).filter(c => lotes.has(c.lote)).map(c => JSON.parse(JSON.stringify(c))) }));
   },
-  huella: arr => JSON.stringify(aLista(arr).map(l => [l.id, l.emitidaAt, !!l.importada, !!l.real, aLista(l.cuotas).map(c => [c.lote, +c.total || 0, +c.interes || 0, +c.saldoInicial || 0, +c.expensas || 0, +c.fondo || 0, +c.redondeo || 0])]).sort()),
+  huella: arr => JSON.stringify(aLista(arr).map(l => [l.id, l.emitidaAt, !!l.importada, !!l.real, l.vto1 || '', l.vto2 || '', aLista(l.cuotas).map(c => [c.lote, +c.total || 0, +c.interes || 0, +c.saldoInicial || 0, +c.expensas || 0, +c.fondo || 0, +c.redondeo || 0])]).sort()),
   publicar(){
     if (yo()?.rol !== 'admin' || typeof cuentaHotel !== 'function' || !cuentaHotel()) return 0;
     if (typeof Nube !== 'undefined' && Nube.activa() && !(Nube.listoParaMotor && Nube.listoParaMotor())) return 0;
@@ -2108,8 +2204,8 @@ const Morosos = {
      saldo que el lote traía de antes de la primera liquidación, siempre. */
   deudaPorMes(lote){
     const c = cuentaLote(lote), hoy = hoyISO();
-    const cargos = c.movs.filter(m => m.debe && m.periodo).map(m => ({ periodo:m.periodo, tipo:m.tipo, resta:+m.debe || 0, vencido: m.tipo === 'saldo' || vtoDe(m.periodo, 2) < hoy }));
-    let credito = c.movs.filter(m => m.haber && !m.pendiente).reduce((a, m) => a + (+m.haber || 0), 0);
+    const cargos = c.movs.filter(m => m.debe && m.periodo && !m.par).map(m => ({ periodo:m.periodo, tipo:m.tipo, resta:+m.debe || 0, vencido: m.tipo === 'saldo' || vtoDe(m.periodo, 2) < hoy }));
+    let credito = c.movs.filter(m => m.haber && !m.pendiente && !m.par).reduce((a, m) => a + (+m.haber || 0), 0);
     for (const k of cargos){ if (credito <= 0) break; const u = Math.min(k.resta, credito); k.resta -= u; credito -= u; }
     const porMes = {};
     cargos.filter(k => k.vencido && k.resta > 0.5).forEach(k => { const key = k.tipo === 'saldo' ? 'antes-' + k.periodo : k.periodo; porMes[key] = (porMes[key] || 0) + k.resta; });
@@ -2123,7 +2219,7 @@ const Morosos = {
     return LOTES.map(L => {
       const lote = 'Lote ' + L.lote, d = this.deudaPorMes(lote); if (d.total <= 1) return null;
       const cu = cuotaDe(ult, lote);
-      return { id:'mor-' + L.lote, lote, meses:d.meses, total:d.total, judicial: !!(cu && cu.judicial), interes: cu ? Math.round((+cu.interes || 0) * 100) / 100 : 0,
+      return { id:'mor-' + L.lote, lote, meses:d.meses, total:d.total, judicial: !!(cu && cu.judicial), interes: cu ? Math.round((+cu.interes || 0) * 100) / 100 : 0, ...segunLiq(cu, ult),
         periodo:ult.periodo, ipc:+ipc.pct || 0, ipcPeriodo:ipc.periodo || '', proyeccion:[3, 6, 12].map(n => ({ n, m:Math.round(d.total * Math.pow(1 + i, n)) })) };
     }).filter(Boolean).sort(ordenMorosos);
   },
@@ -2197,6 +2293,7 @@ function tarjetaMoroso(x, { admin = false, i = 0 } = {}){
     <div class="mr-det"><div class="mr-det-in">
       <div class="mr-meses">${ms.map(m => { const e = typeof mesesEntre === 'function' ? mesesEntre(m.p.startsWith('antes-') ? m.p.slice(6) : m.p, periodoHoy()) : 1; return `<span class="nv-${nivelAntiguedad(Math.max(1, e))}"><small>${esc(Morosos.mes(m.p))}</small><b>${plata(m.m)}</b></span>`; }).join('')}</div>
       ${x.interes ? `<p class="mr-nota">${I('clock')}<span>En su último cupón se le sumaron <b>${plata(x.interes)}</b> de ajuste por lo que no pagó.</span></p>` : ''}
+      ${x.liq ? `<p class="mr-nota">${I('file')}<span>Según la liquidación de ${esc(Morosos.mes(x.liq.periodo).toLowerCase())}: deuda <b>${plata(x.liq.deuda)}</b> e intereses <b>${plata(x.liq.interes)}</b>${x.liq.abogados ? ', en manos de los abogados' : ''}.</span></p>` : ''}
       ${proy.length ? `<div class="mr-proy"><small>Si sigue sin pagar, con la inflación:</small>${proy.map(p => `<span><i style="--w:${Math.round(p.m / tope * 100)}%"></i><em>En ${p.n === 12 ? '1 año' : p.n + ' meses'}</em><b>${plata(p.m)}</b></span>`).join('')}</div>` : ''}
       ${admin ? `<div class="btns"><button class="btn btn-sm btn-sec" data-a="ver-cuenta" data-v="${esc(x.lote)}">${I('eye')}Ver cuenta</button>
         <button class="btn btn-sm btn-sec" data-a="certificado-deuda" data-v="${esc(x.lote)}">${I('file')}Certificado</button>
