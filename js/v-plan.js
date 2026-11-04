@@ -636,12 +636,12 @@ function traerLiquidacionReal(b){
     let res;
     Store.cambiar(s => {
       res = aplicarLiquidacionReal(s, b);
-      notificar(s, { para:'todos', titulo:`Expensas de ${nombrePeriodo(b.periodo)}`, texto:`Ya podés ver tu cupón en la app. Primer vencimiento: ${fechaCorta(b.vto1 || vtoDe(b.periodo, 1))}.`, icon:'wallet', color:'wood', link:'expensas', sonido:true });
+      /* Sin aviso a los vecinos (04-11-2026): los cupones los manda Octavo Piso. */
       auditar(s, 'Trajo la liquidación real', `${nombrePeriodo(b.periodo)} · ${b.lotes.length} cupones · ${plata(tot)} · ${res.pagos} cobros por ${plata(res.cobrado)} · ${res.malos.length ? res.malos.length + ' lotes no coinciden' : 'todos coinciden con el PDF'}`);
     });
     HotelExp.publicar(); ExpLote.publicar(); Morosos.publicar();
     hoja(`${nombrePeriodo(b.periodo)}, real`, `${res.malos.length ? aviso('danger', 'alert', `${plural(res.malos.length, 'lote no coincide', 'lotes no coinciden')} con el PDF`, res.malos.slice(0, 12).map(esc).join('<br>'))
-        : aviso('ok', 'check', `Listo: los ${res.lotes} lotes coinciden al centavo con el PDF`, `Cada vecino ya ve su cupón de ${nombrePeriodo(b.periodo)} por pagar (${plata(res.totalCupones)} entre todos).`)}
+        : aviso('ok', 'check', `Listo: los ${res.lotes} lotes coinciden al centavo con el PDF`, `Cada vecino ya ve en la app su cupón de ${nombrePeriodo(b.periodo)} (sin avisos ni correos: los manda Octavo Piso) · (${plata(res.totalCupones)} entre todos).`)}
       <div class="garita-kpis"><div class="kpi"><b>${res.pagos}</b><span>Cobros de ${MESES_LARGO[+b.anterior.slice(5)]}</span></div><div class="kpi"><b>${plataCorta(res.cobrado)}</b><span>Cobrado</span></div>
         <div class="kpi"><b>${b.gastos.length + aLista(b.particulares).length}</b><span>Gastos</span></div></div>
       ${res.confirmados ? `<div class="card plana small">${I('check')} ${plural(res.confirmados, 'pago informado en la app quedó confirmado', 'pagos informados en la app quedaron confirmados')}: ya estaban en la liquidación.</div>` : ''}

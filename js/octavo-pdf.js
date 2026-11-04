@@ -376,7 +376,7 @@ const RevisarReal = {
         ${lista.length > (this.limite || 40) ? `<button type="button" class="btn btn-sec btn-block" data-a="rv-mas">Ver ${lista.length - (this.limite || 40)} más</button>` : ''}</div>
       <div class="rv-pie"><button type="button" class="btn btn-sec" data-a="cerrar-hoja">Cancelar</button>
         <button type="button" class="btn btn-pri grow" data-a="rv-traer" ${graves.length ? 'disabled' : ''}>${I('download')}Traer ${nombrePeriodo(b.periodo)} a la app</button></div>
-      ${graves.length ? '<p class="rv-nota">Se apaga porque el PDF no cerró sus propias cuentas: revisá el archivo o pasámelo.</p>' : `<p class="rv-nota">Se registran los pagos de ${MESES_LARGO[+b.periodo.slice(5)]}, los gastos y el cupón de cada lote igual al PDF. Si la volvés a traer, no se duplica nada.</p>`}
+      ${graves.length ? '<p class="rv-nota">Se apaga porque el PDF no cerró sus propias cuentas: revisá el archivo o pasámelo.</p>' : `<p class="rv-nota">Se registran los pagos de ${MESES_LARGO[+b.periodo.slice(5)]}, los gastos y el cupón de cada lote igual al PDF. No se manda ningún aviso ni correo a los vecinos (los cupones los manda Octavo Piso). Si la volvés a traer, no se duplica nada.</p>`}
     </div>`;
     const abierta = document.getElementById('hoja')?.open && document.querySelector('#hojaCuerpo .rv');
     if (abierta){ const y = document.getElementById('hojaCuerpo').scrollTop; document.getElementById('hojaCuerpo').innerHTML = html; document.getElementById('hojaTitulo').textContent = 'Revisar antes de traer'; document.getElementById('hojaCuerpo').scrollTop = y; }

@@ -119,6 +119,14 @@ const liqsFuente = () => esHotel() ? (typeof Nube !== 'undefined' && Nube.activa
 const liquidacionDe = p => liqsFuente().find(l => l.periodo === p);
 const liquidacionesEmitidas = () => liqsFuente().filter(l => l.estado === 'emitida').sort((a, b) => a.periodo.localeCompare(b.periodo));
 const cuotaDe = (l, lote) => aLista(l && l.cuotas).find(c => c.lote === lote);
+/* MIENTRAS SE LEA DEL PDF DE OCTAVO PISO (pedido de Claudio, 04-11-2026: "que la
+   app no envíe notificaciones ni mail de las expensas"): una liquidación traída
+   de Octavo Piso no dispara ningún aviso ni correo a los vecinos (ni al traerla,
+   ni los recordatorios de vencimiento, ni el correo de expensas vencidas, ni el
+   reenvío de cupones). Los cupones los manda Octavo Piso y los pagos se le hacen
+   a ella: la app no sabe quién pagó hasta la liquidación siguiente, y avisaría
+   "no registramos tu pago" a quien ya pagó. */
+const deOctavo = l => !!(l && (l.real || l.importada));
 const pagosDe = lote => Store.s.pagos.filter(p => pagoDelLote(p, lote) && p.estado === 'confirmado');
 /* =========================================================
    CUÁNDO UN PAGO DESCUENTA DEL SALDO (26-09-2026)
@@ -1140,7 +1148,7 @@ const CONTA = {
         `Los cupones de ${nombrePeriodo(periodo)} vencen en ${MESES_LARGO[+vtoDe(periodo, 1).slice(5, 7)]} y no llevan el ajuste de los deudores. Para corregirlo: 1) tocá "Reabrir el período" acá abajo; 2) pasá sus gastos a ${nombrePeriodo(falta)} con el botón que aparece; 3) emití ${nombrePeriodo(falta)}. Los pagos ya hechos no se tocan.`) : ''}
       ${aviso('ok', 'check', `${nombrePeriodo(periodo)} ya está liquidado`, `${l.importada ? `Real, de ${esc((String(l.fuente || '').match(/\(([^)]+)\)/) || [, 'Octavo Piso'])[1])}` : `Emitida ${hace(l.emitidaAt)} por ${esc(nombreDe(l.por))}`} · ${plural(l.cuotas.length, 'cupón', 'cupones')}${l.vto1 ? ` · vence el ${fechaCorta(vtoDe(periodo, 1))} y el ${fechaCorta(vtoDe(periodo, 2))}` : ''}`)}
       ${superficie({ a:'ver-liquidacion', v:periodo, icon:'file', color:'wood', t:'Ver la liquidación', s:'Formato completo, para imprimir o guardar en PDF' })}
-      ${superficie({ a:'mandar-cupones', v:periodo, icon:'mail', color:'sky', t:'Reenviar los cupones por correo', s:'A cada propietario con correo cargado' })}
+      ${deOctavo(l) ? `<p class="muted small" style="margin:4px 2px 10px">${I('mail')} Los cupones de esta liquidación los manda Octavo Piso: la app no manda avisos ni correos de expensas.</p>` : superficie({ a:'mandar-cupones', v:periodo, icon:'mail', color:'sky', t:'Reenviar los cupones por correo', s:'A cada propietario con correo cargado' })}
       ${superficie({ a:'reabrir-liquidacion', v:periodo, icon:'refresh', color:'danger', t:'Reabrir el período', s:'Si hay que corregir un gasto', cls:'peligro' })}`;
     const vencido = m => `${fechaCorta(vtoDe(periodo, m))}`, despues = emitidoDespues(periodo);
     return `${despues ? aviso('danger', 'alert', `${nombrePeriodo(despues)} ya está emitido`, `Se emitió ${nombrePeriodo(despues)} antes que ${nombrePeriodo(periodo)}. Para no cobrar dos expensas: 1) reabrí ${nombrePeriodo(despues)}; 2) pasá sus gastos a ${nombrePeriodo(periodo)}; 3) emití ${nombrePeriodo(periodo)} acá.`,
@@ -1557,6 +1565,8 @@ A['ver-liquidacion'] = el => imprimir(`Liquidación ${nombrePeriodo(el.dataset.v
    o solo a mí para ver cómo llega. Dice qué pasó con cada correo. */
 A['mandar-cupones'] = el => {
   const periodo = el.dataset.v, gente = destinatariosDeCupon(), yoU = yo();
+  if (deOctavo(liquidacionDe(periodo))) return hoja(`Cupones de ${nombrePeriodo(periodo)}`, `${aviso('info', 'mail', 'Esta liquidación es de Octavo Piso', `Los cupones de ${nombrePeriodo(periodo)} los manda Octavo Piso. Mientras se lea su PDF, la app no manda avisos ni correos de expensas a los vecinos.`)}
+    <button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`);
   const lotesCon = [...new Set(gente.map(x => x.casa))].sort((a, b) => a.localeCompare(b, 'es', { numeric:true }));
   hoja(`Cupones de ${nombrePeriodo(periodo)}`, `
     ${superficie({ a:'cupones-a-todos', v:periodo, icon:'users', color:'brand', t:`A todos (${plural(gente.length, 'correo')})`, s:`${plural(lotesCon.length, 'lote')} con correo cargado, de ${LOTES.length}` })}

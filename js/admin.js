@@ -90,34 +90,34 @@ const REGLAS = [
         texto:`El primer vencimiento es el ${fechaCorta(vto)} y todavía no se emitieron los cupones.`, icon:'zap', color:'warn', link:'contabilidad:cierre', sonido:true })); } },
 
   { id:'expensas-aviso', n:'Expensas → aviso tres días antes del primer vencimiento',
-    d:'A cada lote que todavía no pagó ni avisó que pagó.',
+    d:'A cada lote que todavía no pagó ni avisó que pagó. No corre con las liquidaciones de Octavo Piso.',
     run(s, hoy){
-      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l) return 0;
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || deOctavo(l)) return 0;
       const vto = vtoDe(l.periodo, 1); if (hoy !== sumarDias(vto, -3)) return 0;
       const d = deudoresExpensas(s); if (!d.length) return 0;
       return marca(s, 'expaviso-' + l.periodo, () => notificar(s, { para:d, titulo:`Las expensas vencen el ${fechaCorta(vto)}`,
         texto:'Faltan 3 días. Podés ver tu cupón y pagar desde la app.', icon:'wallet', color:'wood', link:'expensas' })); } },
 
   { id:'expensas-vence-hoy', n:'Expensas → aviso el día del primer vencimiento',
-    d:'Solo a los lotes que todavía no pagaron ni avisaron.',
+    d:'Solo a los lotes que todavía no pagaron ni avisaron. No corre con las liquidaciones de Octavo Piso.',
     run(s, hoy){
-      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || vtoDe(l.periodo, 1) !== hoy) return 0;
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || deOctavo(l) || vtoDe(l.periodo, 1) !== hoy) return 0;
       const d = deudoresExpensas(s); if (!d.length) return 0;
       return marca(s, 'expvto1-' + l.periodo, () => notificar(s, { para:d, titulo:'Hoy vencen las expensas',
         texto:`Después de hoy se suma el recargo del ${cfgExp().recargo2} % (2º vencimiento el ${fechaCorta(vtoDe(l.periodo, 2))}).`, icon:'wallet', color:'warn', link:'expensas', sonido:true })); } },
 
   { id:'expensas-ultimo-dia', n:'Expensas → aviso el día del segundo vencimiento',
-    d:'El último día para pagar sin el ajuste: aviso con sonido a quien todavía debe.',
+    d:'El último día para pagar sin el ajuste: aviso con sonido a quien todavía debe. No corre con las liquidaciones de Octavo Piso.',
     run(s, hoy){
-      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || vtoDe(l.periodo, 2) !== hoy) return 0;
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || deOctavo(l) || vtoDe(l.periodo, 2) !== hoy) return 0;
       const d = deudoresExpensas(s); if (!d.length) return 0;
       return marca(s, 'expvto2-' + l.periodo, () => notificar(s, { para:d, titulo:'Hoy es el último día para pagar las expensas',
         texto:`Mañana lo impago pasa a la expensa que viene con el ajuste (${textoMora()}).`, icon:'alert', color:'danger', link:'expensas', sonido:true, urgente:true })); } },
 
   { id:'expensas-impaga', n:'Expensas → correo al día siguiente del segundo vencimiento',
-    d:'Solo a los lotes que no pagaron NI avisaron que pagaron: les recuerda que venció y que, pagado fuera de término, la expensa siguiente suma el ajuste por inflación. Queda en la auditoría.',
+    d:'Solo a los lotes que no pagaron NI avisaron que pagaron: les recuerda que venció y que, pagado fuera de término, la expensa siguiente suma el ajuste por inflación. Queda en la auditoría. No corre con las liquidaciones de Octavo Piso (los pagos se le hacen a ella y la app no sabe quién pagó).',
     run(s, hoy){
-      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l) return 0;
+      const l = liquidacionesEmitidas().slice(-1)[0]; if (!l || deOctavo(l)) return 0;
       const per = l.periodo;
       if (sumarDias(vtoDe(per, 2), 1) !== hoy) return 0;
       return marca(s, 'expimpaga-' + per, () => {
