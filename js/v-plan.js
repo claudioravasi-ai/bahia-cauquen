@@ -157,11 +157,17 @@ function anioPlan(anio = +hoyISO().slice(0, 4)){
       const cobradoApp = Store.s.pagos.filter(q => q.estado === 'confirmado' && String(q.fecha || '').slice(0, 7) === periodo).reduce((a, q) => a + (+q.monto || 0), 0);
       const pasado = periodo < periodoHoy();
       const esperado = cuotasAnt * cobro + (p.recupero || 0) + (p.interesesCobrados || 0);
-      x.percibido = pasado && cobradoApp ? cobradoApp : esperado;
+      /* 04-11-2026: si lo que se cobra ese mes es una liquidación de Octavo Piso,
+         los vecinos le pagan a ella y la app ve solo los pocos pagos hechos por la
+         app: tomarlos como "lo cobrado" daba un banco de −32 M en octubre. En ese
+         caso se usa lo esperado hasta que llegue la liquidación real del mes. */
+      const cobraOctavo = typeof deOctavo === 'function' && deOctavo(liquidacionDe(periodoAnterior(periodo)));
+      const usarApp = pasado && cobradoApp > 0 && !cobraOctavo;
+      x.percibido = usarApp ? cobradoApp : esperado;
       x.pagado = x.total;
       banco = banco + x.percibido - x.pagado;
       deuda = Math.max(0, deuda * (1 + i) + cuotasAnt * (1 - cobro) - (p.recupero || 0));
-      x.banco = banco; x.deuda = deuda; x.real = pasado && !!cobradoApp;
+      x.banco = banco; x.deuda = deuda; x.real = usarApp;
       /* Un mes traído de Octavo Piso (liquidación real): banco y deuda reales. */
       const r = (p.reales || {})[periodo];
       if (r){ Object.assign(x, { percibido:r.percibido, pagado:r.egresos, banco:r.saldoCierre, deuda:r.deuda, real:true }); banco = r.saldoCierre; deuda = r.deuda; }
@@ -213,16 +219,24 @@ const leyendaAnual = () => `<div class="graf-leyenda"><span><i style="background
 function graficoLineas(ms, series, { alto = 170 } = {}){
   const angosta = matchMedia('(max-width: 600px)').matches;
   if (angosta){ const i0 = ms.findIndex(x => series.some(s => x[s.k] != null)); if (i0 > 0) ms = ms.slice(Math.max(0, i0 - 1)); }
-  const N = ms.length || 12, W = angosta ? 420 : 720, H = angosta ? 210 : alto, izq = 44, der = 8, arr = 14, abj = 26;
+  const N = ms.length || 12, W = angosta ? 420 : 640, H = angosta ? 220 : Math.max(alto, 200), izq = 46, der = 10, arr = 20, abj = 28;
   const vals = ms.flatMap(x => series.map(s => x[s.k])).filter(v => v != null);
   if (!vals.length) return '';
-  const max = Math.max(1, ...vals) * 1.1, ancho = (W - izq - der) / N, y = v => arr + (H - arr - abj) * (1 - v / max);
+  /* 04-11-2026: con valores negativos (un banco en rojo) la escala baja de 0 y la
+     línea queda SIEMPRE dentro del recuadro (antes se salía y pisaba el texto). */
+  const alto0 = Math.max(1, ...vals), bajo0 = Math.min(0, ...vals), marg = (alto0 - bajo0) * .12;
+  const max = alto0 + marg, min = bajo0 < 0 ? bajo0 - marg : 0, ancho = (W - izq - der) / N, y = v => arr + (H - arr - abj) * (max - v) / (max - min || 1);
+  const ticks = min < 0 ? [min, 0, max] : [0, max / 2, max];
   return `<svg viewBox="0 0 ${W} ${H}" class="grafico" role="img" aria-label="${series.map(s => s.n).join(' y ')}">
-    ${[0, .5, 1].map(f => `<line x1="${izq}" x2="${W - der}" y1="${y(max * f).toFixed(1)}" y2="${y(max * f).toFixed(1)}" stroke="currentColor" stroke-opacity=".1"/><text x="${izq - 6}" y="${(y(max * f) + 3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="currentColor" opacity=".6">${corto(max * f)}</text>`).join('')}
+    ${ticks.map(t => `<line x1="${izq}" x2="${W - der}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" stroke="currentColor" stroke-opacity="${t === 0 && min < 0 ? .35 : .1}"${t === 0 && min < 0 ? ' stroke-dasharray="4 3"' : ''}/><text x="${izq - 6}" y="${(y(t) + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="currentColor" opacity=".6">${corto(t)}</text>`).join('')}
     ${series.map(s => { const pts = ms.map((x, k) => x[s.k] != null ? [izq + k * ancho + ancho / 2, y(x[s.k]), x] : null).filter(Boolean);
-      return `<polyline points="${pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="none" stroke="${s.c}" stroke-width="2.5" stroke-linejoin="round"/>${pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="${s.c}"><title>${s.n} · ${nombrePeriodo(p[2].periodo)}: ${plata(p[2][s.k])}</title></circle><text x="${p[0].toFixed(1)}" y="${(p[1] - 7).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${s.c}">${corto(p[2][s.k])}</text>`).join('')}`; }).join('')}
-    ${ms.map((x, k) => `<text x="${(izq + k * ancho + ancho / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10.5" fill="currentColor" opacity=".7">${MESES_CORTO[+x.periodo.slice(5)]}</text>`).join('')}</svg>
-    <div class="graf-leyenda">${series.map(s => `<span><i class="linea" style="background:${s.c}"></i>${s.n}</span>`).join('')}</div>`;
+      /* Línea llena donde los dos meses son reales; punteada donde hay un estimado. */
+      const tramos = pts.slice(1).map((p, k) => { const q = pts[k], est = !(q[2].real && p[2].real);
+        return `<line x1="${q[0].toFixed(1)}" y1="${q[1].toFixed(1)}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="${s.c}" stroke-width="${est ? 2.2 : 3}" stroke-linecap="round"${est ? ' stroke-dasharray="5 5" opacity=".8"' : ''}/>`; }).join('');
+      return tramos + pts.map(p => { const est = !p[2].real, v = p[2][s.k];
+        return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${est ? 4 : 4.5}" fill="${est ? 'var(--surface, #fff)' : s.c}" stroke="${s.c}" stroke-width="2"><title>${s.n} · ${nombrePeriodo(p[2].periodo)}: ${plata(v)}${est ? ' (estimado)' : ''}</title></circle><text x="${p[0].toFixed(1)}" y="${Math.max(arr - 4, p[1] - 9).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="800" fill="${v < 0 ? CHART_COL.deuda : s.c}">${corto(v)}</text>`; }).join(''); }).join('')}
+    ${ms.map((x, k) => `<text x="${(izq + k * ancho + ancho / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="11.5" font-weight="${x.periodo === periodoHoy() ? 800 : 600}" fill="currentColor" opacity=".75">${MESES_CORTO[+x.periodo.slice(5)]}</text>`).join('')}</svg>
+    <div class="graf-leyenda">${series.map(s => `<span><i class="linea" style="background:${s.c}"></i>${s.n}</span>`).join('')}<span><i class="linea" style="background:repeating-linear-gradient(90deg,currentColor 0 4px,transparent 4px 8px);opacity:.6"></i>punteado: estimado</span></div>`;
 }
 /* Barras horizontales: rubros de un mes o morosos. */
 function barrasH(filas, { color = CHART_COL.emitida, max } = {}){
@@ -272,36 +286,81 @@ function comparacionMeses(per){
   return { a, b, la, lb, mA, mB, filas, rubros, partA:part(a), partB:part(b), varLote, ems };
 }
 const pctVar = (a, b) => !a ? (b ? 'nuevo' : '—') : `${b >= a ? '+' : ''}${((b / a - 1) * 100).toLocaleString('es-AR', { maximumFractionDigits:1 })} %`;
+const PLAN_COMPARAR = { filtro:'todos', todos:false };
+A['mc-filtro'] = el => { PLAN_COMPARAR.filtro = el.dataset.v; PLAN_COMPARAR.todos = false; refrescar(); };
+A['mc-todos'] = () => { PLAN_COMPARAR.todos = !PLAN_COMPARAR.todos; refrescar(); };
 const PLAN_VISTAS = {
+  /* =========================================================
+     MES CONTRA MES, REDISEÑADO (pedido de Claudio, 04-11-2026: "más innovador e
+     interactivo"; los números en rojo sobre el verde no se leían y el tercer
+     cuadro se cortaba). Arriba, tres tarjetas claras con lo de este mes, el
+     cambio en una pastilla (sube = ámbar, baja = verde) y dos barritas que
+     comparan los dos meses. Después "en una frase", "lo que más lo movió"
+     (filtrable: subieron, bajaron, nuevos, no vinieron) y los rubros que se
+     abren con un toque para ver sus gastos. Nada de datos de vecinos.
+     ========================================================= */
   comparar(per){
     const C = comparacionMeses(per);
     if (!C) return vacio('calendar', 'Hacen falta dos meses emitidos seguidos para comparar.') + cajaImportarReal();
     const MA = MESES_LARGO[+C.a.slice(5)], MB = MESES_LARGO[+C.b.slice(5)], prom = l => aLista(l.cuotas).reduce((s, c) => s + (+c.expensas || 0) + (+c.fondo || 0), 0) / (aLista(l.cuotas).length || 1);
-    const kpi = (t, a, b, fmt = plataCorta) => `<div class="kpi"><b>${fmt(b)}</b><span>${t}</span><small class="${b > a ? 'rojo' : 'ok'}">${pctVar(a, b)} · ${MA.slice(0, 3)} ${fmt(a)}</small></div>`;
-    const medio = C.varLote.length ? C.varLote[Math.floor(C.varLote.length / 2)] : 0;
-    const fila = f => `<tr class="${!f.a ? 'nuevo' : !f.b ? 'apagada' : ''}"><td>${esc(f.t)}<div class="muted tiny">${esc(f.d)}${f.cuotaB || f.cuotaA ? ` · cuota ${esc(f.cuotaB || f.cuotaA)}` : ''}${!f.a ? ' <span class="pill p-sky">nuevo</span>' : !f.b ? ' <span class="pill">no está</span>' : ''}</div></td>
-      <td class="n">${f.a ? plata(f.a) : '—'}</td><td class="n">${f.b ? plata(f.b) : '—'}</td><td class="n ${f.b > f.a ? 'rojo' : ''}">${pctVar(f.a, f.b)}</td></tr>`;
-    return `<div class="chips">${C.ems.filter(x => C.ems.includes(periodoAnterior(x))).map(x => `<button class="chip ${x === C.b ? 'on' : ''}" data-a="abrir" data-v="cobranzas" data-p="plan|comparar~${x}">${nombrePeriodo(x)}</button>`).join('')}</div>
-      <div class="admin-hero" style="background:var(--g-brand)"><b style="font-size:18px">${nombrePeriodo(C.b)} contra ${nombrePeriodo(C.a)}</b>
-        <div class="small" style="opacity:.85">${[[MB, C.lb], [MA, C.la]].map(([m, l]) => `${m[0].toUpperCase() + m.slice(1)}: ${l.importada ? 'real, de Octavo Piso' : 'emitida desde la app'}`).join(' · ')}</div>
-        <div class="garita-kpis">${kpi('Gastos del mes', C.la.totalGastos, C.lb.totalGastos)}${kpi('Cuota promedio', prom(C.la), prom(C.lb), plata)}${kpi('Cargos del mes (sin deudas)', C.la.totalCuotas, C.lb.totalCuotas)}</div></div>
-      <div class="card small">${I('info')} La expensa de cada lote (sin deudas ni intereses) cambió, en el lote del medio, <b>${medio >= 0 ? '+' : ''}${(medio * 100).toLocaleString('es-AR', { maximumFractionDigits:1 })} %</b>${C.varLote.length ? ` (entre ${(C.varLote[0] * 100).toLocaleString('es-AR', { maximumFractionDigits:1 })} % y ${(C.varLote.at(-1) * 100).toLocaleString('es-AR', { maximumFractionDigits:1 })} %)` : ''}.
-        ${C.mA.banco != null && C.mB.banco != null ? `Banco al cierre: ${plata(C.mA.banco)} → <b>${plata(C.mB.banco)}</b>. Deuda de vecinos: ${plata(C.mA.deuda)} → <b>${plata(C.mB.deuda)}</b>.` : ''}
-        ${C.mB.percibido != null ? ` Cobrado en ${MB}: <b>${plata(C.mB.percibido)}</b>.` : ''}</div>
-      ${sec('Por rubro', `<button class="link" data-a="plan-comparar-pdf" data-v="${C.b}">${I('download')}PDF</button>`)}
-      <div class="card tabla-scroll"><table class="tabla-plan"><thead><tr><th>Rubro</th><th class="n">${MA}</th><th class="n">${MB}</th><th class="n">Cambio</th></tr></thead><tbody>
-        ${C.rubros.map(r => `<tr><td>${esc(RUBROS[r.r] || 'Otros')}</td><td class="n">${plata(r.a)}</td><td class="n">${plata(r.b)}</td><td class="n ${r.b > r.a ? 'rojo' : ''}">${pctVar(r.a, r.b)}</td></tr>`).join('')}
-        ${C.partA || C.partB ? `<tr><td>Gastos particulares (obleas)</td><td class="n">${plata(C.partA)}</td><td class="n">${plata(C.partB)}</td><td class="n">${pctVar(C.partA, C.partB)}</td></tr>` : ''}
-        <tr class="total"><td>Total</td><td class="n">${plata(C.la.totalGastos)}</td><td class="n">${plata(C.lb.totalGastos)}</td><td class="n">${pctVar(C.la.totalGastos, C.lb.totalGastos)}</td></tr></tbody></table></div>
-      ${sec('Gasto por gasto')}
-      <div class="card tabla-scroll"><table class="tabla-plan tabla-comparar"><thead><tr><th>Proveedor</th><th class="n">${MA}</th><th class="n">${MB}</th><th class="n">Cambio</th></tr></thead><tbody>${C.filas.map(fila).join('')}</tbody></table></div>
-      <p class="muted tiny">"Nuevo": no estaba el mes anterior. "No está": estaba y este mes no vino. Las cuotas de un plan de pagos se suman en un solo renglón.</p>`;
+    const pct = (a, b) => a ? (b / a - 1) * 100 : 0, pctTxt = (a, b) => !a ? (b ? 'nuevo' : '—') : `${b >= a ? '+' : '−'}${Math.abs(pct(a, b)).toLocaleString('es-AR', { maximumFractionDigits:1 })} %`;
+    const tono = (a, b) => !a && b ? 'nuevo' : a && !b ? 'fuera' : Math.abs(pct(a, b)) < 0.05 ? 'igual' : b > a ? 'sube' : 'baja';
+    const flecha = t => ({ sube:'▲', baja:'▼', igual:'', nuevo:'', fuera:'' }[t]);
+    const pillTxt = (a, b) => { const t = tono(a, b); return t === 'igual' ? 'sin cambio' : t === 'nuevo' ? 'nuevo' : t === 'fuera' ? 'no vino' : `${flecha(t)} ${pctTxt(a, b)}`; };
+    const tarjeta = (t, a, b, fmt, ayuda) => { const tn = tono(a, b), top = Math.max(a, b, 1);
+      return `<div class="mc-k mc-${tn}"><span class="mc-k-t">${t}</span><b class="mc-k-v">${fmt(b)}</b>
+        <span class="mc-pill">${pillTxt(a, b)}</span>
+        <span class="mc-k-barras" aria-hidden="true"><i style="--w:${(a / top * 100).toFixed(1)}%"><em>${MA.slice(0, 3)}</em></i><i class="ah" style="--w:${(b / top * 100).toFixed(1)}%"><em>${MB.slice(0, 3)}</em></i></span>
+        <small>${MA[0].toUpperCase() + MA.slice(1)}: ${fmt(a)}${ayuda ? ' · ' + ayuda : ''}</small></div>`; };
+    const medio = C.varLote.length ? C.varLote[Math.floor(C.varLote.length / 2)] : 0, pAR = x => (x * 100).toLocaleString('es-AR', { maximumFractionDigits:1 });
+    const filtro = PLAN_COMPARAR.filtro || 'todos';
+    const movidos = C.filas.map(f => ({ ...f, dif:f.b - f.a, tn:tono(f.a, f.b) })).filter(f => f.tn !== 'igual');
+    const cuenta = { sube:movidos.filter(f => f.tn === 'sube').length, baja:movidos.filter(f => f.tn === 'baja').length, nuevo:movidos.filter(f => f.tn === 'nuevo').length, fuera:movidos.filter(f => f.tn === 'fuera').length };
+    const lista = movidos.filter(f => filtro === 'todos' || f.tn === filtro).sort((x, y) => Math.abs(y.dif) - Math.abs(x.dif)), topD = Math.max(1, ...lista.map(f => Math.abs(f.dif)));
+    const verTodos = PLAN_COMPARAR.todos, mostrados = verTodos ? lista : lista.slice(0, 6);
+    const mov = f => `<div class="mc-m mc-${f.tn}"><div class="mc-m-txt"><b>${esc(f.t)}</b><small>${esc(f.d || '')}${f.cuotaB || f.cuotaA ? ` · cuota ${esc(f.cuotaB || f.cuotaA)}` : ''}</small></div>
+        <div class="mc-m-bar" aria-hidden="true"><span class="${f.dif < 0 ? 'izq' : 'der'}" style="--w:${(Math.sqrt(Math.abs(f.dif) / topD) * 50).toFixed(1)}%"></span></div>
+        <div class="mc-m-v"><b>${f.dif >= 0 ? '+' : '−'}${plataCorta(Math.abs(f.dif))}</b><small>${f.tn === 'nuevo' ? 'nuevo' : f.tn === 'fuera' ? 'no vino' : pctTxt(f.a, f.b)}</small></div></div>`;
+    const topR = Math.max(1, ...C.rubros.map(r => Math.max(r.a, r.b)));
+    const rubro = r => { const tn = tono(r.a, r.b), gs = C.filas.filter(f => f.rubro === r.r).sort((x, y) => y.b - x.b);
+      return `<details class="mc-r mc-${tn}"><summary><span class="mc-r-t"><b>${esc(RUBROS[r.r] || 'Otros')}</b><small>${plural(gs.length, 'gasto')}</small></span>
+          <span class="mc-r-barras" aria-hidden="true"><i style="--w:${(r.a / topR * 100).toFixed(1)}%"></i><i class="ah" style="--w:${(r.b / topR * 100).toFixed(1)}%"></i></span>
+          <span class="mc-r-v"><b>${plataCorta(r.b)}</b><span class="mc-pill">${pillTxt(r.a, r.b)}</span></span><span class="mc-r-fl">${I('right')}</span></summary>
+        <div class="mc-r-det">${gs.map(f => { const t2 = tono(f.a, f.b); return `<div class="mc-g mc-${t2}"><span><b>${esc(f.t)}</b><small>${esc(f.d || '')}${f.cuotaB || f.cuotaA ? ` · cuota ${esc(f.cuotaB || f.cuotaA)}` : ''}</small></span>
+          <span class="mc-g-n"><small>${MA.slice(0, 3)}</small>${f.a ? plata(f.a) : '—'}</span><span class="mc-g-n"><small>${MB.slice(0, 3)}</small><b>${f.b ? plata(f.b) : '—'}</b></span><span class="mc-pill">${pillTxt(f.a, f.b)}</span></div>`; }).join('')}</div></details>`; };
+    return `<div class="chips mc-chips">${C.ems.filter(x => C.ems.includes(periodoAnterior(x))).map(x => `<button class="chip ${x === C.b ? 'on' : ''}" data-a="abrir" data-v="cobranzas" data-p="plan|comparar~${x}">${nombrePeriodo(x)}</button>`).join('')}</div>
+      <section class="mc">
+        <header class="mc-cab"><div><small>Mes contra mes</small><h3>${nombrePeriodo(C.b)} <span>contra ${MA}</span></h3></div>
+          <div class="mc-fuentes">${[[MB, C.lb], [MA, C.la]].map(([m, l]) => `<span class="${l.importada ? 'real' : ''}">${I(l.importada ? 'check' : 'zap')}${m[0].toUpperCase() + m.slice(1)}: ${l.importada ? 'real, de Octavo Piso' : 'emitida por la app'}</span>`).join('')}</div></header>
+        <div class="mc-kpis">${tarjeta('Gastos del mes', C.la.totalGastos, C.lb.totalGastos, plataCorta)}${tarjeta('Cuota promedio por lote', prom(C.la), prom(C.lb), plata, 'sin deudas')}${tarjeta('Cargos del mes', C.la.totalCuotas, C.lb.totalCuotas, plataCorta, 'con el Fondo')}</div>
+        <div class="mc-frase">${I('info')}<p>${(() => {
+          /* 04-11-2026 (Claudio: "¿qué significa el lote del medio?"): en palabras simples.
+             Si todos cambiaron casi igual, se dice el rango; si no, la mitad y la mitad. */
+          if (!C.varLote.length) return 'Sin lotes para comparar.';
+          const lo = C.varLote[0], hi = C.varLote.at(-1), sg = x => (x >= 0 ? '+' : '−') + pAR(Math.abs(x)) + ' %', verbo = medio >= 0 ? 'subió' : 'bajó';
+          return hi - lo < 0.01 ? `A todos los lotes la expensa les ${lo >= 0 && hi >= 0 ? 'subió' : lo < 0 && hi < 0 ? 'bajó' : 'cambió'} <b>entre ${sg(lo)} y ${sg(hi)}</b>.`
+            : `A la mitad de los lotes la expensa les ${verbo} <b>${sg(medio)} o más</b>, y a la otra mitad, menos <span>(va de ${sg(lo)} a ${sg(hi)} según el lote)</span>.`; })()}
+          ${C.mA.banco != null && C.mB.banco != null ? `<br><span class="mc-flujo">${I('wallet')}Banco: ${plataCorta(C.mA.banco)} <i>→</i> <b>${plataCorta(C.mB.banco)}</b></span><span class="mc-flujo">${I('alert')}Deuda de vecinos: ${plataCorta(C.mA.deuda)} <i>→</i> <b>${plataCorta(C.mB.deuda)}</b></span>` : ''}${C.mB.percibido != null ? `<span class="mc-flujo">${I('download')}Cobrado en ${MB}: <b>${plataCorta(C.mB.percibido)}</b></span>` : ''}</p></div>
+        <h4 class="mc-tit">Lo que más lo movió</h4>
+        <div class="seg mc-seg">${[['todos', `Todos · ${movidos.length}`], ['sube', `▲ Subieron · ${cuenta.sube}`], ['baja', `▼ Bajaron · ${cuenta.baja}`], ['nuevo', `Nuevos · ${cuenta.nuevo}`], ['fuera', `No vinieron · ${cuenta.fuera}`]].filter(([k]) => k === 'todos' || cuenta[k]).map(([k, t]) => `<button type="button" class="mc-f${filtro === k ? ' on' : ''}" data-a="mc-filtro" data-v="${k}" aria-pressed="${filtro === k}">${t}</button>`).join('')}</div>
+        <div class="mc-movidos">${mostrados.map(mov).join('') || '<p class="muted small">Nada en esta lista.</p>'}</div>
+        ${lista.length > 6 ? `<button type="button" class="btn btn-sec btn-block mc-mas" data-a="mc-todos">${verTodos ? 'Ver menos' : `Ver los ${lista.length}`}</button>` : ''}
+        <h4 class="mc-tit">Por rubro <span>tocá uno para ver sus gastos</span><button class="link" data-a="plan-comparar-pdf" data-v="${C.b}">${I('download')}PDF</button></h4>
+        <div class="mc-leyenda"><span><i></i>${MA}</span><span><i class="ah"></i>${MB}</span><span class="mc-sube">▲ sube</span><span class="mc-baja">▼ baja</span></div>
+        <div class="mc-rubros">${C.rubros.map(rubro).join('')}
+          ${C.partA || C.partB ? `<div class="mc-r mc-${tono(C.partA, C.partB)} plano"><div class="mc-sum"><span class="mc-r-t"><b>Gastos particulares</b><small>obleas de cada lote</small></span><span class="mc-r-barras"><i style="--w:${(C.partA / topR * 100).toFixed(1)}%"></i><i class="ah" style="--w:${(C.partB / topR * 100).toFixed(1)}%"></i></span><span class="mc-r-v"><b>${plataCorta(C.partB)}</b><span class="mc-pill">${pillTxt(C.partA, C.partB)}</span></span></div></div>` : ''}
+          <div class="mc-total"><span>Total de gastos</span><span>${MA}: ${plata(C.la.totalGastos)}</span><b>${MB}: ${plata(C.lb.totalGastos)}</b><span class="mc-pill">${pillTxt(C.la.totalGastos, C.lb.totalGastos)}</span></div></div>
+        <p class="muted tiny">"Nuevo": no estaba el mes anterior. "No vino": estaba y este mes no. Las cuotas de un plan de pagos se suman en un solo renglón.</p>
+      </section>`;
   },
   anio(){
     const A = anioPlan(), p = A.cfg, hoyP = periodoHoy();
     const futuros = A.meses.filter(x => x.periodo > p.base && x.estado !== 'sin-datos');
     const totAnio = A.meses.reduce((a, x) => a + (x.total || 0), 0), dic = A.meses[11];
-    const prox = A.meses.find(x => x.periodo >= hoyP && x.estado !== 'emitida' && x.estado !== 'sin-datos') || futuros[0];
+    /* 04-11-2026: el próximo es el mes que TOCA liquidar (octubre, que se paga en
+       noviembre), no el mes en curso: decía "Noviembre" y confundía. */
+    const aLiq = typeof periodoALiquidar === 'function' ? periodoALiquidar() : hoyP, conOctavo = deOctavo(liquidacionesEmitidas().slice(-1)[0]);
+    const prox = A.meses.find(x => x.periodo === aLiq && x.estado !== 'emitida' && x.estado !== 'sin-datos') || A.meses.find(x => x.periodo >= hoyP && x.estado !== 'emitida' && x.estado !== 'sin-datos') || futuros[0];
     return `<div class="admin-hero" style="background:var(--g-brand)">
         <b style="font-size:18px">Expensas ${A.anio}, desarrolladas mes a mes</b>
         <div class="small" style="opacity:.85">Base: ${nombrePeriodo(p.base)} (real) · ${plural(futuros.length, 'mes estimado', 'meses estimados')} hasta diciembre · inflación ${p.inflacion.toLocaleString('es-AR')} % mensual</div>
@@ -309,9 +368,9 @@ const PLAN_VISTAS = {
           <div class="kpi"><b>${plataCorta(dic.banco ?? 0)}</b><span>Banco a diciembre</span></div>
           <div class="kpi"><b>${plataCorta(dic.deuda ?? 0)}</b><span>Deuda a diciembre</span></div></div></div>
       ${prox ? `<div class="card"><div class="row" style="align-items:flex-start"><span class="ic ic-wood" style="width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none">${I('zap')}</span>
-        <div class="grow"><b>Próximo cierre: ${nombrePeriodo(prox.periodo)}</b><div class="muted small">${prox.reales ? plural(prox.reales, 'gasto real cargado', 'gastos reales cargados') + ' · ' : ''}${plural(prox.estimados, 'estimado')} · total ${plata(prox.total)} · cuota promedio ${plata(prox.cuotas / LOTES.length)}</div>
-        <div class="muted small">${p.autoBorrador ? `El ${p.diaCierre} de ${MESES_LARGO[+periodoSiguiente(prox.periodo).slice(5)]} la app lo arma sola y te avisa${p.autoEmitir ? ', y lo emite' : ' para que lo emitas'}.` : 'El cierre automático está apagado.'}</div></div></div>
-        <div class="btns" style="margin-top:10px"><button class="btn btn-sm btn-sec" data-a="abrir" data-v="cobranzas" data-p="plan|mes~${prox.periodo}">${I('eye')}Ver el detalle</button>
+        <div class="grow"><b>Próximo a liquidar: ${nombrePeriodo(prox.periodo)}</b> <span class="muted small">· se paga en ${MESES_LARGO[+periodoSiguiente(prox.periodo).slice(5)]} (vence el ${fechaCorta(vtoDe(prox.periodo, 1))})</span><div class="muted small">${prox.reales ? plural(prox.reales, 'gasto real cargado', 'gastos reales cargados') + ' · ' : ''}${plural(prox.estimados, 'estimado')} · total ${plata(prox.total)} · cuota promedio ${plata(prox.cuotas / LOTES.length)}</div>
+        <div class="muted small">${conOctavo ? `Mientras se lleve con Octavo Piso: cuando llegue el PDF de ${MESES_LARGO[+prox.periodo.slice(5)]}, traelo con el botón de abajo. Los números de este mes son estimados hasta entonces.` : p.autoBorrador ? `El ${p.diaCierre} de ${MESES_LARGO[+periodoSiguiente(prox.periodo).slice(5)]} la app lo arma sola y te avisa${p.autoEmitir ? ', y lo emite' : ' para que lo emitas'}.` : 'El cierre automático está apagado.'}</div></div></div>
+        <div class="btns" style="margin-top:10px">${conOctavo ? `<button class="btn btn-sm btn-pri" data-a="plan-traer-real">${I('upload')}Traer el PDF de Octavo Piso</button>` : ''}<button class="btn btn-sm btn-sec" data-a="abrir" data-v="cobranzas" data-p="plan|mes~${prox.periodo}">${I('eye')}Ver el detalle</button>
           <button class="btn btn-sm btn-sec" data-a="abrir" data-v="contabilidad" data-p="gastos|${prox.periodo}">${I('plus')}Cargar facturas reales</button></div></div>` : ''}
       ${sec('Gastos y cobranza, mes a mes')}
       <div class="card grafico-card">${graficoAnual(A)}${leyendaAnual()}</div>
@@ -652,8 +711,9 @@ function traerLiquidacionReal(b){
   } catch(err){ hoja('No se trajo la liquidación', `${aviso('danger', 'alert', 'No pude traerla', esc(err.message))}<button class="btn btn-pri btn-block" data-a="cerrar-hoja">Entendido</button>`); }
 }
 const cajaImportarReal = () => `<label class="superficie acento"><span class="ic">${I('upload')}</span><span class="txt"><b>Traer la liquidación real de un mes</b>
-    <small>Elegí el <b>PDF de Octavo Piso</b> tal como llega (o el archivo .json). Antes de traerlo, la app lo controla y te muestra, lote por lote, en qué difiere de lo que ella habría calculado.</small></span>
+    <small>Elegí el PDF de Octavo Piso tal como llega (o el archivo .json). Antes de traerlo, la app lo controla y te muestra, lote por lote, en qué difiere de lo que ella habría calculado.</small></span>
     <input type="file" accept=".pdf,application/pdf,.json,application/json" id="importarReal" hidden></label>`;
+A['plan-traer-real'] = () => { const i = document.getElementById('importarReal'); if (i) i.click(); };
 A['plan-comparar-ir'] = el => { cerrarHoja(); abrir('cobranzas', 'plan|comparar~' + el.dataset.v); };
 A['plan-comparar-pdf'] = el => { const C = comparacionMeses(el.dataset.v); if (!C) return;
   const MA = MESES_LARGO[+C.a.slice(5)], MB = MESES_LARGO[+C.b.slice(5)];
