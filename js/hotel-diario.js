@@ -129,7 +129,10 @@ const HotelDiario = {
   /* La hoja de las 22 h. Se vuelve a dibujar con cada toque, sin repetir la entrada animada. */
   abrir(f){ AgendaVista.quieta = false; hoja('Agenda inteligente', agendaHtml(f), { ancho:'600px' }); $('#hoja').dataset.agenda = f; setTimeout(() => { AgendaVista.quieta = true; }, 900); },
   repintar(f){ const d = $('#hoja'); if (d && d.open && d.dataset.agenda === f){ AgendaVista.quieta = true; $('#hojaCuerpo').innerHTML = agendaHtml(f); } else refrescar(); },
-  device:(() => { try { let k = sessionStorage.getItem('bhc.equipo'); if (!k){ k = uid(); sessionStorage.setItem('bhc.equipo', k); } return k; } catch(e){ return uid(); } })(),
+  /* (07-11-2026) El equipo se recuerda para siempre (antes duraba lo que la pestaña abierta: cada vez que la
+     garita cerraba y abría la app era "un equipo nuevo" y la bitácora volvía a salir por correo). */
+  device:(() => { try { let k = localStorage.getItem('bhc.equipo.fijo'); if (!k){ k = uid(); localStorage.setItem('bhc.equipo.fijo', k); } return k; }
+    catch(e){ try { let k = sessionStorage.getItem('bhc.equipo'); if (!k){ k = uid(); sessionStorage.setItem('bhc.equipo', k); } return k; } catch(e2){ return uid(); } } })(),
   tic(){
     const u = yo(); if (!u) return;
     if (u.rol === 'hotel' && !(typeof HotelEjemplo !== 'undefined' && HotelEjemplo.activo())) this.delHotel(u);
@@ -156,7 +159,12 @@ const HotelDiario = {
   deLaGarita(){
     const hoy = hoyISO(), ahora = ahoraMin(), ayer = sumarDias(hoy, -1);
     const f = ahora >= 23 * 60 + 59 ? hoy : ahora < 12 * 60 ? ayer : null;
-    if (f && !bitacoraHotelDe(f) && cuentaHotel() && HotelMotor.marcar('bd-' + f + '-' + this.device)) this.cerrarDia(f);
+    /* (07-11-2026, "se mandan tantos mails por día al hotel") Una sola bitácora por día:
+       · espera a que la base termine de bajar lo del hotel (antes miraba a los 4 s de abrir la app,
+         no veía la que ya estaba guardada y la armaba y la mandaba de nuevo: 4 correos el 06-11 a la mañana);
+       · cada teléfono la intenta una sola vez por día, aunque se cierre y se abra la app. */
+    const baseLista = typeof Nube === 'undefined' || !Nube.activa() || (Nube.listoParaMotor && Nube.listoParaMotor());
+    if (f && baseLista && !bitacoraHotelDe(f) && cuentaHotel() && HotelMotor.marcar('bd-' + f)) this.cerrarDia(f);
     /* La agenda que aprobó el hotel se le abre a la garita (una vez por equipo) hasta que alguien toca "Recibido". */
     const ag = [sumarDias(hoy, 1), hoy].map(agendaDe).find(a => a && a.estado === 'aprobada' && !a.recibido && (a.fecha !== hoy || ahora < 12 * 60));
     if (!MODO_MANUAL && ag && document.visibilityState === 'visible' && !hojaAbierta() && (typeof turnoListo !== 'function' || turnoListo()) && HotelMotor.marcar('ag-g-' + ag.fecha + '-' + ag.aprobadaAt)){ AgendaVista.cat = 'todo'; setTimeout(() => this.abrir(ag.fecha), 600); }
@@ -168,7 +176,13 @@ const HotelDiario = {
     Store.cambiar(s => { s.hotelDiario = aLista(s.hotelDiario); if (s.hotelDiario.some(x => x && x.id === doc.id)) return; s.hotelDiario.push({ ...doc, por:this.device }); });
     /* Si dos equipos de la garita lo cerraron a la vez, manda el correo solo el que quedó anotado. */
     await new Promise(ok => setTimeout(ok, 6000));
-    const g = bitacoraHotelDe(f); if (!g || g.por !== this.device || (g.mail && g.mail.ok)) return;
+    const g = bitacoraHotelDe(f); if (!g || g.por !== this.device || g.mail) return;
+    /* (07-11-2026) Antes de mandarlo se anota en la base "saliendo, por este equipo": otro teléfono que la
+       mire en ese momento ya no la manda. Si el correo falla queda "No salió" y la garita o el hotel
+       tocan "Mandarlo de nuevo"; la app no la reintenta sola, para no llenarle la casilla al hotel. */
+    Store.cambiar(s => { const x = aLista(s.hotelDiario).find(z => z && z.id === g.id); if (x && !x.mail) x.mail = { at:Date.now(), ok:false, enviando:true, por:this.device }; });
+    await new Promise(ok => setTimeout(ok, 3000));
+    const g2 = bitacoraHotelDe(f); if (!g2 || !g2.mail || !g2.mail.enviando || g2.mail.por !== this.device) return;
     await mandarBitacoraHotel(f);
   },
 };
@@ -371,7 +385,7 @@ R['hotel-bitacora'] = {
     const IC = { vans:'car', llegan:'login', salen:'logout', personal:'users', eventos:'star', spa:'sparkle', obs:'alert', otro:'calendar' };
     return `${segmento(dias.map(d => ({ k:d, t:d === hoy ? 'Hoy' : DIAS[fechaDe(d).getDay()], n:fechaDe(d).getDate(), c: bitacoraHotelDe(d) ? 'var(--ok)' : 'var(--sky)' })), f, 'bh-dia', 'apilado')}
       <div class="bh-cab"><div class="grow"><small>${esc(diaLargo(f))}</small><b>${guardada ? `Cerrada a las ${hora(guardada.at)} h` : f === hoy ? 'En curso: se cierra sola a las 23:59' : 'Sin cerrar'}</b>
-        ${guardada && guardada.mail ? `<span class="small ${guardada.mail.ok ? '' : 'muted'}">${I('mail')} ${guardada.mail.ok ? 'Enviada por correo a las ' + hora(guardada.mail.at) + ' h' : 'No salió por correo: ' + esc(guardada.mail.error || '')}</span>` : ''}</div>
+        ${guardada && guardada.mail ? `<span class="small ${guardada.mail.ok ? '' : 'muted'}">${I('mail')} ${guardada.mail.ok ? 'Enviada por correo a las ' + hora(guardada.mail.at) + ' h' : guardada.mail.enviando ? (Date.now() - guardada.mail.at < 5 * MIN ? 'Saliendo por correo…' : 'El correo quedó sin confirmar: tocá "Mandarlo de nuevo" si el hotel no lo recibió') : 'No salió por correo: ' + esc(guardada.mail.error || '')}</span>` : ''}</div>
         <span class="bh-nota ${b.nota === 10 ? 'diez' : ''}"><b>${guardada ? b.nota : '—'}</b><small>/10</small></span></div>
       <div class="bh-kpis">${[['traslados', r.traslados, 'car', 'wood'], ['llegaron', r.llegaron, 'login', 'sky'], ['se fueron', r.sefueron, 'logout', 'accent'], ['del personal', r.personal, 'users', 'ok'], ['clientes', (r.spa || 0) + (r.resto || 0) + (r.recep || 0), 'sparkle', 'danger']]
         .map(([t, n, ic, c]) => `<div class="bh-k c-${c}">${I(ic)}<b>${n || 0}</b><small>${t}</small></div>`).join('')}</div>

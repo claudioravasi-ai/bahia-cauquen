@@ -6346,7 +6346,7 @@ li.prox .rm-gn{background:#ff9a3d}
 .pv-col header{display:flex;align-items:center;justify-content:space-between;padding:2px 4px 8px}
 .pv-col header b{display:flex;align-items:center;gap:7px;font-size:13.5px}
 .pv-col header b::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--cc);box-shadow:0 0 0 4px color-mix(in srgb,var(--cc) 20%,transparent)}
-.pv-col header .dn-num{font-size:18px;color:var(--cc);letter-spacing:0}
+.pv-col header .dn-num{font-size:13px;color:#fff;background:var(--cc);letter-spacing:0}
 .pv-col-lista{display:grid;gap:7px}
 .pv-card{--tc:var(--accent);position:relative;display:flex;align-items:stretch;border-radius:13px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--tc);box-shadow:var(--sh-1);animation:ncSube .35s both;animation-delay:calc(var(--i) * 50ms)}
 .pv-card.t-sky{--tc:var(--sky)}.pv-card.t-ok{--tc:var(--ok)}
