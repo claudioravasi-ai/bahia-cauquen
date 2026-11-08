@@ -585,18 +585,43 @@ function rondaGuiaBorrar(token, codigo){
 }
 /* Cuando la Administración cambia el recorrido, se actualizan las guías de los policías de servicio. */
 function rondaGuiasAlDia(){ aLista(Store.s.rondaCodigos).filter(c => c && c.vence > Date.now()).forEach(c => rondaGuiaPublicar(c.g, c.vence, c.id)); }
+/* EL POLICÍA VEÍA OTRO RECORRIDO (pedido de Claudio, 08-11-2026: "a los
+   policías les llega por WhatsApp una distribución de los Hubs distinta a
+   la que tenemos los vecinos, la Administración y la garita, y no se marcan
+   del 1 al 10"). El teléfono del policía no tiene cuenta: al abrir el
+   enlace, la app arranca con los datos de MUESTRA (los 6 puntos de fábrica:
+   Acceso de servicio, Perímetro norte, Contenedores…). La guía se pedía
+   ANTES de que terminara de conectarse la base y, como la base todavía no
+   estaba, se armaba con esos puntos de muestra y quedaba guardada 14 horas.
+   Los QR reales (los 10 Hubs) no estaban en esa guía, así que nunca se
+   tildaban ni avanzaba "el próximo". Ahora:
+   · en la app real la guía sale SOLO de la base: se espera a que esté
+     conectada (hasta 15 segundos) y nunca se arma con los datos de muestra;
+   · la guía de la base lleva la marca "base": una guía guardada sin esa
+     marca (la mala de antes) se descarta sola y se vuelve a bajar.
+   Los puntos guardados en el teléfono se usan solo en la prueba (?local). */
+function rondaEsPrueba(){ return /[?&]local\b/.test(location.search); }
+async function rondaBaseLista(ms = 15000){
+  const t0 = Date.now();
+  while (!(Nube && Nube.db) && Date.now() - t0 < ms) await new Promise(ok => setTimeout(ok, 150));
+  return !!(Nube && Nube.db);
+}
 const RondaGuia = {
   KEY:'bhc.ronda.guia',
-  leer(){ try { const g = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return g && g.vence > Date.now() ? g : null; } catch(e){ return null; } },
+  leer(){ try { const g = JSON.parse(localStorage.getItem(this.KEY) || 'null'); return g && g.vence > Date.now() && (g.base || rondaEsPrueba()) ? g : null; } catch(e){ return null; } },
   guardar(g){ try { localStorage.setItem(this.KEY, JSON.stringify(g)); return true; } catch(e){ return false; } },
   async bajar(token, codigo){
-    if (typeof Nube !== 'undefined' && Nube.activa() && Nube.db){
+    if (typeof Nube !== 'undefined' && Nube.activa()){
+      if (!Nube.db && !await rondaBaseLista()) throw new Error('SIN_BASE');
       if (!token) token = await rondaClaveCodigo(codigo);
       if (!token) return null;
       const snap = await Nube.db.ref('ronda/guia/' + token).once('value'); const v = snap.val();
-      return v ? { ...v, pts: aLista(v.pts).filter(Boolean) } : null;
+      return v ? { ...v, pts: aLista(v.pts).filter(Boolean), base:1 } : null;
     }
-    /* Sin la nube (prueba en esta computadora): se arma de los puntos guardados acá. */
+    /* Sin la nube: solo en la prueba en esta computadora (?local) se arma de
+       los puntos guardados acá. En la app real sin la base (sin señal, el
+       programa de Firebase no cargó) NO: serían los puntos de muestra. */
+    if (!rondaEsPrueba()) throw new Error('SIN_BASE');
     return aLista(Store.s.puntos).length ? rondaGuiaArmar(Date.now() + CODIGO_VIGENCIA) : null;
   },
 };

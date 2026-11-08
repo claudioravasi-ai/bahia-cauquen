@@ -2326,7 +2326,7 @@ function pintarPunto(codigo, yaBusco){
      tarjeta): la baja con el código y vuelve a dibujar con la foto. */
   const bajarGuia = async c => {
     if (g || typeof RondaGuia === 'undefined') return null;
-    try { const ng = await Promise.race([RondaGuia.bajar(null, c), new Promise(ok => setTimeout(() => ok(null), 6000))]); if (ng && aLista(ng.pts).length){ RondaGuia.guardar(ng); return ng; } } catch(e){}
+    try { const ng = await Promise.race([RondaGuia.bajar(null, c), new Promise(ok => setTimeout(() => ok(null), 15000))]); if (ng && aLista(ng.pts).length){ RondaGuia.guardar(ng); return ng; } } catch(e){}
     return null;
   };
   /* LA GUÍA SE PONE AL DÍA SOLA (pedido de Claudio, 23-10-2026: "al policía
@@ -2336,7 +2336,7 @@ function pintarPunto(codigo, yaBusco){
      guía vieja, sin fotos. Ahora, con señal, cada QR vuelve a pedirla por
      detrás (unos KB) y, si cambió, la guarda y vuelve a dibujar el punto. */
   if (g && r && !yaBusco && navigator.onLine !== false && typeof RondaGuia !== 'undefined')
-    Promise.race([RondaGuia.bajar(r.g || null, r.c), new Promise(ok => setTimeout(() => ok(null), 8000))]).then(ng => {
+    Promise.race([RondaGuia.bajar(r.g || null, r.c), new Promise(ok => setTimeout(() => ok(null), 15000))]).then(ng => {
       if (!ng || !aLista(ng.pts).length || JSON.stringify(ng.pts) === JSON.stringify(g.pts)) return;
       RondaGuia.guardar(ng); const f = $('#puntoForm'); if (f && !f.hidden && !f.querySelector('button:disabled')) pintarPunto(codigo, true);
     }).catch(() => {});
