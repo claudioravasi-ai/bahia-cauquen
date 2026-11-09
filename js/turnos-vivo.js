@@ -471,6 +471,8 @@ A['pf-editar'] = el => {
       <div class="field"><label>Correo (para su constancia)</label><input name="email" type="email" inputmode="email" maxlength="80" autocomplete="off" value="${esc(v.email || '')}"></div></div>
     <button class="btn btn-pri btn-block">${I('check')}Guardar la ficha</button>
     ${p ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:8px" data-a="pf-noviene" data-v="${esc(p.key)}">${I(p.noViene ? 'refresh' : 'logout')}${p.noViene ? 'Vuelve a venir' : 'Ya no viene'}</button>` : ''}
+    ${p ? (!p.noches || esAdmin() ? `<button type="button" class="btn btn-danger btn-block" style="margin-top:8px" data-a="pf-borrar" data-v="${esc(p.key)}">${I('trash')}Borrar de la lista</button>`
+      : `<p class="muted tiny" style="margin:8px 0 0">${I('info')} Tiene ${plural(p.noches, 'noche anotada', 'noches anotadas')}: si fueron pruebas, la Administración lo puede borrar de la lista desde acá.</p>`) : ''}
     <p class="muted tiny" style="margin:8px 0 0">Si está de servicio ahora, su servicio de esta noche toma los datos nuevos. Las noches anteriores y las constancias que ya salieron no cambian.</p></form>`);
 };
 /* Guarda (o crea) la ficha de un policía; devuelve false si no se pudo. */
@@ -511,6 +513,34 @@ A['pf-noviene'] = async el => {
   guardarFicha(p, { noViene:!p.noViene });
   Store.cambiar(s => s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:p.noViene ? `El policía ${p.nombre} vuelve a venir.` : `El policía ${p.nombre} ya no viene (sale de los botones de ingreso).`, at:Date.now() }));
   cerrarHoja(); toast(p.noViene ? `${p.nombre} vuelve a estar en los botones` : `${p.nombre} ya no aparece en los botones`, 'check'); refrescar();
+};
+
+/* BORRAR DE LA LISTA (pedido de Claudio, 09-11-2026: "veo uno que dice no
+   viene más (RAVASI), que soy yo de prueba, y quisiera poder borrarlo").
+   · Si nunca vino (solo la ficha): lo borra la Administración o la garita.
+   · Si tiene noches: solo la Administración, y solo si fueron PRUEBAS: se
+     anulan todos sus ingresos con el motivo "fue una prueba" (lo mismo que
+     "Anular el ingreso", de una vez) y se borra su ficha. Las noches de un
+     policía de verdad no se borran así: son la prueba de lo que se le pagó;
+     para él está "Ya no viene".
+   · Si está de servicio ahora, primero se registra su salida.
+   Queda un renglón en la bitácora sin su nombre ni sus datos. */
+A['pf-borrar'] = async el => {
+  if (!puedeFicha()) return;
+  const p = policiasDelBarrio().find(x => x.key === el.dataset.v); if (!p) return;
+  const k = claveNombre(p.nombre), svs = serviciosPolicia().filter(x => [k, p.k].includes(claveNombre(x.nombre)));
+  if (svs.some(x => !x.sale)) return toast(`${p.nombre} está de servicio ahora: primero registrá su salida`, 'alert');
+  if (svs.length && !esAdmin()) return toast('Lo puede borrar la Administración', 'info');
+  if (!await confirmar('Borrar de la lista', svs.length
+      ? `<b>${esc(p.nombre)}</b> tiene ${plural(svs.length, 'noche anotada', 'noches anotadas')}. Borralo solo si <b>fueron pruebas</b>: se anulan esos ingresos (motivo «fue una prueba»), desaparece de Turnos, de las noches y de la meta, y se borran sus datos. Si es un policía de verdad que dejó de venir, usá «Ya no viene». No se puede deshacer.`
+      : `<b>${esc(p.nombre)}</b> nunca vino: se borra su ficha (nombre, cargo, matrícula, celular y correo). No se puede deshacer.`,
+      { si:svs.length ? 'Eran pruebas: borrar' : 'Borrar de la lista', peligro:true })) return;
+  svs.forEach(sv => anularIngreso(sv, MOTIVOS_ANULAR.prueba));
+  Store.cambiar(s => {
+    s.policiasFicha = aLista(s.policiasFicha).filter(f => !(f && (f.id === p.ficha || f.k === p.k || claveNombre(f.nombre) === k)));
+    s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto:`Se borró de la lista de policías a uno ${svs.length ? `de prueba (${plural(svs.length, 'ingreso anulado', 'ingresos anulados')})` : 'que nunca vino'} · lo borró ${esAdmin() ? 'la Administración' : 'la garita'}.`, at:Date.now() });
+  });
+  cerrarHoja(); toast(`${p.nombre} ya no está en la lista de policías`, 'check'); refrescar();
 };
 
 /* ---------- anular un ingreso ---------- */

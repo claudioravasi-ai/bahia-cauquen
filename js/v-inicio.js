@@ -2131,6 +2131,7 @@ function bandaPolicia(){
         <div class="policia-cab"><span class="pn-ini" style="--c:${colorDe(p.nombre)}">${esc(inicialesDe(p.nombre))}</span><div class="grow"><b>${esc(p.nombre)}</b><span class="muted small">${esc(pnCargoMat(p, ' · '))}ingresó ${isoDe(new Date(p.entra)) !== hoyISO() ? fechaCorta(isoDe(new Date(p.entra))) + ' ' : ''}${hora(p.entra)} h · ${hs >= 1 ? Math.floor(hs) + ' h ' : ''}${Math.round(hs % 1 * 60)} min${codigoVigente(p.id) ? ` · código <span class="mono">${codigoVigente(p.id).id}</span>` : ''}${p.email ? '' : ' · <b>sin correo para la constancia</b>'}${!p.cargo && guardia ? ` · <button class="enlace" data-a="policia-cargo" data-id="${p.id}"><b>falta el cargo</b></button>` : ''}</span></div>
           <span class="pill ${rc ? (dur > RONDA_LARGA ? 'p-danger' : 'p-accent') : ''}">${plural(p.rondas.length, 'ronda')}</span></div>
         ${typeof rondaAnillos === 'function' && typeof rondaPuntosMapa === 'function' && rondaPuntosMapa().length ? (() => { const v = rondaEnVivo(); return v.p && v.p.id === p.id ? `<div class="rm-banda">${rondaAnillos(v)}<button class="btn btn-xs btn-sec" data-a="abrir" data-v="mapa">${I('map')}Seguirlo en el mapa</button></div>` : ''; })() : ''}
+        ${(() => { const vj = typeof rondaRecorridoViejo === 'function' && rondaRecorridoViejo(p); return vj ? `<div class="aviso a-warn rm-viejo" role="status" style="margin:8px 0 0">${I('refresh')}<div class="txt"><b>${esc(p.nombre)} tiene un recorrido viejo: mandale la tarjeta de nuevo</b>Su teléfono tiene otros Hubs, otro orden u otros nombres que los del barrio ahora (último paso: ${esc(nombrePunto(vj.punto))}, ${hora(pasoAt(vj))} h). ${guardia ? 'Tocá «Su tarjeta» y mandásela por WhatsApp: al abrirla, su teléfono se pone al día solo.' : 'La garita tiene que mandarle la tarjeta de nuevo.'} Este cartel se va solo con su próximo paso.</div></div>` : ''; })()}
         ${rc ? `<div class="aviso a-${dur > RONDA_LARGA ? 'danger latido' : 'info'}" style="margin:8px 0 0">${I('clock')}<div class="txt"><b>En ronda desde las ${hora(rc.inicio)} h · ${dur} min</b>${dur > RONDA_LARGA ? `Una ronda lleva unos ${RONDA_MIN} minutos: conviene comunicarse con el policía.` : `Vuelve alrededor de las ${hora(rc.inicio + RONDA_MIN * MIN)} h.`}</div></div>` : ''}
         ${p.rondas.length ? `<div class="rondas">${p.rondas.map((r, i) => `<span class="ronda">${i + 1}. ${hora(r.inicio)}${r.fin ? '–' + hora(r.fin) + ' · ' + minutos(r.inicio, r.fin) + ' min' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}` : ''}${r.incompleta ? ' · <b>incompleta</b>' : ''}${guardia ? `<button class="x" data-a="policia-ronda-borrar" data-id="${p.id}" data-v="${r.id}" aria-label="Borrar la ronda">×</button>` : ''}</span>`).join('')}</div>` : ''}
         ${(() => { const r = rc || p.rondas.filter(x => x.pasos.length).slice(-1)[0]; return r && puntosActivos().length ? recorridoRonda(r) : ''; })()}
@@ -2237,6 +2238,11 @@ function cerrarRondaIncompleta(s, p, r, fin, motivo){
 function procesarPasos(){
   if (!esGuardia()) return;
   const t = turnoAbierto(); if (!t) return;
+  /* 09-11: el aviso de recorrido viejo salta una sola vez por paso en este equipo (después queda el cartel). */
+  if (typeof rondaRecorridoViejo === 'function') policiasAdentro(t).forEach(p => { const vj = rondaRecorridoViejo(p); if (!vj) return;
+    let ya = []; try { ya = JSON.parse(sessionStorage.getItem('bhc.ronda.viejoAvisado') || '[]'); } catch(e){}
+    if (ya.includes(vj.id)) return; ya.push(vj.id); try { sessionStorage.setItem('bhc.ronda.viejoAvisado', JSON.stringify(ya.slice(-50))); } catch(e){}
+    toast(`${p.nombre} tiene un recorrido viejo: mandale la tarjeta de nuevo`, 'alert'); refrescarPronto(); });
   const sueltos = pasosSueltos(t), ahora = Date.now();
   const vencida = r => r && !r.fin && conQR(r) && ahora - r.inicio > HORA;
   if (!sueltos.length && !policiasAdentro(t).some(p => vencida(rondaEnCurso(p)))) return;
@@ -2292,6 +2298,7 @@ function pintarRondaHabilitar(ruta){
     <h1 style="font-size:28px">${I('shield')} Ronda de esta noche</h1>
     <div class="panel">${ok ? `${aviso('ok', 'check', `Listo${nombre ? ', ' + esc(nombre) : ''}: tu teléfono quedó habilitado`, 'En cada punto de control escaneá el QR con la cámara y tocá "Registrar paso".')}
       <p style="margin:12px 0 4px;opacity:.9">Tu código de ronda (por si te lo pide):</p><div class="codigo-grande">${c.slice(0, 3)} ${c.slice(3)}</div>
+      <div id="rondaCola">${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}</div>
       <div id="rondaGuia" class="rm-guia-caja"><p class="tiny" style="opacity:.8;margin:12px 0 0">${I('download')} Bajando tu recorrido con las fotos de cada punto…</p></div>`
       : `<p style="margin:0"><b>Este enlace no es válido.</b> Pedile a la garita que te lo mande de nuevo.</p>`}</div></section>`;
   if (!ok || typeof RondaGuia === 'undefined') return;
@@ -2312,7 +2319,7 @@ function pintarGuiaPolicia(g, r){
   $('#app').innerHTML = `<section class="bienvenida" id="puntoPublico"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
     <h1 style="font-size:28px">${I('pin')} Tu recorrido</h1>
-    <div class="panel">${g ? `<p class="tiny" style="opacity:.85;margin:0 0 8px">${r && r.nombre ? esc(r.nombre) + ' · ' : ''}guardado en este teléfono · meta: ${g.meta || 3} rondas completas</p>${rondaProximoHTML(g, rondaHechosLocales(g))}${rondaGuiaHTML(g, { hechos:rondaHechosLocales(g) })}`
+    <div class="panel"><div id="rondaCola">${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}</div>${g ? `<p class="tiny" style="opacity:.85;margin:0 0 8px">${r && r.nombre ? esc(r.nombre) + ' · ' : ''}guardado en este teléfono · meta: ${g.meta || 3} rondas completas</p>${rondaProximoHTML(g, rondaHechosLocales(g))}${rondaGuiaHTML(g, { hechos:rondaHechosLocales(g) })}`
       : `<p style="margin:0">Este teléfono no tiene guardado el recorrido. Tocá el enlace de tu tarjeta (el que te mandó la garita).</p>`}</div></section>`;
 }
 function pintarPunto(codigo, yaBusco){
@@ -2366,11 +2373,15 @@ function pintarPunto(codigo, yaBusco){
     e.preventDefault();
     const c = r ? r.c : soloDigitos(f.c.value);
     if (!/^\d{6}$/.test(c)) return;
-    const b = f.querySelector('button:not([type="button"])'); b.disabled = true;
+    const b = f.querySelector('button:not([type="button"])'), bTxt = b.innerHTML; b.disabled = true;
+    /* 09-11: que se vea que está trabajando (sin señal tarda hasta 3 s en guardarlo). */
+    b.innerHTML = `${I('clock')}Registrando…`;
     const res = $('#puntoRes');
     try {
       /* 18-10: sin señal, el paso queda guardado en el teléfono y sale solo después (js/ronda-mapa.js). */
-      const paso = { id:rondaIdPaso(), punto:id, k, c, nombre:(r && r.nombre) || 'Policía de ronda', t:Date.now() };
+      /* 09-11: "h" = la huella del recorrido de este teléfono (aviso de recorrido viejo en la garita, js/ronda-mapa.js). */
+      const gAhora = (typeof RondaGuia !== 'undefined' && RondaGuia.leer()) || g, hAhora = gAhora && typeof rondaHuella === 'function' ? rondaHuella(gAhora.pts) : '';
+      const paso = { id:rondaIdPaso(), punto:id, k, c, nombre:(r && r.nombre) || 'Policía de ronda', t:Date.now(), ...(hAhora ? { h:hAhora } : {}) };
       if (RondaCola.leer().length) await RondaCola.mandar();
       let res0 = RondaCola.leer().length ? 'sin' : await rondaEscribirPaso(paso);
       if (res0 === 'no') throw new Error('PERMISSION_DENIED');
@@ -2385,7 +2396,8 @@ function pintarPunto(codigo, yaBusco){
       f.hidden = true;
       const fotoAca = $('#puntoPublico .rm-pp-foto'); if (fotoAca) fotoAca.hidden = true;
       const hechos = g ? rondaHechosLocales(g) : [], px = g ? rondaProximo(g, hechos) : null;
-      res.innerHTML = `${guardado ? aviso('warn', 'clock', `Guardado en tu teléfono · ${hora(paso.t)} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Acá no hay señal: el paso queda con esta hora y se manda solo cuando vuelva. Seguí la ronda tranquilo.`)
+      /* 09-11: "puntoEstado" cambia solo a "Llegó a la garita" cuando el paso guardado sale (rondaColaPintar, js/ronda-mapa.js). */
+      res.innerHTML = `${guardado ? `<div id="puntoEstado" data-paso="${esc(paso.id)}" data-hora="${hora(paso.t)}" data-punto="${esc((gp ? gp.n + '. ' : '') + nombre)}">${aviso('warn', 'clock', `Guardado en tu teléfono · ${hora(paso.t)} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. Acá no hay señal: el paso queda con esta hora y se manda solo apenas haya señal. Seguí la ronda tranquilo.`)}</div>`
         : aviso('ok', 'check', `Leído · ${hora(Date.now())} h`, `${gp ? gp.n + '. ' : ''}${esc(nombre)}. ${repetido ? 'Este punto ya lo habías leído en esta ronda: cuenta una sola vez. ' : ''}Llevás ${plural(hechos.length || hoy.length, 'punto', 'puntos')} en esta ronda.${gps.length ? '' : ' Seguí al próximo.'}`)}
         ${g ? rondaProximoHTML(g, hechos) : ''}${g ? `<button type="button" class="btn btn-sec btn-block" style="margin-top:10px" id="verMiRecorrido">${I('map')}Ver todo mi recorrido</button>` : ''}`;
       /* 03-11: el cartel de pasos guardados sin señal se pone al día con este paso. */
@@ -2394,7 +2406,7 @@ function pintarPunto(codigo, yaBusco){
       if (px && px.p) setTimeout(() => $('#puntoRes .rm-prox')?.scrollIntoView({ block:'start', behavior:'smooth' }), 120);
       $('#verMiRecorrido')?.addEventListener('click', () => { history.replaceState(null, '', '#/ronda/guia'); pintarGuiaPolicia(g, Ronda.leer()); });
     } catch(err){
-      b.disabled = false;
+      b.disabled = false; b.innerHTML = bTxt;
       const permiso = /permission|PERMISSION/i.test(String(err && err.message));
       if (permiso) Ronda.olvidar();
       res.innerHTML = aviso('danger', 'alert', 'No se pudo registrar', permiso ? 'El código de ronda no es válido o venció, o este QR ya no vale. Pedile el código a la garita.' : /SIN_LUGAR/.test(String(err && err.message)) ? 'Tu teléfono no tiene lugar para guardar el paso sin señal. Probá de nuevo donde haya señal.' : 'Revisá la conexión a internet y probá de nuevo.');
@@ -3081,7 +3093,8 @@ function tareasGarita(){
     if (mal.length) add(0, 'heart', '"Estoy bien" o salida sin regreso: llamar o pasar', lista3(mal, p => `${esc(p.casa || '')} · ${esc(primerNombre(p.nombre))}`), { v:'estoy-bien' }); }
   const av = s.avisos.filter(a => !a.visto && ahora - a.at < 6 * HORA);
   if (av.length) add(0, 'bell', 'Avisos de vecinos: leer y marcar "Visto"', plural(av.length, 'sin ver', 'sin ver'), { ir:'#garAvisos' });
-  const petP = s.peticiones.filter(p => p.estado === 'pendiente');
+  /* 09-11: las más nuevas primero, igual que en la pantalla de peticiones. */
+  const petP = s.peticiones.filter(p => p.estado === 'pendiente').sort((a, b) => (b.at || 0) - (a.at || 0));
   if (petP.length) add(0, 'edit', 'Peticiones de vecinos: recibir y firmar', lista3(petP, p => `${esc(p.casa || '')} · ${esc((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n.toLowerCase())}`), { v:'peticiones' });
 
   /* La agenda del hotel para mañana (20-10-2026): un solo renglón hasta que
@@ -3149,7 +3162,7 @@ function tareasGarita(){
 
   /* Lo que los vecinos pidieron por escrito y sigue vigente hoy (no dejar pasar, llaves, permisos, paquetes a guardar). */
   const vig = s.peticiones.filter(p => p.estado === 'en_funciones' && p.tipo !== 'viaje' && (!p.desde || p.desde <= hoy) && (!p.hasta || p.hasta >= hoy));
-  if (vig.length) add(2, 'edit', `Pedidos vigentes de vecinos: ${vig.length}`, lista3(vig.sort((a, b) => (b.tipo === 'nopasar') - (a.tipo === 'nopasar')), p => `${p.tipo === 'nopasar' ? '<b>' : ''}${esc(p.casa || '')} · ${esc((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n.toLowerCase())}${p.tipo === 'nopasar' ? '</b>' : ''}`), { v:'peticiones', p:'en_funciones' }, { info:true });
+  if (vig.length) add(2, 'edit', `Pedidos vigentes de vecinos: ${vig.length}`, lista3(vig.sort((a, b) => (b.tipo === 'nopasar') - (a.tipo === 'nopasar') || (b.at || 0) - (a.at || 0)), p => `${p.tipo === 'nopasar' ? '<b>' : ''}${esc(p.casa || '')} · ${esc((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n.toLowerCase())}${p.tipo === 'nopasar' ? '</b>' : ''}`), { v:'peticiones', p:'en_funciones' }, { info:true });
 
   /* El policía contratado: en el turno de noche, o si ya está registrado. */
   const pols = t ? policiasDe(t) : [], adentroP = t ? policiasAdentro(t) : [];
@@ -3326,7 +3339,10 @@ function tiraGarita(opera){
     : tarjeta({ cls:'tg-turno sin', ic:'clock', tag:'Guardia', t:'Nadie anotado', x:'La garita todavía no anotó quién está', a:'guardia-hoy' });
   /* policía */
   const ps = t ? policiasAdentro(t) : [], rondas = ps.reduce((k, p) => k + p.rondas.length, 0), enRonda = ps.map(rondaEnCurso).find(Boolean);
-  const tPol = ps.length ? tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t: enRonda ? 'En ronda' : 'De servicio', x:`${esc(ps.map(p => p.nombre).join(', '))} · ${enRonda ? 'desde las ' + hora(enRonda.inicio) + ' h' : plural(rondas, 'ronda') + ' hoy'}`, a:'garita-ir', v:'.policia-card', on:true, n: rondas || '' })
+  /* 09-11: el recorrido viejo se ve también acá arriba, sin bajar hasta la tarjeta del policía. */
+  const pViejo = typeof rondaRecorridoViejo === 'function' ? ps.find(p => rondaRecorridoViejo(p)) : null;
+  const tPol = pViejo ? tarjeta({ cls:'tg-pol tg-ojo', ic:'refresh', tag:'Policía', t:'Recorrido viejo', x:`${esc(pViejo.nombre)}: mandale la tarjeta de nuevo`, a:'garita-ir', v:'.rm-viejo', on:true, n:'!' })
+    : ps.length ? tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t: enRonda ? 'En ronda' : 'De servicio', x:`${esc(ps.map(p => p.nombre).join(', '))} · ${enRonda ? 'desde las ' + hora(enRonda.inicio) + ' h' : plural(rondas, 'ronda') + ' hoy'}`, a:'garita-ir', v:'.policia-card', on:true, n: rondas || '' })
     : tarjeta({ cls:'tg-pol', ic:'shield', tag:'Policía', t:'Nadie de servicio', x: (() => { const n = nochePolicia(); return opera ? (n.ahora ? `Horario de policía (${horarioNocheTxt(n)}): tocá cuando llegue` : `Viene a las ${hora(n.desde)} h · tocá para el ingreso`) : `${n.ahora ? 'En horario' : 'Desde las ' + hora(n.desde) + ' h'} · lo registra la garita`; })(), a: opera && t ? 'policia-nuevo' : '' });
   /* camión */
   const c = typeof Camion !== 'undefined' ? Camion.adentro() : null, dh = recoleccionDias()[new Date().getDay()];

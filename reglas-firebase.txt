@@ -110,7 +110,8 @@ QUÉ HACEN, EN CASTELLANO
 8 ter. LA GUARDIA DE AHORA (13-10-2026). /barrio/guardiaAhora tiene un solo
    registro: el turno abierto de la garita, su horario, los nombres de
    quienes están de guardia (con su dibujo) y si hay policía de servicio
-   (sí o no, sin nombre). Lo escribe la garita y lo leen los vecinos, la
+   (desde el 09-11-2026, con su cargo y apellido, "Sargento Gómez", campo
+   "pol"; nunca su nombre de pila, matrícula, celular ni correo). Lo escribe la garita y lo leen los vecinos, la
    Administración y la supervisión; el hotel no. Los vecinos siguen sin leer
    la bitácora. /staff/guardiaLooks guarda cómo eligió aparecer cada guardia:
    lo escribe la garita y lo leen la garita, la Administración y la

@@ -7220,3 +7220,6 @@ body.vc-modo{background:#07141a}
 @keyframes grSube{0%{transform:translateY(0) rotate(0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translateY(-105vh) rotate(var(--r)) scale(1);opacity:0}}
 @media (prefers-reduced-motion:reduce){ .gr-latido,.gr-h-corazon,.gr-h-p{animation:none} }
 .hero:has(.gr-boton){padding-top:118px}
+/* 09-11-2026: las peticiones a la garita, en orden de hora y separadas por día. */
+.pet-orden{display:flex;align-items:center;gap:6px;margin:10px 2px 0}.pet-orden svg{width:14px;height:14px}
+.pet-dia{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:16px 4px 6px}

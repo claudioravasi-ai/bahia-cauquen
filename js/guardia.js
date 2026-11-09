@@ -327,6 +327,17 @@ A['guardia-saluda'] = el => {
 
 /* ---------- la guardia de ahora (lo que ven todos) ---------- */
 const lookDe = n => { const x = aLista(Store.s.guardiaLooks).find(z => z && z.id === slugGuardia(n)); return x && x.look ? x.look : null; };
+/* EL POLICÍA DE TURNO PARA LOS VECINOS (pedido de Claudio, 09-11-2026):
+   solo su CARGO y su APELLIDO ("Sargento Gómez"), como en la chapa del
+   uniforme. El nombre de pila, la matrícula, el celular y el correo no
+   salen de la garita. El apellido es la última palabra del nombre, con
+   "de", "del", "la"… si van antes ("Juan de la Fuente" → "de la Fuente"). */
+function apellidoPolicia(n){
+  const ps = String(n || '').trim().split(/\s+/).filter(Boolean); if (ps.length < 2) return ps[0] || '';
+  let i = ps.length - 1; while (i > 1 && /^(de|del|la|las|los|da|das|do|dos|di|van|von|y)$/i.test(ps[i - 1])) i--;
+  return ps.slice(i).join(' ');
+}
+const policiaParaVecinos = p => [String(p && p.cargo || '').trim(), apellidoPolicia(p && p.nombre)].filter(Boolean).join(' ');
 /* Lo que la garita publica: el turno abierto y sus guardias, nada más. */
 function guardiaAhoraDeseada(){
   const t = turnoAbierto();
@@ -342,6 +353,7 @@ function guardiaAhoraDeseada(){
   /* 14-10: cada guardia con su horario (los horarios se superponen). */
   return { id:'ahora', abierto:true, turno:t.turno, desde:c.desde || '', hasta:c.hasta || '', inicio:t.at,
     guardias: relevosDe(t).map(r => { const l = lookDe(r.n), h = horarioDe(r.h); return { n:r.n, ...(l ? { look:l } : {}), ...(h ? { h:r.h, desde:h.desde, hasta:h.hasta } : {}) }; }), policia: policiasAdentro(t).length ? 1 : 0, ...mant,
+    ...(policiasAdentro(t).length ? { pol: policiasAdentro(t).map(policiaParaVecinos).filter(Boolean) } : {}),
     /* 15-10: la ronda del policía para los vecinos (sin nombres; 17-10: en vivo o con la demora que elija la Administración, js/ronda-mapa.js). */
     ...(typeof rondaPublica === 'function' && rondaPublica(t) ? { ronda:rondaPublica(t) } : {}) };
 }
@@ -436,7 +448,7 @@ A['guardia-ver'] = () => {
       ${c.garitaTel ? `<a class="btn btn-pri btn-block" style="margin-top:12px" href="${telLink(c.garitaTel)}">${I('phone')}Llamar a la garita</a>` : ''}`);
     return;
   }
-  const pol = g.policia ? `<span class="ga-pol on">${I('shield')}<b>Policía nocturna de servicio</b><small>${esc(n.etiqueta)} · ${horarioNocheTxt(n)}</small></span>`
+  const pol = g.policia ? `<span class="ga-pol on">${I('shield')}<b>Policía nocturna de servicio${aLista(g.pol).length ? `: ${esc(aLista(g.pol).join(' y '))}` : ''}</b><small>${esc(n.etiqueta)} · ${horarioNocheTxt(n)}</small></span>`
     : `<span class="ga-pol">${I('moon')}<b>Policía nocturna</b><small>${n.ahora ? 'En horario: todavía no se registró' : `${esc(n.etiqueta)}: desde las ${hora(n.desde)} h`}</small></span>`;
   hoja('De guardia ahora', `<div class="ga-caja ${noche ? 'ga-noche' : 'ga-dia'}">
       <div class="ga-cielo"><i class="tl-astro"></i>${noche ? '<i class="tl-estrella s1"></i><i class="tl-estrella s2"></i><i class="tl-estrella s3"></i>' : '<i class="tl-nube n1"></i><i class="tl-nube n2"></i>'}</div>

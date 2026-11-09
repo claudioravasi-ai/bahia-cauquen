@@ -58,15 +58,25 @@ R.peticiones = {
     let lista = staff ? s.peticiones.slice() : s.peticiones.filter(p => p.userId === u.id);
     const filtro = f || (staff ? 'pendiente' : 'todas');
     if (filtro !== 'todas') lista = lista.filter(p => p.estado === filtro);
+    /* EN ORDEN DE HORA (pedido de Claudio, 09-11-2026): las más nuevas arriba
+       y las más viejas abajo, separadas por día. Antes salían en el orden en
+       que las devolvía la base, que es el de su código (al azar), no el de la
+       hora: en la garita se veían mezcladas. */
+    lista.sort((a, b) => (b.at || 0) - (a.at || 0));
+    let diaAnt = '';
+    const cabDia = p => { const d = isoDe(new Date(p.at || 0)); if (d === diaAnt) return ''; diaAnt = d;
+      const r = relDia(d), t = r === 'hoy' || r === 'ayer' ? `${r === 'hoy' ? 'Hoy' : 'Ayer'} · ${fechaLarga(d)}` : fechaLarga(d) + (d.slice(0, 4) !== hoyISO().slice(0, 4) ? ' de ' + d.slice(0, 4) : '');
+      return `<h3 class="pet-dia">${esc(t.charAt(0).toUpperCase() + t.slice(1))}</h3>`; };
     const n = e => (staff ? s.peticiones : s.peticiones.filter(p => p.userId === u.id)).filter(p => p.estado === e).length;
     return `${!staff ? superficie({ a:'nueva-peticion', icon:'edit', t:'Nueva petición a la garita', s:'Queda firmada por vos y por el guardia que la recibe', cls:'acento' }) : ''}
       ${esAdmin() || esSupervisor() ? `<p class="muted small" style="margin:0 0 10px">${I('eye')} Son los pedidos que los vecinos le hacen <b>por escrito y firmados</b> a la garita: no dejar pasar a alguien, que se van de viaje, dejar una llave, recibir paquetes. <b>Los recibe y los firma la garita</b>; desde ${esSupervisor() ? 'la supervisión' : 'la Administración'} solo se miran.</p>` : ''}
       <div class="chips">${[['pendiente','Pendientes'],['en_funciones','En funciones'],['cerrada','Cerradas'],['todas','Todas']].map(([k, t]) =>
         `<button class="chip ${filtro === k ? 'on' : ''}" data-a="abrir" data-v="peticiones" data-p="${k}">${t}${k !== 'todas' && n(k) ? `<span class="n">${n(k)}</span>` : ''}</button>`).join('')}</div>
-      ${lista.length ? lista.map(p => { const t = TIPOS_PET[p.tipo] || TIPOS_PET.otro, e = ESTADO_PET[p.estado], v = usuario(p.userId) || {};
-        return `<button class="superficie" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-${e[1] === 'muted' ? 'brand' : e[1]}">${I(t.icon)}</span>
+ ${lista.length > 1 ? `<p class="muted tiny pet-orden">${I('clock')} Las más nuevas arriba</p>` : ''}
+      ${lista.length ? lista.map(p => { const t = TIPOS_PET[p.tipo] || TIPOS_PET.otro, e = ESTADO_PET[p.estado] || ESTADO_PET.pendiente, v = usuario(p.userId) || {}, deHoy = isoDe(new Date(p.at || 0)) === hoyISO();
+        return `${cabDia(p)}<button class="superficie" data-a="ver-peticion" data-id="${p.id}"><span class="ic ic-${e[1] === 'muted' ? 'brand' : e[1]}">${I(t.icon)}</span>
           <span class="txt"><b>${esc(t.n)}</b><small>${staff ? `<b style="display:inline;color:var(--ink)">${esc(v.casa || '')}</b> · ` : ''}${esc(p.texto.slice(0, 70))}${p.texto.length > 70 ? '…' : ''}</small>
-          <small>${e[0]} · ${hace(p.at)}</small></span>${I('right')}</button>`; }).join('') : vacio('shield', staff ? 'No hay peticiones en este estado.' : 'Todavía no hiciste peticiones.')}
+          <small>${e[0]} · ${hora(p.at)} h${deHoy ? ' · ' + hace(p.at) : ''}</small></span>${I('right')}</button>`; }).join('') : vacio('shield', staff ? 'No hay peticiones en este estado.' : 'Todavía no hiciste peticiones.')}
       <p class="muted tiny" style="margin-top:14px">Cada petición guarda las dos firmas, la fecha y hora, y un sello digital (SHA-256) que permite comprobar que nadie la modificó después.</p>`;
   },
 };
@@ -2065,7 +2075,7 @@ function informeMisDatos(){
   /* 6 · reclamos y peticiones */
   out.push(bloque('6. Reclamos y peticiones a la garita', 'Los reclamos: vos y la Administración. Las peticiones: vos, la garita y la Administración; guardan las dos firmas y un sello digital (las firmas no se reproducen acá).',
     tabla(['Reclamo', 'Categoría', 'Fecha', 'Estado'], s.reclamos.filter(r => r.userId === u.id).map(r => [x(r.titulo) + (r.detalle ? '<br><span style="color:#555">' + x(r.detalle) + '</span>' : ''), x(r.categoria), fh(r.createdAt), x(r.estado)]))
-    + tabla(['Petición', 'Pedido', 'Vigencia', 'Estado'], s.peticiones.filter(p => p.userId === u.id).map(p => [x((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n), x(p.texto), `${fc(p.desde)}${p.hasta ? ' al ' + fc(p.hasta) : ''}`, x((ESTADO_PET[p.estado] || [p.estado])[0])]))));
+    + tabla(['Petición', 'Pedido', 'Vigencia', 'Estado'], s.peticiones.filter(p => p.userId === u.id).sort((a, b) => (b.at || 0) - (a.at || 0)).map(p => [x((TIPOS_PET[p.tipo] || TIPOS_PET.otro).n), x(p.texto), `${fc(p.desde)}${p.hasta ? ' al ' + fc(p.hasta) : ''}`, x((ESTADO_PET[p.estado] || [p.estado])[0])]))));
   /* 7 · votaciones */
   const votos = s.votaciones.map(v => { const vv = (v.votos || {})[u.casa]; const mio = vv && vv.personas ? vv.personas[u.id] : (vv && vv.por === u.id ? vv.i : undefined);
     return mio === undefined || mio === null ? null : [x(v.titulo), x(aLista(v.opciones)[mio] ?? mio), vv.at ? fh(vv.at) : '—']; }).filter(Boolean);

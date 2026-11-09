@@ -664,19 +664,45 @@ const RondaLocal = {
    · Sin señal (o si la base no contesta en 8 segundos), el paso se guarda
      en ESTE teléfono con la hora exacta en que lo leyó (campo "t") y el
      policía sigue al próximo punto igual.
-   · Se manda solo, en orden, apenas vuelve la señal: con la página abierta,
-     al abrir otro QR o al volver a tocar el enlace de su tarjeta.
+   · Se manda solo, en orden, apenas vuelve la señal (09-11: sin tener que
+     abrir otro QR ni el enlace de su tarjeta; ver más abajo).
    · La base anota igual su propia hora ("at", la del servidor); la garita
      usa "t" solo si el paso llegó tarde (más de 2 minutos y menos de 6
      horas después): así ve la hora real de cada punto (pasoAt, js/v-inicio.js).
    · Si la base lo rechaza al mandarlo (el código venció, o ya había
      llegado), se descarta y se le avisa. Se guarda hasta 14 horas. */
+/* LO GUARDADO SALE SOLO APENAS HAY SEÑAL (pedido de Claudio, 09-11-2026:
+   "los hub leídos sin señal no se descargan apenas recibe señal, lo hace
+   después de volver a leer el QR que le dio la garita; queda como en
+   stand-by"). La causa estaba en el programa de la base (Firebase 10.14.1,
+   comprobado en su código): cuando se corta la señal, reintenta conectarse
+   cada vez más espaciado (1 s, y ×1,3 cada vez) hasta 5 MINUTOS entre
+   intento e intento; con el teléfono bloqueado o la pantalla apagada salta
+   directo a 5 minutos. Y en el celular, cuando vuelven los datos, casi nunca
+   avisa "volvió internet" (eso solo pasa con el wifi o el modo avión). Abrir
+   el enlace de la garita lo arreglaba porque arranca una conexión nueva.
+   Ahora:
+   · RondaRed mira si hay conexión con la base (".info/connected"); mientras
+     haya pasos guardados y no haya conexión, cada 20 s (y al prender la
+     pantalla o volver a la página) corta y vuelve a conectar: Firebase
+     intenta YA en vez de esperar sus 5 minutos. Apenas conecta, manda.
+   · Sin conexión, el paso se guarda en 3 s como mucho (antes se esperaban
+     8 s en cada punto, con el botón trabado) y NO se deja un envío colgado
+     dentro de Firebase: antes ese envío salía después por su cuenta, el
+     reenvío de la cola chocaba con él y el policía veía "no se aceptó (el
+     código venció)" de un paso que sí había llegado.
+   · Si un envío quedó sin respuesta (se cortó a mitad de camino) y después
+     la base lo rechaza por repetido, cuenta como llegado (marca "d").
+   · Cuando sale, la pantalla del punto cambia sola de "Guardado en tu
+     teléfono" a "Llegó a la garita", y el cartel de guardados se va. */
 const RondaCola = {
   KEY:'bhc.ronda.cola',
   leer(){ try { return JSON.parse(localStorage.getItem(this.KEY) || '[]').filter(x => x && x.id && Date.now() - x.t < CODIGO_VIGENCIA); } catch(e){ return []; } },
   escribir(l){ try { localStorage.setItem(this.KEY, JSON.stringify(l)); return true; } catch(e){ return false; } },
   sumar(x){ const l = this.leer(); if (!l.some(y => y.id === x.id)) l.push(x); return this.escribir(l); },
   sacar(id){ this.escribir(this.leer().filter(y => y.id !== id)); },
+  marcar(id, c){ const l = this.leer(); if (l.some(y => y.id === id)) this.escribir(l.map(y => y.id === id ? { ...y, ...c } : y)); },
+  llegaron:new Set(),   /* los que salieron desde esta página (para cambiar el cartel del punto) */
   mandando:false,
   /* Manda lo guardado, de a uno y en orden. Devuelve cuántos salieron y cuántos rechazó la base. */
   async mandar(){
@@ -685,8 +711,10 @@ const RondaCola = {
     try {
       for (const x of this.leer()){
         if (navigator.onLine === false) break;
-        const r = await rondaEscribirPaso(x);
-        if (r === 'ok'){ ok++; this.sacar(x.id); }
+        let r = await rondaEscribirPaso(x);
+        /* Rechazado por repetido: ya había llegado en un envío que quedó sin respuesta. */
+        if (r === 'no' && x.d && typeof Ronda !== 'undefined' && (Ronda.leer() || {}).c === x.c) r = 'ok';
+        if (r === 'ok'){ ok++; this.llegaron.add(x.id); this.sacar(x.id); }
         else if (r === 'no'){ no++; this.sacar(x.id); }
         else break;
       }
@@ -694,42 +722,119 @@ const RondaCola = {
     return { ok, no, quedan:this.leer().length };
   },
 };
+/* La conexión con la base, para el teléfono del policía. */
+const RondaRed = {
+  ok:false, armado:false, empujon:0,
+  armar(){
+    if (this.armado) return true;
+    if (typeof Nube === 'undefined' || !Nube.activa() || !Nube.db) return false;
+    this.armado = true;
+    try { Nube.db.ref('.info/connected').on('value', s => { this.ok = s.val() === true; if (this.ok && RondaCola.leer().length) setTimeout(rondaColaVaciar, 200); }); } catch(e){ this.armado = false; }
+    return this.armado;
+  },
+  /* Cortar y volver a conectar: Firebase intenta en el acto (no espera sus 5 minutos). */
+  empujar(ya){
+    if (!this.armar() || this.ok || navigator.onLine === false) return;
+    if (Date.now() - this.empujon < (ya ? 3000 : 20000)) return;
+    this.empujon = Date.now();
+    try { Nube.db.goOffline(); Nube.db.goOnline(); } catch(e){}
+  },
+  /* ¿Hay conexión? Espera hasta "ms" a que llegue (al abrir la página tarda un segundo). */
+  async esperar(ms){
+    if (!this.armar()) return false;
+    if (this.ok) return true;
+    this.empujar();
+    const t0 = Date.now();
+    while (!this.ok && Date.now() - t0 < ms) await new Promise(r => setTimeout(r, 150));
+    return this.ok;
+  },
+};
+/* AVISO DE "RECORRIDO VIEJO" (pedido de Claudio, 08-11 y 09-11-2026).
+   Cada paso que manda el teléfono del policía lleva "h": una huella corta
+   del recorrido que tiene guardado (qué puntos, en qué orden y con qué
+   nombre; no las fotos). La garita calcula la misma huella con los puntos
+   del barrio de ahora: si el último paso del policía trae otra, le aparece
+   sola el cartel "tiene un recorrido viejo: mandale la tarjeta de nuevo".
+   Sirve si la Administración agrega, saca, cambia de orden o de nombre un
+   Hub en plena noche, o si el teléfono quedó con un recorrido equivocado.
+   El cartel se va solo con el próximo paso que llegue con el recorrido al
+   día. Los pasos sin "h" (teléfonos con la versión anterior) no avisan. */
+function rondaHuella(pts){
+  const t = aLista(pts).filter(Boolean).map(p => `${p.id}:${String(p.nombre || '').trim().toLowerCase()}`).join('|');
+  let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) >>> 0;
+  return t ? h.toString(36) : '';
+}
+/* El último paso del policía, si vino con un recorrido distinto al del barrio. */
+function rondaRecorridoViejo(p){
+  const cods = new Set(aLista(Store.s.rondaCodigos).filter(c => c && c.pid === p.id).map(c => c.id)); if (!cods.size) return null;
+  const ult = aLista(Store.s.pasos).filter(x => x && cods.has(x.c) && pasoAt(x) >= p.entra).sort((a, b) => pasoAt(b) - pasoAt(a))[0];
+  const bar = rondaHuella(puntosActivos());
+  return ult && ult.h && bar && ult.h !== bar ? ult : null;
+}
+const rondaVuelo = {};   /* id → el envío en camino dentro de Firebase */
 /* Escribe un paso en la base: 'ok', 'no' (la base no lo acepta) o 'sin' (sin señal). */
 async function rondaEscribirPaso(x){
   if (navigator.onLine === false) return 'sin';
   try {
-    if (typeof Nube !== 'undefined' && Nube.activa() && Nube.db){
-      const espera = new Promise((_, mal) => setTimeout(() => mal(new Error('SIN_SENAL')), 8000));
-      await Promise.race([Nube.db.ref('staff/pasos/' + x.id).set({ id:x.id, punto:x.punto, k:x.k, c:x.c, nombre:x.nombre, t:x.t, at:firebase.database.ServerValue.TIMESTAMP }), espera]);
-    } else if (!/[?&]local\b/.test(location.search)){
-      /* La app real abierta sin señal: el programa de la base no llegó a cargar. Queda guardado. */
-      return 'sin';
-    } else {
-      /* Sin la nube (prueba en esta computadora): se valida contra lo guardado acá. */
-      const pt = aLista(Store.s.puntos).find(z => z.id === x.punto), cod = aLista(Store.s.rondaCodigos).find(z => z && z.id === x.c && z.vence > Date.now());
-      if (!pt || pt.k !== x.k || pt.activo === false || !cod) throw new Error('PERMISSION_DENIED');
-      if (!aLista(Store.s.pasos).some(z => z.id === x.id)) Store.cambiar(s => { s.pasos.unshift({ id:x.id, punto:x.punto, k:x.k, c:x.c, nombre:cod.nombre, t:x.t, at:Date.now() }); });
+    if (typeof Nube !== 'undefined' && Nube.activa()){
+      /* La app real abierta sin señal: si el programa de la base no llegó a cargar, queda guardado. */
+      if (!Nube.db && !await rondaBaseLista(3000)) return 'sin';
+      if (!await RondaRed.esperar(3000)) return 'sin';
+      let v = rondaVuelo[x.id];
+      if (!v){
+        v = rondaVuelo[x.id] = Nube.db.ref('staff/pasos/' + x.id).set({ id:x.id, punto:x.punto, k:x.k, c:x.c, nombre:x.nombre, t:x.t, ...(x.h ? { h:x.h } : {}), at:firebase.database.ServerValue.TIMESTAMP })
+          .then(() => 'ok', e => /permission/i.test(String(e && (e.code || e.message))) ? 'no' : 'sin');
+        /* Si sale más tarde (la señal estaba floja), se saca de lo guardado y se avisa. */
+        v.then(r => { delete rondaVuelo[x.id];
+          if (r === 'ok' && !RondaCola.mandando && RondaCola.leer().some(y => y.id === x.id)){ RondaCola.llegaron.add(x.id); RondaCola.sacar(x.id); rondaColaPintar({ ok:1, no:0 }); } });
+      }
+      const r = await Promise.race([v, new Promise(ok => setTimeout(() => ok('tarde'), 8000))]);
+      if (r === 'tarde'){ x.d = 1; RondaCola.marcar(x.id, { d:1 }); return 'sin'; }
+      return r;
     }
+    if (!/[?&]local\b/.test(location.search)) return 'sin';
+    /* Sin la nube (prueba en esta computadora): se valida contra lo guardado acá. */
+    const pt = aLista(Store.s.puntos).find(z => z.id === x.punto), cod = aLista(Store.s.rondaCodigos).find(z => z && z.id === x.c && z.vence > Date.now());
+    if (!pt || pt.k !== x.k || pt.activo === false || !cod) return 'no';
+    if (!aLista(Store.s.pasos).some(z => z.id === x.id)) Store.cambiar(s => { s.pasos.unshift({ id:x.id, punto:x.punto, k:x.k, c:x.c, nombre:cod.nombre, t:x.t, ...(x.h ? { h:x.h } : {}), at:Date.now() }); });
     return 'ok';
   } catch(e){ return /permission/i.test(String(e && e.message)) ? 'no' : 'sin'; }
 }
 const rondaIdPaso = () => (typeof Nube !== 'undefined' && Nube.activa() && Nube.db) ? Nube.db.ref('staff/pasos').push().key : 'p' + uid();
-/* El cartelito de lo que está guardado sin mandar (en la pantalla del policía). */
+/* El cartelito de lo que está guardado sin mandar (en las pantallas del policía). */
 function rondaColaAviso(){
   const n = RondaCola.leer().length; if (!n) return '';
-  return `<div class="rm-cola" role="status">${I('clock')}<span><b>${n === 1 ? 'Tenés 1 paso guardado en tu teléfono' : `Tenés ${n} pasos guardados en tu teléfono`}</b>Se ${n === 1 ? 'manda' : 'mandan'} solo${n === 1 ? '' : 's'} cuando vuelva la señal. No hace falta que hagas nada.</span></div>`;
+  return `<div class="rm-cola" role="status">${I('clock')}<span><b>${n === 1 ? 'Tenés 1 paso guardado en tu teléfono' : `Tenés ${n} pasos guardados en tu teléfono`}</b>Se ${n === 1 ? 'manda' : 'mandan'} solo${n === 1 ? '' : 's'} apenas haya señal, con la hora en que ${n === 1 ? 'lo' : 'los'} leíste. No hace falta que hagas nada: seguí la ronda.</span></div>`;
 }
-/* Mandar lo guardado y avisar. Con la página del policía abierta, se reintenta solo. */
+/* Pone al día las pantallas del policía después de mandar. */
+function rondaColaPintar(r){
+  document.querySelectorAll('#rondaCola').forEach(c => { c.innerHTML = rondaColaAviso(); });
+  const est = document.getElementById('puntoEstado');
+  if (est && est.dataset.paso && RondaCola.llegaron.has(est.dataset.paso) && !est.dataset.llego){
+    est.dataset.llego = '1';
+    est.innerHTML = aviso('ok', 'check', `Llegó a la garita · leído a las ${esc(est.dataset.hora || '')} h`, `${esc(est.dataset.punto || '')}. Volvió la señal y se mandó solo, con la hora en que lo leíste. Seguí la ronda.`);
+  }
+  if (r && r.ok) toast(r.ok === 1 ? 'Volvió la señal: el paso guardado llegó a la garita' : `Volvió la señal: los ${r.ok} pasos guardados llegaron a la garita`, 'check');
+  if (r && r.no) toast(`${plural(r.no, 'paso guardado no se aceptó', 'pasos guardados no se aceptaron')} (el código venció o ese QR ya no vale). Avisá a la garita.`, 'alert');
+}
+/* Mandar lo guardado y avisar. */
 async function rondaColaVaciar(){
   if (!RondaCola.leer().length) return;
-  const r = await RondaCola.mandar();
-  const caja = document.getElementById('rondaCola');
-  if (caja) caja.innerHTML = rondaColaAviso(); else document.querySelectorAll('#puntoPublico .rm-cola').forEach(el => { el.outerHTML = rondaColaAviso(); });
-  if (r.ok) toast(r.ok === 1 ? 'Volvió la señal: se mandó el paso que estaba guardado' : `Volvió la señal: se mandaron los ${r.ok} pasos guardados`, 'check');
-  if (r.no) toast(`${plural(r.no, 'paso guardado no se aceptó', 'pasos guardados no se aceptaron')} (el código venció). Avisá a la garita.`, 'alert');
+  rondaColaPintar(await RondaCola.mandar());
 }
-window.addEventListener('online', () => setTimeout(rondaColaVaciar, 1500));
-setInterval(() => { if (document.getElementById('puntoPublico') && navigator.onLine !== false) rondaColaVaciar(); }, 20000);
+/* Se reintenta solo: cada 5 s mientras haya algo guardado y la pantalla esté
+   prendida, y en el acto al volver internet, al prender la pantalla o al
+   volver a la página. */
+function rondaColaRevisar(ya){
+  if (!RondaCola.leer().length || document.hidden) return;
+  RondaRed.empujar(ya === true);
+  rondaColaVaciar();
+}
+window.addEventListener('online', () => setTimeout(() => rondaColaRevisar(true), 800));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) rondaColaRevisar(true); });
+window.addEventListener('pageshow', () => rondaColaRevisar(true));
+window.addEventListener('focus', () => rondaColaRevisar(true));
+setInterval(rondaColaRevisar, 5000);
 
 function rondaHechosLocales(g){
   return RondaLocal.leer().map(x => { const p = aLista(g && g.pts).find(z => z.id === x.id || z.n === x.n); return p ? { n:p.n, at:x.at } : null; }).filter(Boolean);

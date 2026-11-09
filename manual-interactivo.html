@@ -331,7 +331,7 @@ const L = [
   ] },
   { id:'peticion', g:'vecino', ven:['garita'], q:'u_lucia', ir:'peticiones', t:'Peticiones a la garita', d:'Pedidos firmados: llaves, permisos, avisos.', p:[
     { t:'Nueva petición', x:'<b>Tocá "Nueva petición"</b>.', s:'#cuerpo [data-a="nueva-peticion"]', h:'tocar' },
-    { t:'Qué pedís', x:'Elegí el tipo y escribí el detalle. La garita la recibe y la firma: te llega el aviso.', s:'#hoja' },
+    { t:'Qué pedís', x:'Elegí el tipo y escribí el detalle. La garita la recibe y la firma: te llega el aviso. En la lista, las más nuevas quedan arriba, separadas por día.', s:'#hoja' },
   ] },
   { id:'reclamo', g:'vecino', q:'u_lucia', ir:'reclamos', t:'Reclamos', d:'Algo roto o que no anda en el barrio.', p:[
     { t:'Nuevo reclamo', x:'<b>Tocá "Nuevo reclamo"</b>.', s:'#cuerpo [data-a="nuevo-reclamo"]', h:'tocar' },
@@ -403,7 +403,7 @@ const L = [
     { t:'Ingreso', x:'<b>Tocá "Policía"</b> cuando llega.', s:'#cuerpo [data-a="policia-nuevo"]', h:'tocar' },
     { t:'Nombre y apellido', x:'Su <b>nombre y apellido</b> (con una sola palabra no se registra: es lo que va en su constancia).', s:'#hoja form[data-f="policia-nuevo"] [name="nombre"]', h:'escribir', v:'Julio Gómez' },
     { t:'Su cargo', x:'El <b>cargo</b> en la policía.', s:'#hoja form[data-f="policia-nuevo"] [name="cargo"]', h:'elegir', v:'Sargento' },
-    { t:'Registrar', x:'<b>Tocá el botón</b>: sale su tarjeta con el código de ronda para mandarle por WhatsApp. Las rondas las abre él solo al leer los QR.', s:'ENVIAR:policia-nuevo', h:'tocar' },
+    { t:'Registrar', x:'<b>Tocá el botón</b>: sale su tarjeta con el código de ronda para mandarle por WhatsApp. Las rondas las abre él solo al leer los QR; sin señal, sus pasos quedan guardados y llegan solos apenas vuelve. Si su teléfono queda con un <b>recorrido viejo</b>, el recuadro "Policía" te avisa: mandale la tarjeta de nuevo.', s:'ENVIAR:policia-nuevo', h:'tocar' },
   ] },
   { id:'bitacora', g:'garita', ven:['supervision'], q:'u_garita', t:'Anotar en la bitácora', d:'El libro de guardia.', p:[
     { t:'¿Qué querés anotar?', x:'En la bitácora de la garita elegí qué es: <b>Novedad</b> (lo de rutina), <b>Incidente</b> (lo grave: le suena a la Administración) o <b>Ronda</b>. <b>Tocá "Novedad"</b>.', s:'#cuerpo form[data-f="bitacora"] .bt-tipos label', h:'tocar' },
@@ -420,7 +420,7 @@ const L = [
     { t:'El calendario', x:'Elegís el <b>año, el mes y el día</b>. <b>Tocá el día de hoy</b>.', s:'#cuerpo .tc-d.hoy', h:'tocar', antes:"TV.tab='calendario';refrescar()" },
     { t:'Ese día', x:'Se ve de 0 a 24 h con cada turno y el policía, y una tarjeta por turno con <b>"Ver el parte"</b>.', s:'#tcDia' },
     { t:'Las noches del policía', x:'Más abajo, las últimas 14 noches con una bolita por ronda: verde completa con QR, ámbar incompleta y gris anotada por la garita (pestaña <b>Policía</b>).', s:'#cuerpo .nc-tira', antes:"TV.tab='policia';refrescar()" },
-    { t:'Policías del barrio', x:'La ficha de cada policía: <b>"Editar"</b> corrige sus datos y <b>"Ya no viene"</b> lo saca de "¿Quién llega?". Un ingreso de prueba o anotado por error se borra con <b>"Anular el ingreso"</b> (la garita, solo en el turno abierto). Está en la pestaña <b>Equipo</b>.', s:'#cuerpo .pf-card', antes:"TV.tab='equipo';refrescar()" },
+    { t:'Policías del barrio', x:'La ficha de cada policía: <b>"Editar"</b> corrige sus datos y <b>"Ya no viene"</b> lo saca de "¿Quién llega?". <b>"Borrar de la lista"</b> es para el que nunca vino o fue una prueba. Un ingreso de prueba o anotado por error se borra con <b>"Anular el ingreso"</b> (la garita, solo en el turno abierto). Está en la pestaña <b>Equipo</b>.', s:'#cuerpo .pf-card', antes:"TV.tab='equipo';refrescar()" },
   ] },
   { id:'van-g', g:'garita', ven:['hotel'], q:'u_garita', t:'Pasa la van del hotel', d:'Salió o volvió, y si iba vacía o con huéspedes.', p:[
     { t:'Las vans', x:'<b>Tocá la tarjeta "Vans del hotel"</b>, arriba: dice lo de ahora (es la hora, la van que está afuera o la próxima salida) y te baja a la lista.', s:'#cuerpo .tg-van', h:'tocar' },
@@ -513,7 +513,7 @@ const L = [
     { t:'Las dos noches', x:'Domingo a jueves y viernes y sábado, con la franja que se mueve, atajos y el total por semana.', s:'#hoja' },
     { t:'Informe semanal', x:'<b>"Informe semanal de la policía"</b>: sale solo cada sábado, al registrarse la salida del policía del viernes, en PDF a la Supervisión de Adicionales Policiales. Acá ves la semana, cada noche, el PDF y la copia de los que ya salieron.', s:'#cuerpo .ip-tarjeta', antes:'cerrarHoja()' },
     { t:'Sacar un nombre', x:'Adentro del informe, <b>"Sacar un nombre (prueba o dado de baja)"</b>: tocá el nombre que fue una prueba y no sale más en ningún informe, ni como policía ni como guardia de la garita. Una cuenta que se da de baja sale sola.', s:'#hoja [data-a="ip-nombres"]', antes:"A['ip-abrir']()" },
-    { t:'Policías del barrio', x:'<b>"Policías del barrio"</b>: la ficha de cada policía. <b>"Editar"</b> corrige sus datos (su próximo ingreso sale con ellos) y <b>"Ya no viene"</b> lo saca de los botones de la garita sin borrar sus noches. Si un ingreso fue una prueba o un error, en su noche está <b>"Anular el ingreso"</b>.', s:'#cuerpo .pf-card', antes:"cerrarHoja();TV.tab='equipo';refrescar()" },
+    { t:'Policías del barrio', x:'<b>"Policías del barrio"</b>: la ficha de cada policía. <b>"Editar"</b> corrige sus datos (su próximo ingreso sale con ellos) y <b>"Ya no viene"</b> lo saca de los botones de la garita sin borrar sus noches. Si era <b>una prueba</b>, adentro de "Editar" está <b>"Borrar de la lista"</b>: anula sus ingresos de prueba y lo saca de todo. Si un ingreso fue una prueba o un error, en su noche está <b>"Anular el ingreso"</b>.', s:'#cuerpo .pf-card', antes:"cerrarHoja();TV.tab='equipo';refrescar()" },
     { t:'El mes', x:'En la pestaña <b>Mes</b>, <b>"Policía contratada"</b>: noches, horas y rondas completas del mes, para controlar lo que se le paga. Tocá un policía para ver sus noches y anular la que fue una prueba.', s:'#cuerpo .nm-card', antes:"TV.tab='mes';refrescar()" },
   ] },
   { id:'infracciones', g:'admin', ven:['vecino'], q:'u_admin', m:'admin', ir:'infracciones', t:'Infracciones al reglamento', d:'Con sus pruebas y su historial.', p:[
