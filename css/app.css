@@ -7223,3 +7223,5 @@ body.vc-modo{background:#07141a}
 /* 09-11-2026: las peticiones a la garita, en orden de hora y separadas por día. */
 .pet-orden{display:flex;align-items:center;gap:6px;margin:10px 2px 0}.pet-orden svg{width:14px;height:14px}
 .pet-dia{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:16px 4px 6px}
+/* 09-11-2026: la versión al pie de las pantallas del policía. */
+.pp-version{position:relative;text-align:center;opacity:.6;margin:14px 0 0;color:#fff}

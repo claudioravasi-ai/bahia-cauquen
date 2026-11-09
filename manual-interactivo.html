@@ -403,7 +403,7 @@ const L = [
     { t:'Ingreso', x:'<b>Tocá "Policía"</b> cuando llega.', s:'#cuerpo [data-a="policia-nuevo"]', h:'tocar' },
     { t:'Nombre y apellido', x:'Su <b>nombre y apellido</b> (con una sola palabra no se registra: es lo que va en su constancia).', s:'#hoja form[data-f="policia-nuevo"] [name="nombre"]', h:'escribir', v:'Julio Gómez' },
     { t:'Su cargo', x:'El <b>cargo</b> en la policía.', s:'#hoja form[data-f="policia-nuevo"] [name="cargo"]', h:'elegir', v:'Sargento' },
-    { t:'Registrar', x:'<b>Tocá el botón</b>: sale su tarjeta con el código de ronda para mandarle por WhatsApp. Las rondas las abre él solo al leer los QR; sin señal, sus pasos quedan guardados y llegan solos apenas vuelve. Si su teléfono queda con un <b>recorrido viejo</b>, el recuadro "Policía" te avisa: mandale la tarjeta de nuevo.', s:'ENVIAR:policia-nuevo', h:'tocar' },
+    { t:'Registrar', x:'<b>Tocá el botón</b>: sale su tarjeta con el código de ronda para mandarle por WhatsApp. Las rondas las abre él solo al leer los QR; sin señal, sus pasos quedan guardados y llegan solos apenas vuelve (en Android, aunque bloquee el teléfono). Si su teléfono queda con un <b>recorrido viejo</b>, el recuadro "Policía" te avisa: mandale la tarjeta de nuevo.', s:'ENVIAR:policia-nuevo', h:'tocar' },
   ] },
   { id:'bitacora', g:'garita', ven:['supervision'], q:'u_garita', t:'Anotar en la bitácora', d:'El libro de guardia.', p:[
     { t:'¿Qué querés anotar?', x:'En la bitácora de la garita elegí qué es: <b>Novedad</b> (lo de rutina), <b>Incidente</b> (lo grave: le suena a la Administración) o <b>Ronda</b>. <b>Tocá "Novedad"</b>.', s:'#cuerpo form[data-f="bitacora"] .bt-tipos label', h:'tocar' },

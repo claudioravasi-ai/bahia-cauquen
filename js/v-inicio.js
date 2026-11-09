@@ -2063,7 +2063,23 @@ function policiasAnulados(){
   return anuladosCache.set;
 }
 const policiasDe = t => aLista(t && t.policias).filter(p => p && p.id && !policiasAnulados().has(p.id)).map(p => ({ ...p, rondas: aLista(p.rondas).filter(r => r && r.inicio).map(r => ({ ...r, pasos: aLista(r.pasos) })) }));
-const policiasAdentro = t => policiasDe(t).filter(p => !p.sale && !p.paso);
+/* LA SALIDA DEL POLICÍA NO SE PIERDE (pedido de Claudio, 09-11-2026: "puse
+   'Se va' y sigue apareciendo de servicio"). La salida queda en el registro
+   del turno, que se guarda entero: si otra pantalla de la garita (u otra
+   cuenta abierta) guardaba al mismo tiempo su copia vieja del turno, la
+   pisaba y el policía volvía a figurar de servicio, ya sin su código. Ahora
+   el renglón "Salida del policía…" de la bitácora (un registro aparte, que
+   nadie pisa) lleva también su id y la hora (salePid, sale): con él el
+   policía cuenta como ido aunque el turno haya quedado viejo, y la garita
+   corrige sola el turno (procesarPasos). */
+let salidasMemo = { arr:null, n:-1, m:new Map() };
+function policiaSalidas(){
+  const b = Store.s.bitacora, arr = aLista(b);
+  if (salidasMemo.arr === b && salidasMemo.n === arr.length) return salidasMemo.m;
+  const m = new Map(); arr.forEach(x => { if (x && x.salePid && x.sale) m.set(x.salePid, { sale:x.sale, turnoSale:x.turnoSale || '' }); });
+  salidasMemo = { arr:b, n:arr.length, m }; return m;
+}
+const policiasAdentro = t => { const sal = policiaSalidas(); return policiasDe(t).filter(p => !p.sale && !p.paso && !sal.has(p.id)); };
 const rondaEnCurso = p => p.rondas.find(r => !r.fin) || null;
 const minutos = (a, b) => Math.max(1, Math.round((b - a) / MIN));
 /* "23:40" escrito a mano → la última vez que fue esa hora (hoy o anoche). */
@@ -2094,7 +2110,7 @@ function resumenPolicia(t){
     return `${p.nombre}${pnParen(p)} desde ${hora(p.entra)}${p.sale ? ' a ' + hora(p.sale) : ''}, ${plural(p.rondas.length, 'ronda')}${inc ? ` (${plural(inc, 'incompleta', 'incompletas')})` : ''}${rc ? ', una en curso' : ''}`; }).join('; ') + '.';
 }
 /* Cambia un policía del turno abierto y guarda. */
-function cambiarPolicia(pid, fn, renglon){
+function cambiarPolicia(pid, fn, renglon, extra){
   const t = turnoAbierto(); if (!t) return toast('No hay un turno abierto', 'clock');
   Store.cambiar(s => {
     const x = aLista(s.bitacora).find(b => b.id === t.id); if (!x) return;
@@ -2102,7 +2118,7 @@ function cambiarPolicia(pid, fn, renglon){
     const p = x.policias.find(q => q.id === pid); if (!p) return;
     fn(p, x, s);
     const texto = renglon && renglon(p);
-    if (texto) s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto, at:Date.now() });
+    if (texto) s.bitacora.unshift({ id:uid(), autor:yo().id, tipo:'acceso', texto, at:Date.now(), ...(extra ? extra(p) : {}) });
   });
   refrescar();
 }
@@ -2243,19 +2259,30 @@ function procesarPasos(){
     let ya = []; try { ya = JSON.parse(sessionStorage.getItem('bhc.ronda.viejoAvisado') || '[]'); } catch(e){}
     if (ya.includes(vj.id)) return; ya.push(vj.id); try { sessionStorage.setItem('bhc.ronda.viejoAvisado', JSON.stringify(ya.slice(-50))); } catch(e){}
     toast(`${p.nombre} tiene un recorrido viejo: mandale la tarjeta de nuevo`, 'alert'); refrescarPronto(); });
-  const sueltos = pasosSueltos(t), ahora = Date.now();
+  const sueltos = pasosSueltos(t), ahora = Date.now(), sal = policiaSalidas();
   const vencida = r => r && !r.fin && conQR(r) && ahora - r.inicio > HORA;
-  if (!sueltos.length && !policiasAdentro(t).some(p => vencida(rondaEnCurso(p)))) return;
+  /* 09-11: una salida que quedó pisada en el turno (ver policiaSalidas). */
+  const pisados = policiasDe(t).filter(p => !p.sale && sal.has(p.id));
+  if (!sueltos.length && !pisados.length && !policiasAdentro(t).some(p => vencida(rondaEnCurso(p)))) return;
   const total = puntosActivos().length;
-  let cambios = false; const renglones = [];
+  let cambios = false; const renglones = [], idosTocados = new Set();
   Store.cambiar(s => {
     const x = aLista(s.bitacora).find(b => b.id === t.id); if (!x) return;
     x.policias = policiasDe(x);
-    const adentro = x.policias.filter(p => !p.sale && !p.paso);
+    x.policias.forEach(p => { const v = sal.get(p.id); if (p.sale || !v) return;
+      const rc = rondaEnCurso(p); if (rc) cerrarRondaIncompleta(s, p, rc, Math.max(rc.inicio + MIN, v.sale), 'el policía se retiró en plena ronda');
+      p.sale = v.sale; p.turnoSale = v.turnoSale; cerrarServicio(s, p); cambios = true; });
+    const adentro = x.policias.filter(p => !p.sale && !p.paso), idos = x.policias.filter(p => p.sale);
     sueltos.forEach(ps => {
       /* El paso se asigna por el CÓDIGO de ronda, no por el nombre escrito. */
       const cod = aLista(s.rondaCodigos).find(c => c && c.id === ps.c);
-      const p = cod && adentro.find(q => q.id === cod.pid);
+      let p = cod && adentro.find(q => q.id === cod.pid);
+      /* 09-11: el Hub atrasado del que ya se fue, si lo leyó antes de irse: va a su servicio
+         (y si completa la ronda que había quedado incompleta al irse, se reabre). */
+      if (!p && cod){ p = idos.find(q => q.id === cod.pid && pasoAt(ps) <= q.sale + 2 * MIN) || null;
+        if (p){ idosTocados.add(p);
+          const rr = p.rondas.filter(r => r.incompleta && conQR(r) && pasoAt(ps) >= r.inicio - MIN && pasoAt(ps) - r.inicio <= HORA).slice(-1)[0];
+          if (rr && !rondaEnCurso(p)){ rr.incompleta = false; rr.fin = 0; s.bitacora = aLista(s.bitacora).filter(b => !(b && b.id === 'ri-' + rr.id)); } } }
       if (!p) return;
       let r = rondaEnCurso(p);
       /* Una ronda abierta hace más de una hora no se estira: se cierra
@@ -2273,6 +2300,8 @@ function procesarPasos(){
     /* La que quedó abierta más de una hora sin completarse, aunque no
        lleguen más pasos. */
     adentro.forEach(p => { const r = rondaEnCurso(p); if (vencida(r)){ r.fin = ultimoPaso(r); cerrarRondaIncompleta(s, p, r, r.fin, 'pasó más de una hora sin completar los puntos'); cambios = true; } });
+    /* El que ya se fue no sigue en ronda: lo que quedó abierto se cierra, y su servicio se vuelve a guardar con los Hubs nuevos. */
+    idosTocados.forEach(p => { const r = rondaEnCurso(p); if (r){ r.fin = ultimoPaso(r); cerrarRondaIncompleta(s, p, r, r.fin, 'el policía se retiró en plena ronda'); } cerrarServicio(s, p); });
     renglones.forEach(({ id, texto }) => { if (!aLista(s.bitacora).some(b => b && b.id === id)) s.bitacora.unshift({ id, autor:yo().id, tipo:'acceso', texto, at:Date.now() }); });
   });
   if (cambios) refrescarPronto();
@@ -2286,6 +2315,8 @@ const Ronda = {
   guardar(c, nombre, g){ try { localStorage.setItem(this.KEY, JSON.stringify({ c, nombre, at:Date.now(), ...(g ? { g } : {}) })); } catch(e){} },
   olvidar(){ try { localStorage.removeItem(this.KEY); } catch(e){} },
 };
+/* 09-11: la versión, chiquita al pie de las pantallas del policía (para saber qué tenía su teléfono en una prueba). */
+const versionPolicia = () => `<p class="tiny pp-version">Versión ${esc(window.VERSION || 'sin sellar')}</p>`;
 /* El enlace que recibe el policía por WhatsApp: deja el teléfono listo. */
 function pintarRondaHabilitar(ruta){
   const [c, n, token] = String(ruta || '').split('/');
@@ -2300,7 +2331,7 @@ function pintarRondaHabilitar(ruta){
       <p style="margin:12px 0 4px;opacity:.9">Tu código de ronda (por si te lo pide):</p><div class="codigo-grande">${c.slice(0, 3)} ${c.slice(3)}</div>
       <div id="rondaCola">${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}</div>
       <div id="rondaGuia" class="rm-guia-caja"><p class="tiny" style="opacity:.8;margin:12px 0 0">${I('download')} Bajando tu recorrido con las fotos de cada punto…</p></div>`
-      : `<p style="margin:0"><b>Este enlace no es válido.</b> Pedile a la garita que te lo mande de nuevo.</p>`}</div></section>`;
+      : `<p style="margin:0"><b>Este enlace no es válido.</b> Pedile a la garita que te lo mande de nuevo.</p>`}</div>${versionPolicia()}</section>`;
   if (!ok || typeof RondaGuia === 'undefined') return;
   if (typeof rondaColaVaciar === 'function') setTimeout(rondaColaVaciar, 300);
   /* La guía se baja UNA vez y queda guardada en este teléfono (las fotos son chicas). */
@@ -2320,7 +2351,7 @@ function pintarGuiaPolicia(g, r){
     <div class="marca"><span class="logo">${LOGO}</span><div><b style="font-size:16px">Barrio ${esc(Store.s.config.nombre)}</b></div></div>
     <h1 style="font-size:28px">${I('pin')} Tu recorrido</h1>
     <div class="panel"><div id="rondaCola">${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}</div>${g ? `<p class="tiny" style="opacity:.85;margin:0 0 8px">${r && r.nombre ? esc(r.nombre) + ' · ' : ''}guardado en este teléfono · meta: ${g.meta || 3} rondas completas</p>${rondaProximoHTML(g, rondaHechosLocales(g))}${rondaGuiaHTML(g, { hechos:rondaHechosLocales(g) })}`
-      : `<p style="margin:0">Este teléfono no tiene guardado el recorrido. Tocá el enlace de tu tarjeta (el que te mandó la garita).</p>`}</div></section>`;
+      : `<p style="margin:0">Este teléfono no tiene guardado el recorrido. Tocá el enlace de tu tarjeta (el que te mandó la garita).</p>`}</div>${versionPolicia()}</section>`;
 }
 function pintarPunto(codigo, yaBusco){
   const [idk, nombreUrl] = String(codigo || '').split('/');
@@ -2359,7 +2390,7 @@ function pintarPunto(codigo, yaBusco){
         <button class="btn btn-pri btn-block btn-grande" ${r ? '' : 'disabled'}>${I('check')}Registrar paso</button>
         ${r ? '' : `<p class="tiny" id="puntoFalta" style="margin:8px 0 0">${I('info')} Escribí los 6 números del código para poder registrar.</p>`}
         <p class="tiny" style="opacity:.75;margin:10px 0 0">Solo cuenta con el código que la garita le da al policía de turno. Tu nombre y la hora del paso los ven solo la garita y la Administración del barrio (Ley 25.326).</p></form>
-      <div id="puntoRes"></div><div id="rondaCola">${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}</div>`}</div></section>`;
+      <div id="puntoRes"></div><div id="rondaCola">${typeof rondaColaAviso === 'function' ? rondaColaAviso() : ''}</div>`}</div>${versionPolicia()}</section>`;
   if (typeof rondaColaVaciar === 'function') setTimeout(rondaColaVaciar, 300);
   $('#puntoOtro')?.addEventListener('click', () => { Ronda.olvidar(); pintarPunto(codigo); });
   const f = $('#puntoForm'); if (!f) return;
@@ -2577,7 +2608,18 @@ function codigoRondaNuevo(){
   let c; do { const a = new Uint32Array(1); crypto.getRandomValues(a); c = String(100000 + a[0] % 900000); } while (usados.has(c));
   return c;
 }
-const codigoVigente = pid => aLista(Store.s.rondaCodigos).find(c => c && c.pid === pid && c.vence > Date.now()) || null;
+const codigoVigente = pid => aLista(Store.s.rondaCodigos).find(c => c && c.pid === pid && !c.sale && c.vence > Date.now()) || null;
+/* LOS HUBS ATRASADOS DEL QUE YA SE FUE (09-11-2026). Antes "Se va" borraba
+   su código en el acto, y la base rechaza los pasos sin código vigente: si
+   su teléfono todavía tenía Hubs guardados sin señal (la última ronda hecha
+   en el perímetro), se perdían. Ahora el código queda 2 horas más, marcado
+   con la salida (no sirve para su tarjeta ni para "Código nuevo"), y la
+   garita suma esos Hubs a su servicio si los leyó antes de irse
+   (procesarPasos). Su recorrido se borra igual de la base. */
+const despedirCodigo = (s, pid, sale) => {
+  aLista(s.rondaCodigos).filter(c => c && c.pid === pid && !c.sale).forEach(c => { if (typeof rondaGuiaBorrar === 'function') setTimeout(() => rondaGuiaBorrar(c.g, c.id), 0); });
+  s.rondaCodigos = aLista(s.rondaCodigos).map(c => c && c.pid === pid && !c.sale ? { ...c, sale, vence:Math.min(c.vence, Date.now() + 2 * HORA) } : c);
+};
 const bajarCodigo = (s, pid) => {
   /* Con el código se borra de la base la guía de su teléfono (la que ya bajó queda en su teléfono hasta que vence). */
   aLista(s.rondaCodigos).filter(c => c && c.pid === pid).forEach(c => { if (typeof rondaGuiaBorrar === 'function') setTimeout(() => rondaGuiaBorrar(c.g, c.id), 0); });
@@ -2686,10 +2728,12 @@ F['policia-salida'] = d => {
   const email = String(d.email || '').trim().toLowerCase();
   if (email && !correoValido(email)) return toast('Revisá el correo del policía', 'mail');
   const turnoSale = turnoGaritaEn(sale);
-  Store.cambiar(s => bajarCodigo(s, d.pid));
+  /* 09-11: el código no se borra en el acto: queda 2 horas más para los Hubs que su teléfono todavía tenga guardados sin señal. */
+  Store.cambiar(s => despedirCodigo(s, d.pid, sale));
   cambiarPolicia(d.pid, (p, x, s) => { const rc = rondaEnCurso(p); if (rc) cerrarRondaIncompleta(s, p, rc, Math.max(rc.inicio + MIN, sale), 'el policía se retiró en plena ronda');
       p.sale = Math.max(sale, p.entra + MIN); p.turnoSale = turnoSale; if (email && !p.email) p.email = email; cerrarServicio(s, p); },
-    p => `Salida del policía ${p.nombre}${pnParen(p)} · ${fechaCorta(isoDe(new Date(p.sale)))} · turno ${turnoSale} · ${hora(p.sale)} h · ${plural(p.rondas.length, 'ronda')} en el servicio.`);
+    p => `Salida del policía ${p.nombre}${pnParen(p)} · ${fechaCorta(isoDe(new Date(p.sale)))} · turno ${turnoSale} · ${hora(p.sale)} h · ${plural(p.rondas.length, 'ronda')} en el servicio.`,
+    p => ({ salePid:p.id, sale:p.sale, turnoSale }));
   cerrarHoja(); toast('Salida anotada. El servicio quedó en Turnos.', 'check');
   mandarConstanciaPolicia(d.pid);
   /* El sábado, la salida del policía del viernes manda sola el informe semanal a la supervisión (js/informe-policia.js). */
@@ -2739,7 +2783,9 @@ function fotoRonda(r){
 /* Guarda la foto del servicio en el registro donde salió el policía. */
 function cerrarServicio(s, p){
   const regs = aLista(s.bitacora).filter(b => b && b.tipo === 'turno' && b.abre);
-  const sv = serviciosPolicia(regs, aLista(s.bitacora)).find(x => x.id === p.id); if (!sv) return;
+  /* 09-11: se arma de nuevo con lo de ahora (si ya tenía su foto, con los Hubs que llegaron tarde). */
+  const viejo = p.servicio; delete p.servicio;
+  const sv = serviciosPolicia(regs, aLista(s.bitacora)).find(x => x.id === p.id); if (!sv){ if (viejo) p.servicio = viejo; return; }
   p.servicio = { guardias:sv.guardias, rondas:sv.rondas.map(fotoRonda), acciones:sv.acciones.slice(-60), turnoEntra:sv.turnoEntra, entra:sv.entra, sale:p.sale, turnoSale:p.turnoSale || '' };
 }
 const estadoRondaTxt = r => r.incompleta ? `INCOMPLETA${r.conQR && r.total ? ` · ${r.qr.length}/${r.total} QR · faltó ${r.faltan.join(', ')}` : ''}`

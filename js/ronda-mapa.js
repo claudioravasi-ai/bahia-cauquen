@@ -584,7 +584,7 @@ function rondaGuiaBorrar(token, codigo){
   if (codigo) rondaClaveCodigo(codigo).then(sacar).catch(() => {});
 }
 /* Cuando la Administración cambia el recorrido, se actualizan las guías de los policías de servicio. */
-function rondaGuiasAlDia(){ aLista(Store.s.rondaCodigos).filter(c => c && c.vence > Date.now()).forEach(c => rondaGuiaPublicar(c.g, c.vence, c.id)); }
+function rondaGuiasAlDia(){ aLista(Store.s.rondaCodigos).filter(c => c && !c.sale && c.vence > Date.now()).forEach(c => rondaGuiaPublicar(c.g, c.vence, c.id)); }
 /* EL POLICÍA VEÍA OTRO RECORRIDO (pedido de Claudio, 08-11-2026: "a los
    policías les llega por WhatsApp una distribución de los Hubs distinta a
    la que tenemos los vecinos, la Administración y la garita, y no se marcan
@@ -698,7 +698,7 @@ const RondaLocal = {
 const RondaCola = {
   KEY:'bhc.ronda.cola',
   leer(){ try { return JSON.parse(localStorage.getItem(this.KEY) || '[]').filter(x => x && x.id && Date.now() - x.t < CODIGO_VIGENCIA); } catch(e){ return []; } },
-  escribir(l){ try { localStorage.setItem(this.KEY, JSON.stringify(l)); return true; } catch(e){ return false; } },
+  escribir(l){ try { localStorage.setItem(this.KEY, JSON.stringify(l)); } catch(e){ return false; } if (typeof RondaFondo !== 'undefined') RondaFondo.dejar(l); return true; },
   sumar(x){ const l = this.leer(); if (!l.some(y => y.id === x.id)) l.push(x); return this.escribir(l); },
   sacar(id){ this.escribir(this.leer().filter(y => y.id !== id)); },
   marcar(id, c){ const l = this.leer(); if (l.some(y => y.id === id)) this.escribir(l.map(y => y.id === id ? { ...y, ...c } : y)); },
@@ -714,6 +714,8 @@ const RondaCola = {
         let r = await rondaEscribirPaso(x);
         /* Rechazado por repetido: ya había llegado en un envío que quedó sin respuesta. */
         if (r === 'no' && x.d && typeof Ronda !== 'undefined' && (Ronda.leer() || {}).c === x.c) r = 'ok';
+        /* …o lo acaba de mandar el service worker (teléfono bloqueado, RondaFondo). */
+        if (r === 'no' && await RondaFondo.llego(x.id, 1500)) r = 'ok';
         if (r === 'ok'){ ok++; this.llegaron.add(x.id); this.sacar(x.id); }
         else if (r === 'no'){ no++; this.sacar(x.id); }
         else break;
@@ -722,6 +724,40 @@ const RondaCola = {
     return { ok, no, quedan:this.leer().length };
   },
 };
+/* CON EL TELÉFONO BLOQUEADO (09-11-2026, ver sw.js "rondaFondo"): la lista
+   de guardados se copia a IndexedDB para el service worker y, en Android
+   (Chrome), se le pide al navegador que lo despierte cuando vuelva la señal
+   ("sync"). Al volver a la página se lee qué mandó él. Solo con la base real
+   (nunca en la prueba ?local). En iPhone no existe: "soporta" da falso y la
+   pantalla le dice al policía que prenda la pantalla con la página abierta. */
+const RondaFondo = {
+  soporta(){ try { return 'serviceWorker' in navigator && 'SyncManager' in window && !!navigator.serviceWorker.controller; } catch(e){ return false; } },
+  base(){ return typeof Nube !== 'undefined' && Nube.activa() && typeof configFirebase === 'function' ? String((configFirebase() || {}).databaseURL || '').replace(/\/+$/, '') : ''; },
+  idb(modo, fn){ return new Promise((ok, mal) => { if (!('indexedDB' in window)) return mal(new Error('sin IndexedDB'));
+    const r = indexedDB.open('bhc-ronda', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onerror = () => mal(r.error); r.onsuccess = () => { const t = r.result.transaction('kv', modo), q = fn(t.objectStore('kv')); t.oncomplete = () => ok(q && q.result); t.onerror = () => mal(t.error); }; }); },
+  async dejar(lista){
+    const base = this.base(); if (!base) return;
+    try {
+      await this.idb('readwrite', st => st.put({ db:base, lista:aLista(lista) }, 'cola'));
+      if (aLista(lista).length && this.soporta()){ const reg = await navigator.serviceWorker.ready; await reg.sync.register('ronda-cola'); }
+    } catch(e){}
+  },
+  async hechos(){ try { return aLista(await this.idb('readonly', st => st.get('hechos'))); } catch(e){ return []; } },
+  async llego(id, espera = 0){ if (!this.base()) return false; if (espera) await new Promise(r => setTimeout(r, espera)); return (await this.hechos()).some(h => h && h.id === id && h.ok); },
+  /* Lo que mandó el service worker mientras la página dormía: se saca de la lista y se avisa. */
+  async alDia(){
+    if (!this.base() || !RondaCola.leer().length) return { ok:0, no:0 };
+    const hs = await this.hechos(); let ok = 0, no = 0;
+    /* Si al service worker se lo rechazaron, no se descarta: lo prueba la página (si la base lo vuelve a rechazar, ahí se avisa). */
+    RondaCola.leer().forEach(x => { const h = hs.find(y => y && y.id === x.id); if (!h || !(h.ok || x.d)) return;
+      ok++; RondaCola.llegaron.add(x.id); RondaCola.sacar(x.id); });
+    return { ok, no };
+  },
+};
+try { navigator.serviceWorker && navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.rondaFondo) RondaFondo.alDia().then(r => { if (r.ok || r.no) rondaColaPintar(r); }); }); } catch(e){}
+/* Al bloquear el teléfono o salir de la página con pasos guardados, el service worker prueba enseguida (y el navegador reintenta solo). */
+document.addEventListener('visibilitychange', () => { try { if (document.hidden && RondaCola.leer().length && RondaFondo.base() && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ rondaFondo:1 }); } catch(e){} });
 /* La conexión con la base, para el teléfono del policía. */
 const RondaRed = {
   ok:false, armado:false, empujon:0,
@@ -804,7 +840,13 @@ const rondaIdPaso = () => (typeof Nube !== 'undefined' && Nube.activa() && Nube.
 /* El cartelito de lo que está guardado sin mandar (en las pantallas del policía). */
 function rondaColaAviso(){
   const n = RondaCola.leer().length; if (!n) return '';
-  return `<div class="rm-cola" role="status">${I('clock')}<span><b>${n === 1 ? 'Tenés 1 paso guardado en tu teléfono' : `Tenés ${n} pasos guardados en tu teléfono`}</b>Se ${n === 1 ? 'manda' : 'mandan'} solo${n === 1 ? '' : 's'} apenas haya señal, con la hora en que ${n === 1 ? 'lo' : 'los'} leíste. No hace falta que hagas nada: seguí la ronda.</span></div>`;
+  return `<div class="rm-cola" role="status">${I('clock')}<span><b>${n === 1 ? 'Tenés 1 paso guardado en tu teléfono' : `Tenés ${n} pasos guardados en tu teléfono`}</b>Se ${n === 1 ? 'manda' : 'mandan'} solo${n === 1 ? '' : 's'} apenas haya señal, con la hora en que ${n === 1 ? 'lo' : 'los'} leíste. ${rondaFondoTexto()}</span></div>`;
+}
+/* Qué tiene que hacer el policía: en Android nada (sale aunque bloquee el
+   teléfono); en iPhone, prender la pantalla con esta página cuando tenga señal. */
+function rondaFondoTexto(){
+  return RondaFondo.soporta() ? 'No hace falta que hagas nada: sale aunque bloquees el teléfono.'
+    : 'Seguí la ronda. Cuando tengas señal, prendé la pantalla con esta página abierta un momento (o leé el próximo QR) y sale sola.';
 }
 /* Pone al día las pantallas del policía después de mandar. */
 function rondaColaPintar(r){
@@ -819,6 +861,8 @@ function rondaColaPintar(r){
 }
 /* Mandar lo guardado y avisar. */
 async function rondaColaVaciar(){
+  if (!RondaCola.leer().length) return;
+  const f = await RondaFondo.alDia(); if (f.ok || f.no) rondaColaPintar(f);
   if (!RondaCola.leer().length) return;
   rondaColaPintar(await RondaCola.mandar());
 }

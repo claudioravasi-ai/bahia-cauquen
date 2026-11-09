@@ -1,10 +1,10 @@
 /* Service worker de Bahía Cauquén: guarda el programa para que abra sin
    internet. Los datos no pasan por acá. El HTML se pide siempre fresco
    (cache:'reload') para que una versión nueva llegue sin demoras. */
-const CACHE = 'bhc-20261109-102506';
-const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=e18ea834a4',
+const CACHE = 'bhc-20261109-110109';
+const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './css/app.css?v=826fafc380',
   './js/firebase-config.js?v=436e2fd7f5', './js/icons.js?v=9438a0dade', './js/agenda.js?v=52eb2c7f4b', './js/padron.js?v=609a9fe311', './js/core.js?v=abb2b028e2', './js/seed.js?v=bb1e7aba3d', './js/clima.js?v=03cd3e043e', './js/calendario.js?v=4c8c2f6ebc',
-  './js/v-inicio.js?v=9446c3ac5f', './js/v-comunidad.js?v=74398b86a2', './js/v-gestion.js?v=1e722eee59', './js/admin.js?v=5cfb562d3f', './js/v-vecinos.js?v=e8125016a0', './js/v-expensas.js?v=d8255d3ad9', './js/v-plan.js?v=fd04e5772b', './js/octavo-pdf.js?v=086165add8', './js/v-debito.js?v=c844498343', './js/v-contable.js?v=76ed8cac61', './js/v-servicio.js?v=b1be088a3f', './js/v-legal.js?v=e37490f864', './js/v-hotel.js?v=14ff69ded5', './js/hotel-diario.js?v=78327f86dd', './js/v-cuidados.js?v=4f9ff758ab', './js/v-casa.js?v=1560341cd7', './js/mapa.js?v=f2e8f7dd38', './js/ronda-mapa.js?v=b51133def9', './js/recorrido.js?v=d04de41dfa', './js/reglas.js?v=90fa01b34e', './js/asistente.js?v=016c84b986', './js/v-manual.js?v=c7a89bb611', './js/push.js?v=cfbdc889f0', './js/sismos.js?v=50a67626c7', './js/nube.js?v=7e7d8b1278', './js/adjuntos.js?v=f452ad2e36', './js/historial.js?v=e91e6e6e66', './js/v-supervisor.js?v=c8355b2cff', './js/guardia.js?v=c6c141dc33', './js/mantenimiento.js?v=1b45f15aed', './js/mant-vivo.js?v=9168f6975f', './js/relevos.js?v=d4f91679a1', './js/turnos-vivo.js?v=3baf8132c4', './js/informe-policia.js?v=be3a71f643', './js/v-informes.js?v=86cdcc4ba7', './js/portal-vivo.js?v=c1844aff30', './js/van-chofer.js?v=93bcde1a86', './js/gracias.js?v=9eee4d61e8', './js/v-consejo.js?v=ee2bf4e3fd', './js/app.js?v=e03bb6893b',
+  './js/v-inicio.js?v=d991cfc2ff', './js/v-comunidad.js?v=806bdd1689', './js/v-gestion.js?v=1e722eee59', './js/admin.js?v=5cfb562d3f', './js/v-vecinos.js?v=e8125016a0', './js/v-expensas.js?v=d8255d3ad9', './js/v-plan.js?v=fd04e5772b', './js/octavo-pdf.js?v=086165add8', './js/v-debito.js?v=c844498343', './js/v-contable.js?v=76ed8cac61', './js/v-servicio.js?v=b1be088a3f', './js/v-legal.js?v=e37490f864', './js/v-hotel.js?v=14ff69ded5', './js/hotel-diario.js?v=78327f86dd', './js/v-cuidados.js?v=4f9ff758ab', './js/v-casa.js?v=1560341cd7', './js/mapa.js?v=f2e8f7dd38', './js/ronda-mapa.js?v=459511808e', './js/recorrido.js?v=d04de41dfa', './js/reglas.js?v=90fa01b34e', './js/asistente.js?v=016c84b986', './js/v-manual.js?v=f15acc41df', './js/push.js?v=cfbdc889f0', './js/sismos.js?v=50a67626c7', './js/nube.js?v=7e7d8b1278', './js/adjuntos.js?v=f452ad2e36', './js/historial.js?v=e91e6e6e66', './js/v-supervisor.js?v=c8355b2cff', './js/guardia.js?v=c6c141dc33', './js/mantenimiento.js?v=1b45f15aed', './js/mant-vivo.js?v=9168f6975f', './js/relevos.js?v=d4f91679a1', './js/turnos-vivo.js?v=3baf8132c4', './js/informe-policia.js?v=be3a71f643', './js/v-informes.js?v=86cdcc4ba7', './js/portal-vivo.js?v=c1844aff30', './js/van-chofer.js?v=93bcde1a86', './js/gracias.js?v=9eee4d61e8', './js/v-consejo.js?v=ee2bf4e3fd', './js/app.js?v=e03bb6893b',
   './img/portada-dia.jpg', './img/portada-noche.jpg', './icons/logo.png', './icons/icon-192.png', './icons/badge.png', './img/logo-noche.png',
   './img/correos/correo-argentino.svg', './img/correos/andreani.svg', './img/correos/oca.svg', './img/correos/ocasa.svg', './img/correos/mercadolibre.png'];
 /* 04-11-2026: cada archivo del programa lleva en ?v= una huella de SU contenido
@@ -205,3 +205,42 @@ self.addEventListener('notificationclick', e => {
     return self.clients.openWindow('./' + (link ? '?abrir=' + encodeURIComponent(link) : ''));
   }));
 });
+
+/* LOS PASOS DE LA RONDA SALEN CON EL TELÉFONO BLOQUEADO (pedido de Claudio,
+   09-11-2026: "que el policía lea el último Hub, cierre el teléfono y le
+   llegue igual a la garita"). Con la pantalla apagada o el navegador cerrado
+   la página no puede hacer nada; este programa (el service worker) sí: en
+   Android (Chrome), cuando vuelve la señal el propio navegador lo despierta
+   ("sync") y manda los pasos guardados directo a la base, por la dirección
+   pública de Firebase, con las mismas reglas que si los mandara la página
+   (la clave del Hub y el código de ronda vigente; la hora "at" la pone el
+   servidor). Si todavía no hay señal, el navegador vuelve a intentar solo.
+   La página le deja la lista en IndexedDB (js/ronda-mapa.js, RondaFondo) y
+   después lee qué salió. En iPhone (Safari) esto no existe: ahí salen al
+   prender la pantalla con la página abierta o al leer el próximo QR. */
+const RF_DB = 'bhc-ronda', RF_ST = 'kv';
+const rfAbrir = () => new Promise((ok, mal) => { const r = indexedDB.open(RF_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore(RF_ST); r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
+const rfLeer = k => rfAbrir().then(db => new Promise((ok, mal) => { const q = db.transaction(RF_ST).objectStore(RF_ST).get(k); q.onsuccess = () => ok(q.result); q.onerror = () => mal(q.error); }));
+const rfPoner = (k, v) => rfAbrir().then(db => new Promise((ok, mal) => { const t = db.transaction(RF_ST, 'readwrite'); t.objectStore(RF_ST).put(v, k); t.oncomplete = () => ok(); t.onerror = () => mal(t.error); }));
+async function rondaFondo(){
+  const d = await rfLeer('cola'); if (!d || !d.db || !Array.isArray(d.lista) || !d.lista.length) return;
+  if (!/^https:\/\/[a-z0-9-]+\.(firebaseio\.com|[a-z0-9-]+\.firebasedatabase\.app)$|^http:\/\/localhost:\d+$/.test(d.db)) return;
+  const hechos = (await rfLeer('hechos')) || [], ya = new Set(hechos.map(h => h.id)), quedan = [];
+  for (const x of d.lista){
+    if (!x || !x.id || ya.has(x.id)) continue;
+    let r = null;
+    try { r = await fetch(`${d.db}/staff/pasos/${encodeURIComponent(x.id)}.json`, { method:'PUT', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ id:x.id, punto:x.punto, k:x.k, c:x.c, nombre:x.nombre, t:x.t, ...(x.h ? { h:x.h } : {}), at:{ '.sv':'timestamp' } }) }); }
+    catch(e){ quedan.push(x); continue; }   /* sin señal todavía */
+    if (r.ok) hechos.push({ id:x.id, ok:1, at:Date.now() });
+    else if (r.status === 401 || r.status === 403) hechos.push({ id:x.id, ok:0, at:Date.now() });   /* la base no lo acepta: ya estaba o venció */
+    else { quedan.push(x); continue; }
+    await rfPoner('hechos', hechos.slice(-200));   /* uno por uno: la página lo ve enseguida */
+  }
+  await rfPoner('cola', { ...d, lista:quedan });
+  /* Avisarle a la página si está abierta (aunque sea de fondo). */
+  try { (await self.clients.matchAll({ type:'window', includeUncontrolled:true })).forEach(c => c.postMessage({ rondaFondo:1 })); } catch(e){}
+  if (quedan.length) throw new Error('Quedan pasos sin mandar: el navegador reintenta solo');
+}
+self.addEventListener('sync', e => { if (e.tag === 'ronda-cola') e.waitUntil(rondaFondo()); });
+self.addEventListener('message', e => { if (e.data && e.data.rondaFondo) e.waitUntil(rondaFondo().catch(() => {})); });
