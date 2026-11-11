@@ -2136,7 +2136,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.fo
    Enter manda y Mayúscula + Enter hace un renglón nuevo.
    ========================================================= */
 const ajustarCaja = t => { if (!t || !t.classList || !t.classList.contains('crece')) return;
-  t.style.height = 'auto'; const max = 168, h = Math.min(t.scrollHeight + 2, max);
+  t.style.height = 'auto'; const max = parseFloat(getComputedStyle(t).maxHeight) || 168, h = Math.min(t.scrollHeight + 2, max);
   t.style.height = h + 'px'; t.style.overflowY = t.scrollHeight + 2 > max ? 'auto' : 'hidden'; };
 document.addEventListener('input', e => ajustarCaja(e.target));
 document.addEventListener('keydown', e => {
@@ -2452,11 +2452,26 @@ function pintarEspera(titulo = 'Conectando con el barrio…', texto = 'Un segund
    de su propia ventana, que sí se desliza bien. Con zoom de dos dedos no se
    toca nada. */
 const Alto = {
+  /* La charla abierta en la que se escribe va al final (solo cuando cambió el alto o recién se abrió el teclado:
+     si la persona sube a leer mensajes viejos con el teclado abierto, no se la vuelve a bajar). */
+  charlaAlFinal(si){
+    if (!si) return; const a = document.activeElement, f = a && a.closest && a.closest('form.chatbar'), c = f && f.closest('.cuerpo');
+    if (c) c.scrollTop = c.scrollHeight;
+  },
   medir(){
+    const de0 = document.documentElement;
     const vv = window.visualViewport, zoom = vv && vv.scale > 1.01;
     const h = vv && !zoom ? Math.round(vv.height) : window.innerHeight; if (!h) return;
     document.documentElement.style.setProperty('--alto', h + 'px');
     if (zoom) return;
+    /* 11-11-2026: con el teclado abierto (la parte visible es bastante más baja que la pantalla)
+       se marca html.teclado, y la charla en la que se está escribiendo se lleva al final:
+       el último mensaje y la caja de escribir quedan justo arriba del teclado. */
+    const tecl = !!vv && window.innerHeight - vv.height > 120, eraTecl = de0.classList.contains('teclado');
+    if (tecl !== eraTecl) de0.classList.toggle('teclado', tecl);
+    de0.classList.toggle('teclado-bajo', tecl && h < 380);
+    if (tecl) this.charlaAlFinal(!eraTecl || h !== this.hAntes);
+    this.hAntes = h;
     const de = document.documentElement, b = document.body;
     if (window.scrollY || de.scrollTop || (b && b.scrollTop) || (vv && vv.offsetTop > .5)){
       window.scrollTo(0, 0); de.scrollTop = 0; if (b) b.scrollTop = 0;
@@ -2472,6 +2487,14 @@ const Alto = {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) this.pronto(); });
     /* Al abrir y al cerrar el teclado, Safari corre la página. */
     document.addEventListener('focusin', () => [80, 400].forEach(ms => setTimeout(() => this.medir(), ms)));
+    /* 11-11-2026: el iPhone agranda la pantalla (zoom) al tocar un casillero con letra de menos de 16 px, y con
+       ese zoom lo que se escribe queda fuera de vista. La hoja de estilos ya los pone en 16 px; esto es la red
+       por si alguno quedó más chico (un estilo puesto a mano): se corrige en el toque, antes de que tome el foco. */
+    document.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse') return; const t = e.target;
+      if (!t || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || /^(checkbox|radio|file|range|color)$/.test(t.type)) return;
+      try { if (parseFloat(getComputedStyle(t).fontSize) < 16) t.style.setProperty('font-size', '16px', 'important'); } catch(err){}
+    }, { capture:true, passive:true });
     document.addEventListener('focusout', () => { this.acercado = null; [120, 450].forEach(ms => setTimeout(() => this.medir(), ms)); });
     let pend = 0; const ya = () => { if (pend) return; pend = requestAnimationFrame(() => { pend = 0; this.medir(); }); };
     if (window.visualViewport){ visualViewport.addEventListener('resize', ya); visualViewport.addEventListener('scroll', ya); }

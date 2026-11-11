@@ -559,7 +559,8 @@ select{appearance:none;-webkit-appearance:none;padding-right:36px;background-ima
 .tel-btn svg.i{width:15px;height:15px}
 
 /* chat */
-.chat-wrap{display:flex;flex-direction:column;min-height:calc(100dvh - 250px)}
+.chat-wrap{display:flex;flex-direction:column;flex:1 0 auto;min-height:calc(var(--alto,100dvh) - 250px)}
+.cuerpo:has(> .chat-wrap){display:flex;flex-direction:column}
 .chat{flex:1;display:flex;flex-direction:column;gap:4px;padding-bottom:10px}
 .dia-sep{align-self:center;font-size:11.5px;font-weight:800;color:var(--muted);background:var(--surface-3);padding:4px 12px;border-radius:999px;margin:10px 0 6px}
 .msg{max-width:82%;align-self:flex-start;display:flex;flex-direction:column}
@@ -7225,3 +7226,29 @@ body.vc-modo{background:#07141a}
 .pet-dia{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:16px 4px 6px}
 /* 09-11-2026: la versión al pie de las pantallas del policía. */
 .pp-version{position:relative;text-align:center;opacity:.6;margin:14px 0 0;color:#fff}
+
+
+/* =========================================================
+   ESCRIBIR EN EL iPhone SIN PERDER DE VISTA LA CAJA (11-11-2026, pedido de
+   Claudio: "cuando le escribo a un vecino o a la garita la app me desplaza
+   y me deja fuera de vista lo que estoy escribiendo").
+   El iPhone AGRANDA solo la pantalla (zoom) al tocar un casillero con letra
+   de menos de 16 px, y los casilleros tenian 15. Con ese zoom la pantalla
+   queda corrida y lo que se escribe se va de la vista. En los telefonos y
+   tablets la letra de TODOS los casilleros pasa a 16 px: el iPhone ya no
+   agranda nada. (Las de letra mas grande, como la patente, quedan igual.)
+   Va al final del archivo para ganarle a las reglas de cada pantalla.
+   ========================================================= */
+@media (pointer:coarse){
+  input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select,
+  .mapa-card .mapa-buscar input[type=search],.mr-buscar input,.rm-editor .rm-ed-lista input.rm-ed-nom,
+  .ag-ed input,.ag-nueva input,.ag-nueva select,.rv-buscar input{font-size:16px}
+}
+/* Con el teclado abierto (html.teclado, lo pone Alto en app.js) no hace falta
+   el margen de abajo para la rayita del iPhone: ese lugar es para la charla. */
+html.teclado .cuerpo{padding-bottom:12px}
+html.teclado .cuerpo:has(> .chat-wrap){scroll-behavior:auto}
+/* Pantalla muy baja con el teclado (iPhone chico, o acostado): se guarda la franja de arriba
+   mientras se escribe y la caja crece menos, para que siempre entren la caja y el último mensaje. */
+html.teclado-bajo #top{display:none}
+html.teclado textarea.crece{max-height:max(72px,min(168px,calc(var(--alto,100dvh) - 250px)))}
