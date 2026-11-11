@@ -709,7 +709,7 @@ function chatInterno(idP){
 
       <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${m.from === 'guardia' ? 'Garita' + (guardiasEn(m.createdAt).length ? ' · ' + esc(guardiasEn(m.createdAt).join(', ')) : '') : 'Administración'}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
       : vacio('lock', esGuardia() ? 'Escribile a la Administración. Ningún vecino lo ve.' : 'Escribile a la garita. Ningún vecino lo ve.')}</div>
-    <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'Mensaje a la Administración' : 'Mensaje a la garita'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
+    <form class="chatbar" data-f="privado" data-u="${esc(garitaId)}" data-con="interno">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esGuardia() ? 'A la Administración' : 'Mensaje a la garita'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
 }
 /* LA CONSULTA DE EXPENSAS VA SOLO A LA ADMINISTRACIÓN (pedido de Claudio,
    28-09): "Consultar a la Administración" desde Expensas abre la charla con
@@ -774,7 +774,7 @@ R.privado = {
     return `<div class="chat-wrap">${chips}${barraHilo('privados', h, yoSoy)}<div class="chat">${msgs.length ? msgs.map(m => `<div class="msg ${mio(m) ? 'mia' : ''}">
         <div class="b">${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
         : vacio('lock', esStaff() ? 'Sin mensajes con este lote.' : con === 'guardia' ? (esHotel() ? 'Escribile a la garita. Solo la leen el hotel y la garita.' : 'Escribile a la guardia. Nadie más lo ve.') : 'Escribí tu consulta. Solo la lee la Administración.')}</div>
-      <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'Mensaje a la Administración'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
+      <form class="chatbar" data-f="privado" data-u="${esc(quienId)}" data-con="${miCanal}">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" placeholder="${esStaff() ? 'Responder…' : con === 'guardia' ? (esHotel() ? 'Mensaje a la garita' : 'Mensaje a la guardia') : 'A la Administración'}" rows="1" class="crece" enterkeyhint="send"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
   },
 };
 F['privado'] = (d, form) => {

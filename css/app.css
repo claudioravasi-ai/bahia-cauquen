@@ -7252,3 +7252,17 @@ html.teclado .cuerpo:has(> .chat-wrap){scroll-behavior:auto}
    mientras se escribe y la caja crece menos, para que siempre entren la caja y el último mensaje. */
 html.teclado-bajo #top{display:none}
 html.teclado textarea.crece{max-height:max(72px,min(168px,calc(var(--alto,100dvh) - 250px)))}
+
+/* LAS VENTANAS QUE SUBEN DESDE ABAJO, CON EL TECLADO DEL iPhone (11-11-2026, visto en el simulador: el teclado
+   tapaba los casilleros de "Me voy de viaje"). El iPhone no achica la pantalla de fondo al abrir el teclado, y la
+   hoja quedaba abajo de todo. Con el teclado abierto la hoja sube lo que tapa el teclado (--tecl, lo pone Alto en
+   app.js) y no pasa del alto que se ve. En Android y en la computadora --tecl vale 0: no cambia nada. */
+html.teclado dialog.hoja,html.teclado dialog.adj-previa{margin-bottom:var(--tecl,0px);max-height:calc(var(--alto,100dvh) - 10px)}
+html.teclado dialog.hoja .hoja-cuerpo{max-height:calc(var(--alto,100dvh) - 74px);padding-bottom:16px}
+/* Con el teclado abierto el margen de abajo de la pantalla es de 12 px (no 28): la caja del chat se pega a esa
+   medida, para que nunca quede hundida debajo del borde (se cortaban el último renglón y el botón de enviar). */
+html.teclado .chatbar{bottom:-12px}
+
+/* El texto gris de ayuda de la caja (11-11-2026, visto en el simulador de iPhone): "Mensaje a la Administración"
+   no entraba en un renglón y quedaba cortado por la mitad. Ahora va siempre en un solo renglón, con "…" si no entra. */
+textarea.crece::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

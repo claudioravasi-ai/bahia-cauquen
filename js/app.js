@@ -2137,7 +2137,11 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.fo
    ========================================================= */
 const ajustarCaja = t => { if (!t || !t.classList || !t.classList.contains('crece')) return;
   t.style.height = 'auto'; const max = parseFloat(getComputedStyle(t).maxHeight) || 168, h = Math.min(t.scrollHeight + 2, max);
-  t.style.height = h + 'px'; t.style.overflowY = t.scrollHeight + 2 > max ? 'auto' : 'hidden'; };
+  const antes = t.offsetHeight;
+  t.style.height = h + 'px'; t.style.overflowY = t.scrollHeight + 2 > max ? 'auto' : 'hidden';
+  /* 11-11-2026 (visto en el simulador de iPhone): al crecer la caja de un chat, la charla se corre con ella;
+     si no, el último renglón y el botón de enviar quedaban cortados abajo. */
+  if (t.offsetHeight !== antes && document.activeElement === t){ const c = t.closest('form.chatbar') && t.closest('.cuerpo'); if (c) c.scrollTop = c.scrollHeight; } };
 document.addEventListener('input', e => ajustarCaja(e.target));
 document.addEventListener('keydown', e => {
   const t = e.target; if (e.key !== 'Enter' || e.shiftKey || e.isComposing || !t.classList || !t.classList.contains('crece')) return;
@@ -2458,6 +2462,12 @@ const Alto = {
     if (!si) return; const a = document.activeElement, f = a && a.closest && a.closest('form.chatbar'), c = f && f.closest('.cuerpo');
     if (c) c.scrollTop = c.scrollHeight;
   },
+  /* El casillero en el que se escribe, dentro de una hoja, se lleva al medio de lo que se ve. */
+  casilleroALaVista(){
+    const a = document.activeElement, d = a && a.closest && a.closest('dialog[open]');
+    if (!d || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
+    setTimeout(() => { try { a.scrollIntoView({ block:'center' }); window.scrollTo(0, 0); document.documentElement.scrollTop = 0; } catch(e){} }, 60);
+  },
   medir(){
     const de0 = document.documentElement;
     const vv = window.visualViewport, zoom = vv && vv.scale > 1.01;
@@ -2470,7 +2480,12 @@ const Alto = {
     const tecl = !!vv && window.innerHeight - vv.height > 120, eraTecl = de0.classList.contains('teclado');
     if (tecl !== eraTecl) de0.classList.toggle('teclado', tecl);
     de0.classList.toggle('teclado-bajo', tecl && h < 380);
+    /* 11-11-2026 (tarde, visto en el simulador de iPhone): las ventanas que suben desde abajo (hojas) quedaban
+       DEBAJO del teclado, porque el iPhone no achica la pantalla "de fondo" al abrirlo. Se anota cuánto tapa el
+       teclado (--tecl) para que la hoja suba ese tanto (app.css), y el casillero tocado se trae a la vista. */
+    de0.style.setProperty('--tecl', (tecl ? Math.max(0, window.innerHeight - h) : 0) + 'px');
     if (tecl) this.charlaAlFinal(!eraTecl || h !== this.hAntes);
+    if (tecl && (!eraTecl || h !== this.hAntes)) this.casilleroALaVista();
     this.hAntes = h;
     const de = document.documentElement, b = document.body;
     if (window.scrollY || de.scrollTop || (b && b.scrollTop) || (vv && vv.offsetTop > .5)){

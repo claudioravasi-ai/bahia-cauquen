@@ -127,7 +127,7 @@ function chatSupervision(p){
       <div class="b">${m.from !== yoSoy ? `<small class="msg-de">${de(m)}</small>` : ''}${cuerpoMsg(m)}<time>${hora(m.createdAt)}${relojMsg(m)}</time></div></div>`).join('')
       : vacio('lock', vacioTxt)}</div>
     <form class="chatbar" data-f="privado-sup" data-u="${esc(supId)}" data-con="${con}">${clipChat()}<textarea name="text" id="privIn" required maxlength="800" rows="1" class="crece" enterkeyhint="send"
-      placeholder="${esSupervisor() ? 'Mensaje a ' + (con === 'supGarita' ? 'la garita' : 'la Administración') : 'Mensaje a la supervisión'}"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
+      placeholder="${esSupervisor() ? (con === 'supGarita' ? 'Mensaje a la garita' : 'A la Administración') : 'A la supervisión'}"></textarea><button class="btn btn-accent">${I('send')}</button></form></div>`;
 }
 /* R.privado ya existe (js/v-gestion.js): se le suman los dos canales. El
    supervisor, entre en el canal que entre, cae en uno de los suyos. */
