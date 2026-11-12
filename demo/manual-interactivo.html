@@ -1,0 +1,1547 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HRU · Manual interactivo</title>
+<meta name="description" content="Recorrido guiado del bloque quirúrgico del HRU: el alta de cada integrante, sus portales, una cirugía programada con el QR del paciente, una urgencia, las estadísticas, la copa de oro, incidencias y reclamos.">
+<style>
+/* Rediseño 16-10-2026: un escenario con pantallas simuladas y un relato al
+   lado. Nada avanza solo: en cada paso se marca qué tocar, y al tocarlo se ve
+   el efecto en todas las pantallas a la vez (por ejemplo, el teléfono del
+   paciente cambia apenas Admisión autoriza). Todo es de ejemplo. */
+:root {
+  --bg: #f2f5fa; --bg2: #ffffff; --ink: #0f1a2e; --mut: #5b687e; --line: #dfe5ee; --soft: #edf1f7;
+  --scr: #f7f9fc; --scr2: #ffffff; --marco: #0f172a;
+  --acento: #0f766e; --ok: #15803d; --mal: #dc2626; --ama: #b45309;
+  --cir: #2563eb; --anest: #7c3aed; --jefa: #b45309; --enf: #0d9488; --inst: #db2777; --adm: #ea580c; --jef: #be123c; --pac: #0891b2; --tab: #475569;
+  --sh: 0 1px 2px rgba(15,26,46,.06), 0 14px 34px -20px rgba(15,26,46,.40);
+  --au1: rgba(37,99,235,.13); --au2: rgba(13,148,136,.12); --au3: rgba(219,39,119,.08);
+  --r: 18px; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b1120; --bg2: #121a2c; --ink: #e7ecf4; --mut: #97a3b6; --line: #24304a; --soft: #182238;
+  --scr: #0f1728; --scr2: #162036; --marco: #020617;
+  --acento: #2dd4bf; --ok: #4ade80; --mal: #f87171; --ama: #fbbf24;
+  --cir: #60a5fa; --anest: #a78bfa; --jefa: #f59e0b; --enf: #2dd4bf; --inst: #f472b6; --adm: #fb923c; --jef: #fb7185; --pac: #22d3ee; --tab: #94a3b8;
+  --sh: 0 1px 2px rgba(0,0,0,.35), 0 16px 36px -18px rgba(0,0,0,.8);
+  --au1: rgba(96,165,250,.12); --au2: rgba(45,212,191,.10); --au3: rgba(244,114,182,.07); } }
+:root[data-theme="dark"] {
+  --bg: #0b1120; --bg2: #121a2c; --ink: #e7ecf4; --mut: #97a3b6; --line: #24304a; --soft: #182238;
+  --scr: #0f1728; --scr2: #162036; --marco: #020617;
+  --acento: #2dd4bf; --ok: #4ade80; --mal: #f87171; --ama: #fbbf24;
+  --cir: #60a5fa; --anest: #a78bfa; --jefa: #f59e0b; --enf: #2dd4bf; --inst: #f472b6; --adm: #fb923c; --jef: #fb7185; --pac: #22d3ee; --tab: #94a3b8;
+  --sh: 0 1px 2px rgba(0,0,0,.35), 0 16px 36px -18px rgba(0,0,0,.8);
+  --au1: rgba(96,165,250,.12); --au2: rgba(45,212,191,.10); --au3: rgba(244,114,182,.07); }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { min-height: 100vh; overflow-x: hidden; line-height: 1.45;
+  background-image: radial-gradient(900px 500px at 8% -10%, var(--au1), transparent 60%), radial-gradient(800px 500px at 100% 0%, var(--au2), transparent 60%), radial-gradient(700px 600px at 50% 110%, var(--au3), transparent 60%);
+  background-attachment: fixed; }
+button { font-family: inherit; color: inherit; cursor: pointer; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+#app { max-width: 1320px; margin: 0 auto; padding: 12px 16px 60px; }
+
+/* ---------- barra superior ---------- */
+.top { position: sticky; top: 8px; z-index: 30; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px;
+  background: color-mix(in srgb, var(--bg2) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--line); box-shadow: var(--sh); }
+.marca { display: flex; align-items: center; gap: 9px; font-weight: 800; min-width: 0; }
+.marca > i { font-style: normal; width: 34px; height: 34px; flex: none; border-radius: 11px; display: grid; place-items: center; background: linear-gradient(135deg, var(--acento), var(--cir)); color: #fff; font-size: 1.05rem; }
+.marca b { display: block; font-size: .95rem; letter-spacing: -.01em; white-space: nowrap; }
+.marca small { display: block; color: var(--mut); font-weight: 600; font-size: .7rem; white-space: nowrap; }
+.prog { flex: 1; min-width: 40px; height: 8px; border-radius: 99px; background: var(--soft); border: 1px solid var(--line); overflow: hidden; }
+.prog i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--cir), var(--anest), var(--enf), var(--inst)); transition: width .5s cubic-bezier(.2,.8,.2,1); }
+.tb { border: 1px solid var(--line); background: var(--soft); border-radius: 11px; height: 36px; min-width: 36px; padding: 0 10px; font-weight: 700; font-size: .82rem; white-space: nowrap; }
+.tb.pri { background: var(--acento); border-color: transparent; color: #fff; }
+:root[data-theme="dark"] .tb.pri { color: #04201c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tb.pri { color: #04201c; } }
+.mapa-btn, .foco-btn, .corto { display: none; }
+
+/* ---------- cuerpo: mapa + escena ---------- */
+.cuerpo { display: grid; grid-template-columns: 262px minmax(0, 1fr); gap: 18px; margin-top: 16px; align-items: start; }
+.mapa { position: sticky; top: 74px; max-height: calc(100vh - 90px); overflow: auto; padding: 12px; border-radius: var(--r); background: color-mix(in srgb, var(--bg2) 90%, transparent); border: 1px solid var(--line); box-shadow: var(--sh); scrollbar-width: thin; }
+.mapa h3 { margin: 2px 4px 10px; font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
+.acto { margin-bottom: 10px; }
+.acto-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; text-align: left; padding: 6px 6px; border-radius: 10px; font-weight: 800; font-size: .86rem; }
+.acto-h:hover { background: var(--soft); }
+.acto-h i { font-style: normal; width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--soft); border: 1px solid var(--line); flex: none; }
+.acto-h small { margin-left: auto; color: var(--mut); font-weight: 700; font-size: .7rem; }
+.acto.on .acto-h i { background: color-mix(in srgb, var(--acento) 18%, var(--bg2)); border-color: var(--acento); }
+.escs { list-style: none; margin: 2px 0 0 19px; padding: 0 0 0 12px; border-left: 2px solid var(--line); }
+.escs button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; text-align: left; padding: 5px 6px; border-radius: 8px; font-size: .8rem; color: var(--mut); font-weight: 600; }
+.escs button:hover { background: var(--soft); color: var(--ink); }
+.escs button span { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); flex: none; display: grid; place-items: center; font-size: .6rem; }
+.escs button.ok { color: var(--ink); } .escs button.ok span { background: var(--ok); border-color: var(--ok); color: #fff; }
+.escs button.act { color: var(--ink); font-weight: 800; background: color-mix(in srgb, var(--acento) 10%, transparent); }
+.escs button.act span { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 25%, transparent); }
+.velo { display: none; }
+
+.escena { min-width: 0; }
+.relato { position: relative; padding: 16px 18px; border-radius: var(--r); background: var(--bg2); border: 1px solid var(--line); box-shadow: var(--sh); overflow: hidden; animation: entra .35s ease both; }
+.relato::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 5px; background: var(--k, var(--acento)); }
+.rel-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .74rem; font-weight: 800; color: var(--mut); text-transform: uppercase; letter-spacing: .06em; }
+.rel-top .chip { background: color-mix(in srgb, var(--k, var(--acento)) 14%, transparent); color: var(--k, var(--acento)); padding: 3px 9px; border-radius: 99px; }
+.relato h1 { font-size: clamp(1.2rem, 2vw, 1.5rem); line-height: 1.2; letter-spacing: -.02em; margin: 8px 0 6px; }
+.quien { display: inline-flex; align-items: center; gap: 8px; font-size: .84rem; font-weight: 700; margin-bottom: 6px; }
+.quien small { color: var(--mut); font-weight: 600; }
+.relato p { margin: 6px 0; color: var(--ink); font-size: .95rem; max-width: 74ch; }
+.go { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--k, var(--acento)) 9%, var(--soft)); border: 1px dashed color-mix(in srgb, var(--k, var(--acento)) 45%, var(--line)); font-weight: 700; font-size: .9rem; }
+.go .dedo { font-size: 1.3rem; animation: dedo 1.4s ease-in-out infinite; }
+@keyframes dedo { 50% { transform: translateY(-4px) rotate(-8deg); } }
+.nav { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.nav .tb { height: 34px; }
+.nav .esp { flex: 1; }
+.atajos { color: var(--mut); font-size: .72rem; align-self: center; }
+
+/* riel del caso (en qué está la cirugía) */
+.riel { display: flex; margin: 14px 0 0; padding: 12px 10px 10px; border-radius: var(--r); background: var(--bg2); border: 1px solid var(--line); box-shadow: var(--sh); overflow-x: auto; scrollbar-width: thin; }
+.est { flex: 1 0 74px; display: flex; flex-direction: column; align-items: center; gap: 5px; position: relative; font-size: .68rem; font-weight: 700; color: var(--mut); text-align: center; line-height: 1.15; }
+.est::before { content: ''; position: absolute; top: 11px; left: -50%; width: 100%; height: 3px; background: var(--line); z-index: 0; }
+.est:first-child::before { display: none; }
+.est i { font-style: normal; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--soft); border: 2px solid var(--line); z-index: 1; font-size: .66rem; }
+.est.ok { color: var(--ink); } .est.ok i { background: var(--ok); border-color: var(--ok); color: #fff; } .est.ok::before { background: var(--ok); }
+.est.act { color: var(--ink); } .est.act i { border-color: var(--acento); background: var(--bg2); animation: latido 1.6s infinite; }
+.est.dif i { background: color-mix(in srgb, var(--ama) 18%, var(--bg2)); border-color: var(--ama); color: var(--ama); }
+.est.dif { color: var(--ama); }
+
+/* ---------- escenario: pantallas simuladas ---------- */
+.escenario { display: flex; gap: 22px; align-items: flex-start; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+.dev { flex: 1 1 340px; max-width: 440px; min-width: 0; border-radius: 34px; padding: 9px; background: var(--marco); box-shadow: 0 30px 60px -30px rgba(2,6,23,.55), 0 0 0 1px rgba(255,255,255,.06) inset; position: relative; animation: entra .45s cubic-bezier(.2,.8,.2,1) both; }
+.dev.lado { flex: 0 1 290px; min-width: 250px; animation-delay: .08s; }
+@media (max-width: 640px) { .dev, .dev.lado { flex: 1 1 100%; min-width: 0; } .dev.lado { max-width: 360px; } }
+@keyframes entra { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+.dev-in { border-radius: 26px; overflow: hidden; background: var(--scr); }
+.dev-st { display: flex; justify-content: space-between; align-items: center; padding: 8px 18px 4px; font-size: .72rem; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.isla { width: 84px; height: 20px; border-radius: 99px; background: var(--marco); }
+.dev-who { display: flex; align-items: center; gap: 9px; padding: 8px 12px 10px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, color-mix(in srgb, var(--k) 12%, var(--scr2)), var(--scr2)); }
+.dev-who > div { min-width: 0; }
+.dev-who b { display: block; font-size: .84rem; line-height: 1.15; }
+.dev-who small { color: var(--mut); font-size: .7rem; font-weight: 600; }
+.dev-who .app { margin-left: auto; font-size: .6rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--k); background: color-mix(in srgb, var(--k) 12%, transparent); padding: 3px 7px; border-radius: 6px; white-space: nowrap; }
+.dev.lado .app { display: none; }
+.scr { position: relative; height: 520px; overflow: auto; padding: 12px 12px 34px; scrollbar-width: thin; }
+.scr > * { animation: sube .4s ease both; }
+.scr > *:nth-child(2) { animation-delay: .05s; } .scr > *:nth-child(3) { animation-delay: .1s; } .scr > *:nth-child(4) { animation-delay: .15s; } .scr > *:nth-child(5) { animation-delay: .2s; }
+@keyframes sube { from { opacity: 0; transform: translateY(8px); } }
+.av { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 1rem; background: color-mix(in srgb, var(--k) 18%, var(--scr2)); border: 2px solid var(--k); }
+
+/* piezas de las pantallas */
+.s-h { display: flex; align-items: flex-start; gap: 8px; margin: 2px 2px 10px; }
+.s-h b { display: block; font-size: 1rem; letter-spacing: -.01em; }
+.s-h small { display: block; color: var(--mut); font-size: .74rem; }
+.s-card { background: var(--scr2); border: 1px solid var(--line); border-radius: 14px; padding: 11px; margin-bottom: 10px; }
+.s-card.k { border-color: color-mix(in srgb, var(--k) 40%, var(--line)); background: linear-gradient(160deg, color-mix(in srgb, var(--k) 9%, var(--scr2)), var(--scr2) 70%); }
+.s-card h4 { margin: 0 0 4px; font-size: .9rem; }
+.s-card p { margin: 3px 0; font-size: .8rem; color: var(--mut); }
+.nota { font-size: .72rem; color: var(--mut); margin: 4px 2px; }
+.tag { display: inline-block; font-size: .64rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: color-mix(in srgb, var(--k, var(--acento)) 15%, transparent); color: var(--k, var(--acento)); white-space: nowrap; }
+.tag.ok { --k: var(--ok); } .tag.mal { --k: var(--mal); } .tag.ama { --k: var(--ama); }
+.b { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 800; font-size: .84rem; color: #fff; background: var(--k, var(--acento)); width: 100%; margin-top: 6px; transition: transform .15s, filter .2s; }
+.b:hover { filter: brightness(1.07); } .b:active { transform: scale(.98); }
+.b.sec { background: var(--soft); color: var(--ink); border: 1px solid var(--line); }
+.b.ok { --k: var(--ok); } .b.mal { --k: var(--mal); }
+.b.chico { width: auto; padding: 7px 11px; font-size: .76rem; margin: 0; flex: none; }
+.dos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.campos { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.campo { background: var(--scr2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 9px; min-width: 0; }
+.campo.full { grid-column: 1 / -1; }
+.campo small { display: block; font-size: .64rem; color: var(--mut); font-weight: 700; }
+.campo span { display: block; font-size: .8rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.campo.esc span { width: 0; animation: escribe 1s steps(24) forwards; }
+@keyframes escribe { to { width: 100%; } }
+.paso-n { display: flex; align-items: center; gap: 7px; font-weight: 800; font-size: .8rem; margin: 10px 2px 6px; }
+.paso-n span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: .7rem; background: var(--acento); color: #fff; }
+.paso-n.off { opacity: .4; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 11px; background: var(--soft); border: 1px solid var(--line); font-size: .78rem; font-weight: 800; text-align: center; }
+.seg span { padding: 7px; border-radius: 9px; color: var(--mut); } .seg span.on { background: var(--scr2); color: var(--ink); box-shadow: var(--sh); }
+.funcs { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.func { text-align: left; border: 1.5px solid var(--line); background: var(--scr2); border-radius: 12px; padding: 8px 9px; display: grid; grid-template-columns: auto 1fr; column-gap: 7px; align-items: center; min-width: 0; }
+.func i { font-style: normal; grid-row: span 2; font-size: 1.2rem; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--k) 14%, transparent); }
+.func b { font-size: .76rem; line-height: 1.1; } .func small { font-size: .66rem; color: var(--mut); }
+.func.on { border-color: var(--k); background: color-mix(in srgb, var(--k) 9%, var(--scr2)); }
+.func.apag { opacity: .45; }
+.reqs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.reqs span { font-size: .68rem; font-weight: 700; padding: 3px 7px; border-radius: 99px; background: var(--soft); border: 1px solid var(--line); }
+.reqs span.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); border-color: color-mix(in srgb, var(--ok) 40%, transparent); color: var(--ok); }
+.fila { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: .8rem; }
+.fila:last-child { border-bottom: 0; }
+.fila .esp { flex: 1; min-width: 0; }
+.fila b { display: block; } .fila small { color: var(--mut); font-size: .7rem; }
+.ptabs { display: flex; gap: 4px; padding: 3px; border-radius: 11px; background: var(--soft); border: 1px solid var(--line); margin-bottom: 10px; overflow-x: auto; scrollbar-width: none; }
+.ptabs span { flex: none; padding: 6px 10px; border-radius: 8px; font-size: .74rem; font-weight: 700; color: var(--mut); }
+.ptabs span.on { background: var(--scr2); color: var(--ink); box-shadow: var(--sh); }
+.primero { position: relative; padding: 14px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--k), color-mix(in srgb, var(--k) 55%, #0f172a)); box-shadow: 0 14px 30px -18px var(--k); }
+.primero .tag { background: rgba(255,255,255,.2); color: #fff; }
+.primero h4 { margin: 8px 0 4px; font-size: 1.05rem; }
+.primero p { margin: 0 0 6px; font-size: .8rem; opacity: .92; }
+.primero .b { background: #fff; color: #0f172a; }
+.wid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.w { position: relative; background: var(--scr2); border: 1px solid var(--line); border-radius: 14px; padding: 10px; min-width: 0; }
+.w .n { position: absolute; top: -7px; left: -7px; width: 20px; height: 20px; border-radius: 50%; background: var(--k); color: #fff; font-size: .66rem; font-weight: 800; display: grid; place-items: center; box-shadow: 0 0 0 3px var(--scr); }
+.w i { font-style: normal; font-size: 1.1rem; }
+.w b { display: block; font-size: .76rem; margin-top: 3px; line-height: 1.15; }
+.w em { font-style: normal; font-weight: 800; font-size: 1.15rem; color: var(--k); display: block; }
+.w small { display: block; color: var(--mut); font-size: .66rem; line-height: 1.25; margin-top: 2px; }
+.flujo { list-style: none; margin: 4px 0 8px; padding: 0; position: relative; }
+.flujo::before { content: ''; position: absolute; left: 13px; top: 10px; bottom: 10px; width: 2px; background: linear-gradient(var(--k), color-mix(in srgb, var(--k) 20%, transparent)); }
+.flujo li { position: relative; display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: .8rem; animation: sube .4s ease both; }
+.flujo li b { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--scr2); border: 2px solid var(--k); color: var(--k); font-size: .76rem; z-index: 1; }
+.flujo li span { padding-top: 4px; }
+.borroso { filter: blur(2px); opacity: .45; pointer-events: none; margin-top: 12px; }
+.hecho-mini { display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700; padding: 8px 10px; border-radius: 11px; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); margin-bottom: 10px; }
+.lvq { list-style: none; margin: 0; padding: 0; }
+.lvq li { display: flex; gap: 8px; align-items: center; font-size: .78rem; padding: 5px 0; }
+.lvq li i { font-style: normal; width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; background: var(--ok); color: #fff; font-size: .62rem; flex: none; animation: tilde .3s ease both; }
+.lvq li:nth-child(2) i { animation-delay: .12s; } .lvq li:nth-child(3) i { animation-delay: .24s; } .lvq li:nth-child(4) i { animation-delay: .36s; } .lvq li:nth-child(5) i { animation-delay: .48s; } .lvq li:nth-child(6) i { animation-delay: .6s; }
+@keyframes tilde { from { transform: scale(0); } }
+.firmas { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 2px; }
+.firmas span { display: inline-flex; align-items: center; gap: 5px; font-size: .7rem; font-weight: 800; padding: 4px 8px; border-radius: 99px; border: 1.5px solid var(--k); color: var(--k); background: color-mix(in srgb, var(--k) 8%, transparent); }
+.cont { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cont div { background: var(--scr2); border: 1px solid var(--line); border-radius: 12px; padding: 8px; text-align: center; }
+.cont small { display: block; color: var(--mut); font-size: .7rem; font-weight: 700; }
+.cont b { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.tabla { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.tabla th, .tabla td { padding: 6px 5px; border-bottom: 1px solid var(--line); text-align: center; }
+.tabla th:first-child, .tabla td:first-child { text-align: left; }
+.tabla td.ok { color: var(--ok); font-weight: 800; }
+.ald .fila span { display: flex; gap: 4px; }
+.ald .fila span i { font-style: normal; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font-size: .72rem; font-weight: 800; background: var(--soft); border: 1px solid var(--line); color: var(--mut); }
+.ald .fila span i.on { background: var(--k); color: #fff; border-color: transparent; }
+.total { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: .84rem; padding: 8px 10px; border-radius: 11px; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); margin-top: 6px; }
+.tiempos { list-style: none; margin: 6px 0 0; padding: 0; }
+.tiempos li { display: flex; justify-content: space-between; font-size: .78rem; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.tiempos li b { font-variant-numeric: tabular-nums; }
+.inicio { display: grid; place-items: center; padding: 18px 0 6px; }
+.inicio button { width: 150px; height: 150px; border-radius: 50%; border: 0; color: #fff; font-weight: 800; font-size: 1rem; background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--k) 70%, #fff), var(--k)); box-shadow: 0 0 0 10px color-mix(in srgb, var(--k) 15%, transparent), 0 20px 40px -18px var(--k); }
+.inicio button small { display: block; font-weight: 600; font-size: .72rem; opacity: .9; }
+.alerta { padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--mal) 12%, var(--scr2)); border: 1.5px solid var(--mal); animation: titila 1.8s ease-in-out infinite; }
+@keyframes titila { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--mal) 18%, transparent); } }
+.elige { display: grid; gap: 10px; }
+.elige button { text-align: left; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; background: var(--scr2); }
+.elige button b { display: block; font-size: .95rem; margin: 4px 0 2px; }
+.elige button small { color: var(--mut); font-size: .76rem; }
+.elige button span { font-size: 1.6rem; }
+.compara { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.compara div { border: 1.5px solid var(--line); border-radius: 14px; padding: 10px; font-size: .74rem; background: var(--scr2); }
+.compara div.on { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 20%, transparent); }
+.compara b { display: block; font-size: .82rem; margin-bottom: 4px; }
+.compara ol { margin: 0; padding-left: 16px; } .compara li { margin: 2px 0; }
+
+/* teléfono del paciente */
+.qr { width: 150px; height: 150px; margin: 6px auto; display: block; background: #fff; border-radius: 10px; padding: 6px; }
+.pase { border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--scr2); }
+.pase-top { padding: 10px 12px; color: #fff; background: linear-gradient(135deg, var(--pac), var(--cir)); }
+.pase-top b { display: block; font-size: .95rem; } .pase-top small { opacity: .9; font-size: .72rem; }
+.pase-cuerpo { padding: 10px 12px; text-align: center; font-size: .74rem; color: var(--mut); }
+.pase-cuerpo strong { display: block; color: var(--ink); font-size: .9rem; letter-spacing: .12em; }
+.camara { position: relative; height: 250px; border-radius: 18px; background: linear-gradient(160deg, #1e293b, #0f172a); display: grid; place-items: center; overflow: hidden; }
+.camara::before { content: ''; width: 150px; height: 150px; border-radius: 14px; border: 3px solid rgba(255,255,255,.85); box-shadow: 0 0 0 999px rgba(0,0,0,.25); }
+.camara::after { content: ''; position: absolute; left: 50%; width: 150px; margin-left: -75px; height: 2px; background: #22d3ee; box-shadow: 0 0 12px #22d3ee; animation: barre 2s ease-in-out infinite; }
+@keyframes barre { 0%, 100% { top: calc(50% - 70px); } 50% { top: calc(50% + 70px); } }
+.camara span { position: absolute; bottom: 10px; color: #fff; font-size: .72rem; font-weight: 700; }
+.pac-hola { padding: 12px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--pac), color-mix(in srgb, var(--pac) 40%, #0f172a)); margin-bottom: 10px; }
+.pac-hola b { display: block; font-size: 1.05rem; } .pac-hola small { opacity: .9; font-size: .72rem; display: block; }
+.tl { list-style: none; margin: 0; padding: 0; position: relative; }
+.tl::before { content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+.tl li { position: relative; display: flex; gap: 10px; padding: 5px 0; font-size: .78rem; }
+.tl li i { font-style: normal; width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: .66rem; background: var(--scr2); border: 2px solid var(--line); z-index: 1; color: var(--mut); }
+.tl li b { display: block; } .tl li small { color: var(--mut); font-size: .68rem; }
+.tl li.ok i { background: var(--ok); border-color: var(--ok); color: #fff; }
+.tl li.act i { border-color: var(--pac); color: var(--pac); animation: latidoPac 1.6s infinite; }
+.tl li.act b { color: var(--pac); }
+@keyframes latidoPac { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--pac) 22%, transparent); } }
+.vivo { display: flex; align-items: center; gap: 6px; font-size: .68rem; color: var(--mut); margin-top: 8px; }
+.vivo::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: parpadea 1.4s infinite; }
+@keyframes parpadea { 50% { opacity: .3; } }
+.candado { text-align: center; padding: 30px 10px; }
+.candado div { font-size: 3rem; }
+.candado b { display: block; font-size: 1rem; margin: 8px 0 4px; }
+.candado p { color: var(--mut); font-size: .78rem; margin: 0 0 6px; }
+.vacio { text-align: center; padding: 60px 14px; color: var(--mut); font-size: .8rem; }
+.vacio div { font-size: 2.6rem; opacity: .6; }
+
+/* estadísticas, copa, incidencias, reclamos */
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.kpi { border-radius: 14px; padding: 10px; background: var(--scr2); border: 1px solid var(--line); }
+.kpi b { display: block; font-size: 1.35rem; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--k); }
+.kpi small { color: var(--mut); font-size: .68rem; font-weight: 700; }
+.barras { display: grid; gap: 6px; }
+.barras div { display: grid; grid-template-columns: 96px 1fr 26px; gap: 6px; align-items: center; font-size: .7rem; font-weight: 700; }
+.barras i { display: block; height: 10px; border-radius: 99px; background: linear-gradient(90deg, var(--cir), var(--enf)); transform-origin: left; animation: crece .9s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes crece { from { transform: scaleX(0); } }
+.barras span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--mut); }
+.semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; font-size: .62rem; color: var(--mut); font-weight: 700; }
+.semana div { display: flex; flex-direction: column-reverse; gap: 2px; align-items: center; min-height: 64px; }
+.semana i { width: 12px; height: 7px; border-radius: 3px; background: var(--enf); opacity: .85; }
+.semana i.u { background: var(--mal); }
+.podio { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 6px; align-items: end; text-align: center; margin: 6px 0 10px; }
+.podio div { border-radius: 14px 14px 6px 6px; padding: 8px 4px; background: var(--scr2); border: 1px solid var(--line); font-size: .7rem; }
+.podio div b { display: block; font-size: .74rem; line-height: 1.15; }
+.podio div em { font-style: normal; font-size: 1.2rem; font-weight: 800; display: block; }
+.podio .p1 { padding-top: 16px; background: linear-gradient(180deg, color-mix(in srgb, #f59e0b 25%, var(--scr2)), var(--scr2)); border-color: #f59e0b; }
+.copa { font-size: 4.2rem; text-align: center; animation: copa 2.4s ease-in-out infinite; filter: drop-shadow(0 10px 18px rgba(245,158,11,.45)); }
+@keyframes copa { 50% { transform: translateY(-6px) rotate(-4deg) scale(1.04); } }
+.stepper { display: flex; gap: 4px; margin: 6px 0 10px; }
+.stepper span { flex: 1; text-align: center; font-size: .66rem; font-weight: 800; padding: 6px 2px; border-radius: 8px; background: var(--soft); color: var(--mut); }
+.stepper span.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.stepper span.act { background: color-mix(in srgb, var(--ama) 18%, transparent); color: var(--ama); }
+.hist { list-style: none; margin: 0; padding: 0; font-size: .74rem; }
+.hist li { padding: 5px 0; border-bottom: 1px dashed var(--line); color: var(--mut); }
+.hist li b { color: var(--ink); }
+.chat { display: grid; gap: 8px; margin-bottom: 8px; }
+.msg { max-width: 86%; padding: 8px 10px; border-radius: 14px; font-size: .78rem; background: var(--scr2); border: 1px solid var(--line); }
+.msg small { display: block; color: var(--mut); font-size: .64rem; font-weight: 700; margin-bottom: 2px; }
+.msg.yo { justify-self: end; background: color-mix(in srgb, var(--jef) 12%, var(--scr2)); border-color: color-mix(in srgb, var(--jef) 35%, var(--line)); border-style: dashed; }
+
+/* portada y final (pantalla completa) */
+.grande { padding: clamp(18px, 4vw, 34px); border-radius: 24px; background: var(--bg2); border: 1px solid var(--line); box-shadow: var(--sh); animation: entra .5s ease both; }
+.hero-t { font-size: clamp(1.7rem, 4.2vw, 2.7rem); line-height: 1.08; letter-spacing: -.03em; margin: 8px 0 10px; }
+.hero-t span { background: linear-gradient(90deg, var(--cir), var(--anest), var(--inst)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.grande > p { color: var(--mut); max-width: 70ch; }
+.actos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 18px 0; }
+.acto-c { text-align: left; border: 1px solid var(--line); background: var(--scr2); border-radius: 18px; padding: 14px; position: relative; overflow: hidden; transition: transform .2s, box-shadow .2s; }
+button.acto-c:hover { transform: translateY(-3px); box-shadow: var(--sh); }
+.acto-c::after { content: ''; position: absolute; right: -30px; top: -30px; width: 90px; height: 90px; border-radius: 50%; background: color-mix(in srgb, var(--k) 16%, transparent); }
+.acto-c i { font-style: normal; font-size: 1.6rem; }
+.acto-c b { display: block; margin: 6px 0 3px; font-size: .95rem; }
+.acto-c small { color: var(--mut); font-size: .78rem; display: block; }
+.acto-c em { font-style: normal; display: inline-block; margin-top: 8px; font-size: .7rem; font-weight: 800; color: var(--k); }
+.elenco { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
+.elenco span { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 700; padding: 4px 10px 4px 4px; border-radius: 99px; background: var(--soft); border: 1px solid var(--line); }
+.elenco .av { width: 26px; height: 26px; font-size: .8rem; }
+.botones { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.botones .b { width: auto; padding: 12px 18px; font-size: .92rem; margin: 0; }
+
+/* el foco: lo que hay que tocar */
+.foco { position: relative; z-index: 2; animation: latido 1.6s ease-in-out infinite !important; outline: 3px solid var(--acento); outline-offset: 3px; }
+.foco::after { content: '👆'; position: absolute; right: 8px; bottom: -16px; font-size: 1.35rem; pointer-events: none; animation: dedo 1.2s ease-in-out infinite; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+@keyframes latido { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--acento) 45%, transparent); } 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--acento) 0%, transparent); } }
+.sacude { animation: sacude .4s !important; }
+@keyframes sacude { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+.toast { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%, 160%); z-index: 90; width: min(560px, calc(100% - 32px)); display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 16px; background: var(--bg2); border: 1px solid var(--line); box-shadow: 0 20px 50px -20px rgba(2,6,23,.6); font-size: .88rem; transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+.toast.on { transform: translate(-50%, 0); }
+.toast i { font-style: normal; font-size: 1.2rem; }
+.toast.ok { border-left: 5px solid var(--ok); } .toast.info { border-left: 5px solid var(--cir); }
+.papel { position: fixed; top: -12px; width: 9px; height: 14px; z-index: 95; pointer-events: none; border-radius: 2px; animation: cae linear forwards; }
+@keyframes cae { to { transform: translateY(110vh) rotate(720deg); opacity: .7; } }
+
+@media (max-width: 1559px) {
+  .cuerpo { grid-template-columns: 1fr; }
+  .mapa { position: fixed; top: 0; bottom: 0; left: 0; width: min(86vw, 320px); max-height: none; border-radius: 0 20px 20px 0; z-index: 60; transform: translateX(-105%); transition: transform .3s ease; background: var(--bg2); }
+  .mapa.abierto { transform: none; }
+  .velo.abierto { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(2,6,23,.45); }
+  .mapa-btn { display: inline-flex; align-items: center; }
+}
+@media (max-width: 1099px) { .foco-btn { display: inline-flex; align-items: center; } }
+@media (max-width: 640px) { .corto { display: inline; } .largo { display: none; } }
+/* Escenario: relato fijo a la izquierda y las pantallas a la derecha, todo a la vista. */
+@media (min-width: 1100px) {
+  .esc-grid { display: grid; grid-template-columns: minmax(290px, 350px) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .col-rel { position: sticky; top: 74px; }
+  .col-esc .riel { margin-top: 0; }
+}
+@media (max-width: 640px) {
+  #app { padding: 8px 12px 40px; }
+  .marca small { display: none; }
+  .marca b { font-size: .86rem; }
+  .scr { height: auto; min-height: 300px; overflow: visible; }
+  .dev { border-radius: 28px; padding: 7px; } .dev-in { border-radius: 22px; }
+  .escenario { gap: 16px; }
+  .relato { padding: 14px 14px 14px 16px; }
+  .atajos { display: none; }
+}
+@media (max-width: 400px) { .marca > div { display: none; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* 3.25 · cama y reprogramación */
+.sects{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0 8px}
+.sect{position:relative;border-radius:12px;padding:8px 8px 8px 12px;border:2px solid color-mix(in srgb,var(--c) 25%,transparent);background:color-mix(in srgb,var(--c) 7%,var(--sup,#fff));overflow:hidden}
+.sect::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+.sect em{font-style:normal;font-size:1.1rem}.sect b{display:block;font-size:.72rem;line-height:1.2;color:var(--ink)}
+.sect small{font-size:.66rem;color:var(--mut)}.sect small span{font-weight:900;color:var(--c);font-size:.8rem}
+.sect.on{border-color:var(--c);box-shadow:0 6px 16px -8px var(--c);animation:sectOn 1.8s ease-in-out infinite}
+@keyframes sectOn{50%{transform:translateY(-2px)}}
+.sello{display:inline-block;font-weight:900;font-size:.7rem;color:#fff;background:linear-gradient(120deg,#dc2626,#ea580c);border-radius:99px;padding:3px 10px;box-shadow:0 4px 12px -4px #dc2626;animation:sello 2s ease-in-out infinite}
+.sello.chico{font-size:.6rem;padding:2px 7px}
+@keyframes sello{50%{box-shadow:0 0 0 5px rgba(220,38,38,.2),0 4px 12px -4px #dc2626}}
+.prio{background:linear-gradient(135deg,color-mix(in srgb,#dc2626 8%,var(--sup,#fff)),color-mix(in srgb,#f59e0b 10%,var(--sup,#fff)))!important}
+.busca{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:4px 0 10px}
+.busca div{border-radius:10px;padding:7px 4px;text-align:center;font-size:.7rem;opacity:0;animation:busca .45s calc(var(--i)*.35s) ease forwards}
+.busca .no{background:color-mix(in srgb,#94a3b8 18%,transparent);color:var(--mut)}.busca .no small{text-decoration:line-through}
+.busca .si{background:#16a34a;color:#fff;box-shadow:0 6px 14px -6px #16a34a}
+.busca b,.busca small{display:block}
+@keyframes busca{from{opacity:0;transform:translateY(6px) scale(.9)}to{opacity:1;transform:none}}
+.oks3{display:grid;gap:5px;margin:8px 0}
+.campana{font-size:2.6rem;text-align:center;animation:campana 1.2s ease-in-out infinite;transform-origin:50% 10%}
+@keyframes campana{0%,60%,100%{transform:rotate(0)}70%{transform:rotate(18deg)}80%{transform:rotate(-16deg)}90%{transform:rotate(9deg)}}
+.partes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 10px}
+.partes>*{border:0;border-radius:12px;padding:10px 6px;text-align:center;color:#fff;background:var(--c);font:inherit;font-size:1.1rem;box-shadow:0 8px 18px -10px var(--c)}
+.partes b{display:block;font-size:.66rem;margin-top:3px}
+.partes span{opacity:.75}
+.mini-parte{padding:0!important;overflow:hidden}
+.mp-h{background:linear-gradient(110deg,#0f2a5f,#1e40af 60%,#0e7490);color:#fff;font-weight:800;font-size:.78rem;padding:7px 10px}
+.mp-f{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:8px 10px;font-size:.74rem;color:var(--ink);background:#fef2f2}
+.mp-f>b{color:#1e3a8a;font-size:.9rem}.mp-f i{font-style:normal;font-weight:800;color:#155e75;background:#ecfeff;border-radius:4px;padding:0 4px;font-size:.62rem}
+.mp-f small{display:block;color:#1d4ed8;font-weight:700;font-size:.64rem;margin-top:2px}
+.mp-ints{font-size:.62rem;font-weight:700;text-align:center;color:#1e3a8a;padding:5px;border-top:1px dashed #cbd5e1}
+@media (prefers-reduced-motion:reduce){.sect.on,.sello,.campana,.busca div{animation:none;opacity:1}}
+
+/* 3.26 · mapa de camas y pulsera */
+.alarma{text-align:center;border-radius:16px;padding:16px 10px;color:#fff;background:linear-gradient(135deg,#dc2626,#ea580c);box-shadow:0 12px 26px -12px #dc2626;margin-bottom:10px;animation:alarma 1s ease-in-out infinite}
+.alarma b{display:block;font-size:.95rem;margin-top:4px}.alarma small{font-size:.72rem;opacity:.95}
+@keyframes alarma{50%{transform:scale(1.025)}}
+.mm{border-radius:12px;border:1px solid color-mix(in srgb,#2563eb 30%,transparent);padding:7px;background:color-mix(in srgb,#2563eb 5%,var(--sup,#fff));margin-bottom:6px}
+.mm-h{display:flex;gap:8px;align-items:center;font-size:.72rem;margin-bottom:5px}.mm-h b{color:#2563eb}.mm-h span{color:var(--mut)}.mm-h em{margin-left:auto;font-style:normal;font-weight:900;color:#fff;background:#16a34a;border-radius:8px;padding:1px 7px}
+.mm-habs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.mm-habs>div{border:1px dashed color-mix(in srgb,#2563eb 30%,transparent);border-radius:8px;padding:3px}
+.mm-habs small{display:block;font-size:.56rem;font-weight:800;color:var(--mut)}
+.mm-habs span{display:flex;gap:3px}
+.mm-habs i{flex:1;font-style:normal;border-radius:6px;color:#fff;background:var(--e);text-align:center;font-size:.7rem;line-height:1.1;padding:3px 0;box-shadow:0 4px 8px -5px var(--e);transition:background .4s}
+.mm-habs i b{display:block;font-size:.55rem}
+.mm-habs i.foco-cama{animation:cmLibreM 1s ease-in-out infinite}
+@keyframes cmLibreM{50%{box-shadow:0 0 0 4px rgba(22,163,74,.35)}}
+.mm-ley{display:flex;flex-wrap:wrap;gap:4px 8px;font-size:.62rem;font-weight:700;color:var(--mut);margin:2px 0 6px}
+.mm-ley span::before{content:'';display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--e);margin-right:3px;vertical-align:-1px}
+.pulsera{display:grid;grid-template-columns:18px 46px 1fr 50px 70px 18px;align-items:center;gap:5px;border:1.5px dashed #64748b;border-radius:10px;padding:3px;background:linear-gradient(90deg,#eff6ff,#fff 35%,#fff 70%,#f5f3ff);margin:6px 0;overflow:hidden}
+.pulsera .pg{writing-mode:vertical-rl;font-size:.45rem;font-weight:900;color:#94a3b8;background:repeating-linear-gradient(45deg,#f1f5f9 0 3px,#e2e8f0 3px 6px);height:100%;display:grid;place-items:center;border-radius:5px}
+.pulsera .pq svg{width:44px;height:44px;display:block}
+.pulsera .pd b{display:block;font-size:.68rem;color:#0f172a}.pulsera .pd small{display:block;font-size:.55rem;color:#475569}.pulsera .pd em{font-style:normal;font-weight:900;color:#b91c1c;font-size:.58rem}
+.pulsera .pu{background:#2563eb;color:#fff;border-radius:6px;font-size:.52rem;font-weight:800;text-align:center;padding:4px 2px;line-height:1.3}
+.pulsera .pf small{display:block;font-size:.5rem;color:#334155}.pulsera .pf code{display:block;font-size:.48rem;color:#1e3a8a;background:#eef2ff;border-radius:3px;padding:1px 2px;margin-top:2px}
+@media (prefers-reduced-motion:reduce){.alarma,.mm-habs i.foco-cama{animation:none}}
+
+.eqm-lleg { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; margin-bottom: 10px; border-radius: 14px; border: 2px solid var(--enf); background: color-mix(in srgb, var(--enf) 10%, var(--scr2)); font-size: .76rem; }
+.eqm-lleg span { flex: 1; min-width: 160px; } .eqm-lleg .b { width: auto; margin: 0; }
+/* ===== 3.31 · Equipos del día ===== */
+.eqm-bloq { background: linear-gradient(160deg, #1e1b4b, #0f766e); color: #fff; border-radius: 16px; padding: 18px 12px 14px; text-align: center; }
+.eqm-hora { font-size: 2.6rem; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+.eqm-bloq > small { opacity: .8; font-size: .74rem; }
+.eqm-noti { display: flex; gap: 10px; text-align: left; width: 100%; margin-top: 16px; padding: 10px; border: 0; border-radius: 14px; background: rgba(255,255,255,.92); color: #111827; cursor: pointer; }
+.eqm-noti i { font-style: normal; font-size: 1.4rem; }
+.eqm-noti b { display: block; font-size: .76rem; } .eqm-noti small { display: block; font-size: .68rem; color: #475569; margin-top: 2px; }
+.eqm { display: grid; gap: 8px; }
+.eqm-hero { position: relative; overflow: hidden; color: #fff; border-radius: 14px; padding: 10px; background: linear-gradient(120deg, #7c3aed, #0d9488 55%, #db2777); background-size: 200% 200%; animation: eqmFondo 10s ease-in-out infinite; }
+@keyframes eqmFondo { 0%, 100% { background-position: 0% 40%; } 50% { background-position: 100% 60%; } }
+.eqm-hero > b { display: block; font-size: 1.05rem; margin-top: 6px; } .eqm-hero > small { font-size: .68rem; opacity: .9; }
+.eqm-top { display: flex; gap: 6px; align-items: center; font-size: .58rem; flex-wrap: wrap; }
+.eqm-vivo { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; text-transform: uppercase; background: rgba(0,0,0,.25); border-radius: 999px; padding: 2px 7px; }
+.eqm-vivo i { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: eqmPulso 1.6s infinite; }
+@keyframes eqmPulso { 70% { box-shadow: 0 0 0 7px rgba(74,222,128,0); } 0% { box-shadow: 0 0 0 0 rgba(74,222,128,.8); } }
+.eqm-ult { background: rgba(255,255,255,.16); border-radius: 999px; padding: 2px 7px; }
+.eqm-kpi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+.eqm-kpi span { background: rgba(255,255,255,.16); border-radius: 8px; padding: 4px; font-size: .56rem; display: flex; flex-direction: column; }
+.eqm-kpi b { font-size: .9rem; } .eqm-kpi .bien { background: rgba(187,247,208,.28); }
+.eqm-secs { display: grid; gap: 5px; }
+.eqm-sec { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 10px; border: 1.5px solid color-mix(in srgb, var(--c) 40%, var(--line)); background: color-mix(in srgb, var(--c) 8%, var(--scr2)); }
+.eqm-sec > i { font-style: normal; } .eqm-sec > span { flex: 1; display: flex; flex-direction: column; }
+.eqm-sec b { font-size: .74rem; } .eqm-sec small { font-size: .62rem; color: var(--mut); }
+.eqm-sec.ok { background: color-mix(in srgb, var(--c) 20%, var(--scr2)); } .eqm-sec.ok small { color: var(--c); font-weight: 800; }
+.eqm-ok { border: 0; border-radius: 999px; padding: 5px 9px; font-weight: 800; font-size: .66rem; color: #fff; background: var(--c); }
+.eqm-sala { border-radius: 12px; padding: 8px; border: 1.5px solid color-mix(in srgb, var(--n) 35%, var(--line)); background: linear-gradient(160deg, color-mix(in srgb, var(--n) 11%, var(--scr2)), var(--scr2) 60%); display: grid; gap: 4px; }
+.eqm-sh { display: flex; justify-content: space-between; align-items: center; } .eqm-sh b { font-size: .8rem; }
+.eqm-sh em { font-style: normal; font-size: .58rem; font-weight: 800; color: #fff; background: var(--n); border-radius: 999px; padding: 1px 7px; }
+.eqm-sala ul { list-style: none; margin: 0; padding: 0; font-size: .64rem; } .eqm-sala time { font-weight: 800; color: var(--n); margin-right: 5px; }
+.eqm-slot { display: flex; align-items: center; gap: 7px; width: 100%; text-align: left; padding: 4px 6px; border-radius: 9px; border: 1.5px solid color-mix(in srgb, var(--s) 28%, var(--line)); background: var(--scr); color: var(--ink); }
+.eqm-slot i { font-style: normal; width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: .6rem; font-weight: 800; color: #fff; background: var(--s); }
+.eqm-slot span { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.eqm-slot small { font-size: .52rem; color: var(--mut); text-transform: uppercase; } .eqm-slot b { font-size: .7rem; }
+.eqm-slot em { font-style: normal; color: var(--s); font-weight: 800; }
+.eqm-slot.vacio { border-style: dashed; } .eqm-slot.vacio i { background: color-mix(in srgb, var(--s) 25%, var(--scr)); }
+.eqm-lista { display: grid; gap: 3px; padding: 5px; border-radius: 10px; background: color-mix(in srgb, var(--enf) 8%, var(--scr2)); border: 1px solid var(--line); }
+.eqm-lista button { text-align: left; border: 1px solid transparent; background: var(--scr); color: var(--ink); border-radius: 8px; padding: 4px 7px; }
+.eqm-lista b { display: block; font-size: .7rem; } .eqm-lista small { font-size: .6rem; color: var(--mut); }
+@media (prefers-reduced-motion: reduce) { .eqm-hero, .eqm-vivo i { animation: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="marca"><i>✚</i><div><b>Manual interactivo</b><small>HRU · Bloque quirúrgico</small></div></div>
+    <button class="tb mapa-btn" data-t="mapa" aria-label="Ver el mapa del recorrido">☰ Mapa</button>
+    <div class="prog" aria-hidden="true"><i id="barra" style="width:0"></i></div>
+    <button class="tb" data-t="tema" aria-label="Cambiar entre claro y oscuro" title="Claro u oscuro">◐</button>
+    <button class="tb pri" data-t="volver">← <span class="largo">Volver a la app</span><span class="corto">App</span></button>
+  </header>
+  <div class="cuerpo">
+    <nav class="mapa" id="mapa" aria-label="Mapa del recorrido"></nav>
+    <div class="velo" id="velo" data-t="mapa"></div>
+    <main class="escena" id="escena"></main>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<noscript><p style="padding:20px">El manual interactivo necesita JavaScript.</p></noscript>
+<script>
+/* =====================================================================
+   MANUAL INTERACTIVO · HRU Quirófanos
+   Personas, pacientes y números son de ejemplo. No toca la base ni la app:
+   solo recuerda en este navegador en qué paso quedó (y el tema elegido).
+
+   Cómo está armado: PASOS es la lista ordenada del recorrido. Cada paso dice
+   quién actúa (q), qué pantalla se ve (ver), qué hay que tocar (t) y qué
+   cambia al tocarlo (hacer). El estado de cualquier paso se obtiene
+   «rebobinando»: se parte de cero y se aplican los `hacer` de los pasos
+   anteriores. Así se puede ir y volver por el mapa sin que nada se desarme.
+   ===================================================================== */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* Volver a la app donde se la dejó: si el manual se abrió desde la app en otra
+   pestaña, se cierra esta; si se abrió en la misma ventana, atrás; si llegó por
+   un enlace suelto, abre la app. */
+function volverApp() {
+  const planB = () => {
+    if (history.length > 1) { history.back(); return; }
+    let desde = '';
+    try { desde = new URLSearchParams(location.search).get('desde') || ''; } catch (e) {}
+    location.href = '../' + (/^#[a-z]+$/.test(desde) ? desde : '');
+  };
+  try {
+    if (window.opener && !window.opener.closed) {
+      try { window.opener.focus(); } catch (e) {}
+      window.close();
+      setTimeout(() => { if (!window.closed) planB(); }, 400);
+      return;
+    }
+  } catch (e) {}
+  planB();
+}
+
+/* ---------- el elenco ---------- */
+const R = {
+  cir:   { n: 'Dr. Martín Sosa', f: 'Cirujano · Cirugía General', c: 'var(--cir)', i: '🩺' },
+  anest: { n: 'Dra. Laura Paz', f: 'Anestesióloga', c: 'var(--anest)', i: '💤' },
+  jefa:  { n: 'Dra. Inés Bianchi', f: 'Jefa de Anestesiología', c: 'var(--jefa)', i: '👑' },
+  enf:   { n: 'Lic. Sofía Molina', f: 'Enfermería · circulante', c: 'var(--enf)', i: '🧭' },
+  inst:  { n: 'Inst. Carla Ruiz', f: 'Instrumentadora quirúrgica', c: 'var(--inst)', i: '🧰' },
+  adm:   { n: 'Admisión y Egresos', f: 'Autoriza el turno', c: 'var(--adm)', i: '🗂️' },
+  jef:   { n: 'Jefatura de Quirófanos', f: 'Valida, confirma y supervisa', c: 'var(--jef)', i: '🏥' },
+  pac:   { n: 'Ana', f: 'Paciente', c: 'var(--pac)', i: '📱' },
+  pac2:  { n: 'Rosa', f: 'Paciente · reprogramada', c: 'var(--pac)', i: '📱' },
+  jenf:  { n: 'Lic. Andrea Molina', f: 'Jefatura de Enfermería', c: 'var(--enf)', i: '🛏️' },
+  jenq:  { n: 'Lic. Pablo Ferrari', f: 'Jefe de Enfermería de Quirófano', c: 'var(--enf)', i: '💉' },
+  enfg:  { n: 'Lic. Nadia Funes', f: 'Enfermera · sin sala asignada', c: 'var(--enf)', i: '💉' },
+  jins:  { n: 'Inst. Marina López', f: 'Jefa de Instrumentación', c: 'var(--inst)', i: '🧰' },
+  tab:   { n: 'Quirófanos en vivo', f: 'Lo ven Jefatura y Admisión', c: 'var(--mal)', i: '📡' },
+};
+const av = (k) => `<span class="av" style="--k:${R[k].c}">${R[k].i}</span>`;
+const FUNCS = [
+  ['medico', '🩺', 'Médico/a cirujano/a', 'Programa y opera', 'var(--cir)'],
+  ['anestesiologia', '💤', 'Anestesiología', 'Anestesia y recuperación', 'var(--anest)'],
+  ['enfermeria', '🧭', 'Enfermería y técnicos', 'Circulante y sala', 'var(--enf)'],
+  ['instrumentacion', '🧰', 'Instrumentación', 'Cajas y recuento', 'var(--inst)'],
+];
+const FK = { cir: 'medico', anest: 'anestesiologia', jefa: 'anestesiologia', enf: 'enfermeria', inst: 'instrumentacion' };
+const nomFunc = (k) => FUNCS.find((f) => f[0] === FK[k])[2];
+const REQ = {
+  medico: ['Matrícula provincial', 'Título de especialista', 'Seguro de RC médica', 'RCP (cada 2 años)', 'Vacunas'],
+  anestesiologia: ['Matrícula provincial', 'Título de especialista', 'Seguro de RC', 'RCP (cada 2 años)', 'Vacunas'],
+  enfermeria: ['Matrícula provincial', 'Seguro de RC profesional', 'RCP (cada 2 años)', 'Vacunas'],
+};
+REQ.instrumentacion = REQ.enfermeria;
+const DATOS = {
+  cir: ['Martín Sosa', '28.456.112', 'msosa@hru.gob.ar', 'Cirugía General'],
+  anest: ['Laura Paz', '31.204.877', 'lpaz@hru.gob.ar'],
+  jefa: ['Inés Bianchi', '25.778.430', 'ibianchi@hru.gob.ar'],
+  enf: ['Sofía Molina', '35.119.062', 'smolina@hru.gob.ar'],
+  inst: ['Carla Ruiz', '33.870.215', 'cruiz@hru.gob.ar'],
+};
+const NOMBRE_ROL = { cir: 'Cirujano/a', anest: 'Anestesiólogo/a', jefa: 'Jefe/a de Anestesia', enf: 'Enfermería', inst: 'Instrumentación' };
+
+/* ---------- lo que elige el usuario (la urgencia: ¿en o fuera de horario?) ---------- */
+let ELEC = {};
+const fuera = () => ELEC.horario !== 'en';
+
+/* ---------- estado del caso, desde cero ---------- */
+function inicial() {
+  return {
+    p: { prog: false, pase: false, esc: false, adm: 'pend', jef: 'espera', llego: false, enf: false, inst: false, ent: false, rec1: false, pausa: false, ini: false, rec2: false, sal: false, recup: false, qr: false },
+    u: { carga: false, adm: false, jef: false, anest: false, eq: false, ini: false, sal: false },
+    c: { sin: false, cir: false, adm: false, jef: false, pac: false, no: false },
+    m: { pinto: false, envio: false, recibido: false, ingreso: false },
+    e: { cambio: false, inst: false, enf: false, anest: false, lleg: false, reemp: false },
+  };
+}
+
+/* ---------- piezas de pantalla ---------- */
+const campo = (l, v, full, escribe) => `<div class="campo${full ? ' full' : ''}${escribe ? ' esc' : ''}"><small>${l}</small><span>${v}</span></div>`;
+const btn = (t, txt, cls = '', k) => `<button class="b ${cls}" data-t="${t}"${k ? ` style="--k:${k}"` : ''}>${txt}</button>`;
+const info = (txt, label, cls = 'sec') => `<button class="b ${cls}" data-t="info" data-info="${esc(txt)}">${label}</button>`;
+const lvq = (items) => `<ul class="lvq">${items.map((x) => `<li><i>✓</i>${x}</li>`).join('')}</ul>`;
+const firmas = (ks) => `<div class="firmas">${ks.map((k) => `<span style="--k:${R[k].c}">${R[k].i} ${R[k].n}</span>`).join('')}</div>`;
+
+/* Un QR de mentira, siempre igual (es un dibujo: no se puede escanear). */
+function qrSVG() {
+  const n = 25; let s = 7, r = '';
+  const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280;
+  const fin = (x, y) => `<rect x="${x}" y="${y}" width="7" height="7" fill="#0f172a"/><rect x="${x + 1}" y="${y + 1}" width="5" height="5" fill="#fff"/><rect x="${x + 2}" y="${y + 2}" width="3" height="3" fill="#0f172a"/>`;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const enMarca = (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9);
+    if (!enMarca && rnd() > .52) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="#0f172a"/>`;
+  }
+  return `<svg class="qr" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="Código QR de ejemplo">${r}${fin(0, 0)}${fin(n - 7, 0)}${fin(0, n - 7)}</svg>`;
+}
+
+/* ---------- Acto 1 · el alta ---------- */
+function scrAlta(k, fase) {
+  const fk = FK[k], d = DATOS[k];
+  const funcs = FUNCS.map(([id, ic, n, sub, col]) => {
+    const on = fase > 0 && id === fk;
+    const attr = fase === 0 ? (id === fk ? 'data-t="func"' : `data-t="info" data-info="${esc(`En este ejemplo, ${R[k].n} elige «${nomFunc(k)}». Cada función tiene su propio portal.`)}"`) : '';
+    return `<button class="func${on ? ' on' : ''}${fase > 0 && !on ? ' apag' : ''}" style="--k:${col}" ${attr}><i>${ic}</i><b>${n}</b><small>${sub}</small></button>`;
+  }).join('');
+  const datos = fase === 0
+    ? `<div class="paso-n off"><span>2</span> Sus datos</div><div class="paso-n off"><span>3</span> Contraseña</div>`
+    : `<div class="s-card" style="margin-top:8px"><b style="font-size:.76rem">🛡️ Para quedar habilitado</b><div class="reqs">${REQ[fk].map((x) => `<span>${x}</span>`).join('')}</div><p>Los carga después del alta, en <b>Mi Perfil</b>.</p></div>
+      <div class="paso-n"><span>2</span> Sus datos</div>
+      <div class="campos">${campo('Nombre y apellido', d[0], false, true)}${campo('DNI', d[1], false, true)}${campo('Correo institucional', d[2], true, true)}${d[3] ? campo('Servicio (el primero es el principal)', d[3], true, true) : ''}</div>
+      <div class="paso-n"><span>3</span> Contraseña</div>
+      <div class="campos">${campo('Contraseña', '••••••••••')}${campo('Repetir', '••••••••••')}</div>
+      ${btn('crear', '➕ Crear cuenta')}
+      <p class="nota">Queda pendiente de autorización de la Jefatura de Quirófanos.</p>`;
+  return `<div class="s-h"><div><b>Acceso profesional</b><small>Cuenta nominal con correo institucional</small></div></div>
+    <div class="seg"><span>🔑 Ingresar</span><span class="on">➕ Solicitar alta</span></div>
+    <div class="paso-n"><span>1</span> ¿Cuál es su función en el bloque?</div>
+    <div class="funcs">${funcs}</div>${datos}`;
+}
+function scrAutoriza(k) {
+  const otros = [['Dr. Pablo Díaz', 'Médico · Traumatología'], ['Enf. Rocío Vera', 'Enfermería y técnicos']];
+  return `<div class="s-h"><div><b>👥 Cuentas por autorizar</b><small>Nadie entra sin el visto de la Jefatura</small></div></div>
+    <div class="s-card k" style="--k:${R[k].c}">
+      <div class="fila"><span class="av" style="--k:${R[k].c}">${FUNCS.find((f) => f[0] === FK[k])[1]}</span><div class="esp"><b>${DATOS[k][0]}</b><small>${nomFunc(k)} · ${DATOS[k][2]}</small></div><span class="tag ama">Nueva</span></div>
+      <div class="reqs">${REQ[FK[k]].map((x) => `<span>${x}</span>`).join('')}</div>
+      <p>La documentación la sube en Mi Perfil; la Jefatura ve qué falta.</p>
+      <div class="dos">${btn('autorizar', '✓ Autorizar', 'ok')}${info('Si se rechaza, la persona recibe el aviso y no puede ingresar.', '✕ Rechazar')}</div>
+    </div>
+    ${otros.map(([n, f]) => `<div class="s-card" style="opacity:.55"><div class="fila"><span class="av" style="--k:var(--tab)">👤</span><div class="esp"><b>${n}</b><small>${f}</small></div><span class="tag">En espera</span></div></div>`).join('')}`;
+}
+function scrDesigna() {
+  const lista = [['Dra. Laura Paz', 'Planta · Q2'], ['Dra. Inés Bianchi', 'Planta · Q1'], ['Dr. Tomás Arce', 'Guardia'], ['Dra. Julia Quiroga', 'Planta · Endoscopía']];
+  return `<div class="s-h"><div><b>🧭 Portales › Anestesiología</b><small>La Jefatura designa al Jefe/a de Anestesiología</small></div></div>
+    <div class="ptabs"><span>🗺️ Recorrido del día</span><span class="on">💤 Anestesiología</span><span>🧭 Enfermería</span><span>🧰 Instrumentación</span></div>
+    <div class="s-card">${lista.map(([n, f]) => `<div class="fila"><span class="av" style="--k:var(--anest)">💤</span><div class="esp"><b>${n}</b><small>${f}</small></div>${n.includes('Bianchi') ? `<button class="b chico" data-t="designar" style="--k:var(--jefa)">👑 Designar</button>` : ''}</div>`).join('')}</div>
+    <p class="nota">Hay un solo Jefe/a a la vez. Se puede cambiar cuando haga falta.</p>`;
+}
+
+/* ---------- Acto 2 · los portales ---------- */
+const PORTALES = {
+  cir: { tabs: ['Inicio', 'Programar', 'Mis cirugías', 'Estadísticas'],
+    primero: { t: 'Completar Mi Perfil', d: 'Antes de programar carga matrícula, título de especialista, seguro de RC, RCP y vacunas. Sin eso, la habilitación queda incompleta.', b: '📎 Cargar documentación', ok: 'Documentación cargada. La Jefatura la verifica y la cuenta queda habilitada para programar.' },
+    panel: [['📅', 'Mis próximas cirugías', '3', 'día, hora, sala y en qué está cada una'], ['✍️', 'Firmas que me tocan', '1', 'Pausa y Salida, con aviso'], ['➕', 'Programar cirugía', '', 'el botón grande, siempre a mano'], ['📊', 'Pulso de la semana', '9', 'sus cirugías y las del servicio'], ['🏆', 'Camino a la copa', '2.º', 'cuánto le falta para el primer puesto'], ['💬', 'Reclamos', '0', 'canal directo con la Jefatura']],
+    flujo: ['Programar la cirugía con los tres requisitos: pre-anestésico, pre-quirúrgico y consentimiento', 'Entregar al paciente el pase con QR', 'Seguir en vivo la autorización de Admisión y la validación de la Jefatura', 'El día de la cirugía: Pausa quirúrgica con anestesia y enfermería', 'Al terminar: LVQ Salida con el parte quirúrgico', 'Mirar sus estadísticas y la copa de oro de la semana'] },
+  anest: { tabs: ['Hoy', 'Mi mes', 'Indicadores'],
+    primero: { t: 'Marcar «Llegué»', d: 'Es la puerta del día: hasta marcar la llegada no puede tomar cirugías ni firmar. Queda registrada la hora.', b: '✅ Llegué', ok: 'Llegada registrada a las 07:32. Ya puede tomar las cirugías de su sala.' },
+    panel: [['📍', 'Mi puesto hoy', 'Q2', 'según la lista mensual: planta Quirófano 2'], ['🗂️', 'Cirugías de mi sala', '4', 'en orden, con el paso de cada una'], ['✍️', 'Le toca firmar', '2', 'Entrada, Pausa y Recuperación'], ['🗓️', 'Mi mes', 'G·P·F', 'guardias, planta, francos y licencias'], ['🔁', 'Cambio de sala', '', 'una persona, una sala'], ['📈', 'Indicadores', '', 'tiempos de anestesia y Aldrete']],
+    flujo: ['Marcar «Llegué» al entrar', 'Anotarse en la cirugía de su sala', 'Firmar la Entrada de la LVQ junto a enfermería', 'Confirmar la Pausa con cirujano y enfermería', 'Dar el alta de Recuperación con la escala de Aldrete', 'Si la necesitan en otra sala: «Cambio de sala»'] },
+  jefa: { tabs: ['Lista mensual', 'Cobertura', 'Presentes', 'Pedidos'],
+    primero: { t: 'Armar la lista del mes', d: 'Pinta cada día de cada anestesiólogo: Guardia, Planta, Franco o Licencia. «Sugerir cobertura» completa los huecos para que ningún quirófano quede sin anestesia.', b: '✨ Sugerir cobertura', ok: 'Cobertura sugerida: todos los días tienen Q1, Q2, Q3 y Endoscopía cubiertos.' },
+    panel: [['🗓️', 'Lista mensual', '31', 'grilla por persona y por día'], ['🛡️', 'Cobertura de hoy', '4/4', 'Q1 · Q2 · Q3 · Endoscopía y Obstetricia'], ['⚠️', 'Huecos', '0', 'días con un puesto sin cubrir'], ['🙋', 'Presentes hoy', '6', 'quién marcó «Llegué» y a qué hora'], ['🔁', 'Pedidos de cambio', '1', 'de sala o de guardia'], ['👑', 'Distintivo', '', 'designada por la Jefatura']],
+    flujo: ['Cargar la disponibilidad del mes', '«Sugerir cobertura» para llenar los huecos', 'Enviar la lista a la Jefatura de Quirófanos', 'Validada: cada anestesiólogo ve su mes', 'Seguir los presentes del día', 'Cubrir ausencias y aprobar cambios de sala'] },
+  enf: { tabs: ['Mi Sala', 'Recorrido', 'Relevo'],
+    primero: { t: 'Tomar su sala', d: 'Una persona, una sala: elige el quirófano donde trabaja hoy y queda anotada como circulante.', b: '🧭 Tomar el Quirófano 2', ok: 'Anotada como circulante del Quirófano 2.' },
+    panel: [['🛏️', 'Cirugías de mi sala', '4', 'la que sigue, arriba'], ['🧭', 'Recorrido de 7 pasos', '3/7', 'de «Equipo» a «Recuperación»'], ['✍️', 'Le toca', 'Entrada', 'con aviso cuando es su turno'], ['🧮', 'Recuento', '', 'gasas, compresas, agujas, instrumental'], ['🔄', 'Relevo', '', 'lo que deja al turno que entra'], ['🔔', 'Avisos', '2', 'si alguien la espera para firmar']],
+    flujo: ['Tomar la cirugía como circulante', 'Firmar la Entrada de la LVQ con anestesia', 'Pausa quirúrgica', 'Recuento final junto a instrumentación', 'Firmar la Salida', 'Dejar el relevo al turno siguiente'] },
+  inst: { tabs: ['Mi Sala', 'Cajas', 'Insumos'],
+    primero: { t: 'Anotarse y preparar las cajas', d: 'Se anota como instrumentadora de la cirugía y verifica las cajas de esterilización. Sin instrumentadora anotada no hay recuento inicial.', b: '🧰 Anotarme', ok: 'Anotada. Las cajas quedan verificadas para la cirugía.' },
+    panel: [['🧰', 'Cajas de esterilización', '3', 'número y control de cada caja'], ['🧮', 'Recuento inicial', '—', 'antes de empezar'], ['🧾', 'Insumos usados', '', 'lo que se gastó en la cirugía'], ['✍️', 'Le toca', 'Recuento', 'con aviso'], ['🛏️', 'Cirugías de mi sala', '4', 'en orden'], ['🔄', 'Relevo', '', 'para el turno que entra']],
+    flujo: ['Anotarse en la cirugía', 'Verificar las cajas de esterilización', 'Recuento inicial antes de empezar', 'Recuento final antes del cierre: tiene que coincidir', 'Cargar los insumos usados', 'Relevo al turno siguiente'] },
+};
+function scrPortal(k, fase) {
+  const P = PORTALES[k], col = R[k].c;
+  const tabs = `<div class="ptabs">${P.tabs.map((t, i) => `<span class="${i === 0 ? 'on' : ''}">${t}</span>`).join('')}</div>`;
+  const wid = `<div class="wid">${P.panel.map(([i, t, v, d], n) => `<div class="w" style="--k:${col}"><span class="n">${n + 1}</span><i>${i}</i>${v ? `<em>${v}</em>` : ''}<b>${t}</b><small>${d}</small></div>`).join('')}</div>`;
+  if (fase === 0) return `${tabs}<div class="primero" style="--k:${col}"><span class="tag">Lo primero</span><h4>${P.primero.t}</h4><p>${P.primero.d}</p>${btn('primero', P.primero.b)}</div><div class="borroso">${wid}</div>`;
+  if (fase === 1) return `${tabs}<div class="hecho-mini">✓ ${P.primero.t}: hecho</div><div class="s-h"><div><b>Panel central</b><small>Lo que ve apenas entra</small></div></div>${wid}${btn('flujo', 'Ver mi flujo de trabajo →', '', col)}`;
+  return `${tabs}<div class="s-h"><div><b>Mi flujo de trabajo</b><small>En este orden, todos los días</small></div></div>
+    <ol class="flujo" style="--k:${col}">${P.flujo.map((x, i) => `<li style="animation-delay:${i * 70}ms"><b>${i + 1}</b><span>${x}</span></li>`).join('')}</ol>${btn('entendido', 'Entendido ✓', '', col)}`;
+}
+
+/* ---------- Acto 3 · cirugía programada ---------- */
+const CASO = { pac: 'Ana Gómez', proc: 'Colecistectomía laparoscópica', dia: 'Jueves 22 · 08:00 h', sala: 'Quirófano 2' };
+function scrProgramar() {
+  return `<div class="ptabs"><span>Inicio</span><span class="on">Programar</span><span>Mis cirugías</span></div>
+    <div class="s-h"><div><b>➕ Programar cirugía</b><small>Datos, requisitos y equipo en una sola pantalla</small></div></div>
+    <div class="campos">${campo('Paciente', CASO.pac + ' (ejemplo)')}${campo('DNI', '40.112.358')}${campo('Procedimiento', CASO.proc, true)}${campo('Día y hora', CASO.dia)}${campo('Sala', CASO.sala)}${campo('Anestesia', 'General')}${campo('Prioridad', 'Programada')}</div>
+    <div class="paso-n"><span>3</span> Requisitos para Admisión y Egresos</div>
+    <div class="reqs"><span class="ok">✓ Pre-anestésico</span><span class="ok">✓ Pre-quirúrgico</span><span class="ok">✓ Consentimiento firmado</span></div>
+    ${btn('programar', '📅 Programar')}`;
+}
+function scrPase(conQR) {
+  if (!conQR) return `<div class="hecho-mini">✓ Turno cargado · espera a Admisión y Egresos</div>
+    <div class="s-card"><h4>${CASO.proc}</h4><p>${CASO.pac} · ${CASO.dia} · ${CASO.sala}</p><div class="reqs"><span class="ok">Requisitos ✓</span><span class="ok">Consentimiento guardado ✓</span></div></div>
+    <div class="s-card k" style="--k:var(--pac)"><h4>🎫 Pase del paciente</h4><p>Una tarjeta con un QR para que ${CASO.pac.split(' ')[0]} siga su cirugía desde el teléfono, en tiempo real.</p>${btn('pase', '🎫 Generar el pase del paciente', '', 'var(--pac)')}</div>`;
+  return `<div class="pase"><div class="pase-top"><b>Pase del paciente · HRU</b><small>${CASO.proc} · ${CASO.dia}</small></div>
+    <div class="pase-cuerpo">${qrSVG()}<strong>HRU-7K2Q</strong>Escaneá el QR con la cámara. Para entrar te pide tu DNI y un código que llega a tu correo.</div></div>
+    <div class="s-card" style="margin-top:10px"><h4>🔒 Qué viaja en el QR</h4><p>Solo una llave al azar. Nada de nombre, DNI ni diagnóstico. El código del correo vence a los 10 minutos.</p></div>`;
+}
+function scrAdmision() {
+  return `<div class="s-h"><div><b>🗂️ Por dictaminar</b><small>Turnos programados que esperan a Admisión</small></div><span class="tag" style="margin-left:auto;--k:var(--adm)">1</span></div>
+    <div class="s-card k" style="--k:var(--adm)"><h4>${CASO.proc}</h4><p>${CASO.pac} · ${CASO.dia} · ${CASO.sala}</p><p>Cirujano: ${R.cir.n} · Cobertura: obra social (ejemplo)</p>
+      <div class="reqs"><span class="ok">✓ Pre-anestésico</span><span class="ok">✓ Pre-quirúrgico</span><span class="ok">✓ Consentimiento</span></div>
+      <div class="dos">${btn('autorizar', '✓ Autorizar', 'ok')}${info('Si no autoriza, la paciente ve «No autorizada por Admisión» en su teléfono y el cirujano recibe el aviso con el motivo.', '✕ No autorizar')}</div></div>
+    <p class="nota">Sin los tres requisitos tildados, el turno ni siquiera llega a esta bandeja.</p>`;
+}
+function scrJefatura() {
+  return `<div class="s-h"><div><b>Ahora te toca</b><small>Ordenado por urgencia: lo vencido y lo que opera antes</small></div></div>
+    <div class="s-card k" style="--k:var(--jef)"><span class="tag" style="--k:var(--jef)">Lo primero</span><h4 style="margin-top:6px">${CASO.proc}</h4><p>${CASO.pac} · ${R.cir.n}</p><p>${CASO.dia} · ${CASO.sala}</p>
+      <div class="reqs"><span class="ok">Admisión: autorizado ✓</span><span>Jefatura: pendiente</span></div>
+      <div class="dos">${btn('validar', '✓ Validar y confirmar', 'ok')}${info('Si la Jefatura cancela, en el teléfono de Ana aparece «Cirugía cancelada» con el motivo, y el QR deja de abrir en el acto.', '✕ Cancelar')}</div></div>
+    <div class="kpis"><div class="kpi" style="--k:var(--jef)"><b>4</b><small>Hoy en quirófano</small></div><div class="kpi" style="--k:var(--ama)"><b>2</b><small>Esperando a otros</small></div></div>`;
+}
+function scrLlegue() {
+  return `<div class="ptabs"><span class="on">Hoy</span><span>Mi mes</span><span>Indicadores</span></div>
+    <div class="s-card k" style="--k:var(--anest)"><span class="tag" style="--k:var(--anest)">Jueves 22</span><h4 style="margin-top:6px">Mi puesto: Planta · Quirófano 2</h4><p>Según la lista mensual validada por la Jefatura.</p>${btn('llegue', '✅ Llegué', '', 'var(--anest)')}</div>
+    <div class="s-card" style="opacity:.55"><div class="fila"><span>🔒</span><div class="esp"><b>08:00 · ${CASO.proc}</b><small>Primero marque su llegada para tomar cirugías</small></div></div><div class="fila"><span>🔒</span><div class="esp"><b>10:30 · Hernioplastia inguinal</b><small>Quirófano 2</small></div></div></div>`;
+}
+function scrSala(S, quien) {
+  const slot = (rol, k, tiene, txt) => `<div class="fila">${av(k)}<div class="esp"><b>${rol}</b><small>${tiene ? R[k].n + ' ✓' : 'Vacante'}${tiene && txt ? ' · ' + txt : ''}</small></div>${!tiene && k === quien ? `<button class="b chico" data-t="tomar" style="--k:${R[k].c}">Anotarme</button>` : tiene ? '<span class="tag ok">Listo</span>' : ''}</div>`;
+  return `<div class="ptabs"><span class="on">Mi Sala</span><span>Recorrido</span><span>Relevo</span></div>
+    <div class="s-card k" style="--k:${R[quien].c}"><span class="tag" style="--k:${R[quien].c}">Quirófano 2 · 08:00</span><h4 style="margin-top:6px">${CASO.proc}</h4><p>${CASO.pac} · ${R.cir.n}</p></div>
+    <div class="s-card"><b style="font-size:.8rem">Equipo de esta cirugía</b>
+      ${slot('Anestesia', 'anest', S.p.llego, 'llegó 07:32')}${slot('Circulante', 'enf', S.p.enf)}${slot('Instrumentación', 'inst', S.p.inst)}</div>
+    <p class="nota">Una persona, una sala: quien está anotado acá no puede firmar en otra sin pedir «cambio de sala».</p>`;
+}
+function scrEntrada() {
+  return `<div class="s-h"><div><b>✅ LVQ · Entrada</b><small>Antes de la inducción · Quirófano 2</small></div></div>
+    <div class="s-card">${lvq(['Identidad del paciente confirmada', 'Sitio quirúrgico marcado', 'Consentimiento firmado', 'Alergias conocidas: ninguna', 'Vía aérea y riesgo de sangrado evaluados', 'Equipo de anestesia controlado'])}</div>
+    <div class="s-card"><b style="font-size:.78rem">Firman juntos</b>${firmas(['enf', 'anest', 'cir'])}</div>
+    ${btn('entrada', '✍️ Firmar la Entrada', '', 'var(--enf)')}`;
+}
+function scrRecuento(final) {
+  const filas = [['Gasas', 10], ['Compresas', 5], ['Agujas', 4], ['Instrumental', 38]];
+  if (!final) return `<div class="s-h"><div><b>🧮 Recuento inicial</b><small>Antes de empezar · lo hace instrumentación</small></div></div>
+    <div class="cont">${filas.map(([n, v]) => `<div><small>${n}</small><b>${v}</b></div>`).join('')}</div>
+    ${btn('rec1', '💾 Guardar recuento inicial', '', 'var(--inst)')}`;
+  return `<div class="s-h"><div><b>🧮 Recuento final</b><small>Antes del cierre · instrumentación y enfermería</small></div></div>
+    <div class="s-card"><table class="tabla"><tr><th></th><th>Inicial</th><th>Final</th><th></th></tr>${filas.map(([n, v]) => `<tr><td>${n}</td><td>${v}</td><td>${v}</td><td class="ok">✓</td></tr>`).join('')}</table></div>
+    <div class="total"><span>Todo coincide</span><span>✓</span></div>
+    <div class="dos">${btn('rec2', '✓ Confirmar recuento', '', 'var(--inst)')}${info('Si algo no coincide, la app lo marca en rojo, no deja firmar la Salida y queda registrada una incidencia para revisar.', '¿Y si no coincide?')}</div>`;
+}
+function scrPausa() {
+  return `<div class="s-h"><div><b>⏸️ Pausa quirúrgica</b><small>Antes de la incisión · todo el equipo se detiene</small></div></div>
+    <div class="s-card">${lvq(['Cada integrante dice su nombre y su función', 'Paciente, sitio y procedimiento, en voz alta', 'Antibiótico profiláctico en los últimos 60 min', 'Imágenes esenciales a la vista', 'Eventos críticos previstos, dichos por cada uno'])}</div>
+    <div class="s-card"><b style="font-size:.78rem">Confirman</b>${firmas(['cir', 'anest', 'enf'])}</div>
+    ${btn('pausa', '⏸️ Confirmar la Pausa', '', 'var(--cir)')}`;
+}
+function scrInicio() {
+  return `<div class="s-h"><div><b>Quirófano 2</b><small>Entrada ✓ · Recuento inicial ✓ · Pausa ✓</small></div></div>
+    <div class="inicio" style="--k:var(--cir)"><button data-t="inicio">▶ Iniciar<small>incisión · 08:21</small></button></div>
+    <p class="nota" style="text-align:center">Desde acá corre el tiempo quirúrgico. Quirófanos en vivo muestra la sala ocupada.</p>`;
+}
+function scrSalida() {
+  return `<div class="s-h"><div><b>🏁 LVQ · Salida y parte</b><small>Antes de dejar la sala</small></div></div>
+    <div class="s-card">${lvq(['Procedimiento realizado registrado', 'Recuento final correcto', 'Muestras rotuladas', 'Indicaciones para recuperación'])}</div>
+    <div class="s-card"><small style="color:var(--mut);font-weight:700;font-size:.68rem">PARTE QUIRÚRGICO</small><p style="color:var(--ink)">Colecistectomía laparoscópica sin complicaciones. Sangrado escaso. Pasa a recuperación.</p></div>
+    ${btn('salida', '🏁 Finalizar (LVQ Salida + parte)', '', 'var(--cir)')}`;
+}
+function scrAldrete() {
+  const A = [['Actividad', 2], ['Respiración', 2], ['Circulación', 2], ['Conciencia', 1], ['Saturación', 2]];
+  return `<div class="s-h"><div><b>🛏️ Recuperación · escala de Aldrete</b><small>El módulo se activó al cerrar la cirugía</small></div></div>
+    <div class="s-card ald" style="--k:var(--anest)">${A.map(([n, v]) => `<div class="fila"><div class="esp"><b>${n}</b></div><span>${[0, 1, 2].map((x) => `<i class="${x === v ? 'on' : ''}">${x}</i>`).join('')}</span></div>`).join('')}</div>
+    <div class="total"><span>Total 9 de 10 · apta para el alta</span><span>✓</span></div>
+    ${btn('alta', '✓ Dar el alta de recuperación', '', 'var(--anest)')}`;
+}
+function scrResumen(conBoton) {
+  const T = [['Llegada de anestesia', '07:32'], ['LVQ Entrada', '07:58'], ['Recuento inicial', '08:05'], ['Pausa quirúrgica', '08:18'], ['Incisión', '08:21'], ['Recuento final', '09:34'], ['LVQ Salida', '09:41'], ['Alta de recuperación', '10:35']];
+  return `<div class="hecho-mini">✓ Cirugía finalizada</div>
+    <div class="s-card"><h4>${CASO.proc}</h4><p>${CASO.pac} · ${CASO.sala}</p><ul class="tiempos">${T.map(([n, h]) => `<li><span>${n}</span><b>${h}</b></li>`).join('')}</ul></div>
+    ${conBoton ? btn('seguir', 'Seguir: una urgencia →') : '<p class="nota">Los tiempos van solos a las estadísticas.</p>'}`;
+}
+/* El teléfono de la paciente: lo que ve Ana en cada momento. */
+function pacHTML(S) {
+  const p = S.p;
+  if (!p.pase) return `<div class="vacio"><div>📱</div><p>El teléfono de ${CASO.pac.split(' ')[0]}.<br>Todavía no tiene el pase.</p></div>`;
+  if (!p.esc) return `<div class="camara"><span>Apuntá al QR del pase</span></div>${btn('escanear', '📷 Escanear el QR', '', 'var(--pac)')}<p class="nota" style="text-align:center">Después: DNI + código de un solo uso por correo.</p>`;
+  if (p.qr) return `<div class="candado"><div>🔒</div><b>Este pase ya no está activo</b><p>Tu cirugía terminó y el QR dejó de abrir. Así nadie más puede ver tus datos.</p><p>¡Que te recuperes pronto, Ana!</p></div>`;
+  const eq = p.llego && p.enf && p.inst;
+  const it = [
+    ['Programada', 'ok', CASO.dia],
+    ['Admisión y Egresos', p.adm === 'ok' ? 'ok' : 'act', p.adm === 'ok' ? 'Autorizada' : 'Revisando tu turno…'],
+    ['Jefatura de Quirófanos', p.jef === 'ok' ? 'ok' : p.adm === 'ok' ? 'act' : '', p.jef === 'ok' ? 'Validada y confirmada' : p.adm === 'ok' ? 'Validando…' : 'Después de Admisión'],
+    ['Tu equipo está listo', eq ? 'ok' : p.jef === 'ok' && p.llego ? 'act' : '', eq ? 'Anestesia, enfermería e instrumentación' : 'El día de la cirugía'],
+    ['En quirófano', p.ent ? 'ok' : eq ? 'act' : '', p.ent ? 'Ingresaste a la sala' : ''],
+    ['Operándote', p.sal ? 'ok' : p.ini ? 'act' : '', p.ini ? 'Empezó 08:21' : ''],
+    ['Recuperación', p.recup ? 'ok' : p.sal ? 'act' : '', p.recup ? 'Alta 10:35' : p.sal ? 'Te están cuidando' : ''],
+  ];
+  return `<div class="pac-hola"><b>Hola, Ana 👋</b><small>${CASO.proc}</small><small>${CASO.dia} · ${CASO.sala} · ${R.cir.n}</small></div>
+    ${p.recup ? `<div class="hecho-mini">✓ Tu cirugía terminó. El pase se cierra solo.</div>` : ''}
+    <ul class="tl">${it.map(([n, c, s]) => `<li class="${c}"><i>${c === 'ok' ? '✓' : c === 'act' ? '●' : ''}</i><div><b>${n}</b>${s ? `<small>${s}</small>` : ''}</div></li>`).join('')}</ul>
+    ${p.cama && !p.recup ? '<div class="s-card k" style="--k:var(--cir)"><small style="font-weight:800;color:var(--cir)">TU INTERNACIÓN</small><p style="margin:2px 0 0;color:var(--ink)"><b>🛏 Sala General de Adultos · Hab. 12 · Cama 3</b></p></div>' : ''}
+    <div class="vivo">Se actualiza solo · hace instantes</div>
+    ${p.recup ? btn('reabrir', '🔄 Volver a abrir el QR', '', 'var(--pac)') : ''}
+    <p class="nota" style="margin:8px 0 0">🔒 Sin diagnóstico ni datos de otras personas.</p>`;
+}
+
+/* ---------- Acto 4 · urgencia ---------- */
+const URG = { pac: 'Juan Pérez', proc: 'Apendicectomía', sala: 'Quirófano 3' };
+const horaU = (a, b) => (fuera() ? a : b);
+function scrElegir() {
+  return `<div class="s-h"><div><b>🚑 Llega una urgencia</b><small>¿A qué hora? Elija un caso (después puede ver el otro)</small></div></div>
+    <div class="elige">
+      <button data-t="fuera"><span>🌙</span><b>Fuera del horario laboral</b><small>Noche, fin de semana o feriado: Admisión y Jefatura no están. Su visto queda diferido.</small></button>
+      <button data-t="en"><span>☀️</span><b>En horario laboral</b><small>Día hábil: Admisión y Jefatura actúan en el momento, mientras se prepara la sala.</small></button>
+    </div>`;
+}
+function scrCargaUrg() {
+  return `<div class="s-h"><div><b>🚑 Cargar urgencia</b><small>La urgencia no espera a nadie</small></div></div>
+    <div class="campos">${campo('Paciente', URG.pac + ' (ejemplo)')}${campo('DNI', '38.004.551')}${campo('Procedimiento', URG.proc, true)}${campo('Prioridad', 'P1 · Emergencia')}${campo('Sala', URG.sala + ' (libre)')}</div>
+    <div class="s-card" style="margin-top:8px"><p>Sin pase QR: la urgencia opera sin esperar y no hay nada que seguir desde casa.</p><p>Admisión y Jefatura: ${fuera() ? '<b>diferidas</b> hasta que vuelvan.' : '<b>reciben el aviso ahora</b>.'}</p></div>
+    ${btn('urg', '🚑 Cargar la urgencia', 'mal')}`;
+}
+function scrAlertaUrg(k) {
+  const adm = k === 'adm';
+  return `<div class="alerta"><span class="tag mal">Urgencia en curso</span><h4 style="margin:6px 0 2px">${URG.proc} · ${URG.sala}</h4><p style="font-size:.78rem;margin:0">${URG.pac} · P1 · ${R.cir.n}</p></div>
+    <div class="s-card" style="margin-top:10px"><p>${adm ? 'Admisión acepta el ingreso en tiempo real, mientras se prepara la sala.' : 'La Jefatura la ve en Quirófanos en vivo, en rojo, y la valida en el momento.'}</p>
+    ${adm ? btn('aceptar', '✓ Aceptar el ingreso', 'ok') : btn('validar', '✓ Validar la urgencia', 'ok')}</div>`;
+}
+function scrGuardia(S, quien) {
+  if (quien === 'anest') return `<div class="s-card k" style="--k:var(--anest)"><span class="tag" style="--k:var(--anest)">De guardia · 24 h</span><h4 style="margin-top:6px">${URG.proc} · ${URG.sala}</h4><p>La app avisa a quien está de guardia según la lista mensual de Anestesiología.</p>${btn('tomar', '✅ Llegué y tomo la urgencia', '', 'var(--anest)')}</div>`;
+  return `<div class="s-card k" style="--k:var(--enf)"><span class="tag" style="--k:var(--enf)">${URG.sala} · urgencia</span><h4 style="margin-top:6px">${URG.proc}</h4>
+    <div class="fila">${av('anest')}<div class="esp"><b>Anestesia</b><small>${R.anest.n} ✓</small></div><span class="tag ok">Listo</span></div>
+    <div class="fila">${av('enf')}<div class="esp"><b>Circulante</b><small>Vacante</small></div><button class="b chico" data-t="tomar" style="--k:var(--enf)">Anotarme</button></div>
+    <div class="fila">${av('inst')}<div class="esp"><b>Instrumentación</b><small>${R.inst.n} se anota al mismo tiempo</small></div></div></div>`;
+}
+function scrUrgLVQ(fin) {
+  if (!fin) return `<div class="s-h"><div><b>${URG.sala} · urgencia</b><small>Equipo completo</small></div></div>
+    <div class="s-card">${lvq(['Identidad y sitio confirmados', 'Recuento inicial de gasas e instrumental', 'Pausa: equipo, procedimiento, antibiótico'])}</div>
+    ${btn('iniciar', '▶ Iniciar LVQ', '', 'var(--mal)')}`;
+  return `<div class="s-h"><div><b>${URG.sala} · en curso</b><small>Empezó a las ${horaU('02:58', '11:33')}</small></div></div>
+    <div class="s-card">${lvq(['Recuento final: coincide', 'Procedimiento registrado', 'Parte quirúrgico escrito'])}</div>
+    ${btn('finalizar', '🏁 Finalizar (LVQ Salida + parte)', '', 'var(--cir)')}`;
+}
+function scrRegulariza(k) {
+  const adm = k === 'adm';
+  return `<div class="s-h"><div><b>${adm ? '🗂️ Urgencias para regularizar' : '🏥 Validaciones diferidas'}</b><small>Entraron fuera de horario</small></div></div>
+    <div class="s-card k" style="--k:${R[k].c}"><span class="tag ama">Diferida</span><h4 style="margin-top:6px">${URG.proc} · ${URG.sala}</h4><p>${URG.pac} · operada el sábado a las 02:58 · ${R.cir.n}</p>
+    <p>${adm ? 'Admisión acepta el ingreso con los datos de la cobertura.' : 'Con Admisión al día, la Jefatura valida y la cirugía queda finalizada.'}</p>
+    ${adm ? btn('aceptar', '✓ Aceptar (regularizar)', 'ok') : btn('validar', '✓ Validar y finalizar', 'ok')}</div>`;
+}
+function scrCompara() {
+  const f = fuera();
+  return `<div class="s-h"><div><b>Los dos casos, lado a lado</b><small>La cirugía es igual; cambia cuándo validan</small></div></div>
+    <div class="compara"><div class="${f ? 'on' : ''}"><b>🌙 Fuera de horario</b><ol><li>Se carga y se opera</li><li>Admisión y Jefatura: diferidas</li><li>Al día hábil regularizan</li><li>Recién ahí: finalizada</li></ol></div>
+    <div class="${f ? '' : 'on'}"><b>☀️ En horario</b><ol><li>Se carga</li><li>Admisión y Jefatura validan en el momento</li><li>Se opera</li><li>Finalizada al salir</li></ol></div></div>
+    <div class="dos" style="margin-top:8px">${btn('otro', f ? '☀️ Ver en horario' : '🌙 Ver fuera de horario', 'sec')}${btn('seguir', 'Seguir →')}</div>`;
+}
+function tabHTML(S) {
+  const u = S.u, f = fuera();
+  const row = (n, est, txt) => `<div class="fila"><div class="esp"><b>${n}</b><small>${txt}</small></div><span class="tag ${est}">${est === 'ok' ? 'Listo' : est === 'ama' ? 'Diferida' : est === 'mal' ? 'Ahora' : '—'}</span></div>`;
+  if (!u.carga) return `<div class="vacio"><div>📡</div><p>Quirófanos en vivo.<br>Todavía no hay urgencias.</p></div>`;
+  const fin = u.jef && u.adm && u.sal;
+  return `<div class="alerta" style="animation:none"><b style="font-size:.84rem">🚑 ${URG.sala} · ${URG.proc}</b><small style="display:block;font-size:.7rem;color:var(--mut)">P1 · ${fin ? 'finalizada' : u.sal ? 'operada' : u.ini ? 'en curso' : 'preparando'}</small></div>
+    <div class="s-card" style="margin-top:10px">
+      ${row('Admisión', u.adm ? 'ok' : f ? 'ama' : 'mal', u.adm ? 'Aceptó el ingreso' : f ? 'La regulariza al volver' : 'Aviso en tiempo real')}
+      ${row('Jefatura', u.jef ? 'ok' : f ? 'ama' : 'mal', u.jef ? 'Validó' : f ? 'Validación diferida' : 'Aviso en tiempo real')}
+      ${row('Equipo', u.eq ? 'ok' : '', u.eq ? 'Anestesia, circulante e instrumentadora' : u.anest ? 'Llegó anestesia' : 'Llamando a la guardia')}
+      ${row('Estado', fin ? 'ok' : '', fin ? 'Finalizada' : u.sal ? 'Operada · falta regularizar' : u.ini ? 'Operando' : 'En preparación')}
+    </div>`;
+}
+
+/* ---------- Acto 5 · estadísticas y cierre ---------- */
+/* 3.48 · Mi actividad: lo que hizo cada profesional, de un vistazo (datos inventados). */
+function scrMiAct() {
+  const T = [['✅', 30, 'Cerrados', '#16a34a'], ['⏳', 6, 'Falta cerrar', '#d97706'], ['🩺', 28, 'A cargo', '#2563eb'], ['🤝', 8, 'Ayudante', '#7c3aed']];
+  const M = [['A', 4, '#8b5cf6'], ['B', 15, '#2980d9'], ['C', 8, '#1fa971']];
+  const mes = [4, 4, 0, 3, 4, 3, 3, 8, 3, 4, 1];
+  return `<div class="ptabs"><span class="on">👤 Mi actividad</span><span>Por servicio</span><span>Por tipo</span></div>
+    <div class="s-card" style="background:linear-gradient(120deg,#1e3a8a,#0f766e,#7c3aed);color:#fff;border:0">
+      <b style="font-size:.95rem">${R.cir.n}</b><small style="display:block;opacity:.85">Cirugía General · Endoscopía Digestiva</small>
+      <p style="margin:6px 0 0;font-size:.85rem">Este año hiciste <b style="font-size:1.2em">36</b> procedimientos, <b>67,7</b> horas de sala, <b>7</b> de urgencia.</p>
+      <small style="opacity:.9">🔪 Quirófanos 27 · 🔭 Endoscopía 9</small></div>
+    <div class="kpis">${T.map(([i, n, l, c]) => `<div class="kpi" style="--k:${c}"><b>${i} ${n}</b><small>${l}</small></div>`).join('')}</div>
+    <div class="s-card"><b style="font-size:.78rem">🧩 Mis módulos</b><div style="display:flex;gap:8px;margin-top:6px">${M.map(([l, n, c]) => `<span style="flex:1;display:flex;align-items:center;gap:6px;padding:6px;border-radius:10px;background:color-mix(in srgb,${c} 12%,#fff)"><i style="font-style:normal;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#fff;font-weight:800;background:${c}">${l}</i><b>${n}</b></span>`).join('')}</div></div>
+    <div class="s-card"><b style="font-size:.78rem">📈 Mes a mes</b><div style="display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:6px">${mes.map((v, i) => `<i style="flex:1;height:${v / 8 * 100}%;min-height:3px;border-radius:4px 4px 1px 1px;background:linear-gradient(#0d9488,#2563eb);animation-delay:${i * 50}ms"></i>`).join('')}</div></div>
+    <div class="s-card"><b style="font-size:.78rem">🏥 Mis servicios</b><p class="nota" style="margin:4px 0 0">Cirugía General: 26 hechos · mi parte 81 % &nbsp;|&nbsp; Endoscopía Digestiva: 9 hechos · mi parte 67 %</p></div>
+    ${btn('estad', '📊 Ver las estadísticas del bloque', '', 'var(--cir)')}`;
+}
+function scrEstad() {
+  const B = [['Cirugía General', 42], ['Traumatología', 31], ['Ginecología y Obst.', 24], ['Urología', 14], ['Otorrino', 9], ['Oftalmología', 8]];
+  const sem = [[5, 1], [7, 0], [6, 2], [8, 1], [6, 0], [2, 1], [1, 2]];
+  return `<div class="ptabs"><span>Pulso de la semana</span><span class="on">Estadísticas</span><span>Excel</span></div>
+    <div class="kpis"><div class="kpi" style="--k:var(--cir)"><b>128</b><small>Cirugías del mes</small></div><div class="kpi" style="--k:var(--ok)"><b>87%</b><small>Empezaron a horario</small></div><div class="kpi" style="--k:var(--ama)"><b>3,9%</b><small>Suspendidas</small></div><div class="kpi" style="--k:var(--enf)"><b>100%</b><small>LVQ completas</small></div></div>
+    <div class="s-card"><b style="font-size:.78rem">Por especialidad</b><div class="barras" style="margin-top:6px">${B.map(([n, v], i) => `<div><span>${n}</span><i style="width:${v / 42 * 100}%;animation-delay:${i * 80}ms"></i><b>${v}</b></div>`).join('')}</div></div>
+    <div class="s-card"><b style="font-size:.78rem">Esta semana · programadas y <span style="color:var(--mal)">urgencias</span></b><div class="semana" style="margin-top:6px">${sem.map(([a, b], i) => `<div><span>${'LMMJVSD'[i]}</span>${'<i></i>'.repeat(a)}${'<i class="u"></i>'.repeat(b)}</div>`).join('')}</div></div>
+    ${btn('copa', '🏆 Ver la copa de oro de la semana', '', 'var(--ama)')}`;
+}
+function scrCopa() {
+  return `<div class="copa" aria-hidden="true">🏆</div>
+    <div style="text-align:center"><b>Copa de oro de la semana</b><p class="nota" style="margin:2px 0 0">Para el cirujano con más cirugías realizadas</p></div>
+    <div class="podio"><div><em>🥈</em><b>Dra. Paula Díaz</b>7</div><div class="p1"><em>🥇 9</em><b>Dr. Martín Sosa</b>Cirugía General</div><div><em>🥉</em><b>Dr. Hugo Ferreyra</b>6</div></div>
+    ${btn('festejar', '🎉 Entregar la copa', '', '#d97706')}
+    <p class="nota" style="text-align:center">La app la entrega sola el domingo a la noche y la suma a «Mis copas de oro».</p>`;
+}
+function scrIncidencia() {
+  return `<div class="s-h"><div><b>⚠️ Incidencias</b><small>Lo que salió de lo previsto, con su seguimiento</small></div></div>
+    <div class="s-card k" style="--k:var(--ama)"><span class="tag ama">INC-0142 · Quirófano 2</span><h4 style="margin-top:6px">Recuento final: faltaba 1 gasa</h4>
+    <div class="stepper"><span class="ok">Pendiente</span><span class="act">En Revisión</span><span>Resuelta</span></div>
+    <ul class="hist"><li><b>09:30</b> · Recuento final con 9 de 10 gasas: la app frenó la Salida</li><li><b>09:32</b> · Se buscó en el campo y apareció. Recuento 10 de 10</li><li><b>09:40</b> · Enfermería lo deja asentado</li></ul>
+    ${btn('resolver', '✓ Marcar como Resuelta', '', 'var(--enf)')}</div>`;
+}
+function scrReclamo() {
+  return `<div class="s-h"><div><b>💬 Reclamos</b><small>Canal directo con la Jefatura</small></div><span class="tag ama" style="margin-left:auto">Abierto</span></div>
+    <div class="chat"><div class="msg"><small>${R.cir.n} · 08:47</small>El Quirófano 2 empezó 40 minutos tarde: no había camillero para traer al paciente.</div>
+    <div class="msg yo"><small>Jefatura · borrador</small>Gracias por avisar. Desde mañana hay un camillero fijo de 7 a 9 h para el primer turno de cada sala.</div></div>
+    <div class="stepper"><span class="act">Abierto</span><span>Respondido</span><span>Cerrado</span></div>
+    ${btn('responder', '📨 Responder y cerrar', '', 'var(--jef)')}`;
+}
+
+
+/* ---------- 3.25 · Cama de internación y reprogramación por falta de cama ---------- */
+const SECT = [
+  ['Sala General de Adultos', '1035', '#2563eb', '🧑'],
+  ['Internación General Pediátrica', '1012', '#7c3aed', '🧒'],
+  ['Maternidad (Gineco y Obstetricia)', '1608', '#db2777', '🤰'],
+  ['UCI', '1034', '#dc2626', '❤️‍🩹'],
+];
+const sectoresHTML = (sel) => `<div class="sects">${SECT.map(([n, int, c, i], k) => `<div class="sect${k === sel ? ' on' : ''}" style="--c:${c}"><em>${i}</em><b>${n}</b><small>Interno <span>${int}</span></small></div>`).join('')}</div>`;
+const SELLO = '<span class="sello">🛏✕ SIN CAMA ×1</span>';
+const REP = { pac: 'Rosa Maidana', proc: 'Hernioplastia inguinal', dia: 'Martes 20 · 10:00 h', nuevo: 'Lunes 26 · 08:00 h', sala: 'Quirófano 3' };
+function scrCama() {
+  return `<div class="s-h"><div><b>🛏️ Paso 4 · Cama de internación</b><small>El día de la cirugía, cuando la paciente ingresa</small></div></div>
+    <div class="s-card k" style="--k:var(--adm)"><h4>${CASO.pac} · ${CASO.proc}</h4><p>${CASO.dia} · ${CASO.sala}</p></div>
+    <div class="paso-n"><span>1</span> Sector donde queda internada</div>
+    ${sectoresHTML(0)}
+    <div class="campos">${campo('Habitación', '12', false, true)}${campo('Cama', '3', false, true)}</div>
+    ${btn('cama', '🛏️ Guardar cama', '', 'var(--adm)')}
+    ${info('Así el equipo la ubica al instante para llamarla a quirófano: la cama y el interno del sector aparecen en la ficha, en el resumen del Panel, en el parte impreso y en el teléfono de la paciente.', '¿Para qué sirve?')}`;
+}
+function scrSinCama() {
+  return `<div class="s-h"><div><b>🛏️ Paso 4 · Cama de internación</b><small>Martes 20 · 07:05 h · ingresa ${REP.pac}</small></div></div>
+    <div class="s-card k" style="--k:var(--adm)"><h4>${REP.proc}</h4><p>${REP.dia} · ${REP.sala}</p></div>
+    ${sectoresHTML(0)}
+    <div class="alerta"><span class="tag mal">Sin camas libres</span><p style="font-size:.8rem;margin:6px 0 0">Las cuatro salas están completas. Sin cama no se opera.</p></div>
+    ${btn('sincama', '🛏✕ No hay cama: suspender y reprogramar', 'mal')}`;
+}
+function scrBusca() {
+  const dias = [['Mié 21', 'antes de 48 h'], ['Jue 22', 'lleno'], ['Vie 23', 'lleno'], ['Lun 26', 'libre · 08:00']];
+  return `<div class="s-h"><div><b>🤖 La app busca sola</b><small>Primer turno libre, a 48 h hábiles como mínimo, en una sala del mismo tipo</small></div></div>
+    <div class="busca">${dias.map(([d, e], i) => `<div class="${/^libre/.test(e) ? 'si' : 'no'}" style="--i:${i}"><b>${d}</b><small>${e}</small></div>`).join('')}</div>
+    <div class="s-card k prio" style="--k:var(--mal)">${SELLO}<h4 style="margin-top:6px">Nueva fecha propuesta</h4><p><b>${REP.nuevo}</b> · ${REP.sala}</p>
+      <p class="nota">Va <b>primera</b> en la lista del día, por encima de todo lo programado.</p></div>
+    ${btn('visto', 'Ver quién tiene que dar el OK →', '', 'var(--jef)')}`;
+}
+function oksHTML(S) {
+  const o = S.c;
+  const fila = (k, ok, quien) => `<div class="fila">${av(k)}<div class="esp"><b>${quien}</b><small>${ok ? 'OK ✓' : 'pendiente'}</small></div>${ok ? '<span class="tag ok">✓</span>' : ''}</div>`;
+  const pac = `<div class="fila">${av('pac2')}<div class="esp"><b>Paciente</b><small>${o.cir && o.adm && o.jef ? 'se le pregunta ahora' : 'va última: se habilita con los tres OK'}</small></div></div>`;
+  return `<div class="oks3">${fila('cir', o.cir, 'Cirujano/a')}${fila('adm', o.adm, 'Admisión y Egresos')}${fila('jef', o.jef, 'Jefatura de Quirófanos')}${pac}</div>`;
+}
+function scrOk(S, k) {
+  const t = { cir: 'okcir', adm: 'okadm', jef: 'okjef' }[k];
+  return `<div class="s-h"><div><b>✅ Los tres OK</b><small>Cada uno desde su sesión · cualquiera puede pedir otra fecha</small></div></div>
+    <div class="s-card k prio" style="--k:var(--mal)">${SELLO}<h4 style="margin-top:6px">${REP.pac} · ${REP.proc}</h4><p>Propuesta: <b>${REP.nuevo}</b> · ${REP.sala}</p></div>
+    ${oksHTML(S)}
+    <div class="dos">${btn(t, '✓ Dar el OK', 'ok')}${info('La app pasa a la franja libre siguiente y los tres OK vuelven a cero. Si la paciente no puede ese día, se saltea el día entero.', '↻ Pedir otra fecha')}</div>`;
+}
+function scrAvisoPrio() {
+  return `<div class="campana">🔔</div>
+    <div class="s-card k prio" style="--k:var(--mal)"><span class="tag mal">PRIORIDAD · con sonido</span><h4 style="margin-top:6px">Reprogramación confirmada ${SELLO}</h4>
+      <p>${REP.pac} confirmó: <b>${REP.nuevo}</b> · ${REP.sala}. Quedó en el parte con prioridad.</p>
+      <p class="nota">Les llega a la Jefatura y al cirujano como aviso crítico (suena y salta en el teléfono) y por correo a Admisión.</p></div>
+    <ul class="hist"><li><b>07:05</b> · Suspendida por falta de cama (1.ª vez)</li><li><b>07:06</b> · La app propuso el lunes 26 · 08:00</li><li><b>09:40</b> · OK del cirujano, Admisión y Jefatura</li><li><b>10:12</b> · La paciente confirmó desde su pase</li></ul>
+    ${btn('parte', '🖨 Ver el parte del día →', '', 'var(--jef)')}`;
+}
+function scrPartes() {
+  return `<div class="s-h"><div><b>🖨 El parte del día, por área</b><small>Un PDF para cada una, mismo diseño</small></div></div>
+    <div class="partes"><button data-t="imprimir" style="--c:#1e40af">🏥<b>Quirófanos centrales</b></button><span style="--c:#0e7490">🔬<b>Endoscopía</b></span><span style="--c:#db2777">🤰<b>Obstetricia y cesáreas</b></span></div>
+    <div class="s-card mini-parte"><div class="mp-h">Parte Quirúrgico · Lun 26</div>
+      <div class="mp-f"><b>08:00</b><div><b>${REP.pac}</b> <i>OSEF</i><small>☎ 2901-400111 · 🛏 Adultos · Hab. 12 · Cama 3 · Int. 1035</small></div><span class="sello chico">SIN CAMA ×1</span></div>
+      <div class="mp-ints">☎ Adultos 1035 · Pediatría 1012 · Maternidad 1608 · UCI 1034</div></div>`;
+}
+function scrNoPuede(S) {
+  const dias = [['Lun 26', 'Rosa no puede'], ['Mar 27', 'lleno'], ['Mié 28', 'libre · 08:00']];
+  return `<div class="s-h"><div><b>↻ Otra fecha</b><small>Se saltea el día entero · 48 h hábiles como mínimo</small></div></div>
+    <div class="busca">${dias.map(([d, e], i) => `<div class="${/^libre/.test(e) ? 'si' : 'no'}" style="--i:${i}"><b>${d}</b><small>${e}</small></div>`).join('')}</div>
+    <div class="s-card k prio" style="--k:var(--mal)">${SELLO}<h4 style="margin-top:6px">Propuesta n.º 2 · <b>Miércoles 28 · 08:00 h</b></h4><p>${REP.sala} · vuelve a <b>Pendiente</b></p></div>
+    <div class="oks3">${['cir', 'adm', 'jef'].map((k) => `<div class="fila">${av(k)}<div class="esp"><b>${{ cir: 'Cirujano/a', adm: 'Admisión y Egresos', jef: 'Jefatura de Quirófanos' }[k]}</b><small>pendiente otra vez</small></div></div>`).join('')}</div>
+    ${btn('entendido', 'Entendido: se repiten los OK', '', 'var(--cir)')}`;
+}
+function scrCaduca() {
+  return `<div class="s-h"><div><b>⏰ 13:00 h del día hábil anterior</b><small>Sale el parte: lo que no está completo caduca</small></div></div>
+    <div class="s-card k" style="--k:#78716c"><span class="tag">Caducada</span> ${SELLO}<h4 style="margin-top:6px">${REP.pac} · ${REP.proc}</h4>
+      <p>Faltaba el OK de: <b>Jefatura de Quirófanos, la paciente</b></p><p class="nota">Sin botones de OK. El pase de la paciente se cerró.</p></div>
+    <div class="alerta"><span class="tag mal">Aviso crítico · Dr. Sosa</span><p style="font-size:.8rem;margin:6px 0 0"><b>Debe reprogramarla</b> — quedó Caducada en Mis Solicitudes.</p></div>
+    ${btn('reprog', '↻ Reprogramar', '', 'var(--cir)')}`;
+}
+function scrReprog() {
+  return `<div class="s-h"><div><b>📅 Nueva solicitud · Quirófano 3 · 08:00</b><small>Reprogramación de ${REP.pac}</small></div></div>
+    <div class="s-card k" style="--k:var(--cir)"><p class="nota" style="margin:0">Los datos vienen de la cirugía caducada. Revíselos y vuelva a tildar los requisitos para Admisión y Egresos.</p></div>
+    <div class="campos">${campo('Paciente', REP.pac, false, true)}${campo('Cirugía', REP.proc, false, true)}${campo('Cirujano', 'Dr. Sosa', false, true)}${campo('Duración', '90 min', false, true)}</div>
+    <div class="oks3"><div class="fila"><div class="esp"><b>☐ Prequirúrgico · ☐ Apto anestésico · ☐ Consentimiento</b><small>se vuelven a tildar para la fecha nueva</small></div></div></div>
+    ${btn('programar', '✓ Programar turno', 'ok')}`;
+}
+function scrRecorrido() {
+  return `<div class="s-h"><div><b>🗺 Recorrido completo · sin cama</b><small>7 pasos y todas las ramas</small></div></div>
+    <ul class="hist"><li><b>1</b> · Admisión: «No hay cama»</li><li><b>2</b> · La app busca fecha (48 h hábiles) · o «sin lugar»</li><li><b>3</b> · Tres OK en cualquier orden · o «Pedir otra fecha»</li><li><b>4</b> · Recién ahí se le pregunta a la paciente</li><li><b>5</b> · Sí → confirmada sola · No → otra fecha</li><li><b>6</b> · 13 h: lo incompleto caduca → Reprogramar</li><li><b>7</b> · El día de la cirugía · sin cama otra vez → ×2</li></ul>
+    <a class="b" href="recorrido-sin-cama.html" target="_blank" rel="noopener" style="--k:var(--adm);text-decoration:none;display:block;text-align:center;margin-bottom:8px">📄 Abrir el recorrido completo</a>
+    ${btn('seguir', 'Seguir: una urgencia →', 'sec')}`;
+}
+/* El teléfono de la paciente de esta historia. */
+function pac2HTML(S) {
+  const c = S.c;
+  if (c.pac) return `<div class="pac-hola"><b>Hola, Rosa 👋</b><small>${REP.proc}</small></div>
+    <div class="hecho-mini">✓ ¡Confirmada! ${REP.nuevo} · ${REP.sala}</div>
+    <p class="nota">Tu cirugía tiene prioridad: se suspendió 1 vez por falta de cama.</p>`;
+  if (c.no) return `<div class="pac-hola"><b>Hola, Rosa 👋</b><small>${REP.proc}</small></div>
+    <div class="s-card k" style="--k:var(--cir)"><h4>Te vamos a proponer otra fecha</h4><p>Nos dijiste que no podés el ${REP.nuevo}. El equipo está confirmando el día siguiente libre: te avisamos por correo.</p></div>
+    <div class="vivo">Se actualiza solo · hace instantes</div>`;
+  if (c.jef) return `<div class="pac-hola"><b>Hola, Rosa 👋</b><small>Te llegó un correo: «Tenés una nueva fecha para confirmar»</small></div>
+    <div class="s-card k prio" style="--k:var(--ama);text-align:center"><small style="font-weight:800;color:var(--ama)">NUEVA FECHA PROPUESTA</small><h4>${REP.nuevo}</h4><p>${REP.sala}</p>
+    ${btn('si', '✓ Sí, puedo venir', 'ok')}${btn('no', 'No puedo ese día', 'sec')}</div>`;
+  if (c.sin) return `<div class="pac-hola"><b>Hola, Rosa 👋</b><small>${REP.proc}</small></div>
+    <div class="s-card k" style="--k:var(--cir)"><h4>Tu cirugía se reprograma con prioridad</h4><p>No hubo cama de internación el día previsto. Vas primera en la lista: el equipo está confirmando la nueva fecha.</p></div>
+    <div class="vivo">Se actualiza solo · hace instantes</div>`;
+  return `<div class="pac-hola"><b>Hola, Rosa 👋</b><small>${REP.proc} · ${REP.dia}</small></div><div class="hecho-mini">✓ Confirmada · hoy ingresás</div>`;
+}
+
+
+/* ---------- 3.26 · Mapa de camas en vivo y pulsera ---------- */
+const MC = { e: { l: '#16a34a', o: '#dc2626', d: '#ea580c', r: '#eab308', f: '#111827' } };
+function mapaMini(S, sector, ocupar) {
+  // Un esquema chico de Adultos (5 habitaciones × 2 camas) que cambia con el estado.
+  const base = [['o', 'o'], ['o', 'd'], ['f', 'l'], ['l', 'l'], ['l', 'l']];
+  if (S.m.pinto) base[3][1] = 'r';
+  if (S.m.ingreso) base[3][0] = 'o';
+  return `<div class="mm"><div class="mm-h" style="--c:#2563eb"><b>Sala General de Adultos</b><span>☎ 1035</span><em>${base.flat().filter((x) => x === 'l').length} libres</em></div>
+    <div class="mm-habs">${base.map((h, i) => `<div><small>Hab. ${i + 1}</small><span>${h.map((e, k) => `<i class="${ocupar && i === 3 && k === 0 && !S.m.ingreso ? 'foco-cama' : ''}" style="--e:${MC.e[e]}" ${ocupar && i === 3 && k === 0 && !S.m.ingreso ? 'data-t="tocar"' : ''}>🛏<b>${k + 1}</b></i>`).join('')}</span></div>`).join('')}</div></div>`;
+}
+const leyMini = `<div class="mm-ley"><span style="--e:#16a34a">Libre</span><span style="--e:#dc2626">Ocupada</span><span style="--e:#ea580c">A desocupar</span><span style="--e:#eab308">Reservada</span><span style="--e:#111827">Fuera de servicio</span></div>`;
+function scrAlarma() {
+  return `<div class="alarma"><div class="campana">⏰</div><b>06:30 · Enviá el mapa de camas a Admisión</b><small>Suena fuerte aunque la app y el teléfono estén cerrados</small></div>
+    ${btn('abrir', '🛏 Abrir el mapa de camas', '', 'var(--enf)')}`;
+}
+function scrPintar(S) {
+  return `<div class="s-h"><div><b>🛏 Mapa de camas</b><small>Solo esta sección · Jefatura de Enfermería</small></div></div>
+    ${mapaMini(S, 'adultos')}${leyMini}
+    <p class="nota">Toque una cama para cambiarla. «Editar salas» agrega o saca habitaciones y camas. Son 4 esquemas: Adultos, Pediatría, Maternidad y UCI.</p>
+    ${btn('pintar', '🟨 Reservar la Hab. 4 · Cama 2 para la cirugía de las 10:00', '', '#ca8a04')}`;
+}
+function scrEnviarMapa(S) {
+  return `<div class="s-h"><div><b>🛏 Mapa de camas</b><small>06:52 · todo revisado</small></div></div>
+    ${mapaMini(S)}
+    ${btn('enviar', '📤 Enviar a Admisión', 'ok')}`;
+}
+function scrRecibido(S) {
+  return `<div class="s-h"><div><b>📧 Llegó el mapa de camas</b><small>Admisión y Egresos · 07:03</small></div></div>
+    <div class="s-card k" style="--k:var(--enf)"><p style="margin:0">Enviado por <b>Lic. Andrea Molina</b> (Jefatura de Enfermería) a las 06:52.</p><p class="nota" style="margin:4px 0 0">Adultos: 4 libres · Pediatría: 20 · Maternidad: 18 · UCI: 2</p></div>
+    ${btn('recibido', '✓ Recibido — ver las camas', 'ok')}`;
+}
+function scrIngresosAdm() {
+  const f = (h, n, dx, cama, c) => `<div class="s-card" style="padding:7px 9px;margin:0 0 5px;display:grid;grid-template-columns:40px 1fr auto;gap:6px;align-items:center"><b style="font-size:.85rem">${h}</b><div><b style="font-size:.76rem">${n}</b><small style="display:block;font-size:.62rem;color:var(--mut)">${dx}</small></div><span style="font-size:.6rem;font-weight:800;border-radius:8px;padding:3px 7px;color:${cama ? '#fff' : '#b91c1c'};background:${cama ? c : '#fee2e2'}">${cama || 'Sin cama'}</span></div>`;
+  return `<div class="ptabs"><span class="on">🗂️ Ingresos del día</span><span>🛏 Camas</span><span>🔔 Avisos</span></div>
+    <div class="alerta" style="background:linear-gradient(120deg,#1d4ed8,#0891b2);color:#fff;border:0"><b style="font-size:.8rem">📥 Enfermería envió el mapa a las 06:52</b><p style="font-size:.66rem;margin:2px 0 0;color:#e0f2fe">Ahora en vivo: Adultos 9 · Pediatría 20 · Maternidad 18 · UCI 2</p></div>
+    <div class="paso-n" style="margin-top:8px"><span>Q</span> Quirófanos centrales · 2 sin cama</div>
+    ${f('08:00', 'Pérez, Juan Carlos', 'Hernia inguinal derecha · OSEF', '', '')}${f('10:00', 'Fernández, Rosa', 'Colelitiasis · PAMI', '', '')}
+    <div class="paso-n"><span>O</span> Obstetricia y cesáreas</div>${f('08:00', 'Gómez, Ana Belén', 'Cesárea segmentaria · OSEF', 'Maternidad 2·3', '#db2777')}
+    ${btn('anotar', '🛏 Anotar cama de Pérez, Juan Carlos', 'ok')}`;
+}
+function scrIngresoMapa(S) {
+  return `<div class="s-h"><div><b>🛏 Paso 4 · Cama de internación</b><small>Pérez, Juan Carlos · Hernioplastia · 08:00 · Q2</small></div></div>
+    <p class="nota" style="margin:0 0 6px">El mapa en vivo del sector, dentro de la misma ventana: toque una cama <b style="color:#16a34a">verde</b>.</p>
+    ${mapaMini(S, 'adultos', true)}
+    ${info('Al guardar, la cama pasa a rojo en el mapa de Enfermería (con las iniciales del paciente) y la app imprime la pulsera.', '¿Y después?')}`;
+}
+function scrPulsera() {
+  return `<div class="s-h"><div><b>🏷️ Pulsera del paciente</b><small>Se imprime sola al guardar la cama</small></div></div>
+    <div class="pulsera"><span class="pg">PEGAR</span><span class="pq">${qrSVG()}</span><span class="pd"><b>PÉREZ, JUAN CARLOS</b><small>DNI 20.868.112 · 52 años</small><em>⚕ Hernia inguinal derecha</em></span>
+      <span class="pu">Adultos<br>Hab. 4 · C1</span><span class="pf"><small>Admisión: Ruiz, Marta</small><code>SHA-256 D49F A6F5…</code></span><span class="pg">PEGAR</span></div>
+    <p class="nota">✂ Se corta con tijera y se pega en la muñeca. El QR no lleva datos: solo abre la ficha con la app del hospital.</p>
+    ${btn('pegar', '✂ Cortar y pegar en la muñeca', '', 'var(--adm)')}`;
+}
+function scrEscaneo() {
+  return `<div class="camara"><span>Apuntá a la pulsera del paciente</span></div>
+    <div class="s-card k" style="--k:var(--ok,#15803d)"><h4>✓ Identidad verificada</h4><p>Pérez, Juan Carlos · DNI 20.868.112<br>Sello SHA-256 D49F A6F5 ✓</p></div>
+    ${btn('lvq', '📣 Abrir para todo el equipo', '', 'var(--enf)')}`;
+}
+/* 3.39 · Endoscopía: su propia secuencia */
+const scrEndo = (tit, sub, L, t, txt) => () => `<div class="s-h"><div><b>${tit}</b><small>${sub}</small></div></div>
+  <div class="s-card">${L.map((x) => `<p>${x}</p>`).join('')}</div>${btn(t, txt, '', 'var(--enf)')}`;
+function scrCesarea() {
+  return `<div class="s-h"><div><b>👶 Panel de Obstetricia</b><small>Programado o de urgencia · campo «Atención»</small></div></div>
+    <div class="s-card k" style="--k:#db2777"><h4>Cesárea</h4><p>Equipo · Entrada · Recuento inicial · Pausa · Recuento final · Salida · Recuperación</p></div>
+    <div class="s-card k" style="--k:#0d9488"><h4>Parto</h4><p>Equipo · Entrada · Pausa · Salida · Recuperación. Sin conteo de gasas ni instrumentación.</p></div>
+    ${btn('cesarea', '✓ Entendido', 'ok')}`;
+}
+/* 3.39 · Del ingreso a la planilla común */
+function scrIngreso() {
+  return `<div class="s-h"><div><b>🗓️ Mi Sala · Hoy</b><small>El equipo que tomó este paciente</small></div></div>
+    <div class="s-card k" style="--k:#d97706"><h4>07:55 · Hernioplastia inguinal</h4><p>Pérez, Juan Carlos · Quirófano 2</p><p><b>🟡 Ingresó · lea su pulsera al hacerlo pasar</b></p></div>
+    <p class="nota">También llega un aviso a la app, sin el nombre del paciente. Se puede tomar el turno antes o después del ingreso.</p>
+    ${btn('ingreso', '✓ Visto: lo espero en la sala', '', 'var(--enf)')}`;
+}
+function scrTodos() {
+  const P4 = [['💉', 'Enfermería', 'leyó el QR'], ['💤', 'Anestesiología', 'se abrió sola'], ['🧰', 'Instrumentación', 'se abrió sola'], ['🩺', 'Cirujano/a', 'se abrió sola']];
+  return `<div class="s-h"><div><b>🟢 Planilla común abierta</b><small>En todos los teléfonos del equipo a la vez</small></div></div>
+    ${P4.map(([i, n, t]) => `<div class="s-card k" style="--k:var(--enf)"><h4>${i} ${n}</h4><p>${t} · Entrada · punto 1 ✓</p></div>`).join('')}
+    ${btn('todos', '📣 Escuchar y confirmar', '', 'var(--enf)')}`;
+}
+function scrEscucha() {
+  return `<div class="s-h"><div><b>📣 Lee en voz alta: Enfermería</b><small>Momento Entrada · En vivo</small></div></div>
+    <div class="s-card">${['Identidad, sitio, procedimiento y consentimiento', 'Sitio quirúrgico demarcado', 'Control de seguridad anestésica', 'Alergias conocidas verificadas'].map((x) => `<p>✓ ${x}</p>`).join('')}</div>
+    <p class="nota">Quien lee tilda y el equipo lo ve en vivo. Cada uno confirma con su botón: son las mismas firmas de siempre.</p>
+    ${btn('escucha', '✓ Confirmo', 'ok')}`;
+}
+function scrSigue() {
+  return `<div class="s-h"><div><b>✓ Terminó este paciente</b><small>Se cierra y se pasa al que sigue</small></div></div>
+    <div class="s-card k" style="--k:#d97706"><h4>Sigue en esta sala · 10:30</h4><p>Colecistectomía laparoscópica</p><p><b>🟡 Ya ingresó: al hacerlo pasar, lean su pulsera</b></p></div>
+    ${btn('sigue', '▶ Pasar al siguiente paciente', '', 'var(--enf)')}`;
+}
+function scrConsPDF() {
+  return `<div class="s-h"><div><b>📄 Consentimiento firmado</b><small>PDF para la historia clínica</small></div></div>
+    <div class="s-card k" style="--k:#15803d"><h4>Aceptado electrónicamente</h4><p>Sello en la Declaración, con fecha y hora</p></div>
+    <div class="s-card k" style="--k:#1d4ed8"><h4>✓ Firma electrónica</h4><p>Paciente y médico, cada uno en su lugar</p></div>
+    <div class="s-card k" style="--k:#b91c1c"><h4>Espacio anulado</h4><p>El espacio de revocación. El derecho a revocar sigue vigente.</p></div>
+    <p class="nota">Cada punto va entero, las hojas quedan parejas y cada una dice «Hoja 2 de 4», con el paciente, el código del documento y el comienzo del código SHA-256 de la firma.</p>
+    ${btn('conspdf', '✍️ Firmar y bajar el consentimiento (PDF)', 'ok')}`;
+}
+
+/* ---------- 3.31 · Equipos del día (la tarjeta de los jefes/as) ---------- */
+const EQD = [
+  { id: 'Q4', n: 'Quirófano 4', niv: 'alta', cx: [['08:00', 'Artroplastia total de cadera'], ['13:00', 'Osteosíntesis de radio']], an: 'Dr. Tomás Vera', e: 'Lic. Juan Díaz', i: 'Inst. Paula Gil', c: 'Inst. Lucía Sanz' },
+  { id: 'Q2', n: 'Quirófano 2', niv: 'media', cx: [['08:00', 'Colecistectomía laparoscópica'], ['10:30', 'Hernioplastia inguinal']], an: 'Dra. Laura Paz', e: 'Lic. Sofía Molina', i: 'Inst. Carla Ruiz', c: '' },
+  { id: 'Q3', n: 'Quirófano 3', niv: 'baja', cx: [['08:00', 'Exéresis de lipoma']], an: 'Dr. Marcos León', e: 'Lic. Ema Ríos', i: 'Inst. Rocío Paz', c: '' },
+];
+const EQD_NIV = { alta: ['🔥 Alta', '#e11d48'], media: ['⚡ Media', '#f59e0b'], baja: ['🌿 Baja', '#16a34a'] };
+const EQD_SEC = [['anest', '💤', 'Anestesiología', 'var(--anest)', 'Dra. Inés Bianchi'], ['enf', '💉', 'Enfermería', 'var(--enf)', 'Lic. Pablo Ferrari'], ['inst', '🩺', 'Instrumentación', 'var(--inst)', 'Inst. Marina López']];
+const ini2 = (n) => String(n).replace(/^(Dra?|Lic|Inst)\.\s*/, '').split(' ').map((x) => x[0]).join('').slice(0, 2);
+function scrEqAviso() {
+  return `<div class="eqm-bloq"><div class="eqm-hora">20:00</div><small>Miércoles 21 de octubre</small>
+    <button class="eqm-noti" data-t="abrir"><i>🪄</i><span><b>HRU Quirófanos — Equipos de mañana: revise y confirme Enfermería</b><small>La app ya armó los equipos de las 3 salas de mañana. Toque para abrir la tarjeta…</small></span></button></div>
+    <p class="nota">Llega aunque la app esté cerrada (y también por correo). Al tocarla, la app se abre directo en la tarjeta.</p>`;
+}
+/* La tarjeta, en chico. o.yo = sector de quien mira; o.foco = qué slot marcar; o.lista = lista abierta en Q3. */
+function scrEqTarjeta(S, o) {
+  const E = S.e, ok = { anest: E.anest, enf: E.enf, inst: E.inst };
+  const ult = E.anest ? '20:21 · Dra. Inés Bianchi: Confirmó Anestesiología' : E.enf ? '20:16 · Lic. Pablo Ferrari: Confirmó Enfermería' : E.inst ? '20:12 · Inst. Marina López: Confirmó Instrumentación' : E.cambio ? '20:07 · Lic. Pablo Ferrari: Enfermería de Q3: Lic. Gustavo Ruiz' : '20:00 · Propuesta automática';
+  const slot = (p, ico, rot, nom, sec, k) => {
+    const mio = o.yo === sec, vacio = !nom;
+    return `<button class="eqm-slot${vacio ? ' vacio' : ''}${mio ? ' mio' : ''}" ${mio && k ? `data-t="${k}"` : 'data-t="nada"'} style="--s:${EQD_SEC.find((x) => x[0] === sec)[3]}">
+      <i>${vacio ? ico : ini2(nom)}</i><span><small>${ico} ${rot}</small><b>${nom || 'Circula el/la enfermero/a'}</b></span>${mio ? '<em>✎</em>' : ''}</button>`;
+  };
+  const lista = `<div class="eqm-lista">
+      <button data-t="nada"><b>Lic. Ema Ríos</b><small>en esta sala · 9 cx en 30 días</small></button>
+      <button data-t="gus"><b>Lic. Gustavo Ruiz</b><small>✓ libre · 4 cx en 30 días</small></button>
+      <button data-t="nada"><b>Lic. Juan Díaz</b><small>↔ está en Quirófano 4 · 7 cx</small></button>
+      <button data-t="nada"><b>Lic. Sofía Molina</b><small>↔ está en Quirófano 2 · 8 cx</small></button>
+      <button data-t="nada"><b>Lic. Nadia Funes</b><small>✓ libre · 🛡️ de guardia · 2 cx</small></button></div>`;
+  return `<div class="eqm">
+    <div class="eqm-hero"><div class="eqm-top"><span class="eqm-vivo"><i></i>En vivo</span><span class="eqm-ult">${ult}</span></div>
+      <b>🪄 Equipos del día</b><small>Mañana · Jueves 22 de octubre</small>
+      <div class="eqm-kpi"><span><b>3</b>salas</span><span><b>5</b>cirugías</span><span><b>11</b>cubiertos</span><span class="bien"><b>0</b>sin cubrir</span></div></div>
+    <div class="eqm-secs">${EQD_SEC.map(([s, i, n, c]) => `<div class="eqm-sec${ok[s] ? ' ok' : ''}" style="--c:${c}"><i>${i}</i><span><b>${n}</b><small>${ok[s] ? '✓ Confirmado' : 'Pendiente'}</small></span>${o.yo === s && !ok[s] ? `<button class="eqm-ok" data-t="${o.conf || 'nada'}">✓ Confirmar</button>` : ''}</div>`).join('')}</div>
+    ${EQD.map((x) => {
+      const e = x.id === 'Q3' && E.cambio ? 'Lic. Gustavo Ruiz' : x.e;
+      return `<div class="eqm-sala" style="--n:${EQD_NIV[x.niv][1]}"><div class="eqm-sh"><b>${x.n}</b><em>${EQD_NIV[x.niv][0]}</em></div>
+        <ul>${x.cx.map(([h, p]) => `<li><time>${h}</time>${p}</li>`).join('')}</ul>
+        ${slot('an', '💤', 'Anestesiología', x.an, 'anest', '')}
+        ${slot('e', '💉', 'Enfermería · téc. anestesia', e, 'enf', x.id === 'Q3' && !E.cambio ? 'ema' : '')}
+        ${x.id === 'Q3' && o.lista ? lista : ''}
+        ${slot('i', '🩺', 'Instrumentación', x.i, 'inst', '')}
+        ${slot('c', '🧭', 'Circulante (2.ª inst.)', x.c, 'inst', '')}</div>`;
+    }).join('')}
+    ${o.fin ? btn(o.fin, o.finTxt || 'Entendido') : ''}</div>`;
+}
+function scrEqSala(S) {
+  return `<div class="s-h"><div><b>🧭 Mi Sala · jueves 22</b><small>Quirófano 2 · desde «Equipos del día»</small></div></div>
+    <div class="eqm-lleg">${S && S.e.lleg ? '<b>✓ Llegada registrada a las 07:30 h · Quirófano 2</b>' : `<span>🗓️ Hoy su jefe lo/la asignó a <b>Quirófano 2</b> desde las <b>08:00 h</b>. Ya figura en su puesto: al llegar, avise.</span>${btn('llegue', '✋ Llegué', '', 'var(--enf)')}`}</div>
+    <div class="s-card k" style="--k:var(--enf)"><b>08:00 · Colecistectomía laparoscópica</b>
+      <p class="nota" style="margin:6px 0 0">💉 Enfermería · téc. de anestesia: <b>Lic. Sofía Molina</b><br>🩺 Instrumentación: <b>Inst. Carla Ruiz</b><br>🧭 Circulante: <b>Lic. Sofía Molina</b> (no hay 2.ª instrumentadora)<br>💤 Anestesia: <b>Dra. Laura Paz</b> (grilla del día)</p></div>
+    <p class="nota">Ya figuran en su puesto: no hace falta «Anotarme», y ese puesto no aparece libre para otros.</p>`;
+}
+function scrEqNoLlego() {
+  return `<div class="alarma"><div class="campana">⏰</div><b>07:30 · Lic. Juan Díaz todavía no llegó</b><small>Está asignado a Quirófano 4 (primera cirugía 08:00 h) y no marcó «Llegué». Llámelo, o cambie a la persona en «Equipos del día».</small></div>
+    ${btn('vio', '📞 Lo llamo · después reviso', '', 'var(--enf)')}
+    <p class="nota">Le llega al Jefe de su sector, aunque tenga la app cerrada.</p>`;
+}
+function scrEqReemplazo(S) {
+  return `<div class="s-h"><div><b>08:00 · Artroplastia total de cadera</b><small>Quirófano 4 · Lic. Nadia Funes no está asignada</small></div></div>
+    <div class="s-card"><p class="nota" style="margin:0">💉 Enfermería · téc. de anestesia: <b>${S.e.reemp ? 'Lic. Nadia Funes <small>(reemplazó a Lic. Juan Díaz)</small>' : 'Lic. Juan Díaz'}</b><br>🩺 Instrumentación: <b>Inst. Paula Gil</b> · 🧭 Circulante: <b>Inst. Lucía Sanz</b></p></div>
+    ${S.e.reemp ? '<p class="nota">✓ Quedaron los dos nombres registrados y al Jefe le llegó: «Lic. Nadia Funes reemplazó a Lic. Juan Díaz».</p>'
+      : `<div class="s-card" style="border:1.5px dashed #d97706"><b style="color:#b45309">🔁 ¿Falta alguien del equipo? Reemplazar</b><p class="nota">Solo si la persona asignada no vino. Queda registrado con los dos nombres y se le avisa a su jefe/a.</p>${btn('reemp', 'Reemplazar a Lic. Juan Díaz · Enfermería', '', '#d97706')}</div>`}`;
+}
+
+/* ---------- pantallas completas: portada y final ---------- */
+const ACTOS = [
+  { k: 'reg', n: 'Registro', i: '🪪', c: 'var(--cir)', d: 'El alta de cada integrante y la autorización de la Jefatura.' },
+  { k: 'por', n: 'Portales', i: '🧭', c: 'var(--anest)', d: 'Lo primero, el panel central y el flujo de cada uno.' },
+  { k: 'eqd', n: 'Equipos del día', i: '🪄', c: 'var(--jefa)', d: 'La víspera, la app arma los equipos de cada sala y los tres jefes los ajustan y confirman en vivo.' },
+  { k: 'prog', n: 'Cirugía y cesárea programadas', i: '📅', c: 'var(--enf)', d: 'Del turno al QR de la paciente, la LVQ con conteo de gasas y el cierre. El parto va sin gasas.' },
+  { k: 'endo', n: 'Endoscopía programada', i: '🔭', c: 'var(--enf)', d: 'Otra secuencia: 5 momentos, sin Jefatura de Quirófanos, sin cama y sin conteo de gasas.' },
+  { k: 'mapa', n: 'Mapa de camas y pulsera', i: '🏷️', c: 'var(--enf)', d: 'Enfermería envía las camas a las 07:00, Admisión ocupa una y sale la pulsera con QR.' },
+  { k: 'cama', n: 'Sin cama: prioridad', i: '🛏️', c: 'var(--adm)', d: 'No hubo cama: la app reprograma sola (48 h hábiles), tres OK, la paciente responde y el plazo de las 13 h.' },
+  { k: 'urg', n: 'Urgencia', i: '🚑', c: 'var(--mal)', d: 'En horario y fuera de horario.' },
+  { k: 'cie', n: 'Estadísticas y cierre', i: '🏆', c: 'var(--ama)', d: 'Números, copa de oro, incidencias y reclamos.' },
+];
+function portadaHTML() {
+  const g = leerGuardado();
+  const seguir = g && g.cur > 0 && g.cur < lista().length - 1;
+  return `<section class="grande">
+    <span class="tag">HRU · Bloque quirúrgico</span>
+    <h1 class="hero-t">Una cirugía, <span>de punta a punta</span>.</h1>
+    <p>Recorra paso a paso cómo se registra cada integrante del equipo, qué ve en su portal, cómo viaja una cirugía programada —con la paciente siguiéndola desde su teléfono— y cómo se resuelve una urgencia. Nada avanza solo: en cada paso le marcamos qué tocar.</p>
+    <div class="elenco">${['cir', 'anest', 'jefa', 'enf', 'inst', 'adm', 'jef', 'pac'].map((k) => `<span>${av(k)}${R[k].n}</span>`).join('')}</div>
+    <div class="actos">${ACTOS.map((a, i) => `<button class="acto-c" style="--k:${a.c}" data-t="ir:${primerDe(a.k)}"><i>${a.i}</i><b>${i + 1} · ${a.n}</b><small>${a.d}</small><em>${pasosDe(a.k)} pasos →</em></button>`).join('')}</div>
+    <div class="botones">${btn('empezar', '▶ Empezar el recorrido')}${seguir ? `<button class="b sec" data-t="ir:${g.cur}">↻ Seguir donde quedé (paso ${g.cur})</button>` : ''}</div>
+    <p style="font-size:.78rem;margin-top:14px">Personas, pacientes y números son de ejemplo. Use ← → del teclado para moverse, o el mapa.</p>
+  </section>`;
+}
+function finalHTML() {
+  return `<section class="grande">
+    <div class="copa" aria-hidden="true" style="font-size:3.4rem">🎉</div>
+    <h1 class="hero-t" style="text-align:center">Recorrido <span>completo</span></h1>
+    <p style="text-align:center;margin:0 auto">Ya vio el circuito entero del bloque quirúrgico. En resumen:</p>
+    <div class="actos">
+      <div class="acto-c" style="--k:var(--cir)"><i>🪪</i><b>Registro</b><small>Cada uno pide el alta con su función; la Jefatura autoriza y designa al Jefe/a de Anestesiología.</small></div>
+      <div class="acto-c" style="--k:var(--anest)"><i>🧭</i><b>Portales</b><small>Lo primero (perfil, llegada, lista, sala, cajas), el panel central y un flujo en orden.</small></div>
+      <div class="acto-c" style="--k:var(--jefa)"><i>🪄</i><b>Equipos del día</b><small>20 h de la víspera: la app propone el equipo de cada sala; cada jefe/a cambia lo suyo y confirma. Al día siguiente: «Llegué», aviso si alguien no llegó y «Reemplazar».</small></div>
+      <div class="acto-c" style="--k:var(--enf)"><i>📅</i><b>Cirugía y cesárea</b><small>El parto va sin gasas. Turno → QR → Admisión → Jefatura → equipo → LVQ → gasas → Pausa → cirugía → Salida → Recuperación → QR cerrado.</small></div>
+      <div class="acto-c" style="--k:var(--enf)"><i>🔭</i><b>Endoscopía</b><small>Turno → Admisión → pulsera sin cama → cuatro en sala → Entrada → Pausa → estudio → Salida → Recuperación. Sin gasas.</small></div>
+      <div class="acto-c" style="--k:var(--enf)"><i>🏷️</i><b>Camas y pulsera</b><small>06:30 aviso, Enfermería envía el mapa, Admisión «Recibido», la cama pasa a rojo y la pulsera abre la LVQ.</small></div>
+      <div class="acto-c" style="--k:var(--adm)"><i>🛏️</i><b>Sin cama</b><small>La app reprograma sola con prioridad; tres OK, la paciente confirma y queda marcado «SIN CAMA ×N».</small></div>
+      <div class="acto-c" style="--k:var(--mal)"><i>🚑</i><b>Urgencia</b><small>Opera sin esperar. Fuera de horario, Admisión y Jefatura regularizan después; en horario, validan en el momento.</small></div>
+      <div class="acto-c" style="--k:var(--ama)"><i>🏆</i><b>Calidad</b><small>Estadísticas, copa de oro semanal, incidencias con seguimiento y reclamos con respuesta.</small></div>
+    </div>
+    <div class="botones" style="justify-content:center">${btn('volver', '← Volver a la app')}<button class="b sec" data-t="reinicio">↺ Empezar de nuevo</button></div>
+  </section>`;
+}
+
+/* ================= EL RECORRIDO ================= */
+const PASOS = [];
+function scrParteAnest(S) {
+  return `<div class="s-h"><div><b>💉 Parte anestésico pre-quirúrgico</b><small>Colecistectomía · Q2 · 08:00 · después de «Llegué»</small></div></div>
+    <div class="s-card k" style="--k:var(--anest)">${S.p && S.p.parte ? '<p style="margin:0"><b>🖼️ Foto · 212 KB</b> · Dra. Laura Paz · 07:41</p><p class="nota" style="margin:4px 0 0">El equipo ve el rótulo y lo baja solo si toca «⬇ Descargar».</p>'
+      : '<p style="margin:0">Saque una foto del parte en papel o adjunte el PDF. La foto se achica en el teléfono (de 4 MB a ~200 KB) antes de subir.</p>'}</div>
+    <div class="dos">${btn('parte', '📷 Sacar foto del parte', 'ok')}${info('Foto o PDF de hasta 900 KB. No viaja con la cirugía: queda aparte y se descarga a pedido, así la app no se enlentece.', '📎 Adjuntar archivo')}</div>`;
+}
+function scrMiLinea() {
+  const cx = (n, h, e, sal, dur) => `<div class="s-card" style="padding:7px 9px;margin:0;border-left:4px solid var(--anest)"><b style="font-size:.76rem">${n}. ${h}</b><small style="display:block;font-size:.62rem;color:var(--mut)">🚶 Entró ${e} · 🚪 Salió ${sal} · en sala <b>${dur}</b></small></div>`;
+  const rec = (n, t, c, vivo) => `<div style="margin:0 0 0 14px;padding:5px 0 5px 14px;border-left:3px dashed ${c};font-size:.7rem"><b style="color:${c}">Recambio ${n}: ${t}</b>${vivo ? ' <i style="color:#b45309">en curso</i>' : ''}</div>`;
+  return `<div class="s-h"><div><b>⏱ Mi línea · 4 cirugías · Q2</b><small>De la salida de un paciente a la entrada del siguiente</small></div></div>
+    ${cx(1, '08:00 Colecistectomía', '07:58', '09:40', '1 h 42 min')}${rec(1, '22 min', '#059669')}
+    ${cx(2, '10:00 Hernioplastia', '10:02', '11:15', '1 h 13 min')}${rec(2, '41 min', '#b45309')}
+    ${cx(3, '12:00 Apendicectomía', '11:56', '12:58', '1 h 02 min')}${rec(3, '00:12:37', '#b45309', true)}
+    ${cx(4, '13:30 Tiroidectomía', '—', '—', '—')}
+    <p class="nota" style="margin:6px 0">Totales: <b>entre cirugías 1 h 03 min</b> · recambio promedio 31 min (meta 30) · en sala 3 h 57 min.</p>
+    ${btn('entro', '🚶 Entró el paciente 4 · Ahora', 'ok')}`;
+}
+
+const P = (o) => PASOS.push(o);
+
+P({ id: 'portada', a: 'ini', e: 'Portada', full: portadaHTML, t: 'empezar' });
+
+/* Acto 1 · Registro */
+const TXT_REG = {
+  cir: ['Todo empieza en la pantalla de acceso, con «Solicitar alta». El cirujano elige su función: eso define qué ve después, qué requisitos le pide la app y qué puede firmar.',
+    'Completa nombre, DNI, correo institucional y el o los servicios donde opera (el primero queda como principal). Los requisitos —matrícula, título, seguro de RC, RCP y vacunas— los carga después en Mi Perfil.'],
+  anest: ['El anestesiólogo hace lo mismo, pero elige «Anestesiología». Su portal será otro: la sala del día, las firmas de anestesia y su mes de guardias y planta.',
+    'No elige servicio: Anestesiología trabaja para todos. Requisitos: matrícula, título de especialista, seguro de RC, RCP y vacunas.'],
+  jefa: ['El Jefe o la Jefa de Anestesiología no tiene un alta especial: se registra como cualquier anestesiólogo.',
+    'Mismos datos y requisitos que el resto de Anestesiología. El cargo se lo da después la Jefatura de Quirófanos.'],
+  enf: ['Enfermería (circulantes y técnicos) elige «Enfermería y técnicos». Su portal gira alrededor de Mi Sala y del recorrido de 7 pasos.',
+    'Requisitos: matrícula provincial, seguro de RC profesional, RCP y vacunas.'],
+  inst: ['Instrumentación elige su propia ficha. Su portal: cajas de esterilización, recuento e insumos.',
+    'Mismos requisitos que enfermería: matrícula, seguro de RC profesional, RCP y vacunas.'],
+};
+['cir', 'anest', 'jefa', 'enf', 'inst'].forEach((k) => {
+  const e = NOMBRE_ROL[k];
+  const qf = k === 'jefa' ? 'Anestesióloga · sin cuenta todavía' : 'Sin cuenta todavía';
+  P({ a: 'reg', e, q: k, qf, h: '08:30', tit: `${R[k].n} pide el alta`, txt: TXT_REG[k][0], t: 'func', go: `Toque la ficha «${nomFunc(k)}»`, ver: () => scrAlta(k, 0), ok: 'Función elegida: la pantalla le pide justo lo que corresponde a esa función.' });
+  P({ a: 'reg', e, q: k, qf, h: '08:32', tit: 'Datos y contraseña', txt: TXT_REG[k][1], t: 'crear', go: 'Toque «Crear cuenta»', ver: () => scrAlta(k, 1), ok: 'Cuenta creada. Queda pendiente, y la app le dice en el acto qué le falta para el alta (se lo recuerda en Mi Perfil y en la campana hasta que lo completa).' });
+  P({ a: 'reg', e, q: 'jef', h: '09:10', tit: 'La Jefatura autoriza la cuenta', txt: `La Jefatura de Quirófanos ve la solicitud en Profesionales, con la función y los requisitos. Si le falta algo, el botón WhatsApp le abre el chat con el mensaje de qué le falta ya escrito. Si está todo, autoriza y ${R[k].n} ya puede ingresar con su correo y contraseña.`, t: 'autorizar', go: 'Toque «Autorizar»', ver: () => scrAutoriza(k), ok: `Autorizada. ${R[k].n} recibe el aviso y entra a su portal.` });
+  if (k === 'jefa') P({ a: 'reg', e, q: 'jef', h: '09:12', tit: 'La Jefatura la designa Jefa de Anestesiología', txt: 'En Portales › Anestesiología, la Jefatura de Quirófanos elige quién es el Jefe/a. Aparece la corona 👑 y se le abre la lista mensual de Anestesiología.', t: 'designar', go: 'Toque «👑 Designar» junto a la Dra. Bianchi', ver: scrDesigna, ok: 'Designada. Desde ahora arma la lista mensual de Anestesiología.' });
+});
+
+/* Acto 2 · Portales */
+['cir', 'anest', 'jefa', 'enf', 'inst'].forEach((k) => {
+  const e = 'Portal · ' + NOMBRE_ROL[k], Pk = PORTALES[k];
+  P({ a: 'por', e, q: k, h: '07:30', tit: `Portal de ${NOMBRE_ROL[k].toLowerCase()}: lo primero`, txt: `Al entrar, ${R[k].n} ve arriba una sola tarea marcada como «Lo primero»: <b>${Pk.primero.t.toLowerCase()}</b>. El resto del panel espera detrás hasta que la haga.`, t: 'primero', go: `Toque «${Pk.primero.b.replace(/^\S+\s/, '')}»`, ver: () => scrPortal(k, 0), ok: Pk.primero.ok });
+  P({ a: 'por', e, q: k, h: '07:34', tit: 'El panel central', txt: 'Esto es lo que ve todos los días en el centro de la pantalla. Cada recuadro numerado resume una parte de su trabajo y se toca para abrirla.', t: 'flujo', go: 'Mire los recuadros y toque «Ver mi flujo de trabajo»', ver: () => scrPortal(k, 1), ok: 'Ahora, el orden en que se hace todo.' });
+  P({ a: 'por', e, q: k, h: '07:35', tit: 'Su flujo de trabajo, en orden', txt: 'El portal sigue siempre este orden. La app avisa cuando le toca a usted y no deja saltear pasos.', t: 'entendido', go: 'Toque «Entendido»', ver: () => scrPortal(k, 2), ok: `Portal de ${NOMBRE_ROL[k].toLowerCase()} recorrido.` });
+});
+
+/* Acto · Equipos del día (3.31) */
+const EQ = (o) => P(Object.assign({ a: 'eqd' }, o));
+EQ({ e: 'El aviso de las 20 h', r: '20h', q: 'jenq', h: 'Mié 20:00', tit: '20:00 · llega «Equipos de mañana»', txt: 'La víspera, a las 20:00, a los tres jefes —Anestesiología, Enfermería de Quirófano e Instrumentación— les llega este aviso, <b>aunque la app esté cerrada</b> (y también por correo). La app ya armó sola los equipos de las salas con cirugías de mañana.', t: 'abrir', go: 'Toque la notificación', ver: scrEqAviso, ok: 'La app se abre directo en la tarjeta, sobre la pantalla.' });
+EQ({ e: 'La propuesta', r: 'ver', q: 'jenq', h: 'Mié 20:01', tit: 'Lo que eligió la app', txt: 'Ordena las salas por <b>complejidad</b> (🔥 alta, ⚡ media, 🌿 baja). Anestesia respeta la <b>grilla del mes</b>. Da <b>una instrumentadora por sala</b> y la que sobra va de 2.ª a la sala más compleja (Quirófano 4); donde no hay 2.ª, circula el/la enfermero/a. Usa solo gente con cuenta, reparte la carga de 30 días y deja libre a quien está de guardia. Una persona, una sala.', t: 'entendido', go: 'Mire las salas y toque «Entendido» abajo', ver: (S) => scrEqTarjeta(S, { yo: 'enf', fin: 'entendido' }), ok: 'Cada jefe/a solo puede tocar los nombres de su sector (los que tienen ✎).' });
+EQ({ e: 'Cambiar a alguien', r: 'camb', q: 'jenq', h: 'Mié 20:05', tit: 'Ema avisó que mañana no viene', txt: 'Lic. Ema Ríos pidió el día. El Jefe de Enfermería toca su nombre en Quirófano 3 y se abre la lista de su sector, con quién está libre, en qué sala está cada uno, quién está de guardia y cuántas cirugías hizo en 30 días.', t: 'ema', go: 'Toque «Lic. Ema Ríos» en Quirófano 3', ver: (S) => scrEqTarjeta(S, { yo: 'enf' }), ok: 'Lista abierta.' });
+EQ({ e: 'Cambiar a alguien', r: 'camb', q: 'jenq', h: 'Mié 20:06', tit: 'Elige a otra persona', txt: 'Elige a alguien <b>libre</b>. Si eligiera a quien está en otra sala, se <b>intercambian</b> solos: nunca queda una persona en dos salas. Con ↻ podría volver a armar toda la propuesta de su sector.', t: 'gus', go: 'Toque «Lic. Gustavo Ruiz · libre»', ver: (S) => scrEqTarjeta(S, { yo: 'enf', lista: true }), hacer: (S) => { S.e.cambio = true; }, ok: 'Guardado. Los otros dos jefes lo ven al instante.' });
+EQ({ e: 'En vivo', r: 'vivo', q: 'jins', h: 'Mié 20:12', ladoQ: 'jenq', lado: (S) => scrEqTarjeta(S, { yo: 'enf' }), tit: 'En el teléfono de la Jefa de Instrumentación', txt: 'Al mismo tiempo, la Jefa de Instrumentación tiene la tarjeta abierta: arriba dice <b>«En vivo»</b> y el último cambio («Enfermería de Q3: Lic. Gustavo Ruiz»). Revisa lo suyo —dos instrumentadoras en la sala de cadera, una en las demás— y confirma. Mire el otro teléfono: el Jefe de Enfermería lo ve aparecer.', t: 'confinst', go: 'Toque «✓ Confirmar» de Instrumentación', ver: (S) => scrEqTarjeta(S, { yo: 'inst', conf: 'confinst' }), hacer: (S) => { S.e.inst = true; }, ok: 'Instrumentación confirmada: quedan anotadas en cada cirugía de su sala.' });
+EQ({ e: 'Confirmar', r: 'conf', q: 'jenq', h: 'Mié 20:16', tit: 'El Jefe de Enfermería confirma', txt: 'Ya ve «✓ Confirmado» en Instrumentación. Ahora confirma lo suyo: cada enfermero/a queda anotado/a en las cirugías de su sala, también como circulante donde no hay 2.ª instrumentadora. Si después alguien cambia algo de su sector, la app le pide volver a confirmar.', t: 'confenf', go: 'Toque «✓ Confirmar» de Enfermería', ver: (S) => scrEqTarjeta(S, { yo: 'enf', conf: 'confenf' }), hacer: (S) => { S.e.enf = true; }, ok: 'Enfermería confirmada.' });
+EQ({ e: 'Confirmar', r: 'conf', q: 'jefa', h: 'Mié 20:21', tit: 'Y la Jefa de Anestesiología', txt: 'La Dra. Bianchi ve que cada sala tiene a quien la grilla del mes ya decía. Al confirmar, queda en la <b>grilla del día</b> sin volver a pedir la validación del mes.', t: 'confan', go: 'Toque «✓ Confirmar» de Anestesiología', ver: (S) => scrEqTarjeta(S, { yo: 'anest', conf: 'confan' }), hacer: (S) => { S.e.anest = true; }, fiesta: true, ok: 'Los tres sectores confirmados: el equipo de mañana está listo.' });
+EQ({ e: 'Al día siguiente', r: 'sala', q: 'enf', h: 'Jue 07:30', tit: 'Mi Sala: cada uno ya está en su puesto', txt: 'Jueves, 07:30. La Lic. Molina abre Mi Sala: figura en Quirófano 2 junto con Carla Ruiz y la Dra. Paz, sin tener que anotarse. Lo único que hace al llegar es avisar. (Anestesiología usa el «Llegué» de siempre en su portal.)', t: 'llegue', go: 'Toque «✋ Llegué»', ver: scrEqSala, hacer: (S) => { S.e.lleg = true; }, ok: 'Llegada registrada.' });
+EQ({ e: 'Al día siguiente', r: 'dia', q: 'jenq', h: 'Jue 07:30', tit: '07:30 · alguien no llegó', txt: 'Media hora antes de su primera cirugía, el Lic. Juan Díaz (Quirófano 4) no tocó «Llegué». Al Jefe de Enfermería le suena el aviso, aunque tenga la app cerrada. Tocándolo se abre «Equipos del día» de hoy para cambiarlo.', t: 'vio', go: 'Toque «Lo llamo»', ver: scrEqNoLlego, ok: 'Juan avisó que está enfermo: hoy no viene.' });
+EQ({ e: 'Al día siguiente', r: 'dia', q: 'enfg', h: 'Jue 07:38', tit: 'Otra enfermera lo reemplaza', txt: 'Los puestos asignados no aparecen libres, así que nadie queda trabado: la Lic. Nadia Funes abre la cirugía de Quirófano 4 y toca «Reemplazar». La app pide confirmar, la anota en las cirugías de esa sala que todavía no empezaron y le avisa al Jefe. Si Juan se hubiera quitado él mismo (✕), el Jefe también recibe el aviso.', t: 'reemp', go: 'Toque «Reemplazar a Lic. Juan Díaz»', ver: scrEqReemplazo, hacer: (S) => { S.e.reemp = true; }, ok: 'Reemplazo registrado. Sigue la cirugía programada de Ana.' });
+
+/* Acto 3 · Cirugía programada */
+const PR = (o) => P(Object.assign({ a: 'prog', pac: true }, o));
+PR({ e: 'Programar y pase QR', r: 'prog', q: 'cir', h: 'Lun 09:10', tit: 'El cirujano anota la cirugía', txt: `El Dr. Sosa programa la cirugía de ${CASO.pac}: procedimiento, día, sala y anestesia. Solo puede enviarla con los tres requisitos tildados: pre-anestésico, pre-quirúrgico y consentimiento firmado.`, t: 'programar', go: 'Toque «Programar»', ver: scrProgramar, hacer: (S) => { S.p.prog = true; }, ok: 'Turno cargado. Pasa a la bandeja de Admisión y Egresos.' });
+PR({ e: 'Programar y pase QR', r: 'prog', q: 'cir', h: 'Lun 09:11', tit: 'El pase de la paciente', txt: 'Con los requisitos completos y el consentimiento guardado, la app ofrece el pase: una tarjeta tipo pase de embarque con un código QR. El botón se prende recién con el correo, el DNI y la casilla de que la paciente aceptó; mientras tanto dice qué falta.', t: 'pase', go: 'Toque «Generar el pase del paciente»', ver: () => scrPase(false), hacer: (S) => { S.p.pase = true; }, ok: 'Pase generado. Se imprime o se le manda a la paciente.' });
+PR({ e: 'Programar y pase QR', r: 'prog', q: 'cir', h: 'Lun 09:12', tit: 'La paciente escanea el QR', txt: `${CASO.pac.split(' ')[0]} apunta la cámara al QR. Para entrar, la app le pide su DNI y un código de un solo uso que le llega al correo. Desde ahí sigue su cirugía en vivo, sin llamar a nadie.`, t: 'escanear', go: 'En el teléfono de Ana, toque «Escanear el QR»', ver: () => scrPase(true), hacer: (S) => { S.p.esc = true; }, ok: 'Ana ya ve su cirugía: «Admisión y Egresos · revisando tu turno».' });
+PR({ e: 'Programar y pase QR', r: 'prog', q: 'cir', h: 'Lun 18:20', tit: 'El consentimiento firmado, en PDF', txt: 'La paciente lee y acepta el consentimiento desde su pase. Recién entonces aparece en la ficha el botón verde (antes, para verlo, se entra en Consentimientos Informados). Si después cambia la fecha del turno, el consentimiento toma la fecha nueva, la paciente lo acepta de nuevo y la versión anterior queda en Consentimientos › No concretados. El cirujano toca «Firmar y bajar»: el PDF sale con el sello de cada firma en su lugar, el espacio de revocación anulado y las hojas numeradas («Hoja 2 de 4»), con el paciente, el código y el comienzo del SHA-256 de la firma en cada una. Cada punto va entero.', t: 'conspdf', go: 'Toque «Firmar y bajar el consentimiento»', ver: scrConsPDF, ok: 'Consentimiento firmado por la paciente y por el médico.' });
+PR({ e: 'Admisión y Jefatura', r: 'adm', q: 'adm', h: 'Lun 11:40', tit: 'Admisión y Egresos autoriza', txt: 'Admisión revisa los requisitos y la cobertura, y dictamina. Mire el teléfono de Ana: cambia en el mismo momento.', t: 'autorizar', go: 'Toque «Autorizar»', ver: scrAdmision, hacer: (S) => { S.p.adm = 'ok'; S.p.jef = 'pend'; }, ok: 'Autorizada. En el teléfono de Ana: «Admisión ✓ · Jefatura validando…».' });
+PR({ e: 'Admisión y Jefatura', r: 'jef', q: 'jef', h: 'Lun 12:05', tit: 'La Jefatura valida… o cancela', txt: 'La Jefatura de Quirófanos ve el turno en «Ahora te toca», ordenado por urgencia. Puede validarlo y confirmarlo en el parte, o cancelarlo (toque «Cancelar» para ver qué pasaría).', t: 'validar', go: 'Toque «Validar y confirmar»', ver: scrJefatura, hacer: (S) => { S.p.jef = 'ok'; }, ok: 'Validada y confirmada en el parte. Ana lo ve al instante.' });
+PR({ e: 'Ingreso y cama', r: 'cama', q: 'adm', h: 'Jue 07:05', tit: 'Paso 4: Admisión anota la cama', txt: 'Jueves, 07:05. Ana ingresa al hospital. Admisión y Egresos anota en qué sector, habitación y cama queda internada. Cada sector tiene su interno para llamarla a quirófano: <b>Adultos 1035 · Pediatría 1012 · Maternidad 1608 · UCI 1034</b>. «Guardar cama» se prende recién con sector, habitación, cama y el nombre de quien la anota.', t: 'cama', go: 'Toque «Guardar cama»', ver: scrCama, hacer: (S) => { S.p.cama = true; }, ok: 'Cama registrada: aparece en la ficha, en el parte y en el teléfono de Ana.' });
+PR({ e: 'Llega el equipo', r: 'eq', q: 'anest', h: 'Jue 07:32', tit: 'El día de la cirugía: la anestesióloga da el OK', txt: 'Jueves, 07:32. La Dra. Paz llega y marca «Llegué». Es la puerta del día: sin llegada no se toman cirugías ni se firma.', t: 'llegue', go: 'Toque «Llegué»', ver: scrLlegue, hacer: (S) => { S.p.llego = true; }, ok: 'Anestesia presente. Ya figura en la cirugía de las 08:00.' });
+PR({ e: 'Llega el equipo', r: 'pa', q: 'anest', h: 'Jue 07:41', tit: 'El parte pre-anestésico, en una foto', txt: 'Después de «Llegué», en la cirugía en que está anotada, la Dra. Paz saca una foto del parte anestésico pre-quirúrgico. La app la achica en el teléfono y la guarda <b>aparte</b>: los demás ven «💉 Parte pre-anestésico» y la bajan solo si la necesitan.', t: 'parte', go: 'Toque «Sacar foto del parte»', ver: scrParteAnest, hacer: (S) => { S.p = S.p || {}; S.p.parte = true; }, ok: 'Parte adjuntado: 212 KB.' });
+PR({ e: 'Llega el equipo', r: 'eq', q: 'enf', h: 'Jue 07:40', tit: 'La enfermera toma la cirugía', txt: 'La Lic. Molina se anota como circulante. Una persona, una sala: desde ahora sus firmas son de esta cirugía.', t: 'tomar', go: 'Toque «Anotarme» en Circulante', ver: (S) => scrSala(S, 'enf'), hacer: (S) => { S.p.enf = true; }, ok: 'Circulante anotada.' });
+PR({ e: 'Llega el equipo', r: 'eq', q: 'inst', h: 'Jue 07:44', tit: 'La instrumentadora toma la cirugía', txt: 'Carla Ruiz se anota y verifica las cajas. Sin instrumentadora anotada no hay recuento inicial, y sin recuento no se sigue.', t: 'tomar', go: 'Toque «Anotarme» en Instrumentación', ver: (S) => scrSala(S, 'inst'), hacer: (S) => { S.p.inst = true; }, ok: 'Equipo completo. Ana ve «Tu equipo está listo».' });
+PR({ e: 'LVQ, gasas y Pausa', r: 'ent', q: 'enf', h: 'Jue 07:58', tit: 'Empieza la LVQ: Entrada', txt: 'La Lista de Verificación Quirúrgica arranca antes de la inducción. Enfermería y anestesia la firman, con el cirujano presente.', t: 'entrada', go: 'Toque «Firmar la Entrada»', ver: scrEntrada, hacer: (S) => { S.p.ent = true; }, ok: 'Entrada firmada. Ana: «En quirófano».' });
+PR({ e: 'LVQ, gasas y Pausa', r: 'rec1', q: 'inst', h: 'Jue 08:05', tit: 'Conteo de gasas inicial', txt: 'La instrumentadora cuenta gasas, compresas, agujas e instrumental. Contra ese número se compara al final.', t: 'rec1', go: 'Toque «Guardar recuento inicial»', ver: () => scrRecuento(false), hacer: (S) => { S.p.rec1 = true; }, ok: 'Recuento inicial guardado: 10 gasas, 5 compresas, 4 agujas, 38 instrumentos.' });
+PR({ e: 'LVQ, gasas y Pausa', r: 'pau', q: 'cir', h: 'Jue 08:18', tit: 'Pausa quirúrgica', txt: 'Antes de la incisión, todo el equipo se detiene: nombres, paciente, sitio, antibiótico. Confirman cirujano, anestesia y enfermería.', t: 'pausa', go: 'Toque «Confirmar la Pausa»', ver: scrPausa, hacer: (S) => { S.p.pausa = true; }, ok: 'Pausa confirmada por los tres.' });
+PR({ e: 'Cirugía y cierre', r: 'ini', q: 'cir', h: 'Jue 08:21', tit: 'Inicio de la cirugía', txt: 'Con Entrada, recuento y Pausa hechos, se habilita el inicio. Desde ahora corre el tiempo quirúrgico.', t: 'inicio', go: 'Toque el botón «Iniciar»', ver: scrInicio, hacer: (S) => { S.p.ini = true; }, ok: 'Cirugía en curso. Ana (y su familia) ven «Operándote».' });
+PR({ e: 'Cirugía y cierre', r: 'rec2', q: 'inst', h: 'Jue 09:34', tit: 'Recuento final', txt: 'Antes del cierre, instrumentación y enfermería vuelven a contar. Tiene que coincidir con el inicial.', t: 'rec2', go: 'Toque «Confirmar recuento»', ver: () => scrRecuento(true), hacer: (S) => { S.p.rec2 = true; }, ok: 'Recuento final correcto. Se habilita la Salida.' });
+PR({ e: 'Cirugía y cierre', r: 'sal', q: 'cir', h: 'Jue 09:41', tit: 'Final de la LVQ y cierre', txt: 'El cirujano completa la Salida con el parte quirúrgico. Con eso la cirugía se cierra sola: la Jefatura no tiene que intervenir.', t: 'salida', go: 'Toque «Finalizar (LVQ Salida + parte)»', ver: scrSalida, hacer: (S) => { S.p.sal = true; }, ok: 'Salida firmada. Se activa el módulo de Recuperación.' });
+PR({ e: 'Recuperación y QR', r: 'rec', q: 'anest', h: 'Jue 10:35', tit: 'Se activa el módulo de Recuperación', txt: 'La paciente pasa a recuperación. La anestesióloga completa la escala de Aldrete: con 9 o más, alta.', t: 'alta', go: 'Toque «Dar el alta de recuperación»', ver: scrAldrete, hacer: (S) => { S.p.recup = true; }, ok: 'Alta de recuperación. Ana ve «Tu cirugía terminó».' });
+PR({ e: 'Recuperación y QR', r: 'lin', q: 'anest', h: 'Jue 13:10', tit: 'Mi línea: el tiempo entre cirugías', txt: 'En su Portal (ahora con diseño de infografía), la anestesióloga ve su línea del día: cada cirugía con su tiempo en sala y, entre una y otra, el <b>recambio</b> —de la salida de un paciente a la entrada del siguiente—, en verde hasta 30 min, ámbar hasta 45 y rojo después, con cronómetro en vivo y los totales del día.', t: 'entro', go: 'Toque «Entró el paciente 4 · Ahora»', ver: scrMiLinea, ok: 'Recambio 3 cerrado: 13 min. Arranca el tiempo en sala de la cirugía 4.' });
+PR({ e: 'Recuperación y QR', r: 'fin', q: 'cir', h: 'Jue 10:36', tit: 'El QR de la paciente se cierra', txt: 'Con la cirugía finalizada, el pase caduca solo: el QR deja de abrir para siempre. Compruébelo en el teléfono de Ana.', t: 'reabrir', go: 'En el teléfono de Ana, toque «Volver a abrir el QR»', ver: () => scrResumen(false), hacer: (S) => { S.p.qr = true; }, ok: 'El QR ya no abre nada: sus datos quedan protegidos.' });
+PR({ e: 'Recuperación y QR', r: 'fin+', q: 'cir', h: 'Jue 10:37', tit: 'Caso cerrado', txt: 'Todos los tiempos quedaron registrados solos y van a las estadísticas. El teléfono de Ana muestra el pase cerrado.', t: 'seguir', go: 'Toque «Seguir: una urgencia»', ver: () => scrResumen(true), ok: 'Ahora, una urgencia.' });
+PR({ e: 'Recuperación y QR', r: 'fin+', q: 'jef', h: 'Otro día', tit: 'Cesárea y parto en Obstetricia', txt: 'En el panel de Obstetricia, programado o de urgencia, el campo <b>Atención</b> dice Cesárea o Parto. La cesárea sigue los pasos que acaba de ver, con recuentos. El parto programado <b>no pasa por la Jefatura</b>: lo confirma Admisión. Tiene 5 momentos, sin conteo de gasas y sin instrumentación, siempre con anestesiólogo/a, y su consentimiento es el <b>obstétrico</b>.', t: 'cesarea', go: 'Toque «Entendido»', ver: scrCesarea, fiesta: true, ok: 'Cesárea con gasas, parto sin gasas.' });
+
+/* Acto · Endoscopía programada (3.33 a 3.39) */
+const EN = (o) => P(Object.assign({ a: 'endo' }, o));
+EN({ e: 'Programar', r: 'prog', q: 'cir', h: 'Lun 09:10', tit: 'El/la endoscopista anota el estudio', txt: 'Elige el turno en la grilla de Endoscopía. Su Jefe/a de Endoscopía abre los días y es quien habilita lo que va fuera de término. El consentimiento es el <b>endoscópico</b>: habla de endoscopista y de estudio, con riesgos y cuidados propios, y va con su preparación. A Endoscopía no se le piden Instrumentación ni Esterilización.', t: 'enprog', go: 'Toque «Enviar el turno»', ver: scrEndo('🔭 Nueva endoscopía', 'Sala de Endoscopía', ['✓ Apto anestésico', '✓ Preparación indicada', '✓ Consentimiento Informado Endoscópico'], 'enprog', '📨 Enviar el turno'), ok: 'Turno enviado a Admisión.' });
+EN({ e: 'Programar', r: 'prog', q: 'cir', h: 'Lun 09:12', tit: 'La app recomienda la prioridad', txt: 'El turno nuevo se carga de a un paso, con cinco casilleros arriba. En <b>Prioridad</b> la app mira la edad, el diagnóstico, los factores tildados, los recursos pedidos y las suspensiones previas del mismo DNI, y dice cuál recomienda y por qué. Cada opción del desplegable explica qué significa. Decide el médico.', t: 'enprio', go: 'Toque «Aplicar»', ver: scrEndo('⭐ La app recomienda: P3 · Alta complejidad', 'Mirando este caso', ['78 años: conviene acortar el ayuno', 'Diabetes: mejor temprano por el ayuno', '1 suspensión en el último año'], 'enprio', '✓ Aplicar'), ok: 'Prioridad aplicada.' });
+EN({ e: 'Admisión', r: 'adm', q: 'adm', h: 'Lun 11:40', tit: 'Admisión autoriza y queda confirmada', txt: 'Acá hay una diferencia: <b>no pasa por la Jefatura de Quirófanos</b>. Si a 48 h hábiles sigue sin autorizar, el/la Jefe/a de Endoscopía recibe la alerta y decide si toca <b>Dar de baja y liberar el turno</b>. Si la da de baja, el médico y el paciente reciben un correo. Con la autorización de Admisión y Egresos, la endoscopía queda confirmada sola.', t: 'enadm', go: 'Toque «Autorizar»', ver: scrEndo('🗂️ Ingresos del día', 'Endoscopía · para autorizar', ['Autoriza Admisión', 'Se confirma sola', 'Sin paso por la Jefatura de Quirófanos'], 'enadm', '🗂️ Autorizar'), ok: 'Endoscopía confirmada.' });
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Lun 11:45', tit: 'Ver la preparación que recibió', txt: 'Con el turno confirmado, el pase le llega solo al paciente por correo, con la <b>preparación</b> del protocolo del HRU (VEDA o colonoscopía) y el consentimiento para leer y aceptar. Para leer esa preparación no hace falta el código del paciente: en la ventana del pase, la tarjeta <b>Preparación</b> la muestra igual que la ve él, con el día en que salió y un botón para imprimirla.', t: 'enprep', go: 'Toque «Preparación»', ver: scrEndo('🎫 Pase del paciente', 'Enviado por correo · VEDA', ['✓ Enlace y QR', '✓ Preparación (protocolo del HRU)', '✓ Consentimiento para aceptar', 'Venir acompañado'], 'enprep', '🧾 Preparación'), ok: 'Ahí está la preparación completa: dieta, medicación, qué traer y cuidados después.' });
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Lun 11:50', tit: 'El consentimiento es del estudio que se hace', txt: 'La app arma el consentimiento según el estudio del turno: en una <b>VEDA</b> dice que el endoscopio entra <b>por la boca</b>; en una <b>colonoscopía</b>, <b>por el ano</b>; si se hacen las dos en el mismo acto, lleva las dos. No deja guardar ni mandar al pase el texto del otro estudio: si alguno quedó mal, lo corrige sola, actualiza el pase y le pide al paciente aceptarlo de nuevo (con un correo).', t: 'enci', go: 'Toque «Consentimiento»', ver: scrEndo('📝 Consentimiento', 'VEDA · por la boca', ['✓ Punto 4: por la boca', '✓ Sin texto de colonoscopía', '✓ Mismo texto en el pase', 'Si cambia, el paciente acepta de nuevo'], 'enci', '📝 Consentimiento'), ok: 'El texto dice exactamente el estudio que se le va a hacer.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Lun 12:30', tit: 'El/la Jefe/a genera el parte antes de las 14 h', txt: 'El parte de Endoscopía se publica solo a las <b>14 h del día hábil previo</b>, para todos. Antes de esa hora, <b>solo el/la Jefe/a de Endoscopía</b> puede generarlo desde su pantalla <b>Jefatura de Endoscopía</b>, en <b>Parte de Endoscopía</b>: elige la fecha y toca <b>Imprimir el parte</b>: pide su contraseña y muestra lo confirmado hasta ese momento, marcado <b>PRELIMINAR</b>, para ver, imprimir o guardar en PDF. No queda guardado en la app: al cerrar la ventana, desaparece.', t: 'enparte', go: 'Toque «Imprimir el parte»', ver: scrEndo('📄 Parte de Endoscopía', 'Antes de las 14 h · solo el/la Jefe/a', ['2 estudios confirmados', '1 sin confirmar (no figura)', 'PRELIMINAR en cada hoja', 'No queda guardado en la app'], 'enparte', '📄 Imprimir el parte'), ok: 'Pidió su contraseña y abrió el parte preliminar. A las 14 h sale el definitivo para todos.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Lun 12:40', tit: 'Cerrar una endoscopía que nadie cargó', txt: 'Si pasó la fecha y nadie dijo qué pasó, el turno queda <b>Sin resolver</b>. El/la Jefe/a de Endoscopía toca <b>Resolver turno</b> y elige: <b>Se realizó</b> (horas, informe del estudio, motivo y Lista de Verificación en papel), <b>No se realizó</b> (con su causa) o <b>Se realizó antes</b>. El botón verde se prende recién con todo lo obligatorio (*) completo y, para registrar el estudio, pide su contraseña.', t: 'enres', go: 'Toque «Resolver turno»', ver: scrEndo('⚠️ Turno sin resolver', '¿Qué pasó con esta endoscopía?', ['Se realizó la colonoscopía', 'No se realizó', 'Se realizó antes', 'Botón apagado hasta completar (*)'], 'enres', '⚠️ Resolver turno'), ok: 'Quedó Finalizada, a su nombre, con el informe del estudio.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Lun 12:45', tit: 'Las franjas, mes por mes', txt: 'En <b>Jefatura de Endoscopía › Franjas</b> el/la Jefe/a ve un <b>calendario del mes</b> y pasa de mes con las flechas, <b>hasta 12 meses adelante</b>. Toca <b>Mañ</b> o <b>Tar</b> para abrir o cerrar esa franja, el <b>número del día</b> para el día entero, <b>«sem»</b> para toda la semana y los botones de abajo para el <b>mes entero</b> (abrir solo toca los días hábiles). Si cierra algo con turnos anotados, la app avisa: cerrar no suspende esos turnos.', t: 'enfra', go: 'Toque «Abrir los días hábiles»', ver: scrEndo('🗓️ Franjas de Endoscopía', 'Calendario de diciembre · hasta 12 meses', ['Mañ / Tar: una franja', 'Número del día: el día entero', '«sem»: la semana', 'Abrir o cerrar el mes'], 'enfra', '✓ Abrir los días hábiles'), ok: 'Quedaron abiertos los días hábiles del mes; los feriados y fines de semana siguen cerrados.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Lun 12:50', tit: 'Tres ventanas que despliegan', txt: 'Arriba de la pantalla del/la Jefe/a hay tres ventanas: <b>Confirmadas</b>, <b>En espera de Admisión y Egresos</b> y <b>Sin resolver</b>. Las tarjetas no se ven sueltas: cada ventana, al tocarla, despliega <b>solo sus turnos</b>, y tocándola otra vez se cierra. Abajo hay un enlace al historial de 60 días.', t: 'envent', go: 'Toque «Sin resolver»', ver: scrEndo('⚠️ Sin resolver · 2', 'Solo los turnos de esta ventana', ['Confirmadas · 3', 'En espera de Admisión · 1', 'Sin resolver · 2', 'Tocar otra vez la cierra'], 'envent', '⚠️ Sin resolver'), ok: 'Se desplegaron solo los turnos sin resolver.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Mié 13:00', tit: 'Hecha y sin cerrar a las 48 h: módulo al 50 %', txt: 'Una endoscopía <b>ya hecha</b> (también la de guardia) tiene <b>48 h desde que terminó</b> para cerrarse: informe del estudio, Lista de Verificación y acreditación de Admisión y Egresos. A las 24 h llega el aviso «Quedan X h». Pasadas las 48 h aparece en <b>Sin resolver</b>: Admisión la acredita igual (sección <b>Para acreditar</b> de Ingresos) y el/la endoscopista la finaliza igual, pero <b>el módulo se liquida al 50 % del valor vigente</b>, y queda anotado en el historial y en Módulos.', t: 'en48', go: 'Toque «Cargar informe del estudio»', ver: scrEndo('⏱ Sin cerrar hace 52 h', 'Falta: informe del estudio', ['Admisión ya la acreditó', 'Se puede cerrar igual', 'Módulo al 50 %', 'Queda en el historial'], 'en48', '📄 Cargar informe del estudio'), ok: 'Quedó Finalizada; en Módulos figura «al 50 %».' }),
+EN({ e: 'Cierre', r: 'sal', q: 'cir', h: 'Jue 10:30', tit: 'El paciente retira su informe en METRIA', txt: 'Al quedar <b>finalizada</b> la endoscopía, el pase del paciente cambia solo: <b>«Tu estudio terminó — Tu informe va a estar en METRIA»</b>, con el botón <b>Retirar mi informe en METRIA</b>, y le llega un correo con el mismo botón. En METRIA entra con su correo, un código y su DNI; el endoscopista le sube el PDF y las fotos (se achican solas). Las descarga y las guarda: se borran de la app a los pocos días.', t: 'enmetria', go: 'Toque «Retirar mi informe en METRIA»', ver: scrEndo('✅ Tu estudio terminó', 'Tu informe va a estar en METRIA', ['1 · Entrá con tu correo', '2 · Código + DNI', '3 · Estudios: informe y fotos', '🔒 Se borran después de bajarlos'], 'enmetria', '➜ Retirar mi informe en METRIA'), ok: 'El paciente entró a METRIA y descargó su informe.' }),
+EN({ e: 'Cierre', r: 'sal', q: 'cir', h: 'Jue 10:40', tit: 'Finalizada y cerrada: ya no se modifica', txt: 'Cuando el endoscopista o el cirujano <b>finaliza y cierra</b>, el turno queda para consulta. En <b>Mis Solicitudes</b> y en la ficha ya no aparecen «Modificar dictamen de Admisión» ni el PDF del consentimiento (queda guardado en <b>Consentimientos Informados</b>), y en el turno desaparece <b>«Eliminar o pasar a otro día»</b>. El recorrido se ve todo en verde: el pase dice que al paciente se le avisa que retire su informe en <b>METRIA</b> y el último paso dice <b>Ficha completa</b>. Única excepción: en las <b>urgencias</b>, donde Admisión autoriza en diferido, el dictamen se puede rectificar.', t: 'encerrada', go: 'Toque «Ficha completa»', ver: scrEndo('🔒 Endoscopía finalizada y cerrada', 'Ya no se modifica: queda para consulta', ['✓ Consentimiento · en Consentimientos Informados', '✓ Pase · se le avisa que retire su informe en METRIA', '✓ Admisión y Egresos · aceptado', '✓ Equipo y módulos'], 'encerrada', '✓ Ficha completa'), ok: 'La ficha se abre solo para leer: sin botones que modifiquen.' }),
+EN({ e: 'En sala', r: 'lvq', q: 'enf', h: 'Jue 08:00', tit: 'La lista de Endoscopía: 11 puntos, entre los cuatro', txt: 'La Lista de Verificación de Endoscopía es propia: <b>11 puntos en tres momentos</b> (Antes de sedar 5 · Antes de empezar 3 · Al terminar 3). Arriba se ven <b>los cuatro</b> de la sala. <b>Tilda cualquiera de los cuatro y lo ven todos al instante</b>. Con <b>✓ Todo verificado</b> se tildan de una vez; con <b>⚠ Hay una novedad</b> se deja escrito algo a tener en cuenta, a la vista del equipo y en el historial. El botón de confirmar queda apagado y dice cuántos puntos faltan.', t: 'enlvq11', go: 'Toque «Todo verificado»', ver: scrEndo('1 · Antes de sedar', 'Tilda cualquiera de los cuatro', ['✓ Identidad, estudio y consentimiento', '✓ Ayuno y preparación', '○ Alergias y anticoagulantes', '○ Vía aérea · ○ Oxímetro y monitoreo'], 'enlvq11', '✓ Todo verificado'), ok: 'Los cinco puntos quedaron tildados en los cuatro teléfonos.' }),
+EN({ e: 'Cierre', r: 'sal', q: 'cir', h: 'Vie 09:00', tit: 'Enmienda con motivo en un caso cerrado', txt: 'El cierre es firme, pero un error se puede corregir a la vista: en la <b>ficha</b> del caso cerrado, el endoscopista o el cirujano (o su Jefatura) toca <b>✏️ Enmienda con motivo</b>. Elige <b>corregir el informe</b> o <b>agregar una aclaración</b>, escribe el <b>motivo</b> y confirma con su contraseña. Lo anterior <b>no se borra</b>: queda guardado con quién, cuándo y por qué. No reabre el caso ni cambia módulos.', t: 'enenm', go: 'Toque «Registrar la enmienda»', ver: scrEndo('✏️ Enmienda con motivo', 'Lo anterior queda guardado', ['◉ Corregir el informe del estudio', '○ Agregar una aclaración', 'Motivo: se omitió describir un pólipo', '🔑 Se confirma con su contraseña'], 'enenm', 'Registrar la enmienda'), ok: 'La enmienda quedó en la ficha, con el texto anterior a la vista.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Mié 13:10', tit: 'Preguntale a la app lo que consideres', txt: 'En el Panel hay una barra para preguntarle a la app. Responde con sus propios datos, sin inteligencia artificial: <b>«¿por qué el módulo de Alegre salió al 50 %?»</b>, <b>«¿cuántas endoscopías mías tiene Admisión sin autorizar?»</b>, <b>«¿cuántos módulos llevo?»</b> (comparado con el mes pasado a la misma fecha, con su importe), <b>«¿quién está de guardia el 20/11?»</b>. Sin ingresar, solo cómo se usa la app. Nada se guarda.', t: 'enpreg', go: 'Toque «Preguntar»', ver: scrEndo('💬 Preguntale a la app', 'lo que consideres', ['¿Por qué el módulo de Alegre salió al 50 %?', 'Se liquida al 50 %: cerrada 52 h después', 'Lleva 12 módulos este mes (+3)', 'Nada se guarda'], 'enpreg', '➤ Preguntar'), ok: 'La app respondió con el motivo y un botón para abrir el turno.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Mié 13:20', tit: 'Un reclamo a la Jefatura de Endoscopía', txt: 'En <b>Reclamos</b>, quien escribe elige a quién va: <b>Jefatura de Quirófanos</b> o <b>Jefatura de Endoscopía</b>. Los de Endoscopía los ve y responde solo el/la Jefe/a de Endoscopía. El botón de enviar dice qué falta hasta elegir destino, asunto y detalle.', t: 'enrec', go: 'Toque «Enviar a la Jefatura de Endoscopía»', ver: scrEndo('✉️ Nuevo reclamo', '¿A quién va?', ['🏥 Jefatura de Quirófanos', '🔭 Jefatura de Endoscopía ✓', 'Asunto y detalle', 'Lo responde el/la Jefe/a de Endoscopía'], 'enrec', '✉️ Enviar a la Jefatura de Endoscopía'), ok: 'El reclamo llegó solo a la Jefatura de Endoscopía.' }),
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Mar 08:00', tit: 'El turno lleva de la mano', txt: 'Al abrir un turno programado, un cartel grande dice <b>su próximo paso</b> y debajo se ve todo el camino. Al cumplir uno, festeja y aparece el siguiente. La tarjeta Consentimiento ya dice si firmó el paciente y si falta el médico. Los datos quedan en tarjetas plegadas.', t: 'encam', go: 'Toque «Firmar el consentimiento»', ver: scrEndo('✍️ Su próximo paso: firmar el consentimiento', 'El paciente ya firmó desde su pase', ['✓ Consentimiento guardado', '✓ Pase del paciente', '✓ Firma del paciente'], 'encam', '🖋️ Firmar el consentimiento'), ok: 'Firmado. Aparece el paso siguiente.' });
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Mar 08:30', tit: 'Los botones de la tarjeta, por importancia', txt: 'En <b>Mis Solicitudes</b> cada turno confirmado muestra primero y más grande <b>▶ Pantalla de sala</b>; al lado, más chico, <b>Iniciar LVQ</b> (apagado y con la fecha hasta el día del turno). Después <b>📅 Pasar a otro día o suspender</b>, y abajo, discretos, <b>Resuelta por urgencia</b> y <b>Pase del paciente</b>. El PDF del consentimiento ya no está en la tarjeta: se baja desde la ficha, al abrir el turno.', t: 'enbot', go: 'Toque «Pasar a otro día o suspender»', ver: scrEndo('🗂 Mis Solicitudes · endoscopía confirmada', 'El orden dice qué es lo importante', ['▶ <b>Pantalla de sala</b> · el principal', '▷ Iniciar LVQ', '⚡ Resuelta por urgencia · ▦ Pase del paciente (discretos)'], 'enbot', '📅 Pasar a otro día o suspender'), ok: 'Se abre una sola ventana con las tres salidas.' });
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Mar 08:32', tit: 'Pasar a otro día, suspender o eliminar', txt: 'Una sola ventana pregunta <b>¿Qué hacemos con la endoscopía?</b> y ofrece tres salidas: <b>📅 Pasarlo a otro día</b> (el mismo turno se muda, con paciente, pase y consentimiento), <b>⏸ Suspender el estudio con causa</b> (el paciente no puede venir, el médico no está disponible…: queda anotado y cuenta en las estadísticas; hay que elegir la causa para poder confirmar) y <b>🗑 Eliminar el estudio</b> (se borra como si nunca se hubiera anotado: es para un error de carga; pide su contraseña). La opción que usted no puede usar se ve <b>apagada</b> y dice por qué: pasar y eliminar son de quien creó el turno y hasta el cierre de la lista; suspender es de la Jefatura.', t: 'enqh', go: 'Toque «Suspender el estudio con causa»', ver: scrEndo('❓ ¿Qué hacemos con la endoscopía?', 'Tres salidas, una sola ventana', ['📅 Pasarlo a otro día', '🗑 Eliminar el estudio · 🔒 la lista ya cerró', 'Causa: «El paciente no puede concurrir (avisó)»'], 'enqh', '⏸ Suspender el estudio con causa'), ok: 'Queda «Suspendida», con su causa.' });
+EN({ e: 'Admisión', r: 'adm', q: 'cir', h: 'Mar 09:00', tit: 'Un feriado nuevo cae sobre el turno', txt: 'La app revisa los feriados todos los días. Si un turno queda en un feriado, al médico que lo programó le aparece una <b>alerta roja</b> al abrir la app, con correo y aviso al teléfono cada día, y al paciente, en su pase y por correo. Cada una se apaga recién cuando esa persona la lee.', t: 'enfer', go: 'Toque «Leí la alerta»', ver: scrEndo('⚠️ Tiene un turno en un día feriado', 'Lunes 9 · 09:00 h', ['Feriado nacional', 'El paciente recibió la misma alerta en su pase'], 'enfer', 'Leí la alerta'), ok: 'Alerta leída: deja de sonar.' });
+EN({ e: 'Ingreso', r: 'pul', q: 'adm', h: 'Jue 07:30', tit: 'Llega: pulsera, sin cama', txt: 'Es ambulatoria: no lleva cama. Admisión imprime la pulsera cuando el paciente se presenta con su DNI, y desde ese momento el equipo ve <b>🟡 Ingresó</b>.', t: 'enpul', go: 'Toque «Imprimir pulsera»', ver: scrEndo('🏷️ Ruta del paciente', 'Ambulatoria · sin cama', ['✓ Autorizada', '✓ Confirmada', 'Pulsera', 'En sala'], 'enpul', '🏷️ Imprimir pulsera'), ok: 'Pulsera lista: el paciente espera que lo llamen.' });
+EN({ e: 'En sala', r: 'eq', q: 'enf', h: 'Jue 07:40', tit: 'Entran siempre cuatro', txt: 'Endoscopista, anestesiólogo/a, enfermero/a de anestesia y enfermero/a de endoscopía. Cada uno toma su lugar con <b>✋ TOMAR</b>. Instrumentación no participa.', t: 'eneq', go: 'Toque «Tomar mi lugar»', ver: scrEndo('✋ Tomar mi lugar', 'Endoscopía · 08:00', ['🩺 Endoscopista', '💤 Anestesiólogo/a', '💉 Enfermería de anestesia', '🔭 Enfermería de endoscopía'], 'eneq', '✋ Tomar mi lugar'), ok: 'Equipo completo.' });
+EN({ e: 'En sala', r: 'lvq', q: 'enf', h: 'Jue 07:58', tit: 'Se lee la pulsera y se abre para todos', txt: 'Quien hace pasar al paciente toca <b>📷 Pulsera</b>, lee el QR y toca «Abrir para todo el equipo». La planilla común se abre en el equipo, con aviso si tienen la app cerrada, y lee en voz alta el/la enfermero/a de endoscopía.', t: 'enqr', go: 'Toque «Abrir para todo el equipo»', ver: scrEndo('✓ Identidad verificada', 'Pulsera · sello SHA-256 ✓', ['Paciente, DNI y estudio a la vista', 'Se abre en todo el equipo'], 'enqr', '📣 Abrir para todo el equipo'), ok: 'Planilla común abierta.' });
+EN({ e: 'Lista de Verificación', r: 'ent', q: 'enf', h: 'Jue 08:00', tit: 'Entrada, sin conteo de gasas', txt: 'La Entrada es antes de la sedación. Firman Enfermería de endoscopía y Anestesiología. <b>No hay recuento inicial ni final</b>, y el punto de gasas no aparece en la lista.', t: 'enent', go: 'Toque «Confirmo»', ver: scrEndo('✅ Entrada', 'Antes de la sedación', ['Identidad, sitio y consentimiento', 'Control de seguridad anestésica', 'Alergias verificadas'], 'enent', '✓ Confirmo'), ok: 'Entrada firmada.' });
+EN({ e: 'Lista de Verificación', r: 'pau', q: 'cir', h: 'Jue 08:06', tit: 'Pausa endoscópica y comienzo del estudio', txt: 'La <b>Pausa endoscópica</b> es antes de la introducción del endoscopio. Confirman endoscopista, Anestesiología y Enfermería de endoscopía.', t: 'enpau', go: 'Toque «Confirmo la Pausa e inicio»', ver: scrEndo('⏸️ Pausa endoscópica', 'Antes de la introducción', ['Equipo presentado', 'Paciente y estudio correctos', 'Eventos críticos revisados'], 'enpau', '▶ Confirmo la Pausa e inicio'), ok: 'Estudio en curso.' });
+EN({ e: 'Cierre', r: 'sal', q: 'enf', h: 'Jue 08:32', tit: 'Salida y parte', txt: 'Al terminar firma la Salida el/la enfermero/a de endoscopía, y el/la endoscopista carga el parte y finaliza.', t: 'ensal', go: 'Toque «Firmar la Salida»', ver: scrEndo('🏁 Salida', 'Antes de dejar la sala', ['Estudio registrado', 'Muestras rotuladas', 'Indicaciones para recuperación'], 'ensal', '✍️ Firmar la Salida'), ok: 'Salida firmada.' });
+EN({ e: 'Cierre', r: 'rec', q: 'anest', h: 'Jue 09:05', tit: 'Recuperación y siguiente paciente', txt: 'Anestesiología da el alta con la escala de Aldrete. La pantalla dice quién sigue en esa sala y si ya ingresó: su planilla se abre al leer su pulsera.', t: 'enrec', go: 'Toque «Registrar el Aldrete»', ver: scrEndo('💤 Recuperación', 'Escala de Aldrete', ['Aldrete 10/10', 'Sigue en esta sala: 08:30 · Colonoscopía'], 'enrec', '✓ Registrar el Aldrete'), fiesta: true, ok: 'Endoscopía cerrada.' });
+
+/* Acto · Mapa de camas y pulsera (3.26) */
+const MP = (o) => P(Object.assign({ a: 'mapa' }, o));
+MP({ e: 'El mapa de las 07:00', r: 'al', q: 'jenf', h: 'Mar 06:30', tit: '06:30 · suena el recordatorio', txt: 'La Jefatura de Enfermería tiene su propia cuenta y entra <b>solo</b> al Mapa de camas. A las 06:30 le suena un aviso fuerte —aunque la app y el teléfono estén cerrados— para que envíe las camas del día a Admisión.', t: 'abrir', go: 'Toque «Abrir el mapa de camas»', ver: scrAlarma, ok: 'Mapa abierto.' });
+MP({ e: 'El mapa de las 07:00', r: 'pin', q: 'jenf', h: 'Mar 06:40', tit: 'Pinta las camas', txt: 'Cuatro esquemas —Adultos (10 habitaciones × 2), Pediatría (12 × 2), Maternidad (8 × 3) y UCI (7 camas)— y cada cama con su color: 🟩 libre · 🟥 ocupada · 🟧 a desocupar (con la hora) · 🟨 reservada · ⬛ fuera de servicio. Todo editable, en todo momento: las urgencias mandan.', t: 'pintar', go: 'Toque el botón amarillo', ver: scrPintar, hacer: (S) => { S.m.pinto = true; }, ok: 'Cama reservada para la cirugía de las 10:00.' });
+MP({ e: 'El mapa de las 07:00', r: 'env', q: 'jenf', h: 'Mar 06:52', tit: 'Enviar a Admisión', txt: 'Con el mapa al día, toca «Enviar a Admisión». Queda la foto sellada de ese momento y Admisión recibe un correo con «✓ Recibido». Si a las 07:00 nadie lo envió, la app manda sola la foto tal como está.', t: 'enviar', go: 'Toque «Enviar a Admisión»', ver: scrEnviarMapa, hacer: (S) => { S.m.envio = true; }, ok: 'Enviado. Ahora espera el «Recibido».' });
+MP({ e: 'Admisión recibe', r: 'rec', q: 'adm', h: 'Mar 07:03', tit: 'Admisión toca «Recibido»', txt: 'En el correo (o en la app), Admisión toca «✓ Recibido»: se le abre el mapa que mandó Enfermería y a la Jefatura de Enfermería le llega «Recibido por Admisión ✓», con nombre y hora.', t: 'recibido', go: 'Toque «Recibido — ver las camas»', ver: scrRecibido, hacer: (S) => { S.m.recibido = true; }, ok: 'A Enfermería le llegó: «Recibido por Admisión ✓ 07:03».' });
+MP({ e: 'Ingreso y pulsera', r: 'ing', q: 'adm', h: 'Mar 07:08', tit: 'Admisión entra con su cuenta', txt: 'Admisión y Egresos tiene su propia entrada («Acceso Admisión y Egresos») con tres secciones: <b>Ingresos del día</b> (los pacientes de hoy y mañana por área, con su cama, autorización y pulsera), el <b>Mapa de camas en vivo</b> y los <b>Avisos</b>. Con la sesión abierta no le pide la contraseña en cada trámite.', t: 'anotar', go: 'Toque «Anotar cama de Pérez, Juan Carlos»', ver: scrIngresosAdm, ok: 'Se abre la ventana de la cama con el mapa del sector.' });
+MP({ e: 'Ingreso y pulsera', r: 'ing', q: 'adm', h: 'Mar 07:10', tit: 'Ingresa el paciente: cama verde → roja', txt: 'Al anotar la cama, Admisión ve el mapa en vivo del sector y toca una cama verde. Al guardar, en el mapa de Enfermería esa cama pasa a <b>rojo</b>, con las iniciales del paciente.', t: 'tocar', go: 'Toque la cama verde marcada (Hab. 4 · Cama 1)', ver: scrIngresoMapa, hacer: (S) => { S.m.ingreso = true; }, ok: 'Hab. 4 · Cama 1: ocupada. Se imprime la pulsera.' });
+MP({ e: 'Ingreso y pulsera', r: 'pul', q: 'adm', h: 'Mar 07:11', tit: 'La pulsera sale sola', txt: 'QR, apellido y nombre, DNI, patología, sector/habitación/cama, quién le dio ingreso y un sello <b>SHA-256</b> de esos datos. Sale en tira: se corta con tijera y se pega en la muñeca (la copia va a la historia clínica).', t: 'pegar', go: 'Toque «Cortar y pegar en la muñeca»', ver: scrPulsera, ok: 'Pulsera puesta.' });
+MP({ e: 'Ingreso y pulsera', r: 'lvq', q: 'enf', h: 'Mar 07:12', tit: 'El equipo ve que ingresó', txt: 'Con la pulsera impresa (con cama o ambulatorio), el turno queda <b>habilitado</b>: quienes tomaron este paciente ven <b>🟡 Ingresó</b> y reciben un aviso. Se puede tomar el turno antes o después del ingreso.', t: 'ingreso', go: 'Toque «Visto»', ver: scrIngreso, ok: 'El equipo sabe que el paciente llegó.' });
+MP({ e: 'Paciente en sala', r: 'lvq', q: 'enf', h: 'Mar 07:55', tit: 'El primero que lee el QR abre la planilla', txt: 'Al hacerlo pasar, cualquiera del equipo toca <b>📷 Pulsera</b> en la app (o usa la cámara del teléfono). Con su cuenta del hospital, la app comprueba el sello (si los datos cambiaron, avisa) y muestra la identidad. Al confirmar, se abre para todos. Si no había tomado el paciente, primero toma su lugar. Sin pulsera, la pantalla de sala lo permite con la identidad verificada a mano.', t: 'lvq', go: 'Toque «Abrir para todo el equipo»', ver: scrEscaneo, ok: 'Planilla abierta, con el punto 1 —identidad— confirmado.' });
+MP({ e: 'Paciente en sala', r: 'lvq', q: 'anest', h: 'Mar 07:55', tit: 'Se abre sola en todos los teléfonos', txt: 'A quienes están anotados en este paciente y tienen la app abierta, la planilla se les abre sola. Si la tienen cerrada les llega <b>Paciente en sala</b> al teléfono: al tocarlo, se abre. Si falta anotarse alguien, empieza por el momento Equipo, con el botón Avisar.', t: 'todos', go: 'Toque «Escuchar y confirmar»', ver: scrTodos, ok: 'Todo el equipo está en la misma planilla.' });
+MP({ e: 'Paciente en sala', r: 'lvq', q: 'enf', h: 'Mar 07:57', tit: 'Una voz, todos escuchan', txt: 'Una persona lee en voz alta y tilda; el resto lo ve en vivo. Cada uno confirma con su botón: no hay casillas repetidas y las firmas son las de siempre. Al confirmar todos, pasa solo al momento siguiente.', t: 'escucha', go: 'Toque «Confirmo»', ver: scrEscucha, ok: 'Entrada confirmada por el equipo.' });
+MP({ e: 'Paciente en sala', r: 'lvq', q: 'enf', h: 'Mar 09:40', tit: 'Se cierra y sigue el próximo', txt: 'Al terminar, la pantalla cierra este paciente y dice quién sigue en esa sala y si ya ingresó. Su planilla se abre al leer su pulsera.', t: 'sigue', go: 'Toque «Pasar al siguiente paciente»', ver: scrSigue, fiesta: true, ok: 'Listo para el siguiente paciente.' });
+
+/* Acto · Sin cama: reprogramación con prioridad (3.25) */
+const CM = (o) => P(Object.assign({ a: 'cama', lado: pac2HTML }, o));
+CM({ e: 'No hay cama', r: 'sin', q: 'adm', h: 'Mar 07:05', tit: 'Ingresa Rosa… y no hay cama', txt: `Martes 20, 07:05. ${REP.pac} llega para su ${REP.proc.toLowerCase()} pero las cuatro salas están completas. Sin cama no se opera: Admisión toca «No hay cama».`, t: 'sincama', go: 'Toque «No hay cama: suspender y reprogramar»', ver: scrSinCama, hacer: (S) => { S.c.sin = true; }, ok: 'Suspendida por falta de cama (1.ª vez). La app ya está buscando lugar.' });
+CM({ e: 'La app busca sola', r: 'bus', q: 'jef', h: 'Mar 07:06', tit: 'La app arma la nueva fecha', txt: 'Sin que nadie haga nada, la app recorre los días que la Jefatura abrió y toma el <b>primer turno libre</b> en una sala del mismo tipo, como mínimo <b>48 horas hábiles</b> después del turno suspendido y en un día cuya lista todavía no cerró. El turno nuevo lleva el sello <b>SIN CAMA ×1</b> y va primero en la lista, por encima de todo lo programado. Vale igual para Endoscopía y Obstetricia.', t: 'visto', go: 'Toque «Ver quién tiene que dar el OK»', ver: scrBusca, ok: 'Turno prioritario armado. Ahora, los tres OK.' });
+CM({ e: 'Los tres OK', r: 'cir', q: 'cir', h: 'Mar 08:10', tit: 'OK del cirujano', txt: 'Los tres OK se dan <b>en cualquier orden</b>. Al Dr. Sosa le salta un aviso crítico «Falta SU OK» —en el teléfono aunque tenga la app cerrada, y por correo—, y si a las 11 h del día del cierre sigue faltando, otro: «Quedan 2 h». Revisa la fecha y la aprueba: un cartel verde le confirma «OK registrado» y le dice quién falta, y en el camino de la ficha (Cirujano · Admisión · Jefatura · <b>Paciente</b>) su paso queda tildado. Si no le sirve, toca «Pedir otra fecha» y la app pasa a la franja siguiente.', t: 'okcir', go: 'Toque «Dar el OK»', ver: (S) => scrOk(S, 'cir'), hacer: (S) => { S.c.cir = true; }, ok: 'OK del cirujano.' });
+CM({ e: 'Los tres OK', r: 'adm', q: 'adm', h: 'Mar 09:20', tit: 'OK de Admisión y Egresos', txt: 'Admisión recibe el aviso también por correo. Lo da desde su sesión, o desde cualquier equipo con el correo y la contraseña del sector; su nombre queda asentado y el OK vale como autorización. Cada OK dado queda tildado ✓ con nombre y hora, sin botón.', t: 'okadm', go: 'Toque «Dar el OK»', ver: (S) => scrOk(S, 'adm'), hacer: (S) => { S.c.adm = true; }, ok: 'OK de Admisión.' });
+CM({ e: 'Los tres OK', r: 'jef', q: 'jef', h: 'Mar 09:40', tit: 'OK de la Jefatura', txt: 'La Jefatura también puede darlo desde otro equipo con su credencial. Recién con el tercer OK la app le pregunta a la paciente —antes no le llega nada—: le manda un correo (sin datos de salud) y la fecha aparece en su pase. Si no tiene pase, Admisión la llama y anota «Confirmó por teléfono» o «No puede ese día».', t: 'okjef', go: 'Toque «Dar el OK»', ver: (S) => scrOk(S, 'jef'), hacer: (S) => { S.c.jef = true; }, ok: 'Los tres OK: se le pregunta a Rosa.' });
+CM({ id: 'cama-pac', e: 'La paciente responde', r: 'pac', q: 'pac2', h: 'Mar 10:12', tit: 'Rosa responde desde su teléfono', txt: 'Rosa abre su pase (DNI + código del correo) y ve la nueva fecha y un paso nuevo, <b>Vos</b>: «Falta tu OK». El equipo la sigue con «👁 Ver el seguimiento del paciente». Si en 24 h no responde, el aviso del equipo cambia a «llamarla». Elija qué contesta Rosa:', t: ['si', 'no'], go: 'En el teléfono de Rosa, toque «Sí, puedo venir» o «No puedo ese día»', ver: pac2HTML, lado: null, elegir: (t) => { ELEC.camaNo = t === 'no'; }, hacer: (S) => { if (ELEC.camaNo) S.c.no = true; else S.c.pac = true; }, ok: (t) => t === 'si' ? '¡Confirmada sola! Queda en el parte con prioridad.' : 'Rosa no puede ese día: la app busca otro.' });
+CM({ si: () => ELEC.camaNo === true, e: 'La paciente responde', r: 'no', q: 'cir', h: 'Mar 10:13', tit: 'Dice que no: otra fecha y los OK a cero', txt: 'La app <b>saltea ese día entero</b> y propone el siguiente turno libre, también a 48 h hábiles como mínimo. La cirugía vuelve a <b>Pendiente</b> y los tres OK vuelven a cero: al Dr. Sosa le salta otra vez «Falta SU OK» y la ve en <b>Mis Solicitudes</b>, en la semana de la nueva fecha. Se repiten los tres OK y la pregunta a Rosa.', t: 'entendido', go: 'Toque «Entendido: se repiten los OK»', ver: scrNoPuede, ok: 'Mientras tanto, corre el reloj de las 13 h.' });
+CM({ si: () => ELEC.camaNo !== true, e: 'Prioridad y parte', r: 'fin', q: 'jef', h: 'Mar 10:12', tit: 'Aviso con PRIORIDAD y sonido', txt: 'Con el SÍ de Rosa antes de las 13 h del día hábil anterior, la app la pone <b>Confirmada sola</b> y le llega el correo «Tu nueva fecha quedó confirmada». A la Jefatura y al cirujano les suena un aviso crítico: «Reprogramación confirmada». Y en el historial queda explícito por qué: cuántas veces se suspendió por falta de cama, quién dio cada OK y cómo respondió la paciente.', t: 'parte', fiesta: true, go: 'Toque «Ver el parte del día»', ver: scrAvisoPrio, ok: 'Todo queda asentado y bien marcado.' });
+CM({ si: () => ELEC.camaNo !== true, e: 'Prioridad y parte', r: 'parte', q: 'jef', h: 'Lun 07:00', tit: 'Tres partes, uno por área', txt: 'El parte del día sale en tres PDF separados y con el mismo diseño: <b>Quirófanos centrales</b>, <b>Endoscopía</b> y <b>Obstetricia y cesáreas</b>. Cada paciente lleva su cama con el interno, y la reprogramada, el sello rojo «SIN CAMA ×1 · PRIORIDAD».', t: 'imprimir', go: 'Toque «Quirófanos centrales»', ver: scrPartes, ok: 'Listo: así se ve en el papel. Ahora, qué pasa si no llegan los OK a tiempo.' });
+CM({ e: 'El plazo de las 13 h', r: 'cad', q: 'cir', h: 'Vie 13:00', tit: 'Si a las 13 h falta un OK: caduca', txt: 'Es el mismo plazo que cualquier cirugía: todo (los tres OK y el de la paciente) tiene que estar antes de las <b>13 h del día hábil anterior</b>, cuando sale el parte. Si falta alguno, la cirugía pasa sola a <b>Caducada</b>, sin botones; el pase de la paciente se cierra y al cirujano le salta «<b>Debe reprogramarla</b>». Queda en Mis Solicitudes → Desvíos → Caducada.', t: 'reprog', go: 'Toque «Reprogramar»', ver: scrCaduca, ok: 'Se abre la solicitud nueva con los datos de Rosa ya cargados.' });
+CM({ e: 'El plazo de las 13 h', r: 'rep', q: 'cir', h: 'Vie 13:05', tit: 'Reprogramar con un toque', txt: 'El cirujano elige la franja libre como siempre y el turno se abre con el paciente, el diagnóstico, la cirugía, el equipo y los recursos <b>ya cargados</b>. Los requisitos para Admisión (prequirúrgico, apto anestésico, consentimiento) se vuelven a tildar. Al guardar, las dos cirugías quedan unidas en el historial, se apaga el aviso y el turno nuevo <b>conserva el sello SIN CAMA y la prioridad</b>.', t: 'programar', go: 'Toque «Programar turno»', ver: scrReprog, ok: 'Turno nuevo programado, con la prioridad SIN CAMA, y unido a la caducada.' });
+CM({ e: 'Todo el recorrido', r: 'mapa', q: 'jef', h: '—', tit: 'El recorrido completo, en una página', txt: 'Los siete pasos con todas las ramas —sin lugar, otra fecha, el sí, el no, el plazo y una nueva falta de cama— en una sola hoja para repasar o imprimir.', t: 'seguir', go: 'Ábralo, y después toque «Seguir: una urgencia»', ver: scrRecorrido, ok: 'Ahora, una urgencia.' });
+
+/* Acto 4 · Urgencia */
+const UR = (o) => P(Object.assign({ a: 'urg', tab: true }, o));
+UR({ id: 'urg-elige', e: '¿En qué horario?', r: 'urg', q: 'cir', h: '—', tit: 'Llega una urgencia', txt: 'La urgencia sigue el mismo circuito, pero no espera a nadie. Lo que cambia es cuándo actúan Admisión y Jefatura, según la hora.', t: ['fuera', 'en'], go: 'Elija «Fuera del horario laboral» o «En horario laboral»', ver: scrElegir, elegir: (t) => { ELEC.horario = t; }, ok: (t) => t === 'fuera' ? 'Sábado, 02:40. Admisión y Jefatura no están.' : 'Martes, 11:15. Admisión y Jefatura están trabajando.' });
+UR({ id: 'urg-carga', e: 'Carga', r: 'urg', q: 'cir', h: () => horaU('Sáb 02:40', 'Mar 11:15'), tit: 'El cirujano carga la urgencia', txt: () => `Prioridad P1, la primera sala libre. ${fuera() ? 'Fuera de horario, Admisión y Jefatura quedan <b>diferidas</b>: se opera igual y lo regularizan al volver.' : 'En horario, Admisión y Jefatura reciben el aviso <b>ahora</b> y validan mientras se prepara la sala.'}`, t: 'urg', go: 'Toque «Cargar la urgencia»', ver: scrCargaUrg, hacer: (S) => { S.u.carga = true; }, ok: () => fuera() ? 'Urgencia cargada. En el tablero: Admisión y Jefatura «diferidas».' : 'Urgencia cargada. Admisión y Jefatura ya tienen el aviso en rojo.' });
+UR({ si: () => ELEC.horario === 'en', e: 'Validación en el momento', r: 'adm', q: 'adm', h: 'Mar 11:17', tit: 'Admisión actúa en tiempo real', txt: 'En horario, Admisión ve la urgencia apenas se carga y acepta el ingreso en el momento.', t: 'aceptar', go: 'Toque «Aceptar el ingreso»', ver: () => scrAlertaUrg('adm'), hacer: (S) => { S.u.adm = true; }, ok: 'Ingreso aceptado en tiempo real.' });
+UR({ si: () => ELEC.horario === 'en', e: 'Validación en el momento', r: 'jef', q: 'jef', h: 'Mar 11:19', tit: 'La Jefatura valida en el momento', txt: 'La Jefatura la ve en Quirófanos en vivo, en rojo, y la valida sin frenar a nadie.', t: 'validar', go: 'Toque «Validar la urgencia»', ver: () => scrAlertaUrg('jef'), hacer: (S) => { S.u.jef = true; }, ok: 'Validada. Todo al día antes de empezar.' });
+UR({ e: 'Equipo de guardia', r: 'eq', q: 'anest', h: () => horaU('Sáb 02:48', 'Mar 11:22'), tit: 'Anestesia de guardia da el OK', txt: 'La app avisa a quien está de guardia según la lista mensual de Anestesiología. Llega y toma la urgencia.', t: 'tomar', go: 'Toque «Llegué y tomo la urgencia»', ver: (S) => scrGuardia(S, 'anest'), hacer: (S) => { S.u.anest = true; }, ok: 'Anestesia en la sala.' });
+UR({ e: 'Equipo de guardia', r: 'eq', q: 'enf', h: () => horaU('Sáb 02:51', 'Mar 11:25'), tit: 'Enfermería e instrumentación se anotan', txt: 'La circulante y la instrumentadora de guardia toman la urgencia. Mismas reglas: una persona, una sala.', t: 'tomar', go: 'Toque «Anotarme» en Circulante', ver: (S) => scrGuardia(S, 'enf'), hacer: (S) => { S.u.eq = true; }, ok: 'Equipo completo.' });
+UR({ e: 'Cirugía', r: 'ini', q: 'cir', h: () => horaU('Sáb 02:58', 'Mar 11:33'), tit: 'LVQ Entrada + Pausa en un solo paso', txt: 'En la urgencia, Entrada, recuento inicial y Pausa se hacen juntos para no perder tiempo, pero no se saltean.', t: 'iniciar', go: 'Toque «Iniciar LVQ»', ver: () => scrUrgLVQ(false), hacer: (S) => { S.u.ini = true; }, ok: 'Cirugía en curso.' });
+UR({ e: 'Cirugía', r: 'sal', q: 'cir', h: () => horaU('Sáb 03:52', 'Mar 12:20'), tit: 'Salida y parte', txt: () => fuera() ? 'Recuento final, Salida y parte. Pero como entró fuera de horario, todavía no se finaliza: faltan Admisión y Jefatura.' : 'Recuento final, Salida y parte. Como Admisión y Jefatura ya validaron, queda finalizada en el acto.', t: 'finalizar', go: 'Toque «Finalizar (LVQ Salida + parte)»', ver: () => scrUrgLVQ(true), hacer: (S) => { S.u.sal = true; }, ok: () => fuera() ? 'Operada. En el tablero queda «falta regularizar».' : 'Finalizada al salir de la sala.' });
+UR({ si: () => ELEC.horario !== 'en', e: 'Validación diferida', r: 'adm', q: 'adm', h: 'Lun 07:10', tit: 'Admisión regulariza al volver', txt: 'Lunes 07:10. La urgencia del sábado espera en la bandeja de Admisión, marcada como diferida.', t: 'aceptar', go: 'Toque «Aceptar (regularizar)»', ver: () => scrRegulariza('adm'), hacer: (S) => { S.u.adm = true; }, ok: 'Admisión regularizada.' });
+UR({ si: () => ELEC.horario !== 'en', e: 'Validación diferida', r: 'jef', q: 'jef', h: 'Lun 07:30', tit: 'La Jefatura valida y se finaliza', txt: 'Con Admisión al día, la Jefatura valida la urgencia diferida y la cirugía queda finalizada.', t: 'validar', go: 'Toque «Validar y finalizar»', ver: () => scrRegulariza('jef'), hacer: (S) => { S.u.jef = true; }, ok: 'Urgencia regularizada y finalizada.' });
+UR({ id: 'urg-fin', e: 'Comparar', r: 'fin', q: 'jef', h: '—', tit: 'Las dos urgencias, lado a lado', txt: 'Puede ver el otro caso o seguir con las estadísticas.', t: ['seguir', 'otro'], go: 'Toque «Seguir» (o vea el otro caso)', ver: scrCompara, elegir: (t) => { if (t === 'otro') { ELEC.horario = fuera() ? 'en' : 'fuera'; return 'urg-carga'; } }, ok: (t) => t === 'otro' ? (fuera() ? 'Ahora: fuera de horario.' : 'Ahora: en horario.') : 'Ahora, los números.' });
+
+/* Acto 5 · Estadísticas y cierre */
+P({ a: 'cie', e: 'Mi actividad', q: 'cir', h: 'Vie 17:30', tit: 'Mi actividad, de un vistazo', txt: 'Al entrar a Estadísticas, cada cirujano o endoscopista ve primero <b>lo suyo</b>: cuántos hizo, cuántos están cerrados y cuántos falta cerrar, a cargo y como ayudante, sus <b>módulos A, B y C</b>, mes a mes y lo que más hizo. Debajo, una tarjeta por cada uno de sus servicios con su parte. Cuenta todo lo hecho, aunque falte cerrarlo.', t: 'estad', go: 'Toque «Ver las estadísticas del bloque»', ver: scrMiAct, ok: 'Y la Jefatura ve el bloque entero.' });
+P({ a: 'cie', e: 'Estadísticas', q: 'jef', h: 'Vie 18:00', tit: 'Un pantallazo de las estadísticas', txt: 'Todo lo que se firmó en la semana arma los números sin cargar nada a mano: cirugías, puntualidad, suspensiones, LVQ completas, por especialidad. También se bajan en Excel.', t: 'copa', go: 'Toque «Ver la copa de oro de la semana»', ver: scrEstad, ok: 'Y quien más operó se lleva la copa.' });
+P({ a: 'cie', e: 'Copa de oro', q: 'cir', h: 'Dom 21:00', tit: 'La copa de oro', txt: 'Cada semana, el cirujano con más cirugías realizadas gana la copa de oro. Al entrar la ve con papelitos y queda en su medallero.', t: 'festejar', fiesta: true, go: 'Toque «Entregar la copa»', ver: scrCopa, ok: '¡Copa de oro para el Dr. Sosa: 9 cirugías esta semana!' });
+P({ a: 'cie', e: 'Incidencias', q: 'enf', h: 'Jue 09:45', tit: 'Una incidencia, de punta a punta', txt: 'Lo que sale de lo previsto queda registrado con su seguimiento: Pendiente → En Revisión → Resuelta. Ejemplo: en un recuento faltaba una gasa.', t: 'resolver', go: 'Toque «Marcar como Resuelta»', ver: scrIncidencia, ok: 'Incidencia resuelta y asentada. Cuenta en los indicadores de calidad.' });
+P({ a: 'cie', e: 'Reclamos', q: 'jef', h: 'Jue 10:10', tit: 'Un reclamo con respuesta', txt: 'Cualquier integrante puede reclamar a la Jefatura. El reclamo pasa de Abierto a Respondido y a Cerrado, y quien reclamó recibe la respuesta.', t: 'responder', go: 'Toque «Responder y cerrar»', ver: scrReclamo, ok: 'Respondido y cerrado. El Dr. Sosa recibe la respuesta.' });
+P({ id: 'final', a: 'cie', e: 'Recorrido final', full: finalHTML, fiesta: true });
+
+/* ================= MOTOR ================= */
+const LLAVE = 'hru_manual_v2';
+let cur = 0;
+const lista = () => PASOS.filter((p) => !p.si || p.si());
+const val = (x, a) => (typeof x === 'function' ? x(a) : x);
+const primerDe = (a) => lista().findIndex((p) => p.a === a);
+const pasosDe = (a) => lista().filter((p) => p.a === a).length;
+function estadoHasta(n) { const S = inicial(), L = lista(); for (let i = 0; i < n; i++) if (L[i].hacer) L[i].hacer(S); return S; }
+function leerGuardado() { try { return JSON.parse(localStorage.getItem(LLAVE) || 'null'); } catch (e) { return null; } }
+// En la portada no se guarda: así «Seguir donde quedé» no se pierde al volver a ella.
+function guardar() { if (cur === 0) return; try { localStorage.setItem(LLAVE, JSON.stringify({ cur, elec: ELEC })); } catch (e) {} }
+
+const RIEL_MAPA = [['al', '06:30'], ['pin', 'Mapa'], ['env', 'Enviar'], ['rec', 'Recibido'], ['ing', 'Cama roja'], ['pul', 'Pulsera'], ['lvq', 'En sala']];
+const RIEL_CAMA = () => [['sin', 'Sin cama'], ['bus', 'Nueva fecha'], ['cir', 'OK cirujano'], ['adm', 'OK Admisión'], ['jef', 'OK Jefatura'], ['pac', 'Paciente'],
+  ...(ELEC.camaNo === true ? [['no', 'Otra fecha']] : [['fin', 'Prioridad'], ['parte', 'Parte']]), ['cad', '13 h'], ['rep', 'Reprogramar'], ['mapa', 'Recorrido']];
+const RIEL_EQD = [['20h', '20:00 aviso'], ['ver', 'Propuesta'], ['camb', 'Cambiar'], ['vivo', 'En vivo'], ['conf', 'Confirmar'], ['sala', 'Llegué'], ['dia', 'Reemplazo']];
+const RIEL_PROG = [['prog', 'Programada'], ['adm', 'Admisión'], ['jef', 'Jefatura'], ['cama', 'Cama'], ['eq', 'Equipo'], ['pa', 'Parte pre-anest.'], ['ent', 'LVQ Entrada'], ['rec1', 'Gasas'], ['pau', 'Pausa'], ['ini', 'Cirugía'], ['rec2', 'Recuento final'], ['sal', 'LVQ Salida'], ['rec', 'Recuperación'], ['lin', 'Mi línea'], ['fin', 'QR cerrado']];
+function rielHTML(st) {
+  let est;
+  if (st.a === 'prog') est = RIEL_PROG;
+  else if (st.a === 'endo') est = [['prog', 'Programada'], ['adm', 'Admisión'], ['pul', 'Pulsera'], ['eq', 'Equipo'], ['lvq', 'QR'], ['ent', 'Entrada'], ['pau', 'Pausa'], ['sal', 'Salida'], ['rec', 'Recuperación']];
+  else if (st.a === 'cama') est = RIEL_CAMA();
+  else if (st.a === 'mapa') est = RIEL_MAPA;
+  else if (st.a === 'eqd') est = RIEL_EQD;
+  else if (st.a === 'urg') est = fuera()
+    ? [['urg', 'Urgencia'], ['eq', 'Guardia'], ['ini', 'LVQ + cirugía'], ['sal', 'Salida'], ['adm', 'Admisión'], ['jef', 'Jefatura'], ['fin', 'Finalizada']]
+    : [['urg', 'Urgencia'], ['adm', 'Admisión'], ['jef', 'Jefatura'], ['eq', 'Equipo'], ['ini', 'LVQ + cirugía'], ['sal', 'Salida'], ['fin', 'Finalizada']];
+  else return '';
+  let idx = est.findIndex(([k]) => k === st.r);
+  if (st.r === 'fin+' || (st.a === 'urg' && st.r === 'fin')) idx = est.length;
+  return `<div class="riel" aria-label="En qué está la cirugía">${est.map(([k, n], i) => {
+    const dif = st.a === 'urg' && fuera() && ['adm', 'jef'].includes(k) && i > idx;
+    const c = i < idx ? 'ok' : i === idx ? 'act' : dif ? 'dif' : '';
+    return `<div class="est ${c}"><i>${c === 'ok' ? '✓' : dif ? '⏸' : i + 1}</i>${n}</div>`;
+  }).join('')}</div>`;
+}
+function devHTML(k, hora, html, lado, qf) {
+  return `<div class="dev${lado ? ' lado' : ''}" style="--k:${R[k].c}"><div class="dev-in">
+    <div class="dev-st"><span>${hora || ''}</span><span class="isla"></span><span>5G ▮▮▮</span></div>
+    <div class="dev-who">${av(k)}<div><b>${R[k].n}</b><small>${qf || R[k].f}</small></div><span class="app">${k.startsWith('pac') ? 'Portal paciente' : 'HRU'}</span></div>
+    <div class="scr">${html}</div></div></div>`;
+}
+function mapaHTML(L) {
+  const st = L[cur];
+  return `<h3>Recorrido</h3>${ACTOS.map((a, ai) => {
+    const pasos = L.map((p, i) => ({ p, i })).filter((x) => x.p.a === a.k);
+    if (!pasos.length) return '';
+    const escs = [];
+    pasos.forEach(({ p, i }) => { const u = escs[escs.length - 1]; if (u && u.e === p.e) u.hasta = i; else escs.push({ e: p.e, desde: i, hasta: i }); });
+    const hechos = pasos.filter((x) => x.i < cur).length;
+    return `<div class="acto${st.a === a.k ? ' on' : ''}"><button class="acto-h" data-t="ir:${pasos[0].i}"><i>${a.i}</i>${ai + 1} · ${a.n}<small>${hechos}/${pasos.length}</small></button>
+      <ul class="escs">${escs.map((s) => { const c = cur > s.hasta ? 'ok' : cur >= s.desde ? 'act' : ''; return `<li><button class="${c}" data-t="ir:${s.desde}"><span>${c === 'ok' ? '✓' : ''}</span>${s.e}</button></li>`; }).join('')}</ul></div>`;
+  }).join('')}<button class="tb" style="width:100%;margin-top:6px" data-t="ir:0">🎬 Portada</button>`;
+}
+function render() {
+  const L = lista();
+  cur = Math.max(0, Math.min(cur, L.length - 1));
+  const st = L[cur], S = estadoHasta(cur);
+  $('#barra').style.width = (cur / (L.length - 1) * 100) + '%';
+  $('#mapa').innerHTML = mapaHTML(L);
+  if (st.full) {
+    $('#escena').innerHTML = st.full();
+  } else {
+    const actoN = ACTOS.findIndex((a) => a.k === st.a);
+    const enActo = L.filter((p) => p.a === st.a), nEn = enActo.indexOf(st) + 1;
+    $('#escena').innerHTML = `<div class="esc-grid"><div class="col-rel"><section class="relato" style="--k:${R[st.q].c}">
+        <div class="rel-top"><span class="chip">${ACTOS[actoN].i} Acto ${actoN + 1} · ${ACTOS[actoN].n}</span><span>${st.e}</span><span>· paso ${nEn} de ${enActo.length}</span></div>
+        <h1>${val(st.tit)}</h1>
+        <div class="quien">${av(st.q)}<span>${R[st.q].n} <small>· ${st.qf || R[st.q].f}</small></span></div>
+        <p>${val(st.txt)}</p>
+        <div class="go"><span class="dedo">👆</span><span>${val(st.go)}</span></div>
+        <div class="nav"><button class="tb" data-t="ant">← Anterior</button><button class="tb foco-btn" data-t="foco">👇 Ir a lo marcado</button><span class="esp"></span><span class="atajos">Teclas ← →</span><button class="tb" data-t="sig">Saltar paso →</button></div>
+      </section></div><div class="col-esc">
+      ${rielHTML(st)}
+      <div class="escenario">${devHTML(st.q, val(st.h), st.ver(S), false, st.qf)}${st.pac ? devHTML('pac', val(st.h), pacHTML(S), true) : ''}${st.tab ? devHTML('tab', val(st.h), tabHTML(S), true) : ''}${st.lado ? devHTML(st.ladoQ || 'pac2', val(st.h), st.lado(S), true) : ''}</div></div></div>`;
+    [].concat(st.t || []).forEach((t) => { const el = document.querySelector(`.escenario [data-t="${t}"]`); if (el) el.classList.add('foco'); });
+    // Dentro de cada pantalla, que lo marcado quede a la vista.
+    document.querySelectorAll('.escenario .foco').forEach((el) => { const s = el.closest('.scr'); if (s && s.scrollHeight > s.clientHeight) s.scrollTop = Math.max(0, el.offsetTop - s.clientHeight / 2); });
+  }
+  if (st.fiesta && st.full) festejo();
+  guardar();
+}
+function ir(n) {
+  cur = n; render();
+  const f = $('.escenario .foco');
+  if (innerWidth >= 1100 && f) {
+    const r = f.getBoundingClientRect();
+    if (r.top < 80 || r.bottom > innerHeight - 20) f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const y = $('#escena').getBoundingClientRect().top + scrollY - 80;
+  if (scrollY > y + 10) scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+}
+function irAFoco() { const el = $('.escenario .foco'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function cumplir(st, t) {
+  const salto = st.elegir ? st.elegir(t) : null;
+  const msg = val(st.ok, t);
+  if (st.fiesta) festejo();
+  if (msg) toast(msg, 'ok');
+  ir(salto ? lista().findIndex((p) => p.id === salto) : cur + 1);
+}
+
+let tt;
+function toast(txt, tipo) {
+  const t = $('#toast');
+  t.className = 'toast ' + (tipo || 'ok');
+  t.innerHTML = `<i>${tipo === 'info' ? 'ℹ️' : '✅'}</i><span>${txt}</span>`;
+  requestAnimationFrame(() => t.classList.add('on'));
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), tipo === 'info' ? 5200 : 3800);
+}
+function festejo() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const cols = ['#f59e0b', '#2563eb', '#db2777', '#0d9488', '#7c3aed', '#16a34a'];
+  for (let i = 0; i < 90; i++) {
+    const p = document.createElement('i');
+    p.className = 'papel';
+    p.style.left = Math.random() * 100 + 'vw';
+    p.style.background = cols[i % cols.length];
+    p.style.animationDuration = 1.6 + Math.random() * 1.6 + 's';
+    p.style.animationDelay = Math.random() * .4 + 's';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 3800);
+  }
+}
+function mapa(abrir) { $('#mapa').classList.toggle('abierto', abrir); $('#velo').classList.toggle('abierto', abrir); }
+function tema() {
+  const r = document.documentElement;
+  const oscuro = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme = oscuro ? 'light' : 'dark';
+  try { localStorage.setItem('hru_manual_tema', r.dataset.theme); } catch (e) {}
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-t]');
+  if (!el || el.disabled) return;
+  const t = el.dataset.t;
+  if (t === 'volver') return volverApp();
+  if (t === 'tema') return tema();
+  if (t === 'mapa') return mapa(!$('#mapa').classList.contains('abierto'));
+  if (t.startsWith('ir:')) { mapa(false); return ir(Number(t.slice(3))); }
+  if (t === 'ant') return ir(cur - 1);
+  if (t === 'sig') return ir(cur + 1);
+  if (t === 'foco') return irAFoco();
+  if (t === 'reinicio') { ELEC = {}; try { localStorage.removeItem(LLAVE); } catch (er) {} return ir(0); }
+  const st = lista()[cur];
+  if ([].concat(st.t || []).includes(t)) return cumplir(st, t);
+  if (t === 'info') return toast(el.dataset.info, 'info');
+  // Tocó otra cosa dentro de una pantalla: se le recuerda qué tocar.
+  const f = $('.escenario .foco');
+  if (f) { f.classList.add('sacude'); setTimeout(() => f.classList.remove('sacude'), 450); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest && e.target.closest('input, textarea')) return;
+  if (e.key === 'ArrowRight') ir(cur + 1);
+  if (e.key === 'ArrowLeft') ir(cur - 1);
+  if (e.key === 'Escape') mapa(false);
+});
+
+/* Arranque: el tema elegido y lo que eligió en la urgencia. Siempre se empieza
+   por la portada, que ofrece «Seguir donde quedé». */
+try { const tm = localStorage.getItem('hru_manual_tema'); if (tm) document.documentElement.dataset.theme = tm; } catch (e) {}
+{ const g = leerGuardado(); if (g && g.elec) ELEC = g.elec; }
+render();
+</script>
+</body>
+</html>

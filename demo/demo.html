@@ -1,0 +1,1239 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>HRU Quirófanos · Guía de inicio</title>
+<meta name="description" content="Guía interactiva de HRU Quirófanos para todo el personal del Bloque Quirúrgico y de Endoscopía del Hospital Regional Ushuaia: qué es, cómo se usa por sector, autorizaciones, contacto con el paciente, automatizaciones y calidad.">
+<meta name="theme-color" content="#0f766e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f766e'/%3E%3Cpath d='M20 32h24M32 20v24' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f8fb; --bg2:#ffffff; --ink:#0f172a; --mut:#5b6474; --line:#e3e8ef; --soft:#eef2f7;
+  --brand:#0f766e; --brand2:#2563eb;
+  --cir:#2563eb; --endo:#059669; --anest:#7c3aed; --enf:#0d9488; --inst:#d97706; --jef:#e11d48; --dir:#4f46e5; --adm:#0891b2; --pac:#db2777;
+  --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+  --r:18px; --sh:0 10px 30px -18px rgba(15,23,42,.35);
+  font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b1120; --bg2:#121a2e; --ink:#e8edf5; --mut:#9aa6b8; --line:#243049; --soft:#18223a; --sh:0 10px 30px -18px rgba(0,0,0,.8);
+    --cir:#60a5fa; --endo:#34d399; --anest:#a78bfa; --enf:#2dd4bf; --inst:#fbbf24; --jef:#fb7185; --dir:#818cf8; --adm:#22d3ee; --pac:#f472b6; --brand:#2dd4bf;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b1120; --bg2:#121a2e; --ink:#e8edf5; --mut:#9aa6b8; --line:#243049; --soft:#18223a; --sh:0 10px 30px -18px rgba(0,0,0,.8);
+  --cir:#60a5fa; --endo:#34d399; --anest:#a78bfa; --enf:#2dd4bf; --inst:#fbbf24; --jef:#fb7185; --dir:#818cf8; --adm:#22d3ee; --pac:#f472b6; --brand:#2dd4bf;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);line-height:1.55;font-size:16px;overflow-x:hidden}
+img,svg{max-width:100%}
+a{color:var(--brand2)}
+button{font:inherit;cursor:pointer;color:inherit}
+h1,h2,h3,h4{line-height:1.2;margin:0 0 .5em;letter-spacing:-.015em}
+h2{font-size:clamp(1.5rem,4.2vw,2.2rem)}
+h3{font-size:1.15rem}
+p{margin:0 0 .8em}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+.mut{color:var(--mut)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:700;background:color-mix(in srgb,var(--k,var(--brand)) 14%,transparent);color:var(--k,var(--brand));border:1px solid color-mix(in srgb,var(--k,var(--brand)) 30%,transparent)}
+.card{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh)}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800;background:var(--k,var(--brand));color:#fff;box-shadow:0 8px 20px -10px var(--k,var(--brand));transition:transform .15s,opacity .2s;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
+.btn.ghost{background:var(--soft);color:var(--ink);box-shadow:none;border:1px solid var(--line)}
+.btn.sm{padding:7px 11px;font-size:.84rem;border-radius:10px}
+section{padding:56px 0;scroll-margin-top:64px}
+section:nth-of-type(even){background:color-mix(in srgb,var(--soft) 60%,transparent)}
+.kick{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--brand);margin-bottom:6px}
+.lead{font-size:1.08rem;color:var(--mut);max-width:760px}
+
+/* ---------- barra superior ---------- */
+.top{position:sticky;top:0;z-index:50;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:10px;height:56px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:900;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.logo i{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#0f766e,#2563eb);display:grid;place-items:center;color:#fff;font-style:normal;font-size:1.1rem}
+.nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.nav::-webkit-scrollbar{display:none}
+.nav a{white-space:nowrap;text-decoration:none;color:var(--mut);font-weight:700;font-size:.86rem;padding:6px 10px;border-radius:9px}
+.nav a:hover,.nav a.on{background:var(--soft);color:var(--ink)}
+.tema{border:1px solid var(--line);background:var(--bg2);border-radius:10px;width:36px;height:36px;flex:none}
+.progreso{position:absolute;left:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--brand),var(--brand2));width:0}
+
+/* ---------- portada ---------- */
+.hero{padding:42px 0 52px;background:radial-gradient(1200px 500px at 85% -10%,color-mix(in srgb,var(--brand2) 22%,transparent),transparent 60%),radial-gradient(900px 500px at -10% 10%,color-mix(in srgb,var(--brand) 22%,transparent),transparent 60%)}
+.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:34px;align-items:center}
+.hero h1{font-size:clamp(2rem,6vw,3.3rem);margin-bottom:.3em}
+.hero h1 span{background:linear-gradient(90deg,var(--brand),var(--brand2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lead{font-size:1.15rem}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 14px}
+.treinta{margin-top:18px;padding:14px 16px;border-radius:16px;background:var(--bg2);border:1px solid var(--line)}
+.treinta b{display:block;margin-bottom:6px}
+.treinta ul{margin:0;padding-left:20px}
+.treinta li{margin:3px 0}
+
+/* ---------- teléfono ---------- */
+.phone{width:min(290px,100%);margin:0 auto;aspect-ratio:9/18.5;border-radius:38px;padding:11px;background:#0f172a;box-shadow:0 30px 60px -25px rgba(15,23,42,.55),inset 0 0 0 2px #334155;position:relative}
+.phone:before{content:"";position:absolute;top:16px;left:50%;transform:translateX(-50%);width:84px;height:20px;border-radius:12px;background:#0f172a;z-index:3}
+.scr{width:100%;height:100%;border-radius:29px;overflow:hidden;background:#f8fafc;color:#0f172a;position:relative;font-size:12.5px;display:flex;flex-direction:column}
+.scr .sb{height:38px;flex:none;display:flex;justify-content:space-between;align-items:flex-end;padding:0 20px 4px;font-weight:800;font-size:11px}
+.scr .hd{padding:8px 12px;background:linear-gradient(135deg,var(--k,#0f766e),color-mix(in srgb,var(--k,#0f766e) 60%,#1e3a8a));color:#fff}
+.scr .hd b{display:block;font-size:14px}
+.scr .hd small{opacity:.85}
+.scr .bd{padding:10px;overflow:hidden;flex:1;display:flex;flex-direction:column;gap:7px}
+.row{display:flex;align-items:center;gap:8px;padding:8px;border-radius:11px;background:#fff;border:1px solid #e2e8f0}
+.row .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.row small{color:#64748b;display:block}
+.pill{display:inline-block;padding:1px 7px;border-radius:7px;font-size:10.5px;font-weight:800;color:#fff}
+.vivo{animation:late 1.4s ease-in-out infinite}
+@keyframes late{50%{opacity:.45}}
+
+/* ---------- qué es ---------- */
+.princ .card h3{display:flex;align-items:center;gap:10px}
+.princ .card h3 span{font-size:1.5rem}
+.antes{margin-top:22px}
+.tog{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px;margin-bottom:12px}
+.tog button{border:0;background:transparent;border-radius:9px;padding:7px 14px;font-weight:800;color:var(--mut)}
+.tog button.on{background:var(--bg2);color:var(--ink);box-shadow:var(--sh)}
+.av-lista{display:grid;gap:8px}
+.av-item{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--bg2);border:1px solid var(--line)}
+.av-item b{font-size:1.2rem;line-height:1}
+.js .av-item .ahora{display:none}
+.js .modo-ahora .av-item .antes-t{display:none}
+.js .modo-ahora .av-item .ahora{display:block}
+.no-js-label{font-weight:800;font-size:.78rem;color:var(--mut)}
+.js .no-js-label{display:none}
+
+/* ---------- quién sos ---------- */
+.sectores{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 20px}
+.sectores button{border:2px solid color-mix(in srgb,var(--k) 35%,var(--line));background:var(--bg2);border-radius:14px;padding:10px 14px;font-weight:800;display:flex;align-items:center;gap:8px;transition:.15s}
+.sectores button span{font-size:1.25rem}
+.sectores button.on{background:var(--k);color:#fff;border-color:var(--k);transform:translateY(-2px);box-shadow:0 10px 22px -12px var(--k)}
+.sector{display:grid;grid-template-columns:1fr 300px;gap:22px;align-items:start;margin-bottom:28px}
+.js .sector{display:none;margin-bottom:0}
+.js .sector.on{display:grid;animation:aparece .35s ease}
+@keyframes aparece{from{opacity:0;transform:translateY(8px)}}
+.sector h3.tit{font-size:1.5rem;color:var(--k)}
+.pasos{counter-reset:p;list-style:none;padding:0;margin:0 0 14px;display:grid;gap:8px}
+.pasos li{counter-increment:p;position:relative;padding:11px 12px 11px 50px;border-radius:14px;background:var(--bg2);border:1px solid var(--line)}
+.pasos li:before{content:counter(p);position:absolute;left:12px;top:10px;width:28px;height:28px;border-radius:50%;background:var(--k);color:#fff;font-weight:900;display:grid;place-items:center;font-size:.9rem}
+.cajas2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.caja{border-radius:14px;padding:12px 14px;border:1px solid var(--line);background:var(--bg2)}
+.caja h4{font-size:.92rem;margin-bottom:6px}
+.caja ul{margin:0;padding-left:18px;font-size:.93rem}
+.caja.auto{border-color:color-mix(in srgb,var(--ok) 40%,var(--line));background:color-mix(in srgb,var(--ok) 6%,var(--bg2))}
+.caja.lock{border-color:color-mix(in srgb,var(--warn) 40%,var(--line));background:color-mix(in srgb,var(--warn) 6%,var(--bg2))}
+
+/* ---------- viaje ---------- */
+.viaje{display:grid;grid-template-columns:1fr 300px;gap:26px;align-items:start}
+.riel{display:flex;gap:4px;margin:18px 0 16px;overflow-x:auto;padding-bottom:6px}
+.riel button{flex:1;min-width:38px;border:0;background:var(--soft);border-radius:10px;padding:8px 4px;font-weight:900;font-size:.8rem;color:var(--mut);position:relative}
+.riel button.hecho{background:color-mix(in srgb,var(--ok) 20%,var(--soft));color:var(--ok)}
+.riel button.on{background:var(--k);color:#fff}
+.etapas{list-style:none;padding:0;margin:0}
+.etapa{margin-bottom:18px}
+.js .etapa{display:none;margin:0}
+.js .etapa.on{display:block;animation:aparece .3s ease}
+.etapa .quien{margin-bottom:8px}
+.etapa h3{font-size:1.4rem}
+.etapa .mini{display:none}
+.navv{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+.pulsa{animation:pulsa 1.6s ease-in-out infinite}
+@keyframes pulsa{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--k,var(--brand)) 55%,transparent)}50%{box-shadow:0 0 0 9px transparent}}
+.tel-viaje{position:sticky;top:76px}
+.toque{font-size:.78rem;color:var(--mut);text-align:center;margin-top:8px}
+
+/* mini-pantallas */
+.agenda{display:grid;grid-template-columns:44px repeat(6,1fr);gap:3px;font-size:10px}
+.agenda b{font-weight:800;color:#475569;align-self:center}
+.agenda button{border:1.5px dashed #cbd5e1;background:#fff;border-radius:6px;height:22px;padding:0;font-size:9px;color:#94a3b8}
+.agenda button.ab{border:0;background:#22c55e;color:#fff;font-weight:800}
+.franja{display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-radius:9px;font-weight:700;border:1px solid #e2e8f0;background:#fff}
+.franja.libre{border-color:#86efac;background:#f0fdf4;color:#166534}
+.franja.res{border-color:#c4b5fd;background:#f5f3ff;color:#5b21b6}
+.franja.cer{color:#94a3b8;background:#f1f5f9}
+.franja.urg{border-color:#fca5a5;background:#fef2f2;color:#b91c1c}
+.doc{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px}
+.doc i{display:block;height:6px;border-radius:3px;background:#e2e8f0;margin:5px 0}
+.cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;font-size:11px;background:#ecfeff;color:#0e7490;border-radius:6px;padding:3px 6px;display:inline-block}
+.dict{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.dict button{border:2px solid #e2e8f0;border-radius:12px;padding:12px 4px;font-weight:900;font-size:11px;background:#fff}
+.dict button.si.on{background:#16a34a;border-color:#16a34a;color:#fff}
+.dict button.no.on{background:#dc2626;border-color:#dc2626;color:#fff}
+.chk{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;background:#fff;border:1px solid #e2e8f0;font-weight:700}
+.chk input{width:16px;height:16px;accent-color:#16a34a}
+.sello{position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.75);opacity:0;pointer-events:none;transition:.3s}
+.sello.on{opacity:1}
+.sello div{border:4px solid #16a34a;color:#16a34a;font-weight:900;font-size:17px;padding:10px 14px;border-radius:12px;transform:rotate(-10deg) scale(.6);transition:.35s cubic-bezier(.2,1.6,.4,1);background:#fff}
+.sello.on div{transform:rotate(-10deg) scale(1)}
+.burbuja{background:#0f172a;color:#fff;border-radius:14px 14px 14px 4px;padding:10px 12px;font-size:12px}
+.barra7{display:flex;gap:3px}
+.barra7 i{flex:1;height:7px;border-radius:4px;background:#e2e8f0}
+.barra7 i.ok{background:#16a34a}
+.barra7 i.ya{background:#f59e0b;animation:late 1.2s infinite}
+
+/* ---------- simulador ---------- */
+.sim{display:grid;grid-template-columns:300px 1fr;gap:22px;align-items:start}
+.manos{display:grid;gap:8px}
+.mano{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:2px solid var(--line);background:var(--bg2);text-align:left;width:100%;position:relative}
+.mano .av{width:38px;height:38px;border-radius:50%;background:var(--k);color:#fff;display:grid;place-items:center;font-weight:900;flex:none}
+.mano b{display:block;font-size:.95rem}
+.mano small{color:var(--mut)}
+.mano.on{border-color:var(--k);background:color-mix(in srgb,var(--k) 10%,var(--bg2))}
+.mano .le{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:.7rem;font-weight:900;background:var(--k);color:#fff;padding:3px 8px;border-radius:999px;display:none}
+.mano.toca .le{display:block;animation:pulsa 1.4s infinite}
+.simbox{border-radius:var(--r);border:1px solid var(--line);background:var(--bg2);overflow:hidden;box-shadow:var(--sh)}
+.simhd{padding:14px 16px;background:linear-gradient(135deg,#0f766e,#1d4ed8);color:#fff}
+.simhd b{font-size:1.05rem}
+.pasos7{display:flex;gap:4px;margin-top:10px}
+.pasos7 i{flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,.25)}
+.pasos7 i.ok{background:#4ade80}
+.pasos7 i.ya{background:#fde047;animation:late 1.2s infinite}
+.simbd{padding:16px}
+.hechos{display:grid;gap:5px;margin-bottom:12px}
+.hechos div{font-size:.86rem;color:var(--mut);display:flex;gap:6px}
+.hechos div b{color:var(--ok)}
+.actual{border:2px solid var(--brand);border-radius:16px;padding:14px}
+.actual h4{font-size:1.1rem;margin-bottom:4px}
+.firmas{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.firma{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:11px;border:1.5px solid var(--line);background:var(--soft);font-weight:700;font-size:.88rem}
+.firma.ok{border-color:var(--ok);color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,var(--bg2))}
+.firma button{margin-left:4px}
+.lehoy{padding:9px 12px;border-radius:11px;font-weight:800;font-size:.92rem;background:color-mix(in srgb,var(--warn) 14%,var(--bg2));color:color-mix(in srgb,var(--warn) 80%,var(--ink));margin-bottom:10px}
+.lehoy.mio{background:color-mix(in srgb,var(--ok) 14%,var(--bg2));color:color-mix(in srgb,var(--ok) 80%,var(--ink))}
+.cuenta{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:10px 0}
+.cnt{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--soft)}
+.cnt span{font-weight:700;font-size:.88rem}
+.cnt div{display:flex;align-items:center;gap:6px}
+.cnt button{width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--bg2);font-weight:900}
+.cnt b{min-width:22px;text-align:center;font-variant-numeric:tabular-nums}
+.cnt.dif{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--bg2))}
+.frenado{padding:11px 13px;border-radius:12px;background:color-mix(in srgb,var(--bad) 12%,var(--bg2));color:var(--bad);font-weight:800;margin:8px 0}
+.items{display:grid;gap:6px;margin:10px 0}
+.items label{display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--soft);font-weight:600;font-size:.92rem}
+.items input{width:18px;height:18px;accent-color:var(--ok)}
+.ald{display:grid;gap:6px;margin:10px 0}
+.ald div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:10px;background:var(--soft);font-weight:600;font-size:.9rem;flex-wrap:wrap}
+.ald span{display:flex;gap:4px}
+.ald button{width:34px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--bg2);font-weight:900}
+.ald button.on{background:var(--anest);color:#fff;border-color:var(--anest)}
+.fin{text-align:center;padding:20px 10px}
+.fin .big{font-size:3rem}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,140%);background:#0f172a;color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;z-index:99;max-width:min(92vw,520px);box-shadow:0 20px 40px -20px #000;transition:transform .3s cubic-bezier(.2,1.4,.4,1),opacity .2s;text-align:center;opacity:0;pointer-events:none}
+.toast.on{transform:translate(-50%,0);opacity:1}
+
+/* ---------- autorizaciones ---------- */
+.cadena{display:grid;gap:10px;margin-top:16px;position:relative}
+.eslabon{display:grid;grid-template-columns:46px 1fr auto;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;background:var(--bg2);border:1px solid var(--line);transition:.25s}
+.eslabon .ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-size:1.4rem;background:color-mix(in srgb,var(--k) 15%,transparent)}
+.eslabon h4{margin:0 0 2px;font-size:1rem}
+.eslabon p{margin:0;font-size:.9rem;color:var(--mut)}
+.eslabon .req{font-size:.78rem;font-weight:800;padding:4px 9px;border-radius:999px;white-space:nowrap}
+.req.pre{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.req.post{background:color-mix(in srgb,var(--brand2) 16%,transparent);color:var(--brand2)}
+.req.na{background:var(--soft);color:var(--mut)}
+.eslabon.atenuado{opacity:.45}
+.flecha{text-align:center;color:var(--mut);font-size:1.1rem;line-height:.6}
+
+/* ---------- paciente ---------- */
+.pac{display:grid;grid-template-columns:300px 1fr;gap:26px;align-items:center}
+.pase{border-radius:18px;overflow:hidden;background:linear-gradient(160deg,#db2777,#7c3aed 55%,#2563eb);color:#fff;box-shadow:0 10px 24px -14px #7c3aed}
+.pase .p1{padding:12px 14px}
+.pase .p1 small{opacity:.85;font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:800}
+.pase .p1 b{display:block;font-size:16px}
+.pase .p2{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:0 14px 10px;font-size:10px}
+.pase .p2 b{display:block;font-size:13px}
+.pase .p3{background:#fff;margin:0 10px 10px;border-radius:12px;padding:8px;display:flex;gap:9px;align-items:center;color:#0f172a}
+.pase .p3 svg{width:74px;height:74px;flex:none}
+.estado-pac{padding:11px;border-radius:12px;font-weight:800;text-align:center;transition:.3s;color:#fff}
+.tl{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:4px}
+.tl li{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);font-weight:600;transition:.25s}
+.tl li i{width:12px;height:12px;border-radius:50%;background:var(--line);flex:none;font-style:normal}
+.tl li.ok i{background:var(--ok)}
+.tl li.ya{border-color:var(--pac);background:color-mix(in srgb,var(--pac) 8%,var(--bg2))}
+.tl li.ya i{background:var(--pac);animation:late 1.2s infinite}
+
+/* ---------- reloj de automatismos ---------- */
+.dia{position:relative;margin:22px 0 10px;padding:42px 0 6px}
+.dia .linea{height:10px;border-radius:5px;background:linear-gradient(90deg,#1e3a8a,#0ea5e9 25%,#facc15 50%,#fb923c 75%,#4c1d95)}
+.dia .mark{position:absolute;top:0;transform:translateX(-50%);text-align:center;font-size:.78rem;font-weight:800;white-space:nowrap}
+.dia .mark:after{content:"";display:block;width:2px;height:14px;background:var(--ink);margin:4px auto 0}
+.dia .ahora{position:absolute;top:36px;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid #0f172a;transform:translateX(-50%);box-shadow:0 0 0 4px rgba(15,23,42,.15)}
+.auto-g .card{padding:14px 16px}
+.auto-g .card .t{font-size:1.5rem;font-weight:900;color:var(--k,var(--brand));font-variant-numeric:tabular-nums}
+.auto-g .card h4{margin:2px 0 4px;font-size:.98rem}
+.auto-g .card p{margin:0;font-size:.9rem;color:var(--mut)}
+
+/* ---------- calidad ---------- */
+.medidor{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center}
+.medidor svg{width:96px;height:96px}
+.medidor h4{margin:0 0 3px}
+.medidor p{margin:0;font-size:.88rem;color:var(--mut)}
+.sem{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.mosaico{display:flex;flex-wrap:wrap;gap:3px;margin:8px 0}
+.mosaico i{width:13px;height:13px;border-radius:3px;background:var(--k);animation:cae .4s backwards}
+.mosaico i.u{background:#dc2626}
+@keyframes cae{from{transform:scale(0)}}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+.tabla-scroll{overflow-x:auto;border-radius:14px;border:1px solid var(--line);background:var(--bg2)}
+.cat{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;color:#fff;font-weight:900}
+
+/* ---------- empezar ---------- */
+.check{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.check li label{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--bg2);border:1px solid var(--line);cursor:pointer}
+.check input{width:22px;height:22px;margin-top:2px;accent-color:var(--ok);flex:none}
+.check li.hecho label{background:color-mix(in srgb,var(--ok) 8%,var(--bg2));border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+.check li.hecho b{text-decoration:line-through;text-decoration-color:var(--ok)}
+.barra-av{height:10px;border-radius:5px;background:var(--soft);overflow:hidden;margin:10px 0 16px}
+.barra-av i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),var(--brand));transition:width .4s}
+.disp{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.disp button{border:1px solid var(--line);background:var(--bg2);border-radius:10px;padding:7px 12px;font-weight:800}
+.disp button.on{background:var(--ink);color:var(--bg)}
+.instal{display:none}
+.instal.on{display:block}
+.no-js .instal{display:block;margin-bottom:10px}
+details{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:0 16px;margin-bottom:8px}
+details summary{cursor:pointer;font-weight:800;padding:14px 0;list-style:none;display:flex;justify-content:space-between;gap:10px}
+details summary::-webkit-details-marker{display:none}
+details summary:after{content:"+";font-size:1.3rem;line-height:1;color:var(--mut);transition:.2s}
+details[open] summary:after{transform:rotate(45deg)}
+details > div{padding:0 0 14px;color:var(--mut)}
+footer{padding:36px 0 60px;text-align:center;color:var(--mut);font-size:.9rem}
+
+/* ---------- responsive ---------- */
+.hero .wrap>*,.viaje>*,.sim>*,.pac>*,.sector>*{min-width:0}
+@media (max-width:900px){
+  .hero .wrap,.viaje,.sim,.pac{grid-template-columns:minmax(0,1fr)}
+  .js .sector.on,.sector{grid-template-columns:minmax(0,1fr)}
+  .tel-viaje{position:static}
+  .hero .phone{width:250px}
+  .sector .phone,.tel-viaje .phone,.pac .phone{aspect-ratio:auto;height:auto;width:min(300px,100%)}
+  .sector .phone .scr,.tel-viaje .phone .scr,.pac .phone .scr{height:auto;min-height:330px;padding-bottom:12px}
+  .riel button{min-width:30px}
+  .manos{grid-template-columns:1fr 1fr}
+  .mano{padding:8px;gap:8px}
+  .mano .av{width:32px;height:32px;font-size:.8rem}
+  .mano small{font-size:.72rem}
+  .mano .le{top:-9px;right:6px;transform:none}
+}
+@media (max-width:560px){
+  body{font-size:15.5px}
+  section{padding:42px 0}
+  .cajas2{grid-template-columns:1fr}
+  .eslabon{grid-template-columns:40px 1fr}
+  .eslabon .ic{width:40px;height:40px;font-size:1.2rem}
+  .eslabon .req{grid-column:2;justify-self:start}
+  .logo span{display:none}
+  .medidor{grid-template-columns:80px 1fr}
+  .medidor svg{width:80px;height:80px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+@media print{
+  .top,.cta,.navv,.riel,.sectores,.tema,.toast,#simulador{display:none!important}
+  .js .sector,.js .etapa{display:block!important}
+  section{padding:20px 0;break-inside:avoid-page}
+  body{background:#fff;color:#000}
+}
+</style>
+</head>
+<body class="no-js">
+<script>document.documentElement.classList.add('js');document.body.classList.remove('no-js');try{var t=localStorage.getItem('hruDemoTema');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+
+<header class="top">
+  <div class="wrap">
+    <a class="logo" href="#inicio"><i>✚</i><span>HRU Quirófanos</span></a>
+    <nav class="nav" id="nav">
+      <a href="#que-es">Qué es</a>
+      <a href="#quien">Tu sector</a>
+      <a href="#viaje">Una cirugía</a>
+      <a href="#simulador">Probalo</a>
+      <a href="#autorizaciones">Autorizaciones</a>
+      <a href="#paciente">Paciente</a>
+      <a href="#automatico">Automático</a>
+      <a href="#calidad">Calidad</a>
+      <a href="#empezar">Empezar</a>
+      <a href="#preguntas">Preguntas</a>
+    </nav>
+    <button class="tema" id="tema" title="Claro / oscuro" aria-label="Cambiar entre tema claro y oscuro">◐</button>
+  </div>
+  <div class="progreso" id="progreso"></div>
+</header>
+
+<main>
+<!-- ================= PORTADA ================= -->
+<section class="hero" id="inicio">
+  <div class="wrap">
+    <div>
+      <div class="kick">Hospital Regional Ushuaia · Bloque Quirúrgico y Endoscopía</div>
+      <h1>Todo el quirófano, <span>en una sola app.</span></h1>
+      <p class="lead">HRU Quirófanos es el canal único del Bloque de Quirófanos Centrales, la Sala de Endoscopía Digestiva y el Quirófano de Obstetricia: desde que se pide el turno hasta que el caso se cierra, todos trabajamos sobre el mismo dato, cada uno con lo suyo, y queda registrado quién hizo qué y a qué hora.</p>
+      <div class="cta">
+        <a class="btn" href="#quien">👤 Empezar por mi sector</a>
+        <a class="btn ghost" href="#viaje">▶ Ver una cirugía de punta a punta</a>
+      </div>
+      <div class="treinta">
+        <b>⏱ Si tenés solo 30 segundos</b>
+        <ul>
+          <li><b style="display:inline">Una cuenta personal</b> por persona: cirujanos, endoscopistas, anestesia, enfermería, instrumentación, Admisión, Jefatura y Dirección.</li>
+          <li>El turno se pide en la <b style="display:inline">grilla real</b>, con consentimiento precargado y el <b style="display:inline">paciente siguiendo su estado</b> desde el celular.</li>
+          <li>En sala, un <b style="display:inline">recorrido de 7 pasos</b> (OMS + NHS) donde firma cada uno lo suyo.</li>
+          <li>Plazos, avisos, módulos e indicadores <b style="display:inline">se calculan solos</b>. Nadie carga planillas.</li>
+          <li>Funciona en computadora, tablet y celular, <b style="display:inline">incluso sin señal</b>.</li>
+        </ul>
+      </div>
+    </div>
+    <div>
+      <div class="phone" aria-hidden="true">
+        <div class="scr">
+          <div class="sb"><span id="hora-tel">10:24</span><span>●●● 5G</span></div>
+          <div class="hd" style="--k:#0f766e"><small>Panel · Quirófanos en vivo</small><b>Buen día, Dra. Ejemplo</b></div>
+          <div class="bd">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <div class="row" style="flex-direction:column;align-items:flex-start;gap:0"><small>Parte de hoy</small><b style="font-size:18px">9</b></div>
+              <div class="row" style="flex-direction:column;align-items:flex-start;gap:0"><small>En curso</small><b style="font-size:18px;color:#ea580c">3 <span class="vivo">●</span></b></div>
+            </div>
+            <div class="row"><span class="dot" style="background:#ea580c"></span><div><b>Q1 · Colecistectomía</b><small>En curso · paso 4 de 7</small></div></div>
+            <div class="row"><span class="dot" style="background:#059669"></span><div><b>Endoscopía · VEDA</b><small>Confirmada · 11:00</small></div></div>
+            <div class="row" style="border-color:#fca5a5;background:#fef2f2"><span class="dot vivo" style="background:#dc2626"></span><div><b>🚑 Q1 · Urgencia</b><small style="color:#b91c1c">Apendicectomía · ahora</small></div></div>
+            <div class="row"><span class="dot" style="background:#7c3aed"></span><div><b>Obstetricia · Cesárea</b><small>Validada · 12:00</small></div></div>
+            <div class="row"><span class="dot" style="background:#2563eb"></span><div><b>Q3 · Hernioplastia</b><small>Confirmada · 14:00</small></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= QUÉ ES ================= -->
+<section id="que-es">
+  <div class="wrap">
+    <div class="kick">De cero</div>
+    <h2>Qué es y qué problema resuelve</h2>
+    <p class="lead">Reemplaza las planillas sueltas, los cuadernos de sala, los mensajes de chat y los llamados. No por prolijidad: por <b>seguridad del paciente y trazabilidad</b>. En un quirófano cada decisión —quién programó, quién autorizó, quién suspendió, qué se le informó al paciente— tiene consecuencias clínicas y responsabilidad profesional.</p>
+    <div class="grid g4 princ" style="margin-top:20px">
+      <div class="card"><h3><span>🎯</span>Una sola fuente de verdad</h3><p class="mut">Grilla, parte, estadísticas, módulos y tablero salen del mismo registro. No pueden contradecirse.</p></div>
+      <div class="card"><h3><span>✍️</span>El dato se carga una vez</h3><p class="mut">Lo que se escribe al pedir el turno pasa solo al consentimiento, al parte, a las estadísticas y a los módulos.</p></div>
+      <div class="card"><h3><span>👁️</span>Cada uno ve lo suyo</h3><p class="mut">Cada perfil ve exactamente aquello sobre lo que actúa y responde. Ni más, ni menos.</p></div>
+      <div class="card"><h3><span>🕓</span>Todo con autor y hora</h3><p class="mut">Cada firma, cambio y aviso queda con nombre, cuenta y hora. Nada se borra: se corrige agregando.</p></div>
+    </div>
+
+    <div class="antes" id="antes">
+      <h3 style="margin-top:28px">¿Qué cambia en el día a día?</h3>
+      <div class="tog" role="tablist"><button class="on" data-modo="antes">Antes</button><button data-modo="ahora">Con la app</button></div>
+      <div class="av-lista">
+        <div class="av-item"><b>📞</b><div><span class="no-js-label">ANTES · </span><span class="antes-t">Pedir turno por teléfono y esperar una confirmación de palabra.</span><span class="no-js-label">AHORA · </span><span class="ahora">Ver la grilla real, tomar la franja y seguir el estado del turno en todo momento.</span></div></div>
+        <div class="av-item"><b>📄</b><div><span class="no-js-label">ANTES · </span><span class="antes-t">Escribir el consentimiento desde cero o usar un formulario genérico.</span><span class="no-js-label">AHORA · </span><span class="ahora">Consentimiento con los datos del turno ya volcados, contenido clínico de 113 procedimientos precargado, editable y con el marco legal argentino.</span></div></div>
+        <div class="av-item"><b>📦</b><div><span class="no-js-label">ANTES · </span><span class="antes-t">Enterarse el mismo día de que falta el implante o la caja.</span><span class="no-js-label">AHORA · </span><span class="ahora">Farmacia, Esterilización, Hemoterapia y Anestesia verifican antes de que la Jefatura valide.</span></div></div>
+        <div class="av-item"><b>📝</b><div><span class="no-js-label">ANTES · </span><span class="antes-t">Lista de verificación en papel, a veces incompleta, y recuento anotado a mano.</span><span class="no-js-label">AHORA · </span><span class="ahora">Recorrido de 7 pasos con la firma de cada integrante; si el recuento no coincide, la salida se frena y la Jefatura se entera al instante.</span></div></div>
+        <div class="av-item"><b>🧑‍🦱</b><div><span class="no-js-label">ANTES · </span><span class="antes-t">El paciente llama para preguntar si se opera o no.</span><span class="no-js-label">AHORA · </span><span class="ahora">El paciente recibe un pase con QR y ve en su celular, en tiempo real, en qué está su cirugía o su estudio.</span></div></div>
+        <div class="av-item"><b>💰</b><div><span class="no-js-label">ANTES · </span><span class="antes-t">Discutir a fin de mes qué módulo correspondía a cada uno.</span><span class="no-js-label">AHORA · </span><span class="ahora">El módulo lo fija el nomenclador al programar y se liquida solo lo operado y documentado.</span></div></div>
+        <div class="av-item"><b>📊</b><div><span class="no-js-label">ANTES · </span><span class="antes-t">Armar estadísticas a mano, tarde y con números que no coinciden.</span><span class="no-js-label">AHORA · </span><span class="ahora">Indicadores y estadísticas en vivo, calculados de la actividad real, con semáforo contra la meta.</span></div></div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:30px">Las salas que administra</h3>
+    <div class="grid g3">
+      <div class="card" style="--k:var(--cir)"><span class="chip">Quirófanos 1 a 4</span><p style="margin:.6em 0 0">Franjas de 08 · 10 · 12 · 14 · 16 · 18 h. El <b>Quirófano 1</b> tiene además un turno rodante de <b>urgencia las 24 h</b>.</p></div>
+      <div class="card" style="--k:var(--endo)"><span class="chip">Sala de Endoscopía Digestiva</span><p style="margin:.6em 0 0">De 08 a 17 h, <b>cada hora</b> (10 franjas), y urgencia endoscópica las 24 h.</p></div>
+      <div class="card" style="--k:var(--anest)"><span class="chip">Quirófano de Obstetricia</span><p style="margin:.6em 0 0">Cesáreas programadas de 08 a 18 h y <b>cesáreas de urgencia las 24 h</b>.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= QUIÉN SOS ================= -->
+<section id="quien">
+  <div class="wrap">
+    <div class="kick">Elegí tu sector</div>
+    <h2>¿Quién sos en el quirófano?</h2>
+    <p class="lead">Tocá tu función y mirá tu lugar en la app, tu primer día paso a paso, lo que la app hace por vos y lo que no te va a dejar hacer (y por qué).</p>
+    <div class="sectores" id="sectores">
+      <button data-s="cir" style="--k:var(--cir)"><span>🩺</span>Cirujano/a</button>
+      <button data-s="endo" style="--k:var(--endo)"><span>🔬</span>Endoscopista</button>
+      <button data-s="anest" style="--k:var(--anest)"><span>💉</span>Anestesiología</button>
+      <button data-s="enf" style="--k:var(--enf)"><span>🧑‍⚕️</span>Enfermería</button>
+      <button data-s="inst" style="--k:var(--inst)"><span>🧰</span>Instrumentación</button>
+      <button data-s="jef" style="--k:var(--jef)"><span>🗂️</span>Jefatura de Quirófanos</button>
+      <button data-s="dir" style="--k:var(--dir)"><span>🏛️</span>Dirección y Jefes de Servicio</button>
+      <button data-s="adm" style="--k:var(--adm)"><span>🧾</span>Admisión y Egresos</button>
+    </div>
+
+    <!-- Cirujano -->
+    <div class="sector" data-s="cir" style="--k:var(--cir)">
+      <div>
+        <h3 class="tit">🩺 Cirujano/a (también Obstetricia)</h3>
+        <p>Tu lugar: <b>Mis Solicitudes</b> (pedir y seguir turnos), <b>Consentimientos</b>, <b>Mis estadísticas y módulos</b>, <b>Reclamos</b>, <b>Reconocimiento</b> y <b>Mi Perfil</b>.</p>
+        <ol class="pasos">
+          <li><b>Pedí el alta</b> en <i>Acceso Profesional › Solicitar alta</i> con tu correo y tus servicios (podés elegir más de uno). Verificá el correo.</li>
+          <li><b>Completá Mi Perfil</b>: matrícula, título de especialista, seguro, RCP y vacunas, con vencimientos. La Jefatura autoriza tu cuenta.</li>
+          <li><b>Pedí el turno</b> tocando una franja libre de la grilla. Cargás paciente, diagnóstico y práctica del nomenclador (el módulo sale solo).</li>
+          <li><b>Guardá el consentimiento</b>: ya viene con los datos y el contenido clínico. <b>Guardarlo confirma la franja.</b> Después, generá el <b>pase del paciente</b>.</li>
+          <li><b>El día de la cirugía</b> tocás <b>Iniciar</b> (registra la Pausa y la incisión) y al terminar cargás el <b>informe operatorio</b>: la cirugía queda Realizada y, cerrados los trámites, Finalizada.</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>🤖 La app hace por vos</h4><ul><li>Te avisa por escrito y <b>con voz</b> a las 20 h de la víspera (sin nombres de pacientes).</li><li>Te avisa antes de que venza tu matrícula, seguro o RCP.</li><li>Asigna el módulo al primer ayudante (un escalón abajo).</li><li>Le manda el pase al paciente por correo.</li></ul></div>
+          <div class="caja lock"><h4>🔒 No te deja</h4><ul><li>Programar fuera de la grilla habilitada o después del cierre de las 13 h del día hábil previo.</li><li>Quedarte con la franja sin consentimiento guardado (se libera a los 60 min).</li><li>Usar una franja reservada para otra especialidad.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>19:58</span><span>●●●</span></div><div class="hd" style="--k:#2563eb"><small>Mis Solicitudes · esta semana</small><b>Lun a Dom</b></div><div class="bd">
+        <div class="row"><span class="dot" style="background:#16a34a"></span><div><b>Mar 10 h · Q2</b><small>Colecistectomía · Confirmada</small></div></div>
+        <div class="row"><span class="dot" style="background:#f59e0b"></span><div><b>Jue 08 h · Q3</b><small>Hernioplastia · En Admisión</small></div></div>
+        <div class="row" style="border-color:#fca5a5"><span class="dot" style="background:#dc2626"></span><div><b>Lun 12 h · Q1</b><small style="color:#b91c1c">Sin resolver · Resolver turno</small></div></div>
+        <div class="burbuja">🔊 «Buenas noches, le recuerdo que mañana tiene una cirugía programada; la primera, a las 10 de la mañana.»</div>
+        <button class="btn sm" style="--k:#2563eb;justify-content:center">＋ Nueva solicitud quirúrgica</button>
+      </div></div></div>
+    </div>
+
+    <!-- Endoscopista -->
+    <div class="sector" data-s="endo" style="--k:var(--endo)">
+      <div>
+        <h3 class="tit">🔬 Endoscopista</h3>
+        <p>Usás la misma app que los cirujanos, con <b>Endoscopía Digestiva</b> entre tus servicios. Tu grilla es la de la <b>Sala de Endoscopía</b>: turnos de una hora de 08 a 17 h y urgencia las 24 h.</p>
+        <ol class="pasos">
+          <li><b>Pedí el alta</b> eligiendo <i>Endoscopía Digestiva</i> (y Cirugía General u otro, si también operás). Verificá el correo y completá Mi Perfil.</li>
+          <li><b>Pedí el estudio</b> tocando la hora libre en la Sala de Endoscopía. VEDA, colonoscopía, CPRE y demás salen del nomenclador.</li>
+          <li><b>Consentimiento</b> precargado para el estudio: revisalo, adecualo al caso y guardalo.</li>
+          <li><b>Pase del paciente</b>: el paciente ve «<b>Mi estudio</b>» — «Tu estudio está confirmado» — y sigue el estado desde su celular.</li>
+          <li><b>Urgencia endoscópica</b>: tocás el turno de urgencia de la hora en curso; se opera primero y los trámites se regularizan después.</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>🤖 La app hace por vos</h4><ul><li>Al tomar una urgencia aparece otro turno libre en la misma hora.</li><li>Tus estudios cuentan en las estadísticas de Endoscopía (verde en el Pulso de la semana).</li><li>Anestesia ve tus estudios en su portal y se anota.</li></ul></div>
+          <div class="caja lock"><h4>🔒 No te deja</h4><ul><li>Pedir un estudio programado sin apto anestésico, estudios previos y consentimiento: Admisión no dictamina.</li><li>Cerrar el caso sin el informe.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>09:12</span><span>●●●</span></div><div class="hd" style="--k:#059669"><small>Programación diaria</small><b>Sala de Endoscopía · Miércoles</b></div><div class="bd">
+        <div class="franja cer"><span>08:00</span><span>VEDA · ocupado</span></div>
+        <div class="franja libre"><span>09:00</span><span>Libre · tocar</span></div>
+        <div class="franja cer"><span>10:00</span><span>Colonoscopía · ocupado</span></div>
+        <div class="franja libre"><span>11:00</span><span>Libre · tocar</span></div>
+        <div class="franja urg"><span>🚑 Ahora</span><span>Urgencia 24 h</span></div>
+        <div class="franja libre"><span>12:00</span><span>Libre · tocar</span></div>
+      </div></div></div>
+    </div>
+
+    <!-- Anestesia -->
+    <div class="sector" data-s="anest" style="--k:var(--anest)">
+      <div>
+        <h3 class="tit">💉 Anestesiología</h3>
+        <p>Tu lugar: el <b>Portal de Anestesiología</b>, con tres pestañas: <b>Hoy</b>, <b>Mes</b> e <b>Indicadores</b>. Sos personal del hospital: tu aporte en la app es de <b>seguridad y organización</b> (no cobrás módulos).</p>
+        <ol class="pasos">
+          <li><b>Pedí el alta</b> con la función <i>Anestesiología</i>; completá matrícula, título, seguro, RCP y vacunas. La Jefatura te autoriza.</li>
+          <li><b>Al llegar</b>: tocá <b>«Llegué · estoy disponible»</b>. Recién ahí se habilitan tus cirugías del día (Quirófanos, Endoscopía y Obstetricia).</li>
+          <li><b>Paso Equipo</b>: confirmá en cada cirugía en la que vas a estar. Si tomás una que tenía un colega, la app pregunta y deja los dos nombres.</li>
+          <li><b>Firmás la Entrada</b> (registra el inicio de la anestesia) y <b>la Pausa</b>; anotás incisión, fin y salida de sala con un botón «Ahora».</li>
+          <li><b>Alta de recuperación</b> con la escala de <b>Aldrete</b> (5 ítems de 0 a 2; con 9 o más, alta).</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>👑 Jefe/a de Servicio</h4><ul><li>Desde el día 15 la app pide la <b>disponibilidad del mes siguiente</b>: asistente de 4 pasos.</li><li><b>Sugerir cobertura</b> reparte en forma pareja sin poner a nadie en dos salas.</li><li>Feriados nacionales y de Tierra del Fuego automáticos; la fila de Guardia para fines de semana.</li><li>La Jefatura de Quirófanos valida o devuelve.</li></ul></div>
+          <div class="caja lock"><h4>📈 Tus indicadores</h4><ul><li>Puntualidad (inicio hasta 15 min de la hora programada).</li><li>Tiempo de anestesia a incisión, duración, Aldrete ≥ 9.</li><li>Uso de cada sala sobre la jornada.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>07:46</span><span>●●●</span></div><div class="hd" style="--k:#7c3aed"><small>Portal de Anestesiología · Hoy</small><b>Dra. Paz · En Quirófano 1</b></div><div class="bd">
+        <button class="btn sm" style="--k:#16a34a;justify-content:center">✓ Llegué · estoy disponible</button>
+        <div class="row"><div style="flex:1"><b>Q1 · 08:00 · Colecistectomía</b><div class="barra7" style="margin-top:5px"><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ya"></i><i></i><i></i><i></i></div><small>Le toca: firmar la Pausa</small></div></div>
+        <div class="row"><div style="flex:1"><b>Endo · 11:00 · VEDA</b><div class="barra7" style="margin-top:5px"><i class="ya"></i><i></i><i></i><i></i><i></i><i></i><i></i></div><small>Le toca: anotarse</small></div></div>
+        <div class="row"><div style="flex:1"><b>Q1 · 08:00 · Recuperación</b><small>Aldrete: 2·2·2·1·2 = <b style="color:#16a34a;display:inline">9 · Alta</b></small></div></div>
+      </div></div></div>
+    </div>
+
+    <!-- Enfermería -->
+    <div class="sector" data-s="enf" style="--k:var(--enf)">
+      <div>
+        <h3 class="tit">🧑‍⚕️ Enfermería (circulantes y técnicas/os de anestesia)</h3>
+        <p>Tu lugar: <b>Mi Sala</b> (las cirugías del día con su recorrido) y el <b>Relevo de turno</b>. Además Reclamos, Reconocimiento y Mi Perfil. No programás cirugías.</p>
+        <ol class="pasos">
+          <li><b>Pedí el alta</b> eligiendo la función <i>Enfermería</i>; tu habilitación pide matrícula, seguro, RCP y vacunas. La Jefatura te autoriza.</li>
+          <li><b>En Mi Sala</b> tocá <b>«Me anoto como circulante»</b> en la cirugía donde estás. <b>Una persona, una sala</b>: si cambiás, la app lo registra como cambio de sala.</li>
+          <li><b>Coordinás la Entrada</b> (antes de la inducción) y la firmás con Anestesia. Firmás tu presencia en la <b>Pausa</b>.</li>
+          <li><b>Cofirmás el recuento final</b> con Instrumentación. Si no coincide, todo se frena hasta corregir.</li>
+          <li><b>Coordinás la Salida</b> y al irte dejás tus novedades en el <b>Relevo de turno</b>, por sala.</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>🤖 La app hace por vos</h4><ul><li>Te dice «<b>Le toca: firmar la Entrada</b>» o a quién está esperando.</li><li>Con 🔔 <b>Avisar</b> le pedís la firma al que falta.</li><li>Lo que ya firmaste no se le vuelve a pedir al cirujano.</li><li>El relevo arma solo quién estuvo en cada sala.</li></ul></div>
+          <div class="caja lock"><h4>🔒 No te deja</h4><ul><li>Firmar por otra persona (otra enfermera no firma por la circulante anotada).</li><li>Estar anotada en dos salas a la vez.</li><li>Avanzar un paso si el anterior no está completo.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>08:03</span><span>●●●</span></div><div class="hd" style="--k:#0d9488"><small>Mi Sala · Lic. Ruiz · Circulante</small><b>Quirófano 1</b></div><div class="bd">
+        <div class="row"><div style="flex:1"><b>08:00 · Colecistectomía</b><div class="barra7" style="margin-top:5px"><i class="ok"></i><i class="ya"></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
+        <div class="chk"><input type="checkbox" checked disabled>Identidad del paciente confirmada</div>
+        <div class="chk"><input type="checkbox" checked disabled>Sitio demarcado</div>
+        <div class="chk"><input type="checkbox" disabled>Consentimiento firmado</div>
+        <div class="chk"><input type="checkbox" disabled>Oxímetro funcionando</div>
+        <div class="row" style="background:#fffbeb;border-color:#fcd34d"><small style="color:#92400e"><b style="display:inline">Le toca:</b> completar y firmar la Entrada</small></div>
+      </div></div></div>
+    </div>
+
+    <!-- Instrumentación -->
+    <div class="sector" data-s="inst" style="--k:var(--inst)">
+      <div>
+        <h3 class="tit">🧰 Instrumentación quirúrgica</h3>
+        <p>Tu lugar: <b>Mi Sala</b> y el <b>Relevo de turno</b>. Sos quien da fe de lo que entra y sale de la mesa: <b>recuentos, cajas e insumos</b>.</p>
+        <ol class="pasos">
+          <li><b>Pedí el alta</b> con la función <i>Instrumentación</i> y completá tu habilitación.</li>
+          <li><b>Me anoto como instrumentador/a</b> en la cirugía. Sin tu anotación no hay recuento inicial.</li>
+          <li><b>Recuento inicial</b> de gasas, compresas, agujas e instrumental con botones − / +.</li>
+          <li><b>Cajas</b> con lote y vencimiento de la esterilización (la app marca <b>VENCIDA</b>) e <b>insumos e implantes usados</b>. También das por verificados los insumos de la cirugía.</li>
+          <li><b>Recuento final</b>, que cofirma Enfermería. Si no coincide con el inicial, la Salida queda frenada y la Jefatura recibe al instante una incidencia confidencial.</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>🤖 La app hace por vos</h4><ul><li>Compara el recuento final con el inicial sola.</li><li>Te avisa si una caja está vencida.</li><li>Guarda el historial de cada recuento (nada se borra).</li></ul></div>
+          <div class="caja lock"><h4>🔒 No te deja</h4><ul><li>Cerrar con un recuento que no coincide (tampoco al cirujano).</li><li>Firmar por otra instrumentadora.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>09:41</span><span>●●●</span></div><div class="hd" style="--k:#d97706"><small>Mi Sala · Recuento final</small><b>Q1 · Colecistectomía</b></div><div class="bd">
+        <div class="row" style="justify-content:space-between"><b>Gasas</b><span>inicio 20 · <b style="display:inline">final 20</b> ✓</span></div>
+        <div class="row" style="justify-content:space-between"><b>Compresas</b><span>inicio 10 · <b style="display:inline">final 10</b> ✓</span></div>
+        <div class="row" style="justify-content:space-between;border-color:#fca5a5;background:#fef2f2"><b>Agujas</b><span style="color:#b91c1c">inicio 6 · <b style="display:inline">final 5</b> ✗</span></div>
+        <div class="row" style="background:#fef2f2;border-color:#fca5a5"><small style="color:#b91c1c"><b style="display:inline">Recorrido frenado.</b> La Jefatura recibió el aviso. Cargue un recuento nuevo al encontrar la diferencia.</small></div>
+        <div class="row" style="justify-content:space-between"><b>Caja lap. 3</b><span class="pill" style="background:#16a34a">Lote 2210 · vence 30/11</span></div>
+      </div></div></div>
+    </div>
+
+    <!-- Jefatura -->
+    <div class="sector" data-s="jef" style="--k:var(--jef)">
+      <div>
+        <h3 class="tit">🗂️ Jefatura de Quirófanos</h3>
+        <p>Tenés el bloque completo: agenda, validación, flujo del día, profesionales, incidencias, reclamos, comunicados, consentimientos e indicadores. Tu pantalla principal es el <b>Flujo de trabajo</b>: un centro de mando con <b>«Ahora te toca»</b> ordenado por urgencia.</p>
+        <ol class="pasos">
+          <li><b>Abrí la agenda</b>: el bloque <b>nace cerrado</b>. Habilitás día, sala y turno según anestesia, instrumentación, esterilización y camas. Podés <b>reservar</b> tramos para una especialidad.</li>
+          <li><b>Autorizá cuentas</b> en Profesionales: <i>registro → correo verificado → documentación → autorización</i>.</li>
+          <li><b>Validá los turnos</b>: con Admisión AUTORIZADO y la coordinación completa tocás <b>Validar y confirmar en el parte</b> (sello verde).</li>
+          <li><b>Seguí el día</b> en el <b>Portal · Recorrido del día</b>: cada cirugía, su paso y a quién espera. Con 🔔 avisás al que falta.</li>
+          <li><b>Regularizá urgencias</b>, resolvé turnos que quedaron atrás, respondé reclamos (48 h hábiles) y leé las incidencias (solo vos podés).</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>🤖 La app hace por vos</h4><ul><li>Ordena tus pendientes: primero lo vencido, después lo de hoy y mañana.</li><li>Cada suspensión genera sola su incidencia D.</li><li>Cierra a los 7 días los turnos sin resolver.</li><li>Calcula indicadores con semáforo.</li></ul></div>
+          <div class="caja lock"><h4>🔒 Barreras que protegen</h4><ul><li>No se valida sin Admisión ni coordinación: la app dice qué falta.</li><li>Las incidencias solo las lee tu cuenta (lo impone el servidor).</li><li>No ves módulos: son de la Dirección.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>11:05</span><span>●●●</span></div><div class="hd" style="--k:#e11d48"><small>Flujo de trabajo</small><b>Ahora te toca · 4</b></div><div class="bd">
+        <div class="row" style="border-color:#fca5a5"><span class="pill" style="background:#dc2626">1</span><div style="flex:1"><b>Turno sin resolver</b><small>Lun · Q1</small></div><span class="pill" style="background:#dc2626">Resolver</span></div>
+        <div class="row"><span class="pill" style="background:#f59e0b">2</span><div style="flex:1"><b>Hernioplastia · mañana</b><small>Listo para validar</small></div><span class="pill" style="background:#16a34a">Validar</span></div>
+        <div class="row"><span class="pill" style="background:#f59e0b">3</span><div style="flex:1"><b>Urgencia de anoche</b><small>Regularizar validación</small></div><span class="pill" style="background:#2563eb">Regularizar</span></div>
+        <div class="row"><span class="pill" style="background:#64748b">4</span><div style="flex:1"><b>Disponibilidad Anestesia</b><small>Noviembre · enviada</small></div><span class="pill" style="background:#7c3aed">Revisar</span></div>
+      </div></div></div>
+    </div>
+
+    <!-- Dirección -->
+    <div class="sector" data-s="dir" style="--k:var(--dir)">
+      <div>
+        <h3 class="tit">🏛️ Dirección Médica y Jefes de Servicio</h3>
+        <p><b>Dirección Médica</b> entra con su credencial y ve los <b>módulos quirúrgicos</b> de todo el hospital y los <b>Portales</b> (recorrido del día y Anestesiología del mes) en modo consulta. <b>Jefes de Servicio</b>: entran con su cuenta profesional y ven las estadísticas y los módulos de sus servicios.</p>
+        <ol class="pasos">
+          <li><b>Módulos</b> por día, semana, mes, año o rango; por servicio y por profesional; totales A, B y C.</li>
+          <li><b>Baja de un módulo</b> con motivo escrito: sale de los totales pero queda listada al pie, y el cirujano y su ayudante reciben aviso.</li>
+          <li><b>Valores unitarios</b> y la decisión de mostrar u ocultar importes a los profesionales.</li>
+          <li><b>Exportación a Excel</b>, por cirugía o agrupada por profesional con subtotales.</li>
+          <li><b>Estadísticas</b> con destacados, anillo de ocupación, barras, semáforo de calidad y causas de suspensión.</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>📐 Regla de oro</h4><ul><li><b>Solo lo Finalizado computa.</b> Se liquida lo que se operó y se documentó, no lo que se planificó.</li><li>Módulo del ayudante: un escalón abajo (A→B, B→C; C es el piso).</li></ul></div>
+          <div class="caja lock"><h4>🔒 Confidencialidad</h4><ul><li>La Dirección no abre incidencias ni reclamos individuales.</li><li>El desglose nominal por cirujano es solo para Jefatura y Dirección.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>16:30</span><span>●●●</span></div><div class="hd" style="--k:#4f46e5"><small>Módulos quirúrgicos · Octubre</small><b>Todo el hospital</b></div><div class="bd">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;text-align:center">
+          <div class="row" style="flex-direction:column;gap:0"><small>A</small><b style="font-size:17px">38</b></div>
+          <div class="row" style="flex-direction:column;gap:0"><small>B</small><b style="font-size:17px">71</b></div>
+          <div class="row" style="flex-direction:column;gap:0"><small>C</small><b style="font-size:17px">54</b></div>
+        </div>
+        <div class="row" style="justify-content:space-between"><b>Cirugía General</b><span>62</span></div>
+        <div class="row" style="justify-content:space-between"><b>Traumatología</b><span>41</span></div>
+        <div class="row" style="justify-content:space-between"><b>Endoscopía</b><span>37</span></div>
+        <div class="row" style="justify-content:space-between"><b>Obstetricia</b><span>23</span></div>
+        <button class="btn sm" style="--k:#4f46e5;justify-content:center">⬇ Exportar a Excel</button>
+      </div></div></div>
+    </div>
+
+    <!-- Admisión -->
+    <div class="sector" data-s="adm" style="--k:var(--adm)">
+      <div>
+        <h3 class="tit">🧾 Admisión y Egresos</h3>
+        <p>Dictaminás sobre cada turno desde el propio turno, con la credencial de tu sector. Tu verificación va por una vía aparte: <b>no cierra la sesión</b> del profesional que estaba usando esa computadora.</p>
+        <ol class="pasos">
+          <li><b>Abrí el turno</b>. El trámite solo se habilita si están los tres requisitos: <b>apto anestésico, estudios preoperatorios y consentimiento guardado</b>.</li>
+          <li>Arriba ves cirugía, paciente, DNI, cobertura y estado.</li>
+          <li><b>Elegí una de dos tarjetas grandes</b>: <b>AUTORIZADO</b> (verde) o <b>NO AUTORIZADO</b> (roja, con motivo escrito).</li>
+          <li>Tu dictamen lleva <b>tu nombre</b>. Se puede rectificar los días siguientes y el cambio queda asentado.</li>
+          <li><b>Urgencias</b>: entran sin tu autorización previa; después las regularizás (la app te explica que estaban exentas).</li>
+        </ol>
+        <div class="cajas2">
+          <div class="caja auto"><h4>🤖 La app hace por vos</h4><ul><li>Te muestra solo los turnos listos para dictaminar.</li><li>El paciente ve en su pase «autorizada» o «no autorizada» apenas firmás.</li></ul></div>
+          <div class="caja lock"><h4>🔒 No te deja</h4><ul><li>Dictaminar sin los tres requisitos.</li><li>Un «No autorizado» sin motivo.</li></ul></div>
+        </div>
+      </div>
+      <div class="phone" aria-hidden="true"><div class="scr"><div class="sb"><span>10:10</span><span>●●●</span></div><div class="hd" style="--k:#0891b2"><small>Admisión y Egresos</small><b>Hernioplastia · Q3 · Jue 08 h</b></div><div class="bd">
+        <div class="chk"><input type="checkbox" checked disabled>Apto anestésico</div>
+        <div class="chk"><input type="checkbox" checked disabled>Estudios preoperatorios</div>
+        <div class="chk"><input type="checkbox" checked disabled>Consentimiento guardado</div>
+        <div class="dict"><button class="si on" tabindex="-1">✓ AUTORIZADO</button><button class="no" tabindex="-1">✗ NO AUTORIZADO</button></div>
+        <button class="btn sm" style="--k:#16a34a;justify-content:center">Registrar AUTORIZADO</button>
+      </div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= VIAJE ================= -->
+<section id="viaje">
+  <div class="wrap">
+    <div class="kick">La secuencia completa</div>
+    <h2>El viaje de una cirugía, de punta a punta</h2>
+    <p class="lead">Nueve paradas. En cada una: quién actúa, qué hace la app sola y qué candado protege al paciente. Las pantallas de la derecha se pueden tocar.</p>
+    <div class="viaje">
+      <div>
+        <div class="riel" id="riel"></div>
+        <ol class="etapas" id="etapas">
+          <li class="etapa" style="--k:var(--jef)">
+            <div class="quien"><span class="chip">🗂️ Jefatura de Quirófanos</span></div>
+            <h3>1 · Se abre la agenda</h3>
+            <p>El bloque <b>nace cerrado</b>. La Jefatura abre día, sala y turno según la disponibilidad real de anestesia, instrumentación, esterilización y camas. Puede <b>reservar</b> un tramo para una especialidad (por ejemplo, el martes de 8 a 12 solo Pediatría).</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>El turno de urgencia de la hora en curso está siempre abierto en Q1, Endoscopía y Obstetricia.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>Solo la cuenta de Jefatura puede cambiar la agenda: lo impone el servidor.</li></ul></div></div>
+            <div class="mini" data-k="#e11d48" data-t="Habilitar agenda" data-s="Martes · tocá las fichas">
+              <div class="agenda" id="agenda"></div>
+              <div class="row" style="margin-top:4px"><small>Abiertos: <b id="ag-n" style="display:inline">0</b> de 36 turnos</small></div>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--cir)">
+            <div class="quien"><span class="chip">🩺 Cirujano/a · 🔬 Endoscopista</span></div>
+            <h3>2 · Se pide el turno</h3>
+            <p>En la grilla del día se toca una franja libre. Se cargan paciente, diagnóstico, práctica del nomenclador (que fija el módulo), anestesia, si necesita sangre, y el primer ayudante si lo hay.</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>Cierre de solicitudes: <b>13 h del día hábil previo</b> (lo del lunes, el viernes; feriados incluidos).</li><li>Las franjas reservadas se ven en violeta.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>Cuenta autorizada y documentación vigente para programar.</li><li>24 h de anticipación mínima para lo electivo.</li></ul></div></div>
+            <div class="mini" data-k="#2563eb" data-t="Programación diaria" data-s="Miércoles · Quirófano 2">
+              <div class="franja cer"><span>08 h</span><span>Ocupado</span></div>
+              <div class="franja libre" data-tomar><span>10 h</span><span>Libre · tocar</span></div>
+              <div class="franja res"><span>12 h</span><span>Solo Pediatría</span></div>
+              <div class="franja libre" data-tomar><span>14 h</span><span>Libre · tocar</span></div>
+              <div class="franja cer"><span>16 h</span><span>Cerrado</span></div>
+              <div class="franja urg"><span>🚑 Q1 ahora</span><span>Urgencia</span></div>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--cir)">
+            <div class="quien"><span class="chip">🩺 Cirujano/a</span></div>
+            <h3>3 · Consentimiento informado: la franja se gana guardándolo</h3>
+            <p>Se abre con los datos del turno ya volcados y el contenido clínico del procedimiento precargado (catálogo de <b>113 procedimientos de 14 especialidades</b>): técnica, beneficios, riesgos, alternativas y cuidados. El cirujano lo adecua al caso y lo guarda.</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>Código de verificación único <b>HRU-XXXXXXX-XXXXXXX</b> para cotejar el papel firmado.</li><li>Marco legal argentino al pie (Ley 26.529 y concordantes).</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>Si no se guarda, la franja <b>se libera a los 60 minutos</b> y el turno vuelve a Borrador.</li><li>Un consentimiento guardado no se edita: se emite uno nuevo.</li></ul></div></div>
+            <div class="mini" data-k="#2563eb" data-t="Consentimiento informado" data-s="Colecistectomía laparoscópica">
+              <div class="doc"><b style="font-size:11px">1 · Datos del paciente</b><i style="width:90%"></i><i style="width:70%"></i><b style="font-size:11px">4 · Descripción</b><i></i><i style="width:85%"></i><i style="width:60%"></i><b style="font-size:11px">6 · Riesgos</b><i style="width:95%"></i><i style="width:75%"></i></div>
+              <span class="cod">HRU-7F3K2QA-9XM41PD</span>
+              <button class="btn sm" style="--k:#16a34a;justify-content:center" data-guardar>💾 Guardar consentimiento</button>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--pac)">
+            <div class="quien"><span class="chip">🧑 Paciente · 🩺 Cirujano/a</span></div>
+            <h3>4 · El pase del paciente</h3>
+            <p>Con el consentimiento guardado, la app genera un <b>pase tipo tarjeta de embarque con QR</b> que le llega solo al correo del paciente. El paciente sigue desde su celular, <b>en tiempo real</b>, en qué está su cirugía o su estudio. <a href="#paciente">Ver cómo lo ve el paciente ›</a></p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>Envío del correo desde el servicio del hospital.</li><li>Código de 8 caracteres de un solo uso, que vence a los 10 minutos.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>El paciente no ve diagnóstico ni datos de nadie más.</li><li>El pase caduca solo al cerrarse el caso.</li></ul></div></div>
+            <div class="mini" data-k="#db2777" data-t="Pase del paciente" data-s="Enviado al correo del paciente">
+              <div class="pase"><div class="p1"><small>Mi cirugía · HRU</small><b>Hola, Ana</b></div><div class="p2"><div>Día<b>Mar 21</b></div><div>Hora<b>10:00</b></div><div>Sala<b>Q2</b></div></div><div class="p3"><svg viewBox="0 0 25 25" class="qr"></svg><div style="font-size:11px"><b>Confirmada</b><br>Escaneá y seguí tu turno</div></div></div>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--adm)">
+            <div class="quien"><span class="chip">🧾 Admisión y Egresos</span></div>
+            <h3>5 · Admisión y Egresos dictamina</h3>
+            <p>Con <b>apto anestésico, estudios preoperatorios y consentimiento guardado</b>, Admisión elige <b>AUTORIZADO</b> o <b>NO AUTORIZADO</b> (con motivo). El dictamen lleva el nombre de quien lo firma.</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>El pase del paciente cambia de estado al instante.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>Sin los tres requisitos, el trámite no abre.</li></ul></div></div>
+            <div class="mini" data-k="#0891b2" data-t="Admisión y Egresos" data-s="Tocá una tarjeta">
+              <div class="chk"><input type="checkbox" checked disabled>Apto anestésico</div>
+              <div class="chk"><input type="checkbox" checked disabled>Estudios preoperatorios</div>
+              <div class="chk"><input type="checkbox" checked disabled>Consentimiento guardado</div>
+              <div class="dict" data-dict><button class="si">✓ AUTORIZADO</button><button class="no">✗ NO AUTORIZADO</button></div>
+              <div class="row" data-dict-res><small>Elegí el dictamen</small></div>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--jef)">
+            <div class="quien"><span class="chip">💊 Farmacia · 🧼 Esterilización · 🩸 Hemoterapia · 💉 Anestesia · 🗂️ Jefatura</span></div>
+            <h3>6 · Coordinación y validación</h3>
+            <p>Se confirman <b>insumos e implantes</b>, <b>instrumental y kits</b>, <b>hemoderivados</b> (solo si se pidieron) y la <b>evaluación preanestésica</b>. Con Admisión autorizada y todo verificado, la Jefatura toca <b>Validar y confirmar en el parte</b>.</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>Hemoterapia figura «no aplica» si no se pidió reserva.</li><li>Sello verde «Cirugía validada» y el turno pasa a <b>Confirmada</b>.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>Si falta algo, la app no deja validar y dice qué falta.</li></ul></div></div>
+            <div class="mini" data-k="#e11d48" data-t="Validar turno" data-s="Marcá las verificaciones">
+              <label class="chk"><input type="checkbox" data-co>Farmacia e Insumos</label>
+              <label class="chk"><input type="checkbox" data-co>Central de Esterilización</label>
+              <label class="chk"><input type="checkbox" data-co>Hemoterapia (reserva)</label>
+              <label class="chk"><input type="checkbox" checked disabled>Anestesiología</label>
+              <button class="btn sm" style="--k:#16a34a;justify-content:center" data-validar disabled>Validar y confirmar en el parte</button>
+              <div class="sello"><div>✓ CIRUGÍA VALIDADA</div></div>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--brand)">
+            <div class="quien"><span class="chip">📣 Todo el bloque</span></div>
+            <h3>7 · Parte quirúrgico y aviso de la víspera</h3>
+            <p>A las <b>14 h del día hábil previo</b> se publica el <b>Parte Quirúrgico</b> ordenado por prioridad. Desde las <b>20 h</b>, el cirujano recibe un recordatorio escrito y <b>hablado</b>, con voz pausada, que nunca dice nombres de pacientes ni procedimientos.</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>Parte, recordatorios y aviso hablado, sin que nadie los dispare.</li><li>Anestesia ve sus cirugías del día siguiente en su portal.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>La Lista de Verificación no se abre antes del día de la cirugía.</li></ul></div></div>
+            <div class="mini" data-k="#0f766e" data-t="Parte Quirúrgico" data-s="Miércoles · publicado 14:00">
+              <div class="row"><span class="pill" style="background:#0f766e">08</span><div><b>Q1 · Colecistectomía</b><small>Cirugía General</small></div></div>
+              <div class="row"><span class="pill" style="background:#0f766e">10</span><div><b>Q2 · Artroscopía</b><small>Traumatología</small></div></div>
+              <div class="row"><span class="pill" style="background:#059669">11</span><div><b>Endo · Colonoscopía</b><small>Endoscopía</small></div></div>
+              <div class="burbuja">🔊 «Buenas noches, le recuerdo que mañana tiene una cirugía programada; la primera, a las 8 de la mañana.»</div>
+              <button class="btn sm ghost" data-hablar style="justify-content:center">🔊 Escuchar el aviso</button>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--enf)">
+            <div class="quien"><span class="chip">💉 Anestesia · 🧑‍⚕️ Enfermería · 🧰 Instrumentación · 🩺 Cirujano/a</span></div>
+            <h3>8 · El día de la cirugía: recorrido de 7 pasos</h3>
+            <p>Basado en la Lista de Verificación de la <b>OMS</b> y en los «Cinco pasos para una cirugía más segura» del <b>NHS</b>: <b>Equipo → Entrada → Recuento inicial → Pausa → Recuento final → Salida → Recuperación</b>. Cada paso se habilita cuando el anterior está completo y <b>firma quien está anotado</b>.</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>Horas reales de anestesia, incisión, fin y salida de sala.</li><li>«Le toca a…» y 🔔 Avisar al que falta.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>Recuento distinto: todo se frena y la Jefatura recibe una incidencia.</li><li>Una persona, una sala.</li></ul></div></div>
+            <p style="margin-top:12px"><a class="btn" href="#simulador" style="--k:var(--enf)">🎮 Probá el recorrido vos mismo ›</a></p>
+            <div class="mini" data-k="#0d9488" data-t="Recorrido · Q1" data-s="Paso 4 de 7 · Pausa">
+              <div class="barra7"><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ya"></i><i></i><i></i><i></i></div>
+              <div class="row"><small>✓ Equipo · Paz, Ruiz, Gómez · 07:52</small></div>
+              <div class="row"><small>✓ Entrada · Ruiz y Paz · 08:04</small></div>
+              <div class="row"><small>✓ Recuento inicial · Gómez · 08:09</small></div>
+              <div class="row" style="border-color:#fcd34d;background:#fffbeb"><small style="color:#92400e"><b style="display:inline">Esperando</b> al Dr. Ferreyra para la Pausa</small></div>
+              <button class="btn sm ghost" style="justify-content:center">🔔 Avisar</button>
+            </div>
+          </li>
+          <li class="etapa" style="--k:var(--ok)">
+            <div class="quien"><span class="chip" style="--k:var(--ok)">✅ Caso cerrado</span></div>
+            <h3>9 · Informe operatorio → Finalizada → computa</h3>
+            <p>Con la Salida y el <b>informe operatorio</b> la cirugía queda <b>Realizada</b>. Cuando además está Admisión autorizada (y regularizada la validación, si fue urgencia) pasa sola a <b>Finalizada</b>. Recién ahí <b>cuenta</b> en estadísticas, indicadores, módulos y en el Pulso de la semana.</p>
+            <div class="cajas2"><div class="caja auto"><h4>🤖 Automático</h4><ul><li>Pasa a Finalizada sola al completarse el último trámite.</li><li>El pase del paciente caduca.</li><li>Módulo del cirujano y del ayudante imputados.</li></ul></div><div class="caja lock"><h4>🔒 Candado</h4><ul><li>Si nadie cierra el turno, al día siguiente queda <b>Sin resolver</b> con aviso diario y cierre a los 7 días.</li></ul></div></div>
+            <div class="mini" data-k="#16a34a" data-t="Ficha de la cirugía" data-s="El camino del caso">
+              <div class="row"><small>✓ Solicitud</small></div><div class="row"><small>✓ Admisión</small></div><div class="row"><small>✓ Jefatura</small></div><div class="row"><small>✓ Quirófano</small></div><div class="row"><small>✓ Salida y parte</small></div>
+              <div class="row" style="background:#f0fdf4;border-color:#86efac"><b style="color:#166534">✓ Finalizada · computa en Módulos (A)</b></div>
+            </div>
+          </li>
+        </ol>
+        <div class="navv" id="navv" hidden>
+          <button class="btn ghost" id="v-ant">‹ Anterior</button>
+          <button class="btn pulsa" id="v-sig">Siguiente ›</button>
+          <span class="mut" id="v-n" style="font-weight:700"></span>
+        </div>
+      </div>
+      <div class="tel-viaje" id="tel-viaje" hidden>
+        <div class="phone"><div class="scr"><div class="sb"><span>HRU</span><span>●●●</span></div><div class="hd" id="tv-hd"><small id="tv-s"></small><b id="tv-t"></b></div><div class="bd" id="tv-bd" style="position:relative"></div></div></div>
+        <div class="toque">👆 Esta pantalla se puede tocar</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SIMULADOR ================= -->
+<section id="simulador">
+  <div class="wrap">
+    <div class="kick">Interactivo</div>
+    <h2>Probá el recorrido en sala</h2>
+    <p class="lead">Una cirugía de ejemplo con cuatro integrantes. Elegí <b>de quién es el teléfono</b> y firmá lo que le toca a esa persona. La app solo deja firmar a quien está anotado, en el orden correcto. Si te trabás, el aro amarillo marca a quién le toca.</p>
+    <noscript><p class="card">Para usar el simulador hace falta abrir esta guía en un navegador (Chrome, Safari, Edge…).</p></noscript>
+    <div class="sim">
+      <div>
+        <h3 style="font-size:1rem">📱 Tenés en la mano el teléfono de:</h3>
+        <div class="manos" id="manos"></div>
+        <button class="btn ghost sm" id="sim-reset" style="margin-top:12px">↺ Empezar de nuevo</button>
+      </div>
+      <div class="simbox">
+        <div class="simhd"><b>Q1 · 08:00 · Colecistectomía laparoscópica</b><div style="opacity:.85;font-size:.88rem">Paciente de ejemplo · Cirugía General</div><div class="pasos7" id="pasos7"></div></div>
+        <div class="simbd"><div class="hechos" id="hechos"></div><div id="actual"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AUTORIZACIONES ================= -->
+<section id="autorizaciones">
+  <div class="wrap">
+    <div class="kick">La secuencia de autorizaciones</div>
+    <h2>Quién autoriza qué, y en qué orden</h2>
+    <p class="lead">Cada eslabón se abre recién cuando el anterior está completo. La app no deja saltear ninguno. Una urgencia sigue el mismo camino clínico, pero <b>se opera primero y los trámites se regularizan después</b>: un quirófano no puede condicionar una urgencia a un papel.</p>
+    <div class="tog" id="tog-urg"><button class="on" data-u="0">📅 Cirugía programada</button><button data-u="1">🚑 Urgencia / Emergencia</button></div>
+    <div class="cadena" id="cadena">
+      <div class="eslabon" style="--k:var(--jef)"><div class="ic">🗓️</div><div><h4>Agenda habilitada</h4><p>La Jefatura abre día, sala y turno.</p></div><span class="req pre" data-p="Antes" data-u="Siempre abierta (24 h)">Antes</span></div>
+      <div class="flecha">↓</div>
+      <div class="eslabon" style="--k:var(--cir)"><div class="ic">👤</div><div><h4>Cuenta autorizada y documentación vigente</h4><p>Matrícula, seguro, RCP, vacunas (y título, para médicos). La app avisa antes de que venzan.</p></div><span class="req pre" data-p="Antes" data-u="Antes">Antes</span></div>
+      <div class="flecha">↓</div>
+      <div class="eslabon" style="--k:var(--cir)"><div class="ic">📄</div><div><h4>Consentimiento informado guardado</h4><p>Gana la franja. Sin él, se libera a los 60 minutos.</p></div><span class="req pre" data-p="Antes · 60 min" data-u="Mismo camino clínico">Antes · 60 min</span></div>
+      <div class="flecha">↓</div>
+      <div class="eslabon" style="--k:var(--adm)"><div class="ic">🧾</div><div><h4>Admisión y Egresos: AUTORIZADO</h4><p>Requiere apto anestésico, estudios preoperatorios y consentimiento.</p></div><span class="req pre" data-p="Antes" data-u="Se regulariza después">Antes</span></div>
+      <div class="flecha">↓</div>
+      <div class="eslabon" style="--k:var(--inst)"><div class="ic">📦</div><div><h4>Coordinación verificada</h4><p>Insumos e implantes · Esterilización · Hemoterapia (si aplica) · Anestesia.</p></div><span class="req pre" data-p="Antes" data-u="Se regulariza después">Antes</span></div>
+      <div class="flecha">↓</div>
+      <div class="eslabon" style="--k:var(--jef)"><div class="ic">✅</div><div><h4>Jefatura: Validar y confirmar en el parte</h4><p>Sello verde. El turno pasa a Confirmada.</p></div><span class="req pre" data-p="Antes" data-u="Regularizar validación">Antes</span></div>
+      <div class="flecha">↓</div>
+      <div class="eslabon" style="--k:var(--enf)"><div class="ic">🛡️</div><div><h4>Recorrido en sala de 7 pasos</h4><p>Firma de cada integrante anotado. Recuento que coincide.</p></div><span class="req post" data-p="El día" data-u="Igual, siempre">El día</span></div>
+      <div class="flecha">↓</div>
+      <div class="eslabon" style="--k:var(--ok)"><div class="ic">🏁</div><div><h4>Informe operatorio → Finalizada</h4><p>Solo lo Finalizado computa en estadísticas y módulos.</p></div><span class="req post" data-p="Después" data-u="Después">Después</span></div>
+    </div>
+    <div class="grid g3" style="margin-top:20px">
+      <div class="card" style="--k:var(--bad)"><span class="chip">P1 · Emergencia</span><p style="margin:.6em 0 0">Riesgo vital. Meta: <b>incisión antes de los 30 minutos</b> desde la solicitud.</p></div>
+      <div class="card" style="--k:var(--warn)"><span class="chip">P2 · Urgencia diferible</span><p style="margin:.6em 0 0">Meta: <b>resolución dentro de las 6 horas</b>.</p></div>
+      <div class="card"><span class="chip">🚑 En vivo</span><p style="margin:.6em 0 0">En <i>Quirófanos en vivo</i> cada urgencia aparece <b>en rojo, con ambulancia y un titileo suave</b>; al tomarla aparece otro turno libre en la misma hora.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PACIENTE ================= -->
+<section id="paciente">
+  <div class="wrap">
+    <div class="kick">Contacto con el paciente</div>
+    <h2>El paciente sabe en qué está su cirugía</h2>
+    <p class="lead">Se terminó el «llame mañana a ver si se opera». Con el consentimiento guardado, el cirujano o endoscopista emite el <b>pase del paciente</b>: le llega solo al correo y el paciente sigue su turno desde el celular. Para endoscopía dice «<b>Mi estudio</b>»; para cesárea, «<b>Mi cesárea</b>».</p>
+    <div class="pac">
+      <div>
+        <div class="phone"><div class="scr"><div class="sb"><span>Portal del paciente</span><span>●●●</span></div><div class="bd" style="background:#fdf2f8">
+          <div class="pase"><div class="p1"><small>Mi cirugía · Hospital Regional Ushuaia</small><b>Hola, Ana</b></div><div class="p2"><div>Día<b>Mar 21</b></div><div>Hora<b>10:00</b></div><div>Sala<b>Q2</b></div></div><div class="p3"><svg viewBox="0 0 25 25" class="qr"></svg><div style="font-size:11px"><b>Colecistectomía</b><br>Dr. Ejemplo</div></div></div>
+          <div class="estado-pac" id="pac-estado" style="background:#f59e0b">En revisión por Admisión</div>
+          <small style="color:#64748b;text-align:center">QR y código de ejemplo · sin datos reales</small>
+        </div></div></div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+          <button class="btn" id="pac-sig" style="--k:var(--pac)">Avanzar el estado ›</button>
+          <button class="btn ghost" id="pac-susp">Ver una suspensión</button>
+        </div>
+      </div>
+      <div>
+        <ol class="tl" id="pac-tl">
+          <li><i></i>📨 Recibe el pase en su correo (sin nombre, DNI ni diagnóstico en el correo)</li>
+          <li><i></i>📷 Escanea el QR y escribe su DNI</li>
+          <li><i></i>🔐 Recibe un código de 8 caracteres: un solo uso, vence en 10 min</li>
+          <li><i></i>🧾 Ve: «En revisión por Admisión y Egresos»</li>
+          <li><i></i>✅ Ve: «Autorizada · esperando a la Jefatura»</li>
+          <li><i></i>🎉 Ve: «Confirmada para el martes 21 a las 10 h en Quirófano 2»</li>
+          <li><i></i>🏁 Al cerrarse el caso, el pase caduca y el QR ya no abre nada</li>
+        </ol>
+        <div class="grid g2" style="margin-top:14px">
+          <div class="caja auto"><h4>🤖 Lo que hace la app</h4><ul><li>Manda el pase solo, desde el servicio del hospital.</li><li>Actualiza el estado al instante con cada dictamen o validación.</li><li>Si se suspende, el paciente ve el motivo (por ejemplo, falta de insumo).</li><li>Imprimir, WhatsApp o «Ver como paciente», con un toque.</li></ul></div>
+          <div class="caja lock"><h4>🔐 Privacidad</h4><ul><li>El QR lleva solo una llave al azar.</li><li>El paciente no entra a la base: ve solo su cirugía, nunca el diagnóstico.</li><li>Su correo y la huella del DNI se borran cuando caduca el pase.</li><li>Las urgencias no llevan pase.</li></ul></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AUTOMÁTICO ================= -->
+<section id="automatico">
+  <div class="wrap">
+    <div class="kick">Automatización</div>
+    <h2>Lo que pasa solo, sin que nadie lo dispare</h2>
+    <p class="lead">Los plazos se recalculan en vivo, cada minuto. No son alarmas que alguien configuró: salen del estado real de los datos y del reloj, y desaparecen solas cuando el problema se resuelve.</p>
+    <div class="dia" id="dia" aria-hidden="true">
+      <div class="mark" style="left:0%">00 h</div>
+      <div class="mark" style="left:33.3%">08 h<br>abre el bloque</div>
+      <div class="mark" style="left:54.2%">13 h<br>cierre</div>
+      <div class="mark" style="left:58.3%;top:-26px">14 h<br>parte</div>
+      <div class="mark" style="left:83.3%">20 h<br>aviso 🔊</div>
+      <div class="mark" style="left:100%">24 h</div>
+      <div class="linea"></div>
+      <div class="ahora" id="dia-ahora" title="Ahora"></div>
+    </div>
+    <p class="mut" style="font-size:.88rem" id="dia-txt"></p>
+    <div class="grid g3 auto-g" style="margin-top:14px">
+      <div class="card" style="--k:var(--cir)"><div class="t">13:00</div><h4>Cierre de solicitudes</h4><p>Del día hábil previo. Lo del lunes cierra el viernes; los feriados se corren solos.</p></div>
+      <div class="card" style="--k:var(--brand)"><div class="t">14:00</div><h4>Parte quirúrgico publicado</h4><p>Ordenado por prioridad, para todo el bloque.</p></div>
+      <div class="card" style="--k:var(--anest)"><div class="t">20:00</div><h4>Aviso hablado de la víspera</h4><p>Cuántas cirugías y a qué hora es la primera. Nunca nombres.</p></div>
+      <div class="card" style="--k:var(--warn)"><div class="t">60 min</div><h4>Franja sin consentimiento</h4><p>Se libera y el turno vuelve a Borrador con todo lo cargado.</p></div>
+      <div class="card" style="--k:var(--bad)"><div class="t">7 días</div><h4>Turno sin resolver</h4><p>Aviso rojo diario y cierre administrativo a la semana.</p></div>
+      <div class="card" style="--k:var(--jef)"><div class="t">Al instante</div><h4>Incidencias automáticas</h4><p>Cada suspensión genera una incidencia D; un recuento distinto, una confidencial a la Jefatura.</p></div>
+      <div class="card" style="--k:var(--dir)"><div class="t">Al programar</div><h4>Módulo del nomenclador</h4><p>Fijo para el cirujano y un escalón abajo para el primer ayudante.</p></div>
+      <div class="card" style="--k:var(--endo)"><div class="t">Vencimientos</div><h4>Documentación habilitante</h4><p>Matrícula, seguro, RCP y vacunas: avisa antes de que caduquen.</p></div>
+      <div class="card" style="--k:var(--anest)"><div class="t">Día 15</div><h4>Disponibilidad de Anestesia</h4><p>Pide la grilla del mes siguiente, con feriados nacionales y provinciales ya cargados.</p></div>
+      <div class="card" style="--k:var(--adm)"><div class="t">48 h</div><h4>Reclamos</h4><p>Plazo de respuesta en horas hábiles, con recordatorios a ambas partes.</p></div>
+      <div class="card" style="--k:var(--enf)"><div class="t">2 h</div><h4>Informe operatorio</h4><p>Se mide el cumplimiento en plazo para los indicadores.</p></div>
+      <div class="card" style="--k:var(--mut)"><div class="t">10 min</div><h4>Cierre por inactividad</h4><p>Con aviso, guardado temporario y «¿seguir donde lo dejó?».</p></div>
+    </div>
+    <div class="card" style="margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:2rem">📶</span>
+      <div style="flex:1;min-width:220px"><b>Sin señal también funciona.</b> <span class="mut">La app trabaja con su copia local y guarda los cambios para enviarlos cuando vuelve la red. Si algo quedó sin enviar, el indicador de arriba aparece en ámbar y late.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CALIDAD ================= -->
+<section id="calidad">
+  <div class="wrap">
+    <div class="kick">Estadísticas y control de calidad</div>
+    <h2>Medimos para mejorar el proceso, no para señalar personas</h2>
+    <p class="lead">Nada se carga a mano: todo se deriva de la actividad, con un único criterio: <b>solo cuentan los casos Finalizados</b>. El profesional ve el agregado de sus servicios y su propia producción; el desglose por cirujano queda reservado a Jefatura y Dirección.</p>
+
+    <h3 style="margin-top:22px">Indicadores de gestión del bloque <span class="mut" style="font-size:.85rem;font-weight:600">(valores de ejemplo)</span></h3>
+    <div class="grid g2" id="medidores"></div>
+
+    <div class="grid g2" style="margin-top:22px">
+      <div class="card">
+        <h3>📊 Pulso de la semana <span class="chip" style="--k:var(--ok)">público</span></h3>
+        <p class="mut" style="font-size:.92rem">Lo ve cualquiera que abra la app sin ingresar: cada cuadradito es una intervención; rojo, urgencia. Sin datos de pacientes ni de profesionales.</p>
+        <div style="--k:var(--cir)"><b style="font-size:.9rem">Quirófanos</b><div class="mosaico" data-n="34" data-u="7"></div></div>
+        <div style="--k:var(--endo)"><b style="font-size:.9rem">Endoscopía</b><div class="mosaico" data-n="22" data-u="2"></div></div>
+        <div style="--k:var(--anest)"><b style="font-size:.9rem">Obstetricia</b><div class="mosaico" data-n="9" data-u="4"></div></div>
+      </div>
+      <div class="card">
+        <h3>🛡️ Seguridad del paciente</h3>
+        <ul style="padding-left:18px;margin:0">
+          <li><b>Lista de Verificación</b> OMS completa en sus tres momentos, con firmas.</li>
+          <li><b>Recuentos</b> inicial y final comparados por la app.</li>
+          <li><b>Cajas</b> con lote y vencimiento de esterilización.</li>
+          <li><b>Aldrete ≥ 9</b> para el alta de recuperación.</li>
+          <li><b>Espera quirúrgica</b> con alerta a partir de 90 días.</li>
+          <li><b>Puntualidad</b> de inicio (hasta 15 min) y tiempo de recambio.</li>
+        </ul>
+        <h3 style="margin-top:16px">💛 Cultura positiva</h3>
+        <ul style="padding-left:18px;margin:0">
+          <li><b>Reconocimiento</b>: voto secreto mensual y Muro de gratitud.</li>
+          <li><b>Premio de oro</b> semanal, sin rankings públicos.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top:26px">Incidencias · Principio de Cultura Justa</h3>
+    <p class="mut">Cualquier persona del bloque puede reportar, <b>con o sin cuenta</b>, desde <b>Informar Incidencia</b>. Se reportan eventos para analizar el sistema, no para buscar culpables. <b>Solo la Jefatura las lee</b> (lo garantiza el servidor).</p>
+    <div class="tabla-scroll">
+      <table>
+        <thead><tr><th>Cat.</th><th>Qué comprende</th><th>Plazo</th></tr></thead>
+        <tbody>
+          <tr><td><span class="cat" style="background:#991b1b">A</span></td><td>Eventos adversos graves: paciente, sitio o procedimiento equivocado, objeto retenido, muerte inesperada</td><td>&lt; 2 h</td></tr>
+          <tr><td><span class="cat" style="background:#dc2626">B</span></td><td>Eventos adversos moderados: infección de sitio quirúrgico, hemorragia que requirió transfusión</td><td>&lt; 2 h</td></tr>
+          <tr><td><span class="cat" style="background:#f59e0b">C</span></td><td>Cuasi-accidentes: detectados a tiempo, evitaron el daño</td><td>&lt; 2 h</td></tr>
+          <tr><td><span class="cat" style="background:#2563eb">D</span></td><td>Proceso y programación: suspensión, atraso &gt; 60 min, falta de insumo crítico, Lista incompleta <i>(las suspensiones la generan solas)</i></td><td>&lt; 24 h</td></tr>
+          <tr><td><span class="cat" style="background:#64748b">E</span></td><td>Gestión y comunicación entre servicios</td><td>Diferido</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EMPEZAR ================= -->
+<section id="empezar">
+  <div class="wrap">
+    <div class="kick">Tu primer día</div>
+    <h2>Cómo empezar hoy</h2>
+    <p class="lead">Seis pasos. Podés ir tildando: esta guía recuerda tu avance en este equipo.</p>
+    <div class="barra-av"><i id="av-barra"></i></div>
+    <ul class="check" id="check">
+      <li><label><input type="checkbox" data-c="1"><div><b>Abrí la app</b><br><span class="mut">Desde el enlace oficial (botón de abajo) en el celular o la computadora del quirófano.</span></div></label></li>
+      <li><label><input type="checkbox" data-c="2"><div><b>Instalala en tu pantalla de inicio</b><br><span class="mut">Así abre a pantalla completa, funciona sin señal y te llegan los avisos. Mirá cómo, según tu equipo, más abajo.</span></div></label></li>
+      <li><label><input type="checkbox" data-c="3"><div><b>Pedí tu alta</b><br><span class="mut">Acceso Profesional › Solicitar alta: nombre, DNI, correo, contraseña, <b>tu función</b> (médico, Anestesiología, Enfermería o Instrumentación) y tus servicios.</span></div></label></li>
+      <li><label><input type="checkbox" data-c="4"><div><b>Verificá tu correo</b><br><span class="mut">Te llega un enlace. Sin correo verificado la Jefatura no puede autorizarte.</span></div></label></li>
+      <li><label><input type="checkbox" data-c="5"><div><b>Completá Mi Perfil</b><br><span class="mut">Matrícula, seguro, RCP, vacunas (y título de especialista si sos médico/a), con sus vencimientos.</span></div></label></li>
+      <li><label><input type="checkbox" data-c="6"><div><b>Esperá la autorización y aceptá el compromiso</b><br><span class="mut">Cuando la Jefatura te autoriza, al entrar leés y aceptás el compromiso de ingreso (credenciales personales, normas del bloque, confidencialidad). ¡Listo!</span></div></label></li>
+    </ul>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 26px">
+      <a class="btn" id="abrir-app" href="https://claudioravasi-ai.github.io/ru-bloque-quir-rgico-incidencias/" target="_blank" rel="noopener">🚀 Abrir HRU Quirófanos</a>
+      <button class="btn ghost" id="compartir">📤 Compartir esta guía</button>
+    </div>
+
+    <h3>Instalarla en tu equipo</h3>
+    <div class="disp" id="disp"><button class="on" data-d="and">🤖 Android</button><button data-d="ios">🍎 iPhone / iPad</button><button data-d="pc">💻 Computadora</button></div>
+    <div class="instal on" data-d="and"><div class="card"><b>Android · Chrome</b><ol style="margin:.5em 0 0;padding-left:20px"><li>Abrí el enlace en <b>Chrome</b>.</li><li>Tocá el menú <b>⋮</b> › <b>Instalar aplicación</b> (o el botón <b>Instalar</b> de la barra de arriba).</li><li>Aparece el ícono en tu pantalla de inicio. Permití las notificaciones.</li></ol></div></div>
+    <div class="instal" data-d="ios"><div class="card"><b>iPhone / iPad · Safari</b><ol style="margin:.5em 0 0;padding-left:20px"><li>Abrí el enlace en <b>Safari</b>.</li><li>Tocá <b>Compartir</b> (el cuadrado con la flecha hacia arriba).</li><li>Elegí <b>Agregar a pantalla de inicio</b> › <b>Agregar</b>.</li></ol></div></div>
+    <div class="instal" data-d="pc"><div class="card"><b>Computadora · Chrome o Edge</b><ol style="margin:.5em 0 0;padding-left:20px"><li>Abrí el enlace.</li><li>Tocá el ícono de instalación a la derecha de la barra de direcciones.</li><li>En la computadora compartida del quirófano: <b>una persona por pantalla</b>. Si entra otra cuenta, la anterior se cierra; y a los 10 minutos sin uso se cierra sola.</li></ol></div></div>
+
+    <div class="card" style="margin-top:18px;--k:var(--brand)">
+      <b>💡 Además, dentro de la app</b>
+      <p class="mut" style="margin:.4em 0 0">El <b>librito del menú</b> tiene el <b>Manual de uso</b> y el <b>Libro Blanco de Quirófanos</b> con buscador, y el botón 🎬 abre el <b>manual interactivo</b> con <b>«🧭 Guíame paso a paso»</b>, que te marca qué tocar en tu pantalla.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PREGUNTAS ================= -->
+<section id="preguntas">
+  <div class="wrap">
+    <div class="kick">Dudas frecuentes</div>
+    <h2>Preguntas</h2>
+    <details><summary>¿Tengo que pagar o instalar algo raro?</summary><div>No. Es una aplicación web del hospital: se abre con el navegador y se «instala» en la pantalla de inicio sin pasar por ninguna tienda. Se actualiza sola; nunca se pierde lo que estabas escribiendo.</div></details>
+    <details><summary>¿Puedo usar la cuenta de un compañero o la del sector?</summary><div>No. Todas las cuentas son personales y las verifica el servidor. Tu nombre y matrícula quedan estampados en cada firma; usar la de otro es firmar por otro. Admisión, Jefatura y Dirección tienen su propia credencial.</div></details>
+    <details><summary>Olvidé mi contraseña. ¿Qué hago?</summary><div>En <i>Acceso Profesional › ¿Olvidó su contraseña?</i> te llega un enlace a tu correo. La Jefatura también puede mandarte un enlace de blanqueo, pero nunca conoce tu contraseña. El enlace vence en una hora.</div></details>
+    <details><summary>¿Qué pasa si no hay señal en el quirófano?</summary><div>La app sigue funcionando con su copia local y envía los cambios al volver la red. El indicador de arriba avisa si quedó algo sin enviar (ámbar, late) y deja reintentar.</div></details>
+    <details><summary>Soy enfermera/o. ¿Por qué no puedo firmar la Entrada de otra sala?</summary><div>Porque cada firma es de quien está anotado en esa cirugía, y una persona está en una sala por vez. Si te cambiaron de sala, anotate en la nueva: la app pregunta si es un <b>cambio de sala</b> y registra el movimiento en las dos cirugías.</div></details>
+    <details><summary>¿Qué pasa si el recuento final no coincide?</summary><div>El recorrido se frena: ni la Salida ni el cirujano pueden cerrar. La Jefatura recibe al instante una incidencia confidencial. Al resolverse, se carga un recuento nuevo; el anterior queda en el historial.</div></details>
+    <details><summary>¿Y si surge una urgencia en medio de la noche?</summary><div>El Quirófano 1, Endoscopía y Obstetricia tienen siempre un turno de urgencia en la hora en curso, las 24 h. Se toma, se opera con el mismo recorrido de seguridad, y Admisión y Jefatura regularizan después.</div></details>
+    <details><summary>¿Quién ve los datos de los pacientes?</summary><div>Solo quien tiene cuenta, y cada perfil lo que necesita para trabajar. Sin ingresar solo se ve el tablero público (seis contadores) y el formulario de incidencias. Los datos de salud se tratan como dato sensible (Ley 25.326). El aviso hablado nunca pronuncia nombres.</div></details>
+    <details><summary>¿Por qué mi cirugía «Realizada» todavía no aparece en mis módulos?</summary><div>Porque solo computa lo <b>Finalizado</b>: Lista completa, informe operatorio, Admisión autorizada y, si fue urgencia, la validación regularizada. Apenas se completa el último trámite, aparece sola.</div></details>
+    <details><summary>¿Cómo informo un problema o un evento adverso?</summary><div>Desde <b>Informar Incidencia</b> en el Panel, con o sin cuenta. Para desacuerdos o pedidos con la Jefatura, usá <b>Reclamos</b> (respuesta en 48 h hábiles).</div></details>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>HRU Quirófanos</b> · Hospital Regional Ushuaia · Bloque de Quirófanos Centrales, Endoscopía Digestiva y Obstetricia</p>
+    <p>Guía de inicio para el equipo · versión de la app 3.22 · Todos los nombres, pacientes y números de esta guía son de ejemplo.</p>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+var $=function(s,c){return (c||document).querySelector(s)}, $$=function(s,c){return Array.prototype.slice.call((c||document).querySelectorAll(s))};
+var APP='https://claudioravasi-ai.github.io/ru-bloque-quir-rgico-incidencias/';
+function guarda(k,v){try{localStorage.setItem('hruDemo'+k,JSON.stringify(v))}catch(e){}}
+function lee(k,d){try{var v=localStorage.getItem('hruDemo'+k);return v==null?d:JSON.parse(v)}catch(e){return d}}
+var tt;function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){t.classList.remove('on')},3200)}
+
+/* tema */
+$('#tema').onclick=function(){var r=document.documentElement,act=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),n=act==='dark'?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('hruDemoTema',n)}catch(e){}};
+
+/* progreso y nav activa */
+var secs=$$('main section'),links=$$('#nav a');
+function alScroll(){var h=document.documentElement,p=h.scrollTop/(h.scrollHeight-h.clientHeight||1);$('#progreso').style.width=(p*100)+'%';
+  var cur='';secs.forEach(function(s){if(s.getBoundingClientRect().top<120)cur=s.id});
+  links.forEach(function(a){var on=a.getAttribute('href')==='#'+cur;if(on&&!a.classList.contains('on')){a.classList.add('on');try{a.scrollIntoView({block:'nearest',inline:'center'})}catch(e){}}else if(!on)a.classList.remove('on')})}
+addEventListener('scroll',alScroll,{passive:true});alScroll();
+
+/* reloj del teléfono */
+function hh(){var d=new Date();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)}
+$('#hora-tel').textContent=hh();setInterval(function(){$('#hora-tel').textContent=hh()},30000);
+
+/* antes / ahora */
+$$('#antes .tog button').forEach(function(b){b.onclick=function(){$$('#antes .tog button').forEach(function(x){x.classList.toggle('on',x===b)});$('#antes').classList.toggle('modo-ahora',b.dataset.modo==='ahora')}});
+setTimeout(function(){},0);
+
+/* sectores */
+var sBtns=$$('#sectores button');
+function verSector(s,scroll){sBtns.forEach(function(b){b.classList.toggle('on',b.dataset.s===s)});$$('.sector').forEach(function(x){x.classList.toggle('on',x.dataset.s===s)});guarda('Sector',s);
+  if(scroll){var el=$('.sector.on');if(el&&el.getBoundingClientRect().top>innerHeight*.7)el.scrollIntoView({behavior:'smooth',block:'start'})}}
+sBtns.forEach(function(b){b.onclick=function(){verSector(b.dataset.s,true)}});
+verSector(lee('Sector','cir'));
+
+/* QR decorativo */
+function qr(svg,seed){var n=25,s=seed||7,r=function(){s=(s*9301+49297)%233280;return s/233280},h='<rect width="25" height="25" fill="#fff"/>';
+  function fin(x,y){h+='<rect x="'+x+'" y="'+y+'" width="7" height="7" fill="#0f172a"/><rect x="'+(x+1)+'" y="'+(y+1)+'" width="5" height="5" fill="#fff"/><rect x="'+(x+2)+'" y="'+(y+2)+'" width="3" height="3" fill="#0f172a"/>'}
+  for(var y=0;y<n;y++)for(var x=0;x<n;x++){if((x<8&&y<8)||(x>16&&y<8)||(x<8&&y>16))continue;if(r()>.52)h+='<rect x="'+x+'" y="'+y+'" width="1" height="1" fill="#0f172a"/>'}
+  fin(0,0);fin(18,0);fin(0,18);svg.innerHTML=h}
+$$('svg.qr').forEach(function(s,i){qr(s,11+i*5)});
+
+/* ===== viaje ===== */
+var etapas=$$('#etapas .etapa'),iv=lee('Viaje',0),riel=$('#riel');
+if(iv>=etapas.length)iv=0;
+$('#navv').hidden=false;$('#tel-viaje').hidden=false;
+etapas.forEach(function(e,i){var b=document.createElement('button');b.textContent=i+1;b.title=$('h3',e).textContent;b.onclick=function(){verEtapa(i)};riel.appendChild(b)});
+function verEtapa(i,desdeBoton){iv=i;guarda('Viaje',i);
+  etapas.forEach(function(e,j){e.classList.toggle('on',j===i)});
+  $$('button',riel).forEach(function(b,j){b.classList.toggle('on',j===i);b.classList.toggle('hecho',j<i);b.style.setProperty('--k',getComputedStyle(etapas[i]).getPropertyValue('--k'))});
+  var m=$('.mini',etapas[i]),hd=$('#tv-hd');hd.style.setProperty('--k',m.dataset.k);$('#tv-t').textContent=m.dataset.t;$('#tv-s').textContent=m.dataset.s;
+  var bd=$('#tv-bd');bd.innerHTML=m.innerHTML;montarMini(bd);
+  $('#v-ant').disabled=i===0;var sig=$('#v-sig');sig.textContent=i===etapas.length-1?'Volver al inicio ↺':'Siguiente ›';sig.style.setProperty('--k',getComputedStyle(etapas[i]).getPropertyValue('--k'));
+  $('#v-n').textContent='Parada '+(i+1)+' de '+etapas.length;
+  if(desdeBoton){var v=$('#viaje');if(v.getBoundingClientRect().top<-200)v.scrollIntoView({behavior:'smooth'})}}
+$('#v-ant').onclick=function(){if(iv>0)verEtapa(iv-1,true)};
+$('#v-sig').onclick=function(){verEtapa(iv<etapas.length-1?iv+1:0,true)};
+
+var agAb=lee('Agenda',[1,2,3,7,8,9]);
+function montarMini(bd){
+  var ag=$('#agenda',bd);
+  if(ag){var salas=['Q1','Q2','Q3','Q4','Endo','Obst'],hs=['08','10','12','14','16','18'];ag.innerHTML='<b></b>'+hs.map(function(h){return '<b style="text-align:center">'+h+'</b>'}).join('');
+    salas.forEach(function(s,si){ag.insertAdjacentHTML('beforeend','<b>'+s+'</b>');hs.forEach(function(h,hi){var k=si*6+hi,b=document.createElement('button');b.className=agAb.indexOf(k)>=0?'ab':'';b.textContent=agAb.indexOf(k)>=0?'✓':'';b.setAttribute('aria-label',s+' '+h+' h');
+      b.onclick=function(){var p=agAb.indexOf(k);if(p>=0)agAb.splice(p,1);else agAb.push(k);guarda('Agenda',agAb);b.className=p>=0?'':'ab';b.textContent=p>=0?'':'✓';$('#ag-n',bd).textContent=agAb.length};ag.appendChild(b)})});
+    $('#ag-n',bd).textContent=agAb.length}
+  $$('[data-tomar]',bd).forEach(function(f){f.style.cursor='pointer';f.onclick=function(){f.className='franja';f.style.background='#dbeafe';f.style.borderColor='#93c5fd';f.style.color='#1e40af';f.lastElementChild.textContent='Pendiente · tuyo';toast('Franja tomada. Ahora: consentimiento informado (tenés 60 minutos).')}});
+  var g=$('[data-guardar]',bd);if(g)g.onclick=function(){g.textContent='✓ Guardado · franja confirmada';g.disabled=true;toast('Consentimiento guardado: la franja es tuya y el pase del paciente está listo.')};
+  $$('svg.qr',bd).forEach(function(s){qr(s,31)});
+  var d=$('[data-dict]',bd);if(d){$$('button',d).forEach(function(b){b.onclick=function(){$$('button',d).forEach(function(x){x.classList.toggle('on',x===b)});var si=b.classList.contains('si');$('[data-dict-res]',bd).innerHTML=si?'<small style="color:#166534"><b style="display:inline">AUTORIZADO</b> · firmado por Agente de ejemplo · el paciente ya lo ve</small>':'<small style="color:#b91c1c"><b style="display:inline">NO AUTORIZADO</b> · pide motivo escrito · el cirujano recibe aviso</small>'}})}
+  var cos=$$('[data-co]',bd),val=$('[data-validar]',bd);
+  if(val){var chk=function(){val.disabled=!cos.every(function(c){return c.checked})};cos.forEach(function(c){c.onchange=chk});
+    val.onclick=function(){var s=$('.sello',bd);s.classList.add('on');toast('Cirugía validada: pasa a Confirmada y entra al parte.');setTimeout(function(){s.classList.remove('on')},2200)}}
+  var hab=$('[data-hablar]',bd);if(hab)hab.onclick=function(){try{var u=new SpeechSynthesisUtterance('Buenas noches, le recuerdo que mañana tiene una cirugía programada; la primera, a las 8 de la mañana.');u.lang='es-AR';u.rate=.9;var vs=speechSynthesis.getVoices().filter(function(v){return /^es/i.test(v.lang)});if(vs.length)u.voice=vs.filter(function(v){return /female|mujer|paulina|monica|mónica|helena|sabina|luciana/i.test(v.name)})[0]||vs[0];speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){toast('Este equipo no tiene voz disponible.')}};
+}
+verEtapa(iv);
+
+/* ===== simulador ===== */
+var P={an:{n:'Dra. Paz',f:'Anestesiología',i:'MP',k:'var(--anest)'},enf:{n:'Lic. Ruiz',f:'Enfermería · circulante',i:'LR',k:'var(--enf)'},ins:{n:'Inst. Gómez',f:'Instrumentación',i:'IG',k:'var(--inst)'},cir:{n:'Dr. Ferreyra',f:'Cirujano',i:'DF',k:'var(--cir)'}};
+var PASOS=[
+ {t:'Equipo',d:'Cada uno confirma que está en esta cirugía. Anestesia primero marca su llegada.',f:['an','enf','ins']},
+ {t:'Entrada',d:'Antes de la inducción. La coordina Enfermería; firman Enfermería y Anestesia (registra el inicio de la anestesia).',f:['enf','an'],items:['Identidad del paciente confirmada','Sitio quirúrgico demarcado','Consentimiento informado firmado','Control de seguridad anestésica','Oxímetro colocado y funcionando']},
+ {t:'Recuento inicial',d:'Instrumentación cuenta gasas, compresas, agujas e instrumental.',f:['ins'],cuenta:'ini'},
+ {t:'Pausa',d:'Antes de la incisión. El cirujano la registra al tocar «Iniciar»; firman también Anestesia y Enfermería.',f:['cir','an','enf']},
+ {t:'Recuento final',d:'Instrumentación vuelve a contar y Enfermería cofirma. Si no coincide, todo se frena.',f:['ins','enf'],cuenta:'fin'},
+ {t:'Salida',d:'Antes de dejar la sala. La coordina Enfermería; se anotan fin de cirugía y salida de sala.',f:['enf'],items:['Procedimiento registrado','Muestras rotuladas','Problemas de equipamiento informados','Aspectos críticos de la recuperación']},
+ {t:'Recuperación',d:'Anestesia da el alta con la escala de Aldrete: 9 o más.',f:['an'],aldrete:true}
+];
+var CN=['Gasas','Compresas','Agujas','Instrumental'],S;
+function nuevo(){S={paso:0,mano:'enf',firmas:{},llego:false,ini:[20,10,6,32],fin:[0,0,0,0],items:{},ald:[2,2,2,1,1],hist:[],frenado:false}}
+nuevo();
+function hora(){var b=new Date(2026,9,21,7,50);b.setMinutes(b.getMinutes()+S.hist.length*6+S.paso*3);return ('0'+b.getHours()).slice(-2)+':'+('0'+b.getMinutes()).slice(-2)}
+function faltan(){var p=PASOS[S.paso];if(!p)return[];return p.f.filter(function(r){return !S.firmas[S.paso+'.'+r]})}
+function quienToca(){var f=faltan();if(!f.length)return null;var p=PASOS[S.paso];
+  if(p.cuenta==='fin'&&f.indexOf('ins')>=0)return 'ins';if(p.cuenta==='ini')return 'ins';if(p.items&&f.indexOf('enf')>=0)return 'enf';if(S.paso===0&&f.indexOf('an')>=0)return 'an';return f[0]}
+function pintarManos(){var q=quienToca(),m=$('#manos');m.innerHTML='';
+  Object.keys(P).forEach(function(k){var p=P[k],b=document.createElement('button');b.className='mano'+(S.mano===k?' on':'')+(q===k&&S.mano!==k?' toca':'');b.style.setProperty('--k',p.k);
+    b.innerHTML='<span class="av">'+p.i+'</span><span><b>'+p.n+'</b><small>'+p.f+'</small></span><span class="le">Le toca</span>';
+    b.onclick=function(){S.mano=k;pintar()};m.appendChild(b)})}
+function firmar(r){var k=S.paso+'.'+r;S.firmas[k]=hora();S.hist.push(P[r].n+' firmó '+PASOS[S.paso].t);
+  if(!faltan().length){var t=PASOS[S.paso].t;S.paso++;toast('✓ '+t+' completo'+(S.paso<7?'. Se habilita: '+PASOS[S.paso].t:''))}
+  pintar()}
+function pintar(){pintarManos();
+  var p7=$('#pasos7');p7.innerHTML=PASOS.map(function(p,i){return '<i class="'+(i<S.paso?'ok':i===S.paso?'ya':'')+'" title="'+p.t+'"></i>'}).join('');
+  $('#hechos').innerHTML=PASOS.slice(0,S.paso).map(function(p,i){return '<div><b>✓</b> '+(i+1)+'. '+p.t+' · '+p.f.map(function(r){return P[r].n.split(' ')[1]}).join(', ')+' · '+(S.firmas[i+'.'+p.f[p.f.length-1]]||'')+'</div>'}).join('');
+  var a=$('#actual');
+  if(S.paso>=PASOS.length){a.innerHTML='<div class="fin"><div class="big">🏁</div><h3>Cirugía Realizada</h3><p class="mut">Los siete pasos quedaron firmados, cada uno por quien estaba anotado, con su hora. Cuando el cirujano carga el informe operatorio y Admisión ya autorizó, pasa sola a <b>Finalizada</b> y computa en estadísticas y módulos.</p><button class="btn" id="otra">↺ Hacer otra</button></div>';$('#otra').onclick=function(){nuevo();pintar()};return}
+  var p=PASOS[S.paso],yo=S.mano,f=faltan(),q=quienToca(),mio=f.indexOf(yo)>=0;
+  var h='<h4>Paso '+(S.paso+1)+' de 7 · '+p.t+'</h4><p class="mut" style="font-size:.93rem">'+p.d+'</p>';
+  h+=mio?'<div class="lehoy mio">Le toca a '+P[yo].n+': '+(S.paso===0?'anotarse':'firmar '+(p.t==='Pausa'&&yo==='cir'?'la Pausa con «Iniciar»':'el paso '+p.t))+'</div>':'<div class="lehoy">'+P[yo].n+' no tiene nada que firmar acá. Esperando a '+f.map(function(r){return P[r].n}).join(' y ')+'.</div>';
+  if(p.items){h+='<div class="items">'+p.items.map(function(it,i){var k=S.paso+'.'+i;return '<label><input type="checkbox" data-it="'+k+'" '+(S.items[k]?'checked':'')+' '+(yo!=='enf'||S.firmas[S.paso+'.enf']?'disabled':'')+'>'+it+'</label>'}).join('')+'</div>'}
+  if(p.cuenta){var arr=S[p.cuenta],editable=yo==='ins'&&!S.firmas[S.paso+'.ins'];
+    h+='<div class="cuenta">'+CN.map(function(c,i){var dif=p.cuenta==='fin'&&S.firmas[S.paso+'.ins']&&arr[i]!==S.ini[i];return '<div class="cnt'+(dif?' dif':'')+'"><span>'+c+(p.cuenta==='fin'?' <small class="mut">(inicio '+S.ini[i]+')</small>':'')+'</span><div><button data-c="'+i+'" data-d="-1" '+(editable?'':'disabled')+'>−</button><b>'+arr[i]+'</b><button data-c="'+i+'" data-d="1" '+(editable?'':'disabled')+'>+</button></div></div>'}).join('')+'</div>';
+    if(p.cuenta==='fin'&&editable)h+='<p class="mut" style="font-size:.85rem">Probá dejar uno distinto del inicio y firmá: vas a ver qué pasa. <button class="btn sm ghost" id="igualar">Copiar los valores del inicio</button></p>';
+    if(S.frenado)h+='<div class="frenado">⛔ Recorrido frenado: el recuento final no coincide con el inicial. La Jefatura recibió al instante una incidencia confidencial. Busquen la diferencia y carguen un recuento nuevo (el anterior queda en el historial).</div>'}
+  if(p.aldrete){var it=['Actividad','Respiración','Circulación','Conciencia','Saturación'],tot=S.ald.reduce(function(a,b){return a+b},0);
+    h+='<div class="ald">'+it.map(function(n,i){return '<div>'+n+'<span>'+[0,1,2].map(function(v){return '<button data-al="'+i+'" data-v="'+v+'" class="'+(S.ald[i]===v?'on':'')+'" '+(yo==='an'?'':'disabled')+'>'+v+'</button>'}).join('')+'</span></div>'}).join('')+'</div><p><b>Total: '+tot+'</b> '+(tot>=9?'<span class="chip" style="--k:var(--ok)">Alta posible</span>':'<span class="chip" style="--k:var(--bad)">Todavía no: hace falta 9 o más</span>')+'</p>'}
+  h+='<div class="firmas">'+p.f.map(function(r){var ok=S.firmas[S.paso+'.'+r];return '<div class="firma'+(ok?' ok':'')+'">'+(ok?'✓ ':'')+P[r].n+(ok?' · '+ok:'')+(!ok&&r===yo?' <button class="btn sm" data-firmar="'+r+'" style="--k:'+P[r].k+'">'+(S.paso===0?(r==='an'&&!S.llego?'Llegué · disponible':'Me anoto'):(p.t==='Pausa'&&r==='cir'?'▶ Iniciar':'Firmar'))+'</button>':'')+'</div>'}).join('')+'</div>';
+  if(!mio&&f.length)h+='<button class="btn sm ghost" id="avisar">🔔 Avisar a '+P[q].n+'</button>';
+  a.innerHTML=h;
+  $$('[data-it]',a).forEach(function(c){c.onchange=function(){S.items[c.dataset.it]=c.checked}});
+  $$('[data-c]',a).forEach(function(b){b.onclick=function(){var arr=S[p.cuenta],i=+b.dataset.c;arr[i]=Math.max(0,arr[i]+(+b.dataset.d));S.frenado=false;pintar()}});
+  var ig=$('#igualar');if(ig)ig.onclick=function(){S.fin=S.ini.slice();S.frenado=false;pintar()};
+  $$('[data-al]',a).forEach(function(b){b.onclick=function(){S.ald[+b.dataset.al]=+b.dataset.v;pintar()}});
+  var av=$('#avisar');if(av)av.onclick=function(){toast('🔔 '+P[q].n+' recibió: «'+P[yo].n+' le pide su firma: '+p.t+'»')};
+  $$('[data-firmar]',a).forEach(function(b){b.onclick=function(){var r=b.dataset.firmar;
+    if(S.paso===0&&r==='an'&&!S.llego){S.llego=true;toast('Dra. Paz marcó su llegada. Ahora puede anotarse.');pintar();return}
+    if(p.items&&r==='enf'){var todos=p.items.every(function(x,i){return S.items[S.paso+'.'+i]});if(!todos){toast('Faltan puntos de la lista: con uno solo sin marcar no se puede firmar.');return}}
+    if(p.items&&r!=='enf'&&!S.firmas[S.paso+'.enf']){toast('Primero Enfermería completa la lista.');return}
+    if(p.cuenta==='fin'&&r==='ins'){var ok=S.fin.every(function(v,i){return v===S.ini[i]});if(!ok){S.frenado=true;toast('⛔ El recuento no coincide: recorrido frenado y aviso a la Jefatura.');pintar();return}}
+    if(p.cuenta==='fin'&&r==='enf'&&!S.firmas[S.paso+'.ins']){toast('Primero Instrumentación carga el recuento final.');return}
+    if(p.aldrete){var tot=S.ald.reduce(function(a,b){return a+b},0);if(tot<9){toast('Aldrete '+tot+': todavía no corresponde el alta.');return}}
+    firmar(r)}});
+}
+$('#sim-reset').onclick=function(){nuevo();pintar();toast('Cirugía de ejemplo reiniciada.')};
+pintar();
+
+/* ===== autorizaciones ===== */
+$$('#tog-urg button').forEach(function(b){b.onclick=function(){var u=b.dataset.u==='1';$$('#tog-urg button').forEach(function(x){x.classList.toggle('on',x===b)});
+  $$('#cadena .req').forEach(function(r){var txt=u?r.dataset.u:r.dataset.p;r.textContent=txt;r.className='req '+(/despu|Regulariz/i.test(txt)?'post':/Siempre|Mismo|Igual|El día/.test(txt)?'post':'pre')});
+  $$('#cadena .eslabon').forEach(function(e,i){e.classList.toggle('atenuado',u&&(i===3||i===4||i===5))})}});
+
+/* ===== paciente ===== */
+var PE=[{t:'En revisión por Admisión',c:'#f59e0b'},{t:'Autorizada · esperando a la Jefatura',c:'#0891b2'},{t:'Confirmada · Mar 21 · 10:00 · Q2',c:'#16a34a'},{t:'Cirugía realizada · pase caducado',c:'#64748b'}],pi=0;
+function pintarPac(susp){var e=$('#pac-estado'),li=$$('#pac-tl li');
+  if(susp){e.textContent='Suspendida · falta de insumo / implante';e.style.background='#dc2626';li.forEach(function(l,i){l.className=i<4?'ok':''});return}
+  e.textContent=PE[pi].t;e.style.background=PE[pi].c;var at=pi+3;li.forEach(function(l,i){l.className=i<at?'ok':i===at?'ya':''})}
+$('#pac-sig').onclick=function(){pi=(pi+1)%PE.length;pintarPac()};
+$('#pac-susp').onclick=function(){pintarPac(true);toast('El paciente ve la suspensión con su motivo, sin tener que llamar.')};
+pintarPac();
+
+/* ===== día ===== */
+function pintarDia(){var d=new Date(),m=d.getHours()*60+d.getMinutes();$('#dia-ahora').style.left=(m/1440*100)+'%';
+  var t=m<13*60?'Faltan '+Math.floor((780-m)/60)+' h '+((780-m)%60)+' min para el cierre de solicitudes de hoy.':m<14*60?'En menos de una hora se publica el parte de mañana.':m<20*60?'El parte de mañana ya está publicado. A las 20 h sale el aviso hablado.':'Ya salió el aviso de la víspera para las cirugías de mañana.';
+  $('#dia-txt').textContent='● Ahora son las '+hh()+'. '+t+' (Los sábados, domingos y feriados no hay cierre.)'}
+pintarDia();setInterval(pintarDia,60000);
+
+/* ===== calidad ===== */
+var MED=[{n:'Utilización del bloque',v:78,u:'%',meta:'Meta 75 % o más',ok:function(v){return v>=75},max:100,d:'Horas operadas sobre horas habilitadas, con las horas reales de la Lista de Verificación.'},
+  {n:'Tasa de suspensiones',v:6.2,u:'%',meta:'Meta menos de 5 %',ok:function(v){return v<5},warn:function(v){return v<8},max:20,d:'Suspendidas sobre programadas, con sus causas en anillo.'},
+  {n:'Tiempo de recambio',v:27,u:' min',meta:'Meta 30 min o menos',ok:function(v){return v<=30},max:60,d:'De la salida de un paciente a la entrada del siguiente en la misma sala.'},
+  {n:'Informe operatorio a tiempo',v:96,u:'%',meta:'Meta 95 % o más',ok:function(v){return v>=95},max:100,d:'Cirugías con el informe cargado dentro de las 2 h.'}];
+$('#medidores').innerHTML=MED.map(function(m){var ok=m.ok(m.v),c=ok?'var(--ok)':(m.warn&&m.warn(m.v)?'var(--warn)':'var(--bad)'),p=Math.min(1,m.v/m.max),L=2*Math.PI*40;
+  return '<div class="card medidor"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--soft)" stroke-width="11"/><circle cx="50" cy="50" r="40" fill="none" stroke="'+c+'" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+(L*p)+' '+L+'" transform="rotate(-90 50 50)"/><text x="50" y="55" text-anchor="middle" font-size="17" font-weight="900" fill="currentColor">'+String(m.v).replace('.',',')+m.u.trim()+'</text></svg><div><h4>'+m.n+'</h4><p><span class="sem" style="background:'+c+'"></span><b>'+m.meta+'</b></p><p>'+m.d+'</p></div></div>'}).join('');
+$$('.mosaico').forEach(function(mo){var n=+mo.dataset.n,u=+mo.dataset.u,h='';for(var i=0;i<n;i++){h+='<i class="'+(i>=n-u?'u':'')+'" style="animation-delay:'+(i*25)+'ms"></i>'}mo.innerHTML=h;mo.insertAdjacentHTML('afterend','<small class="mut">'+n+' esta semana · '+u+' de urgencia</small>')});
+
+/* ===== empezar ===== */
+var ch=lee('Check',{});
+function pintarCheck(){var cs=$$('#check input'),n=0;cs.forEach(function(c){c.checked=!!ch[c.dataset.c];c.closest('li').classList.toggle('hecho',c.checked);if(c.checked)n++});$('#av-barra').style.width=(n/cs.length*100)+'%'}
+$$('#check input').forEach(function(c){c.onchange=function(){ch[c.dataset.c]=c.checked;guarda('Check',ch);pintarCheck();if($$('#check input').every(function(x){return x.checked}))toast('🎉 ¡Listo! Ya sos parte de HRU Quirófanos.')}});
+pintarCheck();
+var ua=navigator.userAgent,dsel=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)?'ios':/Android/.test(ua)?'and':'pc';
+function verDisp(d){$$('#disp button').forEach(function(b){b.classList.toggle('on',b.dataset.d===d)});$$('.instal').forEach(function(x){x.classList.toggle('on',x.dataset.d===d)})}
+$$('#disp button').forEach(function(b){b.onclick=function(){verDisp(b.dataset.d)}});verDisp(dsel);
+$('#compartir').onclick=function(){var url=/^https?:/.test(location.protocol)?location.href.split('#')[0]:null,txt='Guía de inicio de HRU Quirófanos: qué es, cómo se usa en cada sector y cómo empezar.';
+  if(navigator.share&&url){navigator.share({title:'HRU Quirófanos · Guía de inicio',text:txt,url:url}).catch(function(){});return}
+  if(!url){toast('Para compartir, reenviá este mismo archivo por WhatsApp o correo.');return}
+  try{navigator.clipboard.writeText(url).then(function(){toast('Enlace copiado.')})}catch(e){toast(url)}};
+})();
+</script>
+</body>
+</html>
