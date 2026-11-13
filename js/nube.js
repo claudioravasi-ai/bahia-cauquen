@@ -64,7 +64,9 @@ const Nube = {
              /* 15-10: mantenimiento en vivo: quién trabaja y sus puntos en el mapa (js/mant-vivo.js) */
              'mantVivo',
              /* 03-11: El Consejo informa: decisiones, obras y compras (js/v-consejo.js). Lo escribe la Administración */
-             'consejo'],
+             'consejo',
+             /* 13-11: la frase del día de la portada, un registro por día (js/frase.js) */
+             'frase'],
     privado: ['privados','dms','reclamos','peticiones','pases','solicitudesPase','infracciones','notifs','llegadas','paquetes','pagos','recibos',
               /* 27-09: los cuidados de la casa en invierno, por lote (js/v-casa.js) */
               'casaTareas',
@@ -179,6 +181,7 @@ const Nube = {
     pagos:           { listas:['reparto'] },
     debitos:         { listas:['historial'], objetos:['rebotes'] },
     consejo:         { listas:['novedades'] },
+    frase:           { listas:['partes'], objetos:['usaron'] },
     hotelLiqs:       { listas:['cuotas'] },
   },
   comoLaGuardamos(col, x){
@@ -538,7 +541,7 @@ const Nube = {
   tanda: null,
 
   /* Colecciones nuevas: si al abrir la app las reglas todavía no las permitían, se reintenta. */
-  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen', 'morosos', 'guardiaAhora', 'guardiaLooks', 'mantenimiento'],
+  RELEER: ['mensajeria', 'guia', 'telefonos', 'liqResumen', 'morosos', 'guardiaAhora', 'guardiaLooks', 'mantenimiento', 'frase'],
   escucharColeccion(base, cols, opcional = false){
     cols.forEach(col => {
       /* Bitácora y auditoría bajan solo lo reciente (ver js/historial.js). */
@@ -946,6 +949,8 @@ const Nube = {
         /* Los correos (08-10-2026): si las reglas nuevas no están publicadas, se dice qué hacer. */
         /* La guardia de ahora (14-10-2026): si las reglas nuevas no están publicadas, la garita se entera una vez. */
         if (g === 'barrio/guardiaAhora'){ if (!this.avisoGuardia && typeof esGuardia === 'function' && esGuardia()){ this.avisoGuardia = true; toast('Los vecinos todavía no ven quién está de guardia: falta publicar las reglas nuevas de Firebase (reglas-firebase.txt).', 'alert'); } return; }
+        /* La frase del día (13-11-2026): otro vecino grabó primero, o faltan las reglas nuevas. */
+        if (g === 'barrio/frase'){ toast('Tu frase no llegó a la pizarra del barrio: otro vecino grabó la suya un instante antes, o faltan publicar las reglas nuevas de Firebase.', 'alert'); return; }
         if (g === 'barrio/mensajeria'){ (this.sinPermiso = this.sinPermiso || new Set()).add('mensajeria'); toast('El correo no se guardó en la base del barrio: falta publicar las reglas nuevas de Firebase (reglas-firebase.txt). Hasta entonces el camión no llega a los demás.', 'alert'); return; }
         /* La copia de una visita en la carpeta de OTRO del lote (12-10-2026): si
            las reglas nuevas todavía no se publicaron, la reparte la

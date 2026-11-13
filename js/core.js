@@ -269,7 +269,9 @@ function migrar(s){
     /* 15-10: mantenimiento en vivo (js/mant-vivo.js): puntos, enlaces, jornadas y, sin la base, los mensajes */
     mantVivo:[], mantCodigos:[], mantJornadas:[], mantChat:[],
     /* 03-11: los agradecimientos a quien trabaja (js/gracias.js) y El Consejo informa (js/v-consejo.js) */
-    gracias:[], consejo:[] };
+    gracias:[], consejo:[],
+    /* 13-11: la frase del día de la portada (js/frase.js) */
+    frase:[] };
   for (const k in def) if (!Array.isArray(s[k])) s[k] = def[k];
   /* El chat vecinal y las reservas de espacios comunes se sacaron el 29-09-2026:
      lo que haya quedado guardado en este equipo se borra al abrir la app. */

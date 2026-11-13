@@ -383,6 +383,22 @@ PEGAR DESDE ACÁ
         ".write": "root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
         "$id": { ".validate": "!newData.exists() || (newData.child('id').val() === $id && newData.child('titulo').isString() && newData.child('titulo').val().length > 0 && newData.child('titulo').val().length <= 110 && (newData.child('tipo').val() === 'decision' || newData.child('tipo').val() === 'obra'))" }
       },
+      /* FRASE DEL DÍA (13-11-2026, js/frase.js): un registro por día (fd-<día>).
+         La leen los vecinos aprobados, la garita y la Administración (no el
+         hotel). La escribe un vecino (no la garita, el hotel ni la
+         supervisión) solo si la pizarra está libre y él todavía no la usó ese
+         día; su autor la puede borrar (queda sin "userId"). La Administración
+         borra los días viejos. */
+      "frase": {
+        ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
+        "$id": {
+          ".write": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'supervisor' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'guardia' && ((newData.child('userId').val() === auth.uid && newData.child('usaron').child(auth.uid).val() === true && (data.child('userId').val() === auth.uid || (!data.child('userId').exists() && !data.child('usaron').child(auth.uid).exists()))) || (data.child('userId').val() === auth.uid && newData.exists() && !newData.child('userId').exists() && newData.child('usaron').child(auth.uid).val() === true))) || root.child('barrio/users').child(auth.uid).child('rol').val() === 'admin'",
+          ".validate": "!newData.exists() || newData.child('id').val() === $id",
+          "txt": { ".validate": "newData.isString() && newData.val().length <= 160" },
+          "de":  { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "lote": { ".validate": "newData.isString() && newData.val().length <= 40" }
+        }
+      },
       /* COSAS PARA PRESTAR (27-09-2026): las ven los vecinos aprobados; cada
          cosa la crea, cambia y borra solo su dueño (o la Administración). */
       "cosas": { ".read": "(root.child('barrio/users').child(auth.uid).child('estado').val() === 'aprobado' && root.child('barrio/users').child(auth.uid).child('rol').val() !== 'hotel')",
@@ -768,6 +784,14 @@ HASTA ACÁ
 - barrio/consejo/<id>: decisiones, obras y compras del Consejo. Las escribe
   solo la Administración; las leen los vecinos aprobados (no el hotel ni la
   supervisión). Sin publicar esto, no se puede publicar nada ahí.
+
+✔ NUEVO 13-11-2026 (hay que volver a publicar): LA FRASE DEL DÍA.
+- barrio/frase/fd-<día>: la frase de la pizarra de la portada (texto con sus
+  colores, nombre con la inicial del apellido y lote de quien la escribió,
+  hora y las cuentas que ya la usaron ese día). La escribe un vecino si la
+  pizarra está libre y él no la usó ese día; su autor la puede borrar. La
+  leen los vecinos, la garita y la Administración (no el hotel). Sin
+  publicar esto, la frase grabada no les llega a los demás.
 -----------------------------------------------------------
 
 ✔ NUEVO 22-10-2026, tarde (hay que volver a publicar): EL INFORME SEMANAL DE LA POLICÍA.

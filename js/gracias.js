@@ -142,7 +142,8 @@ F['gracias'] = async (d, form) => {
    EL BOTÓN "GRACIAS" EN LA FOTO DE LA PORTADA (pedido de Claudio, 04-11-2026:
    "el diseño como antes, solo que el botón sea un poco más emblemático e
    interaccione con una primera impresión del vecino para agradecer").
-   Debajo de "De guardia", con el mismo vidrio: un corazón rosado que late
+   Debajo de "De guardia", con el mismo vidrio: (13-11-2026: unas manos juntas 🙏, sin círculo,
+   para no confundirse con el corazón del DEA) que late
    con un halo y la palabra "Gracias". Un toque abre "¿A quién le querés
    agradecer?". La primera vez del día que el vecino abre la app, un globito
    lo invita ("¿Le das las gracias a Juan y Ana?") y se va solo a los pocos
@@ -161,7 +162,7 @@ function graciasBoton(){
   const g = typeof guardiaAhora === 'function' ? guardiaAhora() : null, ns = g && g.abierto ? aLista(g.guardias).map(x => String(x.n).split(' ')[0]).filter(Boolean) : [];
   const a = ns.length === 1 ? ns[0] : ns.length === 2 ? `${ns[0]} y ${ns[1]}` : ns.length > 2 ? 'la guardia' : 'quien te cuida';
   return `<div class="gr-boton"><button type="button" class="gr-b" data-a="gracias-nueva" aria-label="Agradecer a quien trabaja en el barrio">
-      <span class="gr-b-cor" aria-hidden="true">${I('heart')}</span><b>Gracias</b></button>
+      <span class="gr-b-cor gr-b-manos" aria-hidden="true">🙏</span><b>Gracias</b></button>
     ${globo ? `<button type="button" class="gr-globo" data-a="gracias-nueva">¿Le das las gracias a ${esc(a)}? 💛</button>` : ''}</div>`;
 }
 /* La lluvia de corazones al mandar (sin nada si el teléfono pide menos movimiento). */
@@ -218,6 +219,18 @@ function bandaGracias(){
       <div class="grow"><b>${xs.length === 1 ? 'Un vecino les agradeció' : `${xs.length} agradecimientos de los vecinos`}</b><small>En las últimas 24 horas</small></div>
       <button class="btn btn-xs btn-sec" data-a="abrir" data-v="gracias">Ver todos</button></div>
     ${xs.slice(0, 3).map(x => `<div class="gr-linea">${Gracias.cara(x.para)}<span class="grow"><b>${esc(Gracias.nombrePara(x.para))}</b> «${esc(x.txt.length > 110 ? x.txt.slice(0, 110) + '…' : x.txt)}»<small>${esc(x.de || '')} · ${hace(x.at)}</small></span></div>`).join('')}</section>`;
+}
+/* LOS AGRADECIMIENTOS EN LOS PARTES POR CORREO (13-11-2026, pedido de Claudio):
+   cuántos, a quién, qué vecino y de qué lote. Estilos escritos en cada
+   elemento, como el resto de los correos. Va en el parte del turno de la
+   garita (que ve la supervisión y le llega a la Administración) y en el parte
+   del día de cada persona de mantenimiento (solo los suyos y los de su equipo). */
+function graciasCorreoHtml(lista){
+  const personas = new Set(lista.map(x => Gracias.clave(x.para))).size, lotes = new Set(lista.map(x => x.lote)).size;
+  const kpi = (n, t) => `<td align="center" style="background:#fdf0f4;border-radius:10px;padding:8px"><b style="display:block;font-size:20px;color:#c0265b">${n}</b><span style="font-size:11px;color:#7a1430">${t}</span></td>`;
+  const td = 'padding:6px 4px;border-top:1px solid #e3e8ea;vertical-align:top';
+  return `<table width="100%" cellpadding="0" cellspacing="6" style="border-collapse:separate"><tr>${kpi(lista.length, 'gracias')}${kpi(personas, personas === 1 ? 'persona' : 'personas')}${kpi(lotes, lotes === 1 ? 'lote' : 'lotes')}</tr></table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px">${lista.map(x => `<tr><td style="${td}"><b>${esc(Gracias.nombrePara(x.para))}</b> «${esc(x.txt)}»</td><td style="${td};color:#6c7d7a;font-size:12px;white-space:nowrap" align="right">${esc(x.de || 'Un vecino')} · ${hora(x.at)}</td></tr>`).join('')}</table>`;
 }
 /* En el portal de la supervisión y en la Administración: el resumen del mes. */
 function graciasResumen(){

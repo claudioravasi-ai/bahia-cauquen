@@ -470,6 +470,7 @@ function morfarIntacto(a, b){
   if (d.qr != null) return d.qr === n.qr;                 /* el QR ya dibujado adentro */
   if (d.qrRonda != null) return d.qrRonda === n.qrRonda;
   if (d.foto != null && d.ok) return d.foto === n.foto;   /* la foto ya bajada del equipo */
+  if (d.fijo != null) return d.fijo === n.fijo;           /* lo que se está escribiendo a mano (la frase del día) */
   return false;
 }
 function morfarAtributos(a, b, marcas){
@@ -851,6 +852,8 @@ function despuesDePintar(){
   if (typeof Servicio !== 'undefined') conRed('servicio', () => Servicio.despues());
   /* El recorrido de bienvenida, la primera vez (js/recorrido.js). */
   if (typeof Recorrido !== 'undefined') conRed('recorrido', () => Recorrido.quizas());
+  /* La frase del día: la perspectiva del acrílico y el tamaño de la letra (js/frase.js). */
+  if (typeof Frase !== 'undefined') conRed('frase del día', () => Frase.despues());
 }
 
 /* =========================================================
@@ -1119,9 +1122,13 @@ const Dea = {
   apretar(e){
     const b = e.target.closest && e.target.closest('#deaBtn'); if (!b) return;
     e.preventDefault(); if (Dea.timer) return;
+    /* 13-11-2026: el ancho queda fijo al apretar; si no, al cambiar "SOLICITARLO" por "Mantené… 2" el botón se angostaba en vez de agrandarse. */
+    b.style.minWidth = b.offsetWidth + 'px';
     Sonido.despertar(); b.classList.add('cargando'); Sonido.vibrar(40);
     const desde = Date.now(), txt = b.querySelector('span');
-    Dea.cuenta = setInterval(() => { const p = Math.min(1, (Date.now() - desde) / DEA_ESPERA);
+    let seg = 0;   /* 13-11-2026: vibra cada segundo mientras se mantiene, como el SOS */
+    Dea.cuenta = setInterval(() => { const p = Math.min(1, (Date.now() - desde) / DEA_ESPERA), sg = Math.floor((Date.now() - desde) / 1000);
+      if (sg > seg && p < 1){ seg = sg; Sonido.vibrar(30); }
       b.style.setProperty('--dea-carga', (p * 100).toFixed(1) + '%'); if (txt) txt.textContent = p < 1 ? `Mantené… ${Math.ceil((DEA_ESPERA - (Date.now() - desde)) / 1000)}` : 'SOLICITARLO'; }, 50);
     Dea.timer = setTimeout(() => { Dea.soltar(false); Sonido.vibrar([90, 60, 90]); Dea.preguntar(); }, DEA_ESPERA);
   },
@@ -1131,7 +1138,7 @@ const Dea = {
     if (Dea.cuenta){ clearInterval(Dea.cuenta); Dea.cuenta = null; }
     if (!b) return;
     const estaba = b.classList.contains('cargando');
-    b.classList.remove('cargando'); b.style.removeProperty('--dea-carga');
+    b.classList.remove('cargando'); b.style.removeProperty('--dea-carga'); b.style.removeProperty('min-width');
     const txt = b.querySelector('span'); if (txt) txt.textContent = 'SOLICITARLO';
     if (cancelado && estaba) toast('Para pedir el DEA, mantené apretado el botón 2 segundos', 'heart');
   },
@@ -1451,7 +1458,7 @@ function sosSoltar(cancelado = true){
   if (!b) return;
   const estaba = b.classList.contains('cargando');
   b.classList.remove('cargando');
-  b.style.removeProperty('--sos-carga');
+  b.style.removeProperty('--sos-carga'); b.style.removeProperty('min-width');
   const txt = b.querySelector('span'); if (txt) txt.textContent = 'SOS';
   if (cancelado && estaba) toast('Mantené apretado el SOS 3 segundos para pedir ayuda', 'siren');
 }
@@ -1460,17 +1467,20 @@ function sosApretar(e){
   e.preventDefault();
   if (sosTimer) return;
   Sonido.despertar();
+  /* 13-11-2026: el ancho queda fijo al apretar (al pasar de "SOS" a "3" se angostaba en vez de agrandarse). */
+  b.style.minWidth = b.offsetWidth + 'px';
   b.classList.add('cargando');
   const txt = b.querySelector('span');
   const desde = Date.now();
+  let seg = 0;
   Sonido.vibrar(40);
   sosCuenta = setInterval(() => {
     const p = Math.min(1, (Date.now() - desde) / SOS_ESPERA);
     b.style.setProperty('--sos-carga', (p * 100).toFixed(1) + '%');
     const quedan = Math.ceil((SOS_ESPERA - (Date.now() - desde)) / 1000);
     if (txt) txt.textContent = quedan > 0 ? String(quedan) : 'SOS';
-    if (p >= .34 && p < .36) Sonido.vibrar(30);
-    if (p >= .67 && p < .69) Sonido.vibrar(30);
+    /* Una vibración cortita por cada segundo que pasa (13-11-2026). */
+    const sg = Math.floor((Date.now() - desde) / 1000); if (sg > seg && p < 1){ seg = sg; Sonido.vibrar(30); }
   }, 50);
   sosTimer = setTimeout(() => {
     sosSoltar(false);
@@ -2347,6 +2357,7 @@ const PIEZAS = [
   ['js/van-chofer.js', () => typeof VanChofer],
   ['js/gracias.js',    () => typeof Gracias],
   ['js/v-consejo.js',  () => typeof Consejo],
+  ['js/frase.js',      () => typeof Frase],
 ];
 function piezasQueFaltan(){
   const falta = [];

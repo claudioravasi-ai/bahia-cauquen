@@ -315,7 +315,8 @@ const L = [
     { t:'Guardar', x:'<b>Tocá el botón</b> para guardarlo.', s:'ENVIAR:modo-viaje', h:'tocar' },
   ] },
   { id:'emergencias', g:'vecino', ven:['garita', 'supervision'], q:'u_lucia', t:'Emergencias: SOS y DEA', d:'Qué hacer cuando algo pasa.', p:[
-    { t:'El SOS', x:'Ante una emergencia, <b>mantené apretado el SOS 3 segundos</b>: se llena de rojo, cuenta 3, 2, 1 y avisa. Acá es de práctica.', s:'#sosBtn' },
+    { t:'El SOS', x:'Ante una emergencia, <b>mantené apretado el SOS 3 segundos</b>: se agranda, se llena de rojo, cuenta 3, 2, 1 (el teléfono vibra cada segundo) y avisa. Acá es de práctica.', s:'#sosBtn' },
+    { t:'El DEA', x:'El <b>corazón rojo que late</b> en la foto abre Emergencias, donde se pide el desfibrilador con el botón verde <b>SOLICITARLO</b> (2 segundos apretado).', s:'#cuerpo .dea-solo' },
     { t:'Emergencias', x:'<b>Tocá "Emergencias"</b>: los teléfonos útiles, el DEA y qué hacer.', s:'#cuerpo [data-a="abrir"][data-v="emergencias"]', h:'tocar' },
     { t:'Todo a mano', x:'Llamar al 911, a la garita, pedir el DEA (desfibrilador) y los datos médicos de tu perfil.', s:'#cuerpo' },
   ] },
@@ -367,6 +368,12 @@ const L = [
     { t:'A quién', x:'Aparecen los que están trabajando ahora. <b>Tocá uno</b> (o "Toda la guardia" para alguien que ya se fue).', s:'#hoja .gr-op[data-a]', h:'tocar' },
     { t:'Qué decirle', x:'<b>Tocá una frase</b> o escribila con tus palabras. El botón se prende recién cuando hay algo para mandar.', s:'#hoja .gr-frases label', h:'tocar' },
     { t:'Mandar', x:'Con <b>"Mandar el agradecimiento"</b> le llega con tu nombre y tu lote. Lo ven esa persona, la garita, la supervisión y la Administración. Uno por día a cada persona.', s:'#hoja [data-gr-boton]' },
+  ] },
+  { id:'frase', g:'vecino', ven:['garita'], q:'u_lucia', ir:'inicio', t:'Frase del día', d:'La pizarra de la portada: un vecino por día escribe una frase.', p:[
+    { t:'La pizarra', x:'Debajo de la foto, la <b>Frase del día</b>. El primer vecino que graba escribe para todo el barrio hasta las 00:00. Si a las 12:00 nadie escribió, aparece sola una frase con la firma de su autor, que dura 24 horas (hasta las 11:59 del día siguiente); la podés reemplazar por la tuya.', s:'#fdCartel' },
+    { t:'Escribir', x:'<b>Tocá la pizarra</b>. Escribís hasta 140 letras; las <b>fibras</b> del estante cambian el color (negro, rojo o azul).', s:'#fdTexto', h:'tocar' },
+    { t:'Grabar', x:'Corregí lo que quieras: recién se guarda al tocar <b>✓ Grabar</b>, y queda firmada con tu nombre y tu lote. Con <b>Cancelar</b> no cuenta.', s:'#cuerpo .fd-acciones' },
+    { t:'El borrador', x:'Solo quien la escribió la borra con el <b>borrador</b>: la pizarra queda libre para otro vecino y vos escribís de nuevo mañana.', s:'#fdBorrador' },
   ] },
   { id:'camion', g:'vecino', ven:['garita'], q:'u_lucia', ir:'recoleccion', t:'El camión de residuos', d:'Qué días pasa y el aviso cuando entra.', p:[
     { t:'Los días', x:'Qué días pasa y qué se saca cada día. Cuando la garita registra que entró, te suena el aviso para que saques las bolsas.', s:'#cuerpo' },

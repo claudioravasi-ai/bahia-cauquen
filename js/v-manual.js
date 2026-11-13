@@ -143,7 +143,7 @@ const MANUAL_CAPS = [
   { id:'emergencias', icon:'siren', color:'danger', para:'vecinos', t:'Emergencias: SOS y DEA', s:'Qué hacer cuando algo pasa', b:[
     ['h', 'El botón SOS'],
     ['pasos', [
-      'Tocá y <b>mantené apretado</b> el botón rojo <b>SOS</b> de arriba a la derecha durante <b>3 segundos</b>. El botón se va llenando de rojo y cuenta 3, 2, 1. (Si soltás antes, no se manda nada: así no sale solo desde el bolsillo.)',
+      'Tocá y <b>mantené apretado</b> el botón rojo <b>SOS</b> de arriba a la derecha durante <b>3 segundos</b>. El botón se agranda, se va llenando de rojo, cuenta 3, 2, 1 y el teléfono vibra cada segundo. (Si soltás antes, no se manda nada: así no sale solo desde el bolsillo.)',
       'Se abre una <b>pantalla roja que late</b> con cuatro fichas grandes de colores: <b>emergencia médica</b> (rosa), <b>seguridad / intrusión</b> (azul), <b>incendio</b> (naranja) u <b>otra</b> (violeta). Cada una muestra su número para llamar. Tocá la que corresponde: la alerta sale en ese momento. Si te equivocaste, tocá <b>"Me equivoqué · cerrar"</b>: todavía no se mandó nada.',
       'La misma pantalla se pinta del color de la emergencia y te muestra, uno por uno, <b>a quién le llegó</b> (la guardia, la Administración y los vecinos; en una emergencia médica, también quienes saben primeros auxilios) y si salió <b>tu ubicación</b> (GPS). La alerta salta con sonido en todos esos teléfonos, con tu nombre y tu lote.',
       'Tocá <b>"Llamar al …"</b> (107 ambulancia, 101 policía, 100 bomberos, 911) o <b>"Llamar a la garita"</b>, que están ahí mismo. <b>"Listo"</b> cierra la pantalla.',
@@ -154,8 +154,8 @@ const MANUAL_CAPS = [
     ['p', 'Aparece un cartel rojo con quién la pidió, el lote y "Dónde está pasando". Seguí lo que indica el cartel (por ejemplo, no bloquear la calle). Tocá <b>"Entendido"</b> para cerrarlo.'],
     ['h', 'Pedir el DEA (desfibrilador)'],
     ['pasos', [
-      'En la foto de la portada, arriba a la derecha, tocá el <b>corazón que late</b> ("DEA operativo en la garita"): se abre <b>Emergencias</b>.',
-      'Al lado del corazón rojo, <b>mantené apretado 2 segundos</b> el botón verde <b>SOLICITARLO</b>.',
+      'En la foto de la portada, arriba a la derecha, tocá el <b>corazón rojo que late</b> con <b>DEA</b> escrito adentro: se abre <b>Emergencias</b>.',
+      'Al lado del corazón rojo, <b>mantené apretado 2 segundos</b> el botón verde <b>SOLICITARLO</b>: mientras lo apretás se agranda (en el celular crece para abajo) y el teléfono vibra cada segundo.',
       'Contestá <b>SÍ</b>. A la garita le salta una alarma con tu apellido y tu lote hasta que sale con el DEA; a vos te avisa cuando va en camino.',
       'Cuando la garita toca "Voy en camino con el DEA", con ese mismo toque les llega un aviso a los <b>vecinos del equipo de salud o con RCP</b>. Si alguno va, lo ves en Emergencias ("También va…").',
       'Llamá además al <b>911</b> o al <b>107</b>.',
@@ -525,13 +525,28 @@ const MANUAL_CAPS = [
   { id:'gracias', icon:'heart', color:'danger', para:'vecinos', t:'Agradecer a quien trabaja', s:'La guardia, la policía nocturna y mantenimiento', b:[
     ['p', 'Un gesto chico que a quien trabaja le cambia el día. Le llega con tu nombre de pila, la inicial de tu apellido y tu lote.'],
     ['pasos', [
-      'Lo más rápido: en la foto de la portada, debajo de <b>"De guardia"</b>, el botón con el <b>corazón rosado que late "Gracias"</b>. La primera vez del día que abrís la app aparece un globito que te invita ("¿Le das las gracias a Juan y Ana?") y se va solo. También se entra por <b>El barrio → Agradecer a quien trabaja</b>, por <b>"De guardia"</b> (botón <b>Agradecer</b>) o por el corazón de la tarjeta de alguien de mantenimiento en vivo.',
+      'Lo más rápido: en la foto de la portada, debajo de <b>"De guardia"</b> (y de <b>"Mantenimiento"</b> si hay alguien trabajando), el botón <b>"Gracias"</b> con las <b>manos juntas 🙏</b>. La primera vez del día que abrís la app aparece un globito que te invita ("¿Le das las gracias a Juan y Ana?") y se va solo. También se entra por <b>El barrio → Agradecer a quien trabaja</b>, por <b>"De guardia"</b> (botón <b>Agradecer</b>) o por el corazón de la tarjeta de alguien de mantenimiento en vivo.',
       'Elegí a quién. Por nombre aparecen quienes están trabajando <b>ahora</b> (cada guardia de turno y quien esté de mantenimiento en el barrio). Y <b>siempre</b>, estén o no en ese momento, los tres equipos: <b>toda la guardia</b> (también para un guardia que ya se fue), <b>la policía nocturna</b> (sin su nombre) y <b>el equipo de mantenimiento</b>.',
       'Tocá una frase hecha ("Gracias por la ayuda"…) o escribila con tus palabras (hasta 280 letras). El botón se prende recién cuando hay algo para mandar.',
       'Tocá <b>Mandar el agradecimiento</b>: suben corazones por la pantalla. Es <b>un agradecimiento por día</b>: después de mandarlo, el botón de la portada desaparece hasta mañana y los demás botones de agradecer dicen "Hoy ya agradeciste".',
     ]],
-    ['ojo', 'info', 'Quién lo ve', 'La persona (en la garita, o en su teléfono si es de mantenimiento), la garita, la supervisión y la Administración. Ningún otro vecino. Uno por día (a quien elijas). Se guarda un año. En la misma ventana ves los que mandaste.'],
+    ['ojo', 'info', 'Quién lo ve', 'La persona (en la garita, o en su teléfono si es de mantenimiento), la garita, la supervisión y la Administración. Ningún otro vecino. Uno por día (a quien elijas). Se guarda un año. En la misma ventana ves los que mandaste. Desde el 13-11-2026 también van en el <b>parte del turno</b> de la garita (cuántos, a quién, de qué vecino y lote) y en el <b>parte del día</b> de la persona de mantenimiento.'],
   ], ir:[['abrir', 'gracias', 'Agradecer a quien trabaja']] },
+  { id:'frase', icon:'edit', color:'brand', para:'vecinos', t:'Frase del día', s:'La pizarra de la portada: un vecino por día', b:[
+    ['p', 'Debajo de la foto de la portada hay una pizarra de acrílico. Cada día, <b>el primer vecino que graba</b> escribe ahí una frase motivadora para todo el barrio. A las <b>00:00</b> se borra sola.'],
+    ['pasos', [
+      '<b>Tocá la pizarra</b> (si está en blanco). Aparecen <b>Cancelar</b> y <b>✓ Grabar</b> y un contador de letras: hasta <b>140</b>.',
+      'Para cambiar el color, <b>tocá las fibras</b> del estante: se abren tres botoncitos (<b>negro, rojo y azul</b>). Podés mezclar colores en la misma frase.',
+      'Mientras escribís corregís libre, con el teclado o con el <b>borrador</b>: no se guarda nada hasta que tocás <b>✓ Grabar</b>. Si tocás Cancelar antes, no cuenta.',
+      'Al grabar queda firmada sola con tu nombre, la inicial de tu apellido y tu lote. Ya grabada, no se cambia.',
+    ]],
+    ['h', 'Si nadie escribe: la frase automática'],
+    ['p', 'Si a las <b>12:00</b> la pizarra sigue vacía (o el que escribió la borró), aparece sola una <b>frase automática del día</b>, firmada por su autor: <b>dos días de cada tres, de Albert Einstein o de Carl G. Jung</b> (solo frases con fuente comprobable), y el otro día un clásico (Séneca, Machado, Cervantes, el <i>Martín Fierro</i>…), un refrán o una frase del barrio. Dura 24 horas: queda hasta las 11:59 del día siguiente y a las 12:00 llega otra (la frase de un vecino, en cambio, se borra a las 00:00).'],
+    ['p', 'No ocupa el lugar de nadie: si querés escribir, <b>tocá la pizarra</b> (o el borrador) y la automática se va para que escribas la tuya.'],
+    ['h', 'Borrarla'],
+    ['p', 'Solo quien la escribió la puede borrar, tocando el <b>borrador</b>. Al borrarla, la pizarra queda libre para <b>otro</b> vecino y vos no podés volver a escribir hasta el día siguiente. Si la escribió otro vecino, nadie más puede escribir ni borrar hasta las 00:00.'],
+    ['ojo', 'info', 'Quién la ve', 'Los vecinos, la garita y la Administración ven la frase con la firma (nombre, inicial del apellido y lote). El hotel y la supervisión no. La garita y la Administración no escriben: es de los vecinos.'],
+  ] },
 
   { id:'ciudad', icon:'pin', color:'sky', para:'vecinos', t:'Ushuaia y servicios', s:'Lo de afuera que igual te toca', b:[
     ['lista', [
@@ -781,7 +796,7 @@ const MANUAL_CAPS = [
       'Con el botón del <b>mapita</b> al lado de la tarea, se abre el <b>mapa del barrio</b> y va derecho a donde está trabajando.',
       '<b>"Movimientos de hoy"</b> abre la lista completa con buscador (nombre, DNI o tarea) y todas las entradas, salidas y tareas del día.',
       'Si alguien figura adentro hace más de 12 horas, su tarjeta se pone amarilla: <b>"¿Se olvidaron de marcar la salida?"</b>.',
-      'Mientras haya alguien adentro, los vecinos (y el hotel) ven en su portada <b>"Mantenimiento trabajando en el barrio"</b>, y al tocarla, el mapa con lo que están haciendo y el nombre con la inicial del apellido (sin DNI, celular ni correo). Desaparece cuando marcás la salida del último.',
+      'Mientras haya alguien adentro, los vecinos ven en la foto de su portada la pastilla <b>"Mantenimiento"</b> (con los nombres, debajo de "De guardia"), y el hotel la banda <b>"Mantenimiento trabajando en el barrio"</b>; al tocarlas, el mapa con lo que están haciendo y el nombre con la inicial del apellido (sin DNI, celular ni correo). Desaparece cuando marcás la salida del último.',
       'La Administración ve la misma banda (en la garita en vivo) y puede agregar o editar, pero las entradas y salidas las marca solo la garita. La supervisión no ve esta lista: ve las entradas y salidas en la bitácora.']],
     ['h', 'El camión, los correos, el policía y la ronda'],
     ['lista', ['<b>Camión de la basura</b>: registrá la entrada (patente) y la salida. A todo el barrio le llega el aviso.',

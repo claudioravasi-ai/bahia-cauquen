@@ -279,6 +279,19 @@ function mantHero(){
       <span>${p.desde ? `desde ${hora(p.desde)} · <em data-mh-desde="${p.desde}">hace ${mantDur(Date.now() - p.desde)}</em>` : 'en el barrio'}</span></span>
     <span class="mi-cascos" aria-hidden="true">${cascos}${p.n > 4 ? `<b>+${p.n - 4}</b>` : ''}</span></button>`;
 }
+/* LA PASTILLA DE MANTENIMIENTO EN LA FOTO (13-11-2026, maqueta aprobada por
+   Claudio): igual a "De guardia" (mismo vidrio, misma medida, caritas), debajo
+   de ella. Reemplaza en la portada del vecino a la isla negra de arriba, que
+   sigue en la portada del hotel y de la garita. Abre "Mantenimiento en vivo". */
+const MP_COLORES = ['#f59e0b', '#10b981', '#3b82f6'];
+function mantPastilla(){
+  const p = mantPublico(); if (!p.n) return '';
+  const ps = typeof mvPersonas === 'function' ? mvPersonas() : [], ns = ps.map(x => String(x.nombre || '').split(' ')[0]).filter(Boolean);
+  const caras = Array.from({ length:Math.min(p.n, 3) }, (_, i) => `<i style="--c:${MP_COLORES[i]}">👷</i>`).join('');
+  const quienes = ns.length ? (ns.length > 2 ? ns.slice(0, 2).join(', ') + ' +' + (ns.length - 2) : ns.join(' y ')) : `${p.n} trabajando`;
+  return `<button type="button" class="guardia-hero mant-pastilla" data-a="mant-ver" aria-label="Mantenimiento trabajando en el barrio: ${esc(ns.length ? ns.join(', ') : plural(p.n, 'persona'))}${p.desde ? ', desde las ' + hora(p.desde) + ' h' : ''}. Ver">
+    <span class="gh-caras mp-caras">${caras}</span><span><b>Mantenimiento</b>${esc(quienes)}</span></button>`;
+}
 /* Tocar la isla abre "Mantenimiento en vivo" (el mapa con los trabajos y
    los mensajes): A['mant-ver'] está en js/mant-vivo.js. */
 

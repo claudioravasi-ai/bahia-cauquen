@@ -433,8 +433,11 @@ setInterval(() => { try { sincroGuardiaAhora(); } catch(e){} }, 60000);
 
 /* En la portada: debajo del DEA, las caritas de quienes están de guardia. */
 function guardiaHero(){
-  const g = guardiaAhora(); if (!g) return '';
-  if (!g.abierto || !g.guardias.length) return `<button class="guardia-hero sin" data-a="guardia-ver" aria-label="La guardia de la garita">${I('shield')}<span><b>Garita</b>Turno sin anotar</span></button>`;
+  /* 13-11-2026 (Claudio: "falta la de la guardia de la garita"): la pastilla está SIEMPRE, con la misma
+     medida y una carita, aunque todavía no haya un turno anotado (antes, sin el dato, desaparecía). */
+  const g = guardiaAhora();
+  if (!g || !g.abierto || !aLista(g.guardias).length) return `<button class="guardia-hero sin" data-a="guardia-ver" aria-label="La guardia de la garita: turno sin anotar">
+    <span class="gh-caras mp-caras"><i style="--c:#3b82f6">👮</i></span><span><b>Garita</b>Turno sin anotar</span></button>`;
   const ns = g.guardias.map(x => String(x.n).split(' ')[0]);
   return `<button class="guardia-hero" data-a="guardia-ver" aria-label="De guardia ahora en la garita: ${esc(g.guardias.map(x => x.n).join(', '))}. Ver la guardia">
     <span class="gh-caras">${g.guardias.slice(0, 3).map(x => `<i style="--c:${colorDe(x.n)}">${caraGuardia(x.n, x.look)}</i>`).join('')}</span>

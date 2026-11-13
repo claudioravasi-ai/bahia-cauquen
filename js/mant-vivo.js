@@ -758,6 +758,10 @@ function mvParteHtml(j, png = ''){
       ${comp.map(c => `<div style="padding:4px 0;border-bottom:1px solid #edf2f1"><b>${esc(c.nombre)}</b><div style="color:#56706c;font-size:11px">${c.sale ? `${hora(c.entra)} a ${hora(c.sale)} h` : `desde ${hora(c.entra)} h · sigue`} · ${mantDur(c.ms || 0)}</div></div>`).join('') || '<div style="color:#6c7d7a">—</div>'}
       <div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#0d6b66;margin:12px 0 6px">Mensajes · ${nMsj}</div>
       ${ch.length ? ch.map(c => `<div style="color:#35504c">${esc(c.con)}: ${c.n}</div>`).join('') : '<div style="color:#6c7d7a">Sin mensajes.</div>'}</td></tr></table>
+  ${(() => { /* 13-11-2026: los agradecimientos de los vecinos de ese día, a esta persona o a todo mantenimiento (js/gracias.js). */
+    const gs = typeof Gracias === 'undefined' ? [] : Gracias.todas().filter(x => x.para && x.para.t === 'mant' && isoDe(new Date(x.at)) === j.fecha
+      && (!x.para.n || (x.para.mid && x.para.mid === j.mid) || normTxt(x.para.n) === normTxt(j.nombre || ''))).sort((a, b) => a.at - b.at);
+    return gs.length ? `<div style="margin-top:12px"><div style="font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#c0265b;margin-bottom:6px">💛 Agradecimientos de los vecinos · ${gs.length}</div>${graciasCorreoHtml(gs)}</div>` : ''; })()}
   <div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:#f1f6f5;color:#56706c;font-size:10px">Parte generado solo por la app del barrio al marcar tu salida en la garita. Si algún dato no coincide, avisá a la garita o a la Administración. Tus datos los ven solo la garita y la Administración del barrio (Ley 25.326).</div></div>`;
 }
 /* El documento del PDF: una hoja A4 con márgenes chicos. */

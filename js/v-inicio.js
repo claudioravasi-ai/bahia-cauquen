@@ -1024,7 +1024,8 @@ A['novedad-al-pizarron'] = () => { cerrarHoja(); abrir('pizarron'); };
    sin buscarlo el día que hace falta. Desde el 09-10-2026 (pedido de
    Claudio) el corazón late y al tocarlo abre Emergencias, que salió de Tu casa. */
 const deaHero = () => { const lugar = /garita/i.test(Store.s.config.dea || '') || !Store.s.config.dea ? 'en la garita' : Store.s.config.dea;
-  return `<button class="dea-hero" data-a="abrir" data-v="emergencias" aria-label="DEA operativo ${esc(lugar)}. Abrir Emergencias">${I('heart')}<span><b>DEA operativo</b>${esc(lugar)}</span></button>`; };
+  /* 13-11-2026 (maqueta aprobada por Claudio): solo el corazón que late, más grande, con "DEA" en blanco adentro. */
+  return `<button class="dea-hero dea-solo" data-a="abrir" data-v="emergencias" aria-label="DEA operativo ${esc(lugar)}. Abrir Emergencias"><svg viewBox="0 0 64 58" aria-hidden="true"><path fill="#e11d2e" d="M32 56S4 39 1.6 21C.2 10 7.6 2 17 2c6.6 0 11.6 3.6 15 9 3.4-5.4 8.4-9 15-9 9.4 0 16.8 8 15.4 19C60 39 32 56 32 56z"/><text x="32" y="31" text-anchor="middle" font-family="system-ui,Arial,sans-serif" font-weight="900" font-size="17" fill="#fff" letter-spacing="1">DEA</text></svg></button>`; };
 /* El pie de la app: chico y en gris, para que esté pero no moleste.
    "by Claudio A. Ravasi" abre los términos de uso, los datos personales y
    el deslinde de responsabilidad. Hasta el 26-09 había además un renglón
@@ -1053,8 +1054,9 @@ R.inicio = {
        llenar. El sismo va debajo, a lo ancho de esa misma grilla. */
     const hero = `<div class="hero"><div class="foto" style="background-image:url('${Clima.portada()}')"></div>
       ${deaHero()}
-      ${typeof guardiaHero === 'function' ? guardiaHero() : ''}
-      ${typeof graciasBoton === 'function' ? graciasBoton() : ''}
+      ${(() => { /* 13-11-2026: las pastillas de vidrio en columna, con la misma medida: De guardia, Mantenimiento y Gracias. */
+        const ps = (typeof guardiaHero === 'function' ? guardiaHero() : '') + (typeof mantPastilla === 'function' ? mantPastilla() : '') + (typeof graciasBoton === 'function' ? graciasBoton() : '');
+        return ps ? `<div class="hero-pilas">${ps}</div>` : ''; })()}
       <div class="hero-centro">
         <div class="saludo">${saludo},</div>
         <h1>${esc(u.rol === 'vecino' ? u.nombre.split(' ')[0] : u.nombre)}</h1>
@@ -1107,7 +1109,7 @@ R.inicio = {
     return `${hero}
       <div class="inicio-lienzo">
         ${esAdmin() && typeof cabinaGarita === 'function' ? `<section class="bloque cg-bloque">${cabinaGarita(pvDatosTanda())}</section>` : ''}
-        ${typeof mantHero === 'function' ? mantHero() : ''}
+        ${typeof fraseDia === 'function' ? `<section class="bloque fd-bloque">${fraseDia()}</section>` : ''}
         ${typeof bloqueCuidado === 'function' ? bloqueCuidado() : ''}
         <section class="bloque dia-y-luz">
           <div>${sec('Próximos días')}${pron}</div>
@@ -2013,10 +2015,13 @@ function parteTurnoHtml(t, nota = ''){
   const lineaPol = p => `<p style="margin:0 0 8px"><b>${esc(p.nombre)}</b>${esc(pnCargoMat(p, '', ' · '))} · ingresó ${hora(p.entra)} h${p.sale ? ' · salió ' + hora(p.sale) + ' h' : p.paso ? ' · siguió en el turno siguiente' : ' · sigue en el barrio'}<br>
     ${p.rondas.length ? p.rondas.map((r, i) => `Ronda ${i + 1}${r.incompleta ? ' (INCOMPLETA)' : ''}: ${hora(r.inicio)}${r.fin ? ' a ' + hora(r.fin) + ' (' + minutos(r.inicio, r.fin) + ' min)' : ' · en curso'}${r.pasos.length ? ` · QR ${new Set(pasosDeRonda(r).map(x => x.punto)).size}/${puntosActivos().length}` : ''}`).join('<br>') : 'Sin rondas registradas.'}</p>`;
   const v = typeof vistoDe === 'function' ? vistoDe(t.id) : null;
+  /* 13-11-2026: los agradecimientos de los vecinos durante el turno (js/gracias.js). */
+  const grs = typeof Gracias !== 'undefined' ? Gracias.todas().filter(x => x.at >= t.at && x.at <= fin).sort((a, b) => a.at - b.at) : [];
   return Correo.plantilla(`Parte del turno ${t.turno}`, `
     ${t.cierreAuto ? '<p style="margin:0 0 12px;text-align:center;color:#6c7d7a">El turno se cerró al abrirse el siguiente.</p>' : ''}
     ${nota ? Correo.sector('Novedades para el turno siguiente', `<div style="white-space:pre-wrap">${esc(nota)}</div>`, '#b7790a') : ''}
     ${ps.length ? Correo.sector('Policía contratada', ps.map(lineaPol).join(''), '#2a3f8a') : ''}
+    ${grs.length ? Correo.sector('💛 Agradecimientos de los vecinos', graciasCorreoHtml(grs), '#c0265b') : ''}
     ${Correo.sector('Bitácora del turno', lineas.length ? `<table style="border-collapse:collapse;font-size:13px">${lineas.map(b => fila(hora(b.at), esc(b.texto || ''))).join('')}</table>` : 'Sin anotaciones.')}
     ${v ? Correo.sector('Visto de la supervisión de garita', `${v.estado === 'obs' ? 'Con observaciones' : 'Sin observaciones'} · ${esc(v.nombre || '')} · ${fechaCorta(isoDe(new Date(v.at)))} ${hora(v.at)} h${v.obs ? '<br>' + esc(v.obs) : ''}`, v.estado === 'obs' ? '#b7790a' : '#1b8f5a') : ''}
     <p style="font-size:12px;color:#6c7d7a;margin:0;text-align:center">Lo mandó la app de la garita al cerrarse el turno. Tiene datos personales: es para uso interno de la Administración (Ley 25.326, art. 10).</p>`,
