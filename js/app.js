@@ -2355,8 +2355,10 @@ function piezasQueFaltan(){
 }
 /* Borra todo lo guardado del programa (no los datos del barrio) y recarga. */
 async function tirarLoGuardado(){
-  try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch(e){}
-  try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); } catch(e){}
+  /* 13-11-2026 · Solo lo del barrio: HRU comparte la dirección y no se toca. */
+  const aca = new URL('./', location.href).href;
+  try { const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith('bhc-')).map(k => caches.delete(k))); } catch(e){}
+  try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.filter(r => r.scope.startsWith(aca)).map(r => r.unregister())); } catch(e){}
 }
 async function programaCompleto(){
   const falta = piezasQueFaltan();

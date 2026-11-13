@@ -489,7 +489,7 @@ function cartelFijo(p){
   if (!hoyLeToca(p)) return `${I('calendar')}Hoy no le toca · viene ${aLista(p.dias).map(d => DIAS[d]).join(', ')}`;
   if (l && l.in) return `${I('check')}Hoy entró ${hora(l.in)} h${l.out ? ' · salió ' + hora(l.out) + ' h' : ''}`;
   /* Un fijo que hoy no vino sigue vigente: no es "Cancelado" (el cartel lo dice; el estado del pase de hoy no se muestra acá). */
-  return ahoraMin() > minutosDe(p.hasta) ? `${I('clock')}Hoy le tocaba · ${esc(p.desde)} a ${esc(p.hasta)} h · no vino` : `${I('clock')}Hoy le toca · ${esc(p.desde)} a ${esc(p.hasta)} h`;
+  return ahoraMin() > finFranja(p.desde, p.hasta) ? `${I('clock')}Hoy le tocaba · ${esc(p.desde)} a ${esc(p.hasta)} h · no vino` : `${I('clock')}Hoy le toca · ${esc(p.desde)} a ${esc(p.hasta)} h`;
 }
 R.frecuentes = {
   titulo:'Ingresos frecuentes', icon:'qr', color:'brand', ancha:true, sub:'Proveedores y personal que entran siempre, con QR fijo',

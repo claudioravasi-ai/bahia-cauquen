@@ -36,12 +36,14 @@ const linea = t => salida.textContent += '\n' + t;
 r.addEventListener('click', async () => {
   r.disabled = true; salida.textContent = 'Limpiando…';
   try {
-    const regs = await navigator.serviceWorker.getRegistrations();
+    /* 13-11-2026 · Solo lo del barrio: HRU comparte la dirección y no se toca. */
+    const aca = new URL('./', location.href).href;
+    const regs = (await navigator.serviceWorker.getRegistrations()).filter(g => g.scope.startsWith(aca));
     for (const g of regs){ await g.unregister(); linea('Dado de baja: ' + (g.active ? g.active.scriptURL : 'service worker')); }
     if (!regs.length) linea('No había service worker.');
   } catch(e){ linea('Service worker: ' + e.message); }
   try {
-    const ks = await caches.keys();
+    const ks = (await caches.keys()).filter(k => k.startsWith('bhc-'));
     for (const k of ks){ await caches.delete(k); linea('Borrado el guardado: ' + k); }
     if (!ks.length) linea('No había nada guardado.');
   } catch(e){ linea('Guardados: ' + e.message); }

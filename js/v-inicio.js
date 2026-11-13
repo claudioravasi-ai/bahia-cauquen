@@ -25,6 +25,14 @@ const TIPOS_PASE = {
   invitado:  { n:'Invitado a evento', icon:'flame', c:'wood' },
 };
 const ESTADO_TXT = { esperado:'Esperado', adentro:'Adentro', salio:'Salió', vencido:'Vencido', cancelado:'Cancelado', futuro:'Próximo', noingreso:'No ingresó', nollego:'Cancelado · no ingresó' };
+/* 13-11-2026 · Franja que cruza la medianoche (por ejemplo, de 19:30 a 01:15): la hora de
+   fin cuenta como del día siguiente. Antes, con la fin «menor» que el inicio, la visita no
+   pasaba nunca a "No ingresó" y la garita la veía "fuera del horario" toda la noche. */
+function finFranja(desde, hasta){ const d = minutosDe(desde), h = minutosDe(hasta); return h > d ? h : h + 1440; }
+function dentroDeFranja(m, desde, hasta, margen = 0){
+  const d = minutosDe(desde), h = finFranja(desde, hasta);
+  return (m >= d - margen && m <= h + margen) || (h >= 1440 && m + 1440 <= h + margen);
+}
 function paseValidoEn(p, iso){
   if (p.cancelado) return false;
   if (p.dias && p.dias.length) return iso >= p.fecha && iso <= (p.fechaFin || p.fecha) && p.dias.includes(fechaDe(iso).getDay());
@@ -43,8 +51,8 @@ function estadoPase(p, iso = hoyISO()){
      no ingresó", se anota en la bitácora (regla visita-no-ingreso) y sale
      de la pantalla de la garita y de la supervisión (pasesEnPantalla). Si
      igual aparece, la garita la busca y tiene "Pase vencido". */
-  const d = minutosDe(p.desde), h = minutosDe(p.hasta);
-  if (iso === hoyISO() && h > d){ const m = ahoraMin();
+  const d = minutosDe(p.desde), h = finFranja(p.desde, p.hasta);
+  if (iso === hoyISO() && p.desde && p.hasta && p.desde !== p.hasta){ const m = ahoraMin();
     if (m > h) return 'nollego';
     if (m > d + 120) return 'noingreso'; }
   return 'esperado';
@@ -3615,7 +3623,7 @@ function validar(q){
   const restr = pases.map(p => restriccionPara(p.nombre, p.dni, p.patente)).find(Boolean) || restriccionPara('', dig, pat);
   hoja('Resultado', `${avisoRestriccion(restr)}${vecino ? aviso('ok', 'car', `Vehículo de vecino: ${esc(vecino.casa)}`, `${esc(vecino.nombre)} · ${esc((vecino.vehiculos.find(v => normPatente(v.patente) === pat) || {}).modelo || '')}`) : ''}
     ${pases.map(p => {
-      const valido = paseValidoEn(p, hoy), est = estadoPase(p), dentroHora = ahoraMin() >= minutosDe(p.desde) - 30 && ahoraMin() <= minutosDe(p.hasta) + 30;
+      const valido = paseValidoEn(p, hoy), est = estadoPase(p), dentroHora = dentroDeFranja(ahoraMin(), p.desde, p.hasta, 30);
       return `${!valido ? aviso('danger', 'alert', 'Este pase no es para hoy', p.dias?.length ? `Días: ${p.dias.map(d => DIAS[d]).join(', ')}` : `Es para el ${fechaLarga(p.fecha)}`) : !dentroHora && est === 'esperado' ? aviso('warn', 'clock', 'Fuera del horario anunciado', `${p.desde} a ${p.hasta}`) : ''}
         ${(() => { if (p.tipo !== 'proveedor') return ''; const pr = Store.s.proveedores.find(x => normTxt(p.nombre).includes(normTxt(x.empresa)) || normTxt(x.empresa).includes(normTxt(p.nombre)));
           if (!pr) return aviso('warn', 'box', 'Proveedor no habilitado', 'No figura en la lista de proveedores. Pedí la constancia de ART.');

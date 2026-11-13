@@ -1703,7 +1703,7 @@ function hotelCodigo(codigo){
     return true; }
   const p = hotelProvs().find(x => String(x.codigo).toUpperCase() === codigo);
   if (p){ const [c, t] = estadoProv(p), hoy = new Date(), dias = aLista(p.dias).map(Number), m = ahoraMin();
-    const hoyNo = dias.length && !dias.includes(hoy.getDay()), fuera = p.desde && p.hasta && (m < minutosDe(p.desde) - 30 || m > minutosDe(p.hasta) + 30);
+    const hoyNo = dias.length && !dias.includes(hoy.getDay()), fuera = p.desde && p.hasta && !dentroDeFranja(m, p.desde, p.hasta, 30);
     hoja('Proveedor del hotel', `${c === 'danger' ? aviso('danger', 'x', 'NO HABILITADO', esc(t)) : hoyNo ? aviso('warn', 'calendar', 'Hoy no es su día', aLista(p.dias).map(d => DIAS[d]).join(', ')) : fuera ? aviso('warn', 'clock', 'Fuera de su horario', `${esc(p.desde)} a ${esc(p.hasta)} h`) : aviso(c, c === 'ok' ? 'check' : 'alert', 'Habilitado', esc(t))}
       <div class="card"><b style="font-size:17px">${esc(p.empresa)}</b><div class="muted small">${esc(p.rubro || '')} → ${HOTEL_NOMBRE}${p.patentes ? ' · ' + esc(p.patentes) : ''}</div>${p.personal ? `<p class="small" style="margin:8px 0 0;white-space:pre-wrap"><b>Personal:</b>\n${esc(p.personal)}</p>` : ''}</div>
       ${c !== 'danger' ? `<div class="btns"><button class="btn btn-ok grow" data-a="hprov-mov" data-id="${esc(p.id)}" data-v="in">${I('login')}Registrar ingreso</button><button class="btn btn-sec grow" data-a="hprov-mov" data-id="${esc(p.id)}" data-v="out">${I('logout')}Registrar salida</button></div>` : ''}`);
