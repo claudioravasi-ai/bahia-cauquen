@@ -7357,3 +7357,22 @@ textarea.crece::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ell
 .fd-texto .fd-frase.fd-auto{margin-right:27%}
 /* 13-11-2026 (SKILL DISEÑO): la zona para tocar las fibras medía 24 px de alto en un celular chico; más alta para el dedo. */
 .fd-fibras{top:70%;height:19%}
+
+/* 13-11-2026 · LA PIZARRA COMO LA FOTO ORIGINAL (Claudio: "el original se ve real, en una pared de una
+   oficina; así quiero que se vea"): la foto entera y vertical, con la oficina; las letras de marcador se
+   funden con el acrílico y proyectan su sombra en la pared (el acrílico está separado de la pared, con
+   la luz de la ventana de la derecha); renglones con aire, como en el original. */
+.fd-cartel{max-width:440px;aspect-ratio:900/1200;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.14)}
+.fd-texto{width:600px;height:720px;mix-blend-mode:multiply}
+.fd-texto .fd-frase,.fd-texto .fd-lapiz{font-size:60px;line-height:1.42;letter-spacing:.04em;word-spacing:.08em;margin-right:4%!important;
+  text-shadow:0 0 .8px rgba(10,30,100,.55),-40px 7px 3px rgba(55,60,66,.17)}
+.fd-texto .fd-frase.fd-auto{margin-right:4%}
+.fd-firma span,.fd-firma small{text-shadow:-28px 5px 3px rgba(55,60,66,.12)}
+.fd-borrador{left:37%;top:89%;width:20%;height:10%}
+.fd-fibras{left:56%;top:85.5%;width:20%;height:9.5%}
+.fd-colores{right:20%;bottom:15%}
+/* Ajuste al compararlo con la foto: todo en mayúsculas del mismo alto (como el original), tinta azul
+   de marcador y la sombra en la pared más suave y difusa (antes parecía texto repetido). */
+.fd-texto .fd-frase,.fd-texto .fd-lapiz{text-transform:uppercase;letter-spacing:.03em;
+  text-shadow:0 0 .8px rgba(10,30,100,.5),-30px 6px 7px rgba(55,60,66,.10)}
+.fd-texto .fd-az{color:#2350bf}

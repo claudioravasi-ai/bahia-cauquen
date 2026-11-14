@@ -19,7 +19,7 @@
      día. Ningún otro vecino puede escribir ni borrar hasta las 00:00.
    · A las 00:00 se borra sola (cada día es un registro nuevo, fd-<día>).
    · La frase y la firma se deforman como el acrílico de la foto (lienzo
-     virtual de 800 x 340 llevado a sus cuatro esquinas) y la letra se
+     virtual de 600 x 720 llevado a sus cuatro esquinas) y la letra se
      achica sola para no salirse.
 
    PROTECCIÓN DE DATOS (Ley 25.326)
@@ -34,7 +34,11 @@ const FD_MAX = 140;
 const FD_TINTAS = { az:'#1f4fb8', ne:'#1b1d22', ro:'#c81e1e' };
 const FD_NOMBRE = { az:'azul', ne:'negra', ro:'roja' };
 /* Las cuatro esquinas del acrílico en la foto (fracción del ancho y del alto). */
-const FD_ESQ = [[.10, .18], [.86, .27], [.86, .70], [.11, .80]];
+/* (13-11-2026, Claudio: "el original se ve real, en la pared de una oficina; así lo quiero") la foto es la
+   original entera, vertical, con la oficina a la derecha, y el texto borrado con cuidado. Las esquinas son
+   las de la zona donde estaba escrita la frase original (con la misma perspectiva). Lienzo de 600 x 720. */
+const FD_W = 600, FD_H = 720;
+const FD_ESQ = [[.222, .179], [.794, .221], [.794, .667], [.222, .704]];
 
 /* =========================================================
    LA FRASE AUTOMÁTICA (pedido de Claudio, 13-11-2026): "si hasta las 11:59 no
@@ -247,14 +251,14 @@ function fdPisaFirma(C, el){
 function fdAjustar(){
   const C = document.getElementById('fdTexto'), el = C && C.querySelector('.fd-frase, .fd-lapiz'); if (!el) return;
   const tr = C.style.transform; C.style.transform = 'none';
-  let f = 78; el.style.setProperty('font-size', f + 'px', 'important');
-  while (f > 34 && (el.scrollHeight > 285 || fdPisaFirma(C, el))){ f -= 2; el.style.setProperty('font-size', f + 'px', 'important'); }
+  let f = 96; el.style.setProperty('font-size', f + 'px', 'important');
+  while (f > 40 && (el.scrollHeight > FD_H * .86 || fdPisaFirma(C, el))){ f -= 2; el.style.setProperty('font-size', f + 'px', 'important'); }
   C.style.transform = tr;
 }
 Frase.despues = function(){
   const F = document.getElementById('fdCartel'); if (!F) return;
   const C = document.getElementById('fdTexto');
-  const pon = () => { const W = F.clientWidth, H = F.clientHeight; if (!W || !C) return; C.style.transform = fdHomografia(800, 340, FD_ESQ.flatMap(([x, y]) => [x * W, y * H])); };
+  const pon = () => { const W = F.clientWidth, H = F.clientHeight; if (!W || !C) return; C.style.transform = fdHomografia(FD_W, FD_H, FD_ESQ.flatMap(([x, y]) => [x * W, y * H])); };
   pon(); fdAjustar();
   if (!F._ro && typeof ResizeObserver !== 'undefined'){ F._ro = new ResizeObserver(pon); F._ro.observe(F); }
 };
